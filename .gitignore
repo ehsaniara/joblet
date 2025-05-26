@@ -23,3 +23,11 @@ go.work.sum
 
 # env file
 .env
+
+/**/*.iml
+/target
+/.idea
+
+# applicatioin specific
+certs
+tmp
