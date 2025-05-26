@@ -1,0 +1,37 @@
+[Unit]
+Description=Job Worker Service
+After=network.target
+
+[Service]
+ExecStart=/opt/job-worker/job-worker
+Restart=always
+RestartSec=10s
+User=root
+Group=root
+Environment=PATH=/usr/bin:/usr/local/bin
+WorkingDirectory=/opt/job-worker
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+
+# Ensure using systemd's terminal features
+TTYReset=yes
+TTYVHangup=yes
+
+# Add capability to manage cgroups
+AmbientCapabilities=CAP_SYS_ADMIN
+
+# Restart behavior
+StartLimitIntervalSec=60s
+StartLimitBurst=5
+
+# Add debug environment variables
+Environment=GODEBUG=gctrace=1,madvdontneed=1
+
+# Add environment variable to control logging
+Environment=JOB_WORKER_LOG_LEVEL=debug
+
+ExecStopPost=/bin/bash -c 'for cg in $(find /sys/fs/cgroup -name "job-*" -type d); do rmdir "$cg" 2>/dev/null || true; done'
+
+[Install]
+WantedBy=multi-user.target

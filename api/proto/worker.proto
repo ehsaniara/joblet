@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+option go_package = "./";
+
+package job_worker;
+
+message Job{
+  string id = 1;
+  string command = 2;
+  repeated string args = 3;
+  int32 maxCPU = 4;
+  int32 maxMemory = 5;
+  int32 maxIOBPS = 6;
+  string status = 7;
+  int32 pid = 8;
+  string cgroupPath = 9;
+  string startTime = 10;
+  string endTime = 11;
+  int32 exitCode = 12;
+}
+
+service JobService{
+  rpc CreateJob(Job) returns (Job){}
+  rpc GetJob(JobReq) returns (Job){}
+  rpc StopJob(JobReq) returns (Job){}
+  rpc GetJobs(EmptyRequest) returns (Jobs){}
+  rpc GetJobsStream(JobReq) returns (stream DataChunk);
+}
+
+message Jobs{
+  repeated Job jobs = 1;
+}
+
+message DataChunk {
+  bytes payload = 1;
+}
+
+message JobReq{
+  string id = 1;
+}
+
+message EmptyRequest {}
