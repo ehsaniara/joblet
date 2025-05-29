@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"job-worker/internal/config"
+	"job-worker/config"
 	"log"
 	"os"
 	"os/signal"

@@ -2,7 +2,7 @@ package task
 
 import (
 	pb "job-worker/api/gen"
-	"job-worker/internal/config"
+	"job-worker/config"
 	"sync"
 )
 
