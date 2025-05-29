@@ -1,5 +1,5 @@
 package config
 
-var (
+const (
 	CgroupsBaseDir = "/sys/fs/cgroup"
 )

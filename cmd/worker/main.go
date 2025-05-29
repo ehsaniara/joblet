@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"job-worker/pkg/config"
+	"job-worker/internal/config"
 	"log"
 	"os"
 	"os/signal"
@@ -11,7 +11,6 @@ import (
 
 func main() {
 
-	// Check if cgroups are available
 	if _, err := os.Stat(config.CgroupsBaseDir); os.IsNotExist(err) {
 		log.Fatalf("[ERROR] Cgroups not available at %s", config.CgroupsBaseDir)
 	}
