@@ -1,26 +1,74 @@
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	pb "job-worker/api/gen"
 	"job-worker/internal/config"
+	auth2 "job-worker/internal/worker/auth"
 	"job-worker/internal/worker/interfaces"
 	"job-worker/pkg/logger"
 	"net"
+	"os"
 )
 
 const (
+	serverCertPath = "./certs/server-cert.pem"
+	serverKeyPath  = "./certs/server-key.pem"
+	caCertPath     = "./certs/ca-cert.pem"
+
 	serverAddress = "0.0.0.0:50051"
 )
 
 func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 
-	serverLogger.Info("initializing gRPC server", "address", serverAddress, "tlsEnabled", false)
+	serverLogger.Info("initializing gRPC server", "address", serverAddress, "tlsEnabled", true)
 
-	// gRPC server options
+	serverLogger.Debug("loading server certificates", "certPath", serverCertPath, "keyPath", serverKeyPath)
+
+	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
+	if err != nil {
+		serverLogger.Error("failed to load server cert/key", "certPath", serverCertPath, "keyPath", serverKeyPath, "error", err)
+		return nil, fmt.Errorf("failed to load server cert/key: %w", err)
+	}
+
+	serverLogger.Debug("server certificate loaded successfully")
+
+	serverLogger.Debug("loading CA certificate", "caPath", caCertPath)
+
+	caCert, err := os.ReadFile(caCertPath)
+	if err != nil {
+		serverLogger.Error("failed to read CA cert", "caPath", caCertPath, "error", err)
+		return nil, fmt.Errorf("failed to read CA cert: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(caCert); !ok {
+		serverLogger.Error("failed to add CA cert to pool")
+		return nil, fmt.Errorf("failed to add CA cert to pool")
+	}
+
+	serverLogger.Debug("CA certificate loaded successfully")
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    certPool,
+		MinVersion:   tls.VersionTLS13,
+	}
+
+	creds := credentials.NewTLS(tlsConfig)
+
+	serverLogger.Info("TLS configuration completed",
+		"clientAuth", "RequireAndVerifyClientCert",
+		"minTLSVersion", "1.3")
+
 	grpcOptions := []grpc.ServerOption{
+		grpc.Creds(creds),
 		grpc.MaxRecvMsgSize(config.MaxRecvMsgSize),
 		grpc.MaxSendMsgSize(config.MaxSendMsgSize),
 		grpc.MaxHeaderListSize(uint32(config.MaxHeaderListSize)),
@@ -33,7 +81,10 @@ func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) 
 
 	grpcServer := grpc.NewServer(grpcOptions...)
 
-	jobService := NewJobServiceServer(jobStore, jobWorker)
+	auth := auth2.NewGrpcAuthorization()
+	serverLogger.Debug("authorization module initialized")
+
+	jobService := NewJobServiceServer(auth, jobStore, jobWorker)
 	pb.RegisterJobServiceServer(grpcServer, jobService)
 
 	serverLogger.Info("job service registered successfully")
@@ -49,7 +100,7 @@ func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) 
 	serverLogger.Info("TCP listener created successfully", "address", serverAddress, "network", "tcp")
 
 	go func() {
-		serverLogger.Info("starting gRPC server", "address", serverAddress, "ready", true)
+		serverLogger.Info("starting TLS gRPC server", "address", serverAddress, "ready", true)
 
 		if serveErr := grpcServer.Serve(lis); serveErr != nil {
 			serverLogger.Error("gRPC server stopped with error", "error", serveErr)
@@ -58,7 +109,7 @@ func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) 
 		}
 	}()
 
-	serverLogger.Info("gRPC server initialization completed", "address", serverAddress, "tlsEnabled", false, "authRequired", true)
+	serverLogger.Info("gRPC server initialization completed", "address", serverAddress, "tlsEnabled", true, "authRequired", true)
 
 	return grpcServer, nil
 }

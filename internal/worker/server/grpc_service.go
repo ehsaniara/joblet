@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/status"
 	pb "job-worker/api/gen"
 	"job-worker/internal/worker/adapters"
+	auth2 "job-worker/internal/worker/auth"
 	"job-worker/internal/worker/interfaces"
 	"job-worker/internal/worker/mappers"
 	_errors "job-worker/pkg/errors"
@@ -16,13 +17,15 @@ import (
 
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
+	auth      auth2.GrpcAuthorization
 	jobStore  interfaces.Store
 	jobWorker interfaces.JobWorker
 	logger    *logger.Logger
 }
 
-func NewJobServiceServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore interfaces.Store, jobWorker interfaces.JobWorker) *JobServiceServer {
 	return &JobServiceServer{
+		auth:      auth,
 		jobStore:  jobStore,
 		jobWorker: jobWorker,
 		logger:    logger.WithField("component", "grpc-service"),
@@ -40,6 +43,11 @@ func (s *JobServiceServer) CreateJob(ctx context.Context, createJobReq *pb.Creat
 	)
 
 	requestLogger.Info("create job request received")
+
+	if err := s.auth.Authorized(ctx, auth2.CreateJobOp); err != nil {
+		requestLogger.Warn("authorization failed", "error", err)
+		return nil, err
+	}
 
 	startTime := time.Now()
 	newJob, err := s.jobWorker.StartJob(ctx, createJobReq.Command, createJobReq.Args, createJobReq.MaxCPU, createJobReq.MaxMemory, createJobReq.MaxIOBPS)
@@ -61,6 +69,11 @@ func (s *JobServiceServer) GetJob(ctx context.Context, req *pb.GetJobReq) (*pb.G
 
 	requestLogger.Debug("get job request received")
 
+	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+		requestLogger.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
 	job, exists := s.jobStore.GetJob(req.GetId())
 	if !exists {
 		requestLogger.Warn("job not found")
@@ -76,6 +89,11 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 	requestLogger := s.logger.WithFields("operation", "StopJob", "jobId", req.GetId())
 
 	requestLogger.Info("stop job request received")
+
+	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
+		requestLogger.Warn("authorization failed", "error", err)
+		return nil, err
+	}
 
 	startTime := time.Now()
 	if err := s.jobWorker.StopJob(ctx, req.GetId()); err != nil {
@@ -100,6 +118,11 @@ func (s *JobServiceServer) GetJobsStream(req *pb.GetJobsStreamReq, stream pb.Job
 	requestLogger := s.logger.WithFields("operation", "GetJobsStream", "jobId", req.GetId())
 
 	requestLogger.Info("job stream request received")
+
+	if err := s.auth.Authorized(stream.Context(), auth2.StreamJobsOp); err != nil {
+		requestLogger.Warn("authorization failed", "error", err)
+		return err
+	}
 
 	existingLogs, isRunning, err := s.jobStore.GetOutput(req.GetId())
 	if err != nil {
