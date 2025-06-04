@@ -1,117 +1,82 @@
 #!/bin/bash
 
-# not in mac os
+set -e
+
+echo "🔐 Generating certificates for Job Worker..."
+
 if [ "$(uname)" = "Linux" ]; then
-    echo "Running on Linux"
-
-    mkdir -p /opt/job-worker/certs
-
-    cd /opt/job-worker/certs
+    CERT_DIR="/opt/job-worker/certs"
+    echo "📁 Using production cert directory: $CERT_DIR"
 else
-    echo "For Dev"
-
-    mkdir -p ../certs
-
-    cd ../certs
+    CERT_DIR="./certs"
+    echo "📁 Using development cert directory: $CERT_DIR"
 fi
 
-# CA cert
+mkdir -p "$CERT_DIR"
+cd "$CERT_DIR"
+
+echo "🏛️  Generating CA certificate..."
+
 openssl genrsa -out ca-key.pem 4096
 
-openssl req -new -x509 -days 1095 -key ca-key.pem -out ca-cert.pem -subj "/C=US/ST=State/L=City/O=Ehsaniara/OU=Security/CN=JobWorker-CA"
+openssl req -new -x509 -days 1095 -key ca-key.pem -out ca-cert.pem -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=CA/CN=JobWorker-CA"
 
-# Server cert
+echo "🖥️  Generating server certificate..."
+
 openssl genrsa -out server-key.pem 2048
 
-openssl req -new -key server-key.pem -out server.csr -subj "/C=US/ST=State/L=City/O=Ehsaniara/OU=Security/CN=job-worker.ehsaniara.com"
+openssl req -new -key server-key.pem -out server.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=Server/CN=job-worker-server"
 
-# SAN (Subject Alternative Names)
-cat > server-ext.cnf << EOF
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
+openssl x509 -req -days 365 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem
 
-[req_distinguished_name]
+echo "👑 Generating admin client certificate..."
 
-[v3_req]
-basicConstraints = CA:FALSE
-keyUsage = digitalSignature, keyEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = job-worker.ehsaniara.com
-DNS.2 = job-worker
-IP.1 = 192.168.1.161
-IP.2 = 0.0.0.0
-EOF
-
-openssl x509 -req -days 365 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -extensions v3_req -extfile server-ext.cnf
-
-openssl verify -CAfile ca-cert.pem server-cert.pem
-
-# Admin Client cert
 openssl genrsa -out admin-client-key.pem 2048
 
-openssl req -new -key admin-client-key.pem -out admin-client.csr -subj "/C=US/ST=State/L=City/O=Ehsaniara/OU=Admin/CN=job-worker-admin-client"
+openssl req -new -key admin-client-key.pem -out admin-client.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=admin/CN=admin-client"
 
-cat > admin-client-ext.cnf << EOF
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
+openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out admin-client-cert.pem
 
-[req_distinguished_name]
+echo "👁️  Generating viewer client certificate..."
 
-[v3_req]
-basicConstraints = CA:FALSE
-keyUsage = digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth
-subjectAltName = @alt_names
-
-[alt_names]
-# Using DNS entry to embed role information
-DNS.1 = admin.job-worker-client.local
-EOF
-
-openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out admin-client-cert.pem -extensions v3_req -extfile admin-client-ext.cnf
-
-openssl verify -CAfile ca-cert.pem admin-client-cert.pem
-
-# Viewer Client cert
 openssl genrsa -out viewer-client-key.pem 2048
 
-openssl req -new -key viewer-client-key.pem -out viewer-client.csr -subj "/C=US/ST=State/L=City/O=Ehsaniara/OU=Viewer/CN=job-worker-viewer-client"
+openssl req -new -key viewer-client-key.pem -out viewer-client.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=viewer/CN=viewer-client"
 
-cat > viewer-client-ext.cnf << EOF
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
+openssl x509 -req -days 365 -in viewer-client.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out viewer-client-cert.pem
 
-[req_distinguished_name]
+echo "🔍 Verifying certificates..."
 
-[v3_req]
-basicConstraints = CA:FALSE
-keyUsage = digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth
-subjectAltName = @alt_names
-
-[alt_names]
-# Using DNS entry to embed role information
-DNS.1 = viewer.job-worker-client.local
-EOF
-
-openssl x509 -req -days 365 -in viewer-client.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out viewer-client-cert.pem -extensions v3_req -extfile viewer-client-ext.cnf
-
+openssl verify -CAfile ca-cert.pem server-cert.pem
+openssl verify -CAfile ca-cert.pem admin-client-cert.pem
 openssl verify -CAfile ca-cert.pem viewer-client-cert.pem
 
+echo "🔒 Setting secure permissions..."
 
-# server certs
-chmod 600 server-key.pem ca-key.pem
-chmod 644 server-cert.pem ca-cert.pem
+chmod 600 *.pem  # All private keys and certs readable only by owner
+chmod 644 ca-cert.pem server-cert.pem admin-client-cert.pem viewer-client-cert.pem  # Certs can be world-readable
 
-# client certs
-chmod 600 admin-client-key.pem viewer-client-key.pem
-chmod 644 admin-client-cert.pem viewer-client-cert.pem
+echo "🧹 Cleaning up temporary files..."
 
-rm -f *.csr *.cnf
+rm -f *.csr *.srl
 
+echo "✅ Certificate generation complete!"
+echo ""
+echo "📋 Generated files:"
+echo "   ca-cert.pem           - CA certificate (public)"
+echo "   ca-key.pem            - CA private key (keep secure!)"
+echo "   server-cert.pem       - Server certificate"
+echo "   server-key.pem        - Server private key"
+echo "   admin-client-cert.pem - Admin client certificate (OU=admin)"
+echo "   admin-client-key.pem  - Admin client private key"
+echo "   viewer-client-cert.pem- Viewer client certificate (OU=viewer)"
+echo "   viewer-client-key.pem - Viewer client private key"
+echo ""
+echo "🚀 Ready to use with Job Worker service!"
+
+if command -v openssl >/dev/null 2>&1; then
+    echo ""
+    echo "🔍 Certificate details:"
+    echo "Admin client OU: $(openssl x509 -in admin-client-cert.pem -noout -subject | grep -o 'OU=[^/]*' | cut -d= -f2)"
+    echo "Viewer client OU: $(openssl x509 -in viewer-client-cert.pem -noout -subject | grep -o 'OU=[^/]*' | cut -d= -f2)"
+fi
