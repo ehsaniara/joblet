@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"google.golang.org/grpc"
 	"job-worker/internal/config"
 	"job-worker/internal/worker"
+	"job-worker/internal/worker/server"
 	"job-worker/internal/worker/store"
 	"job-worker/pkg/logger"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -33,7 +36,7 @@ func main() {
 	appLogger.Debug("goroutine monitoring started")
 
 	s := store.New()
-	_ = worker.New(s)
+	w := worker.New(s)
 	appLogger.Info("worker and store initialized")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -42,15 +45,59 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
+	var grpcServer *grpc.Server
+	serverStarted := make(chan error, 1)
+
+	go func() {
+		appLogger.Info("starting JobService gRPC server", "address", ":50051")
+		var err error
+		grpcServer, err = server.StartGRPCServer(s, w)
+		serverStarted <- err
+	}()
+
 	select {
+	case err := <-serverStarted:
+		if err != nil {
+			appLogger.Fatal("failed to start server", "error", err)
+		}
+		appLogger.Info("gRPC server started successfully")
 
 	case sig := <-sigChan:
 		appLogger.Info("received shutdown signal", "signal", sig)
 		cancel()
 		return
-	case <-ctx.Done():
-		cancel()
 	}
 
+	go func() {
+		sig := <-sigChan
+		appLogger.Info("received shutdown signal, initiating graceful shutdown", "signal", sig)
+		cancel()
+	}()
+
 	<-ctx.Done()
+
+	appLogger.Info("starting graceful shutdown")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if grpcServer != nil {
+		appLogger.Info("stopping gRPC server")
+
+		serverStopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(serverStopped)
+		}()
+
+		select {
+		case <-serverStopped:
+			appLogger.Info("gRPC server stopped gracefully")
+		case <-shutdownCtx.Done():
+			appLogger.Warn("gRPC server shutdown timeout, forcing stop")
+			grpcServer.Stop()
+		}
+	}
+
+	appLogger.Info("server gracefully stopped")
 }

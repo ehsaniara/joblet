@@ -13,4 +13,8 @@ const (
 
 	// CleanupTimeout timeout for the cleanup operation
 	CleanupTimeout = 5 * time.Second
+
+	MaxRecvMsgSize    = 512 * 1024      // 512KB
+	MaxSendMsgSize    = 4 * 1024 * 1024 // 4MB
+	MaxHeaderListSize = 1 * 1024 * 1024 // 1MB
 )
