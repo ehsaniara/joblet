@@ -47,7 +47,7 @@ func NewJobClient(serverAddr string) (*JobClient, error) {
 		Certificates: []tls.Certificate{clientCert},
 		RootCAs:      certPool,
 		MinVersion:   tls.VersionTLS13,
-		ServerName:   "job-worker.ehsaniara.com",
+		ServerName:   "job-worker",
 	}
 
 	creds := credentials.NewTLS(tlsConfig)
