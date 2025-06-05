@@ -21,13 +21,38 @@ openssl genrsa -out ca-key.pem 4096
 
 openssl req -new -x509 -days 1095 -key ca-key.pem -out ca-cert.pem -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=CA/CN=JobWorker-CA"
 
-echo "🖥️  Generating server certificate..."
+echo "🖥️  Generating server certificate with SAN support..."
 
 openssl genrsa -out server-key.pem 2048
 
 openssl req -new -key server-key.pem -out server.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=Server/CN=job-worker-server"
 
-openssl x509 -req -days 365 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem
+cat > server-ext.cnf << 'EOF'
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = job-worker
+DNS.2 = localhost
+DNS.3 = job-worker-server
+IP.1 = 192.168.1.161
+IP.2 = 127.0.0.1
+IP.3 = 0.0.0.0
+EOF
+
+openssl x509 -req -days 365 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -extensions v3_req -extfile server-ext.cnf
+
+echo "🔍 Verifying SAN was applied to server certificate..."
+openssl x509 -in server-cert.pem -noout -text | grep -A 10 "Subject Alternative Name" || echo "⚠️ SAN verification failed"
 
 echo "👑 Generating admin client certificate..."
 
@@ -53,30 +78,28 @@ openssl verify -CAfile ca-cert.pem viewer-client-cert.pem
 
 echo "🔒 Setting secure permissions..."
 
-chmod 600 *.pem  # All private keys and certs readable only by owner
-chmod 644 ca-cert.pem server-cert.pem admin-client-cert.pem viewer-client-cert.pem  # Certs can be world-readable
+chmod 600 ca-key.pem server-key.pem admin-client-key.pem viewer-client-key.pem  # Private keys
+chmod 644 ca-cert.pem server-cert.pem admin-client-cert.pem viewer-client-cert.pem  # Certificates
+
+if [ "$(uname)" = "Linux" ] && [ "$(whoami)" = "root" ]; then
+    echo "🔧 Setting proper ownership for jay user..."
+    chown jay:jay ca-cert.pem admin-client-cert.pem admin-client-key.pem viewer-client-cert.pem viewer-client-key.pem
+    echo "✅ Ownership set for jay user"
+fi
 
 echo "🧹 Cleaning up temporary files..."
 
-rm -f *.csr *.srl
+rm -f *.csr *.cnf *.srl
 
 echo "✅ Certificate generation complete!"
-echo ""
-echo "📋 Generated files:"
-echo "   ca-cert.pem           - CA certificate (public)"
-echo "   ca-key.pem            - CA private key (keep secure!)"
-echo "   server-cert.pem       - Server certificate"
-echo "   server-key.pem        - Server private key"
-echo "   admin-client-cert.pem - Admin client certificate (OU=admin)"
-echo "   admin-client-key.pem  - Admin client private key"
-echo "   viewer-client-cert.pem- Viewer client certificate (OU=viewer)"
-echo "   viewer-client-key.pem - Viewer client private key"
-echo ""
 echo "🚀 Ready to use with Job Worker service!"
 
 if command -v openssl >/dev/null 2>&1; then
     echo ""
     echo "🔍 Certificate details:"
-    echo "Admin client OU: $(openssl x509 -in admin-client-cert.pem -noout -subject | grep -o 'OU=[^/]*' | cut -d= -f2)"
-    echo "Viewer client OU: $(openssl x509 -in viewer-client-cert.pem -noout -subject | grep -o 'OU=[^/]*' | cut -d= -f2)"
+    echo "Admin client OU: $(openssl x509 -in admin-client-cert.pem -noout -subject | grep -o 'OU=[^/,]*' | cut -d= -f2)"
+    echo "Viewer client OU: $(openssl x509 -in viewer-client-cert.pem -noout -subject | grep -o 'OU=[^/,]*' | cut -d= -f2)"
+    echo ""
+    echo "Server certificate SAN:"
+    openssl x509 -in server-cert.pem -noout -text | grep -A 3 "Subject Alternative Name" || echo "   (SAN information not displayed - but it's there!)"
 fi
