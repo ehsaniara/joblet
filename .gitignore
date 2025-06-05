@@ -27,6 +27,7 @@ go.work.sum
 /**/*.iml
 /target
 /.idea
+/bin
 
 # applicatioin specific
 certs
