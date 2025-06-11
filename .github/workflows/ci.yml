@@ -1,0 +1,26 @@
+name: Ci
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - run: go mod download
+
+      - run: go vet ./...
+
+      - run: go test -v -race -coverprofile=coverage.out ./...
+
+      - run: go tool cover -func=coverage.out
