@@ -45,7 +45,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Started At: %s\n", response.StartTime)
 	fmt.Printf("Ended At: %s\n", response.EndTime)
-	fmt.Printf("Status: %d\n", response.Status)
+	fmt.Printf("Status: %s\n", response.Status)
 	fmt.Printf("MaxCPU: %d\n", response.MaxCPU)
 	fmt.Printf("MaxMemory: %d\n", response.MaxMemory)
 	fmt.Printf("MaxIOBPS: %d\n", response.MaxIOBPS)
