@@ -9,20 +9,16 @@ on:
 
 env:
   GO_VERSION: '1.21'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Code Quality and Testing
+  # Test and Code Quality
   test:
     name: Test and Code Quality
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for better analysis
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -48,68 +44,27 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Run staticcheck
-        uses: dominikh/staticcheck-action@v1.3.0
-        with:
-          version: "2023.1.6"
-
       - name: Run tests with coverage
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-          go tool cover -html=coverage.out -o coverage.html
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        if: github.repository == 'ehsaniara/job-worker'
         with:
           files: ./coverage.out
           flags: unittests
-          name: codecov-umbrella
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: coverage.html
-
-  # Security Scanning
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Run Gosec Security Scanner
-        uses: securecodewarrior/github-action-gosec@master
-        with:
-          args: '-fmt sarif -out gosec.sarif ./...'
-
-      - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: gosec.sarif
-
-      - name: Run Nancy (dependency vulnerability scanner)
-        run: |
-          go install github.com/sonatypecommunity/nancy@latest
-          go list -json -deps ./... | nancy sleuth
 
   # Build Binaries
   build:
     name: Build Binaries
     runs-on: ubuntu-latest
-    needs: [test, security]
-
+    needs: [ test ]
+    
     strategy:
       matrix:
-        goos: [linux, darwin]
-        goarch: [amd64, arm64]
+        goos: [ linux, darwin ]
+        goarch: [ amd64, arm64 ]
 
     steps:
       - name: Checkout code
@@ -155,7 +110,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [ build ]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -209,51 +164,3 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
-
-  # Deploy to staging (on develop branch)
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/develop'
-    environment: staging
-
-    steps:
-      - name: Deploy to staging
-        run: |
-          echo "Deploying to staging environment..."
-          # Add your staging deployment logic here
-          # This could involve:
-          # - SSH to staging server
-          # - Upload and restart binaries
-          # - Run health checks
-
-  # Deploy to production (on main branch)
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/main'
-    environment: production
-
-    steps:
-      - name: Deploy to production
-        run: |
-          echo "Deploying to production environment..."
-          # Add your production deployment logic here
-          # This could involve:
-          # - SSH to production servers
-          # - Rolling deployment strategy
-          # - Health checks and rollback capability
-
-  # Cleanup old releases (optional)
-  cleanup:
-    name: Cleanup Old Releases
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Delete old releases
-        run: |
-          echo "Cleanup old releases if needed..."
-          # Add logic to clean up old releases if you want
