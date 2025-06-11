@@ -1,318 +1,260 @@
-# Job Worker System Design Document
+# Job Worker
 
-## 1. Overview
+[![Tests](https://github.com/ehsaniara/job-worker/actions/workflows/test.yml/badge.svg)](https://github.com/ehsaniara/job-worker/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/job-worker)](https://goreportcard.com/report/github.com/ehsaniara/job-worker)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/ehsaniara/job-worker)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
 
-The Job Worker is a distributed job execution system that provides secure, resource-controlled execution of arbitrary commands on remote machines. It implements a client-server architecture using gRPC with mutual TLS authentication and fine-grained resource management through Linux cgroups.
+> A distributed job execution system with secure remote execution, resource management, and real-time streaming.
 
-### 1.1 Key Features
+## ✨ Features
 
-- **Secure Remote Execution**: Mutual TLS authentication with role-based authorization
-- **Resource Management**: CPU, memory, and I/O bandwidth limiting via cgroups v2
-- **Real-time Streaming**: Live output streaming of job execution logs
-- **Process Isolation**: Containerized execution environment with proper cleanup
-- **RESTful API**: gRPC-based API with protobuf serialization
+- 🔒 **Secure Remote Execution** - Mutual TLS authentication with role-based authorization
+- 🎛️ **Resource Management** - CPU, memory, and I/O bandwidth limiting via Linux cgroups v2
+- 📡 **Real-time Streaming** - Live output streaming of job execution logs
+- 🔐 **Process Isolation** - Containerized execution environment with proper cleanup
+- 🌐 **gRPC API** - High-performance API with protobuf serialization
+- ⚡ **Two-Stage Execution** - job-init binary ensures proper resource isolation
 
-## 2. System Architecture
+## 🚀 Quick Start
 
-### 2.1 High-Level Architecture
-
-![high-level.svg](docs/high-level.svg)
-
-### 2.2 Component Overview
-
-| Component | Responsibility | Key Files |
-|-----------|---------------|-----------|
-| **gRPC Server** | API endpoint, authentication, request routing | `grpc_server.go`, `grpc_service.go` |
-| **CLI Client** | Command-line interface for job operations | `root.go`, `create.go`, `get.go`, `stop.go`, `stream.go`, `list.go` |
-| **Job Worker** | Core job execution logic and lifecycle management | `service.go` |
-| **Store** | In-memory job state management and pub/sub | `store.go`, `task.go` |
-| **Resource Manager** | Linux cgroups v2 resource control | `cgroup.go` |
-| **Job Initializer** | Process isolation and execution setup | `init.go` |
-| **Authorization** | Role-based access control via client certificates | `grpc_authorization.go` |
-
-## 3. Core Components
-
-### 3.1 Job Lifecycle Management
-
-#### Job States
-```
-INITIALIZING → RUNNING → COMPLETED/FAILED/STOPPED
-```
-
-- **INITIALIZING**: Job created, cgroup setup, process starting
-- **RUNNING**: Process executing, output streaming available
-- **COMPLETED**: Process finished successfully (exit code 0)
-- **FAILED**: Process finished with error (exit code != 0)
-- **STOPPED**: Process terminated by user request
-
-#### State Transitions
-```go
-type Job struct {
-    Id         string
-    Command    string
-    Args       []string
-    Limits     ResourceLimits
-    Status     JobStatus
-    Pid        int32
-    CgroupPath string
-    StartTime  time.Time
-    EndTime    *time.Time
-    ExitCode   int32
-}
-```
-
-### 3.2 Resource Management
-
-#### Cgroups v2 Integration
-- **CPU Limiting**: Uses `cpu.max` for hard limits (percentage-based)
-- **Memory Limiting**: Uses `memory.max` for hard limits and `memory.high` for soft limits
-- **I/O Limiting**: Uses `io.max` for bandwidth control (bytes per second)
-
-#### Default Resource Limits
-```go
-const (
-    DefaultCPULimitPercent = 100    // 100% of one core
-    DefaultMemoryLimitMB   = 512    // 512 MB
-    DefaultIOBPS          = 0       // Unlimited
-)
-```
-
-### 3.3 Process Isolation
-
-#### Two-Stage Execution
-1. **job-init**: Lightweight initialization binary that joins the cgroup
-2. **Target Command**: The actual user command executed via `exec()`
-
-This approach ensures:
-- Proper cgroup membership before command execution
-- Clean process hierarchy
-- Reliable resource limit enforcement
-
-### 3.4 Security Model
-
-#### Authentication & Authorization
-- **Mutual TLS**: Both client and server certificate validation
-- **Role-Based Access**: Admin and Viewer roles extracted from client certificate OU field
-- **Operation Permissions**:
-    - **Admin**: All operations (create, get, stop, list, stream)
-    - **Viewer**: Read-only operations (get, list, stream)
-
-#### Certificate Structure
-```
-Subject: CN=client-name, OU=admin|viewer, O=organization
-```
-
-## 4. API Design
-
-### 4.1 gRPC Service Definition
-
-```protobuf
-service JobService {
-    rpc CreateJob(CreateJobReq) returns (CreateJobRes);
-    rpc GetJob(GetJobReq) returns (GetJobRes);
-    rpc StopJob(StopJobReq) returns (StopJobRes);
-    rpc GetJobs(EmptyRequest) returns (Jobs);
-    rpc GetJobsStream(GetJobsStreamReq) returns (stream DataChunk);
-}
-```
-
-### 4.2 CLI Interface
+### Installation
 
 ```bash
 
-# Job Management
-cli create <command> [args...] [--max-cpu=N] [--max-memory=N] [--max-iobps=N]
-cli get <job-id>
-cli stop <job-id>
-cli list
+# Install from source
+go install github.com/ehsaniara/job-worker/cmd/job-worker@latest
+go install github.com/ehsaniara/job-worker/cmd/job-worker-cli@latest
 
-# Real-time Monitoring
-cli stream <job-id> [--follow]
+# Or download from releases
+wget https://github.com/ehsaniara/job-worker/releases/latest/download/job-worker-linux-amd64.tar.gz
+tar -xzf job-worker-linux-amd64.tar.gz
 ```
 
-### 4.3 Request/Response Flow
+### Basic Usage
 
-```
-1. Client → Server: CreateJobReq
-2. Server: Validate permissions (Admin role required)
-3. Server: Create cgroup with resource limits
-4. Server: Start job-init process
-5. Server: Monitor process execution
-6. Server → Client: CreateJobRes (job metadata)
-7. Client can stream logs via GetJobsStream
-```
+```bash
 
-## 5. Data Management
+# 1. Start the server (requires root for cgroups)
+sudo ./job-worker
 
-### 5.1 In-Memory Store
+# 2. Create a simple job
+./job-worker-cli create echo "Hello, World!"
+# Output: Job created: ID: 1
 
-#### Job Storage
-- **Thread-Safe**: Uses `sync.RWMutex` for concurrent access
-- **Job State**: Maintains complete job metadata and status
-- **Output Buffering**: Captures stdout/stderr in memory buffers
+# 3. Check job status
+./job-worker-cli get 1
 
-#### Pub/Sub System
-```go
-type Update struct {
-    JobID    string
-    LogChunk []byte
-    Status   string
-}
+# 4. Stream job output in real-time
+./job-worker-cli stream 1
+
+# 5. List all jobs
+./job-worker-cli list
+
+# 6. Stop a running job
+./job-worker-cli stop 1
 ```
 
-- **Real-time Updates**: Publishes log chunks and status changes
-- **Multiple Subscribers**: Supports concurrent log streaming clients
-- **Automatic Cleanup**: Removes slow subscribers to prevent memory leaks
+### Advanced Usage
 
-### 5.2 Output Management
+```bash
 
-#### Streaming Strategy
-1. **Historical Logs**: Send accumulated output first
-2. **Live Updates**: Stream new output chunks in real-time
-3. **Completion**: Close stream when job finishes
+# Create job with resource limits
+./job-worker-cli create --max-cpu=50 --max-memory=512 --max-iobps=1000 \
+  python3 heavy_script.py
 
-#### Buffer Management
-- **Memory-based**: All output stored in memory (no disk persistence)
-- **Thread-safe**: Concurrent writes from process output
-- **Size Limits**: No explicit limits (relies on process lifetime)
+# Run a complex command
+./job-worker-cli create bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
 
-## 6. Error Handling & Reliability
-
-### 6.1 Process Management
-
-#### Graceful Shutdown
-1. Send `SIGTERM` to process group
-2. Wait 100ms for graceful termination
-3. Send `SIGKILL` if process still alive
-4. Clean up cgroup resources
-
-#### Error Recovery
-- **Process Group Killing**: Ensures all child processes are terminated
-- **Cgroup Cleanup**: Automatic resource cleanup on job completion
-- **Emergency Cleanup**: Panic recovery with forced resource cleanup
-
-### 6.2 Resource Cleanup
-
-#### Automatic Cleanup
-```go
-func (cg *cgroup) CleanupCgroup(jobID string) {
-    // 1. Kill remaining processes in cgroup
-    // 2. Remove cgroup directory
-    // 3. Clean up file descriptors
-}
+# Long-running job with streaming
+./job-worker-cli create ping -c 100 google.com
+./job-worker-cli stream <job-id> --follow
 ```
 
-#### Timeout Handling
-- **Cleanup Timeout**: 30-second limit for cgroup cleanup operations
-- **Context Cancellation**: Proper handling of client disconnections
-- **Resource Leak Prevention**: Ensures cleanup happens even on failures
+## 🏗️ Architecture
 
-## 7. Configuration & Deployment
+![high-level.svg](docs/high-level.svg)
 
-### 7.1 Server Configuration
+## 📋 Requirements
 
-#### TLS Certificate Setup
+### System Requirements
+
+- **Operating System**: Linux with cgroups v2 support
+- **Go Version**: 1.21 or later
+- **Privileges**: Root access (for cgroup management)
+- **Dependencies**:
+  - Linux kernel 4.5+ (for cgroups v2)
+  - systemd (recommended)
+
+### TLS Certificates
+
+Generate certificates for secure communication:
+
+```bash
+
+# Create certificate directory
+mkdir certs
+
+# Generate CA certificate
+openssl genrsa -out certs/ca-key.pem 4096
+openssl req -new -x509 -key certs/ca-key.pem -sha256 \
+  -subj "/C=US/ST=CA/O=JobWorker/CN=JobWorker CA" \
+  -days 3650 -out certs/ca-cert.pem
+
+# Generate server certificate
+openssl genrsa -out certs/server-key.pem 4096
+openssl req -subj "/C=US/ST=CA/O=JobWorker/CN=localhost" \
+  -sha256 -new -key certs/server-key.pem -out certs/server.csr
+openssl x509 -req -in certs/server.csr -CA certs/ca-cert.pem \
+  -CAkey certs/ca-key.pem -out certs/server-cert.pem -days 365 -sha256
+
+# Generate admin client certificate
+openssl genrsa -out certs/client-key.pem 4096
+openssl req -subj "/C=US/ST=CA/O=JobWorker/OU=admin/CN=admin-client" \
+  -new -key certs/client-key.pem -out certs/client.csr
+openssl x509 -req -in certs/client.csr -CA certs/ca-cert.pem \
+  -CAkey certs/ca-key.pem -out certs/client-cert.pem -days 365 -sha256
 ```
-./certs/
-├── ca-cert.pem      # Certificate Authority
-├── server-cert.pem  # Server certificate
-├── server-key.pem   # Server private key
-└── client-*.pem     # Client certificates
+
+## 🔧 Configuration
+
+### Server Configuration
+
+```bash
+
+# Environment variables
+export JOB_WORKER_ADDR="0.0.0.0:50051"
+export JOB_WORKER_CERT_PATH="./certs"
+export JOB_WORKER_CGROUP_BASE="/sys/fs/cgroup"
+
+# Default resource limits
+export JOB_WORKER_DEFAULT_CPU=100      # 100% of one core
+export JOB_WORKER_DEFAULT_MEMORY=512   # 512 MB
+export JOB_WORKER_DEFAULT_IO=0         # Unlimited
 ```
 
-#### Network Configuration
-- **Default Address**: `0.0.0.0:50051`
-- **Protocol**: gRPC over TLS 1.3
-- **Message Limits**: Configurable max message sizes
+### Client Configuration
 
-### 7.2 System Requirements
+```bash
 
-#### Linux Dependencies
-- **Cgroups v2**: Must be enabled and mounted
-- **Systemd**: Recommended for cgroup management
-- **Certificates**: Valid TLS certificates for mutual authentication
+# Connect to remote server
+./job-worker-cli --server=remote-host:50051 create echo "hello"
 
-#### Resource Requirements
-- **Memory**: Scales with number of concurrent jobs and output buffer sizes
-- **CPU**: Minimal overhead, primarily limited by job workloads
-- **Storage**: No persistent storage required (in-memory only)
+# Use custom certificates
+./job-worker-cli --cert-path=./custom-certs create echo "hello"
+```
 
-## 8. Performance Characteristics
+## 🔐 Security & Permissions
 
-### 8.1 Scalability
+### Role-Based Access Control
 
-#### Concurrent Jobs
-- **In-Memory Limits**: Bounded by available system memory
-- **Process Limits**: Limited by system `ulimit` settings
-- **Cgroup Limits**: Limited by kernel cgroup hierarchy depth
+| Role | Create Jobs | View Jobs | Stop Jobs | Stream Logs |
+|------|-------------|-----------|-----------|-------------|
+| **Admin** | ✅ | ✅ | ✅ | ✅ |
+| **Viewer** | ❌ | ✅ | ❌ | ✅ |
 
-#### Streaming Performance
-- **Low Latency**: Real-time output streaming with minimal buffering
-- **Multiple Clients**: Concurrent streaming to multiple clients per job
-- **Backpressure**: Automatic slow client removal to prevent memory exhaustion
+### Certificate-Based Authentication
 
-### 8.2 Resource Efficiency
+Roles are determined by the `OU` (Organizational Unit) field in client certificates:
+- `OU=admin` → Admin privileges
+- `OU=viewer` → Read-only access
 
-#### Memory Usage
-- **Per Job Overhead**: ~1-2KB base overhead per job
-- **Output Buffering**: Scales with job output volume
-- **Pub/Sub System**: Minimal overhead with automatic cleanup
+## 📊 Job Lifecycle
 
-#### CPU Usage
-- **Monitoring Overhead**: One goroutine per running job
-- **gRPC Processing**: Efficient binary serialization
-- **Resource Management**: Minimal cgroup operation overhead
+```
+INITIALIZING → RUNNING → COMPLETED/FAILED/STOPPED
+     ↓            ↓            ↓
+  • Cgroup     • Process    • Cleanup
+  • Setup      • Monitor    • Resources
+  • Limits     • Stream     • Final State
+```
 
-## 9. Security Considerations
+### Job States
 
-### 9.1 Threat Model
+- **INITIALIZING**: Job created, setting up cgroup and starting process
+- **RUNNING**: Process executing, logs streaming available
+- **COMPLETED**: Process finished successfully (exit code 0)
+- **FAILED**: Process finished with error (exit code ≠ 0)
+- **STOPPED**: Process terminated by user request
 
-#### Protected Against
-- **Unauthorized Access**: Mutual TLS with certificate validation
-- **Privilege Escalation**: Process isolation via cgroups
-- **Resource Exhaustion**: Configurable resource limits
-- **Information Disclosure**: Role-based access control
+## 🛠️ Development
 
-#### Limitations
-- **Root Access**: Requires root privileges for cgroup management
-- **Local Attacks**: No protection against local root compromise
-- **Certificate Management**: Manual certificate distribution required
+### Building from Source
 
-### 9.2 Best Practices
+```bash
 
-#### Operational Security
-- **Certificate Rotation**: Regular renewal of TLS certificates
-- **Principle of Least Privilege**: Use Viewer role where possible
-- **Network Isolation**: Deploy in controlled network environments
-- **Audit Logging**: Comprehensive operation logging
+# Clone the repository
+git clone https://github.com/ehsaniara/job-worker.git
+cd job-worker
 
-## 10. Future Enhancements
+# Install dependencies
+go mod download
 
-### 10.1 Potential Improvements
+# Build all binaries
+make build
 
-#### Persistence Layer
-- **Job History**: Persistent storage for completed jobs
-- **Output Archival**: Long-term log storage
-- **Database Integration**: SQL/NoSQL backend options
+# Run tests
+make test
 
-#### Advanced Features
-- **Job Scheduling**: Cron-like scheduling capabilities
-- **Job Dependencies**: Chain job execution based on dependencies
-- **Resource Quotas**: Per-user or per-tenant resource limits
-- **Metrics & Monitoring**: Prometheus integration
+# Run with race detection
+make test-race
+```
 
-#### Scalability Enhancements
-- **Horizontal Scaling**: Multi-node job distribution
-- **Load Balancing**: Job placement optimization
-- **Container Integration**: Docker/Podman support
-- **Kubernetes Operator**: Native Kubernetes integration
+### Project Structure
 
-### 10.2 Technical Debt
+```
+job-worker/
+├── cmd/
+│   ├── server/         # Main server binary
+│   ├── cli/           # CLI client binary
+│   └── job-init/      # Job initialization binary
+├── internal/
+│   ├── worker/        # Core business logic
+│   ├── server/        # gRPC server implementation
+│   └── config/        # Configuration management
+├── api/
+│   └── gen/          # Generated protobuf code
+└── pkg/              # Shared packages
+```
 
-#### Known Limitations
-- **In-Memory Only**: No persistence across server restarts
-- **Single Node**: No distributed execution capability
-- **Limited Platforms**: Linux-only due to cgroups dependency
-- **Certificate Management**: Manual certificate provisioning
+## 🤝 Contributing
 
-This design document provides a comprehensive overview of the Job Worker system architecture, implementation details, and operational considerations. The system prioritizes security, resource isolation, and real-time monitoring while maintaining simplicity and reliability.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Workflow
+
+```bash
+
+# Setup development environment
+make dev-setup
+
+# Run linting
+make lint
+
+# Run all tests
+make test-all
+
+# Generate protobuf code
+make generate
+```
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [gRPC](https://grpc.io/) for high-performance RPC framework
+- [Linux Cgroups](https://www.kernel.org/doc/Documentation/cgroup-v2.txt) for resource isolation
+- [Cobra](https://github.com/spf13/cobra) for CLI framework
+
+---
+
+<div align="center">
+  <sub>by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
+</div>
