@@ -26,4 +26,5 @@ func init() {
 	rootCmd.AddCommand(newGetCmd())
 	rootCmd.AddCommand(newStopCmd())
 	rootCmd.AddCommand(newStreamCmd())
+	rootCmd.AddCommand(newListCmd())
 }

@@ -23,6 +23,7 @@ const (
 	JobService_GetJob_FullMethodName        = "/job_worker.JobService/GetJob"
 	JobService_StopJob_FullMethodName       = "/job_worker.JobService/StopJob"
 	JobService_GetJobsStream_FullMethodName = "/job_worker.JobService/GetJobsStream"
+	JobService_GetJobs_FullMethodName       = "/job_worker.JobService/GetJobs"
 )
 
 // JobServiceClient is the client API for JobService service.
@@ -33,6 +34,7 @@ type JobServiceClient interface {
 	GetJob(ctx context.Context, in *GetJobReq, opts ...grpc.CallOption) (*GetJobRes, error)
 	StopJob(ctx context.Context, in *StopJobReq, opts ...grpc.CallOption) (*StopJobRes, error)
 	GetJobsStream(ctx context.Context, in *GetJobsStreamReq, opts ...grpc.CallOption) (JobService_GetJobsStreamClient, error)
+	GetJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Jobs, error)
 }
 
 type jobServiceClient struct {
@@ -102,6 +104,15 @@ func (x *jobServiceGetJobsStreamClient) Recv() (*DataChunk, error) {
 	return m, nil
 }
 
+func (c *jobServiceClient) GetJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Jobs, error) {
+	out := new(Jobs)
+	err := c.cc.Invoke(ctx, JobService_GetJobs_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // JobServiceServer is the server API for JobService service.
 // All implementations must embed UnimplementedJobServiceServer
 // for forward compatibility
@@ -110,6 +121,7 @@ type JobServiceServer interface {
 	GetJob(context.Context, *GetJobReq) (*GetJobRes, error)
 	StopJob(context.Context, *StopJobReq) (*StopJobRes, error)
 	GetJobsStream(*GetJobsStreamReq, JobService_GetJobsStreamServer) error
+	GetJobs(context.Context, *EmptyRequest) (*Jobs, error)
 	mustEmbedUnimplementedJobServiceServer()
 }
 
@@ -128,6 +140,9 @@ func (UnimplementedJobServiceServer) StopJob(context.Context, *StopJobReq) (*Sto
 }
 func (UnimplementedJobServiceServer) GetJobsStream(*GetJobsStreamReq, JobService_GetJobsStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetJobsStream not implemented")
+}
+func (UnimplementedJobServiceServer) GetJobs(context.Context, *EmptyRequest) (*Jobs, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetJobs not implemented")
 }
 func (UnimplementedJobServiceServer) mustEmbedUnimplementedJobServiceServer() {}
 
@@ -217,6 +232,24 @@ func (x *jobServiceGetJobsStreamServer) Send(m *DataChunk) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _JobService_GetJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).GetJobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_GetJobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).GetJobs(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // JobService_ServiceDesc is the grpc.ServiceDesc for JobService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -235,6 +268,10 @@ var JobService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StopJob",
 			Handler:    _JobService_StopJob_Handler,
+		},
+		{
+			MethodName: "GetJobs",
+			Handler:    _JobService_GetJobs_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -51,3 +51,18 @@ func DomainToStopJobResponse(job *domain.Job) *pb.StopJobRes {
 		ExitCode: job.ExitCode,
 	}
 }
+
+func DomainToProtobuf(job *domain.Job) *pb.Job {
+	return &pb.Job{
+		Id:        job.Id,
+		Command:   job.Command,
+		Args:      append([]string(nil), job.Args...),
+		MaxCPU:    job.Limits.MaxCPU,
+		MaxMemory: job.Limits.MaxMemory,
+		MaxIOBPS:  job.Limits.MaxIOBPS,
+		Status:    string(job.Status),
+		StartTime: job.StartTime.Format(time.RFC3339),
+		EndTime:   formatTimePtr(job.EndTime),
+		ExitCode:  job.ExitCode,
+	}
+}
