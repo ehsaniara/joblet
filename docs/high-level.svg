@@ -1,0 +1,237 @@
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="1000" height="700" fill="#f8fafc"/>
+
+    <!-- Title -->
+    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#1e293b">
+        Job Worker System - High-Level Architecture
+    </text>
+
+    <!-- Client Layer -->
+    <g id="client-layer">
+        <!-- CLI Client Box -->
+        <rect x="50" y="80" width="200" height="120" rx="8" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+        <text x="150" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
+            CLI Client
+        </text>
+        <text x="150" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - Admin Role
+        </text>
+        <text x="150" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - Viewer Role
+        </text>
+        <text x="150" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - TLS Certificates
+        </text>
+        <text x="150" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - Command Interface
+        </text>
+    </g>
+
+    <!-- gRPC Connection -->
+    <g id="grpc-connection">
+        <line x1="250" y1="140" x2="350" y2="140" stroke="#059669" stroke-width="3" marker-end="url(#arrowhead)"/>
+        <text x="300" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#059669">
+            gRPC/TLS
+        </text>
+        <text x="300" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#059669">
+            Mutual Auth
+        </text>
+    </g>
+
+    <!-- Server Layer -->
+    <g id="server-layer">
+        <!-- gRPC Server Box -->
+        <rect x="350" y="80" width="300" height="120" rx="8" fill="#7c3aed" stroke="#5b21b6" stroke-width="2"/>
+        <text x="500" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
+            gRPC Server
+        </text>
+        <text x="500" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - Authentication &amp; Authorization
+        </text>
+        <text x="500" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - Job Management API
+        </text>
+        <text x="500" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - Real-time Streaming
+        </text>
+        <text x="500" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
+            - TLS 1.3 Endpoint
+        </text>
+    </g>
+
+    <!-- Service Layer Connection -->
+    <g id="service-connection">
+        <line x1="500" y1="200" x2="500" y2="260" stroke="#059669" stroke-width="3" marker-end="url(#arrowhead)"/>
+    </g>
+
+    <!-- Job Worker Service -->
+    <g id="job-worker-service">
+        <rect x="350" y="260" width="300" height="100" rx="8" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+        <text x="500" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
+            Job Worker Service
+        </text>
+        <text x="500" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
+            - Job Orchestration &amp; Lifecycle
+        </text>
+        <text x="500" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
+            - Process Management
+        </text>
+        <text x="500" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
+            - Two-Stage Execution (job-init)
+        </text>
+    </g>
+
+    <!-- Component Connections -->
+    <g id="component-connections">
+        <!-- To Store -->
+        <line x1="420" y1="360" x2="180" y2="440" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <!-- To Resource Manager -->
+        <line x1="500" y1="360" x2="500" y2="440" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <!-- To Process Executor -->
+        <line x1="580" y1="360" x2="820" y2="440" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead)"/>
+    </g>
+
+    <!-- Component Layer -->
+    <g id="components">
+        <!-- In-Memory Store -->
+        <rect x="80" y="440" width="200" height="140" rx="8" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+        <text x="180" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">
+            In-Memory Store
+        </text>
+        <text x="180" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
+            - Job State Management
+        </text>
+        <text x="180" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
+            - Output Buffering
+        </text>
+        <text x="180" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
+            - Pub/Sub System
+        </text>
+        <text x="180" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
+            - Concurrent Access
+        </text>
+        <text x="180" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
+            - Live Streaming
+        </text>
+        <text x="180" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
+            - Thread-Safe Operations
+        </text>
+
+        <!-- Resource Manager -->
+        <rect x="400" y="440" width="200" height="140" rx="8" fill="#059669" stroke="#047857" stroke-width="2"/>
+        <text x="500" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">
+            Resource Manager
+        </text>
+        <text x="500" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
+            - Linux Cgroups v2
+        </text>
+        <text x="500" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
+            - CPU Limiting (cpu.max)
+        </text>
+        <text x="500" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
+            - Memory Limits
+        </text>
+        <text x="500" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
+            - I/O Bandwidth Control
+        </text>
+        <text x="500" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
+            - Process Isolation
+        </text>
+        <text x="500" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
+            - Automatic Cleanup
+        </text>
+
+        <!-- Process Executor -->
+        <rect x="720" y="440" width="200" height="140" rx="8" fill="#8b5cf6" stroke="#7c3aed" stroke-width="2"/>
+        <text x="820" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">
+            Process Executor
+        </text>
+        <text x="820" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
+            - job-init Binary
+        </text>
+        <text x="820" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
+            - Cgroup Membership
+        </text>
+        <text x="820" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
+            - Command Execution
+        </text>
+        <text x="820" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
+            - Process Monitoring
+        </text>
+        <text x="820" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
+            - Output Capture
+        </text>
+        <text x="820" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
+            - Graceful Termination
+        </text>
+    </g>
+
+    <!-- Job Lifecycle -->
+    <g id="lifecycle">
+        <rect x="50" y="620" width="900" height="60" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+        <text x="500" y="640" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1e293b">
+            Job Lifecycle States
+        </text>
+
+        <!-- States -->
+        <g id="states">
+            <rect x="80" y="650" width="80" height="20" rx="4" fill="#fbbf24" stroke="#f59e0b"/>
+            <text x="120" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">INITIALIZING</text>
+
+            <polygon points="170,650 180,660 170,670" fill="#64748b"/>
+
+            <rect x="190" y="650" width="80" height="20" rx="4" fill="#22c55e" stroke="#16a34a"/>
+            <text x="230" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">RUNNING</text>
+
+            <polygon points="280,650 290,660 280,670" fill="#64748b"/>
+
+            <rect x="300" y="650" width="80" height="20" rx="4" fill="#3b82f6" stroke="#2563eb"/>
+            <text x="340" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">COMPLETED</text>
+
+            <text x="400" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#64748b">/</text>
+
+            <rect x="420" y="650" width="80" height="20" rx="4" fill="#ef4444" stroke="#dc2626"/>
+            <text x="460" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">FAILED</text>
+
+            <text x="520" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#64748b">/</text>
+
+            <rect x="540" y="650" width="80" height="20" rx="4" fill="#6b7280" stroke="#4b5563"/>
+            <text x="580" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">STOPPED</text>
+        </g>
+    </g>
+
+    <!-- Legend -->
+    <g id="legend">
+        <rect x="750" y="80" width="200" height="140" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="850" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1e293b">
+            Key Features
+        </text>
+        <text x="760" y="125" font-family="Arial, sans-serif" font-size="11" fill="#475569">
+            ✓ Mutual TLS Authentication
+        </text>
+        <text x="760" y="140" font-family="Arial, sans-serif" font-size="11" fill="#475569">
+            ✓ Role-Based Authorization
+        </text>
+        <text x="760" y="155" font-family="Arial, sans-serif" font-size="11" fill="#475569">
+            ✓ Resource Isolation
+        </text>
+        <text x="760" y="170" font-family="Arial, sans-serif" font-size="11" fill="#475569">
+            ✓ Real-time Log Streaming
+        </text>
+        <text x="760" y="185" font-family="Arial, sans-serif" font-size="11" fill="#475569">
+            ✓ Process Group Management
+        </text>
+        <text x="760" y="200" font-family="Arial, sans-serif" font-size="11" fill="#475569">
+            ✓ Automatic Cleanup
+        </text>
+    </g>
+
+    <!-- Arrow marker definition -->
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+        </marker>
+    </defs>
+</svg>

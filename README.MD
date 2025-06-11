@@ -1,389 +1,318 @@
-# Job Worker Application Design Document
+# Job Worker System Design Document
 
-![general-arch](docs/job-worker-general.drawio.svg)
+## 1. Overview
 
-## Summary
+The Job Worker is a distributed job execution system that provides secure, resource-controlled execution of arbitrary commands on remote machines. It implements a client-server architecture using gRPC with mutual TLS authentication and fine-grained resource management through Linux cgroups.
 
-The Job Worker Service is a gRPC-based system for executing and managing system processes with resource constraints
-using Linux cgroups. It provides secure, isolated execution of commands with CPU, memory, and I/O limitations, featuring
-real-time log streaming and comprehensive job lifecycle management.
+### 1.1 Key Features
 
-### Core
+- **Secure Remote Execution**: Mutual TLS authentication with role-based authorization
+- **Resource Management**: CPU, memory, and I/O bandwidth limiting via cgroups v2
+- **Real-time Streaming**: Live output streaming of job execution logs
+- **Process Isolation**: Containerized execution environment with proper cleanup
+- **RESTful API**: gRPC-based API with protobuf serialization
 
-* **Resource Isolation:** Leverage Linux cgroups v2 for strict resource enforcement
-* **Real-time Monitoring:** Provide live log streaming and status updates via gRPC streams
-* **Security-First:** Implement mTLS authentication with role-based access control
-* **Graceful Degradation:** Continue operation even if some resource controls fail
-* **Pub/Sub Architecture:** Decouple log collection from distribution using publisher-subscriber pattern
+## 2. System Architecture
 
-## System Architecture
+### 2.1 High-Level Architecture
 
-### High-Level Architecture
+![high-level.svg](docs/high-level.svg)
 
-![High-level-arch](docs/job-worker-high-level.drawio.png)
+### 2.2 Component Overview
 
-## Design Approach
+| Component | Responsibility | Key Files |
+|-----------|---------------|-----------|
+| **gRPC Server** | API endpoint, authentication, request routing | `grpc_server.go`, `grpc_service.go` |
+| **CLI Client** | Command-line interface for job operations | `root.go`, `create.go`, `get.go`, `stop.go`, `stream.go`, `list.go` |
+| **Job Worker** | Core job execution logic and lifecycle management | `service.go` |
+| **Store** | In-memory job state management and pub/sub | `store.go`, `task.go` |
+| **Resource Manager** | Linux cgroups v2 resource control | `cgroup.go` |
+| **Job Initializer** | Process isolation and execution setup | `init.go` |
+| **Authorization** | Role-based access control via client certificates | `grpc_authorization.go` |
 
-## Scope
+## 3. Core Components
 
-### In Scope
+### 3.1 Job Lifecycle Management
 
-* **Job Management:** Create, start, stop, list, and monitor jobs
-* **Resource Control:** CPU, memory, and I/O bandwidth limiting via cgroups
-* **Real-time Logging:** Live stdout/stderr streaming to multiple subscribers
-* **Security:** Mutual TLS with certificate-based role authorization
-* **CLI Interface:** Command-line client
-* **Process Groups:** Proper cleanup of child processes
+#### Job States
+```
+INITIALIZING → RUNNING → COMPLETED/FAILED/STOPPED
+```
 
-### Out of Scope
+- **INITIALIZING**: Job created, cgroup setup, process starting
+- **RUNNING**: Process executing, output streaming available
+- **COMPLETED**: Process finished successfully (exit code 0)
+- **FAILED**: Process finished with error (exit code != 0)
+- **STOPPED**: Process terminated by user request
 
-* Job scheduling/queuing (single worker model)
-* Persistent storage (in-memory only)
-* Multi-node deployment
+#### State Transitions
+```go
+type Job struct {
+    Id         string
+    Command    string
+    Args       []string
+    Limits     ResourceLimits
+    Status     JobStatus
+    Pid        int32
+    CgroupPath string
+    StartTime  time.Time
+    EndTime    *time.Time
+    ExitCode   int32
+}
+```
 
-## Edge Cases Handled
+### 3.2 Resource Management
 
-* **Orphaned Processes:** Process groups ensure all children are terminated
-* **Cgroup Failures:** Continue execution with logging warnings
-* **Stream Subscribers:** Auto-cleanup of stalled/slow subscribers (5s timeout)
-* **Resource Cleanup:** Async cgroup cleanup with timeout protection
-* **Graceful Shutdown:** Signal handling for clean server termination
-* **Certificate Validation:** Organization Unite
+#### Cgroups v2 Integration
+- **CPU Limiting**: Uses `cpu.max` for hard limits (percentage-based)
+- **Memory Limiting**: Uses `memory.max` for hard limits and `memory.high` for soft limits
+- **I/O Limiting**: Uses `io.max` for bandwidth control (bytes per second)
 
-## API Design
+#### Default Resource Limits
+```go
+const (
+    DefaultCPULimitPercent = 100    // 100% of one core
+    DefaultMemoryLimitMB   = 512    // 512 MB
+    DefaultIOBPS          = 0       // Unlimited
+)
+```
 
-### gRPC Service Definition
+### 3.3 Process Isolation
+
+#### Two-Stage Execution
+1. **job-init**: Lightweight initialization binary that joins the cgroup
+2. **Target Command**: The actual user command executed via `exec()`
+
+This approach ensures:
+- Proper cgroup membership before command execution
+- Clean process hierarchy
+- Reliable resource limit enforcement
+
+### 3.4 Security Model
+
+#### Authentication & Authorization
+- **Mutual TLS**: Both client and server certificate validation
+- **Role-Based Access**: Admin and Viewer roles extracted from client certificate OU field
+- **Operation Permissions**:
+    - **Admin**: All operations (create, get, stop, list, stream)
+    - **Viewer**: Read-only operations (get, list, stream)
+
+#### Certificate Structure
+```
+Subject: CN=client-name, OU=admin|viewer, O=organization
+```
+
+## 4. API Design
+
+### 4.1 gRPC Service Definition
 
 ```protobuf
-syntax = "proto3";
-
-service JobService{
-  rpc CreateJob(CreateJobReq) returns (CreateJobRes){}            // Admin only
-  rpc GetJob(GetJobReq) returns (GetJobRes){}                     // Admin + Viewer
-  rpc StopJob(StopJobReq) returns (StopJobRes){}                  // Admin only
-  rpc GetJobsStream(GetJobsStreamReq) returns (stream DataChunk); // Admin + Viewer
+service JobService {
+    rpc CreateJob(CreateJobReq) returns (CreateJobRes);
+    rpc GetJob(GetJobReq) returns (GetJobRes);
+    rpc StopJob(StopJobReq) returns (StopJobRes);
+    rpc GetJobs(EmptyRequest) returns (Jobs);
+    rpc GetJobsStream(GetJobsStreamReq) returns (stream DataChunk);
 }
-
-// CreateJob
-message CreateJobReq{
-  string command = 1;
-  repeated string args = 2;
-  int32 maxCPU = 3;
-  int32 maxMemory = 4;
-  int32 maxIOBPS = 5;
-}
-
-message CreateJobRes{
-  string id = 1;
-  string command = 2;
-  repeated string args = 3;
-  int32 maxCPU = 4;
-  int32 maxMemory = 5;
-  int32 maxIOBPS = 6;
-  string status = 7;
-  string startTime = 8;
-  string endTime = 9;
-  int32 exitCode = 10;
-}
-
-// GetJob
-message GetJobReq{
-  string id = 1;
-}
-
-message GetJobRes{
-  string id = 1;
-  string command = 2;
-  repeated string args = 3;
-  int32 maxCPU = 4;
-  int32 maxMemory = 5;
-  int32 maxIOBPS = 6;
-  string status = 7;
-  string startTime = 8;
-  string endTime = 9;
-  int32 exitCode = 10;
-}
-
-// StopJob
-message StopJobReq{
-  string id = 1;
-}
-
-message StopJobRes{
-  string id = 1;
-  string status = 2;
-  string endTime = 3;
-  int32 exitCode = 4;
-}
-
-// GetJobsStream
-message GetJobsStreamReq{
-  string id = 1;
-}
-
-message DataChunk {
-  bytes payload = 1;
-}
-
 ```
 
-### Default Resource Limits
-
-* **CPU:** `10%` of one core
-* **Memory:** `1MB`
-* **I/O:** Unlimited (`0`)
-
-### Authorization Chart
-
-| Operation  | Admin Role | Viewer Role | Description                         |
-|------------|------------|-------------|-------------------------------------|
-| CreateJob  | ALLOW      | DENY        | Start new jobs with resource limits |
-| GetJob     | ALLOW      | ALLOW       | Retrieve job details and status     |
-| StopJob    | ALLOW      | DENY        | Terminate running jobs              |
-| StreamLogs | ALLOW      | ALLOW       | Real-time log streaming             |
-
-## Security Architecture
-
-### Certificate-Based Role Management
-
-#### Role Types and Detection
-
-- **Admin Role**: Full system access with job management capabilities
-    - **Detection Methods**:
-        - `OU=Admin` in certificate subject
-    - **Permissions**: All operations (CRUD + streaming)
-
-- **Viewer Role**: Read-only access for monitoring
-    - **Detection Methods**:
-        - `OU=Viewer` in certificate subject
-    - **Permissions**: Get, List, Stream operations only
-
-#### Certificate Infrastructure
-
-#### TLS Configuration
-
-- **Version**: TLS 1.3 minimum
-- **Authentication**: Mutual TLS with mandatory client certificates
-- **Key Strengths**: `4096-bit` CA, `2048-bit` clients keys (admin/viewer)
-- **Certificate Lifetime**: `365` days with renewal processes
-
-### Authorization Flow
-
-![Authorization Flow](docs/job-worker-authorization-flow.drawio.png)
-
-## Data Flow Architecture
-
-### Job Lifecycle
-
-![Job Lifecycle](docs/job-worker-job-lifecycle.drawio.png)
-
-- Create cgroups first
-- Start process, using `cmd.Start()`
-- IMMEDIATELY suspend the process before it can do anything, using`syscall.SIGSTOP`
-  - **Note: Tiny race windows:** Process can execute a few CPU instructions before `SIGSTOP` arrives
-- Add suspended process to cgroup
-- Resume process that it's safely in cgroup, using`syscall.SIGCONT`
-
-### Real-Time Log Streaming
-
-![Log Streaming Flow](docs/job-worker-log-streaming-flow.drawio.png)
-
-**Pub-Sub Implementation Details**:
-
-The system implements an in-memory pub-sub mechanism without external message brokers:
-
-1. **Task-Level Subscribers**: Each Task (Task: is a wrapper around the job) maintains its own subscriber list
-
-2. **Subscription Management**:
-    - **Subscribe**: Creates small buffered channel (`2` messages), adds to subscriber list
-    - **Unsubscribe**: Removes channel from list, closes channel safely
-    - **Auto-cleanup**: Detects stalled subscribers (`50ms` timeout), removes automatically
-    - **Context-based cleanup**: Subscribers auto-removed when task context is cancelled
-
-3. **Message Flow**:
-    - Process Output -> `WriteToBuffer` -> `Publish(Update)` -> Subscriber Channels
-    - **Update:** Contains the:
-        - JobId
-        - LogChunk `[]byte`
-        - Status
-
-4. **Delivery Guarantees**:
-    - **Best Effort**: Non-blocking sends with timeout
-    - **Small Buffer**: Each subscriber has `2` message buffer for immediate delivery
-    - **Cleanup**: Slow/dead subscribers automatically removed
-    - **Multiple Subscribers**: Same log chunk delivered to all active subscribers
-    - **Output Persistence**: All job outputs permanently stored in task buffer regardless of subscribers
-
-5. **Thread Safety**:
-    - Copy-on-read pattern for subscriber list during publishing
-    - Mutex-protected subscriber management with race condition prevention
-    - Safe channel cleanup to prevent double-close panics
-
-6. **Performance Characteristics**:
-    - **Memory**: Bounded by `2N` buffered messages where N is subscriber count
-    - **Latency**: Near real-time delivery with `50ms` timeout protection
-    - **Throughput**: Limited by slowest subscriber (with aggressive timeout protection)
-    - **Scalability**: O(n) delivery cost
-        - `n` is subscriber count per job
-    - **Memory Efficiency**: Optimized for multiple subscribers per job
-7. **Buffer sizing Example**
-   ```text
-    Job outputs: [Log A] [Log B] [Log C] ...
-    Subscriber processing time: 30ms per message
-    Publisher timeout: 50ms
-
-    Timeline with buffer=2:
-    t=0ms:   Log A arrives -> buffer [A]
-    t=20ms:  Log B arrives -> buffer [A,B]
-    t=30ms:  Subscriber processes A -> buffer [B]
-    t=40ms:  Log C arrives -> buffer [B,C]
-    t=60ms:  Subscriber processes B -> buffer [C]
-    Result: Subscriber keeps up, no timeouts
-    
-    Timeline with buffer=1:
-    t=0ms:   Log A arrives -> buffer [A]
-    t=20ms:  Log B arrives -> buffer full -> 50ms timeout -> subscriber DROPPED
-    Result: Subscriber removed due to buffer overflow
-    ```
-#### Real-Time Log Streaming (Running)
-
-![job-worker-log-running.drawio.png](docs/job-worker-log-running.drawio.png)
-
-- Client start the stream
-- First retrieve existing logs (Historical)
-- Subscribe to job's log (If job is RUNNING)
-- Stream the logs to client as logs are showing up to channel
-- End the stream when status is not RUNNING
-
-#### Real-Time Log Streaming (Non-Running)
-
-![job-worker-log-non-running.drawio.png](docs/job-worker-log-non-running.drawio.png)
-
-- Client start the stream
-- Retrieve existing logs (Historical)
-- Subscribe to job's log
-- End the stream since job not RUNNING
-
-## Resource Management
-
-### Linux Cgroups v2 Integration
-
-#### CPU Management
-
-- **Control File**: `cpu.max`
-- **Format**: `<microseconds> <period>` (e.g., "50000 100000" = 50%)
-- **Fallback**: `cpu.weight` for alternative implementations
-- **Default Limit**: 10% of one CPU core
-
-#### Memory Management
-
-- **Hard Limit**: `memory.max` (absolute ceiling)
-- **Soft Limit**: `memory.high` (90% of max for early warnings)
-- **Units**: Bytes (converted from MB input)
-- **Default Limit**: 1MB
-
-#### I/O Management
-
-- **Control File**: `io.max`
-- **Multiple Format Support**: Device-specific bandwidth limits
-- **Strategies**: Multiple format attempts for device compatibility
-- **Default**: Unlimited (0 value)
-
-### Process Isolation
-
-- **Process Groups**: Each job runs in dedicated process group
-- **Child Process Handling**: Negative PID kills for complete cleanup
-- **Signal escalation**: `SIGTERM` -> `SIGKILL` for graceful/forced termination
-- **Resource Enforcement**: Cgroup limits prevent resource abuse
-
-## Performance and Scalability
-
-### Concurrent Operations
-
-- **Thread Safety**: Mutex-protected data structures throughout
-
-### Resource Limits and Safeguards
-
-- **gRPC Message Sizes**: `512KB` receive, `4MB` send limits
-- **Header Size Limits**: `1MB` maximum header list size
-- **Timeout Management**: `5` second subscriber timeout for stalled clients
-- **Memory Management**: Bounded log buffers prevent unbounded growth
-
-### Monitoring and Observability
-
-- **Comprehensive Logging**: `INFO`, `WARN`, `ERROR`, `DEBUG` levels
-- **Operation Logging**: All authorization decisions logged
-- **Performance Metrics**: Job timing, resource usage tracking
-
-## CLI Design and Usage
-
-### Command Structure
-
-```text
-Commands:
-  create  Create and start a new job (Admin only)
-  get     Get detailed job information by ID
-  list    List all jobs with basic information  
-  stop    Stop a running job by ID (Admin only)
-  stream  Stream real-time job logs by ID
-```
-
-#### Operations
+### 4.2 CLI Interface
 
 ```bash
-  ./cli get 12345                 
-  ./cli stream 12345
-  ./cli stop 12345
-  
-  ./cli create ping -c 5 google.com  
-  ./cli create ls -la /tmp
-  ./cli create bash -c "for i in {1..10}; do echo \$i; done"
-  
-  ./cli create /bin/sh -c "echo 'POSIX shell'"
+
+# Job Management
+cli create <command> [args...] [--max-cpu=N] [--max-memory=N] [--max-iobps=N]
+cli get <job-id>
+cli stop <job-id>
+cli list
+
+# Real-time Monitoring
+cli stream <job-id> [--follow]
 ```
 
-#### with resource limit
+### 4.3 Request/Response Flow
 
-```bash
-  ./cli create --max-memory=1024 --max-cpu=25 ping -c 100 google.com
+```
+1. Client → Server: CreateJobReq
+2. Server: Validate permissions (Admin role required)
+3. Server: Create cgroup with resource limits
+4. Server: Start job-init process
+5. Server: Monitor process execution
+6. Server → Client: CreateJobRes (job metadata)
+7. Client can stream logs via GetJobsStream
 ```
 
-## Deployment Architecture
+## 5. Data Management
 
-### System Requirements
+### 5.1 In-Memory Store
 
-- **Application Base Directory**: `/opt/job-worker`
-- **Operating System**: Linux with cgroups v2 support
-- **Privileges**: Root access required for cgroup management
-- **Network**: TCP port `50051` accessible for gRPC communications
-- **Storage**: `/opt/job-worker/certs/` directory for certificates
-- **Dependencies**: OpenSSL for certificate operations
+#### Job Storage
+- **Thread-Safe**: Uses `sync.RWMutex` for concurrent access
+- **Job State**: Maintains complete job metadata and status
+- **Output Buffering**: Captures stdout/stderr in memory buffers
 
-### Certificate Deployment Strategy
+#### Pub/Sub System
+```go
+type Update struct {
+    JobID    string
+    LogChunk []byte
+    Status   string
+}
+```
 
-1. **Server Setup**: Generate CA and server certificates on target machine
-2. **Client Distribution**: Securely distribute role-specific client certificates
-3. **Permission Management**: Proper file permissions (`600` for keys, `644` for certs)
-4. **Role Assignment**: Map organizational roles to certificate types
+- **Real-time Updates**: Publishes log chunks and status changes
+- **Multiple Subscribers**: Supports concurrent log streaming clients
+- **Automatic Cleanup**: Removes slow subscribers to prevent memory leaks
 
-### Configuration Management
+### 5.2 Output Management
 
-- **Cgroup Base Directory**: `/sys/fs/cgroup/job-worker/`
-- **Certificate Directory**: `/opt/job-worker/certs/`
+#### Streaming Strategy
+1. **Historical Logs**: Send accumulated output first
+2. **Live Updates**: Stream new output chunks in real-time
+3. **Completion**: Close stream when job finishes
 
-## Current Limitations
+#### Buffer Management
+- **Memory-based**: All output stored in memory (no disk persistence)
+- **Thread-safe**: Concurrent writes from process output
+- **Size Limits**: No explicit limits (relies on process lifetime)
 
-- **In-Memory Storage**: No persistence across server restarts
-- **Single Node Operation**: No distributed execution capabilities
-- **Static Role Assignment**: Certificate-based roles cannot be changed at runtime
-- **Limited Resource Monitoring**: No real-time resource usage metrics
+## 6. Error Handling & Reliability
 
-## Future Enhancements
+### 6.1 Process Management
 
-### Potential Improvements
+#### Graceful Shutdown
+1. Send `SIGTERM` to process group
+2. Wait 100ms for graceful termination
+3. Send `SIGKILL` if process still alive
+4. Clean up cgroup resources
 
-* **Persistent Storage:** Database backend for job history
-* **Job Queuing / Scheduling:** Multi-job scheduling and prioritization
-* **Metrics Collection:** Prometheus/OpenTelemetry integration
-* **Web Dashboard:** HTTP interface for job management
-* **Resource Monitoring:** Real-time resource usage tracking
+#### Error Recovery
+- **Process Group Killing**: Ensures all child processes are terminated
+- **Cgroup Cleanup**: Automatic resource cleanup on job completion
+- **Emergency Cleanup**: Panic recovery with forced resource cleanup
+
+### 6.2 Resource Cleanup
+
+#### Automatic Cleanup
+```go
+func (cg *cgroup) CleanupCgroup(jobID string) {
+    // 1. Kill remaining processes in cgroup
+    // 2. Remove cgroup directory
+    // 3. Clean up file descriptors
+}
+```
+
+#### Timeout Handling
+- **Cleanup Timeout**: 30-second limit for cgroup cleanup operations
+- **Context Cancellation**: Proper handling of client disconnections
+- **Resource Leak Prevention**: Ensures cleanup happens even on failures
+
+## 7. Configuration & Deployment
+
+### 7.1 Server Configuration
+
+#### TLS Certificate Setup
+```
+./certs/
+├── ca-cert.pem      # Certificate Authority
+├── server-cert.pem  # Server certificate
+├── server-key.pem   # Server private key
+└── client-*.pem     # Client certificates
+```
+
+#### Network Configuration
+- **Default Address**: `0.0.0.0:50051`
+- **Protocol**: gRPC over TLS 1.3
+- **Message Limits**: Configurable max message sizes
+
+### 7.2 System Requirements
+
+#### Linux Dependencies
+- **Cgroups v2**: Must be enabled and mounted
+- **Systemd**: Recommended for cgroup management
+- **Certificates**: Valid TLS certificates for mutual authentication
+
+#### Resource Requirements
+- **Memory**: Scales with number of concurrent jobs and output buffer sizes
+- **CPU**: Minimal overhead, primarily limited by job workloads
+- **Storage**: No persistent storage required (in-memory only)
+
+## 8. Performance Characteristics
+
+### 8.1 Scalability
+
+#### Concurrent Jobs
+- **In-Memory Limits**: Bounded by available system memory
+- **Process Limits**: Limited by system `ulimit` settings
+- **Cgroup Limits**: Limited by kernel cgroup hierarchy depth
+
+#### Streaming Performance
+- **Low Latency**: Real-time output streaming with minimal buffering
+- **Multiple Clients**: Concurrent streaming to multiple clients per job
+- **Backpressure**: Automatic slow client removal to prevent memory exhaustion
+
+### 8.2 Resource Efficiency
+
+#### Memory Usage
+- **Per Job Overhead**: ~1-2KB base overhead per job
+- **Output Buffering**: Scales with job output volume
+- **Pub/Sub System**: Minimal overhead with automatic cleanup
+
+#### CPU Usage
+- **Monitoring Overhead**: One goroutine per running job
+- **gRPC Processing**: Efficient binary serialization
+- **Resource Management**: Minimal cgroup operation overhead
+
+## 9. Security Considerations
+
+### 9.1 Threat Model
+
+#### Protected Against
+- **Unauthorized Access**: Mutual TLS with certificate validation
+- **Privilege Escalation**: Process isolation via cgroups
+- **Resource Exhaustion**: Configurable resource limits
+- **Information Disclosure**: Role-based access control
+
+#### Limitations
+- **Root Access**: Requires root privileges for cgroup management
+- **Local Attacks**: No protection against local root compromise
+- **Certificate Management**: Manual certificate distribution required
+
+### 9.2 Best Practices
+
+#### Operational Security
+- **Certificate Rotation**: Regular renewal of TLS certificates
+- **Principle of Least Privilege**: Use Viewer role where possible
+- **Network Isolation**: Deploy in controlled network environments
+- **Audit Logging**: Comprehensive operation logging
+
+## 10. Future Enhancements
+
+### 10.1 Potential Improvements
+
+#### Persistence Layer
+- **Job History**: Persistent storage for completed jobs
+- **Output Archival**: Long-term log storage
+- **Database Integration**: SQL/NoSQL backend options
+
+#### Advanced Features
+- **Job Scheduling**: Cron-like scheduling capabilities
+- **Job Dependencies**: Chain job execution based on dependencies
+- **Resource Quotas**: Per-user or per-tenant resource limits
+- **Metrics & Monitoring**: Prometheus integration
+
+#### Scalability Enhancements
+- **Horizontal Scaling**: Multi-node job distribution
+- **Load Balancing**: Job placement optimization
+- **Container Integration**: Docker/Podman support
+- **Kubernetes Operator**: Native Kubernetes integration
+
+### 10.2 Technical Debt
+
+#### Known Limitations
+- **In-Memory Only**: No persistence across server restarts
+- **Single Node**: No distributed execution capability
+- **Limited Platforms**: Linux-only due to cgroups dependency
+- **Certificate Management**: Manual certificate provisioning
+
+This design document provides a comprehensive overview of the Job Worker system architecture, implementation details, and operational considerations. The system prioritizes security, resource isolation, and real-time monitoring while maintaining simplicity and reliability.
