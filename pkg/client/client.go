@@ -98,6 +98,10 @@ func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, err
 	return resp, nil
 }
 
+func (c *JobClient) GetJobs(ctx context.Context) (*pb.Jobs, error) {
+	return c.client.GetJobs(ctx, &pb.EmptyRequest{})
+}
+
 func (c *JobClient) GetJobsStream(ctx context.Context, id string) (pb.JobService_GetJobsStreamClient, error) {
 	stream, err := c.client.GetJobsStream(ctx, &pb.GetJobsStreamReq{Id: id})
 	if err != nil {

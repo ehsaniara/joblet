@@ -114,6 +114,36 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 	return mappers.DomainToStopJobResponse(job), nil
 }
 
+func (s *JobServiceServer) GetJobs(ctx context.Context, _ *pb.EmptyRequest) (*pb.Jobs, error) {
+	requestLogger := s.logger.WithField("operation", "GetJobs")
+
+	requestLogger.Debug("get jobs request received")
+
+	if err := s.auth.Authorized(ctx, auth2.ListJobsOp); err != nil {
+		requestLogger.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	startTime := time.Now()
+	jobs := s.jobStore.ListJobs()
+
+	rawJobs := &pb.Jobs{}
+	statusCounts := make(map[string]int)
+
+	for _, job := range jobs {
+		rawJobs.Jobs = append(rawJobs.Jobs, mappers.DomainToProtobuf(job))
+		statusCounts[string(job.Status)]++
+	}
+
+	duration := time.Since(startTime)
+	requestLogger.Info("jobs listed successfully",
+		"totalJobs", len(jobs),
+		"statusBreakdown", statusCounts,
+		"duration", duration)
+
+	return rawJobs, nil
+}
+
 func (s *JobServiceServer) GetJobsStream(req *pb.GetJobsStreamReq, stream pb.JobService_GetJobsStreamServer) error {
 	requestLogger := s.logger.WithFields("operation", "GetJobsStream", "jobId", req.GetId())
 
