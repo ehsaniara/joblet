@@ -16,6 +16,8 @@ type SyscallInterface interface {
 	Kill(pid int, sig syscall.Signal) error
 	CreateProcessGroup() *syscall.SysProcAttr
 	Exec(string, []string, []string) error
+	Mount(source string, target string, fstype string, flags uintptr, data string) error
+	Unmount(target string, flags int) error
 }
 
 //counterfeiter:generate . OsInterface
@@ -26,6 +28,7 @@ type OsInterface interface {
 	Environ() []string
 	Getenv(key string) string
 	Getpid() int
+	ReadFile(path string) ([]byte, error)
 }
 
 //counterfeiter:generate . CommandFactory

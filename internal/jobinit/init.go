@@ -1,3 +1,5 @@
+//go:build linux
+
 package jobinit
 
 import (
@@ -6,6 +8,7 @@ import (
 	"job-worker/pkg/os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -219,6 +222,11 @@ func (j *JobInitializer) ValidateEnvironment() error {
 func (j *JobInitializer) Run() error {
 	j.logger.Info("job-init starting")
 
+	if err := j.setupNamespaceEnvironment(); err != nil {
+		logger.Error("failed to setup namespace environment", "error", err)
+		return err
+	}
+
 	if err := j.ValidateEnvironment(); err != nil {
 
 		j.logger.Error("environment validation failed", "error", err)
@@ -241,6 +249,53 @@ func (j *JobInitializer) Run() error {
 		return fmt.Errorf("failed to execute job: %w", e)
 	}
 
+	return nil
+}
+
+func (j *JobInitializer) setupNamespaceEnvironment() error {
+	pid := j.osInterface.Getpid()
+	j.logger.Debug("setting up namespace environment", "pid", pid)
+
+	// Check if we're in a PID namespace (PID 1 indicates namespace)
+	if pid == 1 {
+		j.logger.Info("detected PID 1 - we're the init process in a PID namespace, remounting /proc")
+
+		// Make all mounts private to prevent propagation to parent
+		if err := j.syscallInterface.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""); err != nil {
+			logger.Warn("failed to make mounts private", "error", err)
+		}
+
+		if err := j.remountProc(); err != nil {
+			return fmt.Errorf("failed to remount /proc: %w", err)
+		}
+
+		j.logger.Info("namespace environment setup completed successfully")
+	} else {
+		j.logger.Debug("PID not indicating namespace isolation, skipping /proc remount", "pid", pid)
+	}
+
+	return nil
+}
+
+func (j *JobInitializer) remountProc() error {
+	j.logger.Debug("attempting to remount /proc for namespace isolation")
+
+	// Try direct remount
+	if err := j.syscallInterface.Mount("proc", "/proc", "proc", 0, ""); err != nil {
+		j.logger.Debug("direct /proc mount failed, trying unmount first", "error", err)
+
+		// Try unmounting first, then remounting
+		if unmountErr := j.syscallInterface.Unmount("/proc", syscall.MNT_DETACH); unmountErr != nil {
+			j.logger.Debug("/proc unmount failed (this might be normal)", "error", unmountErr)
+		}
+
+		// Try mounting again after unmount
+		if err := j.syscallInterface.Mount("proc", "/proc", "proc", 0, ""); err != nil {
+			return fmt.Errorf("failed to remount /proc after unmount: %w", err)
+		}
+	}
+
+	j.logger.Info("/proc successfully remounted for namespace isolation")
 	return nil
 }
 

@@ -67,6 +67,14 @@ func (p *ExecProcess) Kill() error {
 // DefaultSyscall implements interfaces.SyscallInterface using real syscalls
 type DefaultSyscall struct{}
 
+func (s *DefaultSyscall) Unmount(target string, flags int) error {
+	return syscall.Unmount(target, flags)
+}
+
+func (s *DefaultSyscall) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	return syscall.Mount(source, target, fstype, flags, data)
+}
+
 func (s *DefaultSyscall) Exec(argv0 string, argv []string, envv []string) error {
 	return syscall.Exec(argv0, argv, envv)
 }
@@ -87,6 +95,10 @@ func (s *DefaultSyscall) CreateProcessGroup() *syscall.SysProcAttr {
 
 // DefaultOs implements interfaces.OsInterface using real os
 type DefaultOs struct{}
+
+func (d *DefaultOs) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
 
 func (d *DefaultOs) WriteFile(name string, data []byte, perm os.FileMode) error {
 	return os.WriteFile(name, data, perm)
