@@ -1,0 +1,183 @@
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="1000" height="700"/>
+
+    <!-- Title -->
+    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#6c4b4b">
+        Job Worker Streaming - Sequence Diagram
+    </text>
+
+    <!-- Actors -->
+    <g id="actors">
+        <!-- Client -->
+        <rect x="50" y="60" width="80" height="40" rx="5" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+        <text x="90" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Client
+        </text>
+
+        <!-- gRPC Service -->
+        <rect x="200" y="60" width="100" height="40" rx="5" fill="#7c3aed" stroke="#5b21b6" stroke-width="2"/>
+        <text x="250" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            gRPC Service
+        </text>
+
+        <!-- Store -->
+        <rect x="370" y="60" width="80" height="40" rx="5" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+        <text x="410" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Store
+        </text>
+
+        <!-- Task -->
+        <rect x="520" y="60" width="80" height="40" rx="5" fill="#10b981" stroke="#047857" stroke-width="2"/>
+        <text x="560" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Task
+        </text>
+
+        <!-- Output Writer -->
+        <rect x="670" y="60" width="100" height="40" rx="5" fill="#8b5cf6" stroke="#7c3aed" stroke-width="2"/>
+        <text x="720" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            OutputWriter
+        </text>
+
+        <!-- Job Process -->
+        <rect x="840" y="60" width="100" height="40" rx="5" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+        <text x="890" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Job Process
+        </text>
+    </g>
+
+    <!-- Lifelines -->
+    <g id="lifelines">
+        <line x1="90" y1="100" x2="90" y2="650" stroke="#64748b" stroke-width="2" stroke-dasharray="5,5"/>
+        <line x1="250" y1="100" x2="250" y2="650" stroke="#64748b" stroke-width="2" stroke-dasharray="5,5"/>
+        <line x1="410" y1="100" x2="410" y2="650" stroke="#64748b" stroke-width="2" stroke-dasharray="5,5"/>
+        <line x1="560" y1="100" x2="560" y2="650" stroke="#64748b" stroke-width="2" stroke-dasharray="5,5"/>
+        <line x1="720" y1="100" x2="720" y2="650" stroke="#64748b" stroke-width="2" stroke-dasharray="5,5"/>
+        <line x1="890" y1="100" x2="890" y2="650" stroke="#64748b" stroke-width="2" stroke-dasharray="5,5"/>
+    </g>
+
+    <!-- Interactions -->
+    <g id="interactions">
+        <!-- 1. Stream Request -->
+        <line x1="90" y1="130" x2="250" y2="130" stroke="#3b82f6" stroke-width="3" marker-end="url(#arrowhead)"/>
+        <text x="170" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#3b82f6">
+            GetJobsStream(job-123)
+        </text>
+
+        <!-- 2. Auth Check -->
+        <rect x="250" y="140" width="20" height="30" fill="#7c3aed" opacity="0.7"/>
+        <text x="280" y="158" font-family="Arial, sans-serif" font-size="9" fill="#7c3aed">
+            auth.Authorized()
+        </text>
+
+        <!-- 3. Get Output -->
+        <line x1="250" y1="180" x2="410" y2="180" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="330" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7c3aed">
+            GetOutput(job-123)
+        </text>
+
+        <!-- 4. Return Historical -->
+        <line x1="410" y1="200" x2="250" y2="200" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="330" y="195" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f59e0b">
+            historical logs, isRunning
+        </text>
+
+        <!-- 5. Send Historical -->
+        <line x1="250" y1="220" x2="90" y2="220" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="170" y="215" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7c3aed">
+            DataChunk{historical}
+        </text>
+
+        <!-- 6. Subscribe -->
+        <line x1="250" y1="250" x2="410" y2="250" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="330" y="245" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7c3aed">
+            SendUpdatesToClient()
+        </text>
+
+        <!-- 7. Subscribe to Task -->
+        <line x1="410" y1="270" x2="560" y2="270" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="485" y="265" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f59e0b">
+            Subscribe()
+        </text>
+
+        <!-- Live Streaming Loop -->
+        <rect x="40" y="300" width="900" height="280" rx="5" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="10,5"/>
+        <text x="50" y="320" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#10b981">
+            Live Streaming Loop
+        </text>
+
+        <!-- 8. Job Output -->
+        <line x1="890" y1="340" x2="720" y2="340" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="805" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#dc2626">
+            stdout/stderr
+        </text>
+
+        <!-- 9. Write Buffer -->
+        <line x1="720" y1="360" x2="560" y2="360" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="640" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#8b5cf6">
+            WriteToBuffer()
+        </text>
+
+        <!-- 10. Publish -->
+        <rect x="560" y="370" width="20" height="30" fill="#10b981" opacity="0.7"/>
+        <text x="590" y="388" font-family="Arial, sans-serif" font-size="9" fill="#10b981">
+            Publish(LogChunk)
+        </text>
+
+        <!-- 11. Notify Store -->
+        <line x1="560" y1="410" x2="410" y2="410" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="485" y="405" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#10b981">
+            Update{LogChunk}
+        </text>
+
+        <!-- 12. Stream Update -->
+        <line x1="410" y1="430" x2="250" y2="430" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="330" y="425" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f59e0b">
+            SendData(chunk)
+        </text>
+
+        <!-- 13. Send to Client -->
+        <line x1="250" y1="450" x2="90" y2="450" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="170" y="445" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7c3aed">
+            DataChunk{live}
+        </text>
+
+        <!-- 14. Job Complete -->
+        <rect x="890" y="480" width="20" height="30" fill="#dc2626" opacity="0.7"/>
+        <text x="920" y="498" font-family="Arial, sans-serif" font-size="9" fill="#dc2626">
+            exit(0)
+        </text>
+
+        <!-- 15. Final Status -->
+        <line x1="560" y1="520" x2="410" y2="520" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="485" y="515" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#10b981">
+            Update{Status: COMPLETED}
+        </text>
+
+        <!-- 16. Close Stream -->
+        <line x1="410" y1="540" x2="250" y2="540" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="330" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f59e0b">
+            close stream
+        </text>
+
+        <!-- 17. Stream End -->
+        <line x1="250" y1="560" x2="90" y2="560" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <text x="170" y="555" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7c3aed">
+            EOF
+        </text>
+    </g>
+
+    <!-- Timeline -->
+    <g id="timeline">
+        <text x="50" y="630" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#64748b">
+            Timeline: Request → Auth → Historical → Live Stream → Complete
+        </text>
+    </g>
+
+    <!-- Arrow marker -->
+    <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#64748b"/>
+        </marker>
+    </defs>
+</svg>

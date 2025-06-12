@@ -83,7 +83,7 @@ make certs-download-viewer  # View-only privileges
 
 ## 🏗️ Architecture
 
-![high-level.svg](docs/high-level.svg)
+![sequence-diagram.svg](docs/sequence-diagram.svg)![high-level.svg](docs/high-level.svg)
 
 ## 📋 Requirements
 
