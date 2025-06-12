@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build release binaries
+        run: |
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -o job-worker-linux-amd64 ./cmd/worker
+          GOOS=linux GOARCH=amd64 go build -o job-worker-cli-linux-amd64 ./cmd/cli
+          GOOS=linux GOARCH=amd64 go build -o job-init-linux-amd64 ./cmd/job-init
+          
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -o job-worker-darwin-amd64 ./cmd/worker
+          GOOS=darwin GOARCH=amd64 go build -o job-worker-cli-darwin-amd64 ./cmd/cli
+          
+          # Create archives
+          tar -czf job-worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz job-worker-linux-amd64 job-worker-cli-linux-amd64 job-init-linux-amd64
+          tar -czf job-worker-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz job-worker-darwin-amd64 job-worker-cli-darwin-amd64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            job-worker-${{ steps.version.outputs.VERSION }}-*.tar.gz
+          generate_release_notes: true
