@@ -40,20 +40,20 @@ tar -xzf job-worker-linux-amd64.tar.gz
 sudo ./job-worker
 
 # 2. Create a simple job
-./job-worker-cli create echo "Hello, World!"
+./cli create echo "Hello, World!"
 # Output: Job created: ID: 1
 
 # 3. Check job status
-./job-worker-cli get 1
+./cli get 1
 
 # 4. Stream job output in real-time
-./job-worker-cli stream 1
+./cli stream 1
 
 # 5. List all jobs
-./job-worker-cli list
+./cli list
 
 # 6. Stop a running job
-./job-worker-cli stop 1
+./cli stop 1
 ```
 
 ### Advanced Usage
@@ -61,15 +61,15 @@ sudo ./job-worker
 ```bash
 
 # Create job with resource limits
-./job-worker-cli create --max-cpu=50 --max-memory=512 --max-iobps=1000 \
+./cli create --max-cpu=50 --max-memory=512 --max-iobps=1000 \
   python3 heavy_script.py
 
 # Run a complex command
-./job-worker-cli create bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
+./cli create bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
 
 # Long-running job with streaming
-./job-worker-cli create ping -c 100 google.com
-./job-worker-cli stream <job-id> --follow
+./cli create ping -c 100 google.com
+./cli stream <job-id>
 ```
 
 ## 🏗️ Architecture
