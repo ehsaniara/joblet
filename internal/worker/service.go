@@ -153,13 +153,19 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	cmd := w.cmdFactory.CreateCommand(initPath)
 	cmd.SetEnv(env)
 
-	jobLogger.Info("starting init process", "initPath", initPath, "targetCommand", job.Command, "targetArgs", job.Args)
+	jobLogger.Info("starting init process with namespace isolation",
+		"initPath", initPath,
+		"targetCommand", job.Command,
+		"targetArgs", job.Args,
+		"namespaces", "pid,mount,ipc,uts")
 
 	cmd.SetStdout(executor.New(w.store, job.Id))
 	cmd.SetStderr(executor.New(w.store, job.Id))
 
 	// create a process group for child process
-	cmd.SetSysProcAttr(w.syscall.CreateProcessGroup())
+	// Use namespace-aware process attributes
+	sysProcAttr := w.createSysProcAttrWithNamespaces()
+	cmd.SetSysProcAttr(sysProcAttr)
 
 	startTime := time.Now()
 	if e := cmd.Start(); e != nil {
@@ -237,6 +243,23 @@ func (w *worker) getJobInitPath() (string, error) {
 	w.logger.Error("job-init binary not found in any location")
 
 	return "", fmt.Errorf("job-init binary not found in executable dir, /usr/local/bin, or PATH")
+}
+
+func (w *worker) createSysProcAttrWithNamespaces() *syscall.SysProcAttr {
+	sysProcAttr := w.syscall.CreateProcessGroup()
+
+	// Add namespace isolation if enabled
+	// Direct Clone Flags
+	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // Process isolation
+		syscall.CLONE_NEWNS | // Mount isolation
+		syscall.CLONE_NEWIPC | // IPC isolation
+		syscall.CLONE_NEWUTS // UTS isolation
+
+	w.logger.Debug("enabled namespace isolation",
+		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
+		"namespaces", "pid,mount,ipc,uts")
+
+	return sysProcAttr
 }
 
 // waitForCompletion waits for a job to complete and updates its status
