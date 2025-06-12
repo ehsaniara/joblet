@@ -1,3 +1,5 @@
+//go:build linux
+
 package worker
 
 import (
@@ -50,7 +52,7 @@ func TestStartJob_Success_InitProcess(t *testing.T) {
 	})
 	fakeCgroup.CreateReturns(nil)
 
-	w := &worker{
+	w := &linuxWorker{
 		store:      fakeStore,
 		cgroup:     fakeCgroup,
 		cmdFactory: fakeCmdFactory,
@@ -132,7 +134,7 @@ func TestStartJob_JobInitNotFound(t *testing.T) {
 	fakeOs.StatReturns(nil, errors.New("file not found"))
 	fakeCgroup.CreateReturns(nil)
 
-	w := &worker{
+	w := &linuxWorker{
 		store:  fakeStore,
 		cgroup: fakeCgroup,
 		os:     fakeOs,
@@ -152,7 +154,7 @@ func TestStartJob_JobInitNotFound(t *testing.T) {
 
 func TestStartJob_ContextCancelled(t *testing.T) {
 	fakeStore := &interfacesfakes.FakeStore{}
-	w := &worker{
+	w := &linuxWorker{
 		store:  fakeStore,
 		logger: logger.WithField("component", "worker-test"),
 	}
@@ -174,7 +176,7 @@ func TestStartJob_CgroupCreationFails(t *testing.T) {
 
 	fakeCgroup.CreateReturns(errors.New("cgroup creation failed"))
 
-	w := &worker{
+	w := &linuxWorker{
 		store:  fakeStore,
 		cgroup: fakeCgroup,
 		logger: logger.WithField("component", "worker-test"),
@@ -205,7 +207,7 @@ func TestStartJob_InitProcessStartFails(t *testing.T) {
 	fakeOs.EnvironReturns([]string{})
 	fakeSyscall.CreateProcessGroupReturns(&syscall.SysProcAttr{})
 
-	w := &worker{
+	w := &linuxWorker{
 		store:      fakeStore,
 		cgroup:     fakeCgroup,
 		cmdFactory: fakeCmdFactory,
@@ -246,7 +248,7 @@ func TestStartJob_ProcessNil(t *testing.T) {
 	fakeOs.EnvironReturns([]string{})
 	fakeSyscall.CreateProcessGroupReturns(&syscall.SysProcAttr{})
 
-	w := &worker{
+	w := &linuxWorker{
 		store:      fakeStore,
 		cgroup:     fakeCgroup,
 		cmdFactory: fakeCmdFactory,
@@ -281,7 +283,7 @@ func TestStartJob_DefaultValues(t *testing.T) {
 	fakeOs.EnvironReturns([]string{})
 	fakeSyscall.CreateProcessGroupReturns(&syscall.SysProcAttr{})
 
-	w := &worker{
+	w := &linuxWorker{
 		store:      fakeStore,
 		cgroup:     fakeCgroup,
 		cmdFactory: fakeCmdFactory,
@@ -317,7 +319,7 @@ func TestStopJob_Success(t *testing.T) {
 	fakeSyscall.KillReturnsOnCall(0, nil)           // SIGTERM succeeds
 	fakeSyscall.KillReturnsOnCall(1, syscall.ESRCH) // process doesn't exist (graceful shutdown)
 
-	w := &worker{
+	w := &linuxWorker{
 		store:   fakeStore,
 		syscall: fakeSyscall,
 		cgroup:  fakeCgroup,
@@ -356,7 +358,7 @@ func TestStopJob_JobNotFound(t *testing.T) {
 	// job doesn't exist
 	fakeStore.GetJobReturns(nil, false)
 
-	w := &worker{
+	w := &linuxWorker{
 		store:  fakeStore,
 		logger: logger.WithField("component", "worker-test"),
 	}
@@ -379,7 +381,7 @@ func TestStopJob_JobNotRunning(t *testing.T) {
 	}
 	fakeStore.GetJobReturns(existingJob, true)
 
-	w := &worker{
+	w := &linuxWorker{
 		store:  fakeStore,
 		logger: logger.WithField("component", "worker-test"),
 	}
@@ -394,7 +396,7 @@ func TestStopJob_JobNotRunning(t *testing.T) {
 func TestStopJob_ContextCancelled(t *testing.T) {
 	fakeStore := &interfacesfakes.FakeStore{}
 
-	w := &worker{
+	w := &linuxWorker{
 		store:  fakeStore,
 		logger: logger.WithField("component", "worker-test"),
 	}
@@ -426,7 +428,7 @@ func TestStopJob_ForcedKill(t *testing.T) {
 	fakeSyscall.KillReturnsOnCall(1, nil) // Process still exists check
 	fakeSyscall.KillReturnsOnCall(2, nil) // SIGKILL succeeds
 
-	w := &worker{
+	w := &linuxWorker{
 		store:   fakeStore,
 		syscall: fakeSyscall,
 		cgroup:  fakeCgroup,
@@ -482,7 +484,7 @@ func TestProcessExists(t *testing.T) {
 			fakeSyscall := &osfakes.FakeSyscallInterface{}
 			fakeSyscall.KillReturns(tt.killErr)
 
-			w := &worker{
+			w := &linuxWorker{
 				syscall: fakeSyscall,
 				logger:  logger.WithField("component", "worker-test"),
 			}
