@@ -372,9 +372,7 @@ make live-log
 make service-status
 ```
 
-### Isolation of Process
-
-Isolation check:
+### Process Isolation
 
 * First create a job: `./bin/cli create sleep 300`
 * Then create a second job ` ./bin/cli create ps aux`
