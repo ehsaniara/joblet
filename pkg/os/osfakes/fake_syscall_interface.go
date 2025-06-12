@@ -43,6 +43,33 @@ type FakeSyscallInterface struct {
 	killReturnsOnCall map[int]struct {
 		result1 error
 	}
+	MountStub        func(string, string, string, uintptr, string) error
+	mountMutex       sync.RWMutex
+	mountArgsForCall []struct {
+		arg1 string
+		arg2 string
+		arg3 string
+		arg4 uintptr
+		arg5 string
+	}
+	mountReturns struct {
+		result1 error
+	}
+	mountReturnsOnCall map[int]struct {
+		result1 error
+	}
+	UnmountStub        func(string, int) error
+	unmountMutex       sync.RWMutex
+	unmountArgsForCall []struct {
+		arg1 string
+		arg2 int
+	}
+	unmountReturns struct {
+		result1 error
+	}
+	unmountReturnsOnCall map[int]struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -235,6 +262,133 @@ func (fake *FakeSyscallInterface) KillReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeSyscallInterface) Mount(arg1 string, arg2 string, arg3 string, arg4 uintptr, arg5 string) error {
+	fake.mountMutex.Lock()
+	ret, specificReturn := fake.mountReturnsOnCall[len(fake.mountArgsForCall)]
+	fake.mountArgsForCall = append(fake.mountArgsForCall, struct {
+		arg1 string
+		arg2 string
+		arg3 string
+		arg4 uintptr
+		arg5 string
+	}{arg1, arg2, arg3, arg4, arg5})
+	stub := fake.MountStub
+	fakeReturns := fake.mountReturns
+	fake.recordInvocation("Mount", []interface{}{arg1, arg2, arg3, arg4, arg5})
+	fake.mountMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4, arg5)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallInterface) MountCallCount() int {
+	fake.mountMutex.RLock()
+	defer fake.mountMutex.RUnlock()
+	return len(fake.mountArgsForCall)
+}
+
+func (fake *FakeSyscallInterface) MountCalls(stub func(string, string, string, uintptr, string) error) {
+	fake.mountMutex.Lock()
+	defer fake.mountMutex.Unlock()
+	fake.MountStub = stub
+}
+
+func (fake *FakeSyscallInterface) MountArgsForCall(i int) (string, string, string, uintptr, string) {
+	fake.mountMutex.RLock()
+	defer fake.mountMutex.RUnlock()
+	argsForCall := fake.mountArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
+}
+
+func (fake *FakeSyscallInterface) MountReturns(result1 error) {
+	fake.mountMutex.Lock()
+	defer fake.mountMutex.Unlock()
+	fake.MountStub = nil
+	fake.mountReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallInterface) MountReturnsOnCall(i int, result1 error) {
+	fake.mountMutex.Lock()
+	defer fake.mountMutex.Unlock()
+	fake.MountStub = nil
+	if fake.mountReturnsOnCall == nil {
+		fake.mountReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.mountReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallInterface) Unmount(arg1 string, arg2 int) error {
+	fake.unmountMutex.Lock()
+	ret, specificReturn := fake.unmountReturnsOnCall[len(fake.unmountArgsForCall)]
+	fake.unmountArgsForCall = append(fake.unmountArgsForCall, struct {
+		arg1 string
+		arg2 int
+	}{arg1, arg2})
+	stub := fake.UnmountStub
+	fakeReturns := fake.unmountReturns
+	fake.recordInvocation("Unmount", []interface{}{arg1, arg2})
+	fake.unmountMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallInterface) UnmountCallCount() int {
+	fake.unmountMutex.RLock()
+	defer fake.unmountMutex.RUnlock()
+	return len(fake.unmountArgsForCall)
+}
+
+func (fake *FakeSyscallInterface) UnmountCalls(stub func(string, int) error) {
+	fake.unmountMutex.Lock()
+	defer fake.unmountMutex.Unlock()
+	fake.UnmountStub = stub
+}
+
+func (fake *FakeSyscallInterface) UnmountArgsForCall(i int) (string, int) {
+	fake.unmountMutex.RLock()
+	defer fake.unmountMutex.RUnlock()
+	argsForCall := fake.unmountArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSyscallInterface) UnmountReturns(result1 error) {
+	fake.unmountMutex.Lock()
+	defer fake.unmountMutex.Unlock()
+	fake.UnmountStub = nil
+	fake.unmountReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallInterface) UnmountReturnsOnCall(i int, result1 error) {
+	fake.unmountMutex.Lock()
+	defer fake.unmountMutex.Unlock()
+	fake.UnmountStub = nil
+	if fake.unmountReturnsOnCall == nil {
+		fake.unmountReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.unmountReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeSyscallInterface) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -244,6 +398,10 @@ func (fake *FakeSyscallInterface) Invocations() map[string][][]interface{} {
 	defer fake.execMutex.RUnlock()
 	fake.killMutex.RLock()
 	defer fake.killMutex.RUnlock()
+	fake.mountMutex.RLock()
+	defer fake.mountMutex.RUnlock()
+	fake.unmountMutex.RLock()
+	defer fake.unmountMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

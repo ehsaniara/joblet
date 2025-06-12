@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"google.golang.org/grpc"
 	"job-worker/internal/config"
 	"job-worker/internal/worker"
@@ -10,6 +11,7 @@ import (
 	"job-worker/pkg/logger"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -26,18 +28,18 @@ func main() {
 		}
 	}
 
-	appLogger.Info("job-worker starting", "version", "1.0.0")
+	appLogger.Info("job-worker starting", "version", "1.0.0", "platform", runtime.GOOS)
 
-	if _, err := os.Stat(config.CgroupsBaseDir); os.IsNotExist(err) {
-		appLogger.Fatal("cgroups not available", "cgroupsPath", config.CgroupsBaseDir)
+	// Platform-specific initialization
+	if err := validatePlatformRequirements(appLogger); err != nil {
+		appLogger.Fatal("platform requirements not met", "error", err)
 	}
-	appLogger.Info("cgroups available", "cgroupsPath", config.CgroupsBaseDir)
 
 	appLogger.Debug("goroutine monitoring started")
 
 	s := store.New()
 	w := worker.New(s)
-	appLogger.Info("worker and store initialized")
+	appLogger.Info("worker and store initialized", "platform", runtime.GOOS)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -100,4 +102,23 @@ func main() {
 	}
 
 	appLogger.Info("server gracefully stopped")
+}
+
+// validatePlatformRequirements checks platform-specific requirements
+func validatePlatformRequirements(logger *logger.Logger) error {
+	switch runtime.GOOS {
+	case "linux":
+		if _, err := os.Stat(config.CgroupsBaseDir); os.IsNotExist(err) {
+			return fmt.Errorf("cgroups not available at %s", config.CgroupsBaseDir)
+		}
+		logger.Info("Linux requirements validated", "cgroupsPath", config.CgroupsBaseDir)
+		return nil
+	case "darwin":
+		logger.Info("macOS detected - using mock implementation")
+		logger.Warn("resource limits not enforced on macOS")
+		return nil
+	default:
+		logger.Warn("unsupported platform, using mock functionality", "platform", runtime.GOOS)
+		return nil
+	}
 }

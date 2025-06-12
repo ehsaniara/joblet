@@ -23,7 +23,7 @@ import (
 
 var jobCounter int64
 
-type worker struct {
+type linuxWorker struct {
 	store      interfaces.Store
 	cgroup     interfaces.Resource
 	cmdFactory os.CommandFactory
@@ -32,18 +32,23 @@ type worker struct {
 	logger     *logger.Logger
 }
 
-func New(store interfaces.Store) interfaces.JobWorker {
-	return &worker{
+// NewPlatformWorker creates a Linux-specific worker implementation
+func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
+	return &linuxWorker{
 		store:      store,
 		cgroup:     resource.New(),
 		cmdFactory: &os.DefaultCommandFactory{},
 		syscall:    &os.DefaultSyscall{},
 		os:         &os.DefaultOs{},
-		logger:     logger.WithField("component", "worker"),
+		logger:     logger.WithField("component", "worker-linux"),
 	}
 }
 
-func (w *worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+// Ensure linuxWorker implements both interfaces
+var _ interfaces.JobWorker = (*linuxWorker)(nil)
+var _ PlatformWorker = (*linuxWorker)(nil)
+
+func (w *linuxWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 
 	select {
 	case <-ctx.Done():
@@ -77,7 +82,7 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 
 	jobLogger.Debug("creating cgroup", "cgroupPath", cgroupJobDir)
 
-	// create cgroup first with limits
+	// create cgroup with limits
 	if err := w.cgroup.Create(cgroupJobDir, maxCPU, maxMemory, maxIOBPS); err != nil {
 
 		jobLogger.Error("failed to create cgroup", "cgroupPath", cgroupJobDir, "error", err)
@@ -151,7 +156,7 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 
 	jobLogger.Debug("environment prepared for init process", "envVarsAdded", len(jobEnvVars), "totalEnvVars", len(env))
 
-	// start the init process instead of the actual command
+	// start init process
 	cmd := w.cmdFactory.CreateCommand(initPath)
 	cmd.SetEnv(env)
 
@@ -164,8 +169,7 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	cmd.SetStdout(executor.New(w.store, job.Id))
 	cmd.SetStderr(executor.New(w.store, job.Id))
 
-	// create a process group for child process
-	// Use namespace-aware process attributes
+	// create a process group for child process, Use namespace-aware process attributes
 	sysProcAttr := w.createSysProcAttrWithNamespaces()
 	cmd.SetSysProcAttr(sysProcAttr)
 
@@ -222,121 +226,8 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	return runningJob, nil
 }
 
-func (w *worker) getJobInitPath() (string, error) {
+func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 
-	w.logger.Debug("searching for job-init binary")
-
-	execPath, err := w.os.Executable()
-	if err != nil {
-		w.logger.Warn("failed to get executable path", "error", err)
-	} else {
-
-		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
-
-		w.logger.Debug("checking job-init in executable directory", "execPath", execPath, "initPath", initPath)
-
-		if _, e := w.os.Stat(initPath); e == nil {
-
-			w.logger.Info("job-init found in executable directory", "path", initPath)
-			return initPath, nil
-		}
-	}
-
-	w.logger.Error("job-init binary not found in any location")
-
-	return "", fmt.Errorf("job-init binary not found in executable dir, /usr/local/bin, or PATH")
-}
-
-func (w *worker) createSysProcAttrWithNamespaces() *syscall.SysProcAttr {
-	sysProcAttr := w.syscall.CreateProcessGroup()
-
-	// Add namespace isolation if enabled
-	// Direct Clone Flags
-	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // Process isolation
-		syscall.CLONE_NEWNS | // Mount isolation
-		syscall.CLONE_NEWIPC | // IPC isolation
-		syscall.CLONE_NEWUTS // UTS isolation
-
-	w.logger.Debug("enabled namespace isolation",
-		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
-		"namespaces", "pid,mount,ipc,uts")
-
-	return sysProcAttr
-}
-
-// waitForCompletion waits for a job to complete and updates its status
-func (w *worker) waitForCompletion(ctx context.Context, cmd os.Command, job *domain.Job) {
-
-	log := w.logger.WithField("jobId", job.Id)
-
-	startTime := time.Now()
-
-	log.Debug("starting job monitoring", "pid", job.Pid, "command", job.Command)
-
-	defer func() {
-
-		// ensure cleanup happens even if something panics
-		if r := recover(); r != nil {
-			duration := time.Since(startTime)
-
-			log.Error("panic in job monitoring", "panic", r, "duration", duration)
-
-			w.cleanup(job.Id, int(job.Pid))
-		}
-	}()
-
-	err := cmd.Wait()
-	duration := time.Since(startTime)
-
-	if err != nil {
-		var exitCode int32
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			exitCode = int32(exitErr.ExitCode())
-		} else {
-			exitCode = -1
-		}
-
-		log.Info("job completed with error", "exitCode", exitCode, "duration", duration, "error", err)
-
-		completedJob := job.DeepCopy()
-
-		if failErr := completedJob.Fail(exitCode); failErr != nil {
-
-			log.Warn("domain validation failed for job failure", "domainError", failErr, "exitCode", exitCode)
-			completedJob.Status = domain.StatusFailed
-			completedJob.ExitCode = exitCode
-			now := time.Now()
-			completedJob.EndTime = &now
-
-		}
-
-		w.store.UpdateJob(completedJob)
-
-	} else {
-		log.Info("job completed successfully", "duration", duration)
-
-		completedJob := job.DeepCopy()
-		if completeErr := completedJob.Complete(0); completeErr != nil {
-
-			log.Warn("domain validation failed for job completion", "domainError", completeErr)
-			completedJob.Status = domain.StatusCompleted
-			completedJob.ExitCode = 0
-			now := time.Now()
-			completedJob.EndTime = &now
-		}
-		w.store.UpdateJob(completedJob)
-	}
-
-	if job.CgroupPath != "" {
-		log.Debug("cleaning up cgroup", "cgroupPath", job.CgroupPath)
-		w.cgroup.CleanupCgroup(job.Id)
-	}
-
-	log.Debug("job monitoring completed", "totalDuration", time.Since(startTime))
-}
-
-func (w *worker) StopJob(ctx context.Context, jobId string) error {
 	log := w.logger.WithField("jobId", jobId)
 
 	select {
@@ -355,18 +246,15 @@ func (w *worker) StopJob(ctx context.Context, jobId string) error {
 	}
 
 	if !job.IsRunning() {
-		log.Warn("attempted to stop non-running job",
-			"currentStatus", string(job.Status))
+		log.Warn("attempted to stop non-running job", "currentStatus", string(job.Status))
 		return fmt.Errorf("job is not running: %s (current status: %s)", jobId, job.Status)
 	}
 
-	log.Info("stopping running job",
-		"pid", job.Pid,
-		"status", string(job.Status))
+	log.Info("stopping running job", "pid", job.Pid, "status", string(job.Status))
 
 	stopStartTime := time.Now()
 
-	// send to process group
+	// send SIGTERM to process group
 	log.Debug("sending SIGTERM to process group", "processGroup", -int(job.Pid))
 	if err := w.syscall.Kill(-int(job.Pid), syscall.SIGTERM); err != nil {
 
@@ -378,7 +266,7 @@ func (w *worker) StopJob(ctx context.Context, jobId string) error {
 		}
 	}
 
-	// for graceful shutdown
+	// wait for graceful shutdown
 	gracefulWaitTime := 100 * time.Millisecond
 	log.Debug("waiting for graceful shutdown", "timeout", gracefulWaitTime)
 	time.Sleep(gracefulWaitTime)
@@ -413,7 +301,7 @@ func (w *worker) StopJob(ctx context.Context, jobId string) error {
 		return nil
 	}
 
-	// send to process group first
+	// send to process group first, force kill
 	log.Warn("process still alive after graceful shutdown, force killing", "pid", job.Pid, "gracefulDuration", gracefulDuration)
 
 	if err := w.syscall.Kill(-int(job.Pid), syscall.SIGKILL); err != nil {
@@ -452,9 +340,99 @@ func (w *worker) StopJob(ctx context.Context, jobId string) error {
 	return nil
 }
 
-// cleanup is for when things go wrong
-func (w *worker) cleanup(jobId string, pid int) {
+func (w *linuxWorker) getJobInitPath() (string, error) {
+	w.logger.Debug("searching for job-init binary")
 
+	execPath, err := w.os.Executable()
+	if err != nil {
+		w.logger.Warn("failed to get executable path", "error", err)
+	} else {
+		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
+		w.logger.Debug("checking job-init in executable directory", "execPath", execPath, "initPath", initPath)
+		if _, e := w.os.Stat(initPath); e == nil {
+			w.logger.Info("job-init found in executable directory", "path", initPath)
+			return initPath, nil
+		}
+	}
+
+	w.logger.Error("job-init binary not found in any location")
+	return "", fmt.Errorf("job-init binary not found in executable dir, /usr/local/bin, or PATH")
+}
+
+func (w *linuxWorker) createSysProcAttrWithNamespaces() *syscall.SysProcAttr {
+	sysProcAttr := w.syscall.CreateProcessGroup()
+
+	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID |
+		syscall.CLONE_NEWNS |
+		syscall.CLONE_NEWIPC |
+		syscall.CLONE_NEWUTS
+
+	w.logger.Debug("enabled namespace isolation",
+		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
+		"namespaces", "pid,mount,ipc,uts")
+
+	return sysProcAttr
+}
+
+func (w *linuxWorker) waitForCompletion(ctx context.Context, cmd os.Command, job *domain.Job) {
+	// COPY YOUR EXISTING waitForCompletion METHOD - it's long, so I'll abbreviate
+	log := w.logger.WithField("jobId", job.Id)
+	startTime := time.Now()
+
+	log.Debug("starting job monitoring", "pid", job.Pid, "command", job.Command)
+
+	defer func() {
+		if r := recover(); r != nil {
+			duration := time.Since(startTime)
+			log.Error("panic in job monitoring", "panic", r, "duration", duration)
+			w.cleanup(job.Id, int(job.Pid))
+		}
+	}()
+
+	err := cmd.Wait()
+	duration := time.Since(startTime)
+
+	if err != nil {
+		var exitCode int32
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = int32(exitErr.ExitCode())
+		} else {
+			exitCode = -1
+		}
+
+		log.Info("job completed with error", "exitCode", exitCode, "duration", duration, "error", err)
+		completedJob := job.DeepCopy()
+		if failErr := completedJob.Fail(exitCode); failErr != nil {
+			log.Warn("domain validation failed for job failure", "domainError", failErr, "exitCode", exitCode)
+			completedJob.Status = domain.StatusFailed
+			completedJob.ExitCode = exitCode
+			now := time.Now()
+			completedJob.EndTime = &now
+		}
+		w.store.UpdateJob(completedJob)
+	} else {
+		log.Info("job completed successfully", "duration", duration)
+		completedJob := job.DeepCopy()
+		if completeErr := completedJob.Complete(0); completeErr != nil {
+			log.Warn("domain validation failed for job completion", "domainError", completeErr)
+			completedJob.Status = domain.StatusCompleted
+			completedJob.ExitCode = 0
+			now := time.Now()
+			completedJob.EndTime = &now
+		}
+		w.store.UpdateJob(completedJob)
+	}
+
+	if job.CgroupPath != "" {
+		log.Debug("cleaning up cgroup", "cgroupPath", job.CgroupPath)
+		w.cgroup.CleanupCgroup(job.Id)
+	}
+
+	log.Debug("job monitoring completed", "totalDuration", time.Since(startTime))
+}
+
+func (w *linuxWorker) cleanup(jobId string, pid int) {
 	log := w.logger.WithFields("jobId", jobId, "pid", pid)
 	log.Warn("starting emergency cleanup")
 
@@ -495,8 +473,7 @@ func (w *worker) cleanup(jobId string, pid int) {
 	log.Info("emergency cleanup completed")
 }
 
-// processExists checks if a process with the given PID exists
-func (w *worker) processExists(pid int) bool {
+func (w *linuxWorker) processExists(pid int) bool {
 	err := w.syscall.Kill(pid, 0)
 	if err == nil {
 		w.logger.Debug("process exists check: process found", "pid", pid)
