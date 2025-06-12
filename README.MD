@@ -83,7 +83,14 @@ make certs-download-viewer  # View-only privileges
 
 ## 🏗️ Architecture
 
-![sequence-diagram.svg](docs/sequence-diagram.svg)![high-level.svg](docs/high-level.svg)
+![high-level.svg](docs/high-level.svg)
+
+## 📖 Documentation
+
+- 📋 [Technical Design](docs/DESIGN.md) - Detailed system architecture
+- 🔧 [API Reference](docs/API.md) - gRPC API documentation
+- 🚀 [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
+- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
 
 ## 📋 Requirements
 
@@ -303,13 +310,6 @@ job-worker/
 ├── Makefile          # Build and deployment automation
 └── test/             # Integration tests
 ```
-
-## 📖 Documentation
-
-- 📋 [Technical Design](docs/DESIGN.md) - Detailed system architecture
-- 🔧 [API Reference](docs/API.md) - gRPC API documentation
-- 🚀 [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
-- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
 
 ## 🤝 Contributing
 

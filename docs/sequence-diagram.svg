@@ -1,9 +1,9 @@
 <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
     <!-- Background -->
-    <rect width="1000" height="700"/>
+    <rect width="1000" height="700" fill="#ccc"/>
 
     <!-- Title -->
-    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#6c4b4b">
+    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">
         Job Worker Streaming - Sequence Diagram
     </text>
 
