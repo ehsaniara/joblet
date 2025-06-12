@@ -134,17 +134,6 @@ export JOB_WORKER_DEFAULT_MEMORY=512   # 512 MB
 export JOB_WORKER_DEFAULT_IO=0         # Unlimited
 ```
 
-### Client Configuration
-
-```bash
-
-# Connect to remote server
-./job-worker-cli --server=remote-host:50051 create echo "hello"
-
-# Use custom certificates
-./job-worker-cli --cert-path=./custom-certs create echo "hello"
-```
-
 ## 🔐 Security & Permissions
 
 ### Role-Based Access Control
