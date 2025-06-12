@@ -93,8 +93,8 @@ make certs-download-viewer  # View-only privileges
 - **Go Version**: 1.23 or later
 - **Privileges**: Root access on Linux (for cgroup management)
 - **Dependencies**:
-  - Linux: kernel 4.5+ (for cgroups v2), systemd (recommended)
-  - macOS: No special requirements (limited functionality)
+    - Linux: kernel 4.5+ (for cgroups v2), systemd (recommended)
+    - macOS: No special requirements (limited functionality)
 
 ### TLS Certificates
 
@@ -169,14 +169,15 @@ export JOB_WORKER_DEFAULT_IO=0         # Unlimited
 
 ### Role-Based Access Control
 
-| Role | Create Jobs | View Jobs | Stop Jobs | Stream Logs |
-|------|-------------|-----------|-----------|-------------|
-| **Admin** | ✅ | ✅ | ✅ | ✅ |
-| **Viewer** | ❌ | ✅ | ❌ | ✅ |
+| Role       | Create Jobs | View Jobs | Stop Jobs | Stream Logs |
+|------------|-------------|-----------|-----------|-------------|
+| **Admin**  | ✅           | ✅         | ✅         | ✅           |
+| **Viewer** | ❌           | ✅         | ❌         | ✅           |
 
 ### Certificate-Based Authentication
 
 Roles are determined by the `OU` (Organizational Unit) field in client certificates:
+
 - `OU=admin` → Admin privileges
 - `OU=viewer` → Read-only access
 
@@ -355,7 +356,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [gRPC](https://grpc.io/) for high-performance RPC framework
 - [Linux Cgroups](https://www.kernel.org/doc/Documentation/cgroup-v2.txt) for resource isolation
 - [Cobra](https://github.com/spf13/cobra) for CLI framework
-
 
 <div align="center">
   <sub>by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
