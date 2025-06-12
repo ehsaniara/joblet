@@ -1,0 +1,97 @@
+<svg width="900" height="650" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="1000" height="700" fill="#ccc"/>
+
+    <!-- Title -->
+    <text x="450" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1a1a1a">
+        Job Worker Creation - Sequence Diagram
+    </text>
+
+    <!-- Participants -->
+    <rect x="40" y="70" width="90" height="45" rx="10" fill="#4285f4" stroke="#1a73e8" stroke-width="2"/>
+    <text x="85" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Client</text>
+
+    <rect x="170" y="70" width="90" height="45" rx="10" fill="#9c27b0" stroke="#7b1fa2" stroke-width="2"/>
+    <text x="215" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">gRPC Service</text>
+
+    <rect x="300" y="70" width="90" height="45" rx="10" fill="#ff9800" stroke="#f57c00" stroke-width="2"/>
+    <text x="345" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Worker</text>
+
+    <rect x="430" y="70" width="90" height="45" rx="10" fill="#4caf50" stroke="#388e3c" stroke-width="2"/>
+    <text x="475" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Store</text>
+
+    <rect x="560" y="70" width="90" height="45" rx="10" fill="#ffc107" stroke="#ffa000" stroke-width="2"/>
+    <text x="605" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">CGroup</text>
+
+    <rect x="690" y="70" width="90" height="45" rx="10" fill="#f44336" stroke="#d32f2f" stroke-width="2"/>
+    <text x="735" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Job Process</text>
+
+    <!-- Lifelines -->
+    <line x1="85" y1="115" x2="85" y2="580" stroke="#e0e0e0" stroke-width="3" stroke-dasharray="8,4"/>
+    <line x1="215" y1="115" x2="215" y2="580" stroke="#e0e0e0" stroke-width="3" stroke-dasharray="8,4"/>
+    <line x1="345" y1="115" x2="345" y2="580" stroke="#e0e0e0" stroke-width="3" stroke-dasharray="8,4"/>
+    <line x1="475" y1="115" x2="475" y2="580" stroke="#e0e0e0" stroke-width="3" stroke-dasharray="8,4"/>
+    <line x1="605" y1="115" x2="605" y2="580" stroke="#e0e0e0" stroke-width="3" stroke-dasharray="8,4"/>
+    <line x1="735" y1="115" x2="735" y2="580" stroke="#e0e0e0" stroke-width="3" stroke-dasharray="8,4"/>
+
+    <!-- Step 1: CreateJob Request -->
+    <line x1="85" y1="150" x2="215" y2="150" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="150" y="143" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">CreateJob(cmd, args, limits)</text>
+
+    <!-- Step 2: Authentication -->
+    <rect x="210" y="170" width="10" height="25" fill="#9c27b0"/>
+    <text x="230" y="185" font-family="Arial, sans-serif" font-size="11" fill="#2c3e50">auth.Authorized()</text>
+
+    <!-- Step 3: StartJob -->
+    <line x1="215" y1="210" x2="345" y2="210" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="280" y="203" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">StartJob()</text>
+
+    <!-- Step 4: Generate JobId -->
+    <rect x="340" y="230" width="10" height="25" fill="#ff9800"/>
+    <text x="360" y="245" font-family="Arial, sans-serif" font-size="11" fill="#2c3e50">Generate jobId</text>
+
+    <!-- Step 5: Create CGroup -->
+    <line x1="345" y1="280" x2="605" y2="280" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="475" y="273" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">Create(cgroupPath, limits)</text>
+
+    <line x1="605" y1="305" x2="345" y2="305" stroke="#4caf50" stroke-width="3" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="475" y="298" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4caf50">✓ CGroup created</text>
+
+    <!-- Step 6: Store Job -->
+    <line x1="345" y1="340" x2="475" y2="340" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="410" y="333" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">CreateNewJob(job)</text>
+
+    <line x1="475" y1="365" x2="345" y2="365" stroke="#4caf50" stroke-width="3" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="410" y="358" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4caf50">✓ Job stored</text>
+
+    <!-- Step 7: Start Process -->
+    <line x1="345" y1="400" x2="735" y2="400" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="540" y="393" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">cmd.Start() via job-init</text>
+
+    <line x1="735" y1="425" x2="345" y2="425" stroke="#4caf50" stroke-width="3" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="540" y="418" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4caf50">✓ Process started (PID)</text>
+
+    <!-- Step 8: Update Job Status -->
+    <line x1="345" y1="460" x2="475" y2="460" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="410" y="453" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">UpdateJob(RUNNING)</text>
+
+    <line x1="475" y1="485" x2="345" y2="485" stroke="#4caf50" stroke-width="3" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="410" y="478" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4caf50">✓ Status updated</text>
+
+    <!-- Step 9: Response -->
+    <line x1="215" y1="520" x2="85" y2="520" stroke="#4caf50" stroke-width="3" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="150" y="513" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4caf50">CreateJobRes(jobId, status)</text>
+
+    <!-- Arrow marker definition -->
+    <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#64748b"/>
+        </marker>
+    </defs>
+
+    <!-- Timeline -->
+    <rect x="40" y="600" width="820" height="30" fill="#f5f5f5" stroke="#e0e0e0" stroke-width="1" rx="5"/>
+    <text x="450" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#666666">
+        Timeline: Request → Auth → Resource Setup → Storage → Process Launch → Status Update → Response
+    </text>
+</svg>
