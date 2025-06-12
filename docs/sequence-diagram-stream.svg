@@ -169,7 +169,8 @@
 
     <!-- Timeline -->
     <g id="timeline">
-        <text x="50" y="630" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#64748b">
+        <rect x="40" y="600" width="820" height="30" fill="#f5f5f5" stroke="#e0e0e0" stroke-width="1" rx="5"/>
+        <text x="450" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#666666">
             Timeline: Request → Auth → Historical → Live Stream → Complete
         </text>
     </g>
