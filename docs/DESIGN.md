@@ -14,9 +14,9 @@ The Job Worker is a distributed job execution system that provides secure, resou
 
 ## 2. System Architecture
 
-### 2.1 High-Level Architecture
+### 2.1 Sequence Diagram
 
-![high-level.svg](high-level.svg)
+![sequence-diagram.svg](sequence-diagram.svg)
 
 ### 2.2 Component Overview
 
