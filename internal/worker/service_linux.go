@@ -15,32 +15,50 @@ import (
 	"job-worker/pkg/os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 )
 
+const (
+	netns       = "/tmp/shared-netns/"
+	varRunNetns = "/var/run/netns/"
+	SYS_SETNS   = 308 // x86_64 syscall number for setns
+)
+
 var jobCounter int64
 
+type NetworkGroup struct {
+	GroupID   string
+	JobCount  int32
+	NamePath  string
+	CreatedAt time.Time
+}
+
 type linuxWorker struct {
-	store      interfaces.Store
-	cgroup     interfaces.Resource
-	cmdFactory os.CommandFactory
-	syscall    os.SyscallInterface
-	os         os.OsInterface
-	logger     *logger.Logger
+	store         interfaces.Store
+	cgroup        interfaces.Resource
+	cmdFactory    os.CommandFactory
+	syscall       os.SyscallInterface
+	os            os.OsInterface
+	logger        *logger.Logger
+	networkGroups map[string]*NetworkGroup
+	groupMutex    sync.RWMutex
 }
 
 // NewPlatformWorker creates a Linux-specific worker implementation
 func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	return &linuxWorker{
-		store:      store,
-		cgroup:     resource.New(),
-		cmdFactory: &os.DefaultCommandFactory{},
-		syscall:    &os.DefaultSyscall{},
-		os:         &os.DefaultOs{},
-		logger:     logger.WithField("component", "worker-linux"),
+		store:         store,
+		cgroup:        resource.New(),
+		cmdFactory:    &os.DefaultCommandFactory{},
+		syscall:       &os.DefaultSyscall{},
+		os:            &os.DefaultOs{},
+		logger:        logger.WithField("component", "worker-linux"),
+		networkGroups: make(map[string]*NetworkGroup),
 	}
 }
 
@@ -48,8 +66,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 var _ interfaces.JobWorker = (*linuxWorker)(nil)
 var _ PlatformWorker = (*linuxWorker)(nil)
 
-func (w *linuxWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
-
+func (w *linuxWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, networkGroupID string) (*domain.Job, error) {
 	select {
 	case <-ctx.Done():
 		w.logger.Warn("start job cancelled by context", "error", ctx.Err())
@@ -58,11 +75,11 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 	}
 
 	jobId := strconv.FormatInt(atomic.AddInt64(&jobCounter, 1), 10)
-
 	jobLogger := w.logger.WithField("jobId", jobId)
 
-	jobLogger.Info("starting new job", "command", command, "args", args, "requestedCPU", maxCPU, "requestedMemory", maxMemory, "requestedIOBPS", maxIOBPS)
+	jobLogger.Info("starting new job", "command", command, "args", args, "requestedCPU", maxCPU, "requestedMemory", maxMemory, "requestedIOBPS", maxIOBPS, "networkGroup", networkGroupID)
 
+	// Apply defaults for resource limits
 	originalCPU, originalMemory, originalIOBPS := maxCPU, maxMemory, maxIOBPS
 	if maxCPU <= 0 {
 		maxCPU = config.DefaultCPULimitPercent
@@ -82,33 +99,58 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 
 	jobLogger.Debug("creating cgroup", "cgroupPath", cgroupJobDir)
 
-	// create cgroup with limits
+	// Create cgroup with limits
 	if err := w.cgroup.Create(cgroupJobDir, maxCPU, maxMemory, maxIOBPS); err != nil {
-
 		jobLogger.Error("failed to create cgroup", "cgroupPath", cgroupJobDir, "error", err)
 		return nil, fmt.Errorf("failed to create cgroup for job %s: %w", jobId, err)
 	}
 
 	jobLogger.Debug("cgroup created successfully", "cgroupPath", cgroupJobDir, "cpuLimit", maxCPU, "memoryLimit", maxMemory, "ioLimit", maxIOBPS)
 
-	// to prevent "command not found" errors
+	// Handle network namespace setup
+	var sysProcAttr *syscall.SysProcAttr
+	var nsPath string
+	var isNewNetworkGroup bool
+	var needsNamespaceJoin bool
+
+	if networkGroupID != "" {
+		// Join existing network group or create new one
+		var err error
+		nsPath, sysProcAttr, isNewNetworkGroup, err = w.handleNetworkGroup(networkGroupID, jobId)
+		if err != nil {
+			jobLogger.Error("failed to handle network group", "networkGroupID", networkGroupID, "error", err)
+			w.cgroup.CleanupCgroup(jobId)
+			return nil, fmt.Errorf("failed to handle network group: %w", err)
+		}
+		needsNamespaceJoin = !isNewNetworkGroup
+		jobLogger.Info("network group handling completed", "groupID", networkGroupID, "isNew", isNewNetworkGroup, "needsJoin", needsNamespaceJoin)
+	} else {
+		// Create isolated namespace (existing behavior)
+		sysProcAttr = w.createSysProcAttrWithNamespaces()
+		nsPath = filepath.Join(netns, jobId)
+		isNewNetworkGroup = true
+		needsNamespaceJoin = false
+	}
+
+	// Prevent "command not found" errors by resolving command path
 	resolvedCommand := command
 	if !filepath.IsAbs(command) {
-
 		jobLogger.Debug("resolving command path", "originalCommand", command)
 
 		if path, err := exec.LookPath(command); err == nil {
-
 			resolvedCommand = path
 			jobLogger.Debug("command resolved", "originalCommand", command, "resolvedPath", resolvedCommand)
 		} else {
-
 			jobLogger.Error("command not found in PATH", "command", command, "error", err)
 			w.cgroup.CleanupCgroup(jobId)
+			if networkGroupID != "" && isNewNetworkGroup {
+				w.cleanupNetworkGroup(networkGroupID)
+			}
 			return nil, fmt.Errorf("command not found in PATH: %s", command)
 		}
 	}
 
+	// Create job domain object
 	limits := domain.ResourceLimits{
 		MaxCPU:    maxCPU,
 		MaxMemory: maxMemory,
@@ -116,30 +158,33 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 	}
 
 	job := &domain.Job{
-		Id:         jobId,
-		Command:    resolvedCommand,
-		Args:       append([]string(nil), args...),
-		Limits:     limits,
-		Status:     domain.StatusInitializing,
-		CgroupPath: cgroupJobDir,
-		StartTime:  time.Now(),
+		Id:             jobId,
+		Command:        resolvedCommand,
+		Args:           append([]string(nil), args...),
+		Limits:         limits,
+		Status:         domain.StatusInitializing,
+		CgroupPath:     cgroupJobDir,
+		StartTime:      time.Now(),
+		NetworkGroupID: networkGroupID,
 	}
 	w.store.CreateNewJob(job)
 
 	jobLogger.Debug("job created in store", "status", string(job.Status), "resolvedCommand", resolvedCommand, "argsCount", len(job.Args))
 
-	// get path to the job-init binary
+	// Get path to the job-init binary
 	initPath, err := w.getJobInitPath()
 	if err != nil {
 		jobLogger.Error("failed to get job-init path", "error", err)
-
 		w.cgroup.CleanupCgroup(job.Id)
+		if networkGroupID != "" && isNewNetworkGroup {
+			w.cleanupNetworkGroup(networkGroupID)
+		}
 		return nil, fmt.Errorf("failed to get job-init path: %w", err)
 	}
 
 	jobLogger.Debug("job-init binary located", "initPath", initPath)
 
-	// prepare environment for init process
+	// Prepare environment for init process
 	env := w.os.Environ()
 	jobEnvVars := []string{
 		fmt.Sprintf("JOB_ID=%s", job.Id),
@@ -147,7 +192,13 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", cgroupJobDir),
 	}
 
-	// add arguments as separate environment variables to handle spaces
+	// Add network group environment variables for job-init
+	if networkGroupID != "" {
+		jobEnvVars = append(jobEnvVars, fmt.Sprintf("NETWORK_GROUP_ID=%s", networkGroupID))
+		jobEnvVars = append(jobEnvVars, fmt.Sprintf("IS_NEW_NETWORK_GROUP=%t", isNewNetworkGroup))
+	}
+
+	// Add arguments as separate environment variables to handle spaces
 	for i, arg := range job.Args {
 		jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
@@ -156,63 +207,170 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 
 	jobLogger.Debug("environment prepared for init process", "envVarsAdded", len(jobEnvVars), "totalEnvVars", len(env))
 
-	// start init process
+	// Prepare command
 	cmd := w.cmdFactory.CreateCommand(initPath)
 	cmd.SetEnv(env)
+	cmd.SetStdout(executor.New(w.store, job.Id))
+	cmd.SetStderr(executor.New(w.store, job.Id))
+	cmd.SetSysProcAttr(sysProcAttr)
 
 	jobLogger.Info("starting init process with namespace isolation",
 		"initPath", initPath,
 		"targetCommand", job.Command,
 		"targetArgs", job.Args,
-		"namespaces", "pid,mount,ipc,uts")
+		"namespaces", "pid,mount,ipc,uts,net",
+		"networkGroup", networkGroupID,
+		"needsNamespaceJoin", needsNamespaceJoin)
 
-	cmd.SetStdout(executor.New(w.store, job.Id))
-	cmd.SetStderr(executor.New(w.store, job.Id))
+	// Use pre-fork namespace setup approach
+	type startResult struct {
+		err error
+		pid int
+	}
 
-	// create a process group for child process, Use namespace-aware process attributes
-	sysProcAttr := w.createSysProcAttrWithNamespaces()
-	cmd.SetSysProcAttr(sysProcAttr)
+	startChan := make(chan startResult, 1)
 
-	startTime := time.Now()
-	if e := cmd.Start(); e != nil {
-		duration := time.Since(startTime)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				startChan <- startResult{err: fmt.Errorf("panic in start goroutine: %v", r)}
+			}
+		}()
 
-		jobLogger.Error("failed to start init process", "error", e, "duration", duration)
+		// Lock this goroutine to the OS thread
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 
-		failedJob := job.DeepCopy()
-		if failErr := failedJob.Fail(-1); failErr != nil {
-
-			jobLogger.Warn("domain validation failed for job failure", "domainError", failErr)
-
-			failedJob.Status = domain.StatusFailed
-			failedJob.ExitCode = -1
-			now := time.Now()
-			failedJob.EndTime = &now
+		// Join network namespace if needed (before forking)
+		if needsNamespaceJoin {
+			jobLogger.Debug("joining network namespace before fork", "nsPath", nsPath)
+			if err := w.setNetworkNamespace(nsPath); err != nil {
+				startChan <- startResult{err: fmt.Errorf("failed to join namespace: %w", err)}
+				return
+			}
+			jobLogger.Debug("successfully joined network namespace")
 		}
-		w.store.UpdateJob(failedJob)
 
+		// Start the process (which will inherit the current namespace)
+		startTime := time.Now()
+		if err := cmd.Start(); err != nil {
+			startChan <- startResult{err: fmt.Errorf("failed to start command: %w", err)}
+			return
+		}
+
+		process := cmd.Process()
+		if process == nil {
+			startChan <- startResult{err: fmt.Errorf("process is nil after start")}
+			return
+		}
+
+		duration := time.Since(startTime)
+		jobLogger.Debug("process started in goroutine", "pid", process.Pid(), "duration", duration)
+		startChan <- startResult{pid: process.Pid()}
+	}()
+
+	// Wait for the goroutine to complete with timeout
+	var actualPid int32
+	select {
+	case result := <-startChan:
+		if result.err != nil {
+			jobLogger.Error("failed to start process in goroutine", "error", result.err)
+
+			// Cleanup on failure
+			w.cgroup.CleanupCgroup(job.Id)
+			if networkGroupID != "" && isNewNetworkGroup {
+				w.cleanupNetworkGroup(networkGroupID)
+			}
+
+			failedJob := job.DeepCopy()
+			if failErr := failedJob.Fail(-1); failErr != nil {
+				jobLogger.Warn("domain validation failed for job failure", "domainError", failErr)
+				failedJob.Status = domain.StatusFailed
+				failedJob.ExitCode = -1
+				now := time.Now()
+				failedJob.EndTime = &now
+			}
+			w.store.UpdateJob(failedJob)
+
+			return nil, fmt.Errorf("failed to start process: %w", result.err)
+		}
+
+		actualPid = int32(result.pid)
+		job.Pid = actualPid
+
+	case <-ctx.Done():
+		jobLogger.Warn("context cancelled while starting process")
 		w.cgroup.CleanupCgroup(job.Id)
-		return nil, fmt.Errorf("start init process: %w", e)
+		if networkGroupID != "" && isNewNetworkGroup {
+			w.cleanupNetworkGroup(networkGroupID)
+		}
+		return nil, ctx.Err()
+
+	case <-time.After(10 * time.Second):
+		jobLogger.Error("timeout waiting for process to start")
+		w.cgroup.CleanupCgroup(job.Id)
+		if networkGroupID != "" && isNewNetworkGroup {
+			w.cleanupNetworkGroup(networkGroupID)
+		}
+		return nil, fmt.Errorf("timeout waiting for process to start")
 	}
 
-	startDuration := time.Since(startTime)
+	jobLogger.Info("init process started successfully", "pid", actualPid)
 
-	process := cmd.Process()
-	if process == nil {
-		jobLogger.Error("process is nil after start", "startDuration", startDuration)
-		w.cgroup.CleanupCgroup(job.Id)
-		return nil, fmt.Errorf("process is nil after start")
+	// Handle namespace symlink creation AFTER we have a valid PID
+	if isNewNetworkGroup {
+		// Only create symlink for new network groups or isolated jobs
+		nsSource := fmt.Sprintf("/proc/%d/ns/net", actualPid)
+
+		// Ensure directory exists
+		if err := w.ensureNetnsDir(nsPath); err != nil {
+			jobLogger.Error("failed to create netns directory", "error", err)
+			w.cleanup(job.Id, int(actualPid))
+			return nil, fmt.Errorf("failed to create netns directory: %w", err)
+		}
+
+		// For network groups, create a bind mount for persistence
+		if networkGroupID != "" {
+			// Create the namespace file first
+			err := w.os.WriteFile(nsPath, []byte{}, 0644)
+			if err != nil {
+				jobLogger.Error("failed to create namespace file", "path", nsPath, "error", err)
+				w.cleanup(job.Id, int(actualPid))
+				return nil, fmt.Errorf("failed to create namespace file: %w", err)
+			}
+
+			// Bind mount the namespace
+			err = w.syscall.Mount(nsSource, nsPath, "", syscall.MS_BIND, "")
+			if err != nil {
+				jobLogger.Error("failed to bind mount namespace", "source", nsSource, "target", nsPath, "error", err)
+				w.cleanup(job.Id, int(actualPid))
+				return nil, fmt.Errorf("failed to bind mount namespace: %w", err)
+			}
+			jobLogger.Debug("namespace bind mounted successfully", "source", nsSource, "target", nsPath)
+		} else {
+			// For isolated jobs, just create a symlink
+			jobLogger.Debug("creating namespace symlink", "source", nsSource, "target", nsPath)
+			err := w.os.Symlink(nsSource, nsPath)
+			if err != nil {
+				jobLogger.Error("failed to create namespace symlink", "source", nsSource, "target", nsPath, "error", err)
+				w.cleanup(job.Id, int(actualPid))
+				return nil, fmt.Errorf("failed to create namespace symlink: %w", err)
+			}
+			jobLogger.Debug("namespace symlink created successfully")
+		}
 	}
 
-	job.Pid = int32(process.Pid())
-	jobLogger.Info("init process started successfully", "pid", job.Pid, "startDuration", startDuration)
+	// Update job counts for network groups
+	if networkGroupID != "" {
+		w.incrementGroupJobCount(networkGroupID)
+	}
 
+	// Mark job as running
 	runningJob := job.DeepCopy()
-	if e := runningJob.MarkAsRunning(job.Pid); e != nil {
-
+	if e := runningJob.MarkAsRunning(actualPid); e != nil {
 		jobLogger.Warn("domain validation failed for running status", "domainError", e)
 		runningJob.Status = domain.StatusRunning
-		runningJob.Pid = job.Pid
+		runningJob.Pid = actualPid
 	}
 
 	runningJob.StartTime = time.Now()
@@ -226,8 +384,39 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 	return runningJob, nil
 }
 
-func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
+// setNetworkNamespace joins an existing network namespace using setns syscall
+func (w *linuxWorker) setNetworkNamespace(nsPath string) error {
+	if nsPath == "" {
+		return fmt.Errorf("namespace path cannot be empty")
+	}
 
+	// Check if namespace file exists
+	if _, err := w.os.Stat(nsPath); err != nil {
+		return fmt.Errorf("namespace file does not exist: %s (%w)", nsPath, err)
+	}
+
+	w.logger.Debug("opening namespace file", "nsPath", nsPath)
+
+	// Open the namespace file
+	fd, err := syscall.Open(nsPath, syscall.O_RDONLY, 0)
+	if err != nil {
+		return fmt.Errorf("failed to open namespace file %s: %w", nsPath, err)
+	}
+	defer syscall.Close(fd)
+
+	w.logger.Debug("calling setns syscall", "fd", fd, "nsPath", nsPath)
+
+	// Call setns system call
+	_, _, errno := syscall.Syscall(SYS_SETNS, uintptr(fd), syscall.CLONE_NEWNET, 0)
+	if errno != 0 {
+		return fmt.Errorf("setns syscall failed for %s: %v", nsPath, errno)
+	}
+
+	w.logger.Debug("successfully joined network namespace", "nsPath", nsPath)
+	return nil
+}
+
+func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 	log := w.logger.WithField("jobId", jobId)
 
 	select {
@@ -245,6 +434,12 @@ func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 		return fmt.Errorf("job not found: %s", jobId)
 	}
 
+	// Clean up isolated job namespace symlink
+	if job.NetworkGroupID == "" {
+		nsPath := filepath.Join(netns, jobId)
+		w.os.Remove(nsPath)
+	}
+
 	if !job.IsRunning() {
 		log.Warn("attempted to stop non-running job", "currentStatus", string(job.Status))
 		return fmt.Errorf("job is not running: %s (current status: %s)", jobId, job.Status)
@@ -254,24 +449,23 @@ func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 
 	stopStartTime := time.Now()
 
-	// send SIGTERM to process group
+	// Send SIGTERM to process group
 	log.Debug("sending SIGTERM to process group", "processGroup", -int(job.Pid))
 	if err := w.syscall.Kill(-int(job.Pid), syscall.SIGTERM); err != nil {
-
 		log.Warn("failed to send SIGTERM to process group", "processGroup", job.Pid, "error", err)
 
-		// if killing the group failed, try killing just the main process
+		// If killing the group failed, try killing just the main process
 		if errIn := w.syscall.Kill(int(job.Pid), syscall.SIGTERM); errIn != nil {
 			log.Warn("failed to send SIGTERM to main process", "pid", job.Pid, "error", errIn)
 		}
 	}
 
-	// wait for graceful shutdown
+	// Wait for graceful shutdown
 	gracefulWaitTime := 100 * time.Millisecond
 	log.Debug("waiting for graceful shutdown", "timeout", gracefulWaitTime)
 	time.Sleep(gracefulWaitTime)
 
-	// check if process is still alive
+	// Check if process is still alive
 	processAlive := w.processExists(int(job.Pid))
 	gracefulDuration := time.Since(stopStartTime)
 
@@ -280,15 +474,12 @@ func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 
 		stoppedJob := job.DeepCopy()
 		if stopErr := stoppedJob.Stop(); stopErr != nil {
-
-			// if domain validation fails
+			// If domain validation fails
 			log.Warn("domain validation failed for graceful stop", "domainError", stopErr)
 			stoppedJob.Status = domain.StatusStopped
 			stoppedJob.ExitCode = 0
-
 			now := time.Now()
 			stoppedJob.EndTime = &now
-
 		} else {
 			stoppedJob.ExitCode = 0
 		}
@@ -298,32 +489,34 @@ func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 			log.Debug("cleaning up cgroup after graceful stop", "cgroupPath", job.CgroupPath)
 			w.cgroup.CleanupCgroup(job.Id)
 		}
+
+		// Handle network group cleanup
+		if job.NetworkGroupID != "" {
+			w.decrementGroupJobCount(job.NetworkGroupID)
+		}
+
 		return nil
 	}
 
-	// send to process group first, force kill
+	// Send SIGKILL to process group (force kill)
 	log.Warn("process still alive after graceful shutdown, force killing", "pid", job.Pid, "gracefulDuration", gracefulDuration)
 
 	if err := w.syscall.Kill(-int(job.Pid), syscall.SIGKILL); err != nil {
 		log.Warn("failed to send SIGKILL to process group", "processGroup", job.Pid, "error", err)
 
-		// then try killing just the main process
+		// Then try killing just the main process
 		if errIn := w.syscall.Kill(int(job.Pid), syscall.SIGKILL); errIn != nil {
-
 			log.Error("failed to kill process", "pid", job.Pid, "error", errIn)
 			return fmt.Errorf("failed to kill process: %v", errIn)
-
 		}
 	}
 
 	stoppedJob := job.DeepCopy()
 	if stopErr := stoppedJob.Stop(); stopErr != nil {
-
-		// if domain validation fails
+		// If domain validation fails
 		log.Warn("domain validation failed for forced stop", "domainError", stopErr)
 		stoppedJob.Status = domain.StatusStopped
-
-		// forced kill
+		// Forced kill
 		stoppedJob.ExitCode = -1
 		now := time.Now()
 		stoppedJob.EndTime = &now
@@ -335,9 +528,135 @@ func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 		w.cgroup.CleanupCgroup(job.Id)
 	}
 
+	// Handle network group cleanup
+	if job.NetworkGroupID != "" {
+		w.decrementGroupJobCount(job.NetworkGroupID)
+	}
+
 	totalDuration := time.Since(stopStartTime)
 	log.Info("job stopped successfully", "method", "forced", "totalDuration", totalDuration)
 	return nil
+}
+
+// Helper method to ensure netns directory exists
+func (w *linuxWorker) ensureNetnsDir(nsPath string) error {
+	dir := filepath.Dir(nsPath)
+
+	// Check if directory exists
+	if _, err := w.os.Stat(dir); err != nil {
+		if w.os.IsNotExist(err) {
+			// Directory doesn't exist, try to create it
+			if mkdirErr := w.os.MkdirAll(dir, 0755); mkdirErr != nil {
+				return fmt.Errorf("failed to create directory %s: %w", dir, mkdirErr)
+			}
+			w.logger.Debug("created netns directory", "path", dir)
+		} else {
+			return fmt.Errorf("failed to stat directory %s: %w", dir, err)
+		}
+	}
+
+	return nil
+}
+
+// Enhanced network group handling for pre-fork approach
+func (w *linuxWorker) handleNetworkGroup(networkGroupID, jobId string) (string, *syscall.SysProcAttr, bool, error) {
+	w.groupMutex.Lock()
+	defer w.groupMutex.Unlock()
+
+	nsPath := filepath.Join(varRunNetns, networkGroupID)
+
+	// Check if group exists
+	if group, exists := w.networkGroups[networkGroupID]; exists {
+		w.logger.Info("joining existing network group", "groupID", networkGroupID, "currentJobs", group.JobCount)
+
+		// Verify the namespace file still exists
+		if _, err := w.os.Stat(group.NamePath); err != nil {
+			w.logger.Warn("network group namespace file missing, recreating group", "groupID", networkGroupID, "path", group.NamePath)
+			delete(w.networkGroups, networkGroupID)
+			// Fall through to create new group
+		} else {
+			// Create sysProcAttr for joining existing namespace
+			// No new network namespace - we'll join existing namespace before fork
+			sysProcAttr := w.syscall.CreateProcessGroup()
+			sysProcAttr.Cloneflags = syscall.CLONE_NEWPID |
+				syscall.CLONE_NEWNS |
+				syscall.CLONE_NEWIPC |
+				syscall.CLONE_NEWUTS
+			// Note: No CLONE_NEWNET - we'll join existing namespace using setns before fork
+
+			return group.NamePath, sysProcAttr, false, nil
+		}
+	}
+
+	// Create new network group
+	w.logger.Info("creating new network group", "groupID", networkGroupID)
+
+	// Create with new network namespace
+	sysProcAttr := w.createSysProcAttrWithNamespaces()
+
+	// Ensure /var/run/netns directory exists
+	if err := w.ensureNetnsDir(nsPath); err != nil {
+		return "", nil, false, fmt.Errorf("failed to ensure netns directory: %w", err)
+	}
+
+	// Create the group
+	group := &NetworkGroup{
+		GroupID:   networkGroupID,
+		JobCount:  0,
+		NamePath:  nsPath,
+		CreatedAt: time.Now(),
+	}
+
+	w.networkGroups[networkGroupID] = group
+
+	return nsPath, sysProcAttr, true, nil
+}
+
+func (w *linuxWorker) incrementGroupJobCount(networkGroupID string) {
+	w.groupMutex.Lock()
+	defer w.groupMutex.Unlock()
+
+	if group, exists := w.networkGroups[networkGroupID]; exists {
+		atomic.AddInt32(&group.JobCount, 1)
+		w.logger.Debug("incremented job count for network group",
+			"groupID", networkGroupID, "newCount", group.JobCount)
+	}
+}
+
+func (w *linuxWorker) decrementGroupJobCount(networkGroupID string) {
+	w.groupMutex.Lock()
+	defer w.groupMutex.Unlock()
+
+	if group, exists := w.networkGroups[networkGroupID]; exists {
+		newCount := atomic.AddInt32(&group.JobCount, -1)
+		w.logger.Debug("decremented job count for network group",
+			"groupID", networkGroupID, "newCount", newCount)
+
+		// Cleanup empty group
+		if newCount <= 0 {
+			w.logger.Info("cleaning up empty network group", "groupID", networkGroupID)
+			w.cleanupNetworkGroup(networkGroupID)
+			delete(w.networkGroups, networkGroupID)
+		}
+	}
+}
+
+func (w *linuxWorker) cleanupNetworkGroup(networkGroupID string) {
+	if group, exists := w.networkGroups[networkGroupID]; exists {
+		// Unmount the bind mount first
+		if err := w.syscall.Unmount(group.NamePath, 0); err != nil {
+			w.logger.Warn("failed to unmount network group namespace",
+				"groupID", networkGroupID, "path", group.NamePath, "error", err)
+		}
+
+		// Remove the namespace file
+		if err := w.os.Remove(group.NamePath); err != nil {
+			w.logger.Warn("failed to remove network group namespace file",
+				"groupID", networkGroupID, "path", group.NamePath, "error", err)
+		}
+
+		w.logger.Info("network group cleaned up", "groupID", networkGroupID)
+	}
 }
 
 func (w *linuxWorker) getJobInitPath() (string, error) {
@@ -356,32 +675,43 @@ func (w *linuxWorker) getJobInitPath() (string, error) {
 	}
 
 	w.logger.Error("job-init binary not found in any location")
-	return "", fmt.Errorf("job-init binary not found in executable dir, /usr/local/bin, or PATH")
+	return "", fmt.Errorf("job-init binary not found in executable dir")
 }
 
 func (w *linuxWorker) createSysProcAttrWithNamespaces() *syscall.SysProcAttr {
 	sysProcAttr := w.syscall.CreateProcessGroup()
 
-	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID |
-		syscall.CLONE_NEWNS |
-		syscall.CLONE_NEWIPC |
-		syscall.CLONE_NEWUTS
+	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // PID namespace - ALWAYS isolated
+		syscall.CLONE_NEWNS | // Mount namespace - ALWAYS isolated
+		syscall.CLONE_NEWIPC | // IPC namespace - ALWAYS isolated
+		syscall.CLONE_NEWUTS | // UTS namespace - ALWAYS isolated
+		syscall.CLONE_NEWNET // Network namespace - isolated by default
 
 	w.logger.Debug("enabled namespace isolation",
 		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
-		"namespaces", "pid,mount,ipc,uts")
+		"namespaces", "pid,mount,ipc,uts,net")
 
 	return sysProcAttr
 }
 
 func (w *linuxWorker) waitForCompletion(ctx context.Context, cmd os.Command, job *domain.Job) {
-	// COPY YOUR EXISTING waitForCompletion METHOD - it's long, so I'll abbreviate
 	log := w.logger.WithField("jobId", job.Id)
 	startTime := time.Now()
 
-	log.Debug("starting job monitoring", "pid", job.Pid, "command", job.Command)
+	log.Debug("starting job monitoring", "pid", job.Pid, "command", job.Command, "networkGroup", job.NetworkGroupID)
 
 	defer func() {
+		// Cleanup network group reference
+		if job.NetworkGroupID != "" {
+			w.decrementGroupJobCount(job.NetworkGroupID)
+		}
+
+		// Cleanup isolated job namespace
+		if job.NetworkGroupID == "" {
+			nsPath := filepath.Join(netns, job.Id)
+			w.os.Remove(nsPath)
+		}
+
 		if r := recover(); r != nil {
 			duration := time.Since(startTime)
 			log.Error("panic in job monitoring", "panic", r, "duration", duration)
@@ -436,27 +766,40 @@ func (w *linuxWorker) cleanup(jobId string, pid int) {
 	log := w.logger.WithFields("jobId", jobId, "pid", pid)
 	log.Warn("starting emergency cleanup")
 
-	// force kill the process group
-	if err := w.syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+	// Get job to check network group
+	var networkGroupID string
+	if job, exists := w.store.GetJob(jobId); exists {
+		networkGroupID = job.NetworkGroupID
+	}
 
+	// Force kill the process group
+	if err := w.syscall.Kill(-pid, syscall.SIGKILL); err != nil {
 		log.Warn("failed to emergency kill process group", "processGroup", -pid, "error", err)
 
-		// then try individual process
+		// Then try individual process
 		if e := w.syscall.Kill(pid, syscall.SIGKILL); e != nil {
 			log.Error("failed to emergency kill individual process", "pid", pid, "error", e)
 		}
 	}
 
 	log.Debug("cleaning up cgroup in emergency cleanup")
-
 	w.cgroup.CleanupCgroup(jobId)
+
+	// Cleanup network resources
+	if networkGroupID != "" {
+		w.decrementGroupJobCount(networkGroupID)
+	} else {
+		// Remove isolated job namespace
+		nsPath := filepath.Join(netns, jobId)
+		w.os.Remove(nsPath)
+	}
 
 	// Update job status using domain method
 	if job, exists := w.store.GetJob(jobId); exists {
 		failedJob := job.DeepCopy()
 
 		if failErr := failedJob.Fail(-1); failErr != nil {
-			// when domain validation fails
+			// When domain validation fails
 			log.Warn("domain validation failed in emergency cleanup", "domainError", failErr)
 			failedJob.Status = domain.StatusFailed
 			failedJob.ExitCode = -1

@@ -8,12 +8,14 @@ type JobInitializer interface {
 	ValidateEnvironment() error
 }
 
-// JobConfig is shared across platforms
+// JobConfig is shared across platforms (simplified for Option 3)
 type JobConfig struct {
-	JobID      string
-	Command    string
-	Args       []string
-	CgroupPath string
+	JobID             string
+	Command           string
+	Args              []string
+	CgroupPath        string
+	NetworkGroupID    string // Network group identifier
+	IsNewNetworkGroup bool   // Whether this is a new network group (for setup)
 }
 
 // Run is the entry point that works on all platforms

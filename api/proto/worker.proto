@@ -37,6 +37,7 @@ message CreateJobReq{
   int32 maxCPU = 3;
   int32 maxMemory = 4;
   int32 maxIOBPS = 5;
+  string NetworkGroupID = 6;
 }
 
 message CreateJobRes{
@@ -46,10 +47,11 @@ message CreateJobRes{
   int32 maxCPU = 4;
   int32 maxMemory = 5;
   int32 maxIOBPS = 6;
-  string status = 7;
-  string startTime = 8;
-  string endTime = 9;
-  int32 exitCode = 10;
+  string NetworkGroupID = 7;
+  string status = 8;
+  string startTime = 9;
+  string endTime = 10;
+  int32 exitCode = 11;
 }
 
 // GetJob
@@ -64,10 +66,11 @@ message GetJobRes{
   int32 maxCPU = 4;
   int32 maxMemory = 5;
   int32 maxIOBPS = 6;
-  string status = 7;
-  string startTime = 8;
-  string endTime = 9;
-  int32 exitCode = 10;
+  string NetworkGroupID = 7;
+  string status = 8;
+  string startTime = 9;
+  string endTime = 10;
+  int32 exitCode = 11;
 }
 
 // StopJob

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"job-worker/pkg/logger"
 	"job-worker/pkg/os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -34,16 +36,18 @@ var _ JobInitializer = (*linuxJobInitializer)(nil)
 
 // LoadConfigFromEnv loads job configuration from environment variables
 func (j *linuxJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
-
 	jobID := j.osInterface.Getenv("JOB_ID")
 	command := j.osInterface.Getenv("JOB_COMMAND")
 	cgroupPath := j.osInterface.Getenv("JOB_CGROUP_PATH")
 	argsCountStr := j.osInterface.Getenv("JOB_ARGS_COUNT")
 
+	// Network group variables (parent process handles namespace joining)
+	networkGroupID := j.osInterface.Getenv("NETWORK_GROUP_ID")
+	isNewNetworkGroupStr := j.osInterface.Getenv("IS_NEW_NETWORK_GROUP")
+
 	jobLogger := j.logger.WithField("jobId", jobID)
 
 	if jobID == "" || command == "" || cgroupPath == "" {
-
 		jobLogger.Error("missing required environment variables",
 			"jobId", jobID,
 			"command", command,
@@ -59,9 +63,7 @@ func (j *linuxJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 	if argsCountStr != "" {
 		argsCount, err := strconv.Atoi(argsCountStr)
 		if err != nil {
-
 			jobLogger.Error("invalid JOB_ARGS_COUNT", "argsCount", argsCountStr, "error", err)
-
 			return nil, fmt.Errorf("invalid JOB_ARGS_COUNT: %v", err)
 		}
 
@@ -74,20 +76,30 @@ func (j *linuxJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 		jobLogger.Debug("loaded job arguments", "argsCount", argsCount, "args", args)
 	}
 
+	// Parse network group settings
+	var isNewNetworkGroup bool
+	if isNewNetworkGroupStr != "" {
+		isNewNetworkGroup = strings.ToLower(isNewNetworkGroupStr) == "true"
+	}
+
 	jobLogger.Debug("loaded job configuration",
 		"command", command,
 		"cgroupPath", cgroupPath,
-		"argsCount", len(args))
+		"argsCount", len(args),
+		"networkGroupID", networkGroupID,
+		"isNewNetworkGroup", isNewNetworkGroup)
 
 	return &JobConfig{
-		JobID:      jobID,
-		Command:    command,
-		Args:       args,
-		CgroupPath: cgroupPath,
+		JobID:             jobID,
+		Command:           command,
+		Args:              args,
+		CgroupPath:        cgroupPath,
+		NetworkGroupID:    networkGroupID,
+		IsNewNetworkGroup: isNewNetworkGroup,
 	}, nil
 }
 
-// ExecuteJob sets up cgroup and executes the job command
+// ExecuteJob sets up cgroup, network namespace, and executes the job command
 func (j *linuxJobInitializer) ExecuteJob(config *JobConfig) error {
 	jobLogger := j.logger.WithField("jobId", config.JobID)
 
@@ -103,7 +115,13 @@ func (j *linuxJobInitializer) ExecuteJob(config *JobConfig) error {
 			config.JobID, config.Command, config.CgroupPath)
 	}
 
-	jobLogger.Info("executing job", "command", config.Command, "args", config.Args)
+	jobLogger.Info("executing job", "command", config.Command, "args", config.Args, "networkGroup", config.NetworkGroupID)
+
+	// Handle network setup if needed (parent already handled namespace joining)
+	if err := j.setupNetworking(config); err != nil {
+		jobLogger.Error("failed to setup networking", "error", err)
+		return fmt.Errorf("failed to setup networking: %w", err)
+	}
 
 	// Add ourselves to the cgroup BEFORE executing the real command
 	if err := j.JoinCgroup(config.CgroupPath); err != nil {
@@ -130,7 +148,7 @@ func (j *linuxJobInitializer) ExecuteJob(config *JobConfig) error {
 		"envCount", len(j.osInterface.Environ()))
 
 	// Now exec the real command - this replaces our process
-	// The exec process will inherit our cgroup membership
+	// The exec process will inherit our cgroup membership and network namespace
 	if e := j.syscallInterface.Exec(commandPath, execArgs, j.osInterface.Environ()); e != nil {
 		jobLogger.Error("exec failed", "commandPath", commandPath, "command", config.Command, "error", e)
 		return fmt.Errorf("failed to exec command %s (resolved to %s): %w",
@@ -141,9 +159,95 @@ func (j *linuxJobInitializer) ExecuteJob(config *JobConfig) error {
 	return nil
 }
 
+// setupNetworking handles network setup - parent process handles namespace joining
+func (j *linuxJobInitializer) setupNetworking(config *JobConfig) error {
+	if config.NetworkGroupID == "" {
+		j.logger.Debug("no network group specified, using isolated namespace")
+		return nil
+	}
+
+	log := j.logger.WithField("networkGroup", config.NetworkGroupID)
+
+	// Parent process already handled namespace joining via wrapper script or clone()
+	// We only need to setup internal networking for new groups
+	if config.IsNewNetworkGroup {
+		log.Info("setting up networking for new network group")
+
+		if err := j.setupInternalNetwork(); err != nil {
+			// Log warning but don't fail - the job might still work
+			log.Warn("failed to setup internal network, continuing anyway", "error", err)
+		} else {
+			log.Info("successfully setup internal networking")
+		}
+	} else {
+		log.Info("joined existing network group")
+	}
+
+	return nil
+}
+
+// setupInternalNetwork sets up internal networking for a new network group
+func (j *linuxJobInitializer) setupInternalNetwork() error {
+	j.logger.Debug("setting up internal network interfaces")
+
+	// Commands to setup internal networking
+	commands := [][]string{
+		{"ip", "link", "set", "lo", "up"},                           // Bring up loopback
+		{"ip", "link", "add", "name", "internal0", "type", "dummy"}, // Create dummy interface
+		{"ip", "link", "set", "internal0", "up"},                    // Bring up internal interface
+		{"ip", "addr", "add", "172.20.0.1/24", "dev", "internal0"},  // Assign IP address
+	}
+
+	successCount := 0
+	for i, cmd := range commands {
+		if err := j.executeCommand(cmd[0], cmd[1:]...); err != nil {
+			j.logger.Warn("network setup command failed", "command", cmd, "step", i+1, "error", err)
+			// Continue with other commands - some may succeed
+		} else {
+			j.logger.Debug("network setup command succeeded", "command", cmd, "step", i+1)
+			successCount++
+		}
+	}
+
+	if successCount > 0 {
+		j.logger.Info("internal network setup completed",
+			"successfulCommands", successCount,
+			"totalCommands", len(commands),
+			"interface", "internal0",
+			"ip", "172.20.0.1/24")
+	} else {
+		j.logger.Warn("all network setup commands failed, jobs may not be able to communicate")
+	}
+
+	return nil
+}
+
+// executeCommand runs a system command
+func (j *linuxJobInitializer) executeCommand(name string, args ...string) error {
+	j.logger.Debug("executing command", "command", name, "args", args)
+
+	// Find the command path
+	commandPath, err := j.execInterface.LookPath(name)
+	if err != nil {
+		return fmt.Errorf("command %s not found: %w", name, err)
+	}
+
+	// Create the command
+	cmd := exec.Command(commandPath, args...)
+	cmd.Env = j.osInterface.Environ()
+
+	// Run the command and wait for completion
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command %s failed: %w", name, err)
+	}
+
+	j.logger.Debug("command executed successfully", "command", name)
+	return nil
+}
+
 // Run is the main entry point
 func (j *linuxJobInitializer) Run() error {
-	j.logger.Info("job-init starting on Linux")
+	j.logger.Info("job-init starting on Linux (CGO-free, parent handles namespaces)")
 
 	if err := j.setupNamespaceEnvironment(); err != nil {
 		j.logger.Error("failed to setup namespace environment", "error", err)

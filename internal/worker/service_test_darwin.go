@@ -24,7 +24,7 @@ func TestWorker_DarwinMockBehavior(t *testing.T) {
 	w := New(fakeStore)
 
 	ctx := context.Background()
-	job, err := w.StartJob(ctx, "echo", []string{"hello from macOS"}, 50, 100, 1000)
+	job, err := w.StartJob(ctx, "echo", []string{"hello from macOS"}, 50, 100, 1000, "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, job)
@@ -48,7 +48,7 @@ func TestWorker_DarwinResourceDefaults(t *testing.T) {
 	w := New(fakeStore)
 
 	ctx := context.Background()
-	job, err := w.StartJob(ctx, "test-command", []string{}, 0, 0, 0)
+	job, err := w.StartJob(ctx, "test-command", []string{}, 0, 0, 0, "")
 
 	require.NoError(t, err)
 
@@ -65,7 +65,7 @@ func TestWorker_DarwinStopJob(t *testing.T) {
 
 	// Start a job first
 	ctx := context.Background()
-	job, err := w.StartJob(ctx, "long-running-command", []string{}, 25, 256, 500)
+	job, err := w.StartJob(ctx, "long-running-command", []string{}, 25, 256, 500, "")
 	require.NoError(t, err)
 
 	// Stop the job

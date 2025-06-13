@@ -24,16 +24,17 @@ type ResourceLimits struct {
 }
 
 type Job struct {
-	Id         string
-	Command    string
-	Args       []string
-	Limits     ResourceLimits
-	Status     JobStatus
-	Pid        int32
-	CgroupPath string
-	StartTime  time.Time
-	EndTime    *time.Time
-	ExitCode   int32
+	Id             string
+	Command        string
+	Args           []string
+	Limits         ResourceLimits
+	Status         JobStatus
+	Pid            int32
+	CgroupPath     string
+	StartTime      time.Time
+	EndTime        *time.Time
+	ExitCode       int32
+	NetworkGroupID string
 }
 
 func (j *Job) IsRunning() bool {
