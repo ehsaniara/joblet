@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"job-worker/pkg/logger"
 	"job-worker/pkg/os"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -186,23 +187,55 @@ func (j *linuxJobInitializer) setupNetworking(config *JobConfig) error {
 	return nil
 }
 
-// setupInternalNetwork sets up internal networking for a new network group
+// setupInternalNetwork sets up internal networking using configuration from environment
 func (j *linuxJobInitializer) setupInternalNetwork() error {
-	j.logger.Debug("setting up internal network interfaces")
+	// Get network configuration from environment variables
+	subnet := j.osInterface.Getenv("INTERNAL_SUBNET")
+	gateway := j.osInterface.Getenv("INTERNAL_GATEWAY")
+	iface := j.osInterface.Getenv("INTERNAL_INTERFACE")
 
-	// Commands to setup internal networking
+	// Use defaults if not specified
+	if subnet == "" {
+		subnet = "172.20.0.0/24"
+	}
+	if gateway == "" {
+		gateway = "172.20.0.1"
+	}
+	if iface == "" {
+		iface = "internal0"
+	}
+
+	j.logger.Debug("setting up internal network",
+		"subnet", subnet,
+		"gateway", gateway,
+		"interface", iface)
+
+	// Parse gateway and subnet for validation
+	gatewayIP, gatewayNet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return fmt.Errorf("invalid subnet %s: %w", subnet, err)
+	}
+
+	// Use the gateway IP from environment, but validate it's in subnet
+	if ip := net.ParseIP(gateway); ip != nil && gatewayNet.Contains(ip) {
+		gatewayIP = ip
+	}
+
+	// Build gateway address with CIDR
+	gatewayAddr := fmt.Sprintf("%s/%s", gatewayIP.String(), strings.Split(subnet, "/")[1])
+
+	// Commands to setup internal networking with dynamic configuration
 	commands := [][]string{
-		{"ip", "link", "set", "lo", "up"},                           // Bring up loopback
-		{"ip", "link", "add", "name", "internal0", "type", "dummy"}, // Create dummy interface
-		{"ip", "link", "set", "internal0", "up"},                    // Bring up internal interface
-		{"ip", "addr", "add", "172.20.0.1/24", "dev", "internal0"},  // Assign IP address
+		{"ip", "link", "set", "lo", "up"},                     // Bring up loopback
+		{"ip", "link", "add", "name", iface, "type", "dummy"}, // Create interface
+		{"ip", "link", "set", iface, "up"},                    // Bring up interface
+		{"ip", "addr", "add", gatewayAddr, "dev", iface},      // Assign IP address
 	}
 
 	successCount := 0
 	for i, cmd := range commands {
 		if err := j.executeCommand(cmd[0], cmd[1:]...); err != nil {
 			j.logger.Warn("network setup command failed", "command", cmd, "step", i+1, "error", err)
-			// Continue with other commands - some may succeed
 		} else {
 			j.logger.Debug("network setup command succeeded", "command", cmd, "step", i+1)
 			successCount++
@@ -213,8 +246,9 @@ func (j *linuxJobInitializer) setupInternalNetwork() error {
 		j.logger.Info("internal network setup completed",
 			"successfulCommands", successCount,
 			"totalCommands", len(commands),
-			"interface", "internal0",
-			"ip", "172.20.0.1/24")
+			"interface", iface,
+			"gatewayAddr", gatewayAddr,
+			"subnet", subnet)
 	} else {
 		j.logger.Warn("all network setup commands failed, jobs may not be able to communicate")
 	}
@@ -247,7 +281,7 @@ func (j *linuxJobInitializer) executeCommand(name string, args ...string) error 
 
 // Run is the main entry point
 func (j *linuxJobInitializer) Run() error {
-	j.logger.Info("job-init starting on Linux (CGO-free, parent handles namespaces)")
+	j.logger.Info("job-init starting on Linux, parent handles namespaces")
 
 	if err := j.setupNamespaceEnvironment(); err != nil {
 		j.logger.Error("failed to setup namespace environment", "error", err)

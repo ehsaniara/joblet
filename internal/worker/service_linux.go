@@ -13,10 +13,12 @@ import (
 	"job-worker/internal/worker/resource"
 	"job-worker/pkg/logger"
 	"job-worker/pkg/os"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -24,41 +26,134 @@ import (
 )
 
 const (
-	netns       = "/tmp/shared-netns/"
-	varRunNetns = "/var/run/netns/"
-	SYS_SETNS   = 308 // x86_64 syscall number for setns
+	netns          = "/tmp/shared-netns/"
+	varRunNetns    = "/var/run/netns/"
+	internalSubnet = "172.20.0.0/24" // Default network range for internal communication
+	internalGW     = "172.20.0.1"    // Default gateway IP for internal network
+	internalIface  = "internal0"     // Default interface name for internal communication
+	baseNetwork    = "172.20.0.0/16" // Base network for dynamic allocation
+	SYS_SETNS      = 308             // x86_64 syscall number for setns
 )
 
 var jobCounter int64
 
+// NetworkConfig holds network configuration for a network group
+type NetworkConfig struct {
+	Subnet    string `json:"subnet"`    // e.g., "172.20.0.0/24"
+	Gateway   string `json:"gateway"`   // e.g., "172.20.0.1"
+	Interface string `json:"interface"` // e.g., "internal0"
+}
+
+// NetworkGroup represents a network isolation group with configuration
 type NetworkGroup struct {
-	GroupID   string
-	JobCount  int32
-	NamePath  string
-	CreatedAt time.Time
+	GroupID       string         `json:"group_id"`
+	JobCount      int32          `json:"job_count"`
+	NamePath      string         `json:"name_path"`
+	CreatedAt     time.Time      `json:"created_at"`
+	NetworkConfig *NetworkConfig `json:"network_config"`
+}
+
+// SubnetAllocator manages dynamic subnet allocation to avoid conflicts
+type SubnetAllocator struct {
+	baseNetwork      string
+	allocatedSubnets map[string]string // subnet -> groupID mapping
+	mutex            sync.RWMutex
+}
+
+// NewSubnetAllocator creates a new subnet allocator
+func NewSubnetAllocator() *SubnetAllocator {
+	return &SubnetAllocator{
+		baseNetwork:      baseNetwork,
+		allocatedSubnets: make(map[string]string),
+	}
+}
+
+// AllocateSubnet allocates a unique subnet for a network group
+func (sa *SubnetAllocator) AllocateSubnet(groupID string) (*NetworkConfig, error) {
+	sa.mutex.Lock()
+	defer sa.mutex.Unlock()
+
+	// Check if group already has an allocated subnet
+	for subnet, existingGroupID := range sa.allocatedSubnets {
+		if existingGroupID == groupID {
+			// Extract gateway from subnet
+			_, ipNet, err := net.ParseCIDR(subnet)
+			if err != nil {
+				continue
+			}
+			gateway := sa.calculateGateway(ipNet)
+
+			return &NetworkConfig{
+				Subnet:    subnet,
+				Gateway:   gateway,
+				Interface: internalIface,
+			}, nil
+		}
+	}
+
+	// Simple allocation strategy: increment the third octet
+	// 172.20.0.0/24, 172.20.1.0/24, 172.20.2.0/24, etc.
+	for i := 0; i < 256; i++ {
+		subnet := fmt.Sprintf("172.20.%d.0/24", i)
+		gateway := fmt.Sprintf("172.20.%d.1", i)
+
+		if _, exists := sa.allocatedSubnets[subnet]; !exists {
+			sa.allocatedSubnets[subnet] = groupID
+
+			return &NetworkConfig{
+				Subnet:    subnet,
+				Gateway:   gateway,
+				Interface: internalIface,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no available subnets in range %s", sa.baseNetwork)
+}
+
+// ReleaseSubnet releases a subnet allocation
+func (sa *SubnetAllocator) ReleaseSubnet(groupID string) {
+	sa.mutex.Lock()
+	defer sa.mutex.Unlock()
+
+	for subnet, existingGroupID := range sa.allocatedSubnets {
+		if existingGroupID == groupID {
+			delete(sa.allocatedSubnets, subnet)
+			break
+		}
+	}
+}
+
+// calculateGateway calculates the gateway IP (.1) for a given network
+func (sa *SubnetAllocator) calculateGateway(ipNet *net.IPNet) string {
+	ip := ipNet.IP.Mask(ipNet.Mask)
+	ip[len(ip)-1] = 1 // Set last octet to 1
+	return ip.String()
 }
 
 type linuxWorker struct {
-	store         interfaces.Store
-	cgroup        interfaces.Resource
-	cmdFactory    os.CommandFactory
-	syscall       os.SyscallInterface
-	os            os.OsInterface
-	logger        *logger.Logger
-	networkGroups map[string]*NetworkGroup
-	groupMutex    sync.RWMutex
+	store           interfaces.Store
+	cgroup          interfaces.Resource
+	cmdFactory      os.CommandFactory
+	syscall         os.SyscallInterface
+	os              os.OsInterface
+	logger          *logger.Logger
+	networkGroups   map[string]*NetworkGroup
+	groupMutex      sync.RWMutex
+	subnetAllocator *SubnetAllocator
 }
 
-// NewPlatformWorker creates a Linux-specific worker implementation
+// NewPlatformWorker creates a Linux-specific worker implementation with configurable networking
 func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	return &linuxWorker{
-		store:         store,
-		cgroup:        resource.New(),
-		cmdFactory:    &os.DefaultCommandFactory{},
-		syscall:       &os.DefaultSyscall{},
-		os:            &os.DefaultOs{},
-		logger:        logger.WithField("component", "worker-linux"),
-		networkGroups: make(map[string]*NetworkGroup),
+		store:           store,
+		cgroup:          resource.New(),
+		cmdFactory:      &os.DefaultCommandFactory{},
+		syscall:         &os.DefaultSyscall{},
+		os:              &os.DefaultOs{},
+		logger:          logger.WithField("component", "worker-linux"),
+		networkGroups:   make(map[string]*NetworkGroup),
+		subnetAllocator: NewSubnetAllocator(),
 	}
 }
 
@@ -184,28 +279,10 @@ func (w *linuxWorker) StartJob(ctx context.Context, command string, args []strin
 
 	jobLogger.Debug("job-init binary located", "initPath", initPath)
 
-	// Prepare environment for init process
-	env := w.os.Environ()
-	jobEnvVars := []string{
-		fmt.Sprintf("JOB_ID=%s", job.Id),
-		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", cgroupJobDir),
-	}
+	// Prepare environment for init process with network configuration
+	env := w.prepareJobEnvironment(job, cgroupJobDir, networkGroupID, isNewNetworkGroup)
 
-	// Add network group environment variables for job-init
-	if networkGroupID != "" {
-		jobEnvVars = append(jobEnvVars, fmt.Sprintf("NETWORK_GROUP_ID=%s", networkGroupID))
-		jobEnvVars = append(jobEnvVars, fmt.Sprintf("IS_NEW_NETWORK_GROUP=%t", isNewNetworkGroup))
-	}
-
-	// Add arguments as separate environment variables to handle spaces
-	for i, arg := range job.Args {
-		jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-	jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)))
-	env = append(env, jobEnvVars...)
-
-	jobLogger.Debug("environment prepared for init process", "envVarsAdded", len(jobEnvVars), "totalEnvVars", len(env))
+	jobLogger.Debug("environment prepared for init process", "totalEnvVars", len(env))
 
 	// Prepare command
 	cmd := w.cmdFactory.CreateCommand(initPath)
@@ -416,6 +493,132 @@ func (w *linuxWorker) setNetworkNamespace(nsPath string) error {
 	return nil
 }
 
+// getNetworkConfigForGroup returns network configuration for a group
+func (w *linuxWorker) getNetworkConfigForGroup(networkGroupID string) (*NetworkConfig, error) {
+	// Option 1: Check for environment variable override
+	envSubnetKey := fmt.Sprintf("NETWORK_GROUP_%s_SUBNET", strings.ToUpper(networkGroupID))
+	envGatewayKey := fmt.Sprintf("NETWORK_GROUP_%s_GATEWAY", strings.ToUpper(networkGroupID))
+
+	if customSubnet := w.os.Getenv(envSubnetKey); customSubnet != "" {
+		w.logger.Debug("using custom subnet from environment", "groupID", networkGroupID, "subnet", customSubnet)
+
+		gateway := w.os.Getenv(envGatewayKey)
+		if gateway == "" {
+			// Calculate default gateway (.1) for the subnet
+			if _, ipNet, err := net.ParseCIDR(customSubnet); err == nil {
+				ip := ipNet.IP.Mask(ipNet.Mask)
+				ip[len(ip)-1] = 1 // Set last octet to 1
+				gateway = ip.String()
+			} else {
+				return nil, fmt.Errorf("invalid custom subnet %s: %w", customSubnet, err)
+			}
+		}
+
+		config := &NetworkConfig{
+			Subnet:    customSubnet,
+			Gateway:   gateway,
+			Interface: internalIface,
+		}
+
+		if err := w.validateNetworkConfig(config); err != nil {
+			return nil, fmt.Errorf("invalid custom network config: %w", err)
+		}
+
+		return config, nil
+	}
+
+	// Option 2: Dynamic allocation (prevents conflicts between groups)
+	if w.subnetAllocator != nil {
+		config, err := w.subnetAllocator.AllocateSubnet(networkGroupID)
+		if err == nil {
+			w.logger.Debug("allocated dynamic subnet", "groupID", networkGroupID, "subnet", config.Subnet, "gateway", config.Gateway)
+			return config, nil
+		}
+		w.logger.Warn("failed to allocate dynamic subnet, using default", "groupID", networkGroupID, "error", err)
+	}
+
+	// Option 3: Default configuration
+	config := &NetworkConfig{
+		Subnet:    internalSubnet,
+		Gateway:   internalGW,
+		Interface: internalIface,
+	}
+
+	w.logger.Debug("using default network configuration", "groupID", networkGroupID, "subnet", config.Subnet, "gateway", config.Gateway)
+	return config, nil
+}
+
+// validateNetworkConfig validates the network configuration
+func (w *linuxWorker) validateNetworkConfig(config *NetworkConfig) error {
+	if config == nil {
+		return fmt.Errorf("network config cannot be nil")
+	}
+
+	// Validate subnet
+	_, ipNet, err := net.ParseCIDR(config.Subnet)
+	if err != nil {
+		return fmt.Errorf("invalid subnet %s: %w", config.Subnet, err)
+	}
+
+	// Validate gateway IP
+	gatewayIP := net.ParseIP(config.Gateway)
+	if gatewayIP == nil {
+		return fmt.Errorf("invalid gateway IP %s", config.Gateway)
+	}
+
+	// Check if gateway is within subnet
+	if !ipNet.Contains(gatewayIP) {
+		return fmt.Errorf("gateway IP %s is not within subnet %s", config.Gateway, config.Subnet)
+	}
+
+	// Validate interface name
+	if config.Interface == "" {
+		return fmt.Errorf("interface name cannot be empty")
+	}
+
+	return nil
+}
+
+// prepareJobEnvironment prepares environment variables including network configuration
+func (w *linuxWorker) prepareJobEnvironment(job *domain.Job, cgroupJobDir string, networkGroupID string, isNewNetworkGroup bool) []string {
+	env := w.os.Environ()
+	jobEnvVars := []string{
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", cgroupJobDir),
+	}
+
+	// Add network group environment variables for job-init
+	if networkGroupID != "" {
+		jobEnvVars = append(jobEnvVars, fmt.Sprintf("NETWORK_GROUP_ID=%s", networkGroupID))
+		jobEnvVars = append(jobEnvVars, fmt.Sprintf("IS_NEW_NETWORK_GROUP=%t", isNewNetworkGroup))
+
+		// Add network configuration if group exists
+		w.groupMutex.RLock()
+		if group, exists := w.networkGroups[networkGroupID]; exists && group.NetworkConfig != nil {
+			jobEnvVars = append(jobEnvVars,
+				fmt.Sprintf("INTERNAL_SUBNET=%s", group.NetworkConfig.Subnet),
+				fmt.Sprintf("INTERNAL_GATEWAY=%s", group.NetworkConfig.Gateway),
+				fmt.Sprintf("INTERNAL_INTERFACE=%s", group.NetworkConfig.Interface),
+			)
+			w.logger.Debug("added network config to environment",
+				"groupID", networkGroupID,
+				"subnet", group.NetworkConfig.Subnet,
+				"gateway", group.NetworkConfig.Gateway,
+				"interface", group.NetworkConfig.Interface)
+		}
+		w.groupMutex.RUnlock()
+	}
+
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+	jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)))
+
+	return append(env, jobEnvVars...)
+}
+
 func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 	log := w.logger.WithField("jobId", jobId)
 
@@ -558,7 +761,7 @@ func (w *linuxWorker) ensureNetnsDir(nsPath string) error {
 	return nil
 }
 
-// Enhanced network group handling for pre-fork approach
+// Enhanced network group handling with configurable networking
 func (w *linuxWorker) handleNetworkGroup(networkGroupID, jobId string) (string, *syscall.SysProcAttr, bool, error) {
 	w.groupMutex.Lock()
 	defer w.groupMutex.Unlock()
@@ -567,7 +770,11 @@ func (w *linuxWorker) handleNetworkGroup(networkGroupID, jobId string) (string, 
 
 	// Check if group exists
 	if group, exists := w.networkGroups[networkGroupID]; exists {
-		w.logger.Info("joining existing network group", "groupID", networkGroupID, "currentJobs", group.JobCount)
+		w.logger.Info("joining existing network group",
+			"groupID", networkGroupID,
+			"currentJobs", group.JobCount,
+			"subnet", group.NetworkConfig.Subnet,
+			"gateway", group.NetworkConfig.Gateway)
 
 		// Verify the namespace file still exists
 		if _, err := w.os.Stat(group.NamePath); err != nil {
@@ -576,7 +783,7 @@ func (w *linuxWorker) handleNetworkGroup(networkGroupID, jobId string) (string, 
 			// Fall through to create new group
 		} else {
 			// Create sysProcAttr for joining existing namespace
-			// No new network namespace - we'll join existing namespace before fork
+			// No new network namespace - we'll join existing namespace using setns before fork
 			sysProcAttr := w.syscall.CreateProcessGroup()
 			sysProcAttr.Cloneflags = syscall.CLONE_NEWPID |
 				syscall.CLONE_NEWNS |
@@ -588,8 +795,19 @@ func (w *linuxWorker) handleNetworkGroup(networkGroupID, jobId string) (string, 
 		}
 	}
 
-	// Create new network group
+	// Create new network group with configuration
 	w.logger.Info("creating new network group", "groupID", networkGroupID)
+
+	// Get network configuration for this group
+	networkConfig, err := w.getNetworkConfigForGroup(networkGroupID)
+	if err != nil {
+		return "", nil, false, fmt.Errorf("failed to get network config for group %s: %w", networkGroupID, err)
+	}
+
+	// Validate network configuration
+	if err := w.validateNetworkConfig(networkConfig); err != nil {
+		return "", nil, false, fmt.Errorf("invalid network config for group %s: %w", networkGroupID, err)
+	}
 
 	// Create with new network namespace
 	sysProcAttr := w.createSysProcAttrWithNamespaces()
@@ -599,15 +817,22 @@ func (w *linuxWorker) handleNetworkGroup(networkGroupID, jobId string) (string, 
 		return "", nil, false, fmt.Errorf("failed to ensure netns directory: %w", err)
 	}
 
-	// Create the group
+	// Create the group with network configuration
 	group := &NetworkGroup{
-		GroupID:   networkGroupID,
-		JobCount:  0,
-		NamePath:  nsPath,
-		CreatedAt: time.Now(),
+		GroupID:       networkGroupID,
+		JobCount:      0,
+		NamePath:      nsPath,
+		CreatedAt:     time.Now(),
+		NetworkConfig: networkConfig,
 	}
 
 	w.networkGroups[networkGroupID] = group
+
+	w.logger.Info("network group created with configuration",
+		"groupID", networkGroupID,
+		"subnet", networkConfig.Subnet,
+		"gateway", networkConfig.Gateway,
+		"interface", networkConfig.Interface)
 
 	return nsPath, sysProcAttr, true, nil
 }
@@ -635,6 +860,12 @@ func (w *linuxWorker) decrementGroupJobCount(networkGroupID string) {
 		// Cleanup empty group
 		if newCount <= 0 {
 			w.logger.Info("cleaning up empty network group", "groupID", networkGroupID)
+
+			// Release subnet allocation
+			if w.subnetAllocator != nil {
+				w.subnetAllocator.ReleaseSubnet(networkGroupID)
+			}
+
 			w.cleanupNetworkGroup(networkGroupID)
 			delete(w.networkGroups, networkGroupID)
 		}
@@ -655,7 +886,9 @@ func (w *linuxWorker) cleanupNetworkGroup(networkGroupID string) {
 				"groupID", networkGroupID, "path", group.NamePath, "error", err)
 		}
 
-		w.logger.Info("network group cleaned up", "groupID", networkGroupID)
+		w.logger.Info("network group cleaned up",
+			"groupID", networkGroupID,
+			"subnet", group.NetworkConfig.Subnet)
 	}
 }
 
