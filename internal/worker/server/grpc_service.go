@@ -40,7 +40,6 @@ func (s *JobServiceServer) CreateJob(ctx context.Context, createJobReq *pb.Creat
 		"maxCPU", createJobReq.MaxCPU,
 		"maxMemory", createJobReq.MaxMemory,
 		"maxIOBPS", createJobReq.MaxIOBPS,
-		"networkGroupID", createJobReq.NetworkGroupID,
 	)
 
 	requestLogger.Info("create job request received")
@@ -51,7 +50,8 @@ func (s *JobServiceServer) CreateJob(ctx context.Context, createJobReq *pb.Creat
 	}
 
 	startTime := time.Now()
-	newJob, err := s.jobWorker.StartJob(ctx, createJobReq.Command, createJobReq.Args, createJobReq.MaxCPU, createJobReq.MaxMemory, createJobReq.MaxIOBPS, createJobReq.NetworkGroupID)
+	// Removed networkGroupID parameter
+	newJob, err := s.jobWorker.StartJob(ctx, createJobReq.Command, createJobReq.Args, createJobReq.MaxCPU, createJobReq.MaxMemory, createJobReq.MaxIOBPS)
 
 	if err != nil {
 		duration := time.Since(startTime)
@@ -60,7 +60,7 @@ func (s *JobServiceServer) CreateJob(ctx context.Context, createJobReq *pb.Creat
 	}
 
 	duration := time.Since(startTime)
-	requestLogger.Info("job created successfully", "jobId", newJob.Id, "duration", duration)
+	requestLogger.Info("job created successfully with host networking", "jobId", newJob.Id, "duration", duration)
 
 	return mappers.DomainToCreateJobResponse(newJob), nil
 }

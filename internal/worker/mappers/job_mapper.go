@@ -3,77 +3,85 @@ package mappers
 import (
 	pb "job-worker/api/gen"
 	"job-worker/internal/worker/domain"
-	"time"
 )
 
-func formatTimePtr(t *time.Time) string {
-	if t != nil {
-		return t.Format(time.RFC3339)
+// DomainToProtobuf converts domain Job to protobuf Job (no network fields)
+func DomainToProtobuf(job *domain.Job) *pb.Job {
+	pbJob := &pb.Job{
+		Id:        job.Id,
+		Command:   job.Command,
+		Args:      job.Args,
+		MaxCPU:    job.Limits.MaxCPU,
+		MaxMemory: job.Limits.MaxMemory,
+		MaxIOBPS:  job.Limits.MaxIOBPS,
+		Status:    string(job.Status),
+		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
+		ExitCode:  job.ExitCode,
+		// Removed network fields
 	}
-	return ""
+
+	if job.EndTime != nil {
+		pbJob.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	return pbJob
 }
 
+// DomainToCreateJobResponse converts domain Job to CreateJobRes (no network fields)
 func DomainToCreateJobResponse(job *domain.Job) *pb.CreateJobRes {
-	return &pb.CreateJobRes{
-		Id:             job.Id,
-		Command:        job.Command,
-		Args:           append([]string(nil), job.Args...),
-		MaxCPU:         job.Limits.MaxCPU,
-		MaxMemory:      job.Limits.MaxMemory,
-		MaxIOBPS:       job.Limits.MaxIOBPS,
-		NetworkGroupID: job.NetworkGroupID,
-		Status:         string(job.Status),
-		StartTime:      job.StartTime.Format(time.RFC3339),
-		EndTime:        formatTimePtr(job.EndTime),
-		ExitCode:       job.ExitCode,
-		AssignedIP:     job.AssignedIP,
-		NetworkSubnet:  job.NetworkSubnet,
+	response := &pb.CreateJobRes{
+		Id:        job.Id,
+		Command:   job.Command,
+		Args:      job.Args,
+		MaxCPU:    job.Limits.MaxCPU,
+		MaxMemory: job.Limits.MaxMemory,
+		MaxIOBPS:  job.Limits.MaxIOBPS,
+		Status:    string(job.Status),
+		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
+		ExitCode:  job.ExitCode,
+		// Removed network fields
 	}
+
+	if job.EndTime != nil {
+		response.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	return response
 }
 
+// DomainToGetJobResponse converts domain Job to GetJobRes (no network fields)
 func DomainToGetJobResponse(job *domain.Job) *pb.GetJobRes {
-	return &pb.GetJobRes{
-		Id:             job.Id,
-		Command:        job.Command,
-		Args:           append([]string(nil), job.Args...),
-		MaxCPU:         job.Limits.MaxCPU,
-		MaxMemory:      job.Limits.MaxMemory,
-		MaxIOBPS:       job.Limits.MaxIOBPS,
-		NetworkGroupID: job.NetworkGroupID,
-		Status:         string(job.Status),
-		StartTime:      job.StartTime.Format(time.RFC3339),
-		EndTime:        formatTimePtr(job.EndTime),
-		ExitCode:       job.ExitCode,
-		AssignedIP:     job.AssignedIP,
-		NetworkSubnet:  job.NetworkSubnet,
-		InterfaceName:  job.InterfaceName,
+	response := &pb.GetJobRes{
+		Id:        job.Id,
+		Command:   job.Command,
+		Args:      job.Args,
+		MaxCPU:    job.Limits.MaxCPU,
+		MaxMemory: job.Limits.MaxMemory,
+		MaxIOBPS:  job.Limits.MaxIOBPS,
+		Status:    string(job.Status),
+		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
+		ExitCode:  job.ExitCode,
+		// Removed network fields
 	}
+
+	if job.EndTime != nil {
+		response.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	return response
 }
 
+// DomainToStopJobResponse converts domain Job to StopJobRes
 func DomainToStopJobResponse(job *domain.Job) *pb.StopJobRes {
-	return &pb.StopJobRes{
+	response := &pb.StopJobRes{
 		Id:       job.Id,
 		Status:   string(job.Status),
-		EndTime:  formatTimePtr(job.EndTime),
 		ExitCode: job.ExitCode,
 	}
-}
 
-func DomainToProtobuf(job *domain.Job) *pb.Job {
-	return &pb.Job{
-		Id:             job.Id,
-		Command:        job.Command,
-		Args:           append([]string(nil), job.Args...),
-		MaxCPU:         job.Limits.MaxCPU,
-		MaxMemory:      job.Limits.MaxMemory,
-		MaxIOBPS:       job.Limits.MaxIOBPS,
-		Status:         string(job.Status),
-		StartTime:      job.StartTime.Format(time.RFC3339),
-		EndTime:        formatTimePtr(job.EndTime),
-		ExitCode:       job.ExitCode,
-		AssignedIP:     job.AssignedIP,
-		NetworkSubnet:  job.NetworkSubnet,
-		InterfaceName:  job.InterfaceName,
-		NetworkGroupID: job.NetworkGroupID,
+	if job.EndTime != nil {
+		response.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
 	}
+
+	return response
 }

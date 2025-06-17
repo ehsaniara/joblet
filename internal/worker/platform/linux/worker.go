@@ -2,487 +2,418 @@
 
 package linux
 
-// Package linux provides the main Linux platform worker implementation for job execution.
-// This package orchestrates all components needed for secure, isolated job execution
-// on Linux systems using namespaces, cgroups, and process management.
-//
-// Thread Safety: All public methods are thread-safe and can be called
-// concurrently from multiple goroutines.
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"job-worker/internal/worker/domain"
+	"job-worker/internal/worker/executor"
 	"job-worker/internal/worker/interfaces"
-	"job-worker/internal/worker/platform/linux/network"
 	"job-worker/internal/worker/platform/linux/process"
 	"job-worker/internal/worker/resource"
 	"job-worker/pkg/logger"
 	osinterface "job-worker/pkg/os"
 )
 
-// jobCounter provides atomic job ID generation across all worker instances.
 var jobCounter int64
 
-// Worker is the main Linux platform worker implementation.
-type Worker struct {
-	// Core job management components
-	starter *JobStarter // Handles job initialization and launching
-	stopper *JobStopper // Handles job termination and cleanup
-	monitor *JobMonitor // Handles job monitoring and health checks
-
-	// Essential dependencies
-	store interfaces.Store // Job data persistence and state management
-
-	// Platform-specific components
-	networkManager   *network.Manager    // Network namespace and isolation management
-	processLauncher  *process.Launcher   // Low-level process creation and management
-	processCleaner   *process.Cleaner    // Process termination and cleanup
-	processValidator *process.Validator  // Input validation and security checks
-	cgroup           interfaces.Resource // Cgroup resource management
-
-	// Configuration and logging
-	config *Config        // Platform-specific configuration
-	logger *logger.Logger // Structured logging with context
+// SimplifiedWorker handles job execution with host networking only
+type SimplifiedWorker struct {
+	store            interfaces.Store
+	cgroup           interfaces.Resource
+	processLauncher  *process.Launcher
+	processCleaner   *process.Cleaner
+	processValidator *process.Validator
+	osInterface      osinterface.OsInterface
+	config           *Config
+	logger           *logger.Logger
 }
 
-// Dependencies holds all dependencies needed by the Linux worker.
-type Dependencies struct {
-	// Core interfaces
-	Store  interfaces.Store    // Job state management (required)
-	Cgroup interfaces.Resource // Resource management (required)
-
-	// OS abstraction interfaces (enable testing with mocks)
-	CmdFactory    osinterface.CommandFactory   // Command creation
-	Syscall       osinterface.SyscallInterface // System call interface
-	OsInterface   osinterface.OsInterface      // OS operation interface
-	ExecInterface osinterface.ExecInterface    // Executable resolution
-
-	// Platform-specific components
-	NetworkManager   *network.Manager   // Network isolation management
-	ProcessLauncher  *process.Launcher  // Process lifecycle management
-	ProcessCleaner   *process.Cleaner   // Process cleanup operations
-	ProcessValidator *process.Validator // Security and validation
-
-	// Configuration
-	Config *Config // Platform-specific settings
+// SimplifiedDependencies contains dependencies for simplified worker
+type SimplifiedDependencies struct {
+	Store            interfaces.Store
+	Cgroup           interfaces.Resource
+	ProcessLauncher  *process.Launcher
+	ProcessCleaner   *process.Cleaner
+	ProcessValidator *process.Validator
+	OsInterface      osinterface.OsInterface
+	Config           *Config
 }
 
-// NewWorker creates a new Linux worker with all dependencies.
-func NewWorker(deps *Dependencies) *Worker {
-	// Create logger with component identification for debugging
-	workerLogger := logger.New().WithField("component", "linux-worker")
-
-	// Initialize main worker structure with provided dependencies
-	worker := &Worker{
-		// Core state management
-		store: deps.Store,
-
-		// Network and process management components
-		networkManager:   deps.NetworkManager,
+// NewSimplifiedWorker creates a worker without network namespace support
+func NewSimplifiedWorker(deps *SimplifiedDependencies) *SimplifiedWorker {
+	return &SimplifiedWorker{
+		store:            deps.Store,
+		cgroup:           deps.Cgroup,
 		processLauncher:  deps.ProcessLauncher,
 		processCleaner:   deps.ProcessCleaner,
 		processValidator: deps.ProcessValidator,
-
-		// Resource management
-		cgroup: deps.Cgroup,
-
-		// Configuration and logging
-		config: deps.Config,
-		logger: workerLogger,
+		osInterface:      deps.OsInterface,
+		config:           deps.Config,
+		logger:           logger.New().WithField("component", "simplified-linux-worker"),
 	}
-
-	// Initialize sub-components with shared worker reference
-	worker.starter = NewJobStarter(worker, deps)
-	worker.stopper = NewJobStopper(worker, deps)
-	worker.monitor = NewJobMonitor(worker, deps)
-
-	workerLogger.Info("Linux worker initialized successfully",
-		"maxConcurrentJobs", deps.Config.MaxConcurrentJobs,
-		"cgroupsBaseDir", deps.Config.CgroupsBaseDir)
-
-	return worker
 }
 
-// NewPlatformWorker creates a Linux-specific worker with default dependencies.
+// NewPlatformWorker creates a simplified Linux worker
 func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
-	// Initialize configuration with production defaults
-	config := DefaultConfig()
-
-	// Create real OS interfaces for production use
+	// Create OS interfaces
 	osInterface := &osinterface.DefaultOs{}
 	syscallInterface := &osinterface.DefaultSyscall{}
 	cmdFactory := &osinterface.DefaultCommandFactory{}
 	execInterface := &osinterface.DefaultExec{}
 
-	// Setup network management components
-	networkPaths := network.NewDefaultPaths()
-	namespaceOps := network.NewNamespaceOperations(
-		syscallInterface,
-		osInterface,
-		networkPaths,
-	)
-
-	// Initialize subnet allocator for network group isolation
-	subnetAllocator := network.NewSubnetAllocator(network.BaseNetwork)
-
-	// Assemble network manager with all dependencies
-	networkDeps := &network.Dependencies{
-		SubnetAllocator: subnetAllocator,
-		NamespaceOps:    namespaceOps,
-		Syscall:         syscallInterface,
-		OsInterface:     osInterface,
-		Paths:           networkPaths,
-	}
-	networkManager := network.NewManager(networkDeps)
-
 	// Create process management components
 	processValidator := process.NewValidator(osInterface, execInterface)
-	processLauncher := process.NewLauncher(
-		cmdFactory,
-		syscallInterface,
-		osInterface,
-		processValidator,
-	)
-	processCleaner := process.NewCleaner(
-		syscallInterface,
-		osInterface,
-		processValidator,
-	)
+	processLauncher := process.NewLauncher(cmdFactory, syscallInterface, osInterface, processValidator)
+	processCleaner := process.NewCleaner(syscallInterface, osInterface, processValidator)
 
-	// Assemble all dependencies for worker creation
-	deps := &Dependencies{
+	// Create resource management
+	cgroupResource := resource.New()
+
+	// Create configuration
+	config := DefaultConfig()
+
+	deps := &SimplifiedDependencies{
 		Store:            store,
-		Cgroup:           resource.New(),
-		CmdFactory:       cmdFactory,
-		Syscall:          syscallInterface,
-		OsInterface:      osInterface,
-		ExecInterface:    execInterface,
-		NetworkManager:   networkManager,
+		Cgroup:           cgroupResource,
 		ProcessLauncher:  processLauncher,
 		ProcessCleaner:   processCleaner,
 		ProcessValidator: processValidator,
+		OsInterface:      osInterface,
 		Config:           config,
 	}
 
-	return NewWorker(deps)
+	return NewSimplifiedWorker(deps)
 }
 
-// StartJob implements the JobWorker interface for job creation.
-func (w *Worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, networkGroupID string) (*domain.Job, error) {
-	// Create structured request for internal processing
-	req := &StartJobRequest{
-		Command:        command,
-		Args:           args,
-		MaxCPU:         maxCPU,
-		MaxMemory:      maxMemory,
-		MaxIOBPS:       maxIOBPS,
-		NetworkGroupID: networkGroupID,
+// StartJob starts a job with host networking (no isolation)
+func (w *SimplifiedWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+	jobID := w.getNextJobID()
+	log := w.logger.WithFields("jobID", jobID, "command", command)
+
+	log.Info("starting job with host networking")
+
+	// Early context check
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
-	// Delegate to specialized job starter component
-	return w.starter.StartJob(ctx, req)
+	// Validate command and arguments
+	if err := w.processValidator.ValidateCommand(command); err != nil {
+		return nil, fmt.Errorf("invalid command: %w", err)
+	}
+
+	if err := w.processValidator.ValidateArguments(args); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	// Resolve command path
+	resolvedCommand, err := w.processValidator.ResolveCommand(command)
+	if err != nil {
+		return nil, fmt.Errorf("command resolution failed: %w", err)
+	}
+
+	// Create job domain object
+	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
+
+	// Setup cgroup resources
+	if err := w.setupCgroup(job); err != nil {
+		return nil, fmt.Errorf("cgroup setup failed: %w", err)
+	}
+
+	// Register job in store
+	w.store.CreateNewJob(job)
+
+	// Start the process with host networking
+	processCmd, err := w.startProcess(ctx, job)
+	if err != nil {
+		w.cleanupFailedJob(job)
+		return nil, fmt.Errorf("process start failed: %w", err)
+	}
+
+	// Update job with process info
+	w.updateJobAsRunning(job, processCmd)
+
+	// Start monitoring
+	w.startMonitoring(ctx, processCmd, job)
+
+	log.Info("job started successfully with host networking", "pid", job.Pid)
+	return job, nil
 }
 
-// StopJob implements the JobWorker interface for job termination.
-func (w *Worker) StopJob(ctx context.Context, jobID string) error {
-	// Create structured request with default settings
-	req := &StopJobRequest{
+// StopJob stops a running job
+func (w *SimplifiedWorker) StopJob(ctx context.Context, jobID string) error {
+	log := w.logger.WithField("jobID", jobID)
+	log.Info("stopping job")
+
+	job, exists := w.store.GetJob(jobID)
+	if !exists {
+		return fmt.Errorf("job not found: %s", jobID)
+	}
+
+	if !job.IsRunning() {
+		return fmt.Errorf("job is not running: %s (status: %s)", jobID, job.Status)
+	}
+
+	// Create cleanup request
+	cleanupReq := &process.CleanupRequest{
 		JobID:           jobID,
-		GracefulTimeout: GracefulShutdownTimeout,
+		PID:             job.Pid,
+		CgroupPath:      job.CgroupPath,
+		IsIsolatedJob:   false, // No network isolation
 		ForceKill:       false,
+		GracefulTimeout: w.config.GracefulShutdownTimeout,
 	}
 
-	// Delegate to specialized job stopper component
-	return w.stopper.StopJob(ctx, req)
+	// Perform process cleanup
+	result, err := w.processCleaner.CleanupProcess(ctx, cleanupReq)
+	if err != nil {
+		return fmt.Errorf("process cleanup failed: %w", err)
+	}
+
+	// Update job status
+	w.updateJobStatus(job, result)
+
+	// Cleanup cgroup
+	w.cgroup.CleanupCgroup(jobID)
+
+	log.Info("job stopped successfully", "method", result.Method)
+	return nil
 }
 
-// GetNextJobID generates a unique job ID for new jobs.
-func (w *Worker) GetNextJobID() string {
+// Private helper methods
+func (w *SimplifiedWorker) getNextJobID() string {
 	nextID := atomic.AddInt64(&jobCounter, 1)
 	return fmt.Sprintf("%d", nextID)
 }
 
-// Getter methods for accessing worker components
-func (w *Worker) GetStore() interfaces.Store {
-	return w.store
-}
-
-func (w *Worker) GetNetworkManager() *network.Manager {
-	return w.networkManager
-}
-
-func (w *Worker) GetProcessLauncher() *process.Launcher {
-	return w.processLauncher
-}
-
-func (w *Worker) GetProcessCleaner() *process.Cleaner {
-	return w.processCleaner
-}
-
-func (w *Worker) GetProcessValidator() *process.Validator {
-	return w.processValidator
-}
-
-func (w *Worker) GetCgroup() interfaces.Resource {
-	return w.cgroup
-}
-
-func (w *Worker) GetConfig() *Config {
-	return w.config
-}
-
-func (w *Worker) GetLogger() *logger.Logger {
-	return w.logger
-}
-
-// StartMonitoring initiates monitoring for a running job.
-func (w *Worker) StartMonitoring(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
-	w.monitor.StartMonitoring(ctx, cmd, job)
-}
-
-// GetJobInitPath returns the path to the job-init binary.
-func (w *Worker) GetJobInitPath() (string, error) {
-	return w.starter.getJobInitPath()
-}
-
-// CreateJobDomain creates a job domain object with proper initialization.
-func (w *Worker) CreateJobDomain(req *StartJobRequest, jobID string, resolvedCommand string) *domain.Job {
-	// Create resource limits structure from request parameters
-	limits := domain.ResourceLimits{
-		MaxCPU:    req.MaxCPU,
-		MaxMemory: req.MaxMemory,
-		MaxIOBPS:  req.MaxIOBPS,
+func (w *SimplifiedWorker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
+	// Apply defaults
+	if maxCPU <= 0 {
+		maxCPU = 100 // 1 CPU core
+	}
+	if maxMemory <= 0 {
+		maxMemory = 512 // 512 MB
+	}
+	if maxIOBPS <= 0 {
+		maxIOBPS = 0 // Unlimited
 	}
 
-	// Build complete job domain object with all required fields
 	return &domain.Job{
-		Id:             jobID,
-		Command:        resolvedCommand,
-		Args:           append([]string(nil), req.Args...), // Deep copy args
-		Limits:         limits,
-		Status:         domain.StatusInitializing,
-		CgroupPath:     w.config.BuildCgroupPath(jobID),
-		StartTime:      time.Now(),
-		NetworkGroupID: req.NetworkGroupID,
-		// CRITICAL: Use unique interface name per job
-		InterfaceName: fmt.Sprintf("job-%s", jobID),
+		Id:      jobID,
+		Command: resolvedCommand,
+		Args:    append([]string(nil), args...), // Deep copy
+		Limits: domain.ResourceLimits{
+			MaxCPU:    maxCPU,
+			MaxMemory: maxMemory,
+			MaxIOBPS:  maxIOBPS,
+		},
+		Status:     domain.StatusInitializing,
+		CgroupPath: w.config.BuildCgroupPath(jobID),
+		StartTime:  time.Now(),
+		// No network fields
 	}
 }
 
-// ValidateAndResolveCommand performs security validation and path resolution.
-func (w *Worker) ValidateAndResolveCommand(command string) (string, error) {
-	// Perform security validation first
-	if err := w.processValidator.ValidateCommand(command); err != nil {
-		return "", fmt.Errorf("command validation failed: %w", err)
-	}
-
-	// Resolve command to full path for secure execution
-	resolvedCommand, err := w.processValidator.ResolveCommand(command)
-	if err != nil {
-		return "", fmt.Errorf("command resolution failed: %w", err)
-	}
-
-	return resolvedCommand, nil
-}
-
-// CleanupJobResources performs comprehensive cleanup of job resources.
-func (w *Worker) CleanupJobResources(jobID string, networkGroupID string, isNewNetworkGroup bool) {
-	log := w.logger.WithField("jobID", jobID)
-	log.Debug("cleaning up job resources",
-		"networkGroup", networkGroupID,
-		"isNewGroup", isNewNetworkGroup)
-
-	// Always cleanup cgroup resources
-	if w.cgroup != nil {
-		w.cgroup.CleanupCgroup(jobID)
-		log.Debug("cgroup cleanup initiated")
-	}
-
-	// Handle network cleanup based on group membership
-	if networkGroupID != "" {
-		if isNewNetworkGroup {
-			// For groups that failed during creation, clean up the entire group
-			if err := w.networkManager.CleanupGroup(networkGroupID); err != nil {
-				log.Warn("failed to cleanup network group",
-					"groupID", networkGroupID,
-					"error", err)
-			} else {
-				log.Debug("network group cleaned up", "groupID", networkGroupID)
-			}
-		} else {
-			// For existing groups, just decrement the job count
-			if err := w.networkManager.DecrementJobCount(networkGroupID); err != nil {
-				log.Warn("failed to decrement network group count",
-					"groupID", networkGroupID,
-					"error", err)
-			} else {
-				log.Debug("network group job count decremented", "groupID", networkGroupID)
-			}
-		}
-	}
-
-	log.Info("job resource cleanup completed")
-}
-
-// EmergencyCleanup performs emergency cleanup when normal cleanup fails.
-func (w *Worker) EmergencyCleanup(jobID string, pid int32, networkGroupID string) {
-	log := w.logger.WithFields("jobID", jobID, "pid", pid)
-	log.Warn("performing emergency cleanup - normal cleanup failed")
-
-	// Determine namespace configuration for cleanup
-	namespacePath := ""
-	isIsolated := networkGroupID == ""
-
-	if isIsolated {
-		namespacePath = w.config.BuildNamespacePath(jobID)
-	}
-
-	// Use process cleaner for emergency cleanup
-	w.processCleaner.EmergencyCleanup(
-		jobID,
-		pid,
-		w.cgroup,
-		w.networkManager,
-		namespacePath,
-		isIsolated,
+func (w *SimplifiedWorker) setupCgroup(job *domain.Job) error {
+	return w.cgroup.Create(
+		job.CgroupPath,
+		job.Limits.MaxCPU,
+		job.Limits.MaxMemory,
+		job.Limits.MaxIOBPS,
 	)
-
-	// Handle network group cleanup if applicable
-	if networkGroupID != "" {
-		if err := w.networkManager.DecrementJobCount(networkGroupID); err != nil {
-			log.Warn("failed to decrement network group count during emergency cleanup",
-				"groupID", networkGroupID,
-				"error", err)
-		}
-	}
-
-	// Update job status to failed in store
-	if job, exists := w.store.GetJob(jobID); exists {
-		failedJob := job.DeepCopy()
-
-		if failErr := failedJob.Fail(-1); failErr != nil {
-			log.Warn("domain validation failed during emergency cleanup",
-				"error", failErr)
-			failedJob.Status = domain.StatusFailed
-			failedJob.ExitCode = -1
-			now := time.Now()
-			failedJob.EndTime = &now
-		}
-
-		w.store.UpdateJob(failedJob)
-		log.Info("job marked as failed during emergency cleanup")
-	}
-
-	log.Warn("emergency cleanup completed")
 }
 
-// GetStats returns comprehensive worker statistics for monitoring.
-func (w *Worker) GetStats() map[string]interface{} {
-	stats := map[string]interface{}{
-		"current_job_counter": atomic.LoadInt64(&jobCounter),
-		"component":           "linux-worker",
+func (w *SimplifiedWorker) startProcess(ctx context.Context, job *domain.Job) (osinterface.Command, error) {
+	// Get job-init binary path
+	initPath, err := w.getJobInitPath()
+	if err != nil {
+		return nil, fmt.Errorf("job-init not found: %w", err)
 	}
 
-	// Add network manager statistics if available
-	if w.networkManager != nil {
-		networkStats := w.networkManager.GetStats()
-		for k, v := range networkStats {
-			stats["network_"+k] = v
-		}
+	// Prepare environment (no network environment)
+	env := w.buildJobEnvironment(job)
+
+	// Create process attributes with NO network namespace isolation
+	sysProcAttr := &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWPID | // PID namespace isolation
+			syscall.CLONE_NEWNS | // Mount namespace isolation
+			syscall.CLONE_NEWIPC | // IPC namespace isolation
+			syscall.CLONE_NEWUTS, // UTS namespace isolation
+		// NO syscall.CLONE_NEWNET - use host networking
+		Setpgid: true,
 	}
 
-	// Add job store statistics
-	if jobs := w.store.ListJobs(); jobs != nil {
-		statusCounts := make(map[string]int)
-		for _, job := range jobs {
-			statusCounts[string(job.Status)]++
-		}
-		stats["jobs_by_status"] = statusCounts
-		stats["total_jobs"] = len(jobs)
+	// Create launch configuration
+	launchConfig := &process.LaunchConfig{
+		InitPath:      initPath,
+		Environment:   env,
+		SysProcAttr:   sysProcAttr,
+		Stdout:        executor.New(w.store, job.Id),
+		Stderr:        executor.New(w.store, job.Id),
+		NamespacePath: "",    // No namespace path needed
+		NeedsNSJoin:   false, // No namespace joining
+		JobID:         job.Id,
+		Command:       job.Command,
+		Args:          job.Args,
 	}
 
-	return stats
+	// Launch the process
+	result, err := w.processLauncher.LaunchProcess(ctx, launchConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.logger.Info("process launched with host networking", "jobID", job.Id, "pid", result.PID)
+	return result.Command, nil
 }
 
-// Shutdown gracefully shuts down the worker and all running jobs.
-func (w *Worker) Shutdown(ctx context.Context) error {
-	w.logger.Info("shutting down Linux worker")
+func (w *SimplifiedWorker) buildJobEnvironment(job *domain.Job) []string {
+	baseEnv := w.osInterface.Environ()
 
-	var errors []error
+	// Job-specific environment (no network variables)
+	jobEnv := []string{
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", job.CgroupPath),
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		"HOST_NETWORKING=true", // Indicate host networking
+	}
 
-	// Stop all running jobs gracefully
-	jobs := w.store.ListJobs()
-	for _, job := range jobs {
-		if job.IsRunning() {
-			w.logger.Debug("stopping running job during shutdown", "jobID", job.Id)
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
 
-			if err := w.StopJob(ctx, job.Id); err != nil {
-				w.logger.Warn("failed to stop job during shutdown", "jobID", job.Id, "error", err)
-				errors = append(errors, fmt.Errorf("failed to stop job %s: %w", job.Id, err))
-			}
+	return append(baseEnv, jobEnv...)
+}
+
+func (w *SimplifiedWorker) getJobInitPath() (string, error) {
+	// Check same directory as main executable
+	if execPath, err := w.osInterface.Executable(); err == nil {
+		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
+		if _, err := w.osInterface.Stat(initPath); err == nil {
+			return initPath, nil
 		}
 	}
 
-	// Shutdown network manager
-	if w.networkManager != nil {
-		if err := w.networkManager.Shutdown(); err != nil {
-			w.logger.Warn("network manager shutdown failed", "error", err)
-			errors = append(errors, fmt.Errorf("network manager shutdown failed: %w", err))
+	// Check standard paths
+	standardPaths := []string{
+		"/opt/job-worker/job-init",
+		"/usr/local/bin/job-init",
+		"/usr/bin/job-init",
+	}
+
+	for _, path := range standardPaths {
+		if _, err := w.osInterface.Stat(path); err == nil {
+			return path, nil
 		}
 	}
 
-	// Report shutdown completion status
-	if len(errors) > 0 {
-		return fmt.Errorf("worker shutdown completed with %d errors (first: %w)", len(errors), errors[0])
-	}
-
-	w.logger.Info("Linux worker shutdown completed successfully")
-	return nil
+	return "", fmt.Errorf("job-init binary not found")
 }
 
-// Health check methods
-func (w *Worker) IsHealthy() bool {
-	if w.store == nil || w.networkManager == nil || w.processLauncher == nil {
-		return false
+func (w *SimplifiedWorker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
+	process := processCmd.Process()
+	if process == nil {
+		w.logger.Warn("process is nil after start", "jobID", job.Id)
+		return
 	}
-	return true
+
+	runningJob := job.DeepCopy()
+	runningJob.Pid = int32(process.Pid())
+
+	if err := runningJob.MarkAsRunning(runningJob.Pid); err != nil {
+		w.logger.Warn("domain validation failed for running status", "error", err)
+		runningJob.Status = domain.StatusRunning
+		runningJob.Pid = int32(process.Pid())
+	}
+
+	runningJob.StartTime = time.Now()
+	w.store.UpdateJob(runningJob)
 }
 
-func (w *Worker) GetComponentStatus() map[string]string {
-	status := map[string]string{
-		"worker":           "healthy",
-		"store":            "unknown",
-		"network_manager":  "unknown",
-		"process_launcher": "unknown",
-		"cgroup":           "unknown",
-	}
+func (w *SimplifiedWorker) startMonitoring(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
+	go w.monitorJob(ctx, cmd, job)
+}
 
-	if w.store != nil {
-		status["store"] = "healthy"
+func (w *SimplifiedWorker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
+	log := w.logger.WithField("jobID", job.Id)
+	startTime := time.Now()
+
+	// Wait for process completion
+	err := cmd.Wait()
+	duration := time.Since(startTime)
+
+	// Determine final status and exit code
+	var finalStatus domain.JobStatus
+	var exitCode int32
+
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = int32(exitErr.ExitCode())
+			finalStatus = domain.StatusFailed
+		} else {
+			exitCode = -1
+			finalStatus = domain.StatusFailed
+		}
 	} else {
-		status["store"] = "unhealthy"
+		exitCode = 0
+		finalStatus = domain.StatusCompleted
 	}
 
-	if w.networkManager != nil {
-		status["network_manager"] = "healthy"
-	} else {
-		status["network_manager"] = "unhealthy"
+	// Update job status
+	completedJob := job.DeepCopy()
+	switch finalStatus {
+	case domain.StatusCompleted:
+		completedJob.Complete(exitCode)
+	case domain.StatusFailed:
+		completedJob.Fail(exitCode)
 	}
 
-	if w.processLauncher != nil {
-		status["process_launcher"] = "healthy"
-	} else {
-		status["process_launcher"] = "unhealthy"
+	w.store.UpdateJob(completedJob)
+
+	// Cleanup cgroup
+	w.cgroup.CleanupCgroup(job.Id)
+
+	log.Info("job monitoring completed",
+		"finalStatus", finalStatus,
+		"exitCode", exitCode,
+		"duration", duration)
+}
+
+func (w *SimplifiedWorker) cleanupFailedJob(job *domain.Job) {
+	failedJob := job.DeepCopy()
+	if err := failedJob.Fail(-1); err != nil {
+		failedJob.Status = domain.StatusFailed
+		failedJob.ExitCode = -1
+		now := time.Now()
+		failedJob.EndTime = &now
+	}
+	w.store.UpdateJob(failedJob)
+	w.cgroup.CleanupCgroup(job.Id)
+}
+
+func (w *SimplifiedWorker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {
+	stoppedJob := job.DeepCopy()
+
+	switch result.Method {
+	case "graceful":
+		stoppedJob.Stop()
+	case "forced", "force_failed":
+		stoppedJob.Fail(-1)
+	case "already_dead":
+		stoppedJob.Complete(0)
+	default:
+		stoppedJob.Fail(-1)
 	}
 
-	if w.cgroup != nil {
-		status["cgroup"] = "healthy"
-	} else {
-		status["cgroup"] = "unhealthy"
-	}
-
-	return status
+	w.store.UpdateJob(stoppedJob)
 }

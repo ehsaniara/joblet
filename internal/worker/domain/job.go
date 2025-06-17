@@ -24,20 +24,16 @@ type ResourceLimits struct {
 }
 
 type Job struct {
-	Id             string
-	Command        string
-	Args           []string
-	Limits         ResourceLimits
-	Status         JobStatus
-	Pid            int32
-	CgroupPath     string
-	StartTime      time.Time
-	EndTime        *time.Time
-	ExitCode       int32
-	NetworkGroupID string
-	AssignedIP     string
-	NetworkSubnet  string
-	InterfaceName  string
+	Id         string
+	Command    string
+	Args       []string
+	Limits     ResourceLimits
+	Status     JobStatus
+	Pid        int32
+	CgroupPath string
+	StartTime  time.Time
+	EndTime    *time.Time
+	ExitCode   int32
 }
 
 func (j *Job) IsRunning() bool {
@@ -115,20 +111,16 @@ func (j *Job) DeepCopy() *Job {
 	}
 
 	return &Job{
-		Id:             j.Id,
-		Command:        j.Command,
-		Args:           utils.CopyStringSlice(j.Args),
-		Limits:         j.Limits,
-		Status:         j.Status,
-		Pid:            j.Pid,
-		CgroupPath:     j.CgroupPath,
-		StartTime:      j.StartTime,
-		EndTime:        endTimeCopy,
-		ExitCode:       j.ExitCode,
-		NetworkGroupID: j.NetworkGroupID,
-		AssignedIP:     j.AssignedIP,
-		NetworkSubnet:  j.NetworkSubnet,
-		InterfaceName:  j.InterfaceName,
+		Id:         j.Id,
+		Command:    j.Command,
+		Args:       utils.CopyStringSlice(j.Args),
+		Limits:     j.Limits,
+		Status:     j.Status,
+		Pid:        j.Pid,
+		CgroupPath: j.CgroupPath,
+		StartTime:  j.StartTime,
+		EndTime:    endTimeCopy,
+		ExitCode:   j.ExitCode,
 	}
 }
 
