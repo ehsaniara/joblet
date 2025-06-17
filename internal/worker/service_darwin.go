@@ -33,7 +33,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 var _ interfaces.JobWorker = (*darwinWorker)(nil)
 var _ PlatformWorker = (*darwinWorker)(nil)
 
-func (w *darwinWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+func (w *darwinWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, networkGroupID string) (*domain.Job, error) {
 	select {
 	case <-ctx.Done():
 		w.logger.Warn("start job cancelled by context", "error", ctx.Err())

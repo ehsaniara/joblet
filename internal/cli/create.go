@@ -19,23 +19,34 @@ func newCreateCmd() *cobra.Command {
 		Long: `Create a new job with the specified command and arguments.
 
 Examples:
+  # Isolated jobs (each gets own network namespace)
+  cli create nginx
+  cli create mysql
   cli create python3 script.py
-  cli create bash -c "for i in {1..10}; do echo $i; done"
-  cli create ping -c 5 google.com
-  cli create ls -la /tmp
-  cli create echo "hello world"
   
-  cli create --max-cpu=50 python3 heavy_script.py
-  cli create --max-memory=1024 java -jar app.jar
-  cli create --max-cpu=25 --max-memory=512 bash -c "intensive command"
+  # Network group (automatic unique IP assignment by server)
+  cli create --network-group=web nginx
+  cli create --network-group=web mysql  
+  cli create --network-group=web redis
+  
+  # Jobs in same group can communicate via auto-assigned IPs
+  cli create --network-group=web bash -c "curl http://nginx-service"
+  
+  # Different groups are completely isolated
+  cli create --network-group=backend postgres
+  cli create --network-group=cache redis
 
-Resource limit flags (must appear before command):
-  --max-cpu=N      Max CPU percentage
-  --max-memory=N   Max Memory in MB
-  --max-iobps=N    Max IO BPS
+Flags:
+  --max-cpu=N         Max CPU percentage
+  --max-memory=N      Max Memory in MB  
+  --max-iobps=N       Max IO BPS
+  --network-group=ID  Network group (server auto-assigns unique IP)
 
-Note: Resource flags must come before the command. Everything after the first 
-non-flag argument is treated as the command and its arguments.`,
+The server automatically handles:
+- Unique IP assignment within network groups
+- Subnet allocation per group  
+- Interface creation and configuration
+- Network isolation between groups`,
 		Args:               cobra.MinimumNArgs(1),
 		RunE:               runCreate,
 		DisableFlagParsing: true,
@@ -46,9 +57,10 @@ non-flag argument is treated as the command and its arguments.`,
 
 func runCreate(cmd *cobra.Command, args []string) error {
 	var (
-		maxCPU    int32
-		maxMemory int32
-		maxIOBPS  int32
+		maxCPU         int32
+		maxMemory      int32
+		maxIOBPS       int32
+		networkGroupID string
 	)
 
 	commandStartIndex := 0
@@ -65,6 +77,11 @@ func runCreate(cmd *cobra.Command, args []string) error {
 			if val, err := parseIntFlag(arg, "--max-iobps="); err == nil {
 				maxIOBPS = int32(val)
 			}
+		} else if strings.HasPrefix(arg, "--network-group=") {
+			networkGroupID = strings.TrimPrefix(arg, "--network-group=")
+			if networkGroupID == "" {
+				return fmt.Errorf("network group ID cannot be empty")
+			}
 		} else if !strings.HasPrefix(arg, "--") {
 			commandStartIndex = i
 			break
@@ -78,10 +95,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	commandArgs := args[commandStartIndex:]
-	if len(commandArgs) == 0 {
-		return fmt.Errorf("must specify a command")
-	}
-
 	command := commandArgs[0]
 	cmdArgs := commandArgs[1:]
 	displayCommand := strings.Join(commandArgs, " ")
@@ -95,12 +108,14 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Simple request - only basic info, server handles all IP logic
 	job := &pb.CreateJobReq{
-		Command:   command,
-		Args:      cmdArgs,
-		MaxCPU:    maxCPU,
-		MaxMemory: maxMemory,
-		MaxIOBPS:  maxIOBPS,
+		Command:        command,
+		Args:           cmdArgs,
+		MaxCPU:         maxCPU,
+		MaxMemory:      maxMemory,
+		MaxIOBPS:       maxIOBPS,
+		NetworkGroupID: networkGroupID, // Only network group, nothing else
 	}
 
 	response, err := jobClient.CreateJob(ctx, job)
@@ -113,6 +128,20 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Command: %s\n", displayCommand)
 	fmt.Printf("Status: %s\n", response.Status)
 	fmt.Printf("StartTime: %s\n", response.StartTime)
+
+	// Show what the server decided (if response includes it)
+	if networkGroupID != "" {
+		fmt.Printf("NetworkGroup: %s\n", networkGroupID)
+
+		// If server returns assigned IP info, show it
+		if response.AssignedIP != "" {
+			fmt.Printf("AssignedIP: %s (auto-assigned by server)\n", response.AssignedIP)
+		} else {
+			fmt.Printf("IP: will be auto-assigned by server\n")
+		}
+	} else {
+		fmt.Printf("Network: isolated (own namespace)\n")
+	}
 
 	return nil
 }

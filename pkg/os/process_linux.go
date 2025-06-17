@@ -96,6 +96,22 @@ func (s *DefaultSyscall) CreateProcessGroup() *syscall.SysProcAttr {
 // DefaultOs implements interfaces.OsInterface using real os
 type DefaultOs struct{}
 
+func (d *DefaultOs) IsNotExist(err error) bool {
+	return os.IsNotExist(err)
+}
+
+func (d *DefaultOs) MkdirAll(dir string, perm os.FileMode) error {
+	return os.MkdirAll(dir, perm)
+}
+
+func (d *DefaultOs) Symlink(source string, path string) error {
+	return os.Symlink(source, path)
+}
+
+func (d *DefaultOs) Remove(script string) error {
+	return os.Remove(script)
+}
+
 func (d *DefaultOs) ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }

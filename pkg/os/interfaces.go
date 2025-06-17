@@ -29,6 +29,10 @@ type OsInterface interface {
 	Getenv(key string) string
 	Getpid() int
 	ReadFile(path string) ([]byte, error)
+	Remove(script string) error
+	Symlink(source string, path string) error
+	MkdirAll(dir string, perm os.FileMode) error
+	IsNotExist(err error) bool
 }
 
 //counterfeiter:generate . CommandFactory
