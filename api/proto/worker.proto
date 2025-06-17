@@ -15,6 +15,7 @@ service JobService{
 message Jobs{
   repeated Job jobs = 1;
 }
+
 message Job{
   string id = 1;
   string command = 2;
@@ -26,6 +27,10 @@ message Job{
   string startTime = 8;
   string endTime = 9;
   int32 exitCode = 10;
+  string networkGroupID = 11;
+  string assignedIP = 12;
+  string networkSubnet = 13;
+  string interfaceName = 14;
 }
 
 message EmptyRequest {}
@@ -52,6 +57,10 @@ message CreateJobRes{
   string startTime = 9;
   string endTime = 10;
   int32 exitCode = 11;
+
+  // Server tells client what it decided (for informational purposes)
+  string assignedIP = 12;       // IP server assigned (empty for isolated jobs)
+  string networkSubnet = 13;    // Subnet server created for the group
 }
 
 // GetJob
@@ -71,6 +80,10 @@ message GetJobRes{
   string startTime = 9;
   string endTime = 10;
   int32 exitCode = 11;
+  // Networking info server assigned
+  string assignedIP = 12;
+  string networkSubnet = 13;
+  string interfaceName = 14;
 }
 
 // StopJob

@@ -35,6 +35,9 @@ type Job struct {
 	EndTime        *time.Time
 	ExitCode       int32
 	NetworkGroupID string
+	AssignedIP     string
+	NetworkSubnet  string
+	InterfaceName  string
 }
 
 func (j *Job) IsRunning() bool {
@@ -112,16 +115,20 @@ func (j *Job) DeepCopy() *Job {
 	}
 
 	return &Job{
-		Id:         j.Id,
-		Command:    j.Command,
-		Args:       utils.CopyStringSlice(j.Args),
-		Limits:     j.Limits,
-		Status:     j.Status,
-		Pid:        j.Pid,
-		CgroupPath: j.CgroupPath,
-		StartTime:  j.StartTime,
-		EndTime:    endTimeCopy,
-		ExitCode:   j.ExitCode,
+		Id:             j.Id,
+		Command:        j.Command,
+		Args:           utils.CopyStringSlice(j.Args),
+		Limits:         j.Limits,
+		Status:         j.Status,
+		Pid:            j.Pid,
+		CgroupPath:     j.CgroupPath,
+		StartTime:      j.StartTime,
+		EndTime:        endTimeCopy,
+		ExitCode:       j.ExitCode,
+		NetworkGroupID: j.NetworkGroupID,
+		AssignedIP:     j.AssignedIP,
+		NetworkSubnet:  j.NetworkSubnet,
+		InterfaceName:  j.InterfaceName,
 	}
 }
 

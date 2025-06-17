@@ -116,7 +116,15 @@ func (j *linuxJobInitializer) ExecuteJob(config *JobConfig) error {
 			config.JobID, config.Command, config.CgroupPath)
 	}
 
-	jobLogger.Info("executing job", "command", config.Command, "args", config.Args, "networkGroup", config.NetworkGroupID)
+	jobLogger.Info("executing job with proper namespace isolation",
+		"jobID", config.JobID,
+		"command", config.Command,
+		"networkGroup", config.NetworkGroupID)
+
+	// CRITICAL: Clean up any leaked interfaces first
+	if err := j.cleanupLeakedInterfaces(); err != nil {
+		jobLogger.Warn("failed to cleanup leaked interfaces", "error", err)
+	}
 
 	// Handle network setup if needed (parent already handled namespace joining)
 	if err := j.setupNetworking(config); err != nil {
@@ -160,100 +168,310 @@ func (j *linuxJobInitializer) ExecuteJob(config *JobConfig) error {
 	return nil
 }
 
-// setupNetworking handles network setup - parent process handles namespace joining
-func (j *linuxJobInitializer) setupNetworking(config *JobConfig) error {
-	if config.NetworkGroupID == "" {
-		j.logger.Debug("no network group specified, using isolated namespace")
-		return nil
+// cleanupLeakedInterfaces removes any interfaces that shouldn't be in this namespace
+func (j *linuxJobInitializer) cleanupLeakedInterfaces() error {
+	j.logger.Debug("cleaning up any leaked interfaces before setup")
+
+	// Get current interfaces
+	cmd := exec.Command("ip", "link", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		j.logger.Warn("failed to list interfaces", "error", err)
+		return nil // Don't fail job for this
 	}
 
-	log := j.logger.WithField("networkGroup", config.NetworkGroupID)
+	lines := strings.Split(string(output), "\n")
+	myJobID := j.osInterface.Getenv("JOB_ID")
 
-	// Parent process already handled namespace joining via wrapper script or clone()
-	// We only need to setup internal networking for new groups
-	if config.IsNewNetworkGroup {
-		log.Info("setting up networking for new network group")
-
-		if err := j.setupInternalNetwork(); err != nil {
-			// Log warning but don't fail - the job might still work
-			log.Warn("failed to setup internal network, continuing anyway", "error", err)
-		} else {
-			log.Info("successfully setup internal networking")
+	for _, line := range lines {
+		// Look for interfaces that match job pattern but aren't ours
+		if strings.Contains(line, "job-") && !strings.Contains(line, "job-"+myJobID) {
+			// Extract interface name
+			if parts := strings.Fields(line); len(parts) >= 2 {
+				interfaceName := strings.TrimSuffix(parts[1], ":")
+				if strings.HasPrefix(interfaceName, "job-") && interfaceName != "job-"+myJobID {
+					j.logger.Warn("found leaked interface, removing", "interface", interfaceName)
+					j.removeInterface(interfaceName)
+				}
+			}
 		}
-	} else {
-		log.Info("joined existing network group")
 	}
 
 	return nil
 }
 
-// setupInternalNetwork sets up internal networking using configuration from environment
-func (j *linuxJobInitializer) setupInternalNetwork() error {
-	// Get network configuration from environment variables
+// removeInterface safely removes a network interface
+func (j *linuxJobInitializer) removeInterface(interfaceName string) {
+	// Try to bring interface down first
+	if err := j.executeCommand("ip", "link", "set", interfaceName, "down"); err != nil {
+		j.logger.Debug("failed to bring interface down", "interface", interfaceName, "error", err)
+	}
+
+	// Remove the interface
+	if err := j.executeCommand("ip", "link", "delete", interfaceName); err != nil {
+		j.logger.Debug("failed to delete interface", "interface", interfaceName, "error", err)
+	} else {
+		j.logger.Info("removed leaked interface", "interface", interfaceName)
+	}
+}
+
+// setupNetworking handles both automatic IP setup and basic network configuration
+func (j *linuxJobInitializer) setupNetworking(config *JobConfig) error {
+	// Check for automatic IP setup first
+	if j.osInterface.Getenv("AUTO_SETUP_IP") == "true" {
+		if err := j.setupAutomaticIP(); err != nil {
+			j.logger.Error("failed to setup automatic IP", "error", err)
+			return fmt.Errorf("failed to setup automatic IP: %w", err)
+		}
+		return nil
+	}
+
+	// For isolated jobs or manual setup, do nothing
+	j.logger.Debug("no automatic IP setup requested")
+	return nil
+}
+
+// setupAutomaticIP configures the network interface with server-assigned IP
+func (j *linuxJobInitializer) setupAutomaticIP() error {
+	assignedIP := j.osInterface.Getenv("JOB_ASSIGNED_IP")
+	jobID := j.osInterface.Getenv("JOB_ID")
 	subnet := j.osInterface.Getenv("INTERNAL_SUBNET")
 	gateway := j.osInterface.Getenv("INTERNAL_GATEWAY")
-	iface := j.osInterface.Getenv("INTERNAL_INTERFACE")
 
-	// Use defaults if not specified
-	if subnet == "" {
-		subnet = "172.20.0.0/24"
-	}
-	if gateway == "" {
-		gateway = "172.20.0.1"
-	}
-	if iface == "" {
-		iface = "internal0"
+	if assignedIP == "" || jobID == "" {
+		return fmt.Errorf("missing required IP configuration: IP=%s, JobID=%s", assignedIP, jobID)
 	}
 
-	j.logger.Debug("setting up internal network",
-		"subnet", subnet,
-		"gateway", gateway,
-		"interface", iface)
+	// Create unique interface name for THIS job only
+	interfaceName := fmt.Sprintf("job-%s", jobID)
 
-	// Parse gateway and subnet for validation
-	gatewayIP, gatewayNet, err := net.ParseCIDR(subnet)
-	if err != nil {
-		return fmt.Errorf("invalid subnet %s: %w", subnet, err)
-	}
+	j.logger.Info("setting up automatic IP with proper isolation",
+		"jobID", jobID,
+		"assignedIP", assignedIP,
+		"interface", interfaceName)
 
-	// Use the gateway IP from environment, but validate it's in subnet
-	if ip := net.ParseIP(gateway); ip != nil && gatewayNet.Contains(ip) {
-		gatewayIP = ip
-	}
-
-	// Build gateway address with CIDR
-	gatewayAddr := fmt.Sprintf("%s/%s", gatewayIP.String(), strings.Split(subnet, "/")[1])
-
-	// Commands to setup internal networking with dynamic configuration
-	commands := [][]string{
-		{"ip", "link", "set", "lo", "up"},                     // Bring up loopback
-		{"ip", "link", "add", "name", iface, "type", "dummy"}, // Create interface
-		{"ip", "link", "set", iface, "up"},                    // Bring up interface
-		{"ip", "addr", "add", gatewayAddr, "dev", iface},      // Assign IP address
-	}
-
-	successCount := 0
-	for i, cmd := range commands {
-		if err := j.executeCommand(cmd[0], cmd[1:]...); err != nil {
-			j.logger.Warn("network setup command failed", "command", cmd, "step", i+1, "error", err)
-		} else {
-			j.logger.Debug("network setup command succeeded", "command", cmd, "step", i+1)
-			successCount++
+	// Calculate interface IP with subnet mask
+	interfaceIP := assignedIP + "/24" // Default
+	if subnet != "" {
+		if _, ipNet, err := net.ParseCIDR(subnet); err == nil {
+			maskSize, _ := ipNet.Mask.Size()
+			interfaceIP = fmt.Sprintf("%s/%d", assignedIP, maskSize)
 		}
 	}
 
-	if successCount > 0 {
-		j.logger.Info("internal network setup completed",
-			"successfulCommands", successCount,
-			"totalCommands", len(commands),
-			"interface", iface,
-			"gatewayAddr", gatewayAddr,
-			"subnet", subnet)
-	} else {
-		j.logger.Warn("all network setup commands failed, jobs may not be able to communicate")
+	// STEP 1: Verify we start with ONLY loopback
+	j.logCurrentInterfaces("BEFORE_setup")
+	if err := j.verifyCleanNamespace(); err != nil {
+		j.logger.Warn("namespace not clean", "error", err)
+		// Don't fail - just warn and continue
 	}
 
+	// STEP 2: Setup loopback (should already exist but ensure it's up)
+	if err := j.executeCommand("ip", "link", "set", "lo", "up"); err != nil {
+		j.logger.Warn("failed to bring up loopback", "error", err)
+	}
+
+	// STEP 3: Create ONLY our job's interface
+	// Use dummy interface instead of veth to avoid peer leakage
+	if err := j.executeCommand("ip", "link", "add", interfaceName, "type", "dummy"); err != nil {
+		j.logger.Error("failed to create job interface", "interface", interfaceName, "error", err)
+		return fmt.Errorf("failed to create interface %s: %w", interfaceName, err)
+	}
+
+	// STEP 4: Assign IP to our interface
+	if err := j.executeCommand("ip", "addr", "add", interfaceIP, "dev", interfaceName); err != nil {
+		j.logger.Error("failed to assign IP", "interface", interfaceName, "ip", interfaceIP, "error", err)
+		return fmt.Errorf("failed to assign IP %s to %s: %w", interfaceIP, interfaceName, err)
+	}
+
+	// STEP 5: Bring interface up
+	if err := j.executeCommand("ip", "link", "set", interfaceName, "up"); err != nil {
+		j.logger.Error("failed to bring interface up", "interface", interfaceName, "error", err)
+		return fmt.Errorf("failed to bring up interface %s: %w", interfaceName, err)
+	}
+
+	// STEP 6: Add route to gateway if specified
+	if gateway != "" {
+		if err := j.executeCommand("ip", "route", "add", "default", "via", gateway, "dev", interfaceName); err != nil {
+			j.logger.Warn("failed to add default route", "gateway", gateway, "error", err)
+			// Don't fail for routing issues
+		}
+	}
+
+	// STEP 7: Verify we now have exactly 2 interfaces
+	j.logCurrentInterfaces("AFTER_setup")
+	if err := j.verifyCorrectInterfaceCount(interfaceName, assignedIP); err != nil {
+		return fmt.Errorf("interface verification failed: %w", err)
+	}
+
+	j.logger.Info("automatic IP setup completed successfully",
+		"interface", interfaceName,
+		"ip", assignedIP,
+		"expectedInterfaces", "2 (lo + job interface)")
+
 	return nil
+}
+
+// verifyCleanNamespace ensures we start with only loopback
+func (j *linuxJobInitializer) verifyCleanNamespace() error {
+	cmd := exec.Command("ip", "link", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to list interfaces: %w", err)
+	}
+
+	lines := strings.Split(string(output), "\n")
+	interfaceCount := 0
+	hasLoopback := false
+	extraInterfaces := []string{}
+
+	for _, line := range lines {
+		if strings.Contains(line, ": lo:") {
+			hasLoopback = true
+			interfaceCount++
+		} else if strings.HasPrefix(line, " ") {
+			// Skip continuation lines
+			continue
+		} else if strings.Contains(line, ": ") {
+			interfaceCount++
+			// Extract interface name for logging
+			if parts := strings.Fields(line); len(parts) >= 2 {
+				interfaceName := strings.TrimSuffix(parts[1], ":")
+				if interfaceName != "lo" {
+					extraInterfaces = append(extraInterfaces, interfaceName)
+				}
+			}
+		}
+	}
+
+	if !hasLoopback {
+		return fmt.Errorf("loopback interface not found")
+	}
+
+	if len(extraInterfaces) > 0 {
+		j.logger.Warn("found extra interfaces in namespace",
+			"extraInterfaces", extraInterfaces,
+			"totalInterfaces", interfaceCount)
+		// Clean them up
+		for _, iface := range extraInterfaces {
+			j.cleanupInterface(iface)
+		}
+	}
+
+	j.logger.Debug("namespace verification",
+		"hasLoopback", hasLoopback,
+		"totalInterfaces", interfaceCount,
+		"extraInterfaces", len(extraInterfaces))
+
+	return nil
+}
+
+// verifyCorrectInterfaceCount ensures we have exactly 2 interfaces after setup
+func (j *linuxJobInitializer) verifyCorrectInterfaceCount(expectedInterface, expectedIP string) error {
+	cmd := exec.Command("ip", "addr", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to verify interfaces: %w", err)
+	}
+
+	outputStr := string(output)
+	lines := strings.Split(outputStr, "\n")
+
+	interfaceCount := 0
+	hasLoopback := false
+	hasJobInterface := false
+	hasExpectedIP := false
+
+	for _, line := range lines {
+		// Count interfaces (lines starting with number)
+		if strings.Contains(line, ": lo:") {
+			hasLoopback = true
+			interfaceCount++
+		} else if strings.Contains(line, ": "+expectedInterface+":") {
+			hasJobInterface = true
+			interfaceCount++
+		} else if strings.HasPrefix(line, " ") {
+			// Skip continuation lines but check for IP
+			if strings.Contains(line, expectedIP) {
+				hasExpectedIP = true
+			}
+		} else if strings.Contains(line, ": ") && !strings.Contains(line, ": lo:") && !strings.Contains(line, ": "+expectedInterface+":") {
+			interfaceCount++
+			// Log unexpected interface
+			if parts := strings.Fields(line); len(parts) >= 2 {
+				unexpectedInterface := strings.TrimSuffix(parts[1], ":")
+				j.logger.Warn("unexpected interface found", "interface", unexpectedInterface)
+			}
+		}
+	}
+
+	// Verify we have exactly what we expect
+	if !hasLoopback {
+		return fmt.Errorf("loopback interface missing")
+	}
+
+	if !hasJobInterface {
+		return fmt.Errorf("job interface %s missing", expectedInterface)
+	}
+
+	if !hasExpectedIP {
+		return fmt.Errorf("expected IP %s not found on interface", expectedIP)
+	}
+
+	if interfaceCount != 2 {
+		return fmt.Errorf("expected exactly 2 interfaces (lo + %s), found %d", expectedInterface, interfaceCount)
+	}
+
+	j.logger.Info("interface verification passed",
+		"hasLoopback", hasLoopback,
+		"hasJobInterface", hasJobInterface,
+		"hasExpectedIP", hasExpectedIP,
+		"totalInterfaces", interfaceCount)
+
+	return nil
+}
+
+// cleanupInterface removes an unexpected interface
+func (j *linuxJobInitializer) cleanupInterface(interfaceName string) {
+	j.logger.Info("cleaning up unexpected interface", "interface", interfaceName)
+
+	// Try to bring interface down first
+	if err := j.executeCommand("ip", "link", "set", interfaceName, "down"); err != nil {
+		j.logger.Debug("failed to bring interface down", "interface", interfaceName, "error", err)
+	}
+
+	// Remove the interface
+	if err := j.executeCommand("ip", "link", "delete", interfaceName); err != nil {
+		j.logger.Debug("failed to delete interface", "interface", interfaceName, "error", err)
+	} else {
+		j.logger.Info("successfully removed unexpected interface", "interface", interfaceName)
+	}
+}
+
+// logCurrentInterfaces - enhanced version for debugging
+func (j *linuxJobInitializer) logCurrentInterfaces(stage string) {
+	cmd := exec.Command("ip", "addr", "show")
+	if output, err := cmd.CombinedOutput(); err == nil {
+		lines := strings.Split(string(output), "\n")
+		interfaceNames := []string{}
+
+		for _, line := range lines {
+			if strings.Contains(line, ": ") && !strings.HasPrefix(line, " ") {
+				if parts := strings.Fields(line); len(parts) >= 2 {
+					interfaceName := strings.TrimSuffix(parts[1], ":")
+					interfaceNames = append(interfaceNames, interfaceName)
+				}
+			}
+		}
+
+		j.logger.Info("current network interfaces",
+			"stage", stage,
+			"interfaces", interfaceNames,
+			"count", len(interfaceNames))
+
+		// Also log full output for debugging
+		j.logger.Debug("full interface output", "stage", stage, "output", string(output))
+	}
 }
 
 // executeCommand runs a system command

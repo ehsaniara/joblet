@@ -15,31 +15,38 @@ func formatTimePtr(t *time.Time) string {
 
 func DomainToCreateJobResponse(job *domain.Job) *pb.CreateJobRes {
 	return &pb.CreateJobRes{
-		Id:        job.Id,
-		Command:   job.Command,
-		Args:      append([]string(nil), job.Args...),
-		MaxCPU:    job.Limits.MaxCPU,
-		MaxMemory: job.Limits.MaxMemory,
-		MaxIOBPS:  job.Limits.MaxIOBPS,
-		Status:    string(job.Status),
-		StartTime: job.StartTime.Format(time.RFC3339),
-		EndTime:   formatTimePtr(job.EndTime),
-		ExitCode:  job.ExitCode,
+		Id:             job.Id,
+		Command:        job.Command,
+		Args:           append([]string(nil), job.Args...),
+		MaxCPU:         job.Limits.MaxCPU,
+		MaxMemory:      job.Limits.MaxMemory,
+		MaxIOBPS:       job.Limits.MaxIOBPS,
+		NetworkGroupID: job.NetworkGroupID,
+		Status:         string(job.Status),
+		StartTime:      job.StartTime.Format(time.RFC3339),
+		EndTime:        formatTimePtr(job.EndTime),
+		ExitCode:       job.ExitCode,
+		AssignedIP:     job.AssignedIP,
+		NetworkSubnet:  job.NetworkSubnet,
 	}
 }
 
 func DomainToGetJobResponse(job *domain.Job) *pb.GetJobRes {
 	return &pb.GetJobRes{
-		Id:        job.Id,
-		Command:   job.Command,
-		Args:      append([]string(nil), job.Args...),
-		MaxCPU:    job.Limits.MaxCPU,
-		MaxMemory: job.Limits.MaxMemory,
-		MaxIOBPS:  job.Limits.MaxIOBPS,
-		Status:    string(job.Status),
-		StartTime: job.StartTime.Format(time.RFC3339),
-		EndTime:   formatTimePtr(job.EndTime),
-		ExitCode:  job.ExitCode,
+		Id:             job.Id,
+		Command:        job.Command,
+		Args:           append([]string(nil), job.Args...),
+		MaxCPU:         job.Limits.MaxCPU,
+		MaxMemory:      job.Limits.MaxMemory,
+		MaxIOBPS:       job.Limits.MaxIOBPS,
+		NetworkGroupID: job.NetworkGroupID,
+		Status:         string(job.Status),
+		StartTime:      job.StartTime.Format(time.RFC3339),
+		EndTime:        formatTimePtr(job.EndTime),
+		ExitCode:       job.ExitCode,
+		AssignedIP:     job.AssignedIP,
+		NetworkSubnet:  job.NetworkSubnet,
+		InterfaceName:  job.InterfaceName,
 	}
 }
 
@@ -54,15 +61,19 @@ func DomainToStopJobResponse(job *domain.Job) *pb.StopJobRes {
 
 func DomainToProtobuf(job *domain.Job) *pb.Job {
 	return &pb.Job{
-		Id:        job.Id,
-		Command:   job.Command,
-		Args:      append([]string(nil), job.Args...),
-		MaxCPU:    job.Limits.MaxCPU,
-		MaxMemory: job.Limits.MaxMemory,
-		MaxIOBPS:  job.Limits.MaxIOBPS,
-		Status:    string(job.Status),
-		StartTime: job.StartTime.Format(time.RFC3339),
-		EndTime:   formatTimePtr(job.EndTime),
-		ExitCode:  job.ExitCode,
+		Id:             job.Id,
+		Command:        job.Command,
+		Args:           append([]string(nil), job.Args...),
+		MaxCPU:         job.Limits.MaxCPU,
+		MaxMemory:      job.Limits.MaxMemory,
+		MaxIOBPS:       job.Limits.MaxIOBPS,
+		Status:         string(job.Status),
+		StartTime:      job.StartTime.Format(time.RFC3339),
+		EndTime:        formatTimePtr(job.EndTime),
+		ExitCode:       job.ExitCode,
+		AssignedIP:     job.AssignedIP,
+		NetworkSubnet:  job.NetworkSubnet,
+		InterfaceName:  job.InterfaceName,
+		NetworkGroupID: job.NetworkGroupID,
 	}
 }
