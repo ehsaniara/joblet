@@ -25,14 +25,25 @@ Examples:
   cli create ls -la /tmp
   cli create echo "hello world"
   
+  # With resource limits
   cli create --max-cpu=50 python3 heavy_script.py
   cli create --max-memory=1024 java -jar app.jar
   cli create --max-cpu=25 --max-memory=512 bash -c "intensive command"
+  
+  # With network groups (jobs in same group share network namespace)
+  cli create --network-group=web-services nginx -g "daemon off;"
+  cli create --network-group=web-services curl http://localhost
+  cli create --network-group=database redis-server
+  
+  # Isolated jobs (default - each gets own network namespace)
+  cli create ip addr show
+  cli create ip addr show
 
 Resource limit flags (must appear before command):
-  --max-cpu=N      Max CPU percentage
-  --max-memory=N   Max Memory in MB
-  --max-iobps=N    Max IO BPS
+  --max-cpu=N         Max CPU percentage
+  --max-memory=N      Max Memory in MB
+  --max-iobps=N       Max IO BPS
+  --network-group=ID  Network group ID (jobs in same group share network namespace)
 
 Note: Resource flags must come before the command. Everything after the first 
 non-flag argument is treated as the command and its arguments.`,
@@ -46,9 +57,10 @@ non-flag argument is treated as the command and its arguments.`,
 
 func runCreate(cmd *cobra.Command, args []string) error {
 	var (
-		maxCPU    int32
-		maxMemory int32
-		maxIOBPS  int32
+		maxCPU         int32
+		maxMemory      int32
+		maxIOBPS       int32
+		networkGroupID string
 	)
 
 	commandStartIndex := 0
@@ -64,6 +76,11 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		} else if strings.HasPrefix(arg, "--max-iobps=") {
 			if val, err := parseIntFlag(arg, "--max-iobps="); err == nil {
 				maxIOBPS = int32(val)
+			}
+		} else if strings.HasPrefix(arg, "--network-group=") {
+			networkGroupID = strings.TrimPrefix(arg, "--network-group=")
+			if networkGroupID == "" {
+				return fmt.Errorf("network group ID cannot be empty")
 			}
 		} else if !strings.HasPrefix(arg, "--") {
 			commandStartIndex = i
@@ -96,11 +113,12 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	job := &pb.CreateJobReq{
-		Command:   command,
-		Args:      cmdArgs,
-		MaxCPU:    maxCPU,
-		MaxMemory: maxMemory,
-		MaxIOBPS:  maxIOBPS,
+		Command:        command,
+		Args:           cmdArgs,
+		MaxCPU:         maxCPU,
+		MaxMemory:      maxMemory,
+		MaxIOBPS:       maxIOBPS,
+		NetworkGroupID: networkGroupID,
 	}
 
 	response, err := jobClient.CreateJob(ctx, job)
@@ -113,6 +131,13 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Command: %s\n", displayCommand)
 	fmt.Printf("Status: %s\n", response.Status)
 	fmt.Printf("StartTime: %s\n", response.StartTime)
+
+	// Show network group info if specified
+	if networkGroupID != "" {
+		fmt.Printf("NetworkGroup: %s\n", networkGroupID)
+	} else {
+		fmt.Printf("NetworkGroup: isolated (default)\n")
+	}
 
 	return nil
 }
