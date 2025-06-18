@@ -7,19 +7,20 @@
 [![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
 
 > A high-performance distributed job execution system with secure remote execution, comprehensive resource management,
-> and real-time streaming capabilities.
+> and real-time streaming capabilities using host networking for maximum compatibility.
 
 ## ✨ Key Features
 
 - 🔒 **Secure Remote Execution** - Mutual TLS authentication with role-based authorization (admin/viewer roles)
 - 🎛️ **Advanced Resource Management** - CPU, memory, and I/O bandwidth limiting via Linux cgroups v2
 - 📡 **Real-time Streaming** - Live output streaming of job execution logs with buffering
-- 🔐 **Complete Process Isolation** - PID, mount, IPC, and UTS namespace isolation with containerized execution
-- 🌐 **High-Performance gRPC API** - Protocol buffer serialization with configurable message limits
-- ⚡ **Two-Stage Execution Architecture** - Dedicated job-init binary ensures proper resource isolation and namespace
+- 🔐 **Process Isolation** - PID, mount, IPC, and UTS namespace isolation with containerized execution
+- 🌐 **Host Networking** - Jobs use host network interface for maximum compatibility and performance
+- ⚡ **High-Performance gRPC API** - Protocol buffer serialization with configurable message limits
+- 📊 **Two-Stage Execution Architecture** - Dedicated job-init binary ensures proper resource isolation and namespace
   setup
-- 🏗️ **Advanced Namespace Management** - Full /proc remounting and private mount propagation
-- 📊 **Comprehensive Monitoring** - Job status tracking, resource usage monitoring, and real-time subscriber management
+- 🏗️ **Advanced Process Management** - Full /proc remounting and private mount propagation
+- 📈 **Comprehensive Monitoring** - Job status tracking, resource usage monitoring, and real-time subscriber management
 - 🚀 **Cross-Platform Support** - Full Linux implementation with macOS development support
 - 🔄 **Robust Error Handling** - Graceful shutdown, emergency cleanup, and process group management
 
@@ -42,7 +43,7 @@
 ### Basic Job Management
 
 ```bash
-# Create simple jobs
+# Create simple jobs (all use host networking)
 ./bin/cli create echo "Hello, World!"
 ./bin/cli create python3 script.py
 ./bin/cli create bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
@@ -78,18 +79,27 @@
 
 ### Advanced Job Scenarios
 
+All jobs share the host network interface and can communicate with each other and external services directly:
+
 ```bash
-# Long-running job with monitoring
+# Network-accessible job (uses host networking)
 ./bin/cli create --max-cpu=100 --max-memory=1024 python3 -c "
+import socket
 import time
+s = socket.socket()
+s.bind(('0.0.0.0', 8080))
+s.listen(5)
+print('Server listening on host port 8080')
 for i in range(60):
-    print(f'Iteration {i}: Processing data...')
+    print(f'Iteration {i}: Server running...')
     time.sleep(1)
-print('Job completed successfully')
 "
 
+# Job that can access external services
+./bin/cli create curl -s https://api.github.com/users/octocat
+
 # Job with complex command line arguments
-./bin/cli create bash -c "echo 'Starting at:' && date && sleep 5 && echo 'Finished at:' && date"
+./bin/cli create bash -c "echo 'Network test:' && curl -s ifconfig.me && echo '' && echo 'Finished at:' && date"
 ```
 
 ### Remote Server Management
@@ -114,7 +124,7 @@ make check-certs-remote REMOTE_HOST=prod.example.com
 ## 🏗️ Architecture
 
 The Job Worker system uses a sophisticated multi-component architecture designed for security, isolation, and
-performance:
+performance with host networking:
 
 ### Core Components
 
@@ -124,6 +134,7 @@ performance:
 - Platform-specific implementations (Linux vs macOS)
 - Advanced resource management via cgroups v2
 - Real-time job monitoring and status tracking
+- All jobs use host networking for maximum compatibility
 
 **CLI Client (`cmd/cli/`)**
 
@@ -135,7 +146,7 @@ performance:
 **Job-Init Binary (`cmd/job-init/main.go`)**
 
 - Specialized initialization binary for process isolation
-- Namespace setup (PID, mount, IPC, UTS)
+- Namespace setup (PID, mount, IPC, UTS) - **Network namespace uses host**
 - Cgroup membership management
 - Platform-specific execution handling
 
@@ -162,7 +173,7 @@ performance:
 
 ### Process Isolation Features
 
-The system provides comprehensive process isolation:
+The system provides comprehensive process isolation while maintaining host networking:
 
 **Namespace Isolation:**
 
@@ -170,6 +181,7 @@ The system provides comprehensive process isolation:
 - **Mount Namespace**: Isolated filesystem view with /proc remounting
 - **IPC Namespace**: Separate inter-process communication
 - **UTS Namespace**: Isolated hostname and domain name
+- **Network**: Uses host networking (no network namespace isolation)
 
 **Verification Example:**
 
@@ -184,11 +196,18 @@ The system provides comprehensive process isolation:
 ./bin/cli stream <job-2-id>
 ```
 
-Output shows complete isolation:
+Output shows process isolation with host networking:
 
 ```
 USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
 root           1  0.0  0.0  10044  1584 ?        R    08:56   0:00 /usr/bin/ps aux
+```
+
+The job can access the host network:
+
+```bash
+# Test network connectivity (uses host network interface)
+./bin/cli create curl -s ifconfig.me
 ```
 
 ## 🔐 Security & Authentication
@@ -234,6 +253,7 @@ make test-tls REMOTE_HOST=your-server.com
 - **Certificate Authority Validation**: Custom CA for secure certificate chain
 - **Role-Based Authorization**: Operation-level permission control
 - **Secure Key Storage**: Proper file permissions and key management
+- **Host Network Security**: Jobs use host networking but remain process-isolated
 
 ## ⚙️ Configuration
 
@@ -260,6 +280,9 @@ export MAX_HEADER_LIST_SIZE=8192       # 8KB max header list size
 
 # Cleanup Configuration
 export CLEANUP_TIMEOUT=30              # 30 second cgroup cleanup timeout
+
+# Network Configuration
+export HOST_NETWORKING=true            # Enable host networking (default)
 ```
 
 ### Client Configuration
@@ -283,6 +306,7 @@ When resource limits are not specified (or set to 0), the system applies these d
 - **CPU**: 100% (one full core)
 - **Memory**: 512 MB
 - **I/O**: Unlimited (not constrained)
+- **Network**: Host networking (shared with system)
 
 ## 🛠️ Development
 
@@ -341,7 +365,7 @@ The comprehensive Makefile provides numerous automation targets:
 
 - `make deploy-safe` - Deploy with password prompt
 - `make deploy-passwordless` - Deploy without passwords (requires setup)
-- `make setup-remote-passwordless` - Complete remote setup
+- `make setup-remote-passwordless` - Complete remote setup with certificates
 
 **Certificate Management:**
 
@@ -382,6 +406,7 @@ message CreateJobReq {
   int32 maxCPU = 3;                     // CPU limit (percentage)
   int32 maxMemory = 4;                  // Memory limit (MB)
   int32 maxIOBPS = 5;                   // I/O limit (bytes/second)
+  // Network: All jobs use host networking
 }
 ```
 
@@ -398,7 +423,7 @@ Jobs progress through these states:
 ### CLI Commands Reference
 
 ```bash
-# Job Creation with Resource Limits
+# Job Creation with Resource Limits (all use host networking)
 cli create [--max-cpu=N] [--max-memory=N] [--max-iobps=N] <command> [args...]
 
 # Job Management Operations
@@ -412,14 +437,6 @@ cli --server=host:port    # Connect to specific server
 cli --cert=path           # Specify client certificate path
 cli --key=path            # Specify client private key path
 ```
-
-## 📚 Documentation
-
-- 🏗️ **Architecture Overview** - Multi-component system with process isolation
-- 🔧 **gRPC API Reference** - Complete Protocol Buffer definitions
-- 🚀 **Deployment Strategies** - Production deployment with automation
-- 🔐 **Security Model** - TLS, certificates, and role-based access
-- 🤝 **Development Guidelines** - Contributing and development workflow
 
 ## 🔧 Troubleshooting
 
@@ -489,6 +506,42 @@ telnet your-server.com 50051
 
 # Check certificate chain
 make verify-cert-chain REMOTE_HOST=your-server.com
+
+# Test host networking (jobs can access external services)
+./bin/cli create curl -s ifconfig.me
+```
+
+## 🎯 Networking Architecture
+
+### Host Networking Design
+
+All jobs use the host network interface, providing:
+
+**Benefits:**
+
+- **Maximum Compatibility**: No network configuration required
+- **Direct Access**: Jobs can bind to host ports and access external services
+- **Performance**: No network overhead from namespace isolation
+- **Simplicity**: Straightforward deployment and management
+
+**Security Considerations:**
+
+- Jobs share the host network interface
+- Process isolation still maintained through other namespaces
+- Port conflicts possible between jobs
+- External firewall rules apply to all jobs
+
+**Example Use Cases:**
+
+```bash
+# Web server job (binds to host port)
+./bin/cli create python3 -m http.server 8080
+
+# Database connection job
+./bin/cli create mysql -h external-db.com -u user -p
+
+# API client job
+./bin/cli create curl -X POST https://api.service.com/webhook
 ```
 
 ## 🤝 Contributing
@@ -552,7 +605,7 @@ We welcome contributions! Here's how to get started:
 - **Resource Enforcement**: Hard limits via cgroups v2
 - **Real-time Streaming**: Low-latency log streaming with buffering
 - **Memory Efficiency**: Minimal overhead per job
-- **Network Performance**: gRPC with Protocol Buffers for efficiency
+- **Network Performance**: Host networking for maximum throughput
 
 ### Monitoring Features
 
@@ -565,7 +618,8 @@ We welcome contributions! Here's how to get started:
 ### Performance Optimization
 
 - **Process Groups**: Efficient process tree management
-- **Namespace Isolation**: Minimal overhead container-like isolation
+- **Namespace Isolation**: Minimal overhead process isolation
+- **Host Networking**: Direct network access without virtualization overhead
 - **Cgroup Management**: Automatic cleanup and resource reclamation
 - **Streaming Optimization**: Buffered log delivery with timeout handling
 - **Connection Pooling**: Efficient gRPC connection management
@@ -585,5 +639,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
+  <sub>By <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
 </div>
