@@ -29,24 +29,16 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	}
 }
 
-// Ensure darwinWorker implements both interfaces
-var _ interfaces.JobWorker = (*darwinWorker)(nil)
-var _ PlatformWorker = (*darwinWorker)(nil)
-
-func (w *darwinWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, networkGroupID string) (*domain.Job, error) {
-	select {
-	case <-ctx.Done():
-		w.logger.Warn("start job cancelled by context", "error", ctx.Err())
-		return nil, ctx.Err()
-	default:
-	}
-
+func (w *darwinWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+	// Remove networkGroupID parameter and all network-related code
 	jobId := strconv.FormatInt(atomic.AddInt64(&darwinJobCounter, 1), 10)
 	jobLogger := w.logger.WithField("jobId", jobId)
 
-	jobLogger.Info("starting mock job on macOS", "command", command, "args", args, "requestedCPU", maxCPU, "requestedMemory", maxMemory, "requestedIOBPS", maxIOBPS)
+	jobLogger.Info("starting mock job on macOS with host networking",
+		"command", command,
+		"args", args)
 
-	// Apply defaults like Linux version
+	// Apply defaults
 	if maxCPU <= 0 {
 		maxCPU = config.DefaultCPULimitPercent
 	}
@@ -57,42 +49,36 @@ func (w *darwinWorker) StartJob(ctx context.Context, command string, args []stri
 		maxIOBPS = config.DefaultIOBPS
 	}
 
-	limits := domain.ResourceLimits{
-		MaxCPU:    maxCPU,
-		MaxMemory: maxMemory,
-		MaxIOBPS:  maxIOBPS,
-	}
-
-	// Create mock job for macOS testing
+	// Create simplified job (no network fields)
 	job := &domain.Job{
-		Id:         jobId,
-		Command:    command,
-		Args:       append([]string(nil), args...),
-		Limits:     limits,
+		Id:      jobId,
+		Command: command,
+		Args:    append([]string(nil), args...),
+		Limits: domain.ResourceLimits{
+			MaxCPU:    maxCPU,
+			MaxMemory: maxMemory,
+			MaxIOBPS:  maxIOBPS,
+		},
 		Status:     domain.StatusInitializing,
-		CgroupPath: fmt.Sprintf("/mock/cgroup/job-%s", jobId), // Mock cgroup path
+		CgroupPath: fmt.Sprintf("/mock/cgroup/job-%s", jobId),
 		StartTime:  time.Now(),
-		Pid:        12345 + int32(atomic.LoadInt64(&darwinJobCounter)), // Mock PID
+		Pid:        12345 + int32(atomic.LoadInt64(&darwinJobCounter)),
 	}
 
 	w.store.CreateNewJob(job)
 
-	// Simulate the job starting
+	// Mark as running
 	runningJob := job.DeepCopy()
 	if err := runningJob.MarkAsRunning(job.Pid); err != nil {
-		jobLogger.Warn("domain validation failed for running status", "domainError", err)
 		runningJob.Status = domain.StatusRunning
 		runningJob.Pid = job.Pid
 	}
-
-	runningJob.StartTime = time.Now()
 	w.store.UpdateJob(runningJob)
 
-	jobLogger.Info("mock job started on macOS", "jobId", jobId, "pid", job.Pid, "command", command)
-
-	// Simulate job completion after a short delay
+	// Simulate job completion
 	go w.simulateJobCompletion(ctx, runningJob)
 
+	jobLogger.Info("mock job started with host networking", "pid", job.Pid)
 	return runningJob, nil
 }
 

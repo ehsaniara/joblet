@@ -5,7 +5,6 @@ type JobInitializer interface {
 	Run() error
 	LoadConfigFromEnv() (*JobConfig, error)
 	ExecuteJob(config *JobConfig) error
-	ValidateEnvironment() error
 }
 
 // JobConfig is shared across platforms (simplified for Option 3)

@@ -9,7 +9,7 @@ import (
 )
 
 type FakeJobWorker struct {
-	StartJobStub        func(context.Context, string, []string, int32, int32, int32, string) (*domain.Job, error)
+	StartJobStub        func(context.Context, string, []string, int32, int32, int32) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
 	startJobArgsForCall []struct {
 		arg1 context.Context
@@ -18,7 +18,6 @@ type FakeJobWorker struct {
 		arg4 int32
 		arg5 int32
 		arg6 int32
-		arg7 string
 	}
 	startJobReturns struct {
 		result1 *domain.Job
@@ -44,7 +43,7 @@ type FakeJobWorker struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeJobWorker) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32, arg7 string) (*domain.Job, error) {
+func (fake *FakeJobWorker) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32) (*domain.Job, error) {
 	var arg3Copy []string
 	if arg3 != nil {
 		arg3Copy = make([]string, len(arg3))
@@ -59,14 +58,13 @@ func (fake *FakeJobWorker) StartJob(arg1 context.Context, arg2 string, arg3 []st
 		arg4 int32
 		arg5 int32
 		arg6 int32
-		arg7 string
-	}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7})
+	}{arg1, arg2, arg3Copy, arg4, arg5, arg6})
 	stub := fake.StartJobStub
 	fakeReturns := fake.startJobReturns
-	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7})
+	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6})
 	fake.startJobMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -80,17 +78,17 @@ func (fake *FakeJobWorker) StartJobCallCount() int {
 	return len(fake.startJobArgsForCall)
 }
 
-func (fake *FakeJobWorker) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32, string) (*domain.Job, error)) {
+func (fake *FakeJobWorker) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32) (*domain.Job, error)) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = stub
 }
 
-func (fake *FakeJobWorker) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32, string) {
+func (fake *FakeJobWorker) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32) {
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	argsForCall := fake.startJobArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
 }
 
 func (fake *FakeJobWorker) StartJobReturns(result1 *domain.Job, result2 error) {
