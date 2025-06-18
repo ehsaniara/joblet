@@ -354,7 +354,7 @@ func (l *Launcher) WaitForProcess(ctx context.Context, cmd osinterface.Command, 
 }
 
 // GetProcessInfo returns information about a running process
-func (l *Launcher) GetProcessInfo(cmd osinterface.Command) (*ProcessInfo, error) {
+func (l *Launcher) GetProcessInfo(cmd osinterface.Command) (*Info, error) {
 	if cmd == nil {
 		return nil, fmt.Errorf("command cannot be nil")
 	}
@@ -364,14 +364,14 @@ func (l *Launcher) GetProcessInfo(cmd osinterface.Command) (*ProcessInfo, error)
 		return nil, fmt.Errorf("process is nil")
 	}
 
-	return &ProcessInfo{
+	return &Info{
 		PID:    int32(process.Pid()),
 		Status: "running", // We can enhance this with actual process status checking
 	}, nil
 }
 
-// ProcessInfo contains information about a running process
-type ProcessInfo struct {
+// Info contains information about a running process
+type Info struct {
 	PID    int32
 	Status string
 }

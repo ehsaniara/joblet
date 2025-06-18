@@ -1,4 +1,4 @@
-package executor
+package linux
 
 import (
 	"job-worker/internal/worker/interfaces"

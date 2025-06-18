@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -17,14 +15,12 @@ import (
 const (
 	GracefulShutdownTimeout = 100 * time.Millisecond
 	ForceKillTimeout        = 5 * time.Second
-	CleanupRetryDelay       = 100 * time.Millisecond
 )
 
 // Cleaner handles process cleanup operations
 type Cleaner struct {
 	syscall     osinterface.SyscallInterface
 	osInterface osinterface.OsInterface
-	validator   *Validator
 	logger      *logger.Logger
 }
 
@@ -65,12 +61,10 @@ type NamespaceCleaner interface {
 func NewCleaner(
 	syscall osinterface.SyscallInterface,
 	osInterface osinterface.OsInterface,
-	validator *Validator,
 ) *Cleaner {
 	return &Cleaner{
 		syscall:     syscall,
 		osInterface: osInterface,
-		validator:   validator,
 		logger:      logger.New().WithField("component", "process-cleaner"),
 	}
 }
@@ -166,7 +160,7 @@ func (c *Cleaner) cleanupProcessAndGroup(ctx context.Context, req *CleanupReques
 	return c.forceKillProcess(req.PID, req.JobID)
 }
 
-// attemptGracefulShutdown attempts to gracefully shutdown a process
+// attemptGracefulShutdown attempts to gracefully shut down a process
 func (c *Cleaner) attemptGracefulShutdown(pid int32, timeout time.Duration, jobID string) *processCleanupResult {
 	log := c.logger.WithFields("jobID", jobID, "pid", pid)
 
@@ -307,148 +301,10 @@ func (c *Cleaner) cleanupNamespace(nsPath string, isBound bool) error {
 	return nil
 }
 
-// StopJobProcess stops a job process with configurable timeout and force options
-func (c *Cleaner) StopJobProcess(ctx context.Context, pid int32, jobID string, gracefulTimeout time.Duration, forceKill bool) error {
-	if err := c.validator.ValidatePID(pid); err != nil {
-		return fmt.Errorf("invalid PID: %w", err)
-	}
-
-	log := c.logger.WithFields("jobID", jobID, "pid", pid)
-	log.Info("stopping job process", "gracefulTimeout", gracefulTimeout, "forceKill", forceKill)
-
-	req := &CleanupRequest{
-		JobID:           jobID,
-		PID:             pid,
-		ForceKill:       forceKill,
-		GracefulTimeout: gracefulTimeout,
-	}
-
-	result := c.cleanupProcessAndGroup(ctx, req)
-	if result.Error != nil {
-		return fmt.Errorf("failed to stop process: %w", result.Error)
-	}
-
-	if !result.Killed {
-		return fmt.Errorf("failed to stop process (method: %s)", result.Method)
-	}
-
-	log.Info("job process stopped successfully", "method", result.Method)
-	return nil
-}
-
-// EmergencyCleanup performs emergency cleanup for a job (used when normal cleanup fails)
-func (c *Cleaner) EmergencyCleanup(jobID string, pid int32, cgroupCleaner CgroupCleaner, namespaceCleaner NamespaceCleaner, namespacePath string, isIsolated bool) {
-	log := c.logger.WithFields("jobID", jobID, "pid", pid)
-	log.Warn("starting emergency cleanup")
-
-	// Force kill the process group
-	if pid > 0 {
-		if err := c.syscall.Kill(-int(pid), syscall.SIGKILL); err != nil {
-			log.Warn("failed to emergency kill process group", "error", err)
-
-			// Try individual process
-			if err := c.syscall.Kill(int(pid), syscall.SIGKILL); err != nil {
-				log.Error("failed to emergency kill individual process", "error", err)
-			}
-		}
-	}
-
-	// Cleanup cgroup
-	if cgroupCleaner != nil {
-		log.Debug("cleaning up cgroup in emergency cleanup")
-		cgroupCleaner.CleanupCgroup(jobID)
-	}
-
-	// Cleanup namespace for isolated jobs
-	if isIsolated && namespacePath != "" && namespaceCleaner != nil {
-		if err := namespaceCleaner.RemoveNamespace(namespacePath, false); err != nil {
-			log.Warn("failed to cleanup namespace in emergency cleanup", "error", err)
-		}
-	}
-
-	log.Info("emergency cleanup completed")
-}
-
-// CleanupCgroupProcesses cleans up any remaining processes in a cgroup
-func (c *Cleaner) CleanupCgroupProcesses(cgroupPath string) error {
-	if cgroupPath == "" {
-		return fmt.Errorf("cgroup path cannot be empty")
-	}
-
-	log := c.logger.WithField("cgroupPath", cgroupPath)
-	log.Debug("cleaning up cgroup processes")
-
-	// Check if the cgroup exists
-	if _, err := c.osInterface.Stat(cgroupPath); c.osInterface.IsNotExist(err) {
-		log.Debug("cgroup directory does not exist, skipping cleanup")
-		return nil
-	}
-
-	// Read processes in the cgroup
-	procsPath := filepath.Join(cgroupPath, "cgroup.procs")
-	procsData, err := c.osInterface.ReadFile(procsPath)
-	if err != nil {
-		log.Warn("failed to read cgroup.procs", "error", err)
-		return nil // Don't error, cgroup might be empty or already cleaned
-	}
-
-	// Parse PIDs
-	pids := strings.Split(string(procsData), "\n")
-	activePids := make([]int, 0)
-
-	for _, pidStr := range pids {
-		pidStr = strings.TrimSpace(pidStr)
-		if pidStr == "" {
-			continue
-		}
-
-		if pid, parseErr := c.parseStringToInt(pidStr); parseErr == nil && pid > 0 {
-			activePids = append(activePids, pid)
-		}
-	}
-
-	if len(activePids) == 0 {
-		log.Debug("no active processes found in cgroup")
-		return nil
-	}
-
-	log.Info("found active processes in cgroup", "count", len(activePids), "pids", activePids)
-
-	// Terminate processes
-	for _, pid := range activePids {
-		log.Debug("terminating process in cgroup", "pid", pid)
-
-		// Try SIGTERM first
-		if err := c.syscall.Kill(pid, syscall.SIGTERM); err != nil {
-			log.Debug("failed to send SIGTERM", "pid", pid, "error", err)
-		} else {
-			// Wait a moment for graceful shutdown
-			time.Sleep(CleanupRetryDelay)
-		}
-
-		// Check if still alive, then SIGKILL
-		if c.isProcessAlive(int32(pid)) {
-			log.Debug("force killing process in cgroup", "pid", pid)
-			if err := c.syscall.Kill(pid, syscall.SIGKILL); err != nil {
-				log.Warn("failed to kill process in cgroup", "pid", pid, "error", err)
-			}
-		}
-	}
-
-	log.Info("cgroup process cleanup completed", "processedPids", len(activePids))
-	return nil
-}
-
 // validateCleanupRequest validates a cleanup request
 func (c *Cleaner) validateCleanupRequest(req *CleanupRequest) error {
 	if req.JobID == "" {
 		return fmt.Errorf("job ID cannot be empty")
-	}
-
-	if req.PID > 0 {
-		if err := c.validator.ValidatePID(req.PID); err != nil {
-			return fmt.Errorf("invalid PID: %w", err)
-		}
 	}
 
 	if req.GracefulTimeout < 0 {
