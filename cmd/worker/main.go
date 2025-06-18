@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -108,17 +109,55 @@ func main() {
 func validatePlatformRequirements(logger *logger.Logger) error {
 	switch runtime.GOOS {
 	case "linux":
+		// Check cgroups v2
 		if _, err := os.Stat(config.CgroupsBaseDir); os.IsNotExist(err) {
 			return fmt.Errorf("cgroups not available at %s", config.CgroupsBaseDir)
 		}
-		logger.Info("Linux requirements validated", "cgroupsPath", config.CgroupsBaseDir)
+
+		// Check cgroup namespace support
+		if _, err := os.Stat("/proc/self/ns/cgroup"); os.IsNotExist(err) {
+			return fmt.Errorf("cgroup namespaces not supported by kernel (required)")
+		}
+
+		// Check kernel version
+		if err := validateKernelVersion(); err != nil {
+			return fmt.Errorf("kernel version validation failed: %w", err)
+		}
+
+		logger.Info("Linux requirements validated",
+			"cgroupsPath", config.CgroupsBaseDir,
+			"cgroupNamespace", true)
 		return nil
+
 	case "darwin":
-		logger.Info("macOS detected - using mock implementation")
-		logger.Warn("resource limits not enforced on macOS")
-		return nil
+		return fmt.Errorf("macOS not supported when cgroup namespaces are required")
+
 	default:
-		logger.Warn("unsupported platform, using mock functionality", "platform", runtime.GOOS)
-		return nil
+		return fmt.Errorf("unsupported platform: %s (cgroup namespaces required)", runtime.GOOS)
 	}
+}
+
+// Kernel version validation
+func validateKernelVersion() error {
+	// Read kernel version
+	version, err := os.ReadFile("/proc/version")
+	if err != nil {
+		return fmt.Errorf("cannot read kernel version: %w", err)
+	}
+
+	// Simple check for minimum kernel version (4.6+)
+	versionStr := string(version)
+	if strings.Contains(versionStr, "Linux version 4.") {
+		// Check if it's 4.6 or higher
+		if strings.Contains(versionStr, "4.0.") ||
+			strings.Contains(versionStr, "4.1.") ||
+			strings.Contains(versionStr, "4.2.") ||
+			strings.Contains(versionStr, "4.3.") ||
+			strings.Contains(versionStr, "4.4.") ||
+			strings.Contains(versionStr, "4.5.") {
+			return fmt.Errorf("kernel too old for cgroup namespaces (need 4.6+)")
+		}
+	}
+
+	return nil
 }

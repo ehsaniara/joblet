@@ -30,13 +30,10 @@
 
 **System Requirements:**
 
-- **Operating System**: Linux (production) or macOS (development/testing)
-- **Go Version**: 1.23 or later
-- **Linux Requirements**:
-    - Kernel 4.5+ (for cgroups v2 support)
-    - Root access (for cgroup management and namespace isolation)
-    - systemd (recommended for service management)
-    - Support for `/sys/fs/cgroup` (cgroups v2)
+- **Kernel**: Linux 4.6+ (for cgroup namespace support)
+- **Cgroups**: cgroups v2 enabled and mounted at /sys/fs/cgroup
+- **Namespaces**: Cgroup namespace support in kernel
+- **Root Access**: Required for cgroup management and namespace operations
 
 ## 📖 Usage Examples
 

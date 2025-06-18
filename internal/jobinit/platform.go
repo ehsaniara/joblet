@@ -7,14 +7,12 @@ type JobInitializer interface {
 	ExecuteJob(config *JobConfig) error
 }
 
-// JobConfig is shared across platforms (simplified for Option 3)
+// JobConfig is shared across platforms
 type JobConfig struct {
-	JobID             string
-	Command           string
-	Args              []string
-	CgroupPath        string
-	NetworkGroupID    string // Network group identifier
-	IsNewNetworkGroup bool   // Whether this is a new network group (for setup)
+	JobID      string
+	Command    string
+	Args       []string
+	CgroupPath string
 }
 
 // Run is the entry point that works on all platforms
