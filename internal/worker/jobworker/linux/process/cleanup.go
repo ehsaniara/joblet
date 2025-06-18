@@ -319,7 +319,7 @@ func (c *Cleaner) parseStringToInt(s string) (int, error) {
 	var result int
 	var err error
 
-	// Simple integer parsing to avoid external dependencies
+	// Integer parsing to avoid external dependencies
 	if len(s) == 0 {
 		return 0, fmt.Errorf("empty string")
 	}

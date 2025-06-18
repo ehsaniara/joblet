@@ -10,7 +10,7 @@ import (
 	"job-worker/internal/config"
 )
 
-// Config holds Linux platform-specific configuration
+// Config internal/worker/platform/linux/config.go
 type Config struct {
 	// Cgroup resource management configuration
 	CgroupsBaseDir string
@@ -33,10 +33,13 @@ type Config struct {
 
 	// System limits
 	MaxConcurrentJobs int32
+
+	// Cgroup namespace configuration (mandatory)
+	CgroupNamespaceMount string // Mount point inside namespace
 }
 
-// DefaultConfig creates a new configuration with sensible defaults
-func DefaultConfig() *Config {
+// DefaultConfigWithCgroupNamespace creates config with mandatory cgroup namespaces
+func DefaultConfigWithCgroupNamespace() *Config {
 	return &Config{
 		CgroupsBaseDir:          config.CgroupsBaseDir,
 		GracefulShutdownTimeout: 100 * time.Millisecond,
@@ -50,6 +53,7 @@ func DefaultConfig() *Config {
 		MaxEnvironmentVars:      1000,
 		MaxEnvironmentVarLen:    8192,
 		MaxConcurrentJobs:       100,
+		CgroupNamespaceMount:    "/sys/fs/cgroup", // Standard mount point
 	}
 }
 
@@ -58,7 +62,7 @@ func (c *Config) BuildCgroupPath(jobID string) string {
 	return filepath.Join(c.CgroupsBaseDir, "job-"+jobID)
 }
 
-// Validate performs comprehensive validation of the configuration
+// Validate ensures cgroup namespace requirements are met
 func (c *Config) Validate() error {
 	if c.CgroupsBaseDir == "" {
 		return fmt.Errorf("CgroupsBaseDir cannot be empty")
@@ -74,6 +78,10 @@ func (c *Config) Validate() error {
 
 	if c.MaxConcurrentJobs <= 0 {
 		return fmt.Errorf("MaxConcurrentJobs must be positive")
+	}
+
+	if c.CgroupNamespaceMount == "" {
+		return fmt.Errorf("CgroupNamespaceMount cannot be empty")
 	}
 
 	return nil

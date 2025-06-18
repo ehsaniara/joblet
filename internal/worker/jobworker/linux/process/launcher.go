@@ -309,10 +309,11 @@ func (l *Launcher) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr 
 	sysProcAttr := l.syscall.CreateProcessGroup()
 
 	// Base namespaces that are always enabled
-	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // PID namespace - ALWAYS isolated
-		syscall.CLONE_NEWNS | // Mount namespace - ALWAYS isolated
-		syscall.CLONE_NEWIPC | // IPC namespace - ALWAYS isolated
-		syscall.CLONE_NEWUTS // UTS namespace - ALWAYS isolated
+	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // PID namespace ALWAYS isolated
+		syscall.CLONE_NEWNS | // Mount namespace ALWAYS isolated
+		syscall.CLONE_NEWIPC | // IPC namespace ALWAYS isolated
+		syscall.CLONE_NEWUTS | // UTS namespace ALWAYS isolated
+		syscall.CLONE_NEWCGROUP // Cgroup namespace MANDATORY
 
 	// Conditionally add network namespace
 	if enableNetworkNS {

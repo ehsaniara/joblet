@@ -33,7 +33,7 @@ type Worker struct {
 	logger           *logger.Logger
 }
 
-// dependencies contains dependencies for simplified Worker
+// dependencies contains dependencies for Worker
 type dependencies struct {
 	Store            interfaces.Store
 	Cgroup           interfaces.Resource
@@ -44,8 +44,8 @@ type dependencies struct {
 	Config           *Config
 }
 
-// NewSimplifiedWorker creates a worker without network namespace support
-func NewSimplifiedWorker(deps *dependencies) *Worker {
+// NewWorker creates a worker without network namespace support
+func NewWorker(deps *dependencies) *Worker {
 	return &Worker{
 		store:            deps.Store,
 		cgroup:           deps.Cgroup,
@@ -54,7 +54,7 @@ func NewSimplifiedWorker(deps *dependencies) *Worker {
 		processValidator: deps.ProcessValidator,
 		osInterface:      deps.OsInterface,
 		config:           deps.Config,
-		logger:           logger.New().WithField("component", "simplified-linux-worker"),
+		logger:           logger.New().WithField("component", "linux-worker"),
 	}
 }
 
@@ -74,8 +74,8 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	// Create resource management
 	cgroupResource := resource.New()
 
-	// Create configuration
-	config := DefaultConfig()
+	// Create configuration with cgroup namespace as prerequisite
+	config := DefaultConfigWithCgroupNamespace()
 
 	deps := &dependencies{
 		Store:            store,
@@ -87,7 +87,23 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 		Config:           config,
 	}
 
-	return NewSimplifiedWorker(deps)
+	worker := &Worker{
+		store:            deps.Store,
+		cgroup:           deps.Cgroup,
+		processLauncher:  deps.ProcessLauncher,
+		processCleaner:   deps.ProcessCleaner,
+		processValidator: deps.ProcessValidator,
+		osInterface:      deps.OsInterface,
+		config:           deps.Config,
+		logger:           logger.New().WithField("component", "linux-worker"),
+	}
+
+	// Validate cgroup namespace support on startup
+	if err := worker.validateCgroupNamespaceSupport(); err != nil {
+		logger.Fatal("cgroup namespace support validation failed", "error", err)
+	}
+
+	return worker
 }
 
 // StartJob starts a job with host networking (no isolation)
@@ -246,7 +262,6 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface
 			syscall.CLONE_NEWNS | // Mount namespace isolation
 			syscall.CLONE_NEWIPC | // IPC namespace isolation
 			syscall.CLONE_NEWUTS, // UTS namespace isolation
-		// NO syscall.CLONE_NEWNET - use host networking
 		Setpgid: true,
 	}
 
@@ -277,13 +292,18 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface
 func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 	baseEnv := w.osInterface.Environ()
 
+	// In cgroup namespace, the job's cgroup always appears at root
+	namespaceCgroupPath := "/sys/fs/cgroup"
+
 	// Job-specific environment
 	jobEnv := []string{
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", job.CgroupPath),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", namespaceCgroupPath), // Namespace path
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		"HOST_NETWORKING=true", // Indicate host networking
+		"HOST_NETWORKING=true",
+		"CGROUP_NAMESPACE=true", // Indicate cgroup namespace is active
 	}
 
 	// Add job arguments
@@ -292,6 +312,22 @@ func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 	}
 
 	return append(baseEnv, jobEnv...)
+}
+
+// Validate cgroup namespace support at startup
+func (w *Worker) validateCgroupNamespaceSupport() error {
+	// Check kernel support
+	if _, err := w.osInterface.Stat("/proc/self/ns/cgroup"); err != nil {
+		return fmt.Errorf("cgroup namespaces not supported by kernel: %w", err)
+	}
+
+	// Check cgroup v2 support
+	if _, err := w.osInterface.Stat("/sys/fs/cgroup/cgroup.controllers"); err != nil {
+		return fmt.Errorf("cgroups v2 not available: %w", err)
+	}
+
+	w.logger.Info("cgroup namespace support validated")
+	return nil
 }
 
 func (w *Worker) getJobInitPath() (string, error) {
