@@ -24,54 +24,54 @@ func New() interfaces.Resource {
 	}
 }
 
-func (cg *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
+func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
 
-	cgroupLogger := cg.logger.WithFields(
+	log := c.logger.WithFields(
 		"cgroupPath", cgroupJobDir,
 		"maxCPU", maxCPU,
 		"maxMemory", maxMemory,
 		"maxIOBPS", maxIOBPS)
 
-	cgroupLogger.Debug("creating cgroup")
+	log.Debug("creating cgroup")
 
 	if err := os.MkdirAll(cgroupJobDir, 0755); err != nil {
 
-		cgroupLogger.Error("failed to create cgroup directory", "error", err)
+		log.Error("failed to create cgroup directory", "error", err)
 		return fmt.Errorf("failed to create cgroup directory: %v", err)
 	}
 
 	// using cpu.max for cgroup v2
-	if err := cg.SetCPULimit(cgroupJobDir, int(maxCPU)); err != nil {
+	if err := c.SetCPULimit(cgroupJobDir, int(maxCPU)); err != nil {
 
-		cgroupLogger.Error("failed to set CPU limit", "error", err)
+		log.Error("failed to set CPU limit", "error", err)
 		return err
 	}
 
-	if err := cg.SetMemoryLimit(cgroupJobDir, int(maxMemory)); err != nil {
+	if err := c.SetMemoryLimit(cgroupJobDir, int(maxMemory)); err != nil {
 
-		cgroupLogger.Error("failed to set memory limit", "error", err)
+		log.Error("failed to set memory limit", "error", err)
 		return err
 	}
 
 	if maxIOBPS > 0 {
 
-		err := cg.SetIOLimit(cgroupJobDir, int(maxIOBPS))
+		err := c.SetIOLimit(cgroupJobDir, int(maxIOBPS))
 		if err != nil {
 
-			cgroupLogger.Error("failed to set IO limit", "error", err)
+			log.Error("failed to set IO limit", "error", err)
 			return err
 		}
 	}
 
-	cgroupLogger.Info("cgroup created successfully")
+	log.Info("cgroup created successfully")
 
 	return nil
 }
 
 // SetIOLimit sets IO limits for a cgroup
-func (cg *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
+func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 
-	log := cg.logger.WithFields("cgroupPath", cgroupPath, "ioBPS", ioBPS)
+	log := c.logger.WithFields("cgroupPath", cgroupPath, "ioBPS", ioBPS)
 
 	// check if io.max exists to confirm cgroup v2
 	ioMaxPath := filepath.Join(cgroupPath, "io.max")
@@ -128,9 +128,9 @@ func (cg *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 }
 
 // SetCPULimit sets CPU limits for the cgroup
-func (cg *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
+func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 
-	log := cg.logger.WithFields("cgroupPath", cgroupPath, "cpuLimit", cpuLimit)
+	log := c.logger.WithFields("cgroupPath", cgroupPath, "cpuLimit", cpuLimit)
 
 	// CPU controller files
 	cpuMaxPath := filepath.Join(cgroupPath, "cpu.max")
@@ -180,8 +180,8 @@ func (cg *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 }
 
 // SetMemoryLimit sets memory limits for the cgroup
-func (cg *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
-	log := cg.logger.WithFields("cgroupPath", cgroupPath, "memoryLimitMB", memoryLimitMB)
+func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
+	log := c.logger.WithFields("cgroupPath", cgroupPath, "memoryLimitMB", memoryLimitMB)
 
 	// convert MB to bytes
 	memoryLimitBytes := int64(memoryLimitMB) * 1024 * 1024
@@ -224,8 +224,8 @@ func (cg *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 }
 
 // CleanupCgroup deletes a cgroup after removing job processes
-func (cg *cgroup) CleanupCgroup(jobID string) {
-	cleanupLogger := cg.logger.WithField("jobId", jobID)
+func (c *cgroup) CleanupCgroup(jobID string) {
+	cleanupLogger := c.logger.WithField("jobId", jobID)
 	cleanupLogger.Debug("starting cgroup cleanup")
 
 	// cleanup in a separate goroutine

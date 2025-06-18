@@ -5,6 +5,7 @@ package linux
 import (
 	"context"
 	"fmt"
+	"job-worker/internal/worker/jobworker/linux/resource"
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
@@ -12,18 +13,16 @@ import (
 	"time"
 
 	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/executor"
 	"job-worker/internal/worker/interfaces"
-	"job-worker/internal/worker/platform/linux/process"
-	"job-worker/internal/worker/resource"
+	"job-worker/internal/worker/jobworker/linux/process"
 	"job-worker/pkg/logger"
 	osinterface "job-worker/pkg/os"
 )
 
 var jobCounter int64
 
-// SimplifiedWorker handles job execution with host networking only
-type SimplifiedWorker struct {
+// Worker handles job execution with host networking only
+type Worker struct {
 	store            interfaces.Store
 	cgroup           interfaces.Resource
 	processLauncher  *process.Launcher
@@ -34,8 +33,8 @@ type SimplifiedWorker struct {
 	logger           *logger.Logger
 }
 
-// SimplifiedDependencies contains dependencies for simplified worker
-type SimplifiedDependencies struct {
+// dependencies contains dependencies for simplified Worker
+type dependencies struct {
 	Store            interfaces.Store
 	Cgroup           interfaces.Resource
 	ProcessLauncher  *process.Launcher
@@ -46,8 +45,8 @@ type SimplifiedDependencies struct {
 }
 
 // NewSimplifiedWorker creates a worker without network namespace support
-func NewSimplifiedWorker(deps *SimplifiedDependencies) *SimplifiedWorker {
-	return &SimplifiedWorker{
+func NewSimplifiedWorker(deps *dependencies) *Worker {
+	return &Worker{
 		store:            deps.Store,
 		cgroup:           deps.Cgroup,
 		processLauncher:  deps.ProcessLauncher,
@@ -70,7 +69,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	// Create process management components
 	processValidator := process.NewValidator(osInterface, execInterface)
 	processLauncher := process.NewLauncher(cmdFactory, syscallInterface, osInterface, processValidator)
-	processCleaner := process.NewCleaner(syscallInterface, osInterface, processValidator)
+	processCleaner := process.NewCleaner(syscallInterface, osInterface)
 
 	// Create resource management
 	cgroupResource := resource.New()
@@ -78,7 +77,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	// Create configuration
 	config := DefaultConfig()
 
-	deps := &SimplifiedDependencies{
+	deps := &dependencies{
 		Store:            store,
 		Cgroup:           cgroupResource,
 		ProcessLauncher:  processLauncher,
@@ -92,7 +91,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 }
 
 // StartJob starts a job with host networking (no isolation)
-func (w *SimplifiedWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+func (w *Worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
@@ -149,7 +148,7 @@ func (w *SimplifiedWorker) StartJob(ctx context.Context, command string, args []
 }
 
 // StopJob stops a running job
-func (w *SimplifiedWorker) StopJob(ctx context.Context, jobID string) error {
+func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 	log := w.logger.WithField("jobID", jobID)
 	log.Info("stopping job")
 
@@ -167,7 +166,7 @@ func (w *SimplifiedWorker) StopJob(ctx context.Context, jobID string) error {
 		JobID:           jobID,
 		PID:             job.Pid,
 		CgroupPath:      job.CgroupPath,
-		IsIsolatedJob:   false, // No network isolation
+		IsIsolatedJob:   false,
 		ForceKill:       false,
 		GracefulTimeout: w.config.GracefulShutdownTimeout,
 	}
@@ -189,12 +188,12 @@ func (w *SimplifiedWorker) StopJob(ctx context.Context, jobID string) error {
 }
 
 // Private helper methods
-func (w *SimplifiedWorker) getNextJobID() string {
+func (w *Worker) getNextJobID() string {
 	nextID := atomic.AddInt64(&jobCounter, 1)
 	return fmt.Sprintf("%d", nextID)
 }
 
-func (w *SimplifiedWorker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
+func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
 	// Apply defaults
 	if maxCPU <= 0 {
 		maxCPU = 100 // 1 CPU core
@@ -222,7 +221,7 @@ func (w *SimplifiedWorker) createJobDomain(jobID, resolvedCommand string, args [
 	}
 }
 
-func (w *SimplifiedWorker) setupCgroup(job *domain.Job) error {
+func (w *Worker) setupCgroup(job *domain.Job) error {
 	return w.cgroup.Create(
 		job.CgroupPath,
 		job.Limits.MaxCPU,
@@ -231,7 +230,7 @@ func (w *SimplifiedWorker) setupCgroup(job *domain.Job) error {
 	)
 }
 
-func (w *SimplifiedWorker) startProcess(ctx context.Context, job *domain.Job) (osinterface.Command, error) {
+func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface.Command, error) {
 	// Get job-init binary path
 	initPath, err := w.getJobInitPath()
 	if err != nil {
@@ -256,8 +255,8 @@ func (w *SimplifiedWorker) startProcess(ctx context.Context, job *domain.Job) (o
 		InitPath:      initPath,
 		Environment:   env,
 		SysProcAttr:   sysProcAttr,
-		Stdout:        executor.New(w.store, job.Id),
-		Stderr:        executor.New(w.store, job.Id),
+		Stdout:        New(w.store, job.Id),
+		Stderr:        New(w.store, job.Id),
 		NamespacePath: "",    // No namespace path needed
 		NeedsNSJoin:   false, // No namespace joining
 		JobID:         job.Id,
@@ -275,10 +274,10 @@ func (w *SimplifiedWorker) startProcess(ctx context.Context, job *domain.Job) (o
 	return result.Command, nil
 }
 
-func (w *SimplifiedWorker) buildJobEnvironment(job *domain.Job) []string {
+func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 	baseEnv := w.osInterface.Environ()
 
-	// Job-specific environment (no network variables)
+	// Job-specific environment
 	jobEnv := []string{
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
@@ -295,7 +294,7 @@ func (w *SimplifiedWorker) buildJobEnvironment(job *domain.Job) []string {
 	return append(baseEnv, jobEnv...)
 }
 
-func (w *SimplifiedWorker) getJobInitPath() (string, error) {
+func (w *Worker) getJobInitPath() (string, error) {
 	// Check same directory as main executable
 	if execPath, err := w.osInterface.Executable(); err == nil {
 		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
@@ -320,7 +319,7 @@ func (w *SimplifiedWorker) getJobInitPath() (string, error) {
 	return "", fmt.Errorf("job-init binary not found")
 }
 
-func (w *SimplifiedWorker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
+func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
 	process := processCmd.Process()
 	if process == nil {
 		w.logger.Warn("process is nil after start", "jobID", job.Id)
@@ -340,11 +339,11 @@ func (w *SimplifiedWorker) updateJobAsRunning(job *domain.Job, processCmd osinte
 	w.store.UpdateJob(runningJob)
 }
 
-func (w *SimplifiedWorker) startMonitoring(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
+func (w *Worker) startMonitoring(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
 	go w.monitorJob(ctx, cmd, job)
 }
 
-func (w *SimplifiedWorker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
+func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
 	log := w.logger.WithField("jobID", job.Id)
 	startTime := time.Now()
 
@@ -389,7 +388,7 @@ func (w *SimplifiedWorker) monitorJob(ctx context.Context, cmd osinterface.Comma
 		"duration", duration)
 }
 
-func (w *SimplifiedWorker) cleanupFailedJob(job *domain.Job) {
+func (w *Worker) cleanupFailedJob(job *domain.Job) {
 	failedJob := job.DeepCopy()
 	if err := failedJob.Fail(-1); err != nil {
 		failedJob.Status = domain.StatusFailed
@@ -401,7 +400,7 @@ func (w *SimplifiedWorker) cleanupFailedJob(job *domain.Job) {
 	w.cgroup.CleanupCgroup(job.Id)
 }
 
-func (w *SimplifiedWorker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {
+func (w *Worker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {
 	stoppedJob := job.DeepCopy()
 
 	switch result.Method {

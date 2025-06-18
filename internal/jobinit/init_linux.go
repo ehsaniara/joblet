@@ -19,7 +19,7 @@ type simplifiedJobInitializer struct {
 	logger           *logger.Logger
 }
 
-// NewJobInitializer creates a simplified job initializer (no networking)
+// NewJobInitializer creates a simplified job initializer
 func NewJobInitializer() JobInitializer {
 	return &simplifiedJobInitializer{
 		osInterface:      &os.DefaultOs{},

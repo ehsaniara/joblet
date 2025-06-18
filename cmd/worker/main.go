@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"job-worker/internal/config"
-	"job-worker/internal/worker"
+	"job-worker/internal/worker/jobworker"
 	"job-worker/internal/worker/server"
 	"job-worker/internal/worker/store"
 	"job-worker/pkg/logger"
@@ -38,7 +38,7 @@ func main() {
 	appLogger.Debug("goroutine monitoring started")
 
 	s := store.New()
-	w := worker.New(s)
+	w := jobworker.New(s)
 	appLogger.Info("worker and store initialized", "platform", runtime.GOOS)
 
 	ctx, cancel := context.WithCancel(context.Background())

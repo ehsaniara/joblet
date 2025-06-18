@@ -10,7 +10,7 @@ import (
 	"job-worker/internal/config"
 )
 
-// Config holds Linux platform-specific configuration (simplified)
+// Config holds Linux platform-specific configuration
 type Config struct {
 	// Cgroup resource management configuration
 	CgroupsBaseDir string
@@ -35,7 +35,7 @@ type Config struct {
 	MaxConcurrentJobs int32
 }
 
-// DefaultConfig creates a new configuration with sensible defaults (no network)
+// DefaultConfig creates a new configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
 		CgroupsBaseDir:          config.CgroupsBaseDir,
