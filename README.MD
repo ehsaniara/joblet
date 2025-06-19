@@ -6,8 +6,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
 
-> A high-performance distributed job execution system with secure remote execution, comprehensive resource management,
-> and real-time streaming capabilities using host networking for maximum compatibility.
+Job Worker is a high-performance distributed job execution system built in Go that provides secure remote command execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated gRPC-based architecture with mutual TLS authentication and role-based authorization, allowing administrators to securely execute arbitrary commands on remote Linux systems while enforcing strict CPU, memory, and I/O bandwidth limits through Linux cgroups v2. Jobs run in isolated process namespaces (PID, mount, IPC, UTS) while utilizing host networking for maximum compatibility and performance.
+
+>The system features a two-stage execution model with a specialized job-init binary that handles proper namespace setup and resource isolation, while the main worker service provides real-time log streaming, job lifecycle management, and automatic cleanup. A full-featured CLI client enables easy job creation, monitoring, and management, with support for streaming live output from running jobs. The architecture is designed for production environments requiring secure, isolated execution of workloads with precise resource controls, making it ideal for distributed computing, CI/CD pipelines, or any scenario where secure remote job execution with resource guarantees is needed.
 
 ## ✨ Key Features
 
