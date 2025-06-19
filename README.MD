@@ -21,7 +21,6 @@
   setup
 - 🏗️ **Advanced Process Management** - Full /proc remounting and private mount propagation
 - 📈 **Comprehensive Monitoring** - Job status tracking, resource usage monitoring, and real-time subscriber management
-- 🚀 **Cross-Platform Support** - Full Linux implementation with macOS development support
 - 🔄 **Robust Error Handling** - Graceful shutdown, emergency cleanup, and process group management
 
 ## 🚀 Quick Start
@@ -128,7 +127,7 @@ performance with host networking:
 **Worker Service (`cmd/worker/main.go`)**
 
 - Main gRPC server handling job execution and management
-- Platform-specific implementations (Linux vs macOS)
+~~- Platform-specific implementations (Linux vs macOS)~~
 - Advanced resource management via cgroups v2
 - Real-time job monitoring and status tracking
 - All jobs use host networking for maximum compatibility
@@ -304,79 +303,6 @@ When resource limits are not specified (or set to 0), the system applies these d
 - **Memory**: 512 MB
 - **I/O**: Unlimited (not constrained)
 - **Network**: Host networking (shared with system)
-
-## 🛠️ Development
-
-### Build Commands
-
-```bash
-# Build all components for respective platforms
-make all
-
-# Build individual components
-make cli     # macOS CLI for local development
-make worker  # Linux server binary
-make init    # Linux job-init binary
-
-# Complete development setup
-make setup-dev  # Builds all + generates certificates
-
-# Clean all build artifacts
-make clean
-```
-
-### Testing & Debugging
-
-```bash
-# Run comprehensive test suite
-go test -v ./...
-
-# Test TLS connection and certificate validation
-make test-tls REMOTE_HOST=your-server.com
-
-# Monitor live service logs
-make live-log REMOTE_HOST=your-server.com
-
-# Check detailed service status
-make service-status REMOTE_HOST=your-server.com
-
-# Test SSH connection and prerequisites
-make test-connection REMOTE_HOST=your-server.com
-
-# Examine certificate details and chain validation
-make examine-server-cert REMOTE_HOST=your-server.com
-```
-
-### Makefile Targets
-
-The comprehensive Makefile provides numerous automation targets:
-
-**Build Targets:**
-
-- `make all` - Build all binaries
-- `make cli` - Build CLI for macOS
-- `make worker` - Build worker for Linux
-- `make init` - Build job-init for Linux
-
-**Deployment Targets:**
-
-- `make deploy-safe` - Deploy with password prompt
-- `make deploy-passwordless` - Deploy without passwords (requires setup)
-- `make setup-remote-passwordless` - Complete remote setup with certificates
-
-**Certificate Management:**
-
-- `make certs-local` - Generate local certificates
-- `make certs-remote-passwordless` - Generate remote certificates
-- `make certs-download-admin-simple` - Download admin certificates
-- `make examine-certs` - Examine certificate details
-
-**Development & Debugging:**
-
-- `make setup-dev` - Complete development setup
-- `make live-log` - View real-time service logs
-- `make service-status` - Check service status
-- `make test-connection` - Test SSH connectivity
 
 ## 📋 API Reference
 
@@ -592,7 +518,7 @@ We welcome contributions! Here's how to get started:
 - **Testing**: Comprehensive test coverage with mocks
 - **Documentation**: Update README and inline documentation
 - **Security**: Certificate management and proper error handling
-- **Platform Support**: Ensure Linux compatibility, macOS development support
+~~- **Platform Support**: Ensure Linux compatibility, macOS development support~~
 
 ## 📊 Performance & Monitoring
 
