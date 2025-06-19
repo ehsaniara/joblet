@@ -4,6 +4,7 @@ package linux
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"job-worker/internal/worker/jobworker/linux/resource"
 	"os/exec"
@@ -42,20 +43,6 @@ type dependencies struct {
 	ProcessValidator *process.Validator
 	OsInterface      osinterface.OsInterface
 	Config           *Config
-}
-
-// NewWorker creates a worker without network namespace support
-func NewWorker(deps *dependencies) *Worker {
-	return &Worker{
-		store:            deps.Store,
-		cgroup:           deps.Cgroup,
-		processLauncher:  deps.ProcessLauncher,
-		processCleaner:   deps.ProcessCleaner,
-		processValidator: deps.ProcessValidator,
-		osInterface:      deps.OsInterface,
-		config:           deps.Config,
-		logger:           logger.New().WithField("component", "linux-worker"),
-	}
 }
 
 // NewPlatformWorker creates a simplified Linux worker
@@ -139,25 +126,30 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
 
 	// Setup cgroup resources
-	if err := w.setupCgroup(job); err != nil {
-		return nil, fmt.Errorf("cgroup setup failed: %w", err)
+	if e := w.cgroup.Create(
+		job.CgroupPath,
+		job.Limits.MaxCPU,
+		job.Limits.MaxMemory,
+		job.Limits.MaxIOBPS,
+	); e != nil {
+		return nil, fmt.Errorf("cgroup setup failed: %w", e)
 	}
 
 	// Register job in store
 	w.store.CreateNewJob(job)
 
 	// Start the process with host networking
-	processCmd, err := w.startProcess(ctx, job)
+	cmd, err := w.startProcess(ctx, job)
 	if err != nil {
 		w.cleanupFailedJob(job)
 		return nil, fmt.Errorf("process start failed: %w", err)
 	}
 
 	// Update job with process info
-	w.updateJobAsRunning(job, processCmd)
+	w.updateJobAsRunning(job, cmd)
 
 	// Start monitoring
-	w.startMonitoring(ctx, processCmd, job)
+	go w.monitorJob(ctx, cmd, job)
 
 	log.Info("job started successfully with host networking", "pid", job.Pid)
 	return job, nil
@@ -237,15 +229,6 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 	}
 }
 
-func (w *Worker) setupCgroup(job *domain.Job) error {
-	return w.cgroup.Create(
-		job.CgroupPath,
-		job.Limits.MaxCPU,
-		job.Limits.MaxMemory,
-		job.Limits.MaxIOBPS,
-	)
-}
-
 func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface.Command, error) {
 	// Get job-init binary path
 	initPath, err := w.getJobInitPath()
@@ -303,7 +286,7 @@ func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
 		"HOST_NETWORKING=true",
-		"CGROUP_NAMESPACE=true", // Indicate cgroup namespace is active
+		"CGROUP_NAMESPACE=true", // cgroup namespace is active
 	}
 
 	// Add job arguments
@@ -356,27 +339,26 @@ func (w *Worker) getJobInitPath() (string, error) {
 }
 
 func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
-	process := processCmd.Process()
-	if process == nil {
+	cmd := processCmd.Process()
+	if cmd == nil {
 		w.logger.Warn("process is nil after start", "jobID", job.Id)
 		return
 	}
 
 	runningJob := job.DeepCopy()
-	runningJob.Pid = int32(process.Pid())
+	runningJob.Pid = int32(cmd.Pid())
 
 	if err := runningJob.MarkAsRunning(runningJob.Pid); err != nil {
 		w.logger.Warn("domain validation failed for running status", "error", err)
 		runningJob.Status = domain.StatusRunning
-		runningJob.Pid = int32(process.Pid())
+		runningJob.Pid = int32(cmd.Pid())
 	}
+
+	//update the reference
+	job.Status = domain.StatusRunning
 
 	runningJob.StartTime = time.Now()
 	w.store.UpdateJob(runningJob)
-}
-
-func (w *Worker) startMonitoring(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
-	go w.monitorJob(ctx, cmd, job)
 }
 
 func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
@@ -392,11 +374,9 @@ func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *d
 	var exitCode int32
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			exitCode = int32(exitErr.ExitCode())
-			finalStatus = domain.StatusFailed
-		} else {
-			exitCode = -1
 			finalStatus = domain.StatusFailed
 		}
 	} else {
