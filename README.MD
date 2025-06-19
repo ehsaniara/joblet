@@ -127,7 +127,6 @@ performance with host networking:
 **Worker Service (`cmd/worker/main.go`)**
 
 - Main gRPC server handling job execution and management
-~~- Platform-specific implementations (Linux vs macOS)~~
 - Advanced resource management via cgroups v2
 - Real-time job monitoring and status tracking
 - All jobs use host networking for maximum compatibility
@@ -518,7 +517,6 @@ We welcome contributions! Here's how to get started:
 - **Testing**: Comprehensive test coverage with mocks
 - **Documentation**: Update README and inline documentation
 - **Security**: Certificate management and proper error handling
-~~- **Platform Support**: Ensure Linux compatibility, macOS development support~~
 
 ## 📊 Performance & Monitoring
 
