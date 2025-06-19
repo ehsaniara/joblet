@@ -68,7 +68,6 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 		Command:    command,
 		Args:       args,
 		CgroupPath: cgroupPath,
-		// No network fields
 	}, nil
 }
 
@@ -81,7 +80,7 @@ func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 
 	jobLogger.Info("executing job with host networking", "command", config.Command)
 
-	// Setup basic namespace environment (no network namespaces)
+	// Setup basic namespace environment
 	if err := j.setupBasicEnvironment(); err != nil {
 		return fmt.Errorf("failed to setup basic environment: %w", err)
 	}
@@ -127,11 +126,6 @@ func (j *jobInitializer) setupBasicEnvironment() error {
 	pid := j.osInterface.Getpid()
 	j.logger.Debug("setting up basic environment", "pid", pid)
 
-	// Validate we're in a cgroup namespace
-	if err := j.validateCgroupNamespace(); err != nil {
-		return fmt.Errorf("cgroup namespace validation failed: %w", err)
-	}
-
 	// Only remount /proc if we're PID 1
 	if pid == 1 {
 		j.logger.Info("detected PID 1 - remounting /proc for namespace isolation")
@@ -144,52 +138,25 @@ func (j *jobInitializer) setupBasicEnvironment() error {
 			return fmt.Errorf("failed to remount /proc: %w", err)
 		}
 
-		// setup cgroup namespace mount
-		if err := j.setupCgroupNamespace(); err != nil {
-			return fmt.Errorf("failed to setup cgroup namespace: %w", err)
-		}
+		j.logger.Info("cgroup namespace already configured by launcher")
 	}
 
-	return nil
-}
-
-// cgroup namespace validation
-func (j *jobInitializer) validateCgroupNamespace() error {
-	// Check if we're in a different cgroup namespace than init
-	initNS, err := j.osInterface.ReadFile("/proc/1/ns/cgroup")
-	if err != nil {
-		return fmt.Errorf("cannot read init cgroup namespace: %w", err)
-	}
-
-	selfNS, err := j.osInterface.ReadFile("/proc/self/ns/cgroup")
-	if err != nil {
-		return fmt.Errorf("cannot read self cgroup namespace: %w", err)
-	}
-
-	if string(initNS) == string(selfNS) {
-		return fmt.Errorf("not running in cgroup namespace (required for this project)")
-	}
-
-	j.logger.Info("cgroup namespace validation passed")
+	j.logger.Info("basic environment setup completed")
 	return nil
 }
 
 // Setup cgroup namespace mount
 func (j *jobInitializer) setupCgroupNamespace() error {
-	j.logger.Info("setting up cgroup namespace mount")
+	j.logger.Info("verifying cgroup namespace setup")
 
-	// Mount cgroup2 filesystem in the namespace
-	// This gives us a clean view of just our cgroup subtree
-	if err := j.syscallInterface.Mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, ""); err != nil {
-		return fmt.Errorf("failed to mount cgroup2 in namespace: %w", err)
-	}
-
-	// Verify the mount worked
+	// Verify cgroup filesystem is accessible
 	if _, err := j.osInterface.Stat("/sys/fs/cgroup/cgroup.procs"); err != nil {
-		return fmt.Errorf("cgroup namespace mount verification failed: %w", err)
+		j.logger.Warn("cgroup.procs not immediately available, will be handled by joinCgroup", "error", err)
+		// Don't fail here - joinCgroup will handle this later
+	} else {
+		j.logger.Info("cgroup filesystem is accessible in namespace")
 	}
 
-	j.logger.Info("cgroup namespace mount setup complete")
 	return nil
 }
 
