@@ -79,7 +79,6 @@ func (l *Logger) WithFields(keyVals ...interface{}) *Logger {
 		newLogger.fields[k] = v
 	}
 
-	// add new fields
 	for i := 0; i < len(keyVals); i += 2 {
 		if i+1 < len(keyVals) {
 			key := fmt.Sprintf("%v", keyVals[i])

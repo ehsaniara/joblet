@@ -72,7 +72,7 @@ func NewLauncher(
 // LaunchProcess launches a process with the given configuration
 func (l *Launcher) LaunchProcess(ctx context.Context, config *LaunchConfig) (*LaunchResult, error) {
 	if config == nil {
-		return nil, fmt.Errorf("launch config cannot be nil")
+		return nil, fmt.Errorf("launch mapping.go cannot be nil")
 	}
 
 	log := l.logger.WithFields("jobID", config.JobID, "command", config.Command)
@@ -82,7 +82,7 @@ func (l *Launcher) LaunchProcess(ctx context.Context, config *LaunchConfig) (*La
 
 	// Validate configuration
 	if err := l.validateLaunchConfig(config); err != nil {
-		return nil, fmt.Errorf("invalid launch config: %w", err)
+		return nil, fmt.Errorf("invalid launch mapping.go: %w", err)
 	}
 
 	// Use pre-fork namespace setup approach for network joining

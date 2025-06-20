@@ -34,7 +34,6 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 	command := j.osInterface.Getenv("JOB_COMMAND")
 	cgroupPath := j.osInterface.Getenv("JOB_CGROUP_PATH")
 	argsCountStr := j.osInterface.Getenv("JOB_ARGS_COUNT")
-	hostNetworking := j.osInterface.Getenv("HOST_NETWORKING")
 
 	jobLogger := j.logger.WithField("jobId", jobID)
 
@@ -60,8 +59,7 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 	jobLogger.Info("loaded job configuration (host networking)",
 		"command", command,
 		"cgroupPath", cgroupPath,
-		"argsCount", len(args),
-		"hostNetworking", hostNetworking)
+		"argsCount", len(args))
 
 	return &JobConfig{
 		JobID:      jobID,
@@ -72,13 +70,13 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 }
 
 func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
-	jobLogger := j.logger.WithField("jobId", config.JobID)
+	log := j.logger.WithField("jobId", config.JobID)
 
 	if config == nil {
-		return fmt.Errorf("job config cannot be nil")
+		return fmt.Errorf("job mapping.go cannot be nil")
 	}
 
-	jobLogger.Info("executing job with host networking", "command", config.Command)
+	log.Info("executing job with host networking", "command", config.Command)
 
 	// Setup basic namespace environment
 	if err := j.setupBasicEnvironment(); err != nil {
@@ -98,10 +96,10 @@ func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 
 	// Execute the command (inherits host networking)
 	execArgs := append([]string{config.Command}, config.Args...)
-	jobLogger.Info("executing command with host networking", "commandPath", commandPath)
+	log.Info("executing command with host networking", "commandPath", commandPath)
 
-	if err := j.syscallInterface.Exec(commandPath, execArgs, j.osInterface.Environ()); err != nil {
-		return fmt.Errorf("failed to exec command: %w", err)
+	if e := j.syscallInterface.Exec(commandPath, execArgs, j.osInterface.Environ()); e != nil {
+		return fmt.Errorf("failed to exec command: %w", e)
 	}
 
 	return nil
@@ -126,22 +124,8 @@ func (j *jobInitializer) setupBasicEnvironment() error {
 	pid := j.osInterface.Getpid()
 	j.logger.Debug("setting up basic environment", "pid", pid)
 
-	// Only remount /proc if we're PID 1
-	if pid == 1 {
-		j.logger.Info("detected PID 1 - remounting /proc for namespace isolation")
-
-		if err := j.syscallInterface.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""); err != nil {
-			j.logger.Warn("failed to make mounts private", "error", err)
-		}
-
-		if err := j.remountProc(); err != nil {
-			return fmt.Errorf("failed to remount /proc: %w", err)
-		}
-
-		j.logger.Info("cgroup namespace already configured by launcher")
-	}
-
-	j.logger.Info("basic environment setup completed")
+	// Skip /proc remount when using user namespaces - they provide sufficient isolation
+	j.logger.Info("skipping /proc remount - using user namespace isolation")
 	return nil
 }
 
@@ -176,7 +160,15 @@ func (j *jobInitializer) remountProc() error {
 }
 
 func (j *jobInitializer) joinCgroup(cgroupPath string) error {
-	// In cgroup namespace, our cgroup appears at the root
+	// Check if we're in a user namespace
+	inUserNS := j.osInterface.Getenv("USER_NAMESPACE") == "true"
+
+	if inUserNS {
+		j.logger.Info("user namespace detected - skipping manual cgroup join (parent process handles cgroup assignment)")
+		return nil
+	}
+
+	// Original cgroup join logic for non-user-namespace jobs
 	namespaceCgroupPath := "/sys/fs/cgroup"
 	procsFile := filepath.Join(namespaceCgroupPath, "cgroup.procs")
 

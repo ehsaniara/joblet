@@ -10,7 +10,6 @@ import (
 	"job-worker/internal/config"
 )
 
-// Config internal/worker/platform/linux/config.go
 type Config struct {
 	// Cgroup resource management configuration
 	CgroupsBaseDir string
@@ -36,10 +35,26 @@ type Config struct {
 
 	// Cgroup namespace configuration (mandatory)
 	CgroupNamespaceMount string // Mount point inside namespace
+
+	// User namespace configuration
+	UserNamespaceEnabled bool
+	UserNamespaceConfig  *UserNamespaceConfig
 }
 
-// DefaultConfigWithCgroupNamespace creates config with mandatory cgroup namespaces
-func DefaultConfigWithCgroupNamespace() *Config {
+// UserNamespaceConfig contains user namespace specific settings
+type UserNamespaceConfig struct {
+	BaseUID          uint32
+	BaseGID          uint32
+	RangeSize        uint32
+	MaxJobs          uint32
+	SubUIDFile       string
+	SubGIDFile       string
+	UseSetuidHelper  bool
+	SetuidHelperPath string
+}
+
+// DefaultConfigWithUserNamespaces creates config
+func DefaultConfigWithUserNamespaces() *Config {
 	return &Config{
 		CgroupsBaseDir:          config.CgroupsBaseDir,
 		GracefulShutdownTimeout: 100 * time.Millisecond,
@@ -53,7 +68,20 @@ func DefaultConfigWithCgroupNamespace() *Config {
 		MaxEnvironmentVars:      1000,
 		MaxEnvironmentVarLen:    8192,
 		MaxConcurrentJobs:       100,
-		CgroupNamespaceMount:    "/sys/fs/cgroup", // Standard mount point
+		CgroupNamespaceMount:    "/sys/fs/cgroup",
+
+		// User namespace configuration
+		UserNamespaceEnabled: true,
+		UserNamespaceConfig: &UserNamespaceConfig{
+			BaseUID:          100000,
+			BaseGID:          100000,
+			RangeSize:        65536,
+			MaxJobs:          100,
+			SubUIDFile:       "/etc/subuid",
+			SubGIDFile:       "/etc/subgid",
+			UseSetuidHelper:  false,
+			SetuidHelperPath: "/usr/bin/newuidmap",
+		},
 	}
 }
 
@@ -82,6 +110,35 @@ func (c *Config) Validate() error {
 
 	if c.CgroupNamespaceMount == "" {
 		return fmt.Errorf("CgroupNamespaceMount cannot be empty")
+	}
+
+	// User namespace validation
+	if c.UserNamespaceEnabled {
+		if c.UserNamespaceConfig == nil {
+			return fmt.Errorf("UserNamespaceConfig cannot be nil when user namespaces are enabled")
+		}
+
+		if c.UserNamespaceConfig.BaseUID < 1000 {
+			return fmt.Errorf("BaseUID should be >= 1000 for security")
+		}
+
+		if c.UserNamespaceConfig.BaseGID < 1000 {
+			return fmt.Errorf("BaseGID should be >= 1000 for security")
+		}
+
+		if c.UserNamespaceConfig.RangeSize == 0 {
+			return fmt.Errorf("RangeSize cannot be zero")
+		}
+
+		if c.UserNamespaceConfig.MaxJobs == 0 {
+			return fmt.Errorf("MaxJobs cannot be zero")
+		}
+
+		// Check if UID range would overflow
+		maxUID := c.UserNamespaceConfig.BaseUID + (c.UserNamespaceConfig.MaxJobs * c.UserNamespaceConfig.RangeSize)
+		if maxUID > 4294967295 { // uint32 max
+			return fmt.Errorf("UID range would overflow: max UID would be %d", maxUID)
+		}
 	}
 
 	return nil

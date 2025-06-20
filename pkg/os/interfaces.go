@@ -33,6 +33,11 @@ type OsInterface interface {
 	Symlink(source string, path string) error
 	MkdirAll(dir string, perm os.FileMode) error
 	IsNotExist(err error) bool
+	Exit(code int)
+
+	// User namespace support methods
+	Getuid() int
+	Getgid() int
 }
 
 //counterfeiter:generate . CommandFactory

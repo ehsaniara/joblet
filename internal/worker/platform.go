@@ -1,7 +1,8 @@
-package jobworker
+package worker
 
 import (
 	"job-worker/internal/worker/interfaces"
+	"job-worker/internal/worker/jobworker"
 	"runtime"
 )
 
@@ -10,7 +11,7 @@ import (
 func New(store interfaces.Store) interfaces.JobWorker {
 	switch runtime.GOOS {
 	case "linux":
-		return NewLinuxWorker(store)
+		return jobworker.NewLinuxWorker(store)
 	case "darwin":
 		return nil
 	default:

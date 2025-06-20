@@ -96,6 +96,14 @@ func (s *DefaultSyscall) CreateProcessGroup() *syscall.SysProcAttr {
 // DefaultOs implements interfaces.OsInterface using real os
 type DefaultOs struct{}
 
+func (d *DefaultOs) Getuid() int {
+	return os.Getuid()
+}
+
+func (d *DefaultOs) Getgid() int {
+	return os.Getgid()
+}
+
 func (d *DefaultOs) IsNotExist(err error) bool {
 	return os.IsNotExist(err)
 }
