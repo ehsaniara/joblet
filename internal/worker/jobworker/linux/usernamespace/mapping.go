@@ -30,17 +30,17 @@ type UserNamespaceManager interface {
 	ValidateSubUIDGID() error
 }
 
-// UserMapping represents the UID/GID mapping for a job
+// UserMapping represents UID/GID translation between host and namespace
 type UserMapping struct {
 	JobID        string
-	NamespaceUID uint32 // UID inside the user namespace (usually 0 for root)
-	NamespaceGID uint32 // GID inside the user namespace (usually 0 for root)
-	HostUID      uint32 // Mapped UID on the host (unprivileged)
-	HostGID      uint32 // Mapped GID on the host (unprivileged)
-	UIDMapPath   string // Path to uid_map file
-	GIDMapPath   string // Path to gid_map file
-	SubUIDRange  *UIDRange
-	SubGIDRange  *GIDRange
+	NamespaceUID uint32    // UID inside namespace (typically 0 for root)
+	NamespaceGID uint32    // GID inside namespace (typically 0 for root)
+	HostUID      uint32    // Actual unprivileged UID on host system
+	HostGID      uint32    // Actual unprivileged GID on host system
+	UIDMapPath   string    // Path to uid_map file for debugging
+	GIDMapPath   string    // Path to gid_map file for debugging
+	SubUIDRange  *UIDRange // Allocated UID range from /etc/subuid
+	SubGIDRange  *GIDRange // Allocated GID range from /etc/subgid
 }
 
 // UIDRange represents a range of UIDs

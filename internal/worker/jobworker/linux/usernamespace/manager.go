@@ -45,7 +45,7 @@ func NewUserNamespaceManager(config *UserNamespaceConfig, osInterface osinterfac
 	}
 }
 
-// CreateUserMapping creates UID/GID mappings for a job with recycling
+// CreateUserMapping allocates unique UID/GID range with recycling support
 func (m *userNamespaceManager) CreateUserMapping(ctx context.Context, jobID string) (*UserMapping, error) {
 	m.allocatedMu.Lock()
 	defer m.allocatedMu.Unlock()
@@ -58,7 +58,7 @@ func (m *userNamespaceManager) CreateUserMapping(ctx context.Context, jobID stri
 		return existing, nil
 	}
 
-	// Try to reuse a released UID first
+	// Reuse released UID ranges before allocating new ones
 	var hostUID uint32
 	if len(m.availableUIDs) > 0 {
 		// Reuse the first available UID
@@ -66,7 +66,7 @@ func (m *userNamespaceManager) CreateUserMapping(ctx context.Context, jobID stri
 		m.availableUIDs = m.availableUIDs[1:] // Remove from available list
 		log.Debug("reusing available UID", "hostUID", hostUID)
 	} else {
-		// No available UIDs, allocate a new one
+		// Allocate new UID range if none available
 		hostUID = m.nextUID
 
 		// Ensure we don't exceed limits
@@ -220,44 +220,6 @@ func (m *userNamespaceManager) ConfigureSysProcAttr(attr *syscall.SysProcAttr, m
 	return attr
 }
 
-// SetupUserMappingInNamespace sets up UID/GID mappings from inside the user namespace
-// This should be called by job-init after entering the user namespace
-func (m *userNamespaceManager) SetupUserMappingInNamespace(mapping *UserMapping) error {
-	log := m.logger.WithField("jobID", mapping.JobID)
-
-	// Write UID mapping
-	uidMapContent := fmt.Sprintf("%d %d %d\n",
-		mapping.NamespaceUID,
-		mapping.HostUID,
-		mapping.SubUIDRange.Count)
-
-	if err := m.writeMapping("/proc/self/uid_map", uidMapContent); err != nil {
-		return fmt.Errorf("failed to setup UID mapping: %w", err)
-	}
-
-	// Deny setgroups for security
-	if err := m.writeMapping("/proc/self/setgroups", "deny\n"); err != nil {
-		log.Warn("failed to deny setgroups", "error", err)
-		// Don't fail for this
-	}
-
-	// Write GID mapping
-	gidMapContent := fmt.Sprintf("%d %d %d\n",
-		mapping.NamespaceGID,
-		mapping.HostGID,
-		mapping.SubGIDRange.Count)
-
-	if err := m.writeMapping("/proc/self/gid_map", gidMapContent); err != nil {
-		return fmt.Errorf("failed to setup GID mapping: %w", err)
-	}
-
-	log.Info("user namespace mappings configured",
-		"uidMapping", fmt.Sprintf("%d->%d", mapping.NamespaceUID, mapping.HostUID),
-		"gidMapping", fmt.Sprintf("%d->%d", mapping.NamespaceGID, mapping.HostGID))
-
-	return nil
-}
-
 // writeMapping writes content to a mapping file with proper error handling
 func (m *userNamespaceManager) writeMapping(path, content string) error {
 	// Check if file exists and is writable
@@ -309,19 +271,6 @@ func (m *userNamespaceManager) ValidateSubUIDGID() error {
 		"subgidFile", m.config.SubGIDFile)
 
 	return nil
-}
-
-// GetAllocatedMappings returns current UID mappings (for debugging)
-func (m *userNamespaceManager) GetAllocatedMappings() map[string]*UserMapping {
-	m.allocatedMu.RLock()
-	defer m.allocatedMu.RUnlock()
-
-	result := make(map[string]*UserMapping)
-	for k, v := range m.allocatedUIDs {
-		result[k] = v
-	}
-
-	return result
 }
 
 // checkUserInFile checks if a user has an entry in subuid/subgid file

@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc"
 	"job-worker/internal/config"
 	"job-worker/internal/worker"
-	"job-worker/internal/worker/jobworker/linux/usernamespace"
 	"job-worker/internal/worker/server"
 	"job-worker/internal/worker/store"
 	"job-worker/pkg/logger"
@@ -33,17 +32,19 @@ func main() {
 
 	appLogger.Info("job-worker starting", "version", "1.0.0", "platform", runtime.GOOS)
 
-	// FAIL FAST: Validate all platform requirements at startup
+	// Validate all platform requirements at startup
 	if err := validatePlatformRequirements(appLogger); err != nil {
 		appLogger.Fatal("platform requirements not met", "error", err)
 	}
 
 	appLogger.Debug("goroutine monitoring started")
 
+	// Initialize core components (store handles job state, worker executes jobs)
 	s := store.New()
-	w := worker.New(s)
+	w := worker.NewWorker(s)
 	appLogger.Info("worker and store initialized", "platform", runtime.GOOS)
 
+	// Setup graceful shutdown handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -53,6 +54,7 @@ func main() {
 	var grpcServer *grpc.Server
 	serverStarted := make(chan error, 1)
 
+	// Start gRPC server in background
 	go func() {
 		appLogger.Info("starting JobService gRPC server", "address", ":50051")
 		var err error
@@ -145,11 +147,6 @@ func validateLinuxRequirements(logger *logger.Logger) error {
 		return fmt.Errorf("kernel version validation failed: %w", err)
 	}
 
-	// SubUID/SubGID validation
-	if err := validateSubUIDGID(osInterface, logger); err != nil {
-		return fmt.Errorf("subuid/subgid validation failed: %w", err)
-	}
-
 	// File system permissions validation
 	if err := validateFileSystemPermissions(osInterface, logger); err != nil {
 		return fmt.Errorf("file system permissions validation failed: %w", err)
@@ -236,53 +233,53 @@ func validateUserNamespaces(osInterface osinterface.OsInterface, logger *logger.
 }
 
 // validateSubUIDGID validates subuid/subgid configuration using UserNamespaceManager
-func validateSubUIDGID(osInterface osinterface.OsInterface, logger *logger.Logger) error {
-	// Create a user namespace manager for validation
-	config := usernamespace.DefaultUserNamespaceConfig()
-	manager := usernamespace.NewUserNamespaceManager(config, osInterface)
-
-	// Use the manager's validation method
-	if err := manager.ValidateSubUIDGID(); err != nil {
-		return fmt.Errorf("subuid/subgid validation failed: %w", err)
-	}
-
-	// Additional validation: check if current user has subuid/subgid entries
-	currentUser := osInterface.Getenv("USER")
-	if currentUser == "" {
-		currentUser = "job-worker" // Default assumption
-	}
-
-	// Check subuid file content
-	if data, err := osInterface.ReadFile(config.SubUIDFile); err == nil {
-		content := string(data)
-		if !strings.Contains(content, currentUser+":") {
-			logger.Warn("current user not found in subuid file",
-				"user", currentUser,
-				"file", config.SubUIDFile,
-				"hint", fmt.Sprintf("Add: %s:100000:65536", currentUser))
-		} else {
-			logger.Debug("subuid entry found for current user", "user", currentUser)
-		}
-	}
-
-	// Check subgid file content
-	if data, err := osInterface.ReadFile(config.SubGIDFile); err == nil {
-		content := string(data)
-		if !strings.Contains(content, currentUser+":") {
-			logger.Warn("current user not found in subgid file",
-				"user", currentUser,
-				"file", config.SubGIDFile,
-				"hint", fmt.Sprintf("Add: %s:100000:65536", currentUser))
-		} else {
-			logger.Debug("subgid entry found for current user", "user", currentUser)
-		}
-	}
-
-	logger.Debug("subuid/subgid validation passed",
-		"subuidFile", config.SubUIDFile,
-		"subgidFile", config.SubGIDFile)
-	return nil
-}
+//func validateSubUIDGID(osInterface osinterface.OsInterface, logger *logger.Logger) error {
+//	// Create a user namespace manager for validation
+//	config := usernamespace.DefaultUserNamespaceConfig()
+//	manager := usernamespace.NewUserNamespaceManager(config, osInterface)
+//
+//	// Use the manager's validation method
+//	if err := manager.ValidateSubUIDGID(); err != nil {
+//		return fmt.Errorf("subuid/subgid validation failed: %w", err)
+//	}
+//
+//	// Additional validation: check if current user has subuid/subgid entries
+//	currentUser := osInterface.Getenv("USER")
+//	if currentUser == "" {
+//		currentUser = "job-worker" // Default assumption
+//	}
+//
+//	// Check subuid file content
+//	if data, err := osInterface.ReadFile(config.SubUIDFile); err == nil {
+//		content := string(data)
+//		if !strings.Contains(content, currentUser+":") {
+//			logger.Warn("current user not found in subuid file",
+//				"user", currentUser,
+//				"file", config.SubUIDFile,
+//				"hint", fmt.Sprintf("Add: %s:100000:65536", currentUser))
+//		} else {
+//			logger.Debug("subuid entry found for current user", "user", currentUser)
+//		}
+//	}
+//
+//	// Check subgid file content
+//	if data, err := osInterface.ReadFile(config.SubGIDFile); err == nil {
+//		content := string(data)
+//		if !strings.Contains(content, currentUser+":") {
+//			logger.Warn("current user not found in subgid file",
+//				"user", currentUser,
+//				"file", config.SubGIDFile,
+//				"hint", fmt.Sprintf("Add: %s:100000:65536", currentUser))
+//		} else {
+//			logger.Debug("subgid entry found for current user", "user", currentUser)
+//		}
+//	}
+//
+//	logger.Debug("subuid/subgid validation passed",
+//		"subuidFile", config.SubUIDFile,
+//		"subgidFile", config.SubGIDFile)
+//	return nil
+//}
 
 // validateFileSystemPermissions validates required file system access
 func validateFileSystemPermissions(osInterface osinterface.OsInterface, logger *logger.Logger) error {

@@ -30,6 +30,11 @@ type FakeOsInterface struct {
 		result1 string
 		result2 error
 	}
+	ExitStub        func(int)
+	exitMutex       sync.RWMutex
+	exitArgsForCall []struct {
+		arg1 int
+	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
 	getenvArgsForCall []struct {
@@ -41,6 +46,16 @@ type FakeOsInterface struct {
 	getenvReturnsOnCall map[int]struct {
 		result1 string
 	}
+	GetgidStub        func() int
+	getgidMutex       sync.RWMutex
+	getgidArgsForCall []struct {
+	}
+	getgidReturns struct {
+		result1 int
+	}
+	getgidReturnsOnCall map[int]struct {
+		result1 int
+	}
 	GetpidStub        func() int
 	getpidMutex       sync.RWMutex
 	getpidArgsForCall []struct {
@@ -49,6 +64,16 @@ type FakeOsInterface struct {
 		result1 int
 	}
 	getpidReturnsOnCall map[int]struct {
+		result1 int
+	}
+	GetuidStub        func() int
+	getuidMutex       sync.RWMutex
+	getuidArgsForCall []struct {
+	}
+	getuidReturns struct {
+		result1 int
+	}
+	getuidReturnsOnCall map[int]struct {
 		result1 int
 	}
 	IsNotExistStub        func(error) bool
@@ -249,6 +274,38 @@ func (fake *FakeOsInterface) ExecutableReturnsOnCall(i int, result1 string, resu
 	}{result1, result2}
 }
 
+func (fake *FakeOsInterface) Exit(arg1 int) {
+	fake.exitMutex.Lock()
+	fake.exitArgsForCall = append(fake.exitArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	stub := fake.ExitStub
+	fake.recordInvocation("Exit", []interface{}{arg1})
+	fake.exitMutex.Unlock()
+	if stub != nil {
+		fake.ExitStub(arg1)
+	}
+}
+
+func (fake *FakeOsInterface) ExitCallCount() int {
+	fake.exitMutex.RLock()
+	defer fake.exitMutex.RUnlock()
+	return len(fake.exitArgsForCall)
+}
+
+func (fake *FakeOsInterface) ExitCalls(stub func(int)) {
+	fake.exitMutex.Lock()
+	defer fake.exitMutex.Unlock()
+	fake.ExitStub = stub
+}
+
+func (fake *FakeOsInterface) ExitArgsForCall(i int) int {
+	fake.exitMutex.RLock()
+	defer fake.exitMutex.RUnlock()
+	argsForCall := fake.exitArgsForCall[i]
+	return argsForCall.arg1
+}
+
 func (fake *FakeOsInterface) Getenv(arg1 string) string {
 	fake.getenvMutex.Lock()
 	ret, specificReturn := fake.getenvReturnsOnCall[len(fake.getenvArgsForCall)]
@@ -310,6 +367,59 @@ func (fake *FakeOsInterface) GetenvReturnsOnCall(i int, result1 string) {
 	}{result1}
 }
 
+func (fake *FakeOsInterface) Getgid() int {
+	fake.getgidMutex.Lock()
+	ret, specificReturn := fake.getgidReturnsOnCall[len(fake.getgidArgsForCall)]
+	fake.getgidArgsForCall = append(fake.getgidArgsForCall, struct {
+	}{})
+	stub := fake.GetgidStub
+	fakeReturns := fake.getgidReturns
+	fake.recordInvocation("Getgid", []interface{}{})
+	fake.getgidMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOsInterface) GetgidCallCount() int {
+	fake.getgidMutex.RLock()
+	defer fake.getgidMutex.RUnlock()
+	return len(fake.getgidArgsForCall)
+}
+
+func (fake *FakeOsInterface) GetgidCalls(stub func() int) {
+	fake.getgidMutex.Lock()
+	defer fake.getgidMutex.Unlock()
+	fake.GetgidStub = stub
+}
+
+func (fake *FakeOsInterface) GetgidReturns(result1 int) {
+	fake.getgidMutex.Lock()
+	defer fake.getgidMutex.Unlock()
+	fake.GetgidStub = nil
+	fake.getgidReturns = struct {
+		result1 int
+	}{result1}
+}
+
+func (fake *FakeOsInterface) GetgidReturnsOnCall(i int, result1 int) {
+	fake.getgidMutex.Lock()
+	defer fake.getgidMutex.Unlock()
+	fake.GetgidStub = nil
+	if fake.getgidReturnsOnCall == nil {
+		fake.getgidReturnsOnCall = make(map[int]struct {
+			result1 int
+		})
+	}
+	fake.getgidReturnsOnCall[i] = struct {
+		result1 int
+	}{result1}
+}
+
 func (fake *FakeOsInterface) Getpid() int {
 	fake.getpidMutex.Lock()
 	ret, specificReturn := fake.getpidReturnsOnCall[len(fake.getpidArgsForCall)]
@@ -359,6 +469,59 @@ func (fake *FakeOsInterface) GetpidReturnsOnCall(i int, result1 int) {
 		})
 	}
 	fake.getpidReturnsOnCall[i] = struct {
+		result1 int
+	}{result1}
+}
+
+func (fake *FakeOsInterface) Getuid() int {
+	fake.getuidMutex.Lock()
+	ret, specificReturn := fake.getuidReturnsOnCall[len(fake.getuidArgsForCall)]
+	fake.getuidArgsForCall = append(fake.getuidArgsForCall, struct {
+	}{})
+	stub := fake.GetuidStub
+	fakeReturns := fake.getuidReturns
+	fake.recordInvocation("Getuid", []interface{}{})
+	fake.getuidMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOsInterface) GetuidCallCount() int {
+	fake.getuidMutex.RLock()
+	defer fake.getuidMutex.RUnlock()
+	return len(fake.getuidArgsForCall)
+}
+
+func (fake *FakeOsInterface) GetuidCalls(stub func() int) {
+	fake.getuidMutex.Lock()
+	defer fake.getuidMutex.Unlock()
+	fake.GetuidStub = stub
+}
+
+func (fake *FakeOsInterface) GetuidReturns(result1 int) {
+	fake.getuidMutex.Lock()
+	defer fake.getuidMutex.Unlock()
+	fake.GetuidStub = nil
+	fake.getuidReturns = struct {
+		result1 int
+	}{result1}
+}
+
+func (fake *FakeOsInterface) GetuidReturnsOnCall(i int, result1 int) {
+	fake.getuidMutex.Lock()
+	defer fake.getuidMutex.Unlock()
+	fake.GetuidStub = nil
+	if fake.getuidReturnsOnCall == nil {
+		fake.getuidReturnsOnCall = make(map[int]struct {
+			result1 int
+		})
+	}
+	fake.getuidReturnsOnCall[i] = struct {
 		result1 int
 	}{result1}
 }
@@ -812,10 +975,16 @@ func (fake *FakeOsInterface) Invocations() map[string][][]interface{} {
 	defer fake.environMutex.RUnlock()
 	fake.executableMutex.RLock()
 	defer fake.executableMutex.RUnlock()
+	fake.exitMutex.RLock()
+	defer fake.exitMutex.RUnlock()
 	fake.getenvMutex.RLock()
 	defer fake.getenvMutex.RUnlock()
+	fake.getgidMutex.RLock()
+	defer fake.getgidMutex.RUnlock()
 	fake.getpidMutex.RLock()
 	defer fake.getpidMutex.RUnlock()
+	fake.getuidMutex.RLock()
+	defer fake.getuidMutex.RUnlock()
 	fake.isNotExistMutex.RLock()
 	defer fake.isNotExistMutex.RUnlock()
 	fake.mkdirAllMutex.RLock()

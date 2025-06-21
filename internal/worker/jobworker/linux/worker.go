@@ -105,7 +105,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	return worker
 }
 
-// StartJob starts a job with user namespace isolation
+// StartJob creates isolated job with user namespaces and cgroup limits
 func (w *Worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
@@ -119,7 +119,7 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	default:
 	}
 
-	// Validate command and arguments
+	// Validate input parameters before resource allocation
 	if err := w.processValidator.ValidateCommand(command); err != nil {
 		return nil, fmt.Errorf("invalid command: %w", err)
 	}
@@ -137,20 +137,20 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
 
-	// Create user namespace mapping
+	// Create unique UID mapping for job isolation
 	userMapping, err := w.userNamespaceManager.CreateUserMapping(ctx, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user mapping: %w", err)
 	}
 
-	// Setup cgroup resources
+	// Setup cgroup for resource limits (CPU/memory/IO)
 	if e := w.cgroup.Create(
 		job.CgroupPath,
 		job.Limits.MaxCPU,
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
-		// Cleanup user mapping on failure
+		// Cleanup on failure to prevent resource leaks
 		w.userNamespaceManager.CleanupUserMapping(jobID)
 		return nil, fmt.Errorf("cgroup setup failed: %w", e)
 	}

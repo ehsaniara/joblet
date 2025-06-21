@@ -48,11 +48,6 @@ type LaunchResult struct {
 	Error   error
 }
 
-// NamespaceJoiner defines the interface for joining network namespaces
-type NamespaceJoiner interface {
-	JoinNetworkNamespace(nsPath string) error
-}
-
 // NewLauncher creates a new process launcher
 func NewLauncher(
 	cmdFactory osinterface.CommandFactory,
@@ -69,7 +64,7 @@ func NewLauncher(
 	}
 }
 
-// LaunchProcess launches a process with the given configuration
+// LaunchProcess starts process with namespace isolation and proper cleanup on failure
 func (l *Launcher) LaunchProcess(ctx context.Context, config *LaunchConfig) (*LaunchResult, error) {
 	if config == nil {
 		return nil, fmt.Errorf("launch mapping.go cannot be nil")
@@ -90,7 +85,7 @@ func (l *Launcher) LaunchProcess(ctx context.Context, config *LaunchConfig) (*La
 
 	go l.launchInGoroutine(config, resultChan)
 
-	// Wait for the goroutine to complete with timeout
+	// Wait with timeout to prevent hanging on process start failures
 	select {
 	case result := <-resultChan:
 		if result.Error != nil {
@@ -269,156 +264,5 @@ func (l *Launcher) validateLaunchConfig(config *LaunchConfig) error {
 		}
 	}
 
-	return nil
-}
-
-// PrepareEnvironment prepares the environment variables for a job
-func (l *Launcher) PrepareEnvironment(baseEnv []string, jobEnvVars []string) []string {
-	if baseEnv == nil {
-		baseEnv = l.osInterface.Environ()
-	}
-
-	// Combine base environment with job-specific variables
-	return append(baseEnv, jobEnvVars...)
-}
-
-// BuildJobEnvironment builds environment variables for a specific job
-func (l *Launcher) BuildJobEnvironment(jobID, command, cgroupPath string, args []string, networkEnvVars []string) []string {
-	jobEnvVars := []string{
-		fmt.Sprintf("JOB_ID=%s", jobID),
-		fmt.Sprintf("JOB_COMMAND=%s", command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", cgroupPath),
-	}
-
-	// Add job arguments
-	for i, arg := range args {
-		jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-	jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARGS_COUNT=%d", len(args)))
-
-	// Add network environment variables if provided
-	if networkEnvVars != nil {
-		jobEnvVars = append(jobEnvVars, networkEnvVars...)
-	}
-
-	return jobEnvVars
-}
-
-// CreateSysProcAttr creates syscall process attributes for namespace isolation
-func (l *Launcher) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
-	sysProcAttr := l.syscall.CreateProcessGroup()
-
-	// Base namespaces that are always enabled
-	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // PID namespace ALWAYS isolated
-		syscall.CLONE_NEWNS | // Mount namespace ALWAYS isolated
-		syscall.CLONE_NEWIPC | // IPC namespace ALWAYS isolated
-		syscall.CLONE_NEWUTS | // UTS namespace ALWAYS isolated
-		syscall.CLONE_NEWCGROUP // Cgroup namespace MANDATORY
-
-	// Conditionally add network namespace
-	if enableNetworkNS {
-		sysProcAttr.Cloneflags |= syscall.CLONE_NEWNET
-	}
-
-	l.logger.Debug("created process attributes",
-		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
-		"networkNS", enableNetworkNS)
-
-	return sysProcAttr
-}
-
-// WaitForProcess waits for a process to complete with timeout
-func (l *Launcher) WaitForProcess(ctx context.Context, cmd osinterface.Command, timeout time.Duration) error {
-	if cmd == nil {
-		return fmt.Errorf("command cannot be nil")
-	}
-
-	if timeout <= 0 {
-		// No timeout, wait indefinitely
-		return cmd.Wait()
-	}
-
-	// Wait with timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(timeout):
-		return fmt.Errorf("process wait timeout after %v", timeout)
-	}
-}
-
-// GetProcessInfo returns information about a running process
-func (l *Launcher) GetProcessInfo(cmd osinterface.Command) (*Info, error) {
-	if cmd == nil {
-		return nil, fmt.Errorf("command cannot be nil")
-	}
-
-	process := cmd.Process()
-	if process == nil {
-		return nil, fmt.Errorf("process is nil")
-	}
-
-	return &Info{
-		PID:    int32(process.Pid()),
-		Status: "running", // We can enhance this with actual process status checking
-	}, nil
-}
-
-// Info contains information about a running process
-type Info struct {
-	PID    int32
-	Status string
-}
-
-// IsProcessRunning checks if a process is still running
-func (l *Launcher) IsProcessRunning(pid int32) bool {
-	if pid <= 0 {
-		return false
-	}
-
-	// Use kill(pid, 0) to check if process exists
-	err := l.syscall.Kill(int(pid), 0)
-	return err == nil
-}
-
-// KillProcess kills a process with the specified signal
-func (l *Launcher) KillProcess(pid int32, signal syscall.Signal) error {
-	if err := l.validator.ValidatePID(pid); err != nil {
-		return fmt.Errorf("invalid PID: %w", err)
-	}
-
-	log := l.logger.WithFields("pid", pid, "signal", signal)
-	log.Debug("killing process")
-
-	if err := l.syscall.Kill(int(pid), signal); err != nil {
-		return fmt.Errorf("failed to kill process %d with signal %v: %w", pid, signal, err)
-	}
-
-	log.Info("process killed successfully")
-	return nil
-}
-
-// KillProcessGroup kills a process group with the specified signal
-func (l *Launcher) KillProcessGroup(pid int32, signal syscall.Signal) error {
-	if err := l.validator.ValidatePID(pid); err != nil {
-		return fmt.Errorf("invalid PID: %w", err)
-	}
-
-	log := l.logger.WithFields("processGroup", pid, "signal", signal)
-	log.Debug("killing process group")
-
-	// Use negative PID to target the process group
-	if err := l.syscall.Kill(-int(pid), signal); err != nil {
-		return fmt.Errorf("failed to kill process group %d with signal %v: %w", pid, signal, err)
-	}
-
-	log.Info("process group killed successfully")
 	return nil
 }
