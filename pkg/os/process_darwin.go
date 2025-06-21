@@ -113,6 +113,7 @@ func (d *DefaultOs) Symlink(source string, path string) error {
 func (d *DefaultOs) Remove(script string) error {
 	return os.Remove(script)
 }
+
 func (d *DefaultOs) ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
@@ -143,6 +144,14 @@ func (d *DefaultOs) Getpid() int {
 
 func (d *DefaultOs) Exit(code int) {
 	os.Exit(code)
+}
+
+func (d *DefaultOs) Getuid() int {
+	return os.Getuid()
+}
+
+func (d *DefaultOs) Getgid() int {
+	return os.Getgid()
 }
 
 // DefaultExec implements interfaces.ExecInterface for jobinit

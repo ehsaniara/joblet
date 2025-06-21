@@ -81,15 +81,15 @@ func (j *darwinJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 func (j *darwinJobInitializer) ExecuteJob(config *JobConfig) error {
 	jobLogger := j.logger.WithField("jobId", config.JobID)
 
-	// Validate config
+	// Validate mapping.go
 	if config == nil {
-		j.logger.Error("job config cannot be nil")
-		return fmt.Errorf("job config cannot be nil")
+		j.logger.Error("job mapping.go cannot be nil")
+		return fmt.Errorf("job mapping.go cannot be nil")
 	}
 
 	if config.JobID == "" || config.Command == "" {
-		jobLogger.Error("invalid job config (macOS)", "command", config.Command)
-		return fmt.Errorf("invalid job config: jobID=%s, command=%s",
+		jobLogger.Error("invalid job mapping.go (macOS)", "command", config.Command)
+		return fmt.Errorf("invalid job mapping.go: jobID=%s, command=%s",
 			config.JobID, config.Command)
 	}
 
@@ -138,8 +138,8 @@ func (j *darwinJobInitializer) Run() error {
 
 	config, err := j.LoadConfigFromEnv()
 	if err != nil {
-		j.logger.Error("failed to load config", "error", err)
-		return fmt.Errorf("failed to load config: %w", err)
+		j.logger.Error("failed to load mapping.go", "error", err)
+		return fmt.Errorf("failed to load mapping.go: %w", err)
 	}
 
 	if e := j.ExecuteJob(config); e != nil {

@@ -2,7 +2,7 @@ REMOTE_HOST ?= 192.168.1.161
 REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/job-worker
 
-.PHONY: all clean cli worker init deploy-passwordless deploy-safe certs-local certs-remote-passwordless certs-download-admin certs-download-admin-simple certs-download-viewer live-log help setup-remote-passwordless setup-dev check-certs-remote service-status
+.PHONY: all clean cli worker init deploy-passwordless deploy-safe certs-local certs-remote-passwordless certs-download-admin certs-download-admin-simple certs-download-viewer live-log help setup-remote-passwordless setup-dev check-certs-remote service-status validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
 
 all: cli worker init
 
@@ -15,6 +15,13 @@ help:
 	@echo "  make worker            - Build job-worker binary for Linux"
 	@echo "  make init              - Build job-init binary for Linux"
 	@echo "  make clean             - Remove build artifacts"
+	@echo ""
+	@echo "User Namespace Setup:"
+	@echo "  make validate-user-namespaces  - Check user namespace support"
+	@echo "  make setup-user-namespaces     - Setup user namespace environment"
+	@echo "  make debug-user-namespaces     - Debug user namespace issues"
+	@echo "  make deploy-with-user-namespaces - Deploy with user namespace validation"
+	@echo "  make test-user-namespace-job   - Test job isolation"
 	@echo ""
 	@echo "Deployment targets:"
 	@echo "  make deploy-passwordless - Deploy without password (requires sudo setup)"
@@ -282,3 +289,143 @@ verify-cert-chain:
 		else \
 			echo "❌ Missing certificates for verification"; \
 		fi'
+
+validate-user-namespaces:
+	@echo "🔍 Validating user namespace support on $(REMOTE_HOST)..."
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
+		echo "📋 Checking kernel support..."; \
+		if [ ! -f /proc/self/ns/user ]; then \
+			echo "❌ User namespaces not supported by kernel"; \
+			exit 1; \
+		else \
+			echo "✅ User namespace kernel support detected"; \
+		fi; \
+		echo "📋 Checking user namespace limits..."; \
+		if [ -f /proc/sys/user/max_user_namespaces ]; then \
+			MAX_NS=$$(cat /proc/sys/user/max_user_namespaces); \
+			if [ "$$MAX_NS" = "0" ]; then \
+				echo "❌ User namespaces disabled (max_user_namespaces=0)"; \
+				exit 1; \
+			else \
+				echo "✅ User namespaces enabled (max: $$MAX_NS)"; \
+			fi; \
+		fi; \
+		echo "📋 Checking cgroup namespace support..."; \
+		if [ ! -f /proc/self/ns/cgroup ]; then \
+			echo "❌ Cgroup namespaces not supported by kernel"; \
+			exit 1; \
+		else \
+			echo "✅ Cgroup namespace kernel support detected"; \
+		fi; \
+		echo "📋 Checking cgroups v2..."; \
+		if [ ! -f /sys/fs/cgroup/cgroup.controllers ]; then \
+			echo "❌ Cgroups v2 not available"; \
+			exit 1; \
+		else \
+			echo "✅ Cgroups v2 detected"; \
+		fi; \
+		echo "📋 Checking subuid/subgid files..."; \
+		if [ ! -f /etc/subuid ]; then \
+			echo "❌ /etc/subuid not found"; \
+			exit 1; \
+		fi; \
+		if [ ! -f /etc/subgid ]; then \
+			echo "❌ /etc/subgid not found"; \
+			exit 1; \
+		fi; \
+		echo "📋 Checking job-worker user configuration..."; \
+		if ! grep -q "job-worker:" /etc/subuid; then \
+			echo "❌ job-worker not configured in /etc/subuid"; \
+			exit 1; \
+		fi; \
+		if ! grep -q "job-worker:" /etc/subgid; then \
+			echo "❌ job-worker not configured in /etc/subgid"; \
+			exit 1; \
+		fi; \
+		echo "✅ All user namespace requirements validated successfully!"'
+
+setup-user-namespaces:
+	@echo "🚀 Setting up user namespace environment on $(REMOTE_HOST)..."
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
+		echo "📋 Creating job-worker user if not exists..."; \
+		if ! id job-worker >/dev/null 2>&1; then \
+			echo "Creating job-worker user..."; \
+			sudo useradd -r -s /bin/false job-worker; \
+			echo "✅ job-worker user created"; \
+		else \
+			echo "✅ job-worker user already exists"; \
+		fi; \
+		echo "📋 Creating subuid/subgid files if needed..."; \
+		sudo touch /etc/subuid /etc/subgid; \
+		echo "📋 Setting up subuid/subgid ranges..."; \
+		if ! grep -q "^job-worker:" /etc/subuid 2>/dev/null; then \
+			echo "job-worker:100000:6553600" | sudo tee -a /etc/subuid; \
+			echo "✅ Added subuid entry for job-worker"; \
+		else \
+			echo "✅ subuid entry already exists for job-worker"; \
+		fi; \
+		if ! grep -q "^job-worker:" /etc/subgid 2>/dev/null; then \
+			echo "job-worker:100000:6553600" | sudo tee -a /etc/subgid; \
+			echo "✅ Added subgid entry for job-worker"; \
+		else \
+			echo "✅ subgid entry already exists for job-worker"; \
+		fi; \
+		echo "📋 Setting up cgroup permissions..."; \
+		sudo mkdir -p /sys/fs/cgroup; \
+		sudo chown job-worker:job-worker /sys/fs/cgroup 2>/dev/null || echo "Note: Could not change cgroup ownership (may be read-only)"; \
+		echo "✅ User namespace environment setup completed!"'
+
+debug-user-namespaces:
+	@echo "🔍 Debugging user namespace configuration on $(REMOTE_HOST)..."
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
+		echo "📋 Kernel configuration:"; \
+		echo "  /proc/sys/user/max_user_namespaces: $$(cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo \"not found\")"; \
+		echo "  /proc/sys/kernel/unprivileged_userns_clone: $$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo \"not found\")"; \
+		echo "📋 SubUID/SubGID configuration:"; \
+		echo "  /etc/subuid entries:"; \
+		cat /etc/subuid 2>/dev/null || echo "  File not found"; \
+		echo "  /etc/subgid entries:"; \
+		cat /etc/subgid 2>/dev/null || echo "  File not found"; \
+		echo "📋 Job-worker user info:"; \
+		id job-worker 2>/dev/null || echo "  job-worker user not found"; \
+		echo "📋 Service status:"; \
+		sudo systemctl status job-worker.service --no-pager --lines=5 2>/dev/null || echo "  Service not found"'
+
+deploy-with-user-namespaces: worker init
+	@echo "🚀 Deploying with user namespace validation to $(REMOTE_USER)@$(REMOTE_HOST)..."
+	@echo "📋 Validating remote user namespace support..."
+	@$(MAKE) validate-user-namespaces || (echo "❌ User namespace validation failed. Running setup..." && $(MAKE) setup-user-namespaces && $(MAKE) validate-user-namespaces)
+	@echo "📤 Uploading binaries..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/job-worker/build"
+	scp bin/job-worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/job-worker/build/
+	scp bin/job-init $(REMOTE_USER)@$(REMOTE_HOST):/tmp/job-worker/build/
+	@echo "🔧 Installing with user namespace support..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
+		sudo systemctl stop job-worker.service 2>/dev/null || echo "Service not running"; \
+		sudo cp /tmp/job-worker/build/* $(REMOTE_DIR)/; \
+		sudo chmod +x $(REMOTE_DIR)/*; \
+		sudo chown job-worker:job-worker $(REMOTE_DIR)/*; \
+		echo "Starting service..."; \
+		sudo systemctl start job-worker.service; \
+		echo "Checking service status..."; \
+		sleep 2; \
+		if sudo systemctl is-active job-worker.service >/dev/null; then \
+			echo "✅ Service started successfully with user namespace support"; \
+		else \
+			echo "❌ Service failed to start. Checking logs..."; \
+			sudo journalctl -u job-worker.service --no-pager --lines=10; \
+		fi'
+
+test-user-namespace-job: certs-download-admin-simple
+	@echo "🧪 Testing job execution with user namespace isolation..."
+	@echo "📋 Creating test jobs to verify isolation..."
+	./bin/cli --server $(REMOTE_HOST):50051 create whoami || echo "❌ Failed to create whoami job"
+	sleep 1
+	./bin/cli --server $(REMOTE_HOST):50051 create id || echo "❌ Failed to create id job"
+	sleep 1
+	./bin/cli --server $(REMOTE_HOST):50051 create "ps aux | head -10" || echo "❌ Failed to create ps job"
+	@echo "✅ Test jobs submitted. Check logs to verify each job runs with different UID:"
+	@echo "   Expected: Each job should run as different UID (100000+)"
+	@echo "   Expected: Jobs should not see each other's processes"
+	@echo "💡 View logs with: make live-log"
+

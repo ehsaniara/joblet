@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"syscall"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 
 const (
 	GracefulShutdownTimeout = 100 * time.Millisecond
-	ForceKillTimeout        = 5 * time.Second
 )
 
 // Cleaner handles process cleanup operations
@@ -45,16 +43,6 @@ type CleanupResult struct {
 	Method           string // "graceful", "forced", "already_dead"
 	Duration         time.Duration
 	Errors           []error
-}
-
-// CgroupCleaner defines the interface for cgroup cleanup operations
-type CgroupCleaner interface {
-	CleanupCgroup(jobID string)
-}
-
-// NamespaceCleaner defines the interface for namespace cleanup operations
-type NamespaceCleaner interface {
-	RemoveNamespace(nsPath string, isBound bool) error
 }
 
 // NewCleaner creates a new process cleaner
@@ -90,7 +78,7 @@ func (c *Cleaner) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cle
 		Errors: make([]error, 0),
 	}
 
-	// Step 1: Handle process termination
+	// Try graceful shutdown first (SIGTERM)
 	if req.PID > 0 {
 		processResult := c.cleanupProcessAndGroup(ctx, req)
 		result.ProcessKilled = processResult.Killed
@@ -100,7 +88,7 @@ func (c *Cleaner) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cle
 		}
 	}
 
-	// Step 2: Cleanup namespace if it's an isolated job
+	// Remove namespace files to prevent resource leaks
 	if req.IsIsolatedJob && req.NamespacePath != "" {
 		if err := c.cleanupNamespace(req.NamespacePath, false); err != nil {
 			log.Warn("failed to cleanup namespace", "path", req.NamespacePath, "error", err)
@@ -312,77 +300,4 @@ func (c *Cleaner) validateCleanupRequest(req *CleanupRequest) error {
 	}
 
 	return nil
-}
-
-// parseStringToInt safely parses a string to int
-func (c *Cleaner) parseStringToInt(s string) (int, error) {
-	var result int
-	var err error
-
-	// Integer parsing to avoid external dependencies
-	if len(s) == 0 {
-		return 0, fmt.Errorf("empty string")
-	}
-
-	for _, char := range s {
-		if char < '0' || char > '9' {
-			return 0, fmt.Errorf("invalid character in number: %c", char)
-		}
-		result = result*10 + int(char-'0')
-
-		// Prevent overflow
-		if result > 1000000 { // Reasonable PID limit
-			return 0, fmt.Errorf("number too large")
-		}
-	}
-
-	return result, err
-}
-
-// WaitForProcessDeath waits for a process to die with timeout
-func (c *Cleaner) WaitForProcessDeath(pid int32, timeout time.Duration) bool {
-	if timeout <= 0 {
-		timeout = ForceKillTimeout
-	}
-
-	deadline := time.Now().Add(timeout)
-
-	for time.Now().Before(deadline) {
-		if !c.isProcessAlive(pid) {
-			return true
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	return false
-}
-
-// GetProcessExitCode attempts to get the exit code of a completed process
-func (c *Cleaner) GetProcessExitCode(cmd osinterface.Command) (int32, error) {
-	if cmd == nil {
-		return -1, fmt.Errorf("command cannot be nil")
-	}
-
-	err := cmd.Wait()
-	if err == nil {
-		return 0, nil // Successful completion
-	}
-
-	// Try to extract exit code from error
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		return int32(exitErr.ExitCode()), nil
-	}
-
-	// Default to -1 for unknown errors
-	return -1, err
-}
-
-// IsProcessAlive checks if a process is still alive (public method)
-func (c *Cleaner) IsProcessAlive(pid int32) bool {
-	if pid <= 0 {
-		return false
-	}
-
-	return c.isProcessAlive(pid)
 }

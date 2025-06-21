@@ -290,7 +290,7 @@ export HOST_NETWORKING=true            # Enable host networking (default)
 # Use custom certificate directory
 ./bin/cli --cert-path=./custom-certs create echo "hello"
 
-# Override default server address in config
+# Override default server address in config.go
 export REMOTE_HOST=prod.example.com
 ./bin/cli create echo "hello"
 ```

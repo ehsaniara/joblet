@@ -13,6 +13,11 @@ type JobConfig struct {
 	Command    string
 	Args       []string
 	CgroupPath string
+
+	// User namespace configuration
+	UserNamespaceEnabled bool
+	NamespaceUID         uint32
+	NamespaceGID         uint32
 }
 
 // Run is the entry point that works on all platforms

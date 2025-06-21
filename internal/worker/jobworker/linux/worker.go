@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"job-worker/internal/worker/jobworker/linux/resource"
+	"job-worker/internal/worker/jobworker/linux/usernamespace"
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
@@ -22,30 +23,33 @@ import (
 
 var jobCounter int64
 
-// Worker handles job execution with host networking only
+// Worker handles job execution with user namespace isolation
 type Worker struct {
-	store            interfaces.Store
-	cgroup           interfaces.Resource
-	processLauncher  *process.Launcher
-	processCleaner   *process.Cleaner
-	processValidator *process.Validator
-	osInterface      osinterface.OsInterface
-	config           *Config
-	logger           *logger.Logger
+	store                interfaces.Store
+	cgroup               interfaces.Resource
+	userNamespaceManager usernamespace.UserNamespaceManager
+	processLauncher      *process.Launcher
+	processCleaner       *process.Cleaner
+	processValidator     *process.Validator
+	osInterface          osinterface.OsInterface
+	config               *Config
+	logger               *logger.Logger
 }
 
 // dependencies contains dependencies for Worker
 type dependencies struct {
-	Store            interfaces.Store
-	Cgroup           interfaces.Resource
-	ProcessLauncher  *process.Launcher
-	ProcessCleaner   *process.Cleaner
-	ProcessValidator *process.Validator
-	OsInterface      osinterface.OsInterface
-	Config           *Config
+	Store                interfaces.Store
+	Cgroup               interfaces.Resource
+	UserNamespaceManager usernamespace.UserNamespaceManager
+	ProcessLauncher      *process.Launcher
+	ProcessCleaner       *process.Cleaner
+	ProcessValidator     *process.Validator
+	OsInterface          osinterface.OsInterface
+	Config               *Config
 }
 
-// NewPlatformWorker creates a simplified Linux worker
+// NewPlatformWorker creates a Linux worker with user namespace isolation
+// Note: All platform requirements should be validated in main.go before calling this
 func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	// Create OS interfaces
 	osInterface := &osinterface.DefaultOs{}
@@ -61,44 +65,52 @@ func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
 	// Create resource management
 	cgroupResource := resource.New()
 
-	// Create configuration with cgroup namespace as prerequisite
-	config := DefaultConfigWithCgroupNamespace()
+	// Create user namespace manager
+	userNSConfig := usernamespace.DefaultUserNamespaceConfig()
+	userNSManager := usernamespace.NewUserNamespaceManager(userNSConfig, osInterface)
+
+	// Create configuration
+	config := DefaultConfigWithUserNamespaces()
 
 	deps := &dependencies{
-		Store:            store,
-		Cgroup:           cgroupResource,
-		ProcessLauncher:  processLauncher,
-		ProcessCleaner:   processCleaner,
-		ProcessValidator: processValidator,
-		OsInterface:      osInterface,
-		Config:           config,
+		Store:                store,
+		Cgroup:               cgroupResource,
+		UserNamespaceManager: userNSManager,
+		ProcessLauncher:      processLauncher,
+		ProcessCleaner:       processCleaner,
+		ProcessValidator:     processValidator,
+		OsInterface:          osInterface,
+		Config:               config,
 	}
 
 	worker := &Worker{
-		store:            deps.Store,
-		cgroup:           deps.Cgroup,
-		processLauncher:  deps.ProcessLauncher,
-		processCleaner:   deps.ProcessCleaner,
-		processValidator: deps.ProcessValidator,
-		osInterface:      deps.OsInterface,
-		config:           deps.Config,
-		logger:           logger.New().WithField("component", "linux-worker"),
+		store:                deps.Store,
+		cgroup:               deps.Cgroup,
+		userNamespaceManager: deps.UserNamespaceManager,
+		processLauncher:      deps.ProcessLauncher,
+		processCleaner:       deps.ProcessCleaner,
+		processValidator:     deps.ProcessValidator,
+		osInterface:          deps.OsInterface,
+		config:               deps.Config,
+		logger:               logger.New().WithField("component", "linux-worker"),
 	}
 
-	// Validate cgroup namespace support on startup
-	if err := worker.validateCgroupNamespaceSupport(); err != nil {
-		logger.Fatal("cgroup namespace support validation failed", "error", err)
-	}
+	// Log successful initialization (validation was done in main)
+	worker.logger.Info("Linux worker initialized with user namespace support",
+		"userNamespacesEnabled", config.UserNamespaceEnabled,
+		"cgroupNamespacesEnabled", true,
+		"baseUID", config.UserNamespaceConfig.BaseUID,
+		"maxJobs", config.UserNamespaceConfig.MaxJobs)
 
 	return worker
 }
 
-// StartJob starts a job with host networking (no isolation)
+// StartJob creates isolated job with user namespaces and cgroup limits
 func (w *Worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
-	log.Info("starting job with host networking")
+	log.Info("starting job with user namespace isolation")
 
 	// Early context check
 	select {
@@ -107,7 +119,7 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	default:
 	}
 
-	// Validate command and arguments
+	// Validate input parameters before resource allocation
 	if err := w.processValidator.ValidateCommand(command); err != nil {
 		return nil, fmt.Errorf("invalid command: %w", err)
 	}
@@ -125,21 +137,29 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
 
-	// Setup cgroup resources
+	// Create unique UID mapping for job isolation
+	userMapping, err := w.userNamespaceManager.CreateUserMapping(ctx, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user mapping: %w", err)
+	}
+
+	// Setup cgroup for resource limits (CPU/memory/IO)
 	if e := w.cgroup.Create(
 		job.CgroupPath,
 		job.Limits.MaxCPU,
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
+		// Cleanup on failure to prevent resource leaks
+		w.userNamespaceManager.CleanupUserMapping(jobID)
 		return nil, fmt.Errorf("cgroup setup failed: %w", e)
 	}
 
 	// Register job in store
 	w.store.CreateNewJob(job)
 
-	// Start the process with host networking
-	cmd, err := w.startProcess(ctx, job)
+	// Start the process with user namespace isolation
+	cmd, err := w.startProcessWithUserNamespace(ctx, job, userMapping)
 	if err != nil {
 		w.cleanupFailedJob(job)
 		return nil, fmt.Errorf("process start failed: %w", err)
@@ -151,11 +171,14 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Start monitoring
 	go w.monitorJob(ctx, cmd, job)
 
-	log.Info("job started successfully with host networking", "pid", job.Pid)
+	log.Info("job started successfully with user namespace isolation",
+		"pid", job.Pid,
+		"hostUID", userMapping.HostUID,
+		"namespaceUID", userMapping.NamespaceUID)
 	return job, nil
 }
 
-// StopJob stops a running job
+// StopJob stops a running job (updated to cleanup user namespaces)
 func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 	log := w.logger.WithField("jobID", jobID)
 	log.Info("stopping job")
@@ -174,7 +197,7 @@ func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 		JobID:           jobID,
 		PID:             job.Pid,
 		CgroupPath:      job.CgroupPath,
-		IsIsolatedJob:   false,
+		IsIsolatedJob:   true, // User namespace isolation
 		ForceKill:       false,
 		GracefulTimeout: w.config.GracefulShutdownTimeout,
 	}
@@ -191,11 +214,111 @@ func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 	// Cleanup cgroup
 	w.cgroup.CleanupCgroup(jobID)
 
+	// Cleanup user namespace mapping
+	if cleanupErr := w.userNamespaceManager.CleanupUserMapping(jobID); cleanupErr != nil {
+		log.Warn("failed to cleanup user namespace mapping", "error", cleanupErr)
+	}
+
 	log.Info("job stopped successfully", "method", result.Method)
 	return nil
 }
 
-// Private helper methods
+// startProcessWithUserNamespace starts a process with user namespace isolation
+func (w *Worker) startProcessWithUserNamespace(ctx context.Context, job *domain.Job, userMapping *usernamespace.UserMapping) (osinterface.Command, error) {
+	// Get job-init binary path
+	initPath, err := w.getJobInitPath()
+	if err != nil {
+		return nil, fmt.Errorf("job-init not found: %w", err)
+	}
+
+	// Prepare environment with user namespace info
+	env := w.buildJobEnvironmentWithUserNS(job, userMapping)
+
+	// Create process attributes WITH user namespace isolation
+	sysProcAttr := w.createUserNamespaceSysProcAttr()
+
+	// Configure user namespace mappings
+	sysProcAttr = w.userNamespaceManager.ConfigureSysProcAttr(sysProcAttr, userMapping)
+
+	// Create launch configuration
+	launchConfig := &process.LaunchConfig{
+		InitPath:      initPath,
+		Environment:   env,
+		SysProcAttr:   sysProcAttr,
+		Stdout:        New(w.store, job.Id),
+		Stderr:        New(w.store, job.Id),
+		NamespacePath: "",    // No separate network namespace needed
+		NeedsNSJoin:   false, // User namespace is created, not joined
+		JobID:         job.Id,
+		Command:       job.Command,
+		Args:          job.Args,
+	}
+
+	// Launch the process
+	result, err := w.processLauncher.LaunchProcess(ctx, launchConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.logger.Info("process launched with user namespace isolation",
+		"jobID", job.Id,
+		"pid", result.PID,
+		"hostUID", userMapping.HostUID,
+		"namespaceUID", userMapping.NamespaceUID)
+	return result.Command, nil
+}
+
+// buildJobEnvironmentWithUserNS builds environment with user namespace info
+func (w *Worker) buildJobEnvironmentWithUserNS(job *domain.Job, userMapping *usernamespace.UserMapping) []string {
+	baseEnv := w.osInterface.Environ()
+
+	// In cgroup namespace, the job's cgroup always appears at root
+	namespaceCgroupPath := "/sys/fs/cgroup"
+
+	// Job-specific environment with user namespace info
+	jobEnv := []string{
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", namespaceCgroupPath),
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		"HOST_NETWORKING=true",
+		"CGROUP_NAMESPACE=true",
+		"USER_NAMESPACE=true",
+		fmt.Sprintf("USER_NAMESPACE_UID=%d", userMapping.NamespaceUID),
+		fmt.Sprintf("USER_NAMESPACE_GID=%d", userMapping.NamespaceGID),
+		fmt.Sprintf("USER_HOST_UID=%d", userMapping.HostUID),
+		fmt.Sprintf("USER_HOST_GID=%d", userMapping.HostGID),
+	}
+
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+
+	return append(baseEnv, jobEnv...)
+}
+
+// createUserNamespaceSysProcAttr creates syscall attributes with user namespaces
+func (w *Worker) createUserNamespaceSysProcAttr() *syscall.SysProcAttr {
+	sysProcAttr := &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWPID | // PID namespace isolation
+			syscall.CLONE_NEWNS | // Mount namespace isolation
+			syscall.CLONE_NEWIPC | // IPC namespace isolation
+			syscall.CLONE_NEWUTS | // UTS namespace isolation
+			syscall.CLONE_NEWCGROUP | // Cgroup namespace isolation (mandatory)
+			syscall.CLONE_NEWUSER, // User namespace isolation
+		Setpgid: true,
+	}
+
+	w.logger.Debug("created user namespace process attributes",
+		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
+		"userNamespace", true)
+
+	return sysProcAttr
+}
+
+// Helper methods
 func (w *Worker) getNextJobID() string {
 	nextID := atomic.AddInt64(&jobCounter, 1)
 	return fmt.Sprintf("%d", nextID)
@@ -225,92 +348,7 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 		Status:     domain.StatusInitializing,
 		CgroupPath: w.config.BuildCgroupPath(jobID),
 		StartTime:  time.Now(),
-		// No network fields
 	}
-}
-
-func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface.Command, error) {
-	// Get job-init binary path
-	initPath, err := w.getJobInitPath()
-	if err != nil {
-		return nil, fmt.Errorf("job-init not found: %w", err)
-	}
-
-	// Prepare environment (no network environment)
-	env := w.buildJobEnvironment(job)
-
-	// Create process attributes with NO network namespace isolation
-	sysProcAttr := &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWPID | // PID namespace isolation
-			syscall.CLONE_NEWNS | // Mount namespace isolation
-			syscall.CLONE_NEWIPC | // IPC namespace isolation
-			syscall.CLONE_NEWUTS, // UTS namespace isolation
-		Setpgid: true,
-	}
-
-	// Create launch configuration
-	launchConfig := &process.LaunchConfig{
-		InitPath:      initPath,
-		Environment:   env,
-		SysProcAttr:   sysProcAttr,
-		Stdout:        New(w.store, job.Id),
-		Stderr:        New(w.store, job.Id),
-		NamespacePath: "",    // No namespace path needed
-		NeedsNSJoin:   false, // No namespace joining
-		JobID:         job.Id,
-		Command:       job.Command,
-		Args:          job.Args,
-	}
-
-	// Launch the process
-	result, err := w.processLauncher.LaunchProcess(ctx, launchConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	w.logger.Info("process launched with host networking", "jobID", job.Id, "pid", result.PID)
-	return result.Command, nil
-}
-
-func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
-	baseEnv := w.osInterface.Environ()
-
-	// In cgroup namespace, the job's cgroup always appears at root
-	namespaceCgroupPath := "/sys/fs/cgroup"
-
-	// Job-specific environment
-	jobEnv := []string{
-		fmt.Sprintf("JOB_ID=%s", job.Id),
-		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", namespaceCgroupPath), // Namespace path
-		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
-		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		"HOST_NETWORKING=true",
-		"CGROUP_NAMESPACE=true", // cgroup namespace is active
-	}
-
-	// Add job arguments
-	for i, arg := range job.Args {
-		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-
-	return append(baseEnv, jobEnv...)
-}
-
-// Validate cgroup namespace support at startup
-func (w *Worker) validateCgroupNamespaceSupport() error {
-	// Check kernel support
-	if _, err := w.osInterface.Stat("/proc/self/ns/cgroup"); err != nil {
-		return fmt.Errorf("cgroup namespaces not supported by kernel: %w", err)
-	}
-
-	// Check cgroup v2 support
-	if _, err := w.osInterface.Stat("/sys/fs/cgroup/cgroup.controllers"); err != nil {
-		return fmt.Errorf("cgroups v2 not available: %w", err)
-	}
-
-	w.logger.Info("cgroup namespace support validated")
-	return nil
 }
 
 func (w *Worker) getJobInitPath() (string, error) {
@@ -398,6 +436,11 @@ func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *d
 	// Cleanup cgroup
 	w.cgroup.CleanupCgroup(job.Id)
 
+	// Cleanup user namespace mapping
+	if cleanupErr := w.userNamespaceManager.CleanupUserMapping(job.Id); cleanupErr != nil {
+		log.Warn("failed to cleanup user namespace mapping during monitoring", "error", cleanupErr)
+	}
+
 	log.Info("job monitoring completed",
 		"finalStatus", finalStatus,
 		"exitCode", exitCode,
@@ -414,6 +457,11 @@ func (w *Worker) cleanupFailedJob(job *domain.Job) {
 	}
 	w.store.UpdateJob(failedJob)
 	w.cgroup.CleanupCgroup(job.Id)
+
+	// Cleanup user namespace mapping for failed job
+	if cleanupErr := w.userNamespaceManager.CleanupUserMapping(job.Id); cleanupErr != nil {
+		w.logger.Warn("failed to cleanup user namespace mapping for failed job", "jobID", job.Id, "error", cleanupErr)
+	}
 }
 
 func (w *Worker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {

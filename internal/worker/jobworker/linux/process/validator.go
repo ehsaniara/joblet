@@ -37,20 +37,6 @@ func NewValidationError(field string, value interface{}, message string) error {
 	}
 }
 
-// LaunchRequest represents a process launch request
-type LaunchRequest struct {
-	Command        string
-	Args           []string
-	MaxCPU         int32
-	MaxMemory      int32
-	MaxIOBPS       int32
-	NetworkGroupID string
-	JobID          string
-	InitPath       string
-	Environment    []string
-	CgroupPath     string
-}
-
 // NewValidator creates a new process validator
 func NewValidator(osInterface osinterface.OsInterface, execInterface osinterface.ExecInterface) *Validator {
 	return &Validator{
@@ -60,67 +46,13 @@ func NewValidator(osInterface osinterface.OsInterface, execInterface osinterface
 	}
 }
 
-// ValidateLaunchRequest validates a process launch request
-func (v *Validator) ValidateLaunchRequest(req *LaunchRequest) error {
-	if req == nil {
-		return fmt.Errorf("launch request cannot be nil")
-	}
-
-	log := v.logger.WithField("jobID", req.JobID)
-	log.Debug("validating launch request")
-
-	// Validate command
-	if err := v.ValidateCommand(req.Command); err != nil {
-		return fmt.Errorf("command validation failed: %w", err)
-	}
-
-	// Validate arguments
-	if err := v.ValidateArguments(req.Args); err != nil {
-		return fmt.Errorf("arguments validation failed: %w", err)
-	}
-
-	// Validate resource limits
-	if err := v.ValidateResourceLimits(req.MaxCPU, req.MaxMemory, req.MaxIOBPS); err != nil {
-		return fmt.Errorf("resource limits validation failed: %w", err)
-	}
-
-	// Validate job ID
-	if err := v.ValidateJobID(req.JobID); err != nil {
-		return fmt.Errorf("job ID validation failed: %w", err)
-	}
-
-	// Validate network group ID if provided
-	if req.NetworkGroupID != "" {
-		if err := v.ValidateNetworkGroupID(req.NetworkGroupID); err != nil {
-			return fmt.Errorf("network group ID validation failed: %w", err)
-		}
-	}
-
-	// Validate init path if provided
-	if req.InitPath != "" {
-		if err := v.ValidateInitPath(req.InitPath); err != nil {
-			return fmt.Errorf("init path validation failed: %w", err)
-		}
-	}
-
-	// Validate cgroup path if provided
-	if req.CgroupPath != "" {
-		if err := v.ValidateCgroupPath(req.CgroupPath); err != nil {
-			return fmt.Errorf("cgroup path validation failed: %w", err)
-		}
-	}
-
-	log.Debug("launch request validation passed")
-	return nil
-}
-
-// ValidateCommand validates a command string
+// ValidateCommand checks for security issues and length limits
 func (v *Validator) ValidateCommand(command string) error {
 	if command == "" {
 		return NewValidationError("command", command, "command cannot be empty")
 	}
 
-	// Check for dangerous characters
+	// Prevent shell injection attacks
 	if strings.ContainsAny(command, ";&|`$()") {
 		return NewValidationError("command", command, "command contains dangerous characters")
 	}
@@ -208,27 +140,6 @@ func (v *Validator) ValidateJobID(jobID string) error {
 	return nil
 }
 
-// ValidateNetworkGroupID validates a network group ID
-func (v *Validator) ValidateNetworkGroupID(groupID string) error {
-	if len(groupID) > 64 {
-		return NewValidationError("networkGroupID", groupID,
-			"network group ID too long (max 64 characters)")
-	}
-
-	// Check for valid characters (alphanumeric, dash, underscore)
-	for _, char := range groupID {
-		if !((char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '-' || char == '_') {
-			return NewValidationError("networkGroupID", groupID,
-				"network group ID contains invalid characters")
-		}
-	}
-
-	return nil
-}
-
 // ValidateInitPath validates the job-init binary path
 func (v *Validator) ValidateInitPath(initPath string) error {
 	if initPath == "" {
@@ -293,7 +204,7 @@ func (v *Validator) ValidateCgroupPath(cgroupPath string) error {
 	return nil
 }
 
-// ResolveCommand resolves a command to its full path
+// ResolveCommand finds executable path using PATH and common locations
 func (v *Validator) ResolveCommand(command string) (string, error) {
 	if command == "" {
 		return "", fmt.Errorf("command cannot be empty")
@@ -311,13 +222,13 @@ func (v *Validator) ResolveCommand(command string) (string, error) {
 		return command, nil
 	}
 
-	// Try to resolve using PATH
+	// Try PATH resolution first (most common case)
 	if resolvedPath, err := v.execInterface.LookPath(command); err == nil {
 		log.Debug("resolved command via PATH", "resolved", resolvedPath)
 		return resolvedPath, nil
 	}
 
-	// Try common paths
+	// Fallback to common system directories
 	commonPaths := []string{
 		filepath.Join("/bin", command),
 		filepath.Join("/usr/bin", command),
@@ -379,49 +290,4 @@ func (v *Validator) ValidatePID(pid int32) error {
 	}
 
 	return nil
-}
-
-// ValidateSignal validates a signal number
-func (v *Validator) ValidateSignal(signal int) error {
-	// Valid signal range in Unix systems
-	if signal < 1 || signal > 64 {
-		return NewValidationError("signal", signal, "invalid signal number (1-64)")
-	}
-
-	return nil
-}
-
-// SanitizeCommand sanitizes a command string for logging
-func (v *Validator) SanitizeCommand(command string) string {
-	// Remove potentially sensitive information for logging
-	if len(command) > 100 {
-		return command[:97] + "..."
-	}
-	return command
-}
-
-// SanitizeArgs sanitizes arguments for logging
-func (v *Validator) SanitizeArgs(args []string) []string {
-	if len(args) == 0 {
-		return args
-	}
-
-	sanitized := make([]string, len(args))
-	for i, arg := range args {
-		if len(arg) > 50 {
-			sanitized[i] = arg[:47] + "..."
-		} else {
-			sanitized[i] = arg
-		}
-	}
-
-	// Limit number of args shown
-	if len(sanitized) > 10 {
-		result := make([]string, 11)
-		copy(result, sanitized[:10])
-		result[10] = fmt.Sprintf("... (%d more)", len(sanitized)-10)
-		return result
-	}
-
-	return sanitized
 }
