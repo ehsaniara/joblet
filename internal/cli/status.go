@@ -10,18 +10,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newGetCmd() *cobra.Command {
+func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <job-id>",
-		Short: "Get a job by ID",
+		Use:   "status <job-id>",
+		Short: "Get the status of a job by ID",
 		Args:  cobra.ExactArgs(1),
-		RunE:  runGet,
+		RunE:  runStatus,
 	}
 
 	return cmd
 }
 
-func runGet(cmd *cobra.Command, args []string) error {
+func runStatus(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 
 	jobClient, err := client.NewJobClient(cfg.ServerAddr)
@@ -33,9 +33,9 @@ func runGet(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	response, err := jobClient.GetJob(ctx, jobID)
+	response, err := jobClient.GetJobStatus(ctx, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get job: %v", err)
+		return fmt.Errorf("failed to get job status: %v", err)
 	}
 
 	fmt.Printf("Id: %s\n", response.Id)

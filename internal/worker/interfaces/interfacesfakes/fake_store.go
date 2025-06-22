@@ -120,7 +120,7 @@ func (fake *FakeStore) GetJob(arg1 string) (*domain.Job, bool) {
 	}{arg1})
 	stub := fake.GetJobStub
 	fakeReturns := fake.getJobReturns
-	fake.recordInvocation("GetJob", []interface{}{arg1})
+	fake.recordInvocation("GetJobStatus", []interface{}{arg1})
 	fake.getJobMutex.Unlock()
 	if stub != nil {
 		return stub(arg1)

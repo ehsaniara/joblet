@@ -8,10 +8,10 @@ import (
 
 // GrpcStreamAdapter adapts gRPC stream to domain interface
 type GrpcStreamAdapter struct {
-	stream pb.JobService_GetJobsStreamServer
+	stream pb.JobService_GetJobLogsServer
 }
 
-func NewGrpcStreamAdapter(stream pb.JobService_GetJobsStreamServer) interfaces.DomainStreamer {
+func NewGrpcStreamAdapter(stream pb.JobService_GetJobLogsServer) interfaces.DomainStreamer {
 	return &GrpcStreamAdapter{stream: stream}
 }
 

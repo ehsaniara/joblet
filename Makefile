@@ -179,7 +179,7 @@ setup-remote-passwordless: certs-remote-passwordless deploy-passwordless
 	@echo ""
 	@echo "📥 Next steps:"
 	@echo "   make certs-download-admin-simple  # Download admin certificates"
-	@echo "   ./bin/cli --server $(REMOTE_HOST):50051 --cert certs/client-cert.pem --key certs/client-key.pem create echo 'Hello World'"
+	@echo "   ./bin/cli --server $(REMOTE_HOST):50051 --cert certs/client-cert.pem --key certs/client-key.pem run echo 'Hello World'"
 
 setup-dev: certs-local all
 	@echo "🎉 Development setup complete!"
@@ -188,7 +188,7 @@ setup-dev: certs-local all
 	@echo ""
 	@echo "🚀 To test locally:"
 	@echo "   ./bin/job-worker  # Start server"
-	@echo "   ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem create echo 'Hello World'"
+	@echo "   ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo 'Hello World'"
 
 check-certs-remote:
 	@echo "🔍 Checking certificate status on $(REMOTE_USER)@$(REMOTE_HOST)..."
@@ -419,13 +419,12 @@ deploy-with-user-namespaces: worker init
 test-user-namespace-job: certs-download-admin-simple
 	@echo "🧪 Testing job execution with user namespace isolation..."
 	@echo "📋 Creating test jobs to verify isolation..."
-	./bin/cli --server $(REMOTE_HOST):50051 create whoami || echo "❌ Failed to create whoami job"
+	./bin/cli --server $(REMOTE_HOST):50051 run whoami || echo "❌ Failed to run whoami job"
 	sleep 1
-	./bin/cli --server $(REMOTE_HOST):50051 create id || echo "❌ Failed to create id job"
+	./bin/cli --server $(REMOTE_HOST):50051 run id || echo "❌ Failed to run id job"
 	sleep 1
-	./bin/cli --server $(REMOTE_HOST):50051 create "ps aux | head -10" || echo "❌ Failed to create ps job"
+	./bin/cli --server $(REMOTE_HOST):50051 run "ps aux | head -10" || echo "❌ Failed to run ps job"
 	@echo "✅ Test jobs submitted. Check logs to verify each job runs with different UID:"
 	@echo "   Expected: Each job should run as different UID (100000+)"
 	@echo "   Expected: Jobs should not see each other's processes"
 	@echo "💡 View logs with: make live-log"
-

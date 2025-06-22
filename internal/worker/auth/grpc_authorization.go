@@ -23,7 +23,7 @@ const (
 type Operation string
 
 const (
-	CreateJobOp  Operation = "create_job"
+	RunJobOp     Operation = "run_job"
 	GetJobOp     Operation = "get_job"
 	StopJobOp    Operation = "stop_job"
 	ListJobsOp   Operation = "list_jobs"
@@ -81,7 +81,7 @@ func (s *grpcAuthorization) isOperationAllowed(role ClientRole, operation Operat
 		switch operation {
 		case GetJobOp, ListJobsOp, StreamJobsOp:
 			return true
-		case CreateJobOp, StopJobOp:
+		case RunJobOp, StopJobOp:
 			return false
 		default:
 			return false
