@@ -10,15 +10,25 @@ import (
 	"syscall"
 	"time"
 	"worker/internal/config"
-	"worker/internal/worker/interfaces"
 	"worker/pkg/logger"
 )
+
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
+//counterfeiter:generate . Resource
+type Resource interface {
+	Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error
+	SetIOLimit(cgroupPath string, ioBPS int) error
+	SetCPULimit(cgroupPath string, cpuLimit int) error
+	SetMemoryLimit(cgroupPath string, memoryLimitMB int) error
+	CleanupCgroup(jobID string)
+}
 
 type cgroup struct {
 	logger *logger.Logger
 }
 
-func New() interfaces.Resource {
+func New() Resource {
 	return &cgroup{
 		logger: logger.New(),
 	}

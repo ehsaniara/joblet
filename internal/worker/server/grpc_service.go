@@ -9,8 +9,9 @@ import (
 	pb "worker/api/gen"
 	"worker/internal/worker/adapters"
 	auth2 "worker/internal/worker/auth"
-	"worker/internal/worker/interfaces"
+	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/mappers"
+	"worker/internal/worker/store"
 	_errors "worker/pkg/errors"
 	"worker/pkg/logger"
 )
@@ -18,12 +19,12 @@ import (
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth      auth2.GrpcAuthorization
-	jobStore  interfaces.Store
+	jobStore  store.Store
 	jobWorker interfaces.Worker
 	logger    *logger.Logger
 }
 
-func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore interfaces.Store, jobWorker interfaces.Worker) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore store.Store, jobWorker interfaces.Worker) *JobServiceServer {
 	return &JobServiceServer{
 		auth:      auth,
 		jobStore:  jobStore,

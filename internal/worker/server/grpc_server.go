@@ -11,7 +11,8 @@ import (
 	pb "worker/api/gen"
 	"worker/internal/config"
 	auth2 "worker/internal/worker/auth"
-	"worker/internal/worker/interfaces"
+	"worker/internal/worker/core/interfaces"
+	"worker/internal/worker/store"
 	"worker/pkg/logger"
 )
 
@@ -23,7 +24,7 @@ const (
 	serverAddress = "0.0.0.0:50051"
 )
 
-func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.Worker) (*grpc.Server, error) {
+func StartGRPCServer(jobStore store.Store, jobWorker interfaces.Worker) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 
 	serverLogger.Info("initializing gRPC server", "address", serverAddress, "tlsEnabled", true)

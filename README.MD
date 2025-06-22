@@ -6,588 +6,274 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/release/ehsaniara/worker.svg)](https://github.com/ehsaniara/worker/releases/latest)
 
-Worker is a high-performance distributed task / job execution system built in Go that provides secure remote command
-execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated
-gRPC-based architecture with mutual TLS authentication and role-based authorization, allowing administrators to securely
-execute arbitrary commands on remote Linux systems while enforcing strict CPU, memory, and I/O bandwidth limits through
-Linux cgroups v2. Jobs run in isolated process namespaces (PID, mount, IPC, UTS) while utilizing host networking for
-maximum compatibility and performance.
+A secure distributed job execution system that lets you run commands on remote Linux servers with resource limits and
+real-time monitoring.
 
 ![worker-thum.png](docs/worker-thum.png)
 
-> The system features a two-stage execution model with a specialized job-init binary that handles proper namespace setup
-> and resource isolation, while the main worker service provides real-time log streaming, job lifecycle management, and
-> automatic cleanup. A full-featured CLI client enables easy job creation, monitoring, and management, with support for
-> streaming live output from running jobs. The architecture is designed for production environments requiring secure,
-> isolated execution of workloads with precise resource controls, making it ideal for distributed computing, CI/CD
-> pipelines, or any scenario where secure remote job execution with resource guarantees is needed.
+## Why Worker vs Docker/Kubernetes?
 
-## Beyond Containers: Process-Native Job Execution
+### Performance Advantages
 
-### Target Markets:
+- **⚡ Faster Startup**: Sub-second cold starts vs Docker's seconds
+- **🪶 Lower Resource Overhead**: No container runtime tax or image layers
+- **🎯 Direct Process Execution**: Native Linux processes, not containerized abstractions
+- **🌐 Host Networking**: Maximum network performance without virtual networking overhead
 
-* Serverless/FaaS Providers - Lambda alternatives with better performance
-* Batch Processing Systems - ETL pipelines, data processing platforms
-* Development Tools - Code execution environments, online IDEs
-* CI/CD Platform Builders - Jenkins alternatives, GitHub Actions runners
+### Operational Simplicity
 
-🎯
+- **📦 No Images Required**: Execute commands directly without building/managing container images
+- **🔧 Minimal Dependencies**: Just the Worker binary and certificates - no Docker daemon or Kubernetes cluster
+- **⚡ Instant Deployment**: No image pulls, registries, or orchestration complexity
+- **💡 Simple Debugging**: Direct process access, standard Linux tooling works immediately
 
-- **For Serverless:** "True sub-second cold starts with enterprise security"
-- **For Batch Processing:** "Precise resource control without container tax"
-- **For Edge Computing:** "Full job isolation in minimal footprint environments"
-- **For CI/CD:** "Execute build steps with container-grade isolation but process-level performance"
+### Resource Efficiency
 
-## ✨ Key Features
+- **💾 Memory Efficient**: Process-level isolation without container memory overhead
+- **🏎️ CPU Efficiency**: No virtualization layer between your code and the CPU
+- **📊 Precise Control**: Direct cgroups v2 integration for exact resource limits
+- **🧹 Automatic Cleanup**: No orphaned containers or dangling images
 
-- 🔒 **Secure Remote Execution** - Mutual TLS authentication with role-based authorization (admin/viewer roles)
-- 🎛️ **Advanced Resource Management** - CPU, memory, and I/O bandwidth limiting via Linux cgroups v2
-- 📡 **Real-time Streaming** - Live output streaming of job execution logs with buffering
-- 🔐 **Process Isolation** - PID, mount, IPC, and UTS namespace isolation with containerized execution
-- 🌐 **Host Networking** - Jobs use host network interface for maximum compatibility and performance
-- ⚡ **High-Performance gRPC API** - Protocol buffer serialization with configurable message limits
-- 📊 **Two-Stage Execution Architecture** - Dedicated job-init binary ensures proper resource isolation and namespace
-  setup
-- 🏗️ **Advanced Process Management** - Full /proc remounting and private mount propagation
-- 📈 **Comprehensive Monitoring** - Job status tracking, resource usage monitoring, and real-time subscriber management
-- 🔄 **Robust Error Handling** - Graceful shutdown, emergency cleanup, and process group management
+### Security Benefits
 
-## 🚀 Quick Start
+- **🔒 Process-Native Isolation**: Linux namespaces without container attack surface
+- **🛡️ Mutual TLS**: Built-in secure authentication, no separate network policies needed
+- **🎭 Role-Based Access**: Simple admin/viewer permissions vs complex RBAC configurations
+- **🔐 Certificate Management**: Straightforward PKI vs Kubernetes secret management
+- **🔑 Fine-Grained Authorization**: Operation-level permissions with certificate-based roles
 
-### Prerequisites
+### Authorization Layer
 
-**System Requirements:**
-
-- **Kernel**: Linux 4.6+ (for cgroup namespace support)
-- **Cgroups**: cgroups v2 enabled and mounted at /sys/fs/cgroup
-- **Namespaces**: Cgroup namespace support in kernel
-- **Root Access**: Required for cgroup management and namespace operations
-
-## 📖 Usage Examples
-
-### Basic Job Management
-
-```bash
-# Run simple jobs (all use host networking)
-./bin/cli run echo "Hello, World!"
-./bin/cli run python3 script.py
-./bin/cli run bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
-
-# List all jobs with status breakdown
-./bin/cli list
-
-# Get detailed job status information
-./bin/cli status <job-id>
-
-# Stop a running job (graceful SIGTERM, then SIGKILL)
-./bin/cli stop <job-id>
-
-# Stream live job output with real-time updates
-./bin/cli log <job-id>
-```
-
-### Resource-Limited Jobs
-
-```bash
-# Limit CPU usage to 50% of one core
-./bin/cli run --max-cpu=50 python3 heavy_computation.py
-
-# Limit memory usage to 512 MB
-./bin/cli run --max-memory=512 java -jar memory-intensive-app.jar
-
-# Limit I/O bandwidth (bytes per second)
-./bin/cli run --max-iobps=1000000 dd if=/dev/zero of=/tmp/test bs=1M count=100
-
-# Combine multiple resource limits
-./bin/cli run --max-cpu=25 --max-memory=256 --max-iobps=1000000 intensive-task.sh
-```
-
-### Advanced Job Scenarios
-
-All jobs share the host network interface and can communicate with each other and external services directly:
-
-```bash
-# Network-accessible job (uses host networking)
-./bin/cli run --max-cpu=100 --max-memory=1024 python3 -c "
-import socket
-import time
-s = socket.socket()
-s.bind(('0.0.0.0', 8080))
-s.listen(5)
-print('Server listening on host port 8080')
-for i in range(60):
-    print(f'Iteration {i}: Server running...')
-    time.sleep(1)
-"
-
-# Job that can access external services
-./bin/cli run curl -s https://api.github.com/users/octocat
-
-# Job with complex command line arguments
-./bin/cli run bash -c "echo 'Network test:' && curl -s ifconfig.me && echo '' && echo 'Finished at:' && date"
-```
-
-### Remote Server Management
-
-```bash
-# Deploy to production server (safe with password prompt)
-make deploy-safe REMOTE_HOST=prod.example.com REMOTE_USER=admin
-
-# Deploy with passwordless sudo (requires setup)
-make deploy-passwordless REMOTE_HOST=prod.example.com
-
-# Monitor service status
-make service-status REMOTE_HOST=prod.example.com
-
-# View live service logs
-make live-log REMOTE_HOST=prod.example.com
-
-# Check certificate status
-make check-certs-remote REMOTE_HOST=prod.example.com
-```
-
-## 🏗️ Architecture
-
-The Job Worker system uses a sophisticated multi-component architecture designed for security, isolation, and
-performance with host networking:
-
-### Core Components
-
-**Worker Service (`cmd/worker/main.go`)**
-
-- Main gRPC server handling job execution and management
-- Advanced resource management via cgroups v2
-- Real-time job monitoring and status tracking
-- All jobs use host networking for maximum compatibility
-
-**CLI Client (`cmd/cli/`)**
-
-- Command-line interface with full feature support
-- TLS certificate management and authentication
-- Real-time streaming capabilities
-- Comprehensive job management commands
-
-**Job-Init Binary (`cmd/job-init/main.go`)**
-
-- Specialized initialization binary for process isolation
-- Namespace setup (PID, mount, IPC, UTS) - **Network namespace uses host**
-- Cgroup membership management
-- Platform-specific execution handling
-
-**gRPC API Layer**
-
-- High-performance Protocol Buffer serialization
-- Mutual TLS with certificate-based authentication
-- Role-based access control (admin/viewer)
-- Streaming support for real-time log output
-
-**Store & Task Management (`internal/worker/store/`)**
-
-- In-memory job state management with thread safety
-- Real-time subscriber management for log streaming
-- Advanced buffering and update distribution
-- Automatic cleanup for completed jobs
-
-**Resource Manager (`internal/worker/resource/`)**
-
-- Linux cgroups v2 integration
-- CPU, memory, and I/O bandwidth limiting
-- Automatic cgroup cleanup and process termination
-- Graceful and forced job termination
-
-### Process Isolation Features
-
-The system provides comprehensive process isolation while maintaining host networking:
-
-**Namespace Isolation:**
-
-- **PID Namespace**: Jobs see only their own process tree
-- **Mount Namespace**: Isolated filesystem view with /proc remounting
-- **IPC Namespace**: Separate inter-process communication
-- **UTS Namespace**: Isolated hostname and domain name
-- **Network**: Uses host networking (no network namespace isolation)
-
-**Verification Example:**
-
-```bash
-# Run a long-running job
-./bin/cli run sleep 300
-
-# Run a process listing job
-./bin/cli run ps aux
-
-# View the second job's output - only its own processes are visible
-./bin/cli log <job-2-id>
-```
-
-Output shows process isolation with host networking:
-
-```
-USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-root           1  0.0  0.0  10044  1584 ?        R    08:56   0:00 /usr/bin/ps aux
-```
-
-The job can access the host network:
-
-```bash
-# Test network connectivity (uses host network interface)
-./bin/cli run curl -s ifconfig.me
-```
-
-## 🔐 Security & Authentication
-
-### Certificate-Based Authentication
-
-The system implements mutual TLS with sophisticated role-based access control:
+Worker implements a sophisticated role-based authorization system that's simpler than Kubernetes RBAC:
 
 | Role       | Run Jobs | View Jobs | Stop Jobs | Stream Logs | Certificate OU |
 |------------|----------|-----------|-----------|-------------|----------------|
 | **Admin**  | ✅        | ✅         | ✅         | ✅           | `OU=admin`     |
 | **Viewer** | ❌        | ✅         | ❌         | ✅           | `OU=viewer`    |
 
-### Certificate Management
+**Authorization Features:**
+
+- **Certificate-Based Roles**: Roles embedded in X.509 certificate Organizational Unit (OU) field
+- **Operation-Level Control**: Each API operation checked against user role
+- **Automatic Role Detection**: System automatically extracts role from client certificates
+- **Case-Insensitive**: Role matching works regardless of case (ADMIN, admin, Admin)
+- **Secure by Default**: Unknown roles are denied all operations
+- **No External Dependencies**: No need for external identity providers or complex policy engines
+
+**vs Kubernetes RBAC:**
+
+- **Simpler Setup**: 2 roles vs dozens of K8s roles/bindings
+- **Certificate Integration**: Built into TLS authentication vs separate service accounts
+- **No YAML Configuration**: Role permissions are code-defined, not configuration-managed
+- **Immediate Effect**: No need to restart services or wait for policy propagation
+
+### Use Case Advantages
+
+| Scenario                 | Worker                     | Docker/K8s                             |
+|--------------------------|----------------------------|----------------------------------------|
+| **CI/CD Builds**         | Instant job start          | Image build + container start overhead |
+| **Serverless Functions** | Sub-second cold starts     | Multi-second container initialization  |
+| **Batch Processing**     | Direct resource allocation | Container scheduling overhead          |
+| **Development Tools**    | Live code execution        | Build/deploy/test cycle                |
+
+## Features
+
+- **Secure**: Mutual TLS authentication with certificate-based access
+- **Resource Control**: Set CPU, memory, and I/O limits for jobs
+- **Real-time Monitoring**: Stream live output from running jobs
+- **Process Isolation**: Jobs run in isolated environments
+- **Easy to Use**: Simple CLI interface
+
+## Quick Start
+
+### Prerequisites
+
+- Linux system with cgroups v2 support
+- Go 1.19+ (for building from source)
+- Root/sudo access for initial setup
+
+### Installation
 
 ```bash
-# Generate certificates locally for development
+# Clone the repository
+git clone https://github.com/ehsaniara/worker.git
+cd worker
+
+# Build the binaries
+make build
+
+# Generate certificates (for local testing)
 make certs-local
 
-# Generate certificates on remote server (passwordless)
-make certs-remote-passwordless
-
-# Download admin certificates (full permissions)
-make certs-download-admin-simple
-
-# Download viewer certificates (read-only)
-make certs-download-viewer
-
-# Examine certificate details and validation
-make examine-certs
-
-# Verify complete certificate chain
-make verify-cert-chain
-
-# Test TLS connection to server
-make test-tls REMOTE_HOST=your-server.com
+# Start the worker service
+sudo ./bin/worker
 ```
+
+### Basic Usage
+
+```bash
+# Run a simple command
+./bin/cli run echo "Hello World"
+
+# Run a command with resource limits
+./bin/cli run --max-cpu=50 --max-memory=512 python3 script.py
+
+# List all jobs
+./bin/cli list
+
+# View job status
+./bin/cli status <job-id>
+
+# Stream live output
+./bin/cli log <job-id>
+
+# Stop a running job
+./bin/cli stop <job-id>
+```
+
+## Authorization & Security
+
+### Certificate-Based Authentication
+
+Worker uses mutual TLS with role-based authorization built into X.509 certificates:
+
+```bash
+# Generate admin certificates (full access)
+make certs-download-admin-simple REMOTE_HOST=your-server.com
+
+# Generate viewer certificates (read-only)  
+make certs-download-viewer REMOTE_HOST=your-server.com
+
+# Use admin certificate
+./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo "Admin job"
+
+# Use viewer certificate (this would fail)
+./bin/cli --cert certs/viewer-client-cert.pem --key certs/viewer-client-key.pem run echo "Denied"
+```
+
+### Role Permissions
+
+| Operation           | Admin | Viewer | Certificate OU      |
+|---------------------|-------|--------|---------------------|
+| **Run Jobs**        | ✅     | ❌      | `OU=admin` required |
+| **View Job Status** | ✅     | ✅      | Any valid role      |
+| **List Jobs**       | ✅     | ✅      | Any valid role      |
+| **Stop Jobs**       | ✅     | ❌      | `OU=admin` required |
+| **Stream Logs**     | ✅     | ✅      | Any valid role      |
 
 ### Security Features
 
-- **TLS 1.3 Minimum**: Modern encryption standards
-- **Mutual Authentication**: Both client and server certificates validated
-- **Certificate Authority Validation**: Custom CA for secure certificate chain
-- **Role-Based Authorization**: Operation-level permission control
-- **Secure Key Storage**: Proper file permissions and key management
-- **Host Network Security**: Jobs use host networking but remain process-isolated
+- **Mutual TLS**: Both client and server authenticate with certificates
+- **Role Extraction**: Automatic role detection from certificate OU field
+- **Operation Validation**: Each API call checked against user permissions
+- **Secure by Default**: Unknown roles denied all access
+- **No External Dependencies**: Self-contained authentication system
 
-## ⚙️ Configuration
+## Configuration
 
-### Environment Variables
+### Resource Limits
 
-```bash
-# Server Configuration
-export JOB_WORKER_ADDR="0.0.0.0:50051"        # Server listening address
-export JOB_WORKER_CERT_PATH="./certs"          # Certificate directory path
-export JOB_WORKER_CGROUP_BASE="/sys/fs/cgroup" # Cgroups v2 base directory
+- `--max-cpu`: CPU limit as percentage (e.g., 50 = 50% of one core)
+- `--max-memory`: Memory limit in MB
+- `--max-iobps`: I/O bandwidth limit in bytes per second
 
-# Default Resource Limits (applied when not specified)
-export JOB_WORKER_DEFAULT_CPU=100      # 100% of one CPU core
-export JOB_WORKER_DEFAULT_MEMORY=512   # 512 MB memory limit
-export JOB_WORKER_DEFAULT_IO=0         # Unlimited I/O (0 = disabled)
+### Certificates
 
-# Logging Configuration
-export LOG_LEVEL="INFO"  # DEBUG, INFO, WARN, ERROR
-
-# gRPC Configuration
-export MAX_RECV_MSG_SIZE=4194304       # 4MB max receive message size
-export MAX_SEND_MSG_SIZE=4194304       # 4MB max send message size
-export MAX_HEADER_LIST_SIZE=8192       # 8KB max header list size
-
-# Cleanup Configuration
-export CLEANUP_TIMEOUT=30              # 30 second cgroup cleanup timeout
-
-# Network Configuration
-export HOST_NETWORKING=true            # Enable host networking (default)
-```
-
-### Client Configuration
+For production use, generate proper certificates:
 
 ```bash
-# Connect to remote server with custom address
-./bin/cli --server=remote-host:50051 run echo "hello"
-
-# Use custom certificate directory
-./bin/cli --cert-path=./custom-certs run echo "hello"
-
-# Override default server address in config.go
-export REMOTE_HOST=prod.example.com
-./bin/cli run echo "hello"
+# Generate certificates for remote deployment
+make certs-remote REMOTE_HOST=your-server.com
 ```
 
-### Resource Limit Defaults
-
-When resource limits are not specified (or set to 0), the system applies these defaults:
-
-- **CPU**: 100% (one full core)
-- **Memory**: 512 MB
-- **I/O**: Unlimited (not constrained)
-- **Network**: Host networking (shared with system)
-
-## 📋 API Reference
-
-### gRPC Service Definition
-
-The `JobService` provides comprehensive job management operations:
-
-```protobuf
-service JobService {
-  rpc RunJob(RunJobReq) returns (RunJobRes)                          // Run and start job
-  rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes)        // Get job details
-  rpc StopJob(StopJobReq) returns (StopJobRes)                       // Stop running job
-  rpc ListJobs(EmptyRequest) returns (Jobs)                          // List all jobs
-  rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk)           // Stream job logs
-}
-```
-
-### Job Resource Specifications
-
-```protobuf
-message RunJobReq {
-  string command = 1;                    // Command to execute
-  repeated string args = 2;              // Command arguments
-  int32 maxCPU = 3;                     // CPU limit (percentage)
-  int32 maxMemory = 4;                  // Memory limit (MB)
-  int32 maxIOBPS = 5;                   // I/O limit (bytes/second)
-  // Network: All jobs use host networking
-}
-```
-
-### Job Status States
-
-Jobs progress through these states:
-
-- `INITIALIZING` - Job created, setting up resources
-- `RUNNING` - Job actively executing
-- `COMPLETED` - Job finished successfully (exit code 0)
-- `FAILED` - Job finished with error (non-zero exit code)
-- `STOPPED` - Job terminated by stop request
-
-### CLI Commands Reference
+## Remote Deployment
 
 ```bash
-# Job Creation with Resource Limits (all use host networking)
-cli run [--max-cpu=N] [--max-memory=N] [--max-iobps=N] <command> [args...]
+# Deploy to remote server
+make deploy-safe REMOTE_HOST=your-server.com REMOTE_USER=admin
 
-# Job Management Operations
-cli status <job-id>               # Get detailed job information
-cli list                          # List all jobs with status summary
-cli stop <job-id>                 # Stop running job (graceful then forced)
-cli log <job-id>                  # Stream real-time job output
-
-# Connection Configuration
-cli --server=host:port            # Connect to specific server
-cli --cert=path                   # Specify client certificate path
-cli --key=path                    # Specify client private key path
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues & Solutions
-
-**Certificate Issues:**
-
-```bash
-# Check certificate status and validity
-make check-certs-remote REMOTE_HOST=your-server.com
-make examine-certs
-
-# Regenerate certificates if needed
-make certs-local          # For local development
-make certs-remote-passwordless  # For remote server
-
-# Fix certificate permissions
-make fix-cert-permissions REMOTE_HOST=your-server.com
-```
-
-**Permission Issues:**
-
-```bash
-# Test SSH connection and sudo access
-make test-connection REMOTE_HOST=your-server.com
-
-# Ensure proper sudo configuration for passwordless deployment
-sudo visudo  # Add: your-user ALL=(ALL) NOPASSWD: ALL
-```
-
-**Service Issues:**
-
-```bash
-# Check comprehensive service status
+# Check service status
 make service-status REMOTE_HOST=your-server.com
 
-# View detailed service logs
+# View logs
 make live-log REMOTE_HOST=your-server.com
-
-# Restart service manually
-ssh user@remote "sudo systemctl restart worker.service"
-
-# Check cgroups v2 availability
-ls -la /sys/fs/cgroup/  # Should show cgroup v2 structure
 ```
 
-**Resource Limit Issues:**
+## Architecture
+
+The system consists of three main components:
+
+- **Worker Service**: Main server that executes jobs
+- **CLI Client**: Command-line interface for job management
+- **Job-Init**: Handles process isolation and resource setup
+
+Jobs run in isolated environments but use host networking for compatibility.
+
+## API
+
+The system provides a gRPC API with the following main operations:
+
+- `Run` - Execute a new job
+- `Status` - Get job information
+- `List` - List all jobs
+- `Stop` - Terminate a job
+- `Log` - Stream job output
+
+## Troubleshooting
+
+### Common Issues
+
+**Permission errors**: Ensure the worker service has proper sudo privileges
+
+**Certificate issues**: Regenerate certificates with `make certs-local` or `make certs-remote`
+
+**Connection refused**: Check if the worker service is running with `systemctl status worker`
+
+### Getting Help
+
+1. Check the service logs: `journalctl -u worker -f`
+2. Verify certificates: `make check-certs-remote REMOTE_HOST=your-server`
+3. Test connection: `make test-connection REMOTE_HOST=your-server`
+4. Test authorization: Use viewer cert and try to run a job (should fail with permission denied)
+
+### Authorization Issues
+
+**Permission Denied Errors:**
 
 ```bash
-# Verify cgroups v2 support
-mount | grep cgroup2
-cat /proc/filesystems | grep cgroup
+# Check certificate role
+openssl x509 -in certs/client-cert.pem -noout -text | grep "Organizational Unit"
 
-# Check available controllers
-cat /sys/fs/cgroup/cgroup.controllers
-# Should show: cpuset cpu io memory hugetlb pids rdma misc
+# Verify you're using the right certificate
+./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo "test"
 ```
 
-**Network & TLS Issues:**
+**Certificate Problems:**
 
 ```bash
+# Regenerate admin certificates
+make certs-download-admin-simple REMOTE_HOST=your-server.com
+
 # Test TLS connection
 make test-tls REMOTE_HOST=your-server.com
 
-# Verify port accessibility
-telnet your-server.com 50051
-
-# Check certificate chain
+# Verify certificate chain
 make verify-cert-chain REMOTE_HOST=your-server.com
-
-# Test host networking (jobs can access external services)
-./bin/cli run curl -s ifconfig.me
 ```
 
-## 🎯 Networking Architecture
+## Contributing
 
-### Host Networking Design
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and test them
+4. Submit a pull request
 
-All jobs use the host network interface, providing:
-
-**Benefits:**
-
-- **Maximum Compatibility**: No network configuration required
-- **Direct Access**: Jobs can bind to host ports and access external services
-- **Performance**: No network overhead from namespace isolation
-- **Simplicity**: Straightforward deployment and management
-
-**Security Considerations:**
-
-- Jobs share the host network interface
-- Process isolation still maintained through other namespaces
-- Port conflicts possible between jobs
-- External firewall rules apply to all jobs
-
-**Example Use Cases:**
-
-```bash
-# Web server job (binds to host port)
-./bin/cli run python3 -m http.server 8080
-
-# Database connection job
-./bin/cli run mysql -h external-db.com -u user -p
-
-# API client job
-./bin/cli run curl -X POST https://api.service.com/webhook
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how to get started:
-
-### Development Workflow
-
-1. **Fork the repository and clone**
-   ```bash
-   git clone https://github.com/your-username/worker.git
-   cd worker
-   ```
-
-2. **Set up development environment**
-   ```bash
-   make setup-dev  # Builds binaries and generates certificates
-   ```
-
-3. **Create feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-
-4. **Make changes and test**
-   ```bash
-   # Run tests
-   go test -v ./...
-   
-   # Test locally
-   ./bin/worker &
-   ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo "test"
-   ```
-
-5. **Test on remote server**
-   ```bash
-   make deploy-safe REMOTE_HOST=test-server.com
-   ```
-
-6. **Commit and push**
-   ```bash
-   git commit -m 'Add amazing feature'
-   git push origin feature/amazing-feature
-   ```
-
-7. **Open Pull Request**
-
-### Code Quality Standards
-
-- **Go Code**: Follow `gofmt` and `golint` standards
-- **Testing**: Comprehensive test coverage with mocks
-- **Documentation**: Update README and inline documentation
-- **Security**: Certificate management and proper error handling
-
-## 📊 Performance & Monitoring
-
-### System Capabilities
-
-- **Concurrent Jobs**: Hundreds of simultaneous jobs with proper isolation
-- **Resource Enforcement**: Hard limits via cgroups v2
-- **Real-time Streaming**: Low-latency log streaming with buffering
-- **Memory Efficiency**: Minimal overhead per job
-- **Network Performance**: Host networking for maximum throughput
-
-### Monitoring Features
-
-- **Resource Tracking**: Real-time CPU, memory, and I/O monitoring
-- **Job Metrics**: Execution time, exit codes, status transitions
-- **System Health**: Service status, connection monitoring
-- **Log Management**: Efficient buffering and subscriber handling
-- **Error Tracking**: Comprehensive error logging and recovery
-
-### Performance Optimization
-
-- **Process Groups**: Efficient process tree management
-- **Namespace Isolation**: Minimal overhead process isolation
-- **Host Networking**: Direct network access without virtualization overhead
-- **Cgroup Management**: Automatic cleanup and resource reclamation
-- **Streaming Optimization**: Buffered log delivery with timeout handling
-- **Connection Pooling**: Efficient gRPC connection management
-
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [gRPC](https://grpc.io/) - High-performance RPC framework
-- [Linux Cgroups v2](https://www.kernel.org/doc/Documentation/cgroup-v2.txt) - Resource isolation and management
-- [Cobra](https://github.com/spf13/cobra) - Modern CLI framework for Go
-- [Protocol Buffers](https://developers.google.com/protocol-buffers) - Language-neutral data serialization
-- [Linux Namespaces](https://man7.org/linux/man-pages/man7/namespaces.7.html) - Process isolation mechanisms
-
----
-
-<div align="center">
-  <sub>By <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
-</div>
+- [Linux Cgroups v2](https://www.kernel.org/doc/Documentation/cgroup-v2.txt) - Resource management
+- [Cobra](https://github.com/spf13/cobra) - CLI framework for Go

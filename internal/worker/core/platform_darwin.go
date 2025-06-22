@@ -1,26 +1,27 @@
 //go:build darwin
 
-package jobworker
+package core
 
 import (
 	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
+	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/interfaces"
+	"worker/internal/worker/store"
 	"worker/pkg/logger"
 )
 
 // darwinWorker provides a basic implementation for macOS development
 type darwinWorker struct {
-	store      interfaces.Store
+	store      store.Store
 	jobCounter int64
 	logger     *logger.Logger
 }
 
 // NewLinuxWorker creates a basic macOS worker for development
-func NewLinuxWorker(store interfaces.Store) interfaces.Worker {
+func NewLinuxWorker(store store.Store) interfaces.Worker {
 	return &darwinWorker{
 		store:  store,
 		logger: logger.New().WithField("component", "darwin-worker"),

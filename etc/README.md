@@ -108,7 +108,7 @@ UMask=0022
 WorkingDirectory=/opt/worker
 Environment=PATH=/usr/bin:/usr/local/bin:/bin
 Environment=GODEBUG=gctrace=1,madvdontneed=1
-Environment=JOB_WORKER_LOG_LEVEL=debug
+Environment=WORKER_LOG_LEVEL=debug
 
 # Resource limits
 LimitNOFILE=4096

@@ -10,15 +10,16 @@ import (
 	pb "worker/api/gen"
 	"worker/internal/worker/auth"
 	"worker/internal/worker/auth/authfakes"
+	"worker/internal/worker/core/interfaces/interfacesfakes"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/interfaces/interfacesfakes"
+	"worker/internal/worker/store/storefakes"
 )
 
 func TestJobServiceServer_RunJob_Success(t *testing.T) {
 	// Setup mocks using counterfeiter
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mock behavior
 	fakeAuth.AuthorizedReturns(nil) // Allow operation
@@ -102,8 +103,8 @@ func TestJobServiceServer_RunJob_Success(t *testing.T) {
 
 func TestJobServiceServer_RunJob_AuthorizationFailure(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure auth to fail
 	authError := status.Error(codes.PermissionDenied, "not authorized")
@@ -141,8 +142,8 @@ func TestJobServiceServer_RunJob_AuthorizationFailure(t *testing.T) {
 
 func TestJobServiceServer_RunJob_WorkerFailure(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil) // Allow operation
@@ -181,8 +182,8 @@ func TestJobServiceServer_RunJob_WorkerFailure(t *testing.T) {
 
 func TestJobServiceServer_GetJobStatus_Success(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil)
@@ -240,8 +241,8 @@ func TestJobServiceServer_GetJobStatus_Success(t *testing.T) {
 
 func TestJobServiceServer_GetJobStatus_NotFound(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil)
@@ -273,8 +274,8 @@ func TestJobServiceServer_GetJobStatus_NotFound(t *testing.T) {
 
 func TestJobServiceServer_StopJob_Success(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil)
@@ -336,8 +337,8 @@ func TestJobServiceServer_StopJob_Success(t *testing.T) {
 
 func TestJobServiceServer_StopJob_WorkerError(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil)
@@ -370,8 +371,8 @@ func TestJobServiceServer_StopJob_WorkerError(t *testing.T) {
 
 func TestJobServiceServer_ListJobs_Success(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil)
@@ -434,8 +435,8 @@ func TestJobServiceServer_ListJobs_Success(t *testing.T) {
 
 func TestJobServiceServer_ListJobs_Empty(t *testing.T) {
 	fakeAuth := &authfakes.FakeGrpcAuthorization{}
-	fakeStore := &interfacesfakes.FakeStore{}
-	fakeWorker := &interfacesfakes.FakeJobWorker{}
+	fakeStore := &storefakes.FakeStore{}
+	fakeWorker := &interfacesfakes.FakeWorker{}
 
 	// Configure mocks
 	fakeAuth.AuthorizedReturns(nil)
