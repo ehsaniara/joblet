@@ -469,12 +469,20 @@ func (w *Worker) updateJobStatus(job *domain.Job, result *process.CleanupResult)
 
 	switch result.Method {
 	case "graceful":
+		// Process shut down gracefully with SIGTERM
 		stoppedJob.Stop()
-	case "forced", "force_failed":
-		stoppedJob.Fail(-1)
+	case "forced":
+		// Process was force killed with SIGKILL
+		stoppedJob.Stop()
 	case "already_dead":
+		// Process was already dead - mark as completed
 		stoppedJob.Complete(0)
+	case "graceful_failed", "graceful_timeout", "force_failed":
+		// These represent failures in the stop process itself
+		stoppedJob.Fail(-1)
 	default:
+		// Unknown cleanup method - treat as failure
+		w.logger.Warn("unknown cleanup method", "method", result.Method)
 		stoppedJob.Fail(-1)
 	}
 

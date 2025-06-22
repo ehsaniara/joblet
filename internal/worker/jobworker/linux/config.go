@@ -57,7 +57,7 @@ type UserNamespaceConfig struct {
 func DefaultConfigWithUserNamespaces() *Config {
 	return &Config{
 		CgroupsBaseDir:          config.CgroupsBaseDir,
-		GracefulShutdownTimeout: 100 * time.Millisecond,
+		GracefulShutdownTimeout: 1 * time.Second,
 		ProcessStartTimeout:     10 * time.Second,
 		CleanupTimeout:          30 * time.Second,
 		DefaultCPULimitPercent:  100,
