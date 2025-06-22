@@ -20,6 +20,20 @@ maximum compatibility and performance.
 > isolated execution of workloads with precise resource controls, making it ideal for distributed computing, CI/CD
 > pipelines, or any scenario where secure remote job execution with resource guarantees is needed.
 
+## Beyond Containers: Process-Native Job Execution
+
+### Target Markets:
+
+* Serverless/FaaS Providers - Lambda alternatives with better performance
+* Batch Processing Systems - ETL pipelines, data processing platforms
+* Development Tools - Code execution environments, online IDEs
+* CI/CD Platform Builders - Jenkins alternatives, GitHub Actions runners
+
+**For Serverless:** "True sub-second cold starts with enterprise security"
+**For Batch Processing:** "Precise resource control without container tax"
+**For Edge Computing:** "Full job isolation in minimal footprint environments"
+**For CI/CD:** "Execute build steps with container-grade isolation but process-level performance"
+
 ## ✨ Key Features
 
 - 🔒 **Secure Remote Execution** - Mutual TLS authentication with role-based authorization (admin/viewer roles)
