@@ -12,19 +12,19 @@ import (
 	pb "job-worker/api/gen"
 )
 
-func newCreateCmd() *cobra.Command {
+func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create <command> [args...]",
-		Short: "Create a new job",
-		Long: `Create a new job with the specified command and arguments.
+		Use:   "run <command> [args...]",
+		Short: "Run a new job",
+		Long: `Run a new job with the specified command and arguments.
 
 All jobs run with host networking (no isolation).
 
 Examples:
-  cli create nginx
-  cli create mysql
-  cli create python3 script.py
-  cli create bash -c "curl http://example.com"
+  cli run nginx
+  cli run mysql
+  cli run python3 script.py
+  cli run bash -c "curl http://example.com"
 
 Flags:
   --max-cpu=N         Max CPU percentage
@@ -34,14 +34,14 @@ Flags:
 All jobs share the host network interface and can communicate
 with each other and external services directly.`,
 		Args:               cobra.MinimumNArgs(1),
-		RunE:               runCreate,
+		RunE:               runRun,
 		DisableFlagParsing: true,
 	}
 
 	return cmd
 }
 
-func runCreate(cmd *cobra.Command, args []string) error {
+func runRun(cmd *cobra.Command, args []string) error {
 	var (
 		maxCPU    int32
 		maxMemory int32
@@ -87,7 +87,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	job := &pb.CreateJobReq{
+	job := &pb.RunJobReq{
 		Command:   command,
 		Args:      cmdArgs,
 		MaxCPU:    maxCPU,
@@ -95,12 +95,12 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		MaxIOBPS:  maxIOBPS,
 	}
 
-	response, err := jobClient.CreateJob(ctx, job)
+	response, err := jobClient.RunJob(ctx, job)
 	if err != nil {
-		return fmt.Errorf("failed to create job: %v", err)
+		return fmt.Errorf("failed to run job: %v", err)
 	}
 
-	fmt.Printf("Job created:\n")
+	fmt.Printf("Job started:\n")
 	fmt.Printf("ID: %s\n", response.Id)
 	fmt.Printf("Command: %s\n", strings.Join(commandArgs, " "))
 	fmt.Printf("Status: %s\n", response.Status)

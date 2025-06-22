@@ -74,12 +74,12 @@ func (c *JobClient) Close() error {
 	return nil
 }
 
-func (c *JobClient) CreateJob(ctx context.Context, job *pb.CreateJobReq) (*pb.CreateJobRes, error) {
-	return c.client.CreateJob(ctx, job)
+func (c *JobClient) RunJob(ctx context.Context, job *pb.RunJobReq) (*pb.RunJobRes, error) {
+	return c.client.RunJob(ctx, job)
 }
 
-func (c *JobClient) GetJob(ctx context.Context, id string) (*pb.GetJobRes, error) {
-	return c.client.GetJob(ctx, &pb.GetJobReq{Id: id})
+func (c *JobClient) GetJobStatus(ctx context.Context, id string) (*pb.GetJobStatusRes, error) {
+	return c.client.GetJobStatus(ctx, &pb.GetJobStatusReq{Id: id})
 }
 
 func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, error) {
@@ -98,14 +98,14 @@ func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, err
 	return resp, nil
 }
 
-func (c *JobClient) GetJobs(ctx context.Context) (*pb.Jobs, error) {
-	return c.client.GetJobs(ctx, &pb.EmptyRequest{})
+func (c *JobClient) ListJobs(ctx context.Context) (*pb.Jobs, error) {
+	return c.client.ListJobs(ctx, &pb.EmptyRequest{})
 }
 
-func (c *JobClient) GetJobsStream(ctx context.Context, id string) (pb.JobService_GetJobsStreamClient, error) {
-	stream, err := c.client.GetJobsStream(ctx, &pb.GetJobsStreamReq{Id: id})
+func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_GetJobLogsClient, error) {
+	stream, err := c.client.GetJobLogs(ctx, &pb.GetJobLogsReq{Id: id})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start stream: %v", err)
+		return nil, fmt.Errorf("failed to start log stream: %v", err)
 	}
 	return stream, nil
 }

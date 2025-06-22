@@ -6,9 +6,19 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
 
-Job Worker is a high-performance distributed job execution system built in Go that provides secure remote command execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated gRPC-based architecture with mutual TLS authentication and role-based authorization, allowing administrators to securely execute arbitrary commands on remote Linux systems while enforcing strict CPU, memory, and I/O bandwidth limits through Linux cgroups v2. Jobs run in isolated process namespaces (PID, mount, IPC, UTS) while utilizing host networking for maximum compatibility and performance.
+Job Worker is a high-performance distributed job execution system built in Go that provides secure remote command
+execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated
+gRPC-based architecture with mutual TLS authentication and role-based authorization, allowing administrators to securely
+execute arbitrary commands on remote Linux systems while enforcing strict CPU, memory, and I/O bandwidth limits through
+Linux cgroups v2. Jobs run in isolated process namespaces (PID, mount, IPC, UTS) while utilizing host networking for
+maximum compatibility and performance.
 
->The system features a two-stage execution model with a specialized job-init binary that handles proper namespace setup and resource isolation, while the main worker service provides real-time log streaming, job lifecycle management, and automatic cleanup. A full-featured CLI client enables easy job creation, monitoring, and management, with support for streaming live output from running jobs. The architecture is designed for production environments requiring secure, isolated execution of workloads with precise resource controls, making it ideal for distributed computing, CI/CD pipelines, or any scenario where secure remote job execution with resource guarantees is needed.
+> The system features a two-stage execution model with a specialized job-init binary that handles proper namespace setup
+> and resource isolation, while the main worker service provides real-time log streaming, job lifecycle management, and
+> automatic cleanup. A full-featured CLI client enables easy job creation, monitoring, and management, with support for
+> streaming live output from running jobs. The architecture is designed for production environments requiring secure,
+> isolated execution of workloads with precise resource controls, making it ideal for distributed computing, CI/CD
+> pipelines, or any scenario where secure remote job execution with resource guarantees is needed.
 
 ## ✨ Key Features
 
@@ -40,38 +50,38 @@ Job Worker is a high-performance distributed job execution system built in Go th
 ### Basic Job Management
 
 ```bash
-# Create simple jobs (all use host networking)
-./bin/cli create echo "Hello, World!"
-./bin/cli create python3 script.py
-./bin/cli create bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
+# Run simple jobs (all use host networking)
+./bin/cli run echo "Hello, World!"
+./bin/cli run python3 script.py
+./bin/cli run bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
 
 # List all jobs with status breakdown
 ./bin/cli list
 
-# Get detailed job information
-./bin/cli get <job-id>
+# Get detailed job status information
+./bin/cli status <job-id>
 
 # Stop a running job (graceful SIGTERM, then SIGKILL)
 ./bin/cli stop <job-id>
 
 # Stream live job output with real-time updates
-./bin/cli stream <job-id>
+./bin/cli log <job-id>
 ```
 
 ### Resource-Limited Jobs
 
 ```bash
 # Limit CPU usage to 50% of one core
-./bin/cli create --max-cpu=50 python3 heavy_computation.py
+./bin/cli run --max-cpu=50 python3 heavy_computation.py
 
 # Limit memory usage to 512 MB
-./bin/cli create --max-memory=512 java -jar memory-intensive-app.jar
+./bin/cli run --max-memory=512 java -jar memory-intensive-app.jar
 
 # Limit I/O bandwidth (bytes per second)
-./bin/cli create --max-iobps=1000000 dd if=/dev/zero of=/tmp/test bs=1M count=100
+./bin/cli run --max-iobps=1000000 dd if=/dev/zero of=/tmp/test bs=1M count=100
 
 # Combine multiple resource limits
-./bin/cli create --max-cpu=25 --max-memory=256 --max-iobps=1000000 intensive-task.sh
+./bin/cli run --max-cpu=25 --max-memory=256 --max-iobps=1000000 intensive-task.sh
 ```
 
 ### Advanced Job Scenarios
@@ -80,7 +90,7 @@ All jobs share the host network interface and can communicate with each other an
 
 ```bash
 # Network-accessible job (uses host networking)
-./bin/cli create --max-cpu=100 --max-memory=1024 python3 -c "
+./bin/cli run --max-cpu=100 --max-memory=1024 python3 -c "
 import socket
 import time
 s = socket.socket()
@@ -93,10 +103,10 @@ for i in range(60):
 "
 
 # Job that can access external services
-./bin/cli create curl -s https://api.github.com/users/octocat
+./bin/cli run curl -s https://api.github.com/users/octocat
 
 # Job with complex command line arguments
-./bin/cli create bash -c "echo 'Network test:' && curl -s ifconfig.me && echo '' && echo 'Finished at:' && date"
+./bin/cli run bash -c "echo 'Network test:' && curl -s ifconfig.me && echo '' && echo 'Finished at:' && date"
 ```
 
 ### Remote Server Management
@@ -182,14 +192,14 @@ The system provides comprehensive process isolation while maintaining host netwo
 **Verification Example:**
 
 ```bash
-# Create a long-running job
-./bin/cli create sleep 300
+# Run a long-running job
+./bin/cli run sleep 300
 
-# Create a process listing job
-./bin/cli create ps aux
+# Run a process listing job
+./bin/cli run ps aux
 
 # View the second job's output - only its own processes are visible
-./bin/cli stream <job-2-id>
+./bin/cli log <job-2-id>
 ```
 
 Output shows process isolation with host networking:
@@ -203,7 +213,7 @@ The job can access the host network:
 
 ```bash
 # Test network connectivity (uses host network interface)
-./bin/cli create curl -s ifconfig.me
+./bin/cli run curl -s ifconfig.me
 ```
 
 ## 🔐 Security & Authentication
@@ -212,10 +222,10 @@ The job can access the host network:
 
 The system implements mutual TLS with sophisticated role-based access control:
 
-| Role       | Create Jobs | View Jobs | Stop Jobs | Stream Logs | Certificate OU |
-|------------|-------------|-----------|-----------|-------------|----------------|
-| **Admin**  | ✅           | ✅         | ✅         | ✅           | `OU=admin`     |
-| **Viewer** | ❌           | ✅         | ❌         | ✅           | `OU=viewer`    |
+| Role       | Run Jobs | View Jobs | Stop Jobs | Stream Logs | Certificate OU |
+|------------|----------|-----------|-----------|-------------|----------------|
+| **Admin**  | ✅        | ✅         | ✅         | ✅           | `OU=admin`     |
+| **Viewer** | ❌        | ✅         | ❌         | ✅           | `OU=viewer`    |
 
 ### Certificate Management
 
@@ -285,14 +295,14 @@ export HOST_NETWORKING=true            # Enable host networking (default)
 
 ```bash
 # Connect to remote server with custom address
-./bin/cli --server=remote-host:50051 create echo "hello"
+./bin/cli --server=remote-host:50051 run echo "hello"
 
 # Use custom certificate directory
-./bin/cli --cert-path=./custom-certs create echo "hello"
+./bin/cli --cert-path=./custom-certs run echo "hello"
 
 # Override default server address in config.go
 export REMOTE_HOST=prod.example.com
-./bin/cli create echo "hello"
+./bin/cli run echo "hello"
 ```
 
 ### Resource Limit Defaults
@@ -312,18 +322,18 @@ The `JobService` provides comprehensive job management operations:
 
 ```protobuf
 service JobService {
-  rpc CreateJob(CreateJobReq) returns (CreateJobRes)      // Create and start job
-  rpc GetJob(GetJobReq) returns (GetJobRes)              // Get job details
-  rpc StopJob(StopJobReq) returns (StopJobRes)           // Stop running job
-  rpc GetJobs(EmptyRequest) returns (Jobs)               // List all jobs
-  rpc GetJobsStream(GetJobsStreamReq) returns (stream DataChunk)  // Stream job logs
+  rpc RunJob(RunJobReq) returns (RunJobRes)                          // Run and start job
+  rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes)        // Get job details
+  rpc StopJob(StopJobReq) returns (StopJobRes)                       // Stop running job
+  rpc ListJobs(EmptyRequest) returns (Jobs)                          // List all jobs
+  rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk)           // Stream job logs
 }
 ```
 
 ### Job Resource Specifications
 
 ```protobuf
-message CreateJobReq {
+message RunJobReq {
   string command = 1;                    // Command to execute
   repeated string args = 2;              // Command arguments
   int32 maxCPU = 3;                     // CPU limit (percentage)
@@ -347,18 +357,18 @@ Jobs progress through these states:
 
 ```bash
 # Job Creation with Resource Limits (all use host networking)
-cli create [--max-cpu=N] [--max-memory=N] [--max-iobps=N] <command> [args...]
+cli run [--max-cpu=N] [--max-memory=N] [--max-iobps=N] <command> [args...]
 
 # Job Management Operations
-cli get <job-id>          # Get detailed job information
-cli list                  # List all jobs with status summary
-cli stop <job-id>         # Stop running job (graceful then forced)
-cli stream <job-id>       # Stream real-time job output
+cli status <job-id>               # Get detailed job information
+cli list                          # List all jobs with status summary
+cli stop <job-id>                 # Stop running job (graceful then forced)
+cli log <job-id>                  # Stream real-time job output
 
 # Connection Configuration
-cli --server=host:port    # Connect to specific server
-cli --cert=path           # Specify client certificate path
-cli --key=path            # Specify client private key path
+cli --server=host:port            # Connect to specific server
+cli --cert=path                   # Specify client certificate path
+cli --key=path                    # Specify client private key path
 ```
 
 ## 🔧 Troubleshooting
@@ -431,7 +441,7 @@ telnet your-server.com 50051
 make verify-cert-chain REMOTE_HOST=your-server.com
 
 # Test host networking (jobs can access external services)
-./bin/cli create curl -s ifconfig.me
+./bin/cli run curl -s ifconfig.me
 ```
 
 ## 🎯 Networking Architecture
@@ -458,13 +468,13 @@ All jobs use the host network interface, providing:
 
 ```bash
 # Web server job (binds to host port)
-./bin/cli create python3 -m http.server 8080
+./bin/cli run python3 -m http.server 8080
 
 # Database connection job
-./bin/cli create mysql -h external-db.com -u user -p
+./bin/cli run mysql -h external-db.com -u user -p
 
 # API client job
-./bin/cli create curl -X POST https://api.service.com/webhook
+./bin/cli run curl -X POST https://api.service.com/webhook
 ```
 
 ## 🤝 Contributing
@@ -496,7 +506,7 @@ We welcome contributions! Here's how to get started:
    
    # Test locally
    ./bin/job-worker &
-   ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem create echo "test"
+   ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo "test"
    ```
 
 5. **Test on remote server**

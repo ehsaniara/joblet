@@ -13,26 +13,26 @@ import (
 	"syscall"
 )
 
-func newStreamCmd() *cobra.Command {
+func newLogCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "stream <job-id>",
+		Use:   "log <job-id>",
 		Short: "Stream job logs",
 		Args:  cobra.ExactArgs(1),
-		RunE:  runStream,
+		RunE:  runLog,
 	}
 
-	cmd.Flags().BoolVarP(&streamParams.follow, "follow", "f", true, "Follow the log stream (can be terminated with Ctrl+C)")
+	cmd.Flags().BoolVarP(&logParams.follow, "follow", "f", true, "Follow the log stream (can be terminated with Ctrl+C)")
 
 	return cmd
 }
 
-type streamCmdParams struct {
+type logCmdParams struct {
 	follow bool
 }
 
-var streamParams = &streamCmdParams{}
+var logParams = &logCmdParams{}
 
-func runStream(cmd *cobra.Command, args []string) error {
+func runLog(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -43,7 +43,7 @@ func runStream(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		<-sigCh
-		fmt.Println("\nReceived termination signal. Closing stream...")
+		fmt.Println("\nReceived termination signal. Closing log stream...")
 		cancel()
 	}()
 
@@ -53,7 +53,7 @@ func runStream(cmd *cobra.Command, args []string) error {
 	}
 	defer jobClient.Close()
 
-	stream, err := jobClient.GetJobsStream(ctx, jobID)
+	stream, err := jobClient.GetJobLogs(ctx, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to start log stream: %v", err)
 	}
@@ -72,10 +72,10 @@ func runStream(cmd *cobra.Command, args []string) error {
 			}
 
 			if s, ok := status.FromError(e); ok {
-				return fmt.Errorf("stream error: %v", s.Message())
+				return fmt.Errorf("log stream error: %v", s.Message())
 			}
 
-			return fmt.Errorf("error receiving stream: %v", e)
+			return fmt.Errorf("error receiving log stream: %v", e)
 		}
 
 		fmt.Printf("%s", chunk.Payload)
