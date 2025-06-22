@@ -1,12 +1,13 @@
 //go:build linux
 
-package jobworker
+package core
 
 import (
 	"context"
+	"worker/internal/worker/core/interfaces"
+	"worker/internal/worker/core/linux"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/interfaces"
-	"worker/internal/worker/jobworker/linux"
+	"worker/internal/worker/store"
 )
 
 // linuxWorker is a thin wrapper around the Linux worker
@@ -15,7 +16,7 @@ type linuxWorker struct {
 }
 
 // NewLinuxWorker creates a Linux worker
-func NewLinuxWorker(store interfaces.Store) interfaces.Worker {
+func NewLinuxWorker(store store.Store) interfaces.Worker {
 	return &linuxWorker{
 		platformWorker: linux.NewPlatformWorker(store),
 	}

@@ -4,8 +4,8 @@ package interfacesfakes
 import (
 	"context"
 	"sync"
+	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/interfaces"
 )
 
 type FakeWorker struct {

@@ -11,22 +11,23 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	"worker/internal/worker/jobworker/linux/resource"
-	"worker/internal/worker/jobworker/linux/usernamespace"
+	interfaces2 "worker/internal/worker/core/interfaces"
+	"worker/internal/worker/core/linux/resource"
+	"worker/internal/worker/core/linux/usernamespace"
+	"worker/internal/worker/store"
 
+	"worker/internal/worker/core/linux/process"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/interfaces"
-	"worker/internal/worker/jobworker/linux/process"
 	"worker/pkg/logger"
 	osinterface "worker/pkg/os"
 )
 
 var jobCounter int64
 
-// Worker handles job execution with user namespace isolation
-type Worker struct {
-	store                interfaces.Store
-	cgroup               interfaces.Resource
+// worker handles job execution with user namespace isolation
+type worker struct {
+	store                store.Store
+	cgroup               resource.Resource
 	userNamespaceManager usernamespace.UserNamespaceManager
 	processLauncher      *process.Launcher
 	processCleaner       *process.Cleaner
@@ -36,10 +37,10 @@ type Worker struct {
 	logger               *logger.Logger
 }
 
-// dependencies contains dependencies for Worker
+// dependencies contains dependencies for worker
 type dependencies struct {
-	Store                interfaces.Store
-	Cgroup               interfaces.Resource
+	Store                store.Store
+	Cgroup               resource.Resource
 	UserNamespaceManager usernamespace.UserNamespaceManager
 	ProcessLauncher      *process.Launcher
 	ProcessCleaner       *process.Cleaner
@@ -50,7 +51,7 @@ type dependencies struct {
 
 // NewPlatformWorker creates a Linux worker with user namespace isolation
 // Note: All platform requirements should be validated in main.go before calling this
-func NewPlatformWorker(store interfaces.Store) interfaces.Worker {
+func NewPlatformWorker(store store.Store) interfaces2.Worker {
 	// Create OS interfaces
 	osInterface := &osinterface.DefaultOs{}
 	syscallInterface := &osinterface.DefaultSyscall{}
@@ -83,7 +84,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.Worker {
 		Config:               config,
 	}
 
-	worker := &Worker{
+	worker := &worker{
 		store:                deps.Store,
 		cgroup:               deps.Cgroup,
 		userNamespaceManager: deps.UserNamespaceManager,
@@ -106,7 +107,7 @@ func NewPlatformWorker(store interfaces.Store) interfaces.Worker {
 }
 
 // StartJob creates isolated job with user namespaces and cgroup limits
-func (w *Worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+func (w *worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
@@ -179,7 +180,7 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 }
 
 // StopJob stops a running job (updated to cleanup user namespaces)
-func (w *Worker) StopJob(ctx context.Context, jobID string) error {
+func (w *worker) StopJob(ctx context.Context, jobID string) error {
 	log := w.logger.WithField("jobID", jobID)
 	log.Info("stopping job")
 
@@ -224,7 +225,7 @@ func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 }
 
 // startProcessWithUserNamespace starts a process with user namespace isolation
-func (w *Worker) startProcessWithUserNamespace(ctx context.Context, job *domain.Job, userMapping *usernamespace.UserMapping) (osinterface.Command, error) {
+func (w *worker) startProcessWithUserNamespace(ctx context.Context, job *domain.Job, userMapping *usernamespace.UserMapping) (osinterface.Command, error) {
 	// Get job-init binary path
 	initPath, err := w.getJobInitPath()
 	if err != nil {
@@ -269,7 +270,7 @@ func (w *Worker) startProcessWithUserNamespace(ctx context.Context, job *domain.
 }
 
 // buildJobEnvironmentWithUserNS builds environment with user namespace info
-func (w *Worker) buildJobEnvironmentWithUserNS(job *domain.Job, userMapping *usernamespace.UserMapping) []string {
+func (w *worker) buildJobEnvironmentWithUserNS(job *domain.Job, userMapping *usernamespace.UserMapping) []string {
 	baseEnv := w.osInterface.Environ()
 
 	// In cgroup namespace, the job's cgroup always appears at root
@@ -300,7 +301,7 @@ func (w *Worker) buildJobEnvironmentWithUserNS(job *domain.Job, userMapping *use
 }
 
 // createUserNamespaceSysProcAttr creates syscall attributes with user namespaces
-func (w *Worker) createUserNamespaceSysProcAttr() *syscall.SysProcAttr {
+func (w *worker) createUserNamespaceSysProcAttr() *syscall.SysProcAttr {
 	sysProcAttr := &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWPID | // PID namespace isolation
 			syscall.CLONE_NEWNS | // Mount namespace isolation
@@ -319,12 +320,12 @@ func (w *Worker) createUserNamespaceSysProcAttr() *syscall.SysProcAttr {
 }
 
 // Helper methods
-func (w *Worker) getNextJobID() string {
+func (w *worker) getNextJobID() string {
 	nextID := atomic.AddInt64(&jobCounter, 1)
 	return fmt.Sprintf("%d", nextID)
 }
 
-func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
+func (w *worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
 	// Apply defaults
 	if maxCPU <= 0 {
 		maxCPU = 100 // 1 CPU core
@@ -351,7 +352,7 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 	}
 }
 
-func (w *Worker) getJobInitPath() (string, error) {
+func (w *worker) getJobInitPath() (string, error) {
 	// Check same directory as main executable
 	if execPath, err := w.osInterface.Executable(); err == nil {
 		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
@@ -376,7 +377,7 @@ func (w *Worker) getJobInitPath() (string, error) {
 	return "", fmt.Errorf("job-init binary not found")
 }
 
-func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
+func (w *worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
 	cmd := processCmd.Process()
 	if cmd == nil {
 		w.logger.Warn("process is nil after start", "jobID", job.Id)
@@ -399,7 +400,7 @@ func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Comm
 	w.store.UpdateJob(runningJob)
 }
 
-func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
+func (w *worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
 	log := w.logger.WithField("jobID", job.Id)
 	startTime := time.Now()
 
@@ -447,7 +448,7 @@ func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *d
 		"duration", duration)
 }
 
-func (w *Worker) cleanupFailedJob(job *domain.Job) {
+func (w *worker) cleanupFailedJob(job *domain.Job) {
 	failedJob := job.DeepCopy()
 	if err := failedJob.Fail(-1); err != nil {
 		failedJob.Status = domain.StatusFailed
@@ -464,7 +465,7 @@ func (w *Worker) cleanupFailedJob(job *domain.Job) {
 	}
 }
 
-func (w *Worker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {
+func (w *worker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {
 	stoppedJob := job.DeepCopy()
 
 	switch result.Method {

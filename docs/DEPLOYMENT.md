@@ -219,9 +219,9 @@ ProtectSystem=strict
 ReadWritePaths=/opt/worker /var/log/worker /sys/fs/cgroup
 
 # Environment
-Environment=JOB_WORKER_ADDR=0.0.0.0:50051
-Environment=JOB_WORKER_CERT_PATH=/opt/worker/certs
-Environment=JOB_WORKER_LOG_LEVEL=info
+Environment=WORKER_ADDR=0.0.0.0:50051
+Environment=WORKER_CERT_PATH=/opt/worker/certs
+Environment=WORKER_LOG_LEVEL=info
 
 # Resource limits
 LimitNOFILE=65536
@@ -523,7 +523,7 @@ sudo systemctl edit worker.service
 
 # Add debug environment
 [Service]
-Environment=JOB_WORKER_LOG_LEVEL=debug
+Environment=WORKER_LOG_LEVEL=debug
 
 # Restart service
 sudo systemctl restart worker.service

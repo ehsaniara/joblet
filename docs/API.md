@@ -72,7 +72,7 @@ certs/
 
 ```protobuf
 syntax = "proto3";
-package job_worker;
+package worker;
 
 service JobService {
   // Create and start a new job
@@ -621,8 +621,8 @@ Examples:
 #### Environment Variables
 
 ```bash
-export JOB_WORKER_SERVER="prod.example.com:50051"
-export JOB_WORKER_CERT_PATH="./certs"
+export WORKER_SERVER="prod.example.com:50051"
+export WORKER_CERT_PATH="./certs"
 
 ./bin/cli create echo "hello"
 ```
