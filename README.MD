@@ -13,6 +13,8 @@ execute arbitrary commands on remote Linux systems while enforcing strict CPU, m
 Linux cgroups v2. Jobs run in isolated process namespaces (PID, mount, IPC, UTS) while utilizing host networking for
 maximum compatibility and performance.
 
+![job-worker.png](docs/job-worker.png)
+
 > The system features a two-stage execution model with a specialized job-init binary that handles proper namespace setup
 > and resource isolation, while the main worker service provides real-time log streaming, job lifecycle management, and
 > automatic cleanup. A full-featured CLI client enables easy job creation, monitoring, and management, with support for
