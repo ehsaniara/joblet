@@ -245,8 +245,8 @@ func (w *Worker) startProcessWithUserNamespace(ctx context.Context, job *domain.
 		InitPath:      initPath,
 		Environment:   env,
 		SysProcAttr:   sysProcAttr,
-		Stdout:        New(w.store, job.Id),
-		Stderr:        New(w.store, job.Id),
+		Stdout:        NewWrite(w.store, job.Id),
+		Stderr:        NewWrite(w.store, job.Id),
 		NamespacePath: "",    // No separate network namespace needed
 		NeedsNSJoin:   false, // User namespace is created, not joined
 		JobID:         job.Id,
