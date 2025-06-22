@@ -9,7 +9,7 @@ type OutputWriter struct {
 	store interfaces.Store
 }
 
-func New(store interfaces.Store, jobId string) *OutputWriter {
+func NewWrite(store interfaces.Store, jobId string) *OutputWriter {
 	return &OutputWriter{store: store, jobId: jobId}
 }
 
