@@ -1,8 +1,8 @@
 package mappers
 
 import (
-	pb "job-worker/api/gen"
-	"job-worker/internal/worker/domain"
+	pb "worker/api/gen"
+	"worker/internal/worker/domain"
 )
 
 // DomainToProtobuf converts domain Job to protobuf Job

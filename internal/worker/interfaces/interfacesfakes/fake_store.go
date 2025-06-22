@@ -3,9 +3,9 @@ package interfacesfakes
 
 import (
 	"context"
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces"
 	"sync"
+	"worker/internal/worker/domain"
+	"worker/internal/worker/interfaces"
 )
 
 type FakeStore struct {

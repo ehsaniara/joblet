@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	pb "job-worker/api/gen"
+	pb "worker/api/gen"
 )
 
 const (
@@ -47,7 +47,7 @@ func NewJobClient(serverAddr string) (*JobClient, error) {
 		Certificates: []tls.Certificate{clientCert},
 		RootCAs:      certPool,
 		MinVersion:   tls.VersionTLS13,
-		ServerName:   "job-worker",
+		ServerName:   "worker",
 	}
 
 	creds := credentials.NewTLS(tlsConfig)

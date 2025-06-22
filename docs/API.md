@@ -1,6 +1,6 @@
-# Job Worker API Documentation
+# Worker API Documentation
 
-This document describes the gRPC API for the Job Worker system, including service definitions, message formats,
+This document describes the gRPC API for the Worker system, including service definitions, message formats,
 authentication, and usage examples.
 
 ## Table of Contents
@@ -16,7 +16,7 @@ authentication, and usage examples.
 
 ## Overview
 
-The Job Worker API is built on gRPC and uses Protocol Buffers for message serialization. All communication is secured
+The Worker API is built on gRPC and uses Protocol Buffers for message serialization. All communication is secured
 with mutual TLS authentication and supports role-based authorization.
 
 ### API Characteristics

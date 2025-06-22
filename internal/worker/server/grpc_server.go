@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	pb "job-worker/api/gen"
-	"job-worker/internal/config"
-	auth2 "job-worker/internal/worker/auth"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/pkg/logger"
 	"net"
 	"os"
+	pb "worker/api/gen"
+	"worker/internal/config"
+	auth2 "worker/internal/worker/auth"
+	"worker/internal/worker/interfaces"
+	"worker/pkg/logger"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 	serverAddress = "0.0.0.0:50051"
 )
 
-func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) (*grpc.Server, error) {
+func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.Worker) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 
 	serverLogger.Info("initializing gRPC server", "address", serverAddress, "tlsEnabled", true)

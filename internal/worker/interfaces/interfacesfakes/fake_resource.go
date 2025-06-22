@@ -2,8 +2,8 @@
 package interfacesfakes
 
 import (
-	"job-worker/internal/worker/interfaces"
 	"sync"
+	"worker/internal/worker/interfaces"
 )
 
 type FakeResource struct {

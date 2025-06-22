@@ -7,10 +7,10 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/status"
 	"io"
-	"job-worker/pkg/client"
 	"os"
 	"os/signal"
 	"syscall"
+	"worker/pkg/client"
 )
 
 func newLogCmd() *cobra.Command {

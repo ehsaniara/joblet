@@ -3,8 +3,8 @@ package interfacesfakes
 
 import (
 	"context"
-	"job-worker/internal/worker/interfaces"
 	"sync"
+	"worker/internal/worker/interfaces"
 )
 
 type FakeDomainStreamer struct {

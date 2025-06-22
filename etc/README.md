@@ -68,10 +68,10 @@ You should be able to log in without entering a password.
 
 ### Creating the Systemd Service File
 
-Create the service file at `/etc/systemd/system/job-worker.service`:
+Create the service file at `/etc/systemd/system/worker.service`:
 
 ```bash
-  sudo nano /etc/systemd/system/job-worker.service
+  sudo nano /etc/systemd/system/worker.service
 ```
 
 **Service Configuration:**
@@ -87,9 +87,9 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-ExecStart=/opt/job-worker/job-worker
+ExecStart=/opt/worker/worker
 ExecReload=/bin/kill -HUP $MAINPID
-ExecStopPost=/bin/bash -c 'for cg in $(find /sys/fs/cgroup -name "job-*" -type d 2>/dev/null); do rmdir "$cg" 2>/dev/null || true; done'
+ExecStopPost=/bin/bash -c 'for cg in $(find /sys/fs/cgroup -name "worker-*" -type d 2>/dev/null); do rmdir "$cg" 2>/dev/null || true; done'
 
 # Process management
 Restart=always
@@ -105,7 +105,7 @@ Group=root
 UMask=0022
 
 # Working directory and environment
-WorkingDirectory=/opt/job-worker
+WorkingDirectory=/opt/worker
 Environment=PATH=/usr/bin:/usr/local/bin:/bin
 Environment=GODEBUG=gctrace=1,madvdontneed=1
 Environment=JOB_WORKER_LOG_LEVEL=debug
@@ -118,7 +118,7 @@ MemoryMax=2G
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=job-worker
+SyslogIdentifier=worker
 
 # Security and capabilities
 NoNewPrivileges=yes
@@ -137,9 +137,9 @@ WantedBy=multi-user.target
 
 ```bash
     sudo systemctl daemon-reload
-    sudo systemctl enable job-worker.service  
-    sudo systemctl start job-worker.service  
-    sudo systemctl status job-worker.service
+    sudo systemctl enable worker.service  
+    sudo systemctl start worker.service  
+    sudo systemctl status worker.service
 ```
 
 ---
@@ -149,37 +149,37 @@ WantedBy=multi-user.target
 ### Basic Service Operations
 
 ```bash
-    sudo systemctl start job-worker
+    sudo systemctl start worker
 ```
 
 ```bash    
-    sudo systemctl stop job-worker
+    sudo systemctl stop worker
 ```
 
 ```bash    
-    sudo systemctl restart job-worker
+    sudo systemctl restart worker
 ```
 
 Reload configuration without restart
 
 ```bash    
-    sudo systemctl reload job-worker
+    sudo systemctl reload worker
 ```
 
 ```bash    
-    sudo systemctl status job-worker
+    sudo systemctl status worker
 ```
 
 Check if service is enabled
 
 ```bash    
-    sudo systemctl is-enabled job-worker
+    sudo systemctl is-enabled worker
 ```
 
 Disable service from starting on boot
 
 ```bash    
-    sudo systemctl disable job-worker
+    sudo systemctl disable worker
 ```
 
 ### Service Health Checks
@@ -187,13 +187,13 @@ Disable service from starting on boot
 Check service active status
 
 ```bash
-    systemctl is-active job-worker
+    systemctl is-active worker
 ```
 
 Check service failed status
 
 ```bash    
-    systemctl is-failed job-worker
+    systemctl is-failed worker
 ```
 
 List all failed services
@@ -205,7 +205,7 @@ List all failed services
 Show service dependencies
 
 ```bash    
-    systemctl list-dependencies job-worker
+    systemctl list-dependencies worker
 ```
 
 ---
@@ -217,43 +217,43 @@ Show service dependencies
 View all logs for the service
 
 ```bash
-    sudo journalctl -u job-worker
+    sudo journalctl -u worker
  ```
 
 Follow logs in real-time
 
 ```bash
-    sudo journalctl -u job-worker -f
+    sudo journalctl -u worker -f
  ```
 
 View logs from last boot
 
 ```bash    
-    sudo journalctl -u job-worker -b
+    sudo journalctl -u worker -b
  ```
 
 View logs from specific time period
 
 ```bash    
-    sudo journalctl -u job-worker --since "2024-01-01" --until "2024-01-02"
+    sudo journalctl -u worker --since "2024-01-01" --until "2024-01-02"
  ```
 
 View last N lines
 
 ```bash    
-    sudo journalctl -u job-worker -n 50
+    sudo journalctl -u worker -n 50
  ```
 
 View logs with specific priority (error, warning, info, debug)
 
 ```bash    
-    sudo journalctl -u job-worker -p err
+    sudo journalctl -u worker -p err
  ```
 
 Export logs to file
 
 ```bash    
-    sudo journalctl -u job-worker > /tmp/job-worker-logs.txt
+    sudo journalctl -u worker > /tmp/worker-logs.txt
 ```
 
 ### Log Management
@@ -287,20 +287,20 @@ Rotate logs manually
 Edit service file
 
 ```bash
-    sudo systemctl edit --full job-worker.service
+    sudo systemctl edit --full worker.service
 ```
 
 Create override file (recommended for modifications)
 
 ```bash    
-    sudo systemctl edit job-worker.service
+    sudo systemctl edit worker.service
 ```
 
 After editing, always reload and restart
 
 ```bash   
     sudo systemctl daemon-reload
-    sudo systemctl restart job-worker.service
+    sudo systemctl restart worker.service
 ```
 
 ---
@@ -309,13 +309,13 @@ After editing, always reload and restart
 
 ### Prerequisites
 
-- New binary built and available in `/tmp/job-worker/build/`
+- New binary built and available in `/tmp/worker/build/`
 - Service currently running
 - Administrative privileges
 
 ### Deployment Steps
 
-Deployment script - save as `deploy-job-worker.sh`
+Deployment script - save as `deploy-worker.sh`
 
 ```bash
     #!/bin/bash
@@ -323,10 +323,10 @@ Deployment script - save as `deploy-job-worker.sh`
     
     set -e  # Exit on any error
     
-    SERVICE_NAME="job-worker"
-    TEMP_BINARY="/tmp/job-worker/build/job-worker"
-    TARGET_BINARY="/opt/job-worker/job-worker"
-    BACKUP_DIR="/opt/job-worker/backups"
+    SERVICE_NAME="worker"
+    TEMP_BINARY="/tmp/worker/build/worker"
+    TARGET_BINARY="/opt/worker/worker"
+    BACKUP_DIR="/opt/worker/backups"
     
     echo "Starting deployment process..."
     
@@ -334,7 +334,7 @@ Deployment script - save as `deploy-job-worker.sh`
     
     # Create backup of current binary
     if [ -f "$TARGET_BINARY" ]; then
-        BACKUP_NAME="job-worker.$(date +%Y%m%d_%H%M%S).backup"
+        BACKUP_NAME="worker.$(date +%Y%m%d_%H%M%S).backup"
         echo "Creating backup: $BACKUP_NAME"
         sudo cp "$TARGET_BINARY" "$BACKUP_DIR/$BACKUP_NAME"
     fi
@@ -382,37 +382,37 @@ Deployment script - save as `deploy-job-worker.sh`
 Stop the service
 
 ```bash
-    sudo systemctl stop job-worker.service
+    sudo systemctl stop worker.service
 ```
 
 Verify service is stopped
 
 ```bash
-    sudo systemctl is-active job-worker.service
+    sudo systemctl is-active worker.service
 ```
 
 Copy new binary
 
 ```bash    
-    sudo cp /tmp/job-worker/build/job-worker /opt/job-worker/job-worker
+    sudo cp /tmp/worker/build/worker /opt/worker/worker
 ```
 
 Set proper permissions
 
 ```bash    
-    sudo chmod +x /opt/job-worker/job-worker
+    sudo chmod +x /opt/worker/worker
 ```
 
 Start the service
 
 ```bash    
-    sudo systemctl start job-worker.service
+    sudo systemctl start worker.service
 ```
 
 Monitor startup logs
 
 ```bash    
-    sudo journalctl -u job-worker.service -f
+    sudo journalctl -u worker.service -f
 ```
 
 ### Rollback Procedure
@@ -420,10 +420,10 @@ Monitor startup logs
 If deployment fails, rollback to previous version
 
 ```bash
-    sudo systemctl stop job-worker.service
-    sudo cp /opt/job-worker/backups/job-worker.YYYYMMDD_HHMMSS.backup /opt/job-worker/job-worker
-    sudo systemctl start job-worker.service
-    sudo systemctl status job-worker.service
+    sudo systemctl stop worker.service
+    sudo cp /opt/worker/backups/worker.YYYYMMDD_HHMMSS.backup /opt/worker/worker
+    sudo systemctl start worker.service
+    sudo systemctl status worker.service
 ```
 
 ---
@@ -437,14 +437,14 @@ If deployment fails, rollback to previous version
 Check service status and recent logs
 
 ```bash
-    sudo systemctl status job-worker.service
-    sudo journalctl -u job-worker.service -n 20
+    sudo systemctl status worker.service
+    sudo journalctl -u worker.service -n 20
     
     # Check if binary exists and is executable
-    ls -la /opt/job-worker/job-worker
-    file /opt/job-worker/job-worker
+    ls -la /opt/worker/worker
+    file /opt/worker/worker
     
-    sudo systemd-analyze verify /etc/systemd/system/job-worker.service
+    sudo systemd-analyze verify /etc/systemd/system/worker.service
 ```
 
 Check for configuration syntax errors
@@ -454,19 +454,19 @@ Check for configuration syntax errors
 Check restart count and failure reason
 
 ```bash
-    sudo systemctl status job-worker.service
+    sudo systemctl status worker.service
 ```
 
 Check for resource limits
 
 ```bash
-    sudo systemctl show job-worker.service | grep -E "(Limit|Memory|CPU)"
+    sudo systemctl show worker.service | grep -E "(Limit|Memory|CPU)"
 ```
 
 Monitor resource usage
 
 ```bash    
-    top -p $(pgrep job-worker)
+    top -p $(pgrep worker)
 ```
 
 #### Permission Issues
@@ -474,12 +474,12 @@ Monitor resource usage
 Check file ownership and permissions
 
 ```bash
-    ls -la /opt/job-worker/
-    sudo namei -l /opt/job-worker/job-worker
+    ls -la /opt/worker/
+    sudo namei -l /opt/worker/worker
     
     # Fix ownership if needed
-    sudo chown -R root:root /opt/job-worker/
-    sudo chmod 755 /opt/job-worker/job-worker
+    sudo chown -R root:root /opt/worker/
+    sudo chmod 755 /opt/worker/worker
 ```
 
 #### Network/Port Issues
@@ -488,11 +488,11 @@ Check listening ports
 
 ```bash
     
-    sudo netstat -tlnp | grep job-worker
-    sudo ss -tlnp | grep job-worker
+    sudo netstat -tlnp | grep worker
+    sudo ss -tlnp | grep worker
     
     # Check if process is running
-    ps aux | grep job-worker
+    ps aux | grep worker
 ```
 
 ### Diagnostic Commands
@@ -507,7 +507,7 @@ System information
 Service configuration
 
 ```bash    
-    sudo systemctl cat job-worker.service
+    sudo systemctl cat worker.service
 ```
 
 Service environment
@@ -533,15 +533,15 @@ System resources
 Secure the service binary
 
 ```bash
-    sudo chmod 755 /opt/job-worker/job-worker
-    sudo chown root:root /opt/job-worker/job-worker
+    sudo chmod 755 /opt/worker/worker
+    sudo chown root:root /opt/worker/worker
 ```
 
 Secure the service file
 
 ```bash    
-    sudo chmod 644 /etc/systemd/system/job-worker.service
-    sudo chown root:root /etc/systemd/system/job-worker.service
+    sudo chmod 644 /etc/systemd/system/worker.service
+    sudo chown root:root /etc/systemd/system/worker.service
 ```
 
 ### Service Hardening
@@ -554,7 +554,7 @@ Options to the service file:
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/opt/job-worker
+ReadWritePaths=/opt/worker
 NoNewPrivileges=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
@@ -583,19 +583,19 @@ Then Restart SSH service
 Set up log monitoring for errors
 
 ```bash
-    sudo journalctl -u job-worker.service -p err -f
+    sudo journalctl -u worker.service -p err -f
 ```
 
 Monitor service uptime
 
 ```bash    
-    systemctl show job-worker.service --property=ActiveEnterTimestamp
+    systemctl show worker.service --property=ActiveEnterTimestamp
 ```
 
 Check service failures
 
 ```bash    
-    systemctl show job-worker.service --property=NRestarts
+    systemctl show worker.service --property=NRestarts
 ```
 
 ---
@@ -613,19 +613,19 @@ Weekly log cleanup
 Check service health
 
 ```bash    
-    sudo systemctl status job-worker.service
+    sudo systemctl status worker.service
 ```
 
 Update binary permissions after system updates
 
 ```bash    
-    sudo chmod +x /opt/job-worker/job-worker
+    sudo chmod +x /opt/worker/worker
 ```
 
 Restart service monthly for fresh state
 
 ```bash    
-    sudo systemctl restart job-worker.service
+    sudo systemctl restart worker.service
 ```
 
 ### Backup Strategy
@@ -633,12 +633,12 @@ Restart service monthly for fresh state
 Backup current binary before updates
 
 ```bash
-    sudo cp /opt/job-worker/job-worker /opt/job-worker/backups/job-worker.$(date +%Y%m%d).backup
+    sudo cp /opt/worker/worker /opt/worker/backups/worker.$(date +%Y%m%d).backup
 ```
 
 Backup service configuration
 
 ```bash    
-    sudo cp /etc/systemd/system/job-worker.service /opt/job-worker/backups/
+    sudo cp /etc/systemd/system/worker.service /opt/worker/backups/
 ```
 

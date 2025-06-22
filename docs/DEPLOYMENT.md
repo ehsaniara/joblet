@@ -1,6 +1,6 @@
-# Job Worker Deployment Guide
+# Worker Deployment Guide
 
-This guide covers production deployment of the Job Worker system, including server setup, certificate management,
+This guide covers production deployment of the Worker system, including server setup, certificate management,
 systemd service configuration, and operational procedures.
 
 ## Table of Contents
@@ -59,23 +59,23 @@ sudo firewall-cmd --reload
 ### 1. Create System User
 
 ```bash
-# Create dedicated user for job-worker
-sudo useradd -r -s /bin/false -d /opt/job-worker job-worker
-sudo mkdir -p /opt/job-worker
-sudo chown job-worker:job-worker /opt/job-worker
+# Create dedicated user for worker
+sudo useradd -r -s /bin/false -d /opt/worker worker
+sudo mkdir -p /opt/worker
+sudo chown worker:worker /opt/worker
 ```
 
 ### 2. Directory Structure
 
 ```bash
 # Create required directories
-sudo mkdir -p /opt/job-worker/{bin,certs,logs}
-sudo mkdir -p /var/log/job-worker
-sudo mkdir -p /etc/job-worker
+sudo mkdir -p /opt/worker/{bin,certs,logs}
+sudo mkdir -p /var/log/worker
+sudo mkdir -p /etc/worker
 
 # Set permissions
-sudo chown -R job-worker:job-worker /opt/job-worker
-sudo chown job-worker:job-worker /var/log/job-worker
+sudo chown -R worker:worker /opt/worker
+sudo chown worker:worker /var/log/worker
 ```
 
 ### 3. Configure SSH Access
@@ -84,13 +84,13 @@ For automated deployment, configure passwordless SSH and sudo:
 
 ```bash
 # On deployment machine, generate SSH key if needed
-ssh-keygen -t ed25519 -C "job-worker-deployment"
+ssh-keygen -t ed25519 -C "worker-deployment"
 
 # Copy public key to server
 ssh-copy-id user@your-server.com
 
 # Configure passwordless sudo on server
-echo "your-username ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/job-worker-deploy
+echo "your-username ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/worker-deploy
 ```
 
 ## Automated Deployment
@@ -101,13 +101,13 @@ Use the Makefile for automated deployment:
 
 ```bash
 # Clone repository
-git clone https://github.com/ehsaniara/job-worker.git
-cd job-worker
+git clone https://github.com/ehsaniara/worker.git
+cd worker
 
 # Configure deployment target
 export REMOTE_HOST=your-server.com
 export REMOTE_USER=your-username
-export REMOTE_DIR=/opt/job-worker
+export REMOTE_DIR=/opt/worker
 
 # Complete automated setup
 make setup-remote-passwordless
@@ -155,26 +155,26 @@ make certs-download-admin-simple
 
 ```bash
 # On development machine
-git clone https://github.com/ehsaniara/job-worker.git
-cd job-worker
+git clone https://github.com/ehsaniara/worker.git
+cd worker
 
 # Build Linux binaries
 make worker init
-# Creates: bin/job-worker, bin/job-init
+# Creates: bin/worker, bin/job-init
 ```
 
 ### 2. Transfer Binaries
 
 ```bash
 # Copy binaries to server
-scp bin/job-worker user@server:/tmp/
+scp bin/worker user@server:/tmp/
 scp bin/job-init user@server:/tmp/
 
 # On server, install binaries
-sudo cp /tmp/job-worker /opt/job-worker/
-sudo cp /tmp/job-init /opt/job-worker/
-sudo chmod +x /opt/job-worker/job-worker /opt/job-worker/job-init
-sudo chown job-worker:job-worker /opt/job-worker/job-*
+sudo cp /tmp/worker /opt/worker/
+sudo cp /tmp/job-init /opt/worker/
+sudo chmod +x /opt/worker/worker /opt/worker/job-init
+sudo chown worker:worker /opt/worker/worker-*
 ```
 
 ### 3. Generate Certificates
@@ -185,19 +185,19 @@ scp etc/certs_gen.sh user@server:/tmp/
 
 # On server, generate certificates
 sudo /tmp/certs_gen.sh
-sudo chown -R job-worker:job-worker /opt/job-worker/certs
+sudo chown -R worker:worker /opt/worker/certs
 ```
 
 ## Service Configuration
 
 ### 1. Create Systemd Service
 
-Create `/etc/systemd/system/job-worker.service`:
+Create `/etc/systemd/system/worker.service`:
 
 ```ini
 [Unit]
 Description=Job Worker Service
-Documentation=https://github.com/ehsaniara/job-worker
+Documentation=https://github.com/ehsaniara/worker
 After=network.target
 Wants=network.target
 
@@ -205,8 +205,8 @@ Wants=network.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/opt/job-worker
-ExecStart=/opt/job-worker/job-worker
+WorkingDirectory=/opt/worker
+ExecStart=/opt/worker/worker
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -216,11 +216,11 @@ TimeoutStopSec=30
 NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/opt/job-worker /var/log/job-worker /sys/fs/cgroup
+ReadWritePaths=/opt/worker /var/log/worker /sys/fs/cgroup
 
 # Environment
 Environment=JOB_WORKER_ADDR=0.0.0.0:50051
-Environment=JOB_WORKER_CERT_PATH=/opt/job-worker/certs
+Environment=JOB_WORKER_CERT_PATH=/opt/worker/certs
 Environment=JOB_WORKER_LOG_LEVEL=info
 
 # Resource limits
@@ -242,22 +242,22 @@ WantedBy=multi-user.target
 sudo systemctl daemon-reload
 
 # Enable service to start on boot
-sudo systemctl enable job-worker.service
+sudo systemctl enable worker.service
 
 # Start service
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 
 # Check status
-sudo systemctl status job-worker.service
+sudo systemctl status worker.service
 ```
 
 ### 3. Configure Logging
 
-Create `/etc/rsyslog.d/job-worker.conf`:
+Create `/etc/rsyslog.d/worker.conf`:
 
 ```bash
 # Job Worker logging configuration
-if $programname == 'job-worker' then /var/log/job-worker/job-worker.log
+if $programname == 'worker' then /var/log/worker/worker.log
 & stop
 ```
 
@@ -275,17 +275,17 @@ The project includes an automated certificate generation script:
 
 ```bash
 # Generate all certificates (server + clients)
-sudo /opt/job-worker/etc/certs_gen.sh
+sudo /opt/worker/etc/certs_gen.sh
 
 # Certificate files created:
-# /opt/job-worker/certs/ca-cert.pem       # Certificate Authority
-# /opt/job-worker/certs/ca-key.pem        # CA private key
-# /opt/job-worker/certs/server-cert.pem   # Server certificate
-# /opt/job-worker/certs/server-key.pem    # Server private key
-# /opt/job-worker/certs/admin-client-cert.pem   # Admin client cert
-# /opt/job-worker/certs/admin-client-key.pem    # Admin client key
-# /opt/job-worker/certs/viewer-client-cert.pem  # Viewer client cert
-# /opt/job-worker/certs/viewer-client-key.pem   # Viewer client key
+# /opt/worker/certs/ca-cert.pem       # Certificate Authority
+# /opt/worker/certs/ca-key.pem        # CA private key
+# /opt/worker/certs/server-cert.pem   # Server certificate
+# /opt/worker/certs/server-key.pem    # Server private key
+# /opt/worker/certs/admin-client-cert.pem   # Admin client cert
+# /opt/worker/certs/admin-client-key.pem    # Admin client key
+# /opt/worker/certs/viewer-client-cert.pem  # Viewer client cert
+# /opt/worker/certs/viewer-client-key.pem   # Viewer client key
 ```
 
 ### Certificate Rotation
@@ -294,38 +294,38 @@ For production environments, implement regular certificate rotation:
 
 ```bash
 # Create certificate rotation script
-cat > /opt/job-worker/scripts/rotate-certs.sh << 'EOF'
+cat > /opt/worker/scripts/rotate-certs.sh << 'EOF'
 #!/bin/bash
 # Certificate rotation script
 
-CERT_DIR="/opt/job-worker/certs"
-BACKUP_DIR="/opt/job-worker/backups/certs-$(date +%Y%m%d)"
+CERT_DIR="/opt/worker/certs"
+BACKUP_DIR="/opt/worker/backups/certs-$(date +%Y%m%d)"
 
 # Backup existing certificates
 mkdir -p "$BACKUP_DIR"
 cp "$CERT_DIR"/*.pem "$BACKUP_DIR/"
 
 # Generate new certificates
-/opt/job-worker/etc/certs_gen.sh
+/opt/worker/etc/certs_gen.sh
 
 # Restart service
-systemctl restart job-worker.service
+systemctl restart worker.service
 
 echo "Certificate rotation completed: $(date)"
 EOF
 
-chmod +x /opt/job-worker/scripts/rotate-certs.sh
+chmod +x /opt/worker/scripts/rotate-certs.sh
 ```
 
 ### Certificate Validation
 
 ```bash
 # Validate certificate chain
-openssl verify -CAfile /opt/job-worker/certs/ca-cert.pem \
-  /opt/job-worker/certs/server-cert.pem
+openssl verify -CAfile /opt/worker/certs/ca-cert.pem \
+  /opt/worker/certs/server-cert.pem
 
 # Check certificate expiration
-openssl x509 -in /opt/job-worker/certs/server-cert.pem -noout -dates
+openssl x509 -in /opt/worker/certs/server-cert.pem -noout -dates
 
 # Test TLS connection
 openssl s_client -connect localhost:50051 -verify_return_error
@@ -337,33 +337,33 @@ openssl s_client -connect localhost:50051 -verify_return_error
 
 ```bash
 # Service status
-sudo systemctl is-active job-worker.service
+sudo systemctl is-active worker.service
 
 # Process check
-pgrep -f job-worker
+pgrep -f worker
 
 # Port check
 netstat -tlnp | grep :50051
 
 # Log tail
-sudo journalctl -u job-worker.service -f
+sudo journalctl -u worker.service -f
 ```
 
 ### Log Management
 
 ```bash
 # Configure log rotation
-cat > /etc/logrotate.d/job-worker << 'EOF'
-/var/log/job-worker/*.log {
+cat > /etc/logrotate.d/worker << 'EOF'
+/var/log/worker/*.log {
     daily
     rotate 30
     compress
     delaycompress
     missingok
     notifempty
-    create 644 job-worker job-worker
+    create 644 worker worker
     postrotate
-        systemctl reload job-worker.service
+        systemctl reload worker.service
     endscript
 }
 EOF
@@ -373,11 +373,11 @@ EOF
 
 ```bash
 # Monitor resource usage
-top -p $(pgrep job-worker)
+top -p $(pgrep worker)
 
 # Check cgroup usage
-cat /sys/fs/cgroup/job-*/memory.current
-cat /sys/fs/cgroup/job-*/cpu.stat
+cat /sys/fs/cgroup/worker-*/memory.current
+cat /sys/fs/cgroup/worker-*/cpu.stat
 
 # Network connections
 ss -tlnp | grep :50051
@@ -386,28 +386,28 @@ ss -tlnp | grep :50051
 ### Backup Script
 
 ```bash
-cat > /opt/job-worker/scripts/backup.sh << 'EOF'
+cat > /opt/worker/scripts/backup.sh << 'EOF'
 #!/bin/bash
 # Job Worker backup script
 
-BACKUP_DIR="/opt/job-worker/backups/$(date +%Y%m%d-%H%M%S)"
+BACKUP_DIR="/opt/worker/backups/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 
 # Backup configuration and certificates
-cp -r /opt/job-worker/certs "$BACKUP_DIR/"
-cp /etc/systemd/system/job-worker.service "$BACKUP_DIR/"
+cp -r /opt/worker/certs "$BACKUP_DIR/"
+cp /etc/systemd/system/worker.service "$BACKUP_DIR/"
 
 # Backup logs (last 7 days)
-find /var/log/job-worker -name "*.log" -mtime -7 -exec cp {} "$BACKUP_DIR/" \;
+find /var/log/worker -name "*.log" -mtime -7 -exec cp {} "$BACKUP_DIR/" \;
 
 # Create tarball
-tar -czf "$BACKUP_DIR.tar.gz" -C /opt/job-worker/backups "$(basename $BACKUP_DIR)"
+tar -czf "$BACKUP_DIR.tar.gz" -C /opt/worker/backups "$(basename $BACKUP_DIR)"
 rm -rf "$BACKUP_DIR"
 
 echo "Backup created: $BACKUP_DIR.tar.gz"
 EOF
 
-chmod +x /opt/job-worker/scripts/backup.sh
+chmod +x /opt/worker/scripts/backup.sh
 ```
 
 ## Security Considerations
@@ -428,25 +428,25 @@ sudo iptables -A INPUT -p tcp --dport 50051 -j DROP
 
 ```bash
 # Secure certificate permissions
-sudo chmod 600 /opt/job-worker/certs/*-key.pem
-sudo chmod 644 /opt/job-worker/certs/*-cert.pem
-sudo chown job-worker:job-worker /opt/job-worker/certs/*
+sudo chmod 600 /opt/worker/certs/*-key.pem
+sudo chmod 644 /opt/worker/certs/*-cert.pem
+sudo chown worker:worker /opt/worker/certs/*
 ```
 
 ### SELinux Configuration (RHEL/CentOS)
 
 ```bash
-# Configure SELinux for job-worker
+# Configure SELinux for worker
 sudo setsebool -P container_manage_cgroup true
-sudo semanage fcontext -a -t bin_t "/opt/job-worker/job-worker"
-sudo restorecon -v /opt/job-worker/job-worker
+sudo semanage fcontext -a -t bin_t "/opt/worker/worker"
+sudo restorecon -v /opt/worker/worker
 ```
 
 ### Audit Logging
 
 ```bash
-# Enable audit logging for job-worker
-echo "-w /opt/job-worker/ -p wa -k job-worker" >> /etc/audit/rules.d/job-worker.rules
+# Enable audit logging for worker
+echo "-w /opt/worker/ -p wa -k worker" >> /etc/audit/rules.d/worker.rules
 sudo systemctl restart auditd
 ```
 
@@ -458,10 +458,10 @@ sudo systemctl restart auditd
 
 ```bash
 # Check systemd status
-sudo systemctl status job-worker.service -l
+sudo systemctl status worker.service -l
 
 # Check logs
-sudo journalctl -u job-worker.service --since "1 hour ago"
+sudo journalctl -u worker.service --since "1 hour ago"
 
 # Common causes:
 # 1. Missing certificates
@@ -519,14 +519,14 @@ Enable debug logging for troubleshooting:
 
 ```bash
 # Edit systemd service
-sudo systemctl edit job-worker.service
+sudo systemctl edit worker.service
 
 # Add debug environment
 [Service]
 Environment=JOB_WORKER_LOG_LEVEL=debug
 
 # Restart service
-sudo systemctl restart job-worker.service
+sudo systemctl restart worker.service
 ```
 
 ### Emergency Procedures
@@ -535,27 +535,27 @@ sudo systemctl restart job-worker.service
 
 ```bash
 # Stop all job processes
-sudo pkill -f job-worker
-sudo systemctl stop job-worker.service
+sudo pkill -f worker
+sudo systemctl stop worker.service
 
 # Clean up cgroups
-sudo find /sys/fs/cgroup -name "job-*" -type d -exec rmdir {} \; 2>/dev/null
+sudo find /sys/fs/cgroup -name "worker-*" -type d -exec rmdir {} \; 2>/dev/null
 
 # Restart service
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 ```
 
 #### Certificate Recovery
 
 ```bash
 # Backup corrupted certificates
-sudo mv /opt/job-worker/certs /opt/job-worker/certs.backup
+sudo mv /opt/worker/certs /opt/worker/certs.backup
 
 # Regenerate certificates
-sudo /opt/job-worker/etc/certs_gen.sh
+sudo /opt/worker/etc/certs_gen.sh
 
 # Restart service
-sudo systemctl restart job-worker.service
+sudo systemctl restart worker.service
 ```
 
 ## Backup & Recovery
@@ -566,31 +566,31 @@ Set up daily backups with cron:
 
 ```bash
 # Add to crontab
-echo "0 2 * * * /opt/job-worker/scripts/backup.sh" | sudo crontab -u job-worker -
+echo "0 2 * * * /opt/worker/scripts/backup.sh" | sudo crontab -u worker -
 ```
 
 ### Disaster Recovery
 
 ```bash
 # 1. Stop service
-sudo systemctl stop job-worker.service
+sudo systemctl stop worker.service
 
 # 2. Restore from backup
-sudo tar -xzf backup.tar.gz -C /opt/job-worker/
+sudo tar -xzf backup.tar.gz -C /opt/worker/
 
 # 3. Fix permissions
-sudo chown -R job-worker:job-worker /opt/job-worker
-sudo chmod 600 /opt/job-worker/certs/*-key.pem
+sudo chown -R worker:worker /opt/worker
+sudo chmod 600 /opt/worker/certs/*-key.pem
 
 # 4. Start service
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 ```
 
 ### Migration to New Server
 
 ```bash
 # 1. On old server - create backup
-/opt/job-worker/scripts/backup.sh
+/opt/worker/scripts/backup.sh
 
 # 2. Set up new server
 # Follow standard deployment process
@@ -599,8 +599,8 @@ sudo systemctl start job-worker.service
 scp backup.tar.gz user@new-server:/tmp/
 
 # 4. On new server - restore
-sudo tar -xzf /tmp/backup.tar.gz -C /opt/job-worker/
-sudo systemctl start job-worker.service
+sudo tar -xzf /tmp/backup.tar.gz -C /opt/worker/
+sudo systemctl start worker.service
 ```
 
 ## Environment-Specific Configurations
@@ -612,7 +612,7 @@ sudo systemctl start job-worker.service
 make setup-dev
 
 # Start local server
-./bin/job-worker
+./bin/worker
 
 # Test with local CLI
 ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem create echo "test"
@@ -646,7 +646,7 @@ make setup-remote-passwordless REMOTE_HOST=prod.example.com
 
 For high-availability deployments:
 
-1. **Load Balancer**: Deploy multiple job-worker instances behind a load balancer
+1. **Load Balancer**: Deploy multiple worker instances behind a load balancer
 2. **Shared Storage**: Use shared storage for certificate distribution
 3. **Service Discovery**: Implement service discovery for dynamic scaling
 4. **Health Checks**: Configure load balancer health checks
@@ -682,6 +682,6 @@ For high-availability deployments:
 
 ### Quarterly
 
-- Update job-worker binaries
+- Update worker binaries
 - Review and update documentation
 - Conduct disaster recovery tests

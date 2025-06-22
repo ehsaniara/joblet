@@ -3,10 +3,10 @@ package store
 import (
 	"bytes"
 	"context"
-	"job-worker/internal/worker/domain"
-	"job-worker/pkg/logger"
 	"sync"
 	"time"
+	"worker/internal/worker/domain"
+	"worker/pkg/logger"
 )
 
 type Task struct {

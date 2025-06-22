@@ -6,19 +6,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"job-worker/internal/worker/jobworker/linux/resource"
-	"job-worker/internal/worker/jobworker/linux/usernamespace"
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
 	"syscall"
 	"time"
+	"worker/internal/worker/jobworker/linux/resource"
+	"worker/internal/worker/jobworker/linux/usernamespace"
 
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/internal/worker/jobworker/linux/process"
-	"job-worker/pkg/logger"
-	osinterface "job-worker/pkg/os"
+	"worker/internal/worker/domain"
+	"worker/internal/worker/interfaces"
+	"worker/internal/worker/jobworker/linux/process"
+	"worker/pkg/logger"
+	osinterface "worker/pkg/os"
 )
 
 var jobCounter int64
@@ -50,7 +50,7 @@ type dependencies struct {
 
 // NewPlatformWorker creates a Linux worker with user namespace isolation
 // Note: All platform requirements should be validated in main.go before calling this
-func NewPlatformWorker(store interfaces.Store) interfaces.JobWorker {
+func NewPlatformWorker(store interfaces.Store) interfaces.Worker {
 	// Create OS interfaces
 	osInterface := &osinterface.DefaultOs{}
 	syscallInterface := &osinterface.DefaultSyscall{}
@@ -362,7 +362,7 @@ func (w *Worker) getJobInitPath() (string, error) {
 
 	// Check standard paths
 	standardPaths := []string{
-		"/opt/job-worker/job-init",
+		"/opt/worker/job-init",
 		"/usr/local/bin/job-init",
 		"/usr/bin/job-init",
 	}

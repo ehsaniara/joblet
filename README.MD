@@ -1,19 +1,19 @@
-# Job Worker
+# Worker
 
-[![Tests](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/job-worker)](https://goreportcard.com/report/github.com/ehsaniara/job-worker)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/ehsaniara/job-worker)](https://golang.org/)
+[![Tests](https://github.com/ehsaniara/worker/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/worker/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/worker)](https://goreportcard.com/report/github.com/ehsaniara/worker)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/ehsaniara/worker)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
+[![Release](https://img.shields.io/github/release/ehsaniara/worker.svg)](https://github.com/ehsaniara/worker/releases/latest)
 
-Job Worker is a high-performance distributed job execution system built in Go that provides secure remote command
+Worker is a high-performance distributed task / job execution system built in Go that provides secure remote command
 execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated
 gRPC-based architecture with mutual TLS authentication and role-based authorization, allowing administrators to securely
 execute arbitrary commands on remote Linux systems while enforcing strict CPU, memory, and I/O bandwidth limits through
 Linux cgroups v2. Jobs run in isolated process namespaces (PID, mount, IPC, UTS) while utilizing host networking for
 maximum compatibility and performance.
 
-![job-worker-thum.png](docs/job-worker-thum.png)
+![worker-thum.png](docs/worker-thum.png)
 
 > The system features a two-stage execution model with a specialized job-init binary that handles proper namespace setup
 > and resource isolation, while the main worker service provides real-time log streaming, job lifecycle management, and
@@ -428,7 +428,7 @@ make service-status REMOTE_HOST=your-server.com
 make live-log REMOTE_HOST=your-server.com
 
 # Restart service manually
-ssh user@remote "sudo systemctl restart job-worker.service"
+ssh user@remote "sudo systemctl restart worker.service"
 
 # Check cgroups v2 availability
 ls -la /sys/fs/cgroup/  # Should show cgroup v2 structure
@@ -503,8 +503,8 @@ We welcome contributions! Here's how to get started:
 
 1. **Fork the repository and clone**
    ```bash
-   git clone https://github.com/your-username/job-worker.git
-   cd job-worker
+   git clone https://github.com/your-username/worker.git
+   cd worker
    ```
 
 2. **Set up development environment**
@@ -523,7 +523,7 @@ We welcome contributions! Here's how to get started:
    go test -v ./...
    
    # Test locally
-   ./bin/job-worker &
+   ./bin/worker &
    ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo "test"
    ```
 

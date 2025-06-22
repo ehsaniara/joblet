@@ -3,15 +3,15 @@ package resource
 import (
 	"context"
 	"fmt"
-	"job-worker/internal/config"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/pkg/logger"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+	"worker/internal/config"
+	"worker/internal/worker/interfaces"
+	"worker/pkg/logger"
 )
 
 type cgroup struct {

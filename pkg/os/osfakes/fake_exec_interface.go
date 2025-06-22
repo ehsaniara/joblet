@@ -2,8 +2,8 @@
 package osfakes
 
 import (
-	"job-worker/pkg/os"
 	"sync"
+	"worker/pkg/os"
 )
 
 type FakeExecInterface struct {

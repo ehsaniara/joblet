@@ -5,25 +5,25 @@ import (
 	"errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	pb "job-worker/api/gen"
-	"job-worker/internal/worker/adapters"
-	auth2 "job-worker/internal/worker/auth"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/internal/worker/mappers"
-	_errors "job-worker/pkg/errors"
-	"job-worker/pkg/logger"
 	"time"
+	pb "worker/api/gen"
+	"worker/internal/worker/adapters"
+	auth2 "worker/internal/worker/auth"
+	"worker/internal/worker/interfaces"
+	"worker/internal/worker/mappers"
+	_errors "worker/pkg/errors"
+	"worker/pkg/logger"
 )
 
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth      auth2.GrpcAuthorization
 	jobStore  interfaces.Store
-	jobWorker interfaces.JobWorker
+	jobWorker interfaces.Worker
 	logger    *logger.Logger
 }
 
-func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore interfaces.Store, jobWorker interfaces.JobWorker) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore interfaces.Store, jobWorker interfaces.Worker) *JobServiceServer {
 	return &JobServiceServer{
 		auth:      auth,
 		jobStore:  jobStore,

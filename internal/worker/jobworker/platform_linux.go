@@ -4,18 +4,18 @@ package jobworker
 
 import (
 	"context"
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/internal/worker/jobworker/linux"
+	"worker/internal/worker/domain"
+	"worker/internal/worker/interfaces"
+	"worker/internal/worker/jobworker/linux"
 )
 
 // linuxWorker is a thin wrapper around the Linux worker
 type linuxWorker struct {
-	platformWorker interfaces.JobWorker
+	platformWorker interfaces.Worker
 }
 
 // NewLinuxWorker creates a Linux worker
-func NewLinuxWorker(store interfaces.Store) interfaces.JobWorker {
+func NewLinuxWorker(store interfaces.Store) interfaces.Worker {
 	return &linuxWorker{
 		platformWorker: linux.NewPlatformWorker(store),
 	}
@@ -32,4 +32,4 @@ func (w *linuxWorker) StopJob(ctx context.Context, jobId string) error {
 }
 
 // Ensure linuxWorker implements interfaces
-var _ interfaces.JobWorker = (*linuxWorker)(nil)
+var _ interfaces.Worker = (*linuxWorker)(nil)
