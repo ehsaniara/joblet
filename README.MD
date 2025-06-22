@@ -29,10 +29,12 @@ maximum compatibility and performance.
 * Development Tools - Code execution environments, online IDEs
 * CI/CD Platform Builders - Jenkins alternatives, GitHub Actions runners
 
-**For Serverless:** "True sub-second cold starts with enterprise security"
-**For Batch Processing:** "Precise resource control without container tax"
-**For Edge Computing:** "Full job isolation in minimal footprint environments"
-**For CI/CD:** "Execute build steps with container-grade isolation but process-level performance"
+🎯
+
+- **For Serverless:** "True sub-second cold starts with enterprise security"
+- **For Batch Processing:** "Precise resource control without container tax"
+- **For Edge Computing:** "Full job isolation in minimal footprint environments"
+- **For CI/CD:** "Execute build steps with container-grade isolation but process-level performance"
 
 ## ✨ Key Features
 
