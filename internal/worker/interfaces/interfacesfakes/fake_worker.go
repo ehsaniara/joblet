@@ -8,7 +8,7 @@ import (
 	"worker/internal/worker/interfaces"
 )
 
-type FakeJobWorker struct {
+type FakeWorker struct {
 	StartJobStub        func(context.Context, string, []string, int32, int32, int32) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
 	startJobArgsForCall []struct {
@@ -43,7 +43,7 @@ type FakeJobWorker struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeJobWorker) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32) (*domain.Job, error) {
+func (fake *FakeWorker) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32) (*domain.Job, error) {
 	var arg3Copy []string
 	if arg3 != nil {
 		arg3Copy = make([]string, len(arg3))
@@ -72,26 +72,26 @@ func (fake *FakeJobWorker) StartJob(arg1 context.Context, arg2 string, arg3 []st
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeJobWorker) StartJobCallCount() int {
+func (fake *FakeWorker) StartJobCallCount() int {
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	return len(fake.startJobArgsForCall)
 }
 
-func (fake *FakeJobWorker) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32) (*domain.Job, error)) {
+func (fake *FakeWorker) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32) (*domain.Job, error)) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = stub
 }
 
-func (fake *FakeJobWorker) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32) {
+func (fake *FakeWorker) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32) {
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	argsForCall := fake.startJobArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
 }
 
-func (fake *FakeJobWorker) StartJobReturns(result1 *domain.Job, result2 error) {
+func (fake *FakeWorker) StartJobReturns(result1 *domain.Job, result2 error) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = nil
@@ -101,7 +101,7 @@ func (fake *FakeJobWorker) StartJobReturns(result1 *domain.Job, result2 error) {
 	}{result1, result2}
 }
 
-func (fake *FakeJobWorker) StartJobReturnsOnCall(i int, result1 *domain.Job, result2 error) {
+func (fake *FakeWorker) StartJobReturnsOnCall(i int, result1 *domain.Job, result2 error) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = nil
@@ -117,7 +117,7 @@ func (fake *FakeJobWorker) StartJobReturnsOnCall(i int, result1 *domain.Job, res
 	}{result1, result2}
 }
 
-func (fake *FakeJobWorker) StopJob(arg1 context.Context, arg2 string) error {
+func (fake *FakeWorker) StopJob(arg1 context.Context, arg2 string) error {
 	fake.stopJobMutex.Lock()
 	ret, specificReturn := fake.stopJobReturnsOnCall[len(fake.stopJobArgsForCall)]
 	fake.stopJobArgsForCall = append(fake.stopJobArgsForCall, struct {
@@ -137,26 +137,26 @@ func (fake *FakeJobWorker) StopJob(arg1 context.Context, arg2 string) error {
 	return fakeReturns.result1
 }
 
-func (fake *FakeJobWorker) StopJobCallCount() int {
+func (fake *FakeWorker) StopJobCallCount() int {
 	fake.stopJobMutex.RLock()
 	defer fake.stopJobMutex.RUnlock()
 	return len(fake.stopJobArgsForCall)
 }
 
-func (fake *FakeJobWorker) StopJobCalls(stub func(context.Context, string) error) {
+func (fake *FakeWorker) StopJobCalls(stub func(context.Context, string) error) {
 	fake.stopJobMutex.Lock()
 	defer fake.stopJobMutex.Unlock()
 	fake.StopJobStub = stub
 }
 
-func (fake *FakeJobWorker) StopJobArgsForCall(i int) (context.Context, string) {
+func (fake *FakeWorker) StopJobArgsForCall(i int) (context.Context, string) {
 	fake.stopJobMutex.RLock()
 	defer fake.stopJobMutex.RUnlock()
 	argsForCall := fake.stopJobArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeJobWorker) StopJobReturns(result1 error) {
+func (fake *FakeWorker) StopJobReturns(result1 error) {
 	fake.stopJobMutex.Lock()
 	defer fake.stopJobMutex.Unlock()
 	fake.StopJobStub = nil
@@ -165,7 +165,7 @@ func (fake *FakeJobWorker) StopJobReturns(result1 error) {
 	}{result1}
 }
 
-func (fake *FakeJobWorker) StopJobReturnsOnCall(i int, result1 error) {
+func (fake *FakeWorker) StopJobReturnsOnCall(i int, result1 error) {
 	fake.stopJobMutex.Lock()
 	defer fake.stopJobMutex.Unlock()
 	fake.StopJobStub = nil
@@ -179,7 +179,7 @@ func (fake *FakeJobWorker) StopJobReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeJobWorker) Invocations() map[string][][]interface{} {
+func (fake *FakeWorker) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.startJobMutex.RLock()
@@ -193,7 +193,7 @@ func (fake *FakeJobWorker) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
-func (fake *FakeJobWorker) recordInvocation(key string, args []interface{}) {
+func (fake *FakeWorker) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -205,4 +205,4 @@ func (fake *FakeJobWorker) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ interfaces.Worker = new(FakeJobWorker)
+var _ interfaces.Worker = new(FakeWorker)

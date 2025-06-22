@@ -3,13 +3,13 @@ package cli
 import (
 	"context"
 	"fmt"
-	"job-worker/pkg/client"
 	"strconv"
 	"strings"
 	"time"
+	"worker/pkg/client"
 
 	"github.com/spf13/cobra"
-	pb "job-worker/api/gen"
+	pb "worker/api/gen"
 )
 
 func newRunCmd() *cobra.Command {

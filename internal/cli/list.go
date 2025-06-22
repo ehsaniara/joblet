@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
-	"job-worker/pkg/client"
 	"strings"
 	"time"
+	"worker/pkg/client"
 
 	"github.com/spf13/cobra"
 )

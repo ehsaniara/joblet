@@ -2,12 +2,12 @@ package store
 
 import (
 	"context"
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces"
-	_errors "job-worker/pkg/errors"
-	"job-worker/pkg/logger"
 	"sync"
 	"time"
+	"worker/internal/worker/domain"
+	"worker/internal/worker/interfaces"
+	_errors "worker/pkg/errors"
+	"worker/pkg/logger"
 )
 
 type store struct {

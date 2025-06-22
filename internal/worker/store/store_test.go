@@ -3,10 +3,10 @@ package store
 import (
 	"context"
 	"fmt"
-	"job-worker/internal/worker/domain"
 	"sync"
 	"testing"
 	"time"
+	"worker/internal/worker/domain"
 )
 
 // mockDomainStreamer for testing

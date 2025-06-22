@@ -16,7 +16,7 @@
         <mxCell id="H5O__hxZZ8Mj5J5bq98N-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontColor=#000000;strokeColor=#000000;shadow=0;sketch=1;curveFitting=1;jiggle=2;" parent="1" source="H5O__hxZZ8Mj5J5bq98N-2" target="H5O__hxZZ8Mj5J5bq98N-3" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="H5O__hxZZ8Mj5J5bq98N-2" value="Job Worker&lt;div&gt;Server&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#36393d;fontColor=#000000;sketch=1;curveFitting=1;jiggle=2;" parent="1" vertex="1">
+        <mxCell id="H5O__hxZZ8Mj5J5bq98N-2" value="Worker&lt;div&gt;Server&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#36393d;fontColor=#000000;sketch=1;curveFitting=1;jiggle=2;" parent="1" vertex="1">
           <mxGeometry x="270" y="50" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="H5O__hxZZ8Mj5J5bq98N-3" value="Linux System&lt;div&gt;(cgroups)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#36393d;fontColor=#000000;sketch=1;curveFitting=1;jiggle=2;" parent="1" vertex="1">

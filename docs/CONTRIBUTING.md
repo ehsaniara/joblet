@@ -1,6 +1,6 @@
 # Contributing to Job Worker
 
-Thank you for your interest in contributing to Job Worker! This guide will help you get started with contributing to the project, whether you're reporting bugs, suggesting features, or submitting code changes.
+Thank you for your interest in contributing to Worker! This guide will help you get started with contributing to the project, whether you're reporting bugs, suggesting features, or submitting code changes.
 
 ## Table of Contents
 
@@ -52,11 +52,11 @@ Before contributing, ensure you have:
 ```bash
 # 1. Fork the repository on GitHub
 # 2. Clone your fork
-git clone https://github.com/your-username/job-worker.git
-cd job-worker
+git clone https://github.com/your-username/worker.git
+cd worker
 
 # 3. Add upstream remote
-git remote add upstream https://github.com/ehsaniara/job-worker.git
+git remote add upstream https://github.com/ehsaniara/worker.git
 
 # 4. Set up development environment
 make setup-dev
@@ -78,7 +78,7 @@ make setup-dev
 
 # This creates:
 # - bin/cli (CLI binary for testing)
-# - bin/job-worker (server binary)
+# - bin/worker (server binary)
 # - bin/job-init (initialization binary)
 # - certs/ (TLS certificates for testing)
 ```
@@ -196,7 +196,7 @@ golangci-lint run
 
 # Build and test locally
 make all
-./bin/job-worker &
+./bin/worker &
 ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem create echo "test"
 ```
 
@@ -290,12 +290,12 @@ import (
     "google.golang.org/grpc"
     
     // Local packages
-    "job-worker/internal/worker/domain"
-    "job-worker/pkg/logger"
+    "worker/internal/worker/domain"
+    "worker/pkg/logger"
 )
 
 // Interface definitions before implementations
-type JobWorker interface {
+type Worker interface {
     StartJob(ctx context.Context, command string) (*domain.Job, error)
     StopJob(ctx context.Context, jobId string) error
 }
@@ -650,8 +650,8 @@ If you have questions about contributing:
 3. Create a new discussion or issue
 4. Tag maintainers if needed
 
-Thank you for contributing to Job Worker! 🚀
+Thank you for contributing to Worker! 🚀
 
 ---
 
-**Happy Contributing!** Every contribution, no matter how small, helps make Job Worker better for everyone.
+**Happy Contributing!** Every contribution, no matter how small, helps make Worker better for everyone.

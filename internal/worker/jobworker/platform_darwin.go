@@ -5,11 +5,11 @@ package jobworker
 import (
 	"context"
 	"fmt"
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/pkg/logger"
 	"sync/atomic"
 	"time"
+	"worker/internal/worker/domain"
+	"worker/internal/worker/interfaces"
+	"worker/pkg/logger"
 )
 
 // darwinWorker provides a basic implementation for macOS development
@@ -20,7 +20,7 @@ type darwinWorker struct {
 }
 
 // NewLinuxWorker creates a basic macOS worker for development
-func NewLinuxWorker(store interfaces.Store) interfaces.JobWorker {
+func NewLinuxWorker(store interfaces.Store) interfaces.Worker {
 	return &darwinWorker{
 		store:  store,
 		logger: logger.New().WithField("component", "darwin-worker"),
@@ -114,4 +114,4 @@ func (w *darwinWorker) getNextJobID() string {
 }
 
 // Ensure darwinWorker implements interfaces
-var _ interfaces.JobWorker = (*darwinWorker)(nil)
+var _ interfaces.Worker = (*darwinWorker)(nil)

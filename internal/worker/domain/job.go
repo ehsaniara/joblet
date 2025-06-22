@@ -3,8 +3,8 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"job-worker/internal/worker/utils"
 	"time"
+	"worker/internal/worker/utils"
 )
 
 type JobStatus string

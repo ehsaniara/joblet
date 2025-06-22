@@ -2,9 +2,9 @@
 package osfakes
 
 import (
-	"job-worker/pkg/os"
 	"sync"
 	"syscall"
+	"worker/pkg/os"
 )
 
 type FakeCommand struct {

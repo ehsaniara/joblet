@@ -5,7 +5,7 @@ set -e
 echo "🔐 Generating certificates for Job Worker..."
 
 if [ "$(uname)" = "Linux" ]; then
-    CERT_DIR="/opt/job-worker/certs"
+    CERT_DIR="/opt/worker/certs"
     echo "📁 Using production cert directory: $CERT_DIR"
 else
     CERT_DIR="./certs"
@@ -19,13 +19,13 @@ echo "🏛️  Generating CA certificate..."
 
 openssl genrsa -out ca-key.pem 4096
 
-openssl req -new -x509 -days 1095 -key ca-key.pem -out ca-cert.pem -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=CA/CN=JobWorker-CA"
+openssl req -new -x509 -days 1095 -key ca-key.pem -out ca-cert.pem -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=CA/CN=Worker-CA"
 
 echo "🖥️  Generating server certificate with SAN support..."
 
 openssl genrsa -out server-key.pem 2048
 
-openssl req -new -key server-key.pem -out server.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=Server/CN=job-worker-server"
+openssl req -new -key server-key.pem -out server.csr -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=Server/CN=worker-server"
 
 cat > server-ext.cnf << 'EOF'
 [req]
@@ -41,9 +41,9 @@ extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1 = job-worker
+DNS.1 = worker
 DNS.2 = localhost
-DNS.3 = job-worker-server
+DNS.3 = worker-server
 IP.1 = 192.168.1.161
 IP.2 = 127.0.0.1
 IP.3 = 0.0.0.0
@@ -58,7 +58,7 @@ echo "👑 Generating admin client certificate..."
 
 openssl genrsa -out admin-client-key.pem 2048
 
-openssl req -new -key admin-client-key.pem -out admin-client.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=admin/CN=admin-client"
+openssl req -new -key admin-client-key.pem -out admin-client.csr -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=admin/CN=admin-client"
 
 openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out admin-client-cert.pem
 
@@ -66,7 +66,7 @@ echo "👁️  Generating viewer client certificate..."
 
 openssl genrsa -out viewer-client-key.pem 2048
 
-openssl req -new -key viewer-client-key.pem -out viewer-client.csr -subj "/C=US/ST=CA/L=Los Angeles/O=JobWorker/OU=viewer/CN=viewer-client"
+openssl req -new -key viewer-client-key.pem -out viewer-client.csr -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=viewer/CN=viewer-client"
 
 openssl x509 -req -days 365 -in viewer-client.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out viewer-client-cert.pem
 

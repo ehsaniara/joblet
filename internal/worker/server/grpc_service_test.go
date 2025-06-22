@@ -5,13 +5,13 @@ import (
 	"errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	pb "job-worker/api/gen"
-	"job-worker/internal/worker/auth"
-	"job-worker/internal/worker/auth/authfakes"
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces/interfacesfakes"
 	"testing"
 	"time"
+	pb "worker/api/gen"
+	"worker/internal/worker/auth"
+	"worker/internal/worker/auth/authfakes"
+	"worker/internal/worker/domain"
+	"worker/internal/worker/interfaces/interfacesfakes"
 )
 
 func TestJobServiceServer_RunJob_Success(t *testing.T) {

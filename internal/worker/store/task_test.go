@@ -1,9 +1,9 @@
 package store
 
 import (
-	"job-worker/internal/worker/domain"
 	"testing"
 	"time"
+	"worker/internal/worker/domain"
 )
 
 func TestTask_NewTask(t *testing.T) {

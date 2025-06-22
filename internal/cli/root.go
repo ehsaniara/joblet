@@ -2,7 +2,7 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
-	"job-worker/internal/config"
+	"worker/internal/config"
 )
 
 var (

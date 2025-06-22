@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
-	"job-worker/internal/config"
-	"job-worker/internal/worker"
-	"job-worker/internal/worker/server"
-	"job-worker/internal/worker/store"
-	"job-worker/pkg/logger"
-	osinterface "job-worker/pkg/os"
 	"os"
 	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
 	"time"
+	"worker/internal/config"
+	"worker/internal/worker"
+	"worker/internal/worker/server"
+	"worker/internal/worker/store"
+	"worker/pkg/logger"
+	osinterface "worker/pkg/os"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 		}
 	}
 
-	appLogger.Info("job-worker starting", "version", "1.0.0", "platform", runtime.GOOS)
+	appLogger.Info("worker starting", "version", "1.0.0", "platform", runtime.GOOS)
 
 	// Validate all platform requirements at startup
 	if err := validatePlatformRequirements(appLogger); err != nil {
@@ -246,7 +246,7 @@ func validateUserNamespaces(osInterface osinterface.OsInterface, logger *logger.
 //	// Additional validation: check if current user has subuid/subgid entries
 //	currentUser := osInterface.Getenv("USER")
 //	if currentUser == "" {
-//		currentUser = "job-worker" // Default assumption
+//		currentUser = "worker" // Default assumption
 //	}
 //
 //	// Check subuid file content

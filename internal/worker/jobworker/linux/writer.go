@@ -1,7 +1,7 @@
 package linux
 
 import (
-	"job-worker/internal/worker/interfaces"
+	"worker/internal/worker/interfaces"
 )
 
 type OutputWriter struct {

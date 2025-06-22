@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"job-worker/pkg/logger"
-	osinterface "job-worker/pkg/os"
+	"worker/pkg/logger"
+	osinterface "worker/pkg/os"
 )
 
 // Validator handles validation of process-related operations

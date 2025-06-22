@@ -1,8 +1,8 @@
-# Job Worker System Design Document
+# Worker System Design Document
 
 ## 1. Overview
 
-The Job Worker is a distributed job execution system that provides secure, resource-controlled execution of arbitrary commands on remote machines. It implements a client-server architecture using gRPC with mutual TLS authentication and fine-grained resource management through Linux cgroups.
+The Worker is a distributed job execution system that provides secure, resource-controlled execution of arbitrary commands on remote machines. It implements a client-server architecture using gRPC with mutual TLS authentication and fine-grained resource management through Linux cgroups.
 
 ### 1.1 Key Features
 
@@ -28,13 +28,13 @@ The Job Worker is a distributed job execution system that provides secure, resou
 
 | Component | Deployment | Responsibility | Key Files |
 |-----------|------------|---------------|-----------|
-| **Job Worker Server** | Server Machine | Core job execution engine, gRPC API, resource management | `cmd/server`, `grpc_server.go`, `grpc_service.go`, `service.go` |
+| **Worker Server** | Server Machine | Core job execution engine, gRPC API, resource management | `cmd/server`, `grpc_server.go`, `grpc_service.go`, `service.go` |
 | **CLI Client** | Client Machine | Command-line interface for remote job operations | `cmd/cli`, `root.go`, `create.go`, `get.go`, `stop.go`, `stream.go`, `list.go` |
 | **job-init Binary** | Server Machine | Process isolation and execution setup (spawned by server) | `cmd/job-init`, `init.go` |
 
-## 3. Server-Side Components (Job Worker)
+## 3. Server-Side Components (Worker)
 
-### 3.1 Job Worker Server
+### 3.1 Worker Server
 
 The server runs as a daemon on the target machine and provides the core job execution capabilities.
 
@@ -43,7 +43,7 @@ The server runs as a daemon on the target machine and provides the core job exec
 | Component | Purpose | Implementation |
 |-----------|---------|---------------|
 | **gRPC Server** | API endpoint with TLS authentication | `grpc_server.go`, `grpc_service.go` |
-| **Job Worker Service** | Core job execution logic and lifecycle management | `service.go` |
+| **Worker Service** | Core job execution logic and lifecycle management | `service.go` |
 | **In-Memory Store** | Job state management and real-time pub/sub | `store.go`, `task.go` |
 | **Resource Manager** | Linux cgroups v2 resource control | `cgroup.go` |
 | **Authorization** | Role-based access control via client certificates | `grpc_authorization.go` |
@@ -78,7 +78,7 @@ Server Process                    job-init Process
 ```
 
 #### Server-Side Resource Management
-- **Cgroups v2 Integration**: Creates and manages `/sys/fs/cgroup/job-{id}` directories
+- **Cgroups v2 Integration**: Creates and manages `/sys/fs/cgroup/worker-{id}` directories
 - **CPU Limiting**: Uses `cpu.max` for percentage-based limits
 - **Memory Limiting**: Uses `memory.max` and `memory.high` for hard/soft limits
 - **I/O Limiting**: Uses `io.max` for bandwidth control
@@ -88,7 +88,7 @@ Server Process                    job-init Process
 
 ### 4.1 CLI Client Commands
 
-The CLI client connects to remote Job Worker servers via gRPC/TLS.
+The CLI client connects to remote Worker servers via gRPC/TLS.
 
 #### Available Commands
 
@@ -103,11 +103,11 @@ The CLI client connects to remote Job Worker servers via gRPC/TLS.
 #### CLI Configuration
 ```bash
 # Global server configuration
-./job-worker-cli --server=remote-host:50051 --cert-path=./certs <command>
+./worker-cli --server=remote-host:50051 --cert-path=./certs <command>
 
 # Per-command usage
-./job-worker-cli create --max-cpu=50 --max-memory=512 python3 script.py
-./job-worker-cli stream <job-id> --follow
+./worker-cli create --max-cpu=50 --max-memory=512 python3 script.py
+./worker-cli stream <job-id> --follow
 ```
 
 ### 4.2 Client Authentication
@@ -144,7 +144,7 @@ service JobService {
 
 #### Request/Response Flow
 ```
-1. Client: job-worker-cli create python3 script.py
+1. Client: worker-cli create python3 script.py
 2. Client: Establish TLS connection to server
 3. Client: Send CreateJobReq with command and args
 4. Server: Validate admin permissions
@@ -166,7 +166,7 @@ service JobService {
 #### Server Installation
 ```bash
 # On the server machine
-sudo ./job-worker &  # Runs as daemon
+sudo ./worker &  # Runs as daemon
 # Server listens on 0.0.0.0:50051
 # Requires ./certs/ directory with TLS certificates
 ```
@@ -176,7 +176,7 @@ sudo ./job-worker &  # Runs as daemon
 #### Client Installation
 ```bash
 # On client machines (any OS)
-./job-worker-cli --server=server-host:50051 list
+./worker-cli --server=server-host:50051 list
 # Requires client certificate for authentication
 ```
 

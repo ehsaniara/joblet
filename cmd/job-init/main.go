@@ -4,8 +4,8 @@ import (
 	"os"
 	"runtime"
 
-	"job-worker/internal/jobinit"
-	"job-worker/pkg/logger"
+	"worker/internal/jobinit"
+	"worker/pkg/logger"
 )
 
 func main() {

@@ -5,13 +5,13 @@ package usernamespace
 import (
 	"context"
 	"fmt"
-	"job-worker/pkg/logger"
-	osinterface "job-worker/pkg/os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"worker/pkg/logger"
+	osinterface "worker/pkg/os"
 )
 
 // userNamespaceManager implements UserNamespaceManager with UID recycling
@@ -250,7 +250,7 @@ func (m *userNamespaceManager) ValidateSubUIDGID() error {
 	}
 
 	// Determine expected user
-	expectedUser := "job-worker"
+	expectedUser := "worker"
 	if user := m.osInterface.Getenv("USER"); user != "" && user != "root" {
 		expectedUser = user
 	}

@@ -27,33 +27,33 @@ jobs:
       - name: Build release binaries
         run: |
           # Linux binaries (worker, CLI, and job-init)
-          GOOS=linux GOARCH=amd64 go build -o job-worker-linux-amd64 ./cmd/worker
-          GOOS=linux GOARCH=amd64 go build -o job-worker-cli-linux-amd64 ./cmd/cli
+          GOOS=linux GOARCH=amd64 go build -o worker-linux-amd64 ./cmd/worker
+          GOOS=linux GOARCH=amd64 go build -o worker-cli-linux-amd64 ./cmd/cli
           GOOS=linux GOARCH=amd64 go build -o job-init-linux-amd64 ./cmd/job-init
           
           # macOS CLI only
-          GOOS=darwin GOARCH=amd64 go build -o job-worker-cli-darwin-amd64 ./cmd/cli
-          GOOS=darwin GOARCH=arm64 go build -o job-worker-cli-darwin-arm64 ./cmd/cli
+          GOOS=darwin GOARCH=amd64 go build -o worker-cli-darwin-amd64 ./cmd/cli
+          GOOS=darwin GOARCH=arm64 go build -o worker-cli-darwin-arm64 ./cmd/cli
           
           # Windows CLI only
-          GOOS=windows GOARCH=amd64 go build -o job-worker-cli-windows-amd64.exe ./cmd/cli
+          GOOS=windows GOARCH=amd64 go build -o worker-cli-windows-amd64.exe ./cmd/cli
           
           # Create archives
           # Linux (includes all three binaries)
-          tar -czf job-worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz job-worker-linux-amd64 job-worker-cli-linux-amd64 job-init-linux-amd64
+          tar -czf worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz worker-linux-amd64 worker-cli-linux-amd64 job-init-linux-amd64
           
           # macOS (CLI only)
-          tar -czf job-worker-cli-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz job-worker-cli-darwin-amd64
-          tar -czf job-worker-cli-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz job-worker-cli-darwin-arm64
+          tar -czf worker-cli-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz worker-cli-darwin-amd64
+          tar -czf worker-cli-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz worker-cli-darwin-arm64
           
           # Windows (CLI only)
-          zip job-worker-cli-${{ steps.version.outputs.VERSION }}-windows-amd64.zip job-worker-cli-windows-amd64.exe
+          zip worker-cli-${{ steps.version.outputs.VERSION }}-windows-amd64.zip worker-cli-windows-amd64.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            job-worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz
-            job-worker-cli-${{ steps.version.outputs.VERSION }}-*.tar.gz
-            job-worker-cli-${{ steps.version.outputs.VERSION }}-*.zip
+            worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz
+            worker-cli-${{ steps.version.outputs.VERSION }}-*.tar.gz
+            worker-cli-${{ steps.version.outputs.VERSION }}-*.zip
           generate_release_notes: true

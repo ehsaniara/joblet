@@ -4,11 +4,11 @@ package jobinit
 
 import (
 	"fmt"
-	"job-worker/pkg/logger"
-	"job-worker/pkg/os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"worker/pkg/logger"
+	"worker/pkg/os"
 )
 
 type darwinJobInitializer struct {

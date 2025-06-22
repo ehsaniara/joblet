@@ -2,8 +2,8 @@ package adapters
 
 import (
 	"context"
-	pb "job-worker/api/gen"
-	"job-worker/internal/worker/interfaces"
+	pb "worker/api/gen"
+	"worker/internal/worker/interfaces"
 )
 
 // GrpcStreamAdapter adapts gRPC stream to domain interface

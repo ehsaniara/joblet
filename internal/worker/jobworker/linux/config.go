@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"job-worker/internal/config"
+	"worker/internal/config"
 )
 
 type Config struct {
@@ -87,7 +87,7 @@ func DefaultConfigWithUserNamespaces() *Config {
 
 // BuildCgroupPath constructs the filesystem path for a job's cgroup
 func (c *Config) BuildCgroupPath(jobID string) string {
-	return filepath.Join(c.CgroupsBaseDir, "job-"+jobID)
+	return filepath.Join(c.CgroupsBaseDir, "worker-"+jobID)
 }
 
 // Validate ensures cgroup namespace requirements are met

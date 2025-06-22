@@ -19,11 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	JobService_RunJob_FullMethodName       = "/job_worker.JobService/RunJob"
-	JobService_GetJobStatus_FullMethodName = "/job_worker.JobService/GetJobStatus"
-	JobService_StopJob_FullMethodName      = "/job_worker.JobService/StopJob"
-	JobService_GetJobLogs_FullMethodName   = "/job_worker.JobService/GetJobLogs"
-	JobService_ListJobs_FullMethodName     = "/job_worker.JobService/ListJobs"
+	JobService_RunJob_FullMethodName       = "/worker.JobService/RunJob"
+	JobService_GetJobStatus_FullMethodName = "/worker.JobService/GetJobStatus"
+	JobService_StopJob_FullMethodName      = "/worker.JobService/StopJob"
+	JobService_GetJobLogs_FullMethodName   = "/worker.JobService/GetJobLogs"
+	JobService_ListJobs_FullMethodName     = "/worker.JobService/ListJobs"
 )
 
 // JobServiceClient is the client API for JobService service.
@@ -254,7 +254,7 @@ func _JobService_ListJobs_Handler(srv interface{}, ctx context.Context, dec func
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var JobService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "job_worker.JobService",
+	ServiceName: "worker.JobService",
 	HandlerType: (*JobServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"job-worker/internal/cli"
+	"worker/internal/cli"
 )
 
 func main() {

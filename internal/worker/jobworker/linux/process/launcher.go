@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"job-worker/pkg/logger"
-	osinterface "job-worker/pkg/os"
+	"worker/pkg/logger"
+	osinterface "worker/pkg/os"
 )
 
 const (
