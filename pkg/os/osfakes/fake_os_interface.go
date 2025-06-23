@@ -8,6 +8,17 @@ import (
 )
 
 type FakeOsInterface struct {
+	ChdirStub        func(string) error
+	chdirMutex       sync.RWMutex
+	chdirArgsForCall []struct {
+		arg1 string
+	}
+	chdirReturns struct {
+		result1 error
+	}
+	chdirReturnsOnCall map[int]struct {
+		result1 error
+	}
 	EnvironStub        func() []string
 	environMutex       sync.RWMutex
 	environArgsForCall []struct {
@@ -99,6 +110,19 @@ type FakeOsInterface struct {
 	mkdirAllReturnsOnCall map[int]struct {
 		result1 error
 	}
+	ReadDirStub        func(string) ([]osa.DirEntry, error)
+	readDirMutex       sync.RWMutex
+	readDirArgsForCall []struct {
+		arg1 string
+	}
+	readDirReturns struct {
+		result1 []osa.DirEntry
+		result2 error
+	}
+	readDirReturnsOnCall map[int]struct {
+		result1 []osa.DirEntry
+		result2 error
+	}
 	ReadFileStub        func(string) ([]byte, error)
 	readFileMutex       sync.RWMutex
 	readFileArgsForCall []struct {
@@ -112,6 +136,19 @@ type FakeOsInterface struct {
 		result1 []byte
 		result2 error
 	}
+	ReadlinkStub        func(string) (string, error)
+	readlinkMutex       sync.RWMutex
+	readlinkArgsForCall []struct {
+		arg1 string
+	}
+	readlinkReturns struct {
+		result1 string
+		result2 error
+	}
+	readlinkReturnsOnCall map[int]struct {
+		result1 string
+		result2 error
+	}
 	RemoveStub        func(string) error
 	removeMutex       sync.RWMutex
 	removeArgsForCall []struct {
@@ -121,6 +158,29 @@ type FakeOsInterface struct {
 		result1 error
 	}
 	removeReturnsOnCall map[int]struct {
+		result1 error
+	}
+	RemoveAllStub        func(string) error
+	removeAllMutex       sync.RWMutex
+	removeAllArgsForCall []struct {
+		arg1 string
+	}
+	removeAllReturns struct {
+		result1 error
+	}
+	removeAllReturnsOnCall map[int]struct {
+		result1 error
+	}
+	SetenvStub        func(string, string) error
+	setenvMutex       sync.RWMutex
+	setenvArgsForCall []struct {
+		arg1 string
+		arg2 string
+	}
+	setenvReturns struct {
+		result1 error
+	}
+	setenvReturnsOnCall map[int]struct {
 		result1 error
 	}
 	StatStub        func(string) (osa.FileInfo, error)
@@ -163,6 +223,67 @@ type FakeOsInterface struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeOsInterface) Chdir(arg1 string) error {
+	fake.chdirMutex.Lock()
+	ret, specificReturn := fake.chdirReturnsOnCall[len(fake.chdirArgsForCall)]
+	fake.chdirArgsForCall = append(fake.chdirArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ChdirStub
+	fakeReturns := fake.chdirReturns
+	fake.recordInvocation("Chdir", []interface{}{arg1})
+	fake.chdirMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOsInterface) ChdirCallCount() int {
+	fake.chdirMutex.RLock()
+	defer fake.chdirMutex.RUnlock()
+	return len(fake.chdirArgsForCall)
+}
+
+func (fake *FakeOsInterface) ChdirCalls(stub func(string) error) {
+	fake.chdirMutex.Lock()
+	defer fake.chdirMutex.Unlock()
+	fake.ChdirStub = stub
+}
+
+func (fake *FakeOsInterface) ChdirArgsForCall(i int) string {
+	fake.chdirMutex.RLock()
+	defer fake.chdirMutex.RUnlock()
+	argsForCall := fake.chdirArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOsInterface) ChdirReturns(result1 error) {
+	fake.chdirMutex.Lock()
+	defer fake.chdirMutex.Unlock()
+	fake.ChdirStub = nil
+	fake.chdirReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeOsInterface) ChdirReturnsOnCall(i int, result1 error) {
+	fake.chdirMutex.Lock()
+	defer fake.chdirMutex.Unlock()
+	fake.ChdirStub = nil
+	if fake.chdirReturnsOnCall == nil {
+		fake.chdirReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.chdirReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeOsInterface) Environ() []string {
@@ -649,6 +770,70 @@ func (fake *FakeOsInterface) MkdirAllReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeOsInterface) ReadDir(arg1 string) ([]osa.DirEntry, error) {
+	fake.readDirMutex.Lock()
+	ret, specificReturn := fake.readDirReturnsOnCall[len(fake.readDirArgsForCall)]
+	fake.readDirArgsForCall = append(fake.readDirArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ReadDirStub
+	fakeReturns := fake.readDirReturns
+	fake.recordInvocation("ReadDir", []interface{}{arg1})
+	fake.readDirMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeOsInterface) ReadDirCallCount() int {
+	fake.readDirMutex.RLock()
+	defer fake.readDirMutex.RUnlock()
+	return len(fake.readDirArgsForCall)
+}
+
+func (fake *FakeOsInterface) ReadDirCalls(stub func(string) ([]osa.DirEntry, error)) {
+	fake.readDirMutex.Lock()
+	defer fake.readDirMutex.Unlock()
+	fake.ReadDirStub = stub
+}
+
+func (fake *FakeOsInterface) ReadDirArgsForCall(i int) string {
+	fake.readDirMutex.RLock()
+	defer fake.readDirMutex.RUnlock()
+	argsForCall := fake.readDirArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOsInterface) ReadDirReturns(result1 []osa.DirEntry, result2 error) {
+	fake.readDirMutex.Lock()
+	defer fake.readDirMutex.Unlock()
+	fake.ReadDirStub = nil
+	fake.readDirReturns = struct {
+		result1 []osa.DirEntry
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeOsInterface) ReadDirReturnsOnCall(i int, result1 []osa.DirEntry, result2 error) {
+	fake.readDirMutex.Lock()
+	defer fake.readDirMutex.Unlock()
+	fake.ReadDirStub = nil
+	if fake.readDirReturnsOnCall == nil {
+		fake.readDirReturnsOnCall = make(map[int]struct {
+			result1 []osa.DirEntry
+			result2 error
+		})
+	}
+	fake.readDirReturnsOnCall[i] = struct {
+		result1 []osa.DirEntry
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeOsInterface) ReadFile(arg1 string) ([]byte, error) {
 	fake.readFileMutex.Lock()
 	ret, specificReturn := fake.readFileReturnsOnCall[len(fake.readFileArgsForCall)]
@@ -713,6 +898,70 @@ func (fake *FakeOsInterface) ReadFileReturnsOnCall(i int, result1 []byte, result
 	}{result1, result2}
 }
 
+func (fake *FakeOsInterface) Readlink(arg1 string) (string, error) {
+	fake.readlinkMutex.Lock()
+	ret, specificReturn := fake.readlinkReturnsOnCall[len(fake.readlinkArgsForCall)]
+	fake.readlinkArgsForCall = append(fake.readlinkArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ReadlinkStub
+	fakeReturns := fake.readlinkReturns
+	fake.recordInvocation("Readlink", []interface{}{arg1})
+	fake.readlinkMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeOsInterface) ReadlinkCallCount() int {
+	fake.readlinkMutex.RLock()
+	defer fake.readlinkMutex.RUnlock()
+	return len(fake.readlinkArgsForCall)
+}
+
+func (fake *FakeOsInterface) ReadlinkCalls(stub func(string) (string, error)) {
+	fake.readlinkMutex.Lock()
+	defer fake.readlinkMutex.Unlock()
+	fake.ReadlinkStub = stub
+}
+
+func (fake *FakeOsInterface) ReadlinkArgsForCall(i int) string {
+	fake.readlinkMutex.RLock()
+	defer fake.readlinkMutex.RUnlock()
+	argsForCall := fake.readlinkArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOsInterface) ReadlinkReturns(result1 string, result2 error) {
+	fake.readlinkMutex.Lock()
+	defer fake.readlinkMutex.Unlock()
+	fake.ReadlinkStub = nil
+	fake.readlinkReturns = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeOsInterface) ReadlinkReturnsOnCall(i int, result1 string, result2 error) {
+	fake.readlinkMutex.Lock()
+	defer fake.readlinkMutex.Unlock()
+	fake.ReadlinkStub = nil
+	if fake.readlinkReturnsOnCall == nil {
+		fake.readlinkReturnsOnCall = make(map[int]struct {
+			result1 string
+			result2 error
+		})
+	}
+	fake.readlinkReturnsOnCall[i] = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeOsInterface) Remove(arg1 string) error {
 	fake.removeMutex.Lock()
 	ret, specificReturn := fake.removeReturnsOnCall[len(fake.removeArgsForCall)]
@@ -770,6 +1019,129 @@ func (fake *FakeOsInterface) RemoveReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.removeReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeOsInterface) RemoveAll(arg1 string) error {
+	fake.removeAllMutex.Lock()
+	ret, specificReturn := fake.removeAllReturnsOnCall[len(fake.removeAllArgsForCall)]
+	fake.removeAllArgsForCall = append(fake.removeAllArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.RemoveAllStub
+	fakeReturns := fake.removeAllReturns
+	fake.recordInvocation("RemoveAll", []interface{}{arg1})
+	fake.removeAllMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOsInterface) RemoveAllCallCount() int {
+	fake.removeAllMutex.RLock()
+	defer fake.removeAllMutex.RUnlock()
+	return len(fake.removeAllArgsForCall)
+}
+
+func (fake *FakeOsInterface) RemoveAllCalls(stub func(string) error) {
+	fake.removeAllMutex.Lock()
+	defer fake.removeAllMutex.Unlock()
+	fake.RemoveAllStub = stub
+}
+
+func (fake *FakeOsInterface) RemoveAllArgsForCall(i int) string {
+	fake.removeAllMutex.RLock()
+	defer fake.removeAllMutex.RUnlock()
+	argsForCall := fake.removeAllArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOsInterface) RemoveAllReturns(result1 error) {
+	fake.removeAllMutex.Lock()
+	defer fake.removeAllMutex.Unlock()
+	fake.RemoveAllStub = nil
+	fake.removeAllReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeOsInterface) RemoveAllReturnsOnCall(i int, result1 error) {
+	fake.removeAllMutex.Lock()
+	defer fake.removeAllMutex.Unlock()
+	fake.RemoveAllStub = nil
+	if fake.removeAllReturnsOnCall == nil {
+		fake.removeAllReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.removeAllReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeOsInterface) Setenv(arg1 string, arg2 string) error {
+	fake.setenvMutex.Lock()
+	ret, specificReturn := fake.setenvReturnsOnCall[len(fake.setenvArgsForCall)]
+	fake.setenvArgsForCall = append(fake.setenvArgsForCall, struct {
+		arg1 string
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.SetenvStub
+	fakeReturns := fake.setenvReturns
+	fake.recordInvocation("Setenv", []interface{}{arg1, arg2})
+	fake.setenvMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOsInterface) SetenvCallCount() int {
+	fake.setenvMutex.RLock()
+	defer fake.setenvMutex.RUnlock()
+	return len(fake.setenvArgsForCall)
+}
+
+func (fake *FakeOsInterface) SetenvCalls(stub func(string, string) error) {
+	fake.setenvMutex.Lock()
+	defer fake.setenvMutex.Unlock()
+	fake.SetenvStub = stub
+}
+
+func (fake *FakeOsInterface) SetenvArgsForCall(i int) (string, string) {
+	fake.setenvMutex.RLock()
+	defer fake.setenvMutex.RUnlock()
+	argsForCall := fake.setenvArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeOsInterface) SetenvReturns(result1 error) {
+	fake.setenvMutex.Lock()
+	defer fake.setenvMutex.Unlock()
+	fake.SetenvStub = nil
+	fake.setenvReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeOsInterface) SetenvReturnsOnCall(i int, result1 error) {
+	fake.setenvMutex.Lock()
+	defer fake.setenvMutex.Unlock()
+	fake.SetenvStub = nil
+	if fake.setenvReturnsOnCall == nil {
+		fake.setenvReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.setenvReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -971,6 +1343,8 @@ func (fake *FakeOsInterface) WriteFileReturnsOnCall(i int, result1 error) {
 func (fake *FakeOsInterface) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.chdirMutex.RLock()
+	defer fake.chdirMutex.RUnlock()
 	fake.environMutex.RLock()
 	defer fake.environMutex.RUnlock()
 	fake.executableMutex.RLock()
@@ -989,10 +1363,18 @@ func (fake *FakeOsInterface) Invocations() map[string][][]interface{} {
 	defer fake.isNotExistMutex.RUnlock()
 	fake.mkdirAllMutex.RLock()
 	defer fake.mkdirAllMutex.RUnlock()
+	fake.readDirMutex.RLock()
+	defer fake.readDirMutex.RUnlock()
 	fake.readFileMutex.RLock()
 	defer fake.readFileMutex.RUnlock()
+	fake.readlinkMutex.RLock()
+	defer fake.readlinkMutex.RUnlock()
 	fake.removeMutex.RLock()
 	defer fake.removeMutex.RUnlock()
+	fake.removeAllMutex.RLock()
+	defer fake.removeAllMutex.RUnlock()
+	fake.setenvMutex.RLock()
+	defer fake.setenvMutex.RUnlock()
 	fake.statMutex.RLock()
 	defer fake.statMutex.RUnlock()
 	fake.symlinkMutex.RLock()

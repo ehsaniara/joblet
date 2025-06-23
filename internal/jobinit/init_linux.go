@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"worker/pkg/logger"
@@ -37,9 +38,28 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 
 	jobLogger := j.logger.WithField("jobId", jobID)
 
-	if jobID == "" || command == "" || cgroupPath == "" {
-		jobLogger.Error("missing required environment variables")
-		return nil, fmt.Errorf("missing required environment variables")
+	// Debug: Log all environment variables we're checking
+	jobLogger.Info("checking required environment variables",
+		"JOB_ID", jobID,
+		"JOB_COMMAND", command,
+		"JOB_CGROUP_PATH", cgroupPath,
+		"JOB_ISOLATED_ROOT", j.osInterface.Getenv("JOB_ISOLATED_ROOT"))
+
+	// Improved error checking with specific missing variables
+	var missingVars []string
+	if jobID == "" {
+		missingVars = append(missingVars, "JOB_ID")
+	}
+	if command == "" {
+		missingVars = append(missingVars, "JOB_COMMAND")
+	}
+	if cgroupPath == "" {
+		missingVars = append(missingVars, "JOB_CGROUP_PATH")
+	}
+
+	if len(missingVars) > 0 {
+		jobLogger.Error("missing required environment variables", "missing", missingVars)
+		return nil, fmt.Errorf("missing required environment variables: %v", missingVars)
 	}
 
 	var args []string
@@ -56,7 +76,7 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 		}
 	}
 
-	jobLogger.Info("loaded job configuration (host networking)",
+	jobLogger.Info("loaded job configuration with filesystem isolation",
 		"command", command,
 		"cgroupPath", cgroupPath,
 		"argsCount", len(args))
@@ -73,12 +93,12 @@ func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 	log := j.logger.WithField("jobId", config.JobID)
 
 	if config == nil {
-		return fmt.Errorf("job mapping.go cannot be nil")
+		return fmt.Errorf("job config cannot be nil")
 	}
 
-	log.Info("executing job with host networking", "command", config.Command)
+	log.Info("executing job with filesystem isolation", "command", config.Command)
 
-	// Setup basic namespace environment
+	// Setup basic namespace environment with filesystem isolation
 	if err := j.setupBasicEnvironment(); err != nil {
 		return fmt.Errorf("failed to setup basic environment: %w", err)
 	}
@@ -94,9 +114,9 @@ func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 		return fmt.Errorf("command not found: %w", err)
 	}
 
-	// Execute the command (inherits host networking)
+	// Execute the command (in isolated filesystem)
 	execArgs := append([]string{config.Command}, config.Args...)
-	log.Info("executing command with host networking", "commandPath", commandPath)
+	log.Info("executing command in isolated environment", "commandPath", commandPath)
 
 	if e := j.syscallInterface.Exec(commandPath, execArgs, j.osInterface.Environ()); e != nil {
 		return fmt.Errorf("failed to exec command: %w", e)
@@ -106,7 +126,7 @@ func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 }
 
 func (j *jobInitializer) Run() error {
-	j.logger.Info("job-init starting with host networking")
+	j.logger.Info("job-init starting with filesystem isolation")
 
 	if err := j.setupBasicEnvironment(); err != nil {
 		return err
@@ -120,13 +140,166 @@ func (j *jobInitializer) Run() error {
 	return j.ExecuteJob(config)
 }
 
+// Just change working directory and setup environment
 func (j *jobInitializer) setupBasicEnvironment() error {
 	pid := j.osInterface.Getpid()
-	j.logger.Debug("setting up basic environment", "pid", pid)
+	j.logger.Info("setting up basic environment with filesystem isolation", "pid", pid)
 
-	// Skip /proc remount when using user namespaces - they provide sufficient isolation
-	j.logger.Info("skipping /proc remount - using user namespace isolation")
+	// Setup simple filesystem isolation (working directory + environment)
+	if err := j.setupFilesystemIsolation(); err != nil {
+		return fmt.Errorf("filesystem isolation failed: %w", err)
+	}
+
+	j.logger.Info("basic environment with filesystem isolation complete")
 	return nil
+}
+
+func (j *jobInitializer) setupFilesystemIsolation() error {
+	jobID := j.osInterface.Getenv("JOB_ID")
+	isolatedRoot := j.osInterface.Getenv("JOB_ISOLATED_ROOT")
+
+	if isolatedRoot == "" {
+		return fmt.Errorf("JOB_ISOLATED_ROOT environment variable not set")
+	}
+
+	j.logger.Info("setting up conservative filesystem isolation", "jobID", jobID, "root", isolatedRoot)
+
+	// Simply change to the isolated working directory
+	workDir := filepath.Join(isolatedRoot, "work")
+	if err := j.osInterface.Chdir(workDir); err != nil {
+		return fmt.Errorf("failed to change to isolated work directory %s: %w", workDir, err)
+	}
+
+	// Update PATH to prioritize isolated binaries
+	if err := j.setupIsolatedPath(isolatedRoot); err != nil {
+		return fmt.Errorf("failed to setup isolated PATH: %w", err)
+	}
+
+	// Set up isolated environment variables with helpful paths
+	j.setupConservativeIsolatedEnvironment(isolatedRoot)
+
+	j.logger.Info("conservative filesystem isolation complete", "workDir", workDir)
+	return nil
+}
+
+func (j *jobInitializer) setupConservativeIsolatedEnvironment(isolatedRoot string) {
+	jobID := j.osInterface.Getenv("JOB_ID")
+	workDir := filepath.Join(isolatedRoot, "work")
+
+	// Set environment variables for isolated environment
+	j.osInterface.Setenv("HOME", workDir)
+	j.osInterface.Setenv("TMPDIR", filepath.Join(isolatedRoot, "tmp"))
+	j.osInterface.Setenv("TMP", filepath.Join(isolatedRoot, "tmp"))
+	j.osInterface.Setenv("TEMP", filepath.Join(isolatedRoot, "tmp"))
+
+	// Set PWD to current working directory
+	j.osInterface.Setenv("PWD", workDir)
+	j.osInterface.Setenv("OLDPWD", "/")
+
+	// Provide work directory paths for scripts that need absolute paths
+	j.osInterface.Setenv("WORK_DIR", workDir)
+	j.osInterface.Setenv("JOB_WORK_DIR", workDir)
+	j.osInterface.Setenv("WORKSPACE", workDir)
+
+	// Mark as isolated environment
+	j.osInterface.Setenv("WORKER_ISOLATED", "true")
+	j.osInterface.Setenv("WORKER_ISOLATED_ROOT", isolatedRoot)
+	j.osInterface.Setenv("WORKER_JOB_ID", jobID)
+	j.osInterface.Setenv("FILESYSTEM_VIRTUALIZED", "false")
+
+	j.logger.Info("conservative isolated environment variables set")
+}
+
+// Setup additional bind mounts for common directories
+func (j *jobInitializer) setupAdditionalBindMounts(isolatedRoot string) error {
+	bindMounts := map[string]string{
+		// Virtual path -> Isolated path
+		"/tmp":     filepath.Join(isolatedRoot, "tmp"),
+		"/var/tmp": filepath.Join(isolatedRoot, "var/tmp"),
+		"/home":    filepath.Join(isolatedRoot, "home"),
+	}
+
+	for virtualPath, isolatedPath := range bindMounts {
+		// Create virtual directory
+		if err := j.osInterface.MkdirAll(virtualPath, 0755); err != nil {
+			j.logger.Debug("failed to create virtual directory", "path", virtualPath, "error", err)
+			continue
+		}
+
+		// Bind mount isolated path to virtual path
+		if err := j.syscallInterface.Mount(isolatedPath, virtualPath, "", syscall.MS_BIND, ""); err != nil {
+			j.logger.Debug("failed to bind mount", "virtual", virtualPath, "isolated", isolatedPath, "error", err)
+			continue
+		}
+
+		// Make mount private
+		if err := j.syscallInterface.Mount("", virtualPath, "", syscall.MS_PRIVATE, ""); err != nil {
+			j.logger.Debug("failed to make mount private", "path", virtualPath, "error", err)
+		}
+
+		j.logger.Debug("bind mount created", "virtual", virtualPath, "isolated", isolatedPath)
+	}
+
+	return nil
+}
+
+// Setup isolated PATH
+func (j *jobInitializer) setupIsolatedPath(isolatedRoot string) error {
+	// Build new PATH with isolated directories first
+	isolatedPaths := []string{
+		filepath.Join(isolatedRoot, "bin"),
+		filepath.Join(isolatedRoot, "usr/bin"),
+	}
+
+	// Get current PATH
+	currentPath := j.osInterface.Getenv("PATH")
+
+	// Build new PATH: isolated paths + current path
+	var pathComponents []string
+	for _, isolatedPath := range isolatedPaths {
+		// Only add if directory exists
+		if _, err := j.osInterface.Stat(isolatedPath); err == nil {
+			pathComponents = append(pathComponents, isolatedPath)
+		}
+	}
+
+	// Add original PATH as fallback
+	if currentPath != "" {
+		pathComponents = append(pathComponents, currentPath)
+	}
+
+	newPath := strings.Join(pathComponents, ":")
+	j.osInterface.Setenv("PATH", newPath)
+
+	j.logger.Info("PATH updated for isolation", "newPath", newPath)
+	return nil
+}
+
+// Setup isolated environment variables
+func (j *jobInitializer) setupIsolatedEnvironment(isolatedRoot string) {
+	jobID := j.osInterface.Getenv("JOB_ID")
+
+	// Set environment variables for the virtualized filesystem
+	j.osInterface.Setenv("HOME", "/home")  // Virtualized home
+	j.osInterface.Setenv("TMPDIR", "/tmp") // Virtualized tmp
+	j.osInterface.Setenv("TMP", "/tmp")    // Virtualized tmp
+	j.osInterface.Setenv("TEMP", "/tmp")   // Virtualized tmp
+
+	// Set PWD to virtualized work directory
+	j.osInterface.Setenv("PWD", "/work") // Virtualized work
+	j.osInterface.Setenv("OLDPWD", "/")
+
+	// Provide both virtualized and real paths for flexibility
+	j.osInterface.Setenv("WORK_DIR", "/work")                                  // Virtualized
+	j.osInterface.Setenv("REAL_WORK_DIR", filepath.Join(isolatedRoot, "work")) // Real path
+
+	// Mark as isolated environment
+	j.osInterface.Setenv("WORKER_ISOLATED", "true")
+	j.osInterface.Setenv("WORKER_ISOLATED_ROOT", isolatedRoot)
+	j.osInterface.Setenv("WORKER_JOB_ID", jobID)
+	j.osInterface.Setenv("FILESYSTEM_VIRTUALIZED", "true")
+
+	j.logger.Info("virtualized environment variables set")
 }
 
 // Setup cgroup namespace mount
