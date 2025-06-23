@@ -68,6 +68,13 @@ func (p *ExecProcess) Kill() error {
 // DefaultSyscall implements interfaces.SyscallInterface for macOS (mock/stub)
 type DefaultSyscall struct{}
 
+func (s *DefaultSyscall) PivotRoot(newRoot, oldRoot string) error {
+	panic("not implemented")
+}
+
+func (s *DefaultSyscall) Chroot(path string) error {
+	return syscall.Chroot(path)
+}
 func (s *DefaultSyscall) Kill(pid int, sig syscall.Signal) error {
 	return syscall.Kill(pid, sig)
 }
@@ -97,6 +104,23 @@ func (s *DefaultSyscall) Unmount(target string, flags int) error {
 
 // DefaultOs implements interfaces.OsInterface using real os
 type DefaultOs struct{}
+
+func (d *DefaultOs) ReadDir(dirname string) ([]os.DirEntry, error) {
+	return os.ReadDir(dirname)
+}
+func (d *DefaultOs) RemoveAll(root string) error {
+	return os.RemoveAll(root)
+}
+func (d *DefaultOs) Setenv(key, value string) error {
+	return os.Setenv(key, value)
+}
+func (d *DefaultOs) Chdir(dir string) error {
+	return os.Chdir(dir)
+}
+
+func (d *DefaultOs) Readlink(name string) (string, error) {
+	return os.Readlink(name)
+}
 
 func (d *DefaultOs) IsNotExist(err error) bool {
 	return os.IsNotExist(err)

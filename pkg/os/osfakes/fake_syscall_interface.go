@@ -8,6 +8,17 @@ import (
 )
 
 type FakeSyscallInterface struct {
+	ChrootStub        func(string) error
+	chrootMutex       sync.RWMutex
+	chrootArgsForCall []struct {
+		arg1 string
+	}
+	chrootReturns struct {
+		result1 error
+	}
+	chrootReturnsOnCall map[int]struct {
+		result1 error
+	}
 	CreateProcessGroupStub        func() *syscall.SysProcAttr
 	createProcessGroupMutex       sync.RWMutex
 	createProcessGroupArgsForCall []struct {
@@ -58,6 +69,18 @@ type FakeSyscallInterface struct {
 	mountReturnsOnCall map[int]struct {
 		result1 error
 	}
+	PivotRootStub        func(string, string) error
+	pivotRootMutex       sync.RWMutex
+	pivotRootArgsForCall []struct {
+		arg1 string
+		arg2 string
+	}
+	pivotRootReturns struct {
+		result1 error
+	}
+	pivotRootReturnsOnCall map[int]struct {
+		result1 error
+	}
 	UnmountStub        func(string, int) error
 	unmountMutex       sync.RWMutex
 	unmountArgsForCall []struct {
@@ -72,6 +95,67 @@ type FakeSyscallInterface struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeSyscallInterface) Chroot(arg1 string) error {
+	fake.chrootMutex.Lock()
+	ret, specificReturn := fake.chrootReturnsOnCall[len(fake.chrootArgsForCall)]
+	fake.chrootArgsForCall = append(fake.chrootArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ChrootStub
+	fakeReturns := fake.chrootReturns
+	fake.recordInvocation("Chroot", []interface{}{arg1})
+	fake.chrootMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallInterface) ChrootCallCount() int {
+	fake.chrootMutex.RLock()
+	defer fake.chrootMutex.RUnlock()
+	return len(fake.chrootArgsForCall)
+}
+
+func (fake *FakeSyscallInterface) ChrootCalls(stub func(string) error) {
+	fake.chrootMutex.Lock()
+	defer fake.chrootMutex.Unlock()
+	fake.ChrootStub = stub
+}
+
+func (fake *FakeSyscallInterface) ChrootArgsForCall(i int) string {
+	fake.chrootMutex.RLock()
+	defer fake.chrootMutex.RUnlock()
+	argsForCall := fake.chrootArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeSyscallInterface) ChrootReturns(result1 error) {
+	fake.chrootMutex.Lock()
+	defer fake.chrootMutex.Unlock()
+	fake.ChrootStub = nil
+	fake.chrootReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallInterface) ChrootReturnsOnCall(i int, result1 error) {
+	fake.chrootMutex.Lock()
+	defer fake.chrootMutex.Unlock()
+	fake.ChrootStub = nil
+	if fake.chrootReturnsOnCall == nil {
+		fake.chrootReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.chrootReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeSyscallInterface) CreateProcessGroup() *syscall.SysProcAttr {
@@ -327,6 +411,68 @@ func (fake *FakeSyscallInterface) MountReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeSyscallInterface) PivotRoot(arg1 string, arg2 string) error {
+	fake.pivotRootMutex.Lock()
+	ret, specificReturn := fake.pivotRootReturnsOnCall[len(fake.pivotRootArgsForCall)]
+	fake.pivotRootArgsForCall = append(fake.pivotRootArgsForCall, struct {
+		arg1 string
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.PivotRootStub
+	fakeReturns := fake.pivotRootReturns
+	fake.recordInvocation("PivotRoot", []interface{}{arg1, arg2})
+	fake.pivotRootMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallInterface) PivotRootCallCount() int {
+	fake.pivotRootMutex.RLock()
+	defer fake.pivotRootMutex.RUnlock()
+	return len(fake.pivotRootArgsForCall)
+}
+
+func (fake *FakeSyscallInterface) PivotRootCalls(stub func(string, string) error) {
+	fake.pivotRootMutex.Lock()
+	defer fake.pivotRootMutex.Unlock()
+	fake.PivotRootStub = stub
+}
+
+func (fake *FakeSyscallInterface) PivotRootArgsForCall(i int) (string, string) {
+	fake.pivotRootMutex.RLock()
+	defer fake.pivotRootMutex.RUnlock()
+	argsForCall := fake.pivotRootArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSyscallInterface) PivotRootReturns(result1 error) {
+	fake.pivotRootMutex.Lock()
+	defer fake.pivotRootMutex.Unlock()
+	fake.PivotRootStub = nil
+	fake.pivotRootReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallInterface) PivotRootReturnsOnCall(i int, result1 error) {
+	fake.pivotRootMutex.Lock()
+	defer fake.pivotRootMutex.Unlock()
+	fake.PivotRootStub = nil
+	if fake.pivotRootReturnsOnCall == nil {
+		fake.pivotRootReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.pivotRootReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeSyscallInterface) Unmount(arg1 string, arg2 int) error {
 	fake.unmountMutex.Lock()
 	ret, specificReturn := fake.unmountReturnsOnCall[len(fake.unmountArgsForCall)]
@@ -392,6 +538,8 @@ func (fake *FakeSyscallInterface) UnmountReturnsOnCall(i int, result1 error) {
 func (fake *FakeSyscallInterface) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.chrootMutex.RLock()
+	defer fake.chrootMutex.RUnlock()
 	fake.createProcessGroupMutex.RLock()
 	defer fake.createProcessGroupMutex.RUnlock()
 	fake.execMutex.RLock()
@@ -400,6 +548,8 @@ func (fake *FakeSyscallInterface) Invocations() map[string][][]interface{} {
 	defer fake.killMutex.RUnlock()
 	fake.mountMutex.RLock()
 	defer fake.mountMutex.RUnlock()
+	fake.pivotRootMutex.RLock()
+	defer fake.pivotRootMutex.RUnlock()
 	fake.unmountMutex.RLock()
 	defer fake.unmountMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}

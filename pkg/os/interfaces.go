@@ -18,6 +18,8 @@ type SyscallInterface interface {
 	Exec(string, []string, []string) error
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
 	Unmount(target string, flags int) error
+	Chroot(path string) error
+	PivotRoot(newRoot, oldRoot string) error // for pivot_root approach
 }
 
 //counterfeiter:generate . OsInterface
@@ -38,6 +40,11 @@ type OsInterface interface {
 	// User namespace support methods
 	Getuid() int
 	Getgid() int
+	Chdir(dir string) error
+	RemoveAll(root string) error
+	Setenv(key, value string) error
+	ReadDir(dirname string) ([]os.DirEntry, error)
+	Readlink(name string) (string, error)
 }
 
 //counterfeiter:generate . CommandFactory

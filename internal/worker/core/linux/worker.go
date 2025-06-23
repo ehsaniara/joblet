@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
-	interfaces2 "worker/internal/worker/core/interfaces"
+	"worker/internal/worker/core/interfaces"
+	"worker/internal/worker/core/linux/filesystem"
 	"worker/internal/worker/core/linux/resource"
 	"worker/internal/worker/core/linux/usernamespace"
 	"worker/internal/worker/store"
@@ -32,6 +34,7 @@ type worker struct {
 	processLauncher      *process.Launcher
 	processCleaner       *process.Cleaner
 	processValidator     *process.Validator
+	filesystemManager    interfaces.FilesystemManager
 	osInterface          osinterface.OsInterface
 	config               *Config
 	logger               *logger.Logger
@@ -45,13 +48,14 @@ type dependencies struct {
 	ProcessLauncher      *process.Launcher
 	ProcessCleaner       *process.Cleaner
 	ProcessValidator     *process.Validator
+	FilesystemManager    interfaces.FilesystemManager
 	OsInterface          osinterface.OsInterface
 	Config               *Config
 }
 
 // NewPlatformWorker creates a Linux worker with user namespace isolation
 // Note: All platform requirements should be validated in main.go before calling this
-func NewPlatformWorker(store store.Store) interfaces2.Worker {
+func NewPlatformWorker(store store.Store) interfaces.Worker {
 	// Create OS interfaces
 	osInterface := &osinterface.DefaultOs{}
 	syscallInterface := &osinterface.DefaultSyscall{}
@@ -62,6 +66,7 @@ func NewPlatformWorker(store store.Store) interfaces2.Worker {
 	processValidator := process.NewValidator(osInterface, execInterface)
 	processLauncher := process.NewLauncher(cmdFactory, syscallInterface, osInterface, processValidator)
 	processCleaner := process.NewCleaner(syscallInterface, osInterface)
+	filesystemManager := filesystem.NewManager(osInterface)
 
 	// Create resource management
 	cgroupResource := resource.New()
@@ -80,30 +85,28 @@ func NewPlatformWorker(store store.Store) interfaces2.Worker {
 		ProcessLauncher:      processLauncher,
 		ProcessCleaner:       processCleaner,
 		ProcessValidator:     processValidator,
+		FilesystemManager:    filesystemManager,
 		OsInterface:          osInterface,
 		Config:               config,
 	}
 
-	worker := &worker{
+	w := &worker{
 		store:                deps.Store,
 		cgroup:               deps.Cgroup,
 		userNamespaceManager: deps.UserNamespaceManager,
 		processLauncher:      deps.ProcessLauncher,
 		processCleaner:       deps.ProcessCleaner,
 		processValidator:     deps.ProcessValidator,
+		filesystemManager:    deps.FilesystemManager,
 		osInterface:          deps.OsInterface,
 		config:               deps.Config,
 		logger:               logger.New().WithField("component", "linux-worker"),
 	}
 
-	// Log successful initialization (validation was done in main)
-	worker.logger.Info("Linux worker initialized with user namespace support",
-		"userNamespacesEnabled", config.UserNamespaceEnabled,
-		"cgroupNamespacesEnabled", true,
-		"baseUID", config.UserNamespaceConfig.BaseUID,
-		"maxJobs", config.UserNamespaceConfig.MaxJobs)
+	// Log successful initialization
+	w.logger.Info("Linux worker initialized with filesystem isolation support")
 
-	return worker
+	return w
 }
 
 // StartJob creates isolated job with user namespaces and cgroup limits
@@ -138,9 +141,17 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
 
+	// Setup isolated filesystem
+	isolatedRoot, err := w.filesystemManager.SetupIsolatedFilesystem(ctx, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("filesystem isolation setup failed: %w", err)
+	}
+
 	// Create unique UID mapping for job isolation
 	userMapping, err := w.userNamespaceManager.CreateUserMapping(ctx, jobID)
 	if err != nil {
+		// Cleanup filesystem on failure
+		w.filesystemManager.CleanupIsolatedFilesystem(jobID)
 		return nil, fmt.Errorf("failed to create user mapping: %w", err)
 	}
 
@@ -151,8 +162,9 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
-		// Cleanup on failure to prevent resource leaks
+		// Cleanup on failure
 		w.userNamespaceManager.CleanupUserMapping(jobID)
+		w.filesystemManager.CleanupIsolatedFilesystem(jobID)
 		return nil, fmt.Errorf("cgroup setup failed: %w", e)
 	}
 
@@ -160,7 +172,7 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	w.store.CreateNewJob(job)
 
 	// Start the process with user namespace isolation
-	cmd, err := w.startProcessWithUserNamespace(ctx, job, userMapping)
+	cmd, err := w.startProcessWithFilesystemIsolation(ctx, job, userMapping, isolatedRoot)
 	if err != nil {
 		w.cleanupFailedJob(job)
 		return nil, fmt.Errorf("process start failed: %w", err)
@@ -172,11 +184,84 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Start monitoring
 	go w.monitorJob(ctx, cmd, job)
 
-	log.Info("job started successfully with user namespace isolation",
+	log.Info("job started successfully with filesystem isolation",
 		"pid", job.Pid,
-		"hostUID", userMapping.HostUID,
-		"namespaceUID", userMapping.NamespaceUID)
+		"isolatedRoot", isolatedRoot)
 	return job, nil
+}
+
+func (w *worker) startProcessWithFilesystemIsolation(ctx context.Context, job *domain.Job, userMapping *usernamespace.UserMapping, isolatedRoot string) (osinterface.Command, error) {
+	// Get job-init binary path
+	initPath, err := w.getJobInitPath()
+	if err != nil {
+		return nil, fmt.Errorf("job-init not found: %w", err)
+	}
+
+	// Prepare environment with filesystem isolation info
+	env := w.buildJobEnvironmentWithFilesystemIsolation(job, userMapping, isolatedRoot)
+
+	// Create process attributes with user namespace isolation
+	sysProcAttr := w.createUserNamespaceSysProcAttr()
+
+	// Configure user namespace mappings
+	sysProcAttr = w.userNamespaceManager.ConfigureSysProcAttr(sysProcAttr, userMapping)
+
+	// Create launch configuration
+	launchConfig := &process.LaunchConfig{
+		InitPath:      initPath,
+		Environment:   env,
+		SysProcAttr:   sysProcAttr,
+		Stdout:        NewWrite(w.store, job.Id),
+		Stderr:        NewWrite(w.store, job.Id),
+		NamespacePath: "",
+		NeedsNSJoin:   false,
+		JobID:         job.Id,
+		Command:       job.Command,
+		Args:          job.Args,
+	}
+
+	// Launch the process
+	result, err := w.processLauncher.LaunchProcess(ctx, launchConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.logger.Info("process launched with filesystem isolation",
+		"jobID", job.Id,
+		"pid", result.PID,
+		"isolatedRoot", isolatedRoot)
+	return result.Command, nil
+}
+
+func (w *worker) buildJobEnvironmentWithFilesystemIsolation(job *domain.Job, userMapping *usernamespace.UserMapping, isolatedRoot string) []string {
+	baseEnv := w.osInterface.Environ()
+
+	// In cgroup namespace, the job's cgroup always appears at root
+	namespaceCgroupPath := "/sys/fs/cgroup"
+
+	// Job-specific environment with filesystem isolation
+	jobEnv := []string{
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", namespaceCgroupPath),
+		fmt.Sprintf("JOB_ISOLATED_ROOT=%s", isolatedRoot), // Critical for filesystem isolation
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		"HOST_NETWORKING=true",
+		"CGROUP_NAMESPACE=true",
+		"USER_NAMESPACE=true",
+		"FILESYSTEM_ISOLATION=true", // Mark as filesystem isolated
+		fmt.Sprintf("USER_NAMESPACE_UID=%d", userMapping.NamespaceUID),
+		fmt.Sprintf("USER_NAMESPACE_GID=%d", userMapping.NamespaceGID),
+		fmt.Sprintf("USER_HOST_UID=%d", userMapping.HostUID),
+		fmt.Sprintf("USER_HOST_GID=%d", userMapping.HostGID),
+	}
+
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+
+	return append(baseEnv, jobEnv...)
 }
 
 // StopJob stops a running job (updated to cleanup user namespaces)
@@ -198,7 +283,7 @@ func (w *worker) StopJob(ctx context.Context, jobID string) error {
 		JobID:           jobID,
 		PID:             job.Pid,
 		CgroupPath:      job.CgroupPath,
-		IsIsolatedJob:   true, // User namespace isolation
+		IsIsolatedJob:   true,
 		ForceKill:       false,
 		GracefulTimeout: w.config.GracefulShutdownTimeout,
 	}
@@ -220,84 +305,19 @@ func (w *worker) StopJob(ctx context.Context, jobID string) error {
 		log.Warn("failed to cleanup user namespace mapping", "error", cleanupErr)
 	}
 
+	// Cleanup isolated filesystem
+	if cleanupErr := w.filesystemManager.CleanupIsolatedFilesystem(jobID); cleanupErr != nil {
+		log.Warn("failed to cleanup isolated filesystem", "error", cleanupErr)
+		// Don't fail the entire stop operation
+	}
+
+	// Cleanup global symlinks/mounts created by this job
+	if cleanupErr := w.cleanupGlobalFilesystemVirtualization(jobID); cleanupErr != nil {
+		log.Warn("failed to cleanup global filesystem virtualization", "error", cleanupErr)
+	}
+
 	log.Info("job stopped successfully", "method", result.Method)
 	return nil
-}
-
-// startProcessWithUserNamespace starts a process with user namespace isolation
-func (w *worker) startProcessWithUserNamespace(ctx context.Context, job *domain.Job, userMapping *usernamespace.UserMapping) (osinterface.Command, error) {
-	// Get job-init binary path
-	initPath, err := w.getJobInitPath()
-	if err != nil {
-		return nil, fmt.Errorf("job-init not found: %w", err)
-	}
-
-	// Prepare environment with user namespace info
-	env := w.buildJobEnvironmentWithUserNS(job, userMapping)
-
-	// Create process attributes WITH user namespace isolation
-	sysProcAttr := w.createUserNamespaceSysProcAttr()
-
-	// Configure user namespace mappings
-	sysProcAttr = w.userNamespaceManager.ConfigureSysProcAttr(sysProcAttr, userMapping)
-
-	// Create launch configuration
-	launchConfig := &process.LaunchConfig{
-		InitPath:      initPath,
-		Environment:   env,
-		SysProcAttr:   sysProcAttr,
-		Stdout:        NewWrite(w.store, job.Id),
-		Stderr:        NewWrite(w.store, job.Id),
-		NamespacePath: "",    // No separate network namespace needed
-		NeedsNSJoin:   false, // User namespace is created, not joined
-		JobID:         job.Id,
-		Command:       job.Command,
-		Args:          job.Args,
-	}
-
-	// Launch the process
-	result, err := w.processLauncher.LaunchProcess(ctx, launchConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	w.logger.Info("process launched with user namespace isolation",
-		"jobID", job.Id,
-		"pid", result.PID,
-		"hostUID", userMapping.HostUID,
-		"namespaceUID", userMapping.NamespaceUID)
-	return result.Command, nil
-}
-
-// buildJobEnvironmentWithUserNS builds environment with user namespace info
-func (w *worker) buildJobEnvironmentWithUserNS(job *domain.Job, userMapping *usernamespace.UserMapping) []string {
-	baseEnv := w.osInterface.Environ()
-
-	// In cgroup namespace, the job's cgroup always appears at root
-	namespaceCgroupPath := "/sys/fs/cgroup"
-
-	// Job-specific environment with user namespace info
-	jobEnv := []string{
-		fmt.Sprintf("JOB_ID=%s", job.Id),
-		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", namespaceCgroupPath),
-		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
-		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		"HOST_NETWORKING=true",
-		"CGROUP_NAMESPACE=true",
-		"USER_NAMESPACE=true",
-		fmt.Sprintf("USER_NAMESPACE_UID=%d", userMapping.NamespaceUID),
-		fmt.Sprintf("USER_NAMESPACE_GID=%d", userMapping.NamespaceGID),
-		fmt.Sprintf("USER_HOST_UID=%d", userMapping.HostUID),
-		fmt.Sprintf("USER_HOST_GID=%d", userMapping.HostGID),
-	}
-
-	// Add job arguments
-	for i, arg := range job.Args {
-		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-
-	return append(baseEnv, jobEnv...)
 }
 
 // createUserNamespaceSysProcAttr creates syscall attributes with user namespaces
@@ -431,7 +451,6 @@ func (w *worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *d
 	case domain.StatusFailed:
 		completedJob.Fail(exitCode)
 	}
-
 	w.store.UpdateJob(completedJob)
 
 	// Cleanup cgroup
@@ -440,6 +459,16 @@ func (w *worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *d
 	// Cleanup user namespace mapping
 	if cleanupErr := w.userNamespaceManager.CleanupUserMapping(job.Id); cleanupErr != nil {
 		log.Warn("failed to cleanup user namespace mapping during monitoring", "error", cleanupErr)
+	}
+
+	// Cleanup isolated filesystem
+	if cleanupErr := w.filesystemManager.CleanupIsolatedFilesystem(job.Id); cleanupErr != nil {
+		log.Warn("failed to cleanup isolated filesystem during monitoring", "error", cleanupErr)
+	}
+
+	// Cleanup global symlinks/mounts
+	if cleanupErr := w.cleanupGlobalFilesystemVirtualization(job.Id); cleanupErr != nil {
+		log.Warn("failed to cleanup global filesystem virtualization during monitoring", "error", cleanupErr)
 	}
 
 	log.Info("job monitoring completed",
@@ -457,12 +486,60 @@ func (w *worker) cleanupFailedJob(job *domain.Job) {
 		failedJob.EndTime = &now
 	}
 	w.store.UpdateJob(failedJob)
+
+	// Cleanup cgroup
 	w.cgroup.CleanupCgroup(job.Id)
 
-	// Cleanup user namespace mapping for failed job
+	// Cleanup user namespace mapping
 	if cleanupErr := w.userNamespaceManager.CleanupUserMapping(job.Id); cleanupErr != nil {
 		w.logger.Warn("failed to cleanup user namespace mapping for failed job", "jobID", job.Id, "error", cleanupErr)
 	}
+
+	// Cleanup isolated filesystem
+	if cleanupErr := w.filesystemManager.CleanupIsolatedFilesystem(job.Id); cleanupErr != nil {
+		w.logger.Warn("failed to cleanup isolated filesystem for failed job", "jobID", job.Id, "error", cleanupErr)
+	}
+
+	// Cleanup global symlinks/mounts
+	if cleanupErr := w.cleanupGlobalFilesystemVirtualization(job.Id); cleanupErr != nil {
+		w.logger.Warn("failed to cleanup global filesystem virtualization for failed job", "jobID", job.Id, "error", cleanupErr)
+	}
+}
+
+func (w *worker) cleanupGlobalFilesystemVirtualization(jobID string) error {
+	log := w.logger.WithField("jobID", jobID)
+
+	// List of global paths that might have been created for this job
+	globalPaths := []string{
+		"/work",
+		"/tmp",  // Only if we created job-specific /tmp
+		"/home", // Only if we created job-specific /home
+	}
+
+	var cleanupErrors []error
+
+	for _, globalPath := range globalPaths {
+		// Check if it's a symlink
+		if linkTarget, err := w.osInterface.Readlink(globalPath); err == nil {
+			// It's a symlink - check if it points to our job's directory
+			isolatedRoot := w.filesystemManager.GetIsolatedRoot(jobID)
+			if strings.Contains(linkTarget, isolatedRoot) {
+				// This symlink belongs to our job - remove it
+				if err := w.osInterface.Remove(globalPath); err != nil {
+					log.Debug("failed to remove global symlink", "path", globalPath, "error", err)
+					cleanupErrors = append(cleanupErrors, err)
+				} else {
+					log.Debug("removed global symlink", "path", globalPath, "target", linkTarget)
+				}
+			}
+		}
+	}
+
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("failed to cleanup some global paths: %v", cleanupErrors)
+	}
+
+	return nil
 }
 
 func (w *worker) updateJobStatus(job *domain.Job, result *process.CleanupResult) {

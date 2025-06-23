@@ -67,6 +67,14 @@ func (p *ExecProcess) Kill() error {
 // DefaultSyscall implements interfaces.SyscallInterface using real syscalls
 type DefaultSyscall struct{}
 
+func (s *DefaultSyscall) PivotRoot(newRoot, oldRoot string) error {
+	return syscall.PivotRoot(newRoot, oldRoot)
+}
+
+func (s *DefaultSyscall) Chroot(path string) error {
+	return syscall.Chroot(path)
+}
+
 func (s *DefaultSyscall) Unmount(target string, flags int) error {
 	return syscall.Unmount(target, flags)
 }
@@ -95,6 +103,26 @@ func (s *DefaultSyscall) CreateProcessGroup() *syscall.SysProcAttr {
 
 // DefaultOs implements interfaces.OsInterface using real os
 type DefaultOs struct{}
+
+func (d *DefaultOs) ReadDir(dirname string) ([]os.DirEntry, error) {
+	return os.ReadDir(dirname)
+}
+
+func (d *DefaultOs) Setenv(key, value string) error {
+	return os.Setenv(key, value)
+}
+
+func (d *DefaultOs) RemoveAll(root string) error {
+	return os.RemoveAll(root)
+}
+
+func (d *DefaultOs) Chdir(dir string) error {
+	return os.Chdir(dir)
+}
+
+func (d *DefaultOs) Readlink(name string) (string, error) {
+	return os.Readlink(name)
+}
 
 func (d *DefaultOs) Getuid() int {
 	return os.Getuid()
