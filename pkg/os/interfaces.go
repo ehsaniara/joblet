@@ -20,6 +20,7 @@ type SyscallInterface interface {
 	Unmount(target string, flags int) error
 	Chroot(path string) error
 	PivotRoot(newRoot, oldRoot string) error // for pivot_root approach
+	Unshare(flags int) error
 }
 
 //counterfeiter:generate . OsInterface

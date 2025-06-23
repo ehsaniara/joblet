@@ -35,6 +35,7 @@ type LaunchConfig struct {
 	Stdout        io.Writer
 	Stderr        io.Writer
 	NamespacePath string
+	NamespaceType string
 	NeedsNSJoin   bool
 	JobID         string
 	Command       string
@@ -67,20 +68,21 @@ func NewLauncher(
 // LaunchProcess starts process with namespace isolation and proper cleanup on failure
 func (l *Launcher) LaunchProcess(ctx context.Context, config *LaunchConfig) (*LaunchResult, error) {
 	if config == nil {
-		return nil, fmt.Errorf("launch mapping.go cannot be nil")
+		return nil, fmt.Errorf("launch config cannot be nil")
 	}
 
 	log := l.logger.WithFields("jobID", config.JobID, "command", config.Command)
 	log.Info("launching process",
 		"needsNSJoin", config.NeedsNSJoin,
-		"namespacePath", config.NamespacePath)
+		"namespacePath", config.NamespacePath,
+		"namespaceType", config.NamespaceType)
 
 	// Validate configuration
 	if err := l.validateLaunchConfig(config); err != nil {
-		return nil, fmt.Errorf("invalid launch mapping.go: %w", err)
+		return nil, fmt.Errorf("invalid launch config: %w", err)
 	}
 
-	// Use pre-fork namespace setup approach for network joining
+	// Use pre-fork namespace setup approach for namespace joining
 	resultChan := make(chan *LaunchResult, 1)
 
 	go l.launchInGoroutine(config, resultChan)
@@ -122,16 +124,19 @@ func (l *Launcher) launchInGoroutine(config *LaunchConfig, resultChan chan<- *La
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// Join network namespace if needed (before forking)
+	// Join namespace if needed (before forking) - now supports any namespace type
 	if config.NeedsNSJoin && config.NamespacePath != "" {
-		log.Debug("joining network namespace before fork", "nsPath", config.NamespacePath)
-		if err := l.joinNetworkNamespace(config.NamespacePath); err != nil {
+		log.Debug("joining namespace before fork",
+			"nsPath", config.NamespacePath,
+			"nsType", config.NamespaceType)
+
+		if err := l.joinNamespace(config.NamespacePath, config.NamespaceType); err != nil {
 			resultChan <- &LaunchResult{
 				Error: fmt.Errorf("failed to join namespace: %w", err),
 			}
 			return
 		}
-		log.Debug("successfully joined network namespace")
+		log.Debug("successfully joined namespace", "nsType", config.NamespaceType)
 	}
 
 	// Start the process (which will inherit the current namespace)
@@ -160,6 +165,68 @@ func (l *Launcher) launchInGoroutine(config *LaunchConfig, resultChan chan<- *La
 		Command: cmd,
 		Error:   nil,
 	}
+}
+
+// Generic namespace joining that supports multiple namespace types
+func (l *Launcher) joinNamespace(nsPath string, nsType string) error {
+	if nsPath == "" {
+		return fmt.Errorf("namespace path cannot be empty")
+	}
+
+	if nsType == "" {
+		return fmt.Errorf("namespace type cannot be empty")
+	}
+
+	// Check if namespace file exists
+	if _, err := l.osInterface.Stat(nsPath); err != nil {
+		return fmt.Errorf("namespace file does not exist: %s (%w)", nsPath, err)
+	}
+
+	l.logger.Debug("opening namespace file", "nsPath", nsPath, "nsType", nsType)
+
+	// Open the namespace file
+	fd, err := syscall.Open(nsPath, syscall.O_RDONLY, 0)
+	if err != nil {
+		return fmt.Errorf("failed to open namespace file %s: %w", nsPath, err)
+	}
+	defer func() {
+		if closeErr := syscall.Close(fd); closeErr != nil {
+			l.logger.Warn("failed to close namespace file descriptor", "error", closeErr)
+		}
+	}()
+
+	// Map namespace type to appropriate clone flag
+	var cloneFlag uintptr
+	switch nsType {
+	case "mount":
+		cloneFlag = syscall.CLONE_NEWNS
+	case "network":
+		cloneFlag = syscall.CLONE_NEWNET
+	case "pid":
+		cloneFlag = syscall.CLONE_NEWPID
+	case "ipc":
+		cloneFlag = syscall.CLONE_NEWIPC
+	case "uts":
+		cloneFlag = syscall.CLONE_NEWUTS
+	case "user":
+		cloneFlag = syscall.CLONE_NEWUSER
+	case "cgroup":
+		cloneFlag = syscall.CLONE_NEWCGROUP
+	default:
+		return fmt.Errorf("unsupported namespace type: %s", nsType)
+	}
+
+	l.logger.Debug("calling setns syscall", "fd", fd, "nsPath", nsPath, "nsType", nsType, "cloneFlag", cloneFlag)
+
+	// Call setns system call (x86_64 syscall number for setns)
+	const SysSetnsX86_64 = 308
+	_, _, errno := syscall.Syscall(SysSetnsX86_64, uintptr(fd), cloneFlag, 0)
+	if errno != 0 {
+		return fmt.Errorf("setns syscall failed for %s namespace %s: %v", nsType, nsPath, errno)
+	}
+
+	l.logger.Debug("successfully joined namespace", "nsPath", nsPath, "nsType", nsType)
+	return nil
 }
 
 // createAndStartCommand creates and starts the command with proper configuration
@@ -193,43 +260,6 @@ func (l *Launcher) createAndStartCommand(config *LaunchConfig) (osinterface.Comm
 	return cmd, nil
 }
 
-// joinNetworkNamespace joins an existing network namespace using setns syscall
-func (l *Launcher) joinNetworkNamespace(nsPath string) error {
-	if nsPath == "" {
-		return fmt.Errorf("namespace path cannot be empty")
-	}
-
-	// Check if namespace file exists
-	if _, err := l.osInterface.Stat(nsPath); err != nil {
-		return fmt.Errorf("namespace file does not exist: %s (%w)", nsPath, err)
-	}
-
-	l.logger.Debug("opening namespace file", "nsPath", nsPath)
-
-	// Open the namespace file
-	fd, err := syscall.Open(nsPath, syscall.O_RDONLY, 0)
-	if err != nil {
-		return fmt.Errorf("failed to open namespace file %s: %w", nsPath, err)
-	}
-	defer func() {
-		if closeErr := syscall.Close(fd); closeErr != nil {
-			l.logger.Warn("failed to close namespace file descriptor", "error", closeErr)
-		}
-	}()
-
-	l.logger.Debug("calling setns syscall", "fd", fd, "nsPath", nsPath)
-
-	// Call setns system call (x86_64 syscall number for setns)
-	const SysSetnsX86_64 = 308
-	_, _, errno := syscall.Syscall(SysSetnsX86_64, uintptr(fd), syscall.CLONE_NEWNET, 0)
-	if errno != 0 {
-		return fmt.Errorf("setns syscall failed for %s: %v", nsPath, errno)
-	}
-
-	l.logger.Debug("successfully joined network namespace", "nsPath", nsPath)
-	return nil
-}
-
 // validateLaunchConfig validates the launch configuration
 func (l *Launcher) validateLaunchConfig(config *LaunchConfig) error {
 	if config.InitPath == "" {
@@ -252,10 +282,27 @@ func (l *Launcher) validateLaunchConfig(config *LaunchConfig) error {
 		}
 	}
 
-	// Validate namespace path if namespace join is needed
+	// Validate namespace configuration if namespace join is needed
 	if config.NeedsNSJoin {
 		if config.NamespacePath == "" {
 			return fmt.Errorf("namespace path required when NeedsNSJoin is true")
+		}
+
+		if config.NamespaceType == "" {
+			return fmt.Errorf("namespace type required when NeedsNSJoin is true")
+		}
+
+		// Validate that the namespace type is supported
+		supportedTypes := []string{"mount", "network", "pid", "ipc", "uts", "user", "cgroup"}
+		isSupported := false
+		for _, supportedType := range supportedTypes {
+			if config.NamespaceType == supportedType {
+				isSupported = true
+				break
+			}
+		}
+		if !isSupported {
+			return fmt.Errorf("unsupported namespace type: %s", config.NamespaceType)
 		}
 
 		// Check if namespace file exists
