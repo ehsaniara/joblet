@@ -27,21 +27,23 @@ func NewManager(osInterface osinterface.OsInterface) interfaces.FilesystemManage
 	}
 }
 
+// SetupIsolatedFilesystem creates and prepares an isolated filesystem for a job
+// Enhanced for true filesystem virtualization with bind mount support
 func (m *Manager) SetupIsolatedFilesystem(ctx context.Context, jobID string) (string, error) {
 	isolatedRoot := m.GetIsolatedRoot(jobID)
 
-	m.logger.Info("setting up isolated filesystem", "jobID", jobID, "root", isolatedRoot)
+	m.logger.Info("setting up isolated filesystem for virtualization", "jobID", jobID, "root", isolatedRoot)
 
 	// Create isolated root directory
 	if err := m.osInterface.MkdirAll(isolatedRoot, 0755); err != nil {
 		return "", fmt.Errorf("failed to create isolated root: %w", err)
 	}
 
-	// Create essential directory structure
-	if err := m.createEssentialDirectories(isolatedRoot); err != nil {
+	// Create directories specifically designed for bind mounting
+	if err := m.createDirectoriesForBindMounting(isolatedRoot); err != nil {
 		// Cleanup on failure
 		m.osInterface.RemoveAll(isolatedRoot)
-		return "", fmt.Errorf("failed to create essential directories: %w", err)
+		return "", fmt.Errorf("failed to create directories for bind mounting: %w", err)
 	}
 
 	// Copy essential binaries and libraries
@@ -56,10 +58,83 @@ func (m *Manager) SetupIsolatedFilesystem(ctx context.Context, jobID string) (st
 		// Don't fail completely
 	}
 
-	m.logger.Info("isolated filesystem setup complete", "root", isolatedRoot)
+	// Create basic configuration files for isolated environment
+	if err := m.createBasicConfigFiles(isolatedRoot); err != nil {
+		m.logger.Warn("failed to create basic config files", "error", err)
+		// Don't fail completely
+	}
+
+	m.logger.Info("isolated filesystem setup complete for virtualization", "root", isolatedRoot)
 	return isolatedRoot, nil
 }
 
+// createDirectoriesForBindMounting creates directories specifically for bind mounting
+// This replaces createEssentialDirectories with a focus on virtualization
+func (m *Manager) createDirectoriesForBindMounting(isolatedRoot string) error {
+	// Primary directories that will be bind-mounted to provide isolation
+	bindMountDirs := []string{
+		"tmp",     // For /tmp - critical for isolation
+		"var/tmp", // For /var/tmp - secondary temp directory
+		"home",    // For /home - user home directories
+		"work",    // Working directory for job execution
+	}
+
+	// Additional system directories that may be needed for full compatibility
+	systemDirs := []string{
+		"proc",          // Process information (for potential future proc mounting)
+		"dev",           // Device nodes
+		"sys",           // System information (for potential future sys mounting)
+		"run",           // Runtime data
+		"etc",           // Configuration files
+		"usr/bin",       // Additional binaries
+		"usr/lib",       // Additional libraries
+		"usr/lib64",     // 64-bit libraries
+		"usr/local/bin", // Local binaries
+		"bin",           // Essential binaries
+		"lib",           // Essential libraries
+		"lib64",         // 64-bit libraries
+		"opt",           // Optional software
+		"root",          // Root home directory
+		"srv",           // Service data
+		"mnt",           // Mount points
+		"media",         // Removable media
+		"var/log",       // Log files (isolated)
+		"var/cache",     // Cache files (isolated)
+		"var/spool",     // Spool files (isolated)
+	}
+
+	allDirs := append(bindMountDirs, systemDirs...)
+
+	successCount := 0
+	for _, dir := range allDirs {
+		fullPath := filepath.Join(isolatedRoot, dir)
+		if err := m.osInterface.MkdirAll(fullPath, 0755); err != nil {
+			m.logger.Debug("failed to create directory", "path", fullPath, "error", err)
+			// Continue with other directories
+		} else {
+			m.logger.Debug("created directory for isolation", "path", fullPath)
+			successCount++
+		}
+	}
+
+	// Ensure critical bind mount directories exist
+	criticalDirs := []string{"tmp", "home", "work"}
+	for _, criticalDir := range criticalDirs {
+		criticalPath := filepath.Join(isolatedRoot, criticalDir)
+		if _, err := m.osInterface.Stat(criticalPath); err != nil {
+			return fmt.Errorf("critical directory creation failed: %s (%w)", criticalDir, err)
+		}
+	}
+
+	m.logger.Info("directories for bind mounting created",
+		"successful", successCount,
+		"total", len(allDirs),
+		"critical", len(criticalDirs))
+
+	return nil
+}
+
+// CleanupIsolatedFilesystem removes the isolated filesystem for a job
 func (m *Manager) CleanupIsolatedFilesystem(jobID string) error {
 	isolatedRoot := m.GetIsolatedRoot(jobID)
 
@@ -92,80 +167,15 @@ func (m *Manager) CleanupIsolatedFilesystem(jobID string) error {
 	return nil
 }
 
-// to get directory size for logging
-func (m *Manager) getDirectorySize(dirPath string) (string, error) {
-	// Simple approach - count files/directories
-	entries, err := m.osInterface.ReadDir(dirPath)
-	if err != nil {
-		return "", err
-	}
-
-	fileCount := 0
-	dirCount := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			dirCount++
-		} else {
-			fileCount++
-		}
-	}
-
-	return fmt.Sprintf("%d files, %d directories", fileCount, dirCount), nil
-}
-
-// Cleanup any job-specific global directories
-func (m *Manager) cleanupJobSpecificGlobalDirectories(jobID string) {
-	// If we created job-specific global directories, clean them up
-	jobSpecificDirs := []string{
-		fmt.Sprintf("/work-%s", jobID), // If we used job-specific global work dirs
-		fmt.Sprintf("/tmp-%s", jobID),  // If we used job-specific global tmp dirs
-		fmt.Sprintf("/home-%s", jobID), // If we used job-specific global home dirs
-	}
-
-	for _, dir := range jobSpecificDirs {
-		if _, err := m.osInterface.Stat(dir); err == nil {
-			if err := m.osInterface.RemoveAll(dir); err != nil {
-				m.logger.Debug("failed to remove job-specific global directory", "dir", dir, "error", err)
-			} else {
-				m.logger.Debug("removed job-specific global directory", "dir", dir)
-			}
-		}
-	}
-}
-
+// GetIsolatedRoot returns the root path for a job's isolated filesystem
 func (m *Manager) GetIsolatedRoot(jobID string) string {
 	return filepath.Join(m.baseDir, fmt.Sprintf("job-%s-root", jobID))
 }
 
+// createEssentialDirectories is maintained for backward compatibility
+// but now calls the enhanced createDirectoriesForBindMounting
 func (m *Manager) createEssentialDirectories(isolatedRoot string) error {
-	essentialDirs := []string{
-		"tmp",       // Temporary files
-		"proc",      // Process information (for potential future proc mounting)
-		"dev",       // Device nodes
-		"sys",       // System information (for potential future sys mounting)
-		"work",      // Job working directory (main workspace)
-		"bin",       // Essential binaries
-		"lib",       // Essential libraries
-		"lib64",     // 64-bit libraries
-		"usr/bin",   // Additional binaries
-		"usr/lib",   // Additional libraries
-		"usr/lib64", // Additional 64-bit libraries
-		"etc",       // Configuration files
-		"var/tmp",   // Variable temporary files
-		"home",      // Home directories
-		"opt",       // Optional software
-		"root",      // Root home directory
-	}
-
-	for _, dir := range essentialDirs {
-		dirPath := filepath.Join(isolatedRoot, dir)
-		if err := m.osInterface.MkdirAll(dirPath, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
-
-	m.logger.Debug("essential directories created", "count", len(essentialDirs))
-	return nil
+	return m.createDirectoriesForBindMounting(isolatedRoot)
 }
 
 func (m *Manager) copyEssentialBinaries(isolatedRoot string) error {
@@ -350,32 +360,6 @@ func (m *Manager) createBasicDeviceNodes(isolatedRoot string) error {
 	return nil
 }
 
-func (m *Manager) copyFile(src, dest string) error {
-	// Ensure destination directory exists
-	if err := m.osInterface.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-		return err
-	}
-
-	// Read source file
-	data, err := m.osInterface.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	// Get source file permissions
-	srcInfo, err := m.osInterface.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	// Write to destination with same permissions
-	if err := m.osInterface.WriteFile(dest, data, srcInfo.Mode()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Helper method to create configuration files if needed
 func (m *Manager) createBasicConfigFiles(isolatedRoot string) error {
 	etcDir := filepath.Join(isolatedRoot, "etc")
@@ -402,4 +386,71 @@ worker:x:1000:
 
 	m.logger.Debug("basic config files created")
 	return nil
+}
+
+func (m *Manager) copyFile(src, dest string) error {
+	// Ensure destination directory exists
+	if err := m.osInterface.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return err
+	}
+
+	// Read source file
+	data, err := m.osInterface.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	// Get source file permissions
+	srcInfo, err := m.osInterface.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	// Write to destination with same permissions
+	if err := m.osInterface.WriteFile(dest, data, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getDirectorySize gets directory size for logging
+func (m *Manager) getDirectorySize(dirPath string) (string, error) {
+	// Simple approach - count files/directories
+	entries, err := m.osInterface.ReadDir(dirPath)
+	if err != nil {
+		return "", err
+	}
+
+	fileCount := 0
+	dirCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirCount++
+		} else {
+			fileCount++
+		}
+	}
+
+	return fmt.Sprintf("%d files, %d directories", fileCount, dirCount), nil
+}
+
+// cleanupJobSpecificGlobalDirectories cleans up any job-specific global directories
+func (m *Manager) cleanupJobSpecificGlobalDirectories(jobID string) {
+	// If we created job-specific global directories, clean them up
+	jobSpecificDirs := []string{
+		fmt.Sprintf("/work-%s", jobID), // If we used job-specific global work dirs
+		fmt.Sprintf("/tmp-%s", jobID),  // If we used job-specific global tmp dirs
+		fmt.Sprintf("/home-%s", jobID), // If we used job-specific global home dirs
+	}
+
+	for _, dir := range jobSpecificDirs {
+		if _, err := m.osInterface.Stat(dir); err == nil {
+			if err := m.osInterface.RemoveAll(dir); err != nil {
+				m.logger.Debug("failed to remove job-specific global directory", "dir", dir, "error", err)
+			} else {
+				m.logger.Debug("removed job-specific global directory", "dir", dir)
+			}
+		}
+	}
 }

@@ -67,6 +67,10 @@ func (p *ExecProcess) Kill() error {
 // DefaultSyscall implements interfaces.SyscallInterface using real syscalls
 type DefaultSyscall struct{}
 
+func (s *DefaultSyscall) Unshare(flags int) error {
+	return syscall.Unshare(flags)
+}
+
 func (s *DefaultSyscall) PivotRoot(newRoot, oldRoot string) error {
 	return syscall.PivotRoot(newRoot, oldRoot)
 }

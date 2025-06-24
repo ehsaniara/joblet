@@ -93,6 +93,17 @@ type FakeSyscallInterface struct {
 	unmountReturnsOnCall map[int]struct {
 		result1 error
 	}
+	UnshareStub        func(int) error
+	unshareMutex       sync.RWMutex
+	unshareArgsForCall []struct {
+		arg1 int
+	}
+	unshareReturns struct {
+		result1 error
+	}
+	unshareReturnsOnCall map[int]struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -535,6 +546,67 @@ func (fake *FakeSyscallInterface) UnmountReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeSyscallInterface) Unshare(arg1 int) error {
+	fake.unshareMutex.Lock()
+	ret, specificReturn := fake.unshareReturnsOnCall[len(fake.unshareArgsForCall)]
+	fake.unshareArgsForCall = append(fake.unshareArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	stub := fake.UnshareStub
+	fakeReturns := fake.unshareReturns
+	fake.recordInvocation("Unshare", []interface{}{arg1})
+	fake.unshareMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallInterface) UnshareCallCount() int {
+	fake.unshareMutex.RLock()
+	defer fake.unshareMutex.RUnlock()
+	return len(fake.unshareArgsForCall)
+}
+
+func (fake *FakeSyscallInterface) UnshareCalls(stub func(int) error) {
+	fake.unshareMutex.Lock()
+	defer fake.unshareMutex.Unlock()
+	fake.UnshareStub = stub
+}
+
+func (fake *FakeSyscallInterface) UnshareArgsForCall(i int) int {
+	fake.unshareMutex.RLock()
+	defer fake.unshareMutex.RUnlock()
+	argsForCall := fake.unshareArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeSyscallInterface) UnshareReturns(result1 error) {
+	fake.unshareMutex.Lock()
+	defer fake.unshareMutex.Unlock()
+	fake.UnshareStub = nil
+	fake.unshareReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallInterface) UnshareReturnsOnCall(i int, result1 error) {
+	fake.unshareMutex.Lock()
+	defer fake.unshareMutex.Unlock()
+	fake.UnshareStub = nil
+	if fake.unshareReturnsOnCall == nil {
+		fake.unshareReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.unshareReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeSyscallInterface) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -552,6 +624,8 @@ func (fake *FakeSyscallInterface) Invocations() map[string][][]interface{} {
 	defer fake.pivotRootMutex.RUnlock()
 	fake.unmountMutex.RLock()
 	defer fake.unmountMutex.RUnlock()
+	fake.unshareMutex.RLock()
+	defer fake.unshareMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

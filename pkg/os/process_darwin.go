@@ -68,8 +68,11 @@ func (p *ExecProcess) Kill() error {
 // DefaultSyscall implements interfaces.SyscallInterface for macOS (mock/stub)
 type DefaultSyscall struct{}
 
+func (s *DefaultSyscall) Unshare(flags int) error {
+	panic("not implemented in darwin")
+}
 func (s *DefaultSyscall) PivotRoot(newRoot, oldRoot string) error {
-	panic("not implemented")
+	panic("not implemented in darwin")
 }
 
 func (s *DefaultSyscall) Chroot(path string) error {
