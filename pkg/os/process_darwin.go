@@ -69,10 +69,10 @@ func (p *ExecProcess) Kill() error {
 type DefaultSyscall struct{}
 
 func (s *DefaultSyscall) Unshare(flags int) error {
-	return syscall.Unshare(flags)
+	panic("not implemented in darwin")
 }
 func (s *DefaultSyscall) PivotRoot(newRoot, oldRoot string) error {
-	panic("not implemented")
+	panic("not implemented in darwin")
 }
 
 func (s *DefaultSyscall) Chroot(path string) error {

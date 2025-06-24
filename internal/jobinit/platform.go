@@ -22,15 +22,23 @@ type JobConfig struct {
 	NamespaceGID         uint32
 }
 
-// Run is the entry point that works on all platforms
-func Run() error {
+// NewJobInitializer creates a platform-specific job initializer
+// This calls the existing platform-specific constructors
+func NewJobInitializer() JobInitializer {
 	switch runtime.GOOS {
 	case "linux":
-		initializer := NewLinuxJobInitializer()
-		return initializer.Run()
+		return newLinuxJobInitializer()
 	case "darwin":
-		return nil
+		// Use the existing Darwin implementation
+		return newDarwinJobInitializer()
 	default:
-		return nil
+		// Fallback - assume Linux for unknown platforms
+		return newLinuxJobInitializer()
 	}
+}
+
+// Run is the entry point that works on all platforms
+func Run() error {
+	ji := NewJobInitializer()
+	return ji.Run()
 }
