@@ -4,6 +4,7 @@ package linux
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -178,8 +179,11 @@ func (w *worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Update job with process info
 	w.updateJobAsRunning(job, cmd)
 
+	// Create a new background context for monitoring, to ensure monitoring continues even after the gRPC request context is cancelled
+	monitorCtx := context.Background()
+
 	// Start monitoring
-	go w.monitorJob(ctx, cmd, job)
+	go w.monitorJob(monitorCtx, cmd, job)
 
 	log.Info("job started successfully with single-process filesystem isolation",
 		"pid", job.Pid,
@@ -453,39 +457,53 @@ func (w *worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *d
 	log := w.logger.WithField("jobID", job.Id)
 	log.Info("starting job monitoring")
 
+	// Create a done channel to signal completion
+	done := make(chan error, 1)
+
+	// Start waiting for the process in a separate goroutine
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	// Wait for either context cancellation or process completion
 	select {
 	case <-ctx.Done():
 		log.Info("monitoring cancelled due to context cancellation")
+		// Force kill the process if context is cancelled
+		if p := cmd.Process(); p != nil {
+			log.Warn("force killing process due to context cancellation")
+			p.Kill()
+		}
 		return
-	default:
-	}
+	case err := <-done:
+		// Process completed normally
+		if err != nil {
+			log.Info("job process completed with error", "error", err)
 
-	// Wait for process to complete
-	if err := cmd.Wait(); err != nil {
-		log.Info("job process completed with error", "error", err)
+			exitCode := 1
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				exitCode = exitError.ExitCode()
+			}
 
-		exitCode := 1
-		if exitError, ok := err.(*exec.ExitError); ok {
-			exitCode = exitError.ExitCode()
+			completedJob := job.DeepCopy()
+			if e := completedJob.Complete(int32(exitCode)); e != nil {
+				log.Warn("domain validation failed for completion", "error", e)
+				completedJob.Status = domain.StatusCompleted
+				completedJob.ExitCode = int32(exitCode)
+			}
+			w.store.UpdateJob(completedJob)
+		} else {
+			log.Info("job process completed successfully")
+
+			completedJob := job.DeepCopy()
+			if e := completedJob.Complete(0); e != nil {
+				log.Warn("domain validation failed for completion", "error", e)
+				completedJob.Status = domain.StatusCompleted
+				completedJob.ExitCode = 0
+			}
+			w.store.UpdateJob(completedJob)
 		}
-
-		completedJob := job.DeepCopy()
-		if err := completedJob.Complete(int32(exitCode)); err != nil {
-			log.Warn("domain validation failed for completion", "error", err)
-			completedJob.Status = domain.StatusCompleted
-			completedJob.ExitCode = int32(exitCode)
-		}
-		w.store.UpdateJob(completedJob)
-	} else {
-		log.Info("job process completed successfully")
-
-		completedJob := job.DeepCopy()
-		if err := completedJob.Complete(0); err != nil {
-			log.Warn("domain validation failed for completion", "error", err)
-			completedJob.Status = domain.StatusCompleted
-			completedJob.ExitCode = 0
-		}
-		w.store.UpdateJob(completedJob)
 	}
 
 	// Cleanup resources
