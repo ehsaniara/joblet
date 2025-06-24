@@ -6,7 +6,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/release/ehsaniara/worker.svg)](https://github.com/ehsaniara/worker/releases/latest)
 
-A high-performance job execution system built in Go that provides secure, isolated execution environments using Linux namespaces and cgroups. The system enables safe execution of arbitrary commands with comprehensive resource management, filesystem isolation, and real-time monitoring capabilities.
+![worker-thum.png](docs/worker-thum.png)
+
+A high-performance job execution system built in Go that provides secure, isolated execution environments using Linux
+namespaces and cgroups. The system enables safe execution of arbitrary commands with comprehensive resource management,
+filesystem isolation, and real-time monitoring capabilities.
 
 ## Table of Contents
 
@@ -24,24 +28,28 @@ A high-performance job execution system built in Go that provides secure, isolat
 ## Features
 
 ### **Isolation & Security**
+
 - **User Namespace Isolation**: Runs jobs with mapped user/group IDs for enhanced security
 - **Filesystem Isolation**: Creates isolated filesystem environments with bind mounting
 - **Process Isolation**: Uses PID, IPC, UTS, and mount namespaces
 - **Resource Limits**: CPU, memory, and I/O bandwidth limiting via cgroups v2
 
 ### **Job Management**
+
 - **Real-time Streaming**: Live log streaming with WebSocket-like interfaces
 - **Job State Management**: Complete lifecycle management (initializing, running, completed, failed, stopped)
 - **Concurrent Execution**: Support for multiple simultaneous jobs
 - **Persistent Storage**: Job state and output persistence
 
 ### **Monitoring & Observability**
+
 - **Live Log Streaming**: Real-time output streaming with subscriber management
 - **Resource Monitoring**: CPU, memory, and I/O usage tracking
 - **Job Status Updates**: Real-time status updates via publish/subscribe pattern
 - **Comprehensive Logging**: Structured logging with multiple levels
 
 ### **System Requirements**
+
 - **Kernel**: Linux 4.6+ (for cgroup namespaces and user namespace support)
 - **Go**: 1.21+ for building from source
 - **Cgroups**: cgroup v2 filesystem mounted at `/sys/fs/cgroup`
@@ -139,31 +147,37 @@ export DEFAULT_IO_LIMIT=10485760
 ### Core Components
 
 **Job Manager (`worker.go`)**
+
 - Orchestrates job lifecycle from creation to completion
 - Manages isolation setup and resource allocation
 - Coordinates between all subsystems
 
 **Store (`store.go`, `task.go`)**
+
 - Thread-safe job state management
 - Real-time log streaming via publish/subscribe
 - Job output buffering and retrieval
 
 **Filesystem Manager (`manager.go`)**
+
 - Creates isolated filesystem environments
 - Copies essential binaries and libraries
 - Sets up bind mount points for virtualization
 
 **User Namespace Manager**
+
 - Manages UID/GID mappings for isolation
 - Validates subuid/subgid configuration
 - Handles namespace creation and cleanup
 
 **Cgroup Manager (`cgroup.go`)**
+
 - Sets CPU, memory, and I/O limits
 - Creates and manages cgroup hierarchies
 - Enforces resource constraints
 
 **Launcher (`launcher.go`)**
+
 - Executes jobs within configured namespaces
 - Handles process creation with proper attributes
 - Manages command execution lifecycle
@@ -185,14 +199,14 @@ export DEFAULT_IO_LIMIT=10485760
 
 ```go
 job := &domain.Job{
-    Id:      "job-123",
-    Command: "python3",
-    Args:    []string{"script.py"},
-    Limits: domain.JobLimits{
-        MaxCPU:    100,    // CPU limit
-        MaxMemory: 512,    // Memory in MB
-        MaxIOBPS:  1048576, // I/O bandwidth
-    },
+Id:      "job-123",
+Command: "python3",
+Args:    []string{"script.py"},
+Limits: domain.JobLimits{
+MaxCPU:    100, // CPU limit
+MaxMemory: 512, // Memory in MB
+MaxIOBPS:  1048576, // I/O bandwidth
+},
 }
 
 result, err := worker.StartJob(ctx, job)
@@ -232,6 +246,7 @@ The system includes comprehensive validation checks:
 ### Common Issues & Solutions
 
 **User namespace creation fails:**
+
 ```bash
 # Enable unprivileged user namespaces
 echo 1 | sudo tee /proc/sys/kernel/unprivileged_userns_clone
@@ -242,6 +257,7 @@ sudo usermod --add-subgids 100000-165535 worker
 ```
 
 **Cgroup v2 not available:**
+
 ```bash
 # Mount cgroup v2 (if not mounted)
 sudo mount -t cgroup2 none /sys/fs/cgroup
@@ -383,12 +399,12 @@ For issues and questions:
 - 📖 **Documentation**: Check the [Wiki](https://github.com/ehsaniara/worker/wiki) for detailed guides
 - 💬 **Discussions**: Join [GitHub Discussions](https://github.com/ehsaniara/worker/discussions)
 
+## Acknowledgments
+
+- [gRPC](https://grpc.io/) - High-performance RPC framework
+- [Linux Cgroups v2](https://www.kernel.org/doc/Documentation/cgroup-v2.txt) - Resource management
+- [Cobra](https://github.com/spf13/cobra) - CLI framework for Go
+
 ### Maintainer
 
-This project is maintained by [Ehsan Iara](https://github.com/ehsaniara).
-
----
-
-**⭐ Star this repository if you find it useful!**
-
-Built with ❤️ using Go and Linux namespaces for secure, isolated job execution.
+Maintained by [Jay Ehsaniara](https://github.com/ehsaniara).
