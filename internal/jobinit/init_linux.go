@@ -9,32 +9,29 @@ import (
 	"syscall"
 	"time"
 	"worker/pkg/logger"
-	"worker/pkg/os"
+	"worker/pkg/platform"
 )
 
 type jobInitializer struct {
-	osInterface      os.OsInterface
-	syscallInterface os.SyscallInterface
-	execInterface    os.ExecInterface
-	logger           *logger.Logger
+	platform platform.Platform
+	logger   *logger.Logger
 }
 
 // NewJobInitializer creates a job initializer
 func NewJobInitializer() JobInitializer {
+	platformInterface := platform.NewPlatform()
 	return &jobInitializer{
-		osInterface:      &os.DefaultOs{},
-		syscallInterface: &os.DefaultSyscall{},
-		execInterface:    &os.DefaultExec{},
-		logger:           logger.New(),
+		platform: platformInterface,
+		logger:   logger.New(),
 	}
 }
 
 func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
-	jobID := j.osInterface.Getenv("JOB_ID")
-	command := j.osInterface.Getenv("JOB_COMMAND")
-	cgroupPath := j.osInterface.Getenv("JOB_CGROUP_PATH")
-	argsCountStr := j.osInterface.Getenv("JOB_ARGS_COUNT")
-	hostNetworking := j.osInterface.Getenv("HOST_NETWORKING")
+	jobID := j.platform.Getenv("JOB_ID")
+	command := j.platform.Getenv("JOB_COMMAND")
+	cgroupPath := j.platform.Getenv("JOB_CGROUP_PATH")
+	argsCountStr := j.platform.Getenv("JOB_ARGS_COUNT")
+	hostNetworking := j.platform.Getenv("HOST_NETWORKING")
 
 	jobLogger := j.logger.WithField("jobId", jobID)
 
@@ -53,7 +50,7 @@ func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 		args = make([]string, argsCount)
 		for i := 0; i < argsCount; i++ {
 			argKey := fmt.Sprintf("JOB_ARG_%d", i)
-			args[i] = j.osInterface.Getenv(argKey)
+			args[i] = j.platform.Getenv(argKey)
 		}
 	}
 
@@ -100,7 +97,7 @@ func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 	execArgs := append([]string{config.Command}, config.Args...)
 	jobLogger.Info("executing command with host networking", "commandPath", commandPath)
 
-	if err := j.syscallInterface.Exec(commandPath, execArgs, j.osInterface.Environ()); err != nil {
+	if err := j.platform.Exec(commandPath, execArgs, j.platform.Environ()); err != nil {
 		return fmt.Errorf("failed to exec command: %w", err)
 	}
 
@@ -123,14 +120,14 @@ func (j *jobInitializer) Run() error {
 }
 
 func (j *jobInitializer) setupBasicEnvironment() error {
-	pid := j.osInterface.Getpid()
+	pid := j.platform.Getpid()
 	j.logger.Debug("setting up basic environment", "pid", pid)
 
 	// Only remount /proc if we're PID 1
 	if pid == 1 {
 		j.logger.Info("detected PID 1 - remounting /proc for namespace isolation")
 
-		if err := j.syscallInterface.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""); err != nil {
+		if err := j.platform.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""); err != nil {
 			j.logger.Warn("failed to make mounts private", "error", err)
 		}
 
@@ -150,7 +147,7 @@ func (j *jobInitializer) setupCgroupNamespace() error {
 	j.logger.Info("verifying cgroup namespace setup")
 
 	// Verify cgroup filesystem is accessible
-	if _, err := j.osInterface.Stat("/sys/fs/cgroup/cgroup.procs"); err != nil {
+	if _, err := j.platform.Stat("/sys/fs/cgroup/cgroup.procs"); err != nil {
 		j.logger.Warn("cgroup.procs not immediately available, will be handled by joinCgroup", "error", err)
 		// Don't fail here - joinCgroup will handle this later
 	} else {
@@ -161,12 +158,12 @@ func (j *jobInitializer) setupCgroupNamespace() error {
 }
 
 func (j *jobInitializer) remountProc() error {
-	if err := j.syscallInterface.Mount("proc", "/proc", "proc", 0, ""); err != nil {
-		if unmountErr := j.syscallInterface.Unmount("/proc", syscall.MNT_DETACH); unmountErr != nil {
+	if err := j.platform.Mount("proc", "/proc", "proc", 0, ""); err != nil {
+		if unmountErr := j.platform.Unmount("/proc", syscall.MNT_DETACH); unmountErr != nil {
 			j.logger.Debug("/proc unmount failed", "error", unmountErr)
 		}
 
-		if err := j.syscallInterface.Mount("proc", "/proc", "proc", 0, ""); err != nil {
+		if err := j.platform.Mount("proc", "/proc", "proc", 0, ""); err != nil {
 			return fmt.Errorf("failed to remount /proc: %w", err)
 		}
 	}
@@ -180,7 +177,7 @@ func (j *jobInitializer) joinCgroup(cgroupPath string) error {
 	namespaceCgroupPath := "/sys/fs/cgroup"
 	procsFile := filepath.Join(namespaceCgroupPath, "cgroup.procs")
 
-	pid := j.osInterface.Getpid()
+	pid := j.platform.Getpid()
 	pidBytes := []byte(strconv.Itoa(pid))
 
 	log := j.logger.WithFields(
@@ -189,7 +186,7 @@ func (j *jobInitializer) joinCgroup(cgroupPath string) error {
 		"namespaceCgroupPath", namespaceCgroupPath)
 
 	for i := 0; i < 5; i++ {
-		if err := j.osInterface.WriteFile(procsFile, pidBytes, 0644); err != nil {
+		if err := j.platform.WriteFile(procsFile, pidBytes, 0644); err != nil {
 			backoff := time.Duration(1<<uint(i)) * time.Millisecond
 			log.Debug("cgroup join attempt failed, retrying", "attempt", i+1, "backoff", backoff)
 			time.Sleep(backoff)
@@ -204,13 +201,13 @@ func (j *jobInitializer) joinCgroup(cgroupPath string) error {
 
 func (j *jobInitializer) resolveCommandPath(command string) (string, error) {
 	if filepath.IsAbs(command) {
-		if _, err := j.osInterface.Stat(command); err != nil {
+		if _, err := j.platform.Stat(command); err != nil {
 			return "", fmt.Errorf("command %s not found: %w", command, err)
 		}
 		return command, nil
 	}
 
-	if resolvedPath, err := j.execInterface.LookPath(command); err == nil {
+	if resolvedPath, err := j.platform.LookPath(command); err == nil {
 		return resolvedPath, nil
 	}
 
@@ -223,7 +220,7 @@ func (j *jobInitializer) resolveCommandPath(command string) (string, error) {
 	}
 
 	for _, path := range commonPaths {
-		if _, err := j.osInterface.Stat(path); err == nil {
+		if _, err := j.platform.Stat(path); err == nil {
 			return path, nil
 		}
 	}

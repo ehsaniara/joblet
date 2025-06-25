@@ -18,46 +18,35 @@ import (
 
 	"worker/internal/worker/domain"
 	"worker/pkg/logger"
-	osinterface "worker/pkg/os"
+	"worker/pkg/platform"
 )
 
 var jobCounter int64
 
 // Worker handles job execution with host networking only
 type Worker struct {
-	store            store.Store
-	cgroup           resource.Resource
-	processLauncher  *process.Launcher
-	processCleaner   *process.Cleaner
-	processValidator *process.Validator
-	osInterface      osinterface.OsInterface
-	config           *Config
-	logger           *logger.Logger
+	store          store.Store
+	cgroup         resource.Resource
+	processManager *process.ProcessManager
+	platform       platform.Platform
+	config         *Config
+	logger         *logger.Logger
 }
 
 // dependencies contains dependencies for Worker
 type dependencies struct {
-	Store            store.Store
-	Cgroup           resource.Resource
-	ProcessLauncher  *process.Launcher
-	ProcessCleaner   *process.Cleaner
-	ProcessValidator *process.Validator
-	OsInterface      osinterface.OsInterface
-	Config           *Config
+	Store          store.Store
+	Cgroup         resource.Resource
+	ProcessManager *process.ProcessManager
+	Platform       platform.Platform
+	Config         *Config
 }
 
 // NewPlatformWorker creates a simplified Linux worker
 func NewPlatformWorker(store store.Store) interfaces.Worker {
-	// Create OS interfaces
-	osInterface := &osinterface.DefaultOs{}
-	syscallInterface := &osinterface.DefaultSyscall{}
-	cmdFactory := &osinterface.DefaultCommandFactory{}
-	execInterface := &osinterface.DefaultExec{}
+	platformInterface := platform.NewPlatform()
 
-	// Create process management components
-	processValidator := process.NewValidator(osInterface, execInterface)
-	processLauncher := process.NewLauncher(cmdFactory, syscallInterface, osInterface, processValidator)
-	processCleaner := process.NewCleaner(syscallInterface, osInterface)
+	processManager := process.NewProcessManager(platformInterface)
 
 	// Create resource management
 	cgroupResource := resource.New()
@@ -66,29 +55,24 @@ func NewPlatformWorker(store store.Store) interfaces.Worker {
 	config := DefaultConfigWithCgroupNamespace()
 
 	deps := &dependencies{
-		Store:            store,
-		Cgroup:           cgroupResource,
-		ProcessLauncher:  processLauncher,
-		ProcessCleaner:   processCleaner,
-		ProcessValidator: processValidator,
-		OsInterface:      osInterface,
-		Config:           config,
+		Store:          store,
+		Cgroup:         cgroupResource,
+		ProcessManager: processManager,
+		Platform:       platformInterface,
+		Config:         config,
 	}
 
 	worker := &Worker{
-		store:            deps.Store,
-		cgroup:           deps.Cgroup,
-		processLauncher:  deps.ProcessLauncher,
-		processCleaner:   deps.ProcessCleaner,
-		processValidator: deps.ProcessValidator,
-		osInterface:      deps.OsInterface,
-		config:           deps.Config,
-		logger:           logger.New().WithField("component", "linux-worker"),
+		store:          deps.Store,
+		cgroup:         deps.Cgroup,
+		processManager: deps.ProcessManager,
+		platform:       deps.Platform,
+		config:         deps.Config,
+		logger:         logger.New().WithField("component", "linux-worker"),
 	}
 
-	// Validate cgroup namespace support on startup
-	if err := worker.validateCgroupNamespaceSupport(); err != nil {
-		logger.Fatal("cgroup namespace support validation failed", "error", err)
+	if err := worker.validatePlatformSupport(); err != nil {
+		logger.Fatal("platform support validation failed", "error", err)
 	}
 
 	return worker
@@ -109,16 +93,16 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	}
 
 	// Validate command and arguments
-	if err := w.processValidator.ValidateCommand(command); err != nil {
+	if err := w.processManager.ValidateCommand(command); err != nil {
 		return nil, fmt.Errorf("invalid command: %w", err)
 	}
 
-	if err := w.processValidator.ValidateArguments(args); err != nil {
+	if err := w.processManager.ValidateArguments(args); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	// Resolve command path
-	resolvedCommand, err := w.processValidator.ResolveCommand(command)
+	resolvedCommand, err := w.processManager.ResolveCommand(command)
 	if err != nil {
 		return nil, fmt.Errorf("command resolution failed: %w", err)
 	}
@@ -181,7 +165,7 @@ func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 	}
 
 	// Perform process cleanup
-	result, err := w.processCleaner.CleanupProcess(ctx, cleanupReq)
+	result, err := w.processManager.CleanupProcess(ctx, cleanupReq)
 	if err != nil {
 		return fmt.Errorf("process cleanup failed: %w", err)
 	}
@@ -226,11 +210,10 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 		Status:     domain.StatusInitializing,
 		CgroupPath: w.config.BuildCgroupPath(jobID),
 		StartTime:  time.Now(),
-		// No network fields
 	}
 }
 
-func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface.Command, error) {
+func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Command, error) {
 	// Get job-init binary path
 	initPath, err := w.getJobInitPath()
 	if err != nil {
@@ -264,7 +247,7 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface
 	}
 
 	// Launch the process
-	result, err := w.processLauncher.LaunchProcess(ctx, launchConfig)
+	result, err := w.processManager.LaunchProcess(ctx, launchConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +257,7 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (osinterface
 }
 
 func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
-	baseEnv := w.osInterface.Environ()
+	baseEnv := w.platform.Environ()
 
 	// In cgroup namespace, the job's cgroup always appears at root
 	namespaceCgroupPath := "/sys/fs/cgroup"
@@ -298,27 +281,41 @@ func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 	return append(baseEnv, jobEnv...)
 }
 
-// Validate cgroup namespace support at startup
-func (w *Worker) validateCgroupNamespaceSupport() error {
-	// Check kernel support
-	if _, err := w.osInterface.Stat("/proc/self/ns/cgroup"); err != nil {
-		return fmt.Errorf("cgroup namespaces not supported by kernel: %w", err)
+func (w *Worker) validatePlatformSupport() error {
+	// Get platform info
+	info := w.platform.GetInfo()
+
+	if info.OS != "linux" {
+		return fmt.Errorf("Linux worker requires Linux platform, got %s", info.OS)
 	}
 
-	// Check cgroup v2 support
-	if _, err := w.osInterface.Stat("/sys/fs/cgroup/cgroup.controllers"); err != nil {
-		return fmt.Errorf("cgroups v2 not available: %w", err)
+	if !info.SupportsCgroups {
+		return fmt.Errorf("cgroups support required but not available")
 	}
 
-	w.logger.Info("cgroup namespace support validated")
+	if !info.SupportsNamespaces {
+		return fmt.Errorf("namespace support required but not available")
+	}
+
+	// Validate platform requirements (this will do the cgroup namespace + kernel checks)
+	if err := w.platform.ValidateRequirements(); err != nil {
+		return fmt.Errorf("platform requirements validation failed: %w", err)
+	}
+
+	w.logger.Info("platform support validated",
+		"os", info.OS,
+		"arch", info.Architecture,
+		"cgroups", info.SupportsCgroups,
+		"namespaces", info.SupportsNamespaces)
+
 	return nil
 }
 
 func (w *Worker) getJobInitPath() (string, error) {
 	// Check same directory as main executable
-	if execPath, err := w.osInterface.Executable(); err == nil {
+	if execPath, err := w.platform.Executable(); err == nil {
 		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
-		if _, err := w.osInterface.Stat(initPath); err == nil {
+		if _, err := w.platform.Stat(initPath); err == nil {
 			return initPath, nil
 		}
 	}
@@ -331,7 +328,7 @@ func (w *Worker) getJobInitPath() (string, error) {
 	}
 
 	for _, path := range standardPaths {
-		if _, err := w.osInterface.Stat(path); err == nil {
+		if _, err := w.platform.Stat(path); err == nil { // CHANGE: Use platform instead of osInterface
 			return path, nil
 		}
 	}
@@ -339,7 +336,7 @@ func (w *Worker) getJobInitPath() (string, error) {
 	return "", fmt.Errorf("job-init binary not found")
 }
 
-func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Command) {
+func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd platform.Command) {
 	cmd := processCmd.Process()
 	if cmd == nil {
 		w.logger.Warn("process is nil after start", "jobID", job.Id)
@@ -362,7 +359,7 @@ func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd osinterface.Comm
 	w.store.UpdateJob(runningJob)
 }
 
-func (w *Worker) monitorJob(ctx context.Context, cmd osinterface.Command, job *domain.Job) {
+func (w *Worker) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
 	log := w.logger.WithField("jobID", job.Id)
 	startTime := time.Now()
 

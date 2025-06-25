@@ -8,21 +8,20 @@ import (
 	"path/filepath"
 	"strconv"
 	"worker/pkg/logger"
-	"worker/pkg/os"
+	"worker/pkg/platform"
 )
 
 type darwinJobInitializer struct {
-	osInterface   os.OsInterface
-	execInterface os.ExecInterface
-	logger        *logger.Logger
+	platform platform.Platform
+	logger   *logger.Logger
 }
 
 // NewJobInitializer creates a macOS-specific job initializer
 func NewJobInitializer() JobInitializer {
+	platformInterface := platform.NewPlatform()
 	return &darwinJobInitializer{
-		osInterface:   &os.DefaultOs{},
-		execInterface: &os.DefaultExec{},
-		logger:        logger.New(),
+		platform: platformInterface,
+		logger:   logger.New(),
 	}
 }
 
@@ -30,10 +29,10 @@ func NewJobInitializer() JobInitializer {
 var _ JobInitializer = (*darwinJobInitializer)(nil)
 
 func (j *darwinJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
-	jobID := j.osInterface.Getenv("JOB_ID")
-	command := j.osInterface.Getenv("JOB_COMMAND")
-	cgroupPath := j.osInterface.Getenv("JOB_CGROUP_PATH")
-	argsCountStr := j.osInterface.Getenv("JOB_ARGS_COUNT")
+	jobID := j.platform.Getenv("JOB_ID")
+	command := j.platform.Getenv("JOB_COMMAND")
+	cgroupPath := j.platform.Getenv("JOB_CGROUP_PATH")
+	argsCountStr := j.platform.Getenv("JOB_ARGS_COUNT")
 
 	jobLogger := j.logger.WithField("jobId", jobID)
 
@@ -59,7 +58,7 @@ func (j *darwinJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 		args = make([]string, argsCount)
 		for i := 0; i < argsCount; i++ {
 			argKey := fmt.Sprintf("JOB_ARG_%d", i)
-			args[i] = j.osInterface.Getenv(argKey)
+			args[i] = j.platform.Getenv(argKey)
 		}
 
 		jobLogger.Debug("loaded job arguments", "argsCount", argsCount, "args", args)
@@ -112,11 +111,11 @@ func (j *darwinJobInitializer) ExecuteJob(config *JobConfig) error {
 	jobLogger.Debug("executing real command on macOS",
 		"commandPath", commandPath,
 		"execArgs", execArgs,
-		"envCount", len(j.osInterface.Environ()))
+		"envCount", len(j.platform.Environ()))
 
 	// Use standard exec.Command instead of syscall.Exec for macOS
 	cmd := exec.Command(commandPath, config.Args...)
-	cmd.Env = j.osInterface.Environ()
+	cmd.Env = j.platform.Environ()
 
 	// Replace current process with the command
 	if err := cmd.Run(); err != nil {
@@ -155,7 +154,7 @@ func (j *darwinJobInitializer) ValidateEnvironment() error {
 	requiredVars := []string{"JOB_ID", "JOB_COMMAND"}
 
 	for _, varName := range requiredVars {
-		if j.osInterface.Getenv(varName) == "" {
+		if j.platform.Getenv(varName) == "" {
 			j.logger.Error("required environment variable not set", "variable", varName)
 			return fmt.Errorf("required environment variable %s is not set", varName)
 		}
@@ -172,7 +171,7 @@ func (j *darwinJobInitializer) resolveCommandPath(command string) (string, error
 
 	// If already absolute path, verify it exists
 	if filepath.IsAbs(command) {
-		if _, err := j.osInterface.Stat(command); err != nil {
+		if _, err := j.platform.Stat(command); err != nil {
 			j.logger.Error("absolute command path not found", "command", command, "error", err)
 			return "", fmt.Errorf("command %s not found: %w", command, err)
 		}
@@ -181,7 +180,7 @@ func (j *darwinJobInitializer) resolveCommandPath(command string) (string, error
 	}
 
 	// Try to find the command in PATH
-	if resolvedPath, err := j.execInterface.LookPath(command); err == nil {
+	if resolvedPath, err := j.platform.LookPath(command); err == nil {
 		j.logger.Debug("resolved command via PATH", "command", command, "resolved", resolvedPath)
 		return resolvedPath, nil
 	}
@@ -200,7 +199,7 @@ func (j *darwinJobInitializer) resolveCommandPath(command string) (string, error
 	j.logger.Debug("checking common command locations (macOS)", "command", command, "paths", commonPaths)
 
 	for _, path := range commonPaths {
-		if _, err := j.osInterface.Stat(path); err == nil {
+		if _, err := j.platform.Stat(path); err == nil {
 			j.logger.Debug("found command in common location", "command", command, "path", path)
 			return path, nil
 		}

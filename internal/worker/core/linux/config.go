@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"path/filepath"
 	"time"
-	"worker/config"
 )
 
-// Config internal/worker/platform/linux/config.go
+const (
+	CgroupsBaseDir = "/sys/fs/cgroup"
+)
+
 type Config struct {
 	// Cgroup resource management configuration
 	CgroupsBaseDir string
@@ -33,14 +35,14 @@ type Config struct {
 	// System limits
 	MaxConcurrentJobs int32
 
-	// Cgroup namespace configuration (mandatory)
-	CgroupNamespaceMount string // Mount point inside namespace
+	// Mount point inside namespace
+	CgroupNamespaceMount string
 }
 
 // DefaultConfigWithCgroupNamespace creates config with mandatory cgroup namespaces
 func DefaultConfigWithCgroupNamespace() *Config {
 	return &Config{
-		CgroupsBaseDir:          config.CgroupsBaseDir,
+		CgroupsBaseDir:          CgroupsBaseDir,
 		GracefulShutdownTimeout: 100 * time.Millisecond,
 		ProcessStartTimeout:     10 * time.Second,
 		CleanupTimeout:          30 * time.Second,
