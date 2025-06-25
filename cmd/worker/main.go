@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
-	"job-worker/internal/config"
-	"job-worker/internal/worker/jobworker"
-	"job-worker/internal/worker/server"
-	"job-worker/internal/worker/store"
-	"job-worker/pkg/logger"
 	"os"
 	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
 	"time"
+	"worker/internal/worker"
+	"worker/internal/worker/core/linux/resource"
+	"worker/internal/worker/server"
+	"worker/internal/worker/store"
+	"worker/pkg/logger"
 )
 
 func main() {
@@ -39,7 +39,7 @@ func main() {
 	appLogger.Debug("goroutine monitoring started")
 
 	s := store.New()
-	w := jobworker.New(s)
+	w := worker.NewWorker(s)
 	appLogger.Info("worker and store initialized", "platform", runtime.GOOS)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -110,8 +110,8 @@ func validatePlatformRequirements(logger *logger.Logger) error {
 	switch runtime.GOOS {
 	case "linux":
 		// Check cgroups v2
-		if _, err := os.Stat(config.CgroupsBaseDir); os.IsNotExist(err) {
-			return fmt.Errorf("cgroups not available at %s", config.CgroupsBaseDir)
+		if _, err := os.Stat(resource.CgroupsBaseDir); os.IsNotExist(err) {
+			return fmt.Errorf("cgroups not available at %s", resource.CgroupsBaseDir)
 		}
 
 		// Check cgroup namespace support
@@ -125,7 +125,7 @@ func validatePlatformRequirements(logger *logger.Logger) error {
 		}
 
 		logger.Info("Linux requirements validated",
-			"cgroupsPath", config.CgroupsBaseDir,
+			"cgroupsPath", resource.CgroupsBaseDir,
 			"cgroupNamespace", true)
 		return nil
 

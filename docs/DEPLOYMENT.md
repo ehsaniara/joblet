@@ -219,9 +219,9 @@ ProtectSystem=strict
 ReadWritePaths=/opt/job-worker /var/log/job-worker /sys/fs/cgroup
 
 # Environment
-Environment=JOB_WORKER_ADDR=0.0.0.0:50051
-Environment=JOB_WORKER_CERT_PATH=/opt/job-worker/certs
-Environment=JOB_WORKER_LOG_LEVEL=info
+Environment=WORKER_ADDR=0.0.0.0:50051
+Environment=WORKER_CERT_PATH=/opt/job-worker/certs
+Environment=WORKER_LOG_LEVEL=info
 
 # Resource limits
 LimitNOFILE=65536
@@ -242,13 +242,13 @@ WantedBy=multi-user.target
 sudo systemctl daemon-reload
 
 # Enable service to start on boot
-sudo systemctl enable job-worker.service
+sudo systemctl enable worker.service
 
 # Start service
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 
 # Check status
-sudo systemctl status job-worker.service
+sudo systemctl status worker.service
 ```
 
 ### 3. Configure Logging
@@ -337,7 +337,7 @@ openssl s_client -connect localhost:50051 -verify_return_error
 
 ```bash
 # Service status
-sudo systemctl is-active job-worker.service
+sudo systemctl is-active worker.service
 
 # Process check
 pgrep -f job-worker
@@ -346,7 +346,7 @@ pgrep -f job-worker
 netstat -tlnp | grep :50051
 
 # Log tail
-sudo journalctl -u job-worker.service -f
+sudo journalctl -u worker.service -f
 ```
 
 ### Log Management
@@ -458,10 +458,10 @@ sudo systemctl restart auditd
 
 ```bash
 # Check systemd status
-sudo systemctl status job-worker.service -l
+sudo systemctl status worker.service -l
 
 # Check logs
-sudo journalctl -u job-worker.service --since "1 hour ago"
+sudo journalctl -u worker.service --since "1 hour ago"
 
 # Common causes:
 # 1. Missing certificates
@@ -519,14 +519,14 @@ Enable debug logging for troubleshooting:
 
 ```bash
 # Edit systemd service
-sudo systemctl edit job-worker.service
+sudo systemctl edit worker.service
 
 # Add debug environment
 [Service]
-Environment=JOB_WORKER_LOG_LEVEL=debug
+Environment=WORKER_LOG_LEVEL=debug
 
 # Restart service
-sudo systemctl restart job-worker.service
+sudo systemctl restart worker.service
 ```
 
 ### Emergency Procedures
@@ -536,13 +536,13 @@ sudo systemctl restart job-worker.service
 ```bash
 # Stop all job processes
 sudo pkill -f job-worker
-sudo systemctl stop job-worker.service
+sudo systemctl stop worker.service
 
 # Clean up cgroups
 sudo find /sys/fs/cgroup -name "job-*" -type d -exec rmdir {} \; 2>/dev/null
 
 # Restart service
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 ```
 
 #### Certificate Recovery
@@ -555,7 +555,7 @@ sudo mv /opt/job-worker/certs /opt/job-worker/certs.backup
 sudo /opt/job-worker/etc/certs_gen.sh
 
 # Restart service
-sudo systemctl restart job-worker.service
+sudo systemctl restart worker.service
 ```
 
 ## Backup & Recovery
@@ -573,7 +573,7 @@ echo "0 2 * * * /opt/job-worker/scripts/backup.sh" | sudo crontab -u job-worker 
 
 ```bash
 # 1. Stop service
-sudo systemctl stop job-worker.service
+sudo systemctl stop worker.service
 
 # 2. Restore from backup
 sudo tar -xzf backup.tar.gz -C /opt/job-worker/
@@ -583,7 +583,7 @@ sudo chown -R job-worker:job-worker /opt/job-worker
 sudo chmod 600 /opt/job-worker/certs/*-key.pem
 
 # 4. Start service
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 ```
 
 ### Migration to New Server
@@ -600,7 +600,7 @@ scp backup.tar.gz user@new-server:/tmp/
 
 # 4. On new server - restore
 sudo tar -xzf /tmp/backup.tar.gz -C /opt/job-worker/
-sudo systemctl start job-worker.service
+sudo systemctl start worker.service
 ```
 
 ## Environment-Specific Configurations

@@ -3,8 +3,8 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"job-worker/internal/worker/utils"
 	"time"
+	"worker/internal/worker/utils"
 )
 
 type JobStatus string
@@ -24,16 +24,16 @@ type ResourceLimits struct {
 }
 
 type Job struct {
-	Id         string
-	Command    string
-	Args       []string
-	Limits     ResourceLimits
-	Status     JobStatus
-	Pid        int32
-	CgroupPath string
-	StartTime  time.Time
-	EndTime    *time.Time
-	ExitCode   int32
+	Id         string         // Unique identifier for job tracking
+	Command    string         // Executable command path
+	Args       []string       // Command line arguments
+	Limits     ResourceLimits // CPU/memory/IO constraints
+	Status     JobStatus      // Current execution state
+	Pid        int32          // Process ID when running
+	CgroupPath string         // Filesystem path for resource limits
+	StartTime  time.Time      // Job creation timestamp
+	EndTime    *time.Time     // Completion timestamp (nil if running)
+	ExitCode   int32          // Process exit status
 }
 
 func (j *Job) IsRunning() bool {
@@ -44,11 +44,7 @@ func (j *Job) IsCompleted() bool {
 	return j.Status == StatusCompleted || j.Status == StatusFailed || j.Status == StatusStopped
 }
 
-func (j *Job) IsInitializing() bool {
-	return j.Status == StatusInitializing
-}
-
-// MarkAsRunning from INITIALIZING to RUNNING
+// MarkAsRunning transitions job from INITIALIZING to RUNNING state with given PID
 func (j *Job) MarkAsRunning(pid int32) error {
 
 	if j.Status != StatusInitializing {
@@ -64,6 +60,7 @@ func (j *Job) MarkAsRunning(pid int32) error {
 	return nil
 }
 
+// Complete marks job as successfully finished with given exit code
 func (j *Job) Complete(exitCode int32) error {
 
 	if j.Status != StatusRunning {
@@ -77,6 +74,7 @@ func (j *Job) Complete(exitCode int32) error {
 	return nil
 }
 
+// Fail marks job as failed with given exit code (allows INITIALIZING->FAILED transition)
 func (j *Job) Fail(exitCode int32) error {
 
 	if j.Status != StatusRunning && j.Status != StatusInitializing {
@@ -90,6 +88,7 @@ func (j *Job) Fail(exitCode int32) error {
 	return nil
 }
 
+// Stop forcefully terminates a running job
 func (j *Job) Stop() error {
 
 	if j.Status != StatusRunning {
@@ -103,6 +102,7 @@ func (j *Job) Stop() error {
 	return nil
 }
 
+// DeepCopy creates independent copy to prevent concurrent modification issues
 func (j *Job) DeepCopy() *Job {
 	var endTimeCopy *time.Time
 	if j.EndTime != nil {
@@ -124,6 +124,7 @@ func (j *Job) DeepCopy() *Job {
 	}
 }
 
+// Duration calculates job runtime (current time if still running)
 func (j *Job) Duration() time.Duration {
 	if j.EndTime != nil {
 		return j.EndTime.Sub(j.StartTime)

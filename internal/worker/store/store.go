@@ -2,13 +2,32 @@ package store
 
 import (
 	"context"
-	"job-worker/internal/worker/domain"
-	"job-worker/internal/worker/interfaces"
-	_errors "job-worker/pkg/errors"
-	"job-worker/pkg/logger"
 	"sync"
 	"time"
+	"worker/internal/worker/domain"
+	_errors "worker/pkg/errors"
+	"worker/pkg/logger"
 )
+
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
+//counterfeiter:generate . Store
+type Store interface {
+	CreateNewJob(job *domain.Job)
+	UpdateJob(job *domain.Job)
+	GetJob(id string) (*domain.Job, bool)
+	ListJobs() []*domain.Job
+	WriteToBuffer(jobId string, chunk []byte)
+	GetOutput(id string) ([]byte, bool, error)
+	SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error
+}
+
+//counterfeiter:generate . DomainStreamer
+type DomainStreamer interface {
+	SendData(data []byte) error
+	SendKeepalive() error
+	Context() context.Context
+}
 
 type store struct {
 	tasks  map[string]*Task
@@ -16,7 +35,7 @@ type store struct {
 	logger *logger.Logger
 }
 
-func New() interfaces.Store {
+func New() Store {
 	s := &store{
 		tasks:  make(map[string]*Task),
 		logger: logger.WithField("component", "store"),
@@ -129,7 +148,7 @@ func (st *store) GetOutput(id string) ([]byte, bool, error) {
 }
 
 // SendUpdatesToClient sends the job log updates only
-func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream interfaces.DomainStreamer) error {
+func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error {
 	st.mutex.RLock()
 	job, exists := st.tasks[id]
 	st.mutex.RUnlock()

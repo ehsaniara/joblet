@@ -2,14 +2,14 @@ syntax = "proto3";
 
 option go_package = "./";
 
-package job_worker;
+package worker;
 
 service JobService{
-  rpc CreateJob(CreateJobReq) returns (CreateJobRes){}
-  rpc GetJob(GetJobReq) returns (GetJobRes){}
+  rpc RunJob(RunJobReq) returns (RunJobRes){}
+  rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes){}
   rpc StopJob(StopJobReq) returns (StopJobRes){}
-  rpc GetJobsStream(GetJobsStreamReq) returns (stream DataChunk);
-  rpc GetJobs(EmptyRequest) returns (Jobs){}
+  rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
+  rpc ListJobs(EmptyRequest) returns (Jobs){}
 }
 
 message Jobs{
@@ -31,7 +31,7 @@ message Job{
 
 message EmptyRequest {}
 
-message CreateJobReq{
+message RunJobReq{
   string command = 1;
   repeated string args = 2;
   int32 maxCPU = 3;
@@ -39,7 +39,7 @@ message CreateJobReq{
   int32 maxIOBPS = 5;
 }
 
-message CreateJobRes{
+message RunJobRes{
   string id = 1;
   string command = 2;
   repeated string args = 3;
@@ -52,12 +52,12 @@ message CreateJobRes{
   int32 exitCode = 10;
 }
 
-// GetJob
-message GetJobReq{
+// GetJobStatus
+message GetJobStatusReq{
   string id = 1;
 }
 
-message GetJobRes{
+message GetJobStatusRes{
   string id = 1;
   string command = 2;
   repeated string args = 3;
@@ -82,8 +82,8 @@ message StopJobRes{
   int32 exitCode = 4;
 }
 
-// GetJobsStream
-message GetJobsStreamReq{
+// GetJobLogs
+message GetJobLogsReq{
   string id = 1;
 }
 

@@ -290,8 +290,8 @@ import (
     "google.golang.org/grpc"
     
     // Local packages
-    "job-worker/internal/worker/domain"
-    "job-worker/pkg/logger"
+    "worker/internal/worker/domain"
+    "worker/pkg/logger"
 )
 
 // Interface definitions before implementations

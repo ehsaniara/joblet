@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
-	"job-worker/pkg/client"
 	"strings"
 	"time"
+	"worker/pkg/client"
 
 	"github.com/spf13/cobra"
 )
@@ -30,7 +30,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	response, err := jobClient.GetJobs(ctx)
+	response, err := jobClient.ListJobs(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list jobs: %v", err)
 	}

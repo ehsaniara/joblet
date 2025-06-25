@@ -257,14 +257,14 @@ make test-tls REMOTE_HOST=your-server.com
 
 ```bash
 # Server Configuration
-export JOB_WORKER_ADDR="0.0.0.0:50051"        # Server listening address
-export JOB_WORKER_CERT_PATH="./certs"          # Certificate directory path
-export JOB_WORKER_CGROUP_BASE="/sys/fs/cgroup" # Cgroups v2 base directory
+export WORKER_ADDR="0.0.0.0:50051"        # Server listening address
+export WORKER_CERT_PATH="./certs"          # Certificate directory path
+export WORKER_CGROUP_BASE="/sys/fs/cgroup" # Cgroups v2 base directory
 
 # Default Resource Limits (applied when not specified)
-export JOB_WORKER_DEFAULT_CPU=100      # 100% of one CPU core
-export JOB_WORKER_DEFAULT_MEMORY=512   # 512 MB memory limit
-export JOB_WORKER_DEFAULT_IO=0         # Unlimited I/O (0 = disabled)
+export WORKER_DEFAULT_CPU=100      # 100% of one CPU core
+export WORKER_DEFAULT_MEMORY=512   # 512 MB memory limit
+export WORKER_DEFAULT_IO=0         # Unlimited I/O (0 = disabled)
 
 # Logging Configuration
 export LOG_LEVEL="INFO"  # DEBUG, INFO, WARN, ERROR

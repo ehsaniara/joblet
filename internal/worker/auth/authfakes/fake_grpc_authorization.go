@@ -3,8 +3,8 @@ package authfakes
 
 import (
 	"context"
-	"job-worker/internal/worker/auth"
 	"sync"
+	"worker/internal/worker/auth"
 )
 
 type FakeGrpcAuthorization struct {

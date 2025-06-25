@@ -1,11 +1,11 @@
 package mappers
 
 import (
-	pb "job-worker/api/gen"
-	"job-worker/internal/worker/domain"
+	pb "worker/api/gen"
+	"worker/internal/worker/domain"
 )
 
-// DomainToProtobuf converts domain Job to protobuf Job (no network fields)
+// DomainToProtobuf converts domain Job to protobuf Job
 func DomainToProtobuf(job *domain.Job) *pb.Job {
 	pbJob := &pb.Job{
 		Id:        job.Id,
@@ -27,9 +27,9 @@ func DomainToProtobuf(job *domain.Job) *pb.Job {
 	return pbJob
 }
 
-// DomainToCreateJobResponse converts domain Job to CreateJobRes (no network fields)
-func DomainToCreateJobResponse(job *domain.Job) *pb.CreateJobRes {
-	response := &pb.CreateJobRes{
+// DomainToRunJobResponse converts domain Job to RunJobRes
+func DomainToRunJobResponse(job *domain.Job) *pb.RunJobRes {
+	response := &pb.RunJobRes{
 		Id:        job.Id,
 		Command:   job.Command,
 		Args:      job.Args,
@@ -49,9 +49,9 @@ func DomainToCreateJobResponse(job *domain.Job) *pb.CreateJobRes {
 	return response
 }
 
-// DomainToGetJobResponse converts domain Job to GetJobRes (no network fields)
-func DomainToGetJobResponse(job *domain.Job) *pb.GetJobRes {
-	response := &pb.GetJobRes{
+// DomainToGetJobStatusResponse converts domain Job to GetJobStatusRes
+func DomainToGetJobStatusResponse(job *domain.Job) *pb.GetJobStatusRes {
+	response := &pb.GetJobStatusRes{
 		Id:        job.Id,
 		Command:   job.Command,
 		Args:      job.Args,

@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	pb "job-worker/api/gen"
-	"job-worker/internal/config"
-	auth2 "job-worker/internal/worker/auth"
-	"job-worker/internal/worker/interfaces"
-	"job-worker/pkg/logger"
 	"net"
 	"os"
+	pb "worker/api/gen"
+	auth2 "worker/internal/worker/auth"
+	"worker/internal/worker/core/interfaces"
+	"worker/internal/worker/store"
+	"worker/pkg/logger"
 )
 
 const (
@@ -20,10 +20,14 @@ const (
 	serverKeyPath  = "./certs/server-key.pem"
 	caCertPath     = "./certs/ca-cert.pem"
 
+	MaxRecvMsgSize    = 512 * 1024      // 512KB
+	MaxSendMsgSize    = 4 * 1024 * 1024 // 4MB
+	MaxHeaderListSize = 1 * 1024 * 1024 // 1MB
+
 	serverAddress = "0.0.0.0:50051"
 )
 
-func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) (*grpc.Server, error) {
+func StartGRPCServer(jobStore store.Store, jobWorker interfaces.Worker) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 
 	serverLogger.Info("initializing gRPC server", "address", serverAddress, "tlsEnabled", true)
@@ -69,15 +73,15 @@ func StartGRPCServer(jobStore interfaces.Store, jobWorker interfaces.JobWorker) 
 
 	grpcOptions := []grpc.ServerOption{
 		grpc.Creds(creds),
-		grpc.MaxRecvMsgSize(config.MaxRecvMsgSize),
-		grpc.MaxSendMsgSize(config.MaxSendMsgSize),
-		grpc.MaxHeaderListSize(uint32(config.MaxHeaderListSize)),
+		grpc.MaxRecvMsgSize(MaxRecvMsgSize),
+		grpc.MaxSendMsgSize(MaxSendMsgSize),
+		grpc.MaxHeaderListSize(uint32(MaxHeaderListSize)),
 	}
 
 	serverLogger.Debug("gRPC server options configured",
-		"maxRecvMsgSize", config.MaxRecvMsgSize,
-		"maxSendMsgSize", config.MaxSendMsgSize,
-		"maxHeaderListSize", config.MaxHeaderListSize)
+		"maxRecvMsgSize", MaxRecvMsgSize,
+		"maxSendMsgSize", MaxSendMsgSize,
+		"maxHeaderListSize", MaxHeaderListSize)
 
 	grpcServer := grpc.NewServer(grpcOptions...)
 

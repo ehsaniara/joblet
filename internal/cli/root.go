@@ -2,7 +2,7 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
-	"job-worker/internal/config"
+	"worker/internal/cli/config"
 )
 
 var (
@@ -22,9 +22,9 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfg.ServerAddr, "server", "s", "192.168.1.161:50051", "Address format host:port")
 
-	rootCmd.AddCommand(newCreateCmd())
-	rootCmd.AddCommand(newGetCmd())
+	rootCmd.AddCommand(newRunCmd())
+	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newStopCmd())
-	rootCmd.AddCommand(newStreamCmd())
+	rootCmd.AddCommand(newLogCmd())
 	rootCmd.AddCommand(newListCmd())
 }

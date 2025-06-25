@@ -4,12 +4,12 @@ package jobinit
 
 import (
 	"fmt"
-	"job-worker/pkg/logger"
-	"job-worker/pkg/os"
 	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
+	"worker/pkg/logger"
+	"worker/pkg/os"
 )
 
 type jobInitializer struct {
