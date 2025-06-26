@@ -1,5 +1,5 @@
 [Unit]
-Description=Worker Service
+Description=Worker Service - Job Isolation Platform
 After=network.target
 
 [Service]
@@ -7,37 +7,46 @@ ExecStart=/opt/worker/worker
 Restart=always
 RestartSec=10s
 
-# User isolation
-User=worker
-Group=worker
+# Run as root to enable full namespace isolation capabilities
+User=root
+Group=root
 
-# Minimal capability for cgroup management
-AmbientCapabilities=CAP_SYS_ADMIN
-NoNewPrivileges=yes
+# CRITICAL: Allow new privileges for namespace operations
+NoNewPrivileges=no
 
-# Cgroup v2 delegation
+# Security hardening while maintaining isolation capabilities
+PrivateTmp=yes
+ProtectHome=yes
+ReadWritePaths=/opt/worker /sys/fs/cgroup /proc /tmp
+
+# CRITICAL: Disable protections that block namespace operations
+ProtectSystem=no
+PrivateDevices=no
+ProtectKernelTunables=no
+ProtectControlGroups=no
+RestrictRealtime=no
+RestrictSUIDSGID=no
+MemoryDenyWriteExecute=no
+
+# Cgroup delegation for job resource management
 Delegate=yes
 DelegateControllers=cpu memory io pids
-
-# Enable accounting
 CPUAccounting=yes
 MemoryAccounting=yes
 IOAccounting=yes
 TasksAccounting=yes
-
-# Use dedicated slice
 Slice=worker.slice
 
-# Basic settings
+# Runtime settings
 WorkingDirectory=/opt/worker
 LimitNOFILE=4096
 StandardOutput=journal
 StandardError=journal
 
-# Setup controllers after service starts
+# Setup cgroup controllers after service starts
 ExecStartPost=/bin/bash -c 'sleep 1; echo "+cpu +memory +io +pids" > /sys/fs/cgroup/worker.slice/worker.service/cgroup.subtree_control || true'
 
-# Cleanup job cgroups on stop
+# Cleanup job cgroups on service stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'
 
 [Install]

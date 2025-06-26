@@ -27,21 +27,19 @@ const (
 	MaxEnvironmentVarLen    = 8192
 )
 
-// ProcessManager handles all process-related operations including launching, cleanup, and validation
-type ProcessManager struct {
+// Manager handles all process-related operations including launching, cleanup, and validation
+type Manager struct {
 	platform platform.Platform
 	logger   *logger.Logger
 }
 
 // NewProcessManager creates a new unified process manager
-func NewProcessManager(platform platform.Platform) *ProcessManager {
-	return &ProcessManager{
+func NewProcessManager(platform platform.Platform) *Manager {
+	return &Manager{
 		platform: platform,
 		logger:   logger.New().WithField("component", "process-manager"),
 	}
 }
-
-// === LAUNCH OPERATIONS ===
 
 // LaunchConfig contains all configuration for launching a process
 type LaunchConfig struct {
@@ -65,7 +63,7 @@ type LaunchResult struct {
 }
 
 // LaunchProcess launches a process with the given configuration
-func (pm *ProcessManager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*LaunchResult, error) {
+func (pm *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*LaunchResult, error) {
 	if config == nil {
 		return nil, fmt.Errorf("launch config cannot be nil")
 	}
@@ -101,7 +99,7 @@ func (pm *ProcessManager) LaunchProcess(ctx context.Context, config *LaunchConfi
 }
 
 // launchInGoroutine launches the process in a separate goroutine with proper namespace handling
-func (pm *ProcessManager) launchInGoroutine(config *LaunchConfig, resultChan chan<- *LaunchResult) {
+func (pm *Manager) launchInGoroutine(config *LaunchConfig, resultChan chan<- *LaunchResult) {
 	defer func() {
 		if r := recover(); r != nil {
 			resultChan <- &LaunchResult{
@@ -157,7 +155,7 @@ func (pm *ProcessManager) launchInGoroutine(config *LaunchConfig, resultChan cha
 }
 
 // createAndStartCommand creates and starts the command with proper configuration
-func (pm *ProcessManager) createAndStartCommand(config *LaunchConfig) (platform.Command, error) {
+func (pm *Manager) createAndStartCommand(config *LaunchConfig) (platform.Command, error) {
 	// Create command
 	cmd := pm.platform.CreateCommand(config.InitPath)
 
@@ -187,8 +185,6 @@ func (pm *ProcessManager) createAndStartCommand(config *LaunchConfig) (platform.
 	return cmd, nil
 }
 
-// === CLEANUP OPERATIONS ===
-
 // CleanupRequest contains information needed for cleanup
 type CleanupRequest struct {
 	JobID           string
@@ -196,7 +192,6 @@ type CleanupRequest struct {
 	CgroupPath      string
 	NetworkGroupID  string
 	NamespacePath   string
-	IsIsolatedJob   bool
 	ForceKill       bool
 	GracefulTimeout time.Duration
 }
@@ -213,7 +208,7 @@ type CleanupResult struct {
 }
 
 // CleanupProcess performs comprehensive cleanup of a job process and its resources
-func (pm *ProcessManager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*CleanupResult, error) {
+func (pm *Manager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*CleanupResult, error) {
 	if req == nil {
 		return nil, fmt.Errorf("cleanup request cannot be nil")
 	}
@@ -231,7 +226,7 @@ func (pm *ProcessManager) CleanupProcess(ctx context.Context, req *CleanupReques
 		Errors: make([]error, 0),
 	}
 
-	// Step 1: Handle process termination
+	// Handle process termination
 	if req.PID > 0 {
 		processResult := pm.cleanupProcessAndGroup(ctx, req)
 		result.ProcessKilled = processResult.Killed
@@ -241,8 +236,8 @@ func (pm *ProcessManager) CleanupProcess(ctx context.Context, req *CleanupReques
 		}
 	}
 
-	// Step 2: Cleanup namespace if it's an isolated job
-	if req.IsIsolatedJob && req.NamespacePath != "" {
+	// Cleanup namespace if it's an isolated job
+	if req.NamespacePath != "" {
 		if err := pm.cleanupNamespace(req.NamespacePath, false); err != nil {
 			log.Warn("failed to cleanup namespace", "path", req.NamespacePath, "error", err)
 			result.Errors = append(result.Errors, fmt.Errorf("namespace cleanup failed: %w", err))
@@ -270,7 +265,7 @@ type processCleanupResult struct {
 }
 
 // cleanupProcessAndGroup handles process and process group cleanup
-func (pm *ProcessManager) cleanupProcessAndGroup(ctx context.Context, req *CleanupRequest) *processCleanupResult {
+func (pm *Manager) cleanupProcessAndGroup(ctx context.Context, req *CleanupRequest) *processCleanupResult {
 	log := pm.logger.WithFields("jobID", req.JobID, "pid", req.PID)
 
 	// Check if process is still alive
@@ -300,7 +295,7 @@ func (pm *ProcessManager) cleanupProcessAndGroup(ctx context.Context, req *Clean
 }
 
 // attemptGracefulShutdown attempts to gracefully shut down a process
-func (pm *ProcessManager) attemptGracefulShutdown(pid int32, timeout time.Duration, jobID string) *processCleanupResult {
+func (pm *Manager) attemptGracefulShutdown(pid int32, timeout time.Duration, jobID string) *processCleanupResult {
 	log := pm.logger.WithFields("jobID", jobID, "pid", pid)
 
 	if timeout <= 0 {
@@ -346,7 +341,7 @@ func (pm *ProcessManager) attemptGracefulShutdown(pid int32, timeout time.Durati
 }
 
 // forceKillProcess force kills a process and its group
-func (pm *ProcessManager) forceKillProcess(pid int32, jobID string) *processCleanupResult {
+func (pm *Manager) forceKillProcess(pid int32, jobID string) *processCleanupResult {
 	log := pm.logger.WithFields("jobID", jobID, "pid", pid)
 	log.Warn("force killing process")
 
@@ -385,8 +380,6 @@ func (pm *ProcessManager) forceKillProcess(pid int32, jobID string) *processClea
 	}
 }
 
-// === VALIDATION OPERATIONS ===
-
 // LaunchRequest represents a process launch request for validation
 type LaunchRequest struct {
 	Command        string
@@ -414,7 +407,7 @@ func (e ValidationError) Error() string {
 }
 
 // ValidateLaunchRequest validates a process launch request
-func (pm *ProcessManager) ValidateLaunchRequest(req *LaunchRequest) error {
+func (pm *Manager) ValidateLaunchRequest(req *LaunchRequest) error {
 	if req == nil {
 		return fmt.Errorf("launch request cannot be nil")
 	}
@@ -444,17 +437,17 @@ func (pm *ProcessManager) ValidateLaunchRequest(req *LaunchRequest) error {
 }
 
 // ValidateCommand validates a command string
-func (pm *ProcessManager) ValidateCommand(command string) error {
+func (pm *Manager) ValidateCommand(command string) error {
 	return pm.validateCommand(command)
 }
 
 // ValidateArguments validates command arguments
-func (pm *ProcessManager) ValidateArguments(args []string) error {
+func (pm *Manager) ValidateArguments(args []string) error {
 	return pm.validateArguments(args)
 }
 
 // ResolveCommand resolves a command to its full path
-func (pm *ProcessManager) ResolveCommand(command string) (string, error) {
+func (pm *Manager) ResolveCommand(command string) (string, error) {
 	if command == "" {
 		return "", fmt.Errorf("command cannot be empty")
 	}
@@ -499,10 +492,8 @@ func (pm *ProcessManager) ResolveCommand(command string) (string, error) {
 	return "", fmt.Errorf("command %s not found in PATH or common locations", command)
 }
 
-// === UTILITY OPERATIONS ===
-
 // CreateSysProcAttr creates syscall process attributes for namespace isolation
-func (pm *ProcessManager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
+func (pm *Manager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
 	sysProcAttr := pm.platform.CreateProcessGroup()
 
 	// Base namespaces that are always enabled
@@ -525,7 +516,7 @@ func (pm *ProcessManager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysPr
 }
 
 // BuildJobEnvironment builds environment variables for a specific job
-func (pm *ProcessManager) BuildJobEnvironment(jobID, command, cgroupPath string, args []string, networkEnvVars []string) []string {
+func (pm *Manager) BuildJobEnvironment(jobID, command, cgroupPath string, args []string, networkEnvVars []string) []string {
 	jobEnvVars := []string{
 		fmt.Sprintf("JOB_ID=%s", jobID),
 		fmt.Sprintf("JOB_COMMAND=%s", command),
@@ -547,7 +538,7 @@ func (pm *ProcessManager) BuildJobEnvironment(jobID, command, cgroupPath string,
 }
 
 // PrepareEnvironment prepares the environment variables for a job
-func (pm *ProcessManager) PrepareEnvironment(baseEnv []string, jobEnvVars []string) []string {
+func (pm *Manager) PrepareEnvironment(baseEnv []string, jobEnvVars []string) []string {
 	if baseEnv == nil {
 		baseEnv = pm.platform.Environ()
 	}
@@ -555,7 +546,7 @@ func (pm *ProcessManager) PrepareEnvironment(baseEnv []string, jobEnvVars []stri
 }
 
 // IsProcessAlive checks if a process is still alive
-func (pm *ProcessManager) IsProcessAlive(pid int32) bool {
+func (pm *Manager) IsProcessAlive(pid int32) bool {
 	if pid <= 0 {
 		return false
 	}
@@ -563,7 +554,7 @@ func (pm *ProcessManager) IsProcessAlive(pid int32) bool {
 }
 
 // KillProcess kills a process with the specified signal
-func (pm *ProcessManager) KillProcess(pid int32, signal syscall.Signal) error {
+func (pm *Manager) KillProcess(pid int32, signal syscall.Signal) error {
 	if err := pm.validatePID(pid); err != nil {
 		return fmt.Errorf("invalid PID: %w", err)
 	}
@@ -580,7 +571,7 @@ func (pm *ProcessManager) KillProcess(pid int32, signal syscall.Signal) error {
 }
 
 // KillProcessGroup kills a process group with the specified signal
-func (pm *ProcessManager) KillProcessGroup(pid int32, signal syscall.Signal) error {
+func (pm *Manager) KillProcessGroup(pid int32, signal syscall.Signal) error {
 	if err := pm.validatePID(pid); err != nil {
 		return fmt.Errorf("invalid PID: %w", err)
 	}
@@ -598,7 +589,7 @@ func (pm *ProcessManager) KillProcessGroup(pid int32, signal syscall.Signal) err
 }
 
 // WaitForProcess waits for a process to complete with timeout
-func (pm *ProcessManager) WaitForProcess(ctx context.Context, cmd platform.Command, timeout time.Duration) error {
+func (pm *Manager) WaitForProcess(ctx context.Context, cmd platform.Command, timeout time.Duration) error {
 	if cmd == nil {
 		return fmt.Errorf("command cannot be nil")
 	}
@@ -623,7 +614,7 @@ func (pm *ProcessManager) WaitForProcess(ctx context.Context, cmd platform.Comma
 }
 
 // GetProcessExitCode attempts to get the exit code of a completed process
-func (pm *ProcessManager) GetProcessExitCode(cmd platform.Command) (int32, error) {
+func (pm *Manager) GetProcessExitCode(cmd platform.Command) (int32, error) {
 	if cmd == nil {
 		return -1, fmt.Errorf("command cannot be nil")
 	}
@@ -641,10 +632,8 @@ func (pm *ProcessManager) GetProcessExitCode(cmd platform.Command) (int32, error
 	return -1, err
 }
 
-// === PRIVATE HELPER METHODS ===
-
 // isProcessAlive checks if a process is still alive
-func (pm *ProcessManager) isProcessAlive(pid int32) bool {
+func (pm *Manager) isProcessAlive(pid int32) bool {
 	err := pm.platform.Kill(int(pid), 0)
 	if err == nil {
 		return true
@@ -663,7 +652,7 @@ func (pm *ProcessManager) isProcessAlive(pid int32) bool {
 }
 
 // joinNetworkNamespace joins an existing network namespace using setns syscall
-func (pm *ProcessManager) joinNetworkNamespace(nsPath string) error {
+func (pm *Manager) joinNetworkNamespace(nsPath string) error {
 	if nsPath == "" {
 		return fmt.Errorf("namespace path cannot be empty")
 	}
@@ -697,7 +686,7 @@ func (pm *ProcessManager) joinNetworkNamespace(nsPath string) error {
 }
 
 // cleanupNamespace removes a namespace file or symlink
-func (pm *ProcessManager) cleanupNamespace(nsPath string, isBound bool) error {
+func (pm *Manager) cleanupNamespace(nsPath string, isBound bool) error {
 	log := pm.logger.WithFields("nsPath", nsPath, "isBound", isBound)
 
 	if _, err := pm.platform.Stat(nsPath); err != nil {
@@ -725,7 +714,7 @@ func (pm *ProcessManager) cleanupNamespace(nsPath string, isBound bool) error {
 }
 
 // Validation helper methods
-func (pm *ProcessManager) validateCommand(command string) error {
+func (pm *Manager) validateCommand(command string) error {
 	if command == "" {
 		return ValidationError{Field: "command", Value: command, Message: "command cannot be empty"}
 	}
@@ -738,7 +727,7 @@ func (pm *ProcessManager) validateCommand(command string) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateArguments(args []string) error {
+func (pm *Manager) validateArguments(args []string) error {
 	if len(args) > MaxJobArgs {
 		return ValidationError{Field: "args", Value: len(args), Message: fmt.Sprintf("too many arguments (max %d)", MaxJobArgs)}
 	}
@@ -753,7 +742,7 @@ func (pm *ProcessManager) validateArguments(args []string) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateResourceLimits(maxCPU, maxMemory, maxIOBPS int32) error {
+func (pm *Manager) validateResourceLimits(maxCPU, maxMemory, maxIOBPS int32) error {
 	if maxCPU < 0 {
 		return ValidationError{Field: "maxCPU", Value: maxCPU, Message: "CPU limit cannot be negative"}
 	}
@@ -775,7 +764,7 @@ func (pm *ProcessManager) validateResourceLimits(maxCPU, maxMemory, maxIOBPS int
 	return nil
 }
 
-func (pm *ProcessManager) validateJobID(jobID string) error {
+func (pm *Manager) validateJobID(jobID string) error {
 	if jobID == "" {
 		return ValidationError{Field: "jobID", Value: jobID, Message: "job ID cannot be empty"}
 	}
@@ -790,7 +779,7 @@ func (pm *ProcessManager) validateJobID(jobID string) error {
 	return nil
 }
 
-func (pm *ProcessManager) validatePID(pid int32) error {
+func (pm *Manager) validatePID(pid int32) error {
 	if pid <= 0 {
 		return ValidationError{Field: "pid", Value: pid, Message: "PID must be positive"}
 	}
@@ -800,7 +789,7 @@ func (pm *ProcessManager) validatePID(pid int32) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateLaunchConfig(config *LaunchConfig) error {
+func (pm *Manager) validateLaunchConfig(config *LaunchConfig) error {
 	if config.InitPath == "" {
 		return fmt.Errorf("init path cannot be empty")
 	}
@@ -826,7 +815,7 @@ func (pm *ProcessManager) validateLaunchConfig(config *LaunchConfig) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateCleanupRequest(req *CleanupRequest) error {
+func (pm *Manager) validateCleanupRequest(req *CleanupRequest) error {
 	if req.JobID == "" {
 		return fmt.Errorf("job ID cannot be empty")
 	}
@@ -836,7 +825,7 @@ func (pm *ProcessManager) validateCleanupRequest(req *CleanupRequest) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateInitPath(initPath string) error {
+func (pm *Manager) validateInitPath(initPath string) error {
 	if !filepath.IsAbs(initPath) {
 		return ValidationError{Field: "initPath", Value: initPath, Message: "init path must be absolute"}
 	}
@@ -856,7 +845,7 @@ func (pm *ProcessManager) validateInitPath(initPath string) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateCgroupPath(cgroupPath string) error {
+func (pm *Manager) validateCgroupPath(cgroupPath string) error {
 	if !filepath.IsAbs(cgroupPath) {
 		return ValidationError{Field: "cgroupPath", Value: cgroupPath, Message: "cgroup path must be absolute"}
 	}
@@ -873,7 +862,7 @@ func (pm *ProcessManager) validateCgroupPath(cgroupPath string) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateNetworkGroupID(groupID string) error {
+func (pm *Manager) validateNetworkGroupID(groupID string) error {
 	if len(groupID) > 64 {
 		return ValidationError{Field: "networkGroupID", Value: groupID, Message: "network group ID too long (max 64 characters)"}
 	}
@@ -885,7 +874,7 @@ func (pm *ProcessManager) validateNetworkGroupID(groupID string) error {
 	return nil
 }
 
-func (pm *ProcessManager) validateEnvironment(env []string) error {
+func (pm *Manager) validateEnvironment(env []string) error {
 	if len(env) > MaxEnvironmentVars {
 		return ValidationError{Field: "environment", Value: len(env), Message: fmt.Sprintf("too many environment variables (max %d)", MaxEnvironmentVars)}
 	}
@@ -904,28 +893,28 @@ func (pm *ProcessManager) validateEnvironment(env []string) error {
 }
 
 // Conditional validation helpers
-func (pm *ProcessManager) validateInitPathIfProvided(initPath string) error {
+func (pm *Manager) validateInitPathIfProvided(initPath string) error {
 	if initPath != "" {
 		return pm.validateInitPath(initPath)
 	}
 	return nil
 }
 
-func (pm *ProcessManager) validateCgroupPathIfProvided(cgroupPath string) error {
+func (pm *Manager) validateCgroupPathIfProvided(cgroupPath string) error {
 	if cgroupPath != "" {
 		return pm.validateCgroupPath(cgroupPath)
 	}
 	return nil
 }
 
-func (pm *ProcessManager) validateNetworkGroupIDIfProvided(groupID string) error {
+func (pm *Manager) validateNetworkGroupIDIfProvided(groupID string) error {
 	if groupID != "" {
 		return pm.validateNetworkGroupID(groupID)
 	}
 	return nil
 }
 
-func (pm *ProcessManager) validateEnvironmentIfProvided(env []string) error {
+func (pm *Manager) validateEnvironmentIfProvided(env []string) error {
 	if env != nil {
 		return pm.validateEnvironment(env)
 	}

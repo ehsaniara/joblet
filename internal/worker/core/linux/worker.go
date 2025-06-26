@@ -14,60 +14,40 @@ import (
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/core/linux/process"
 	"worker/internal/worker/core/linux/resource"
-	"worker/internal/worker/store"
-
+	"worker/internal/worker/core/linux/unprivileged"
 	"worker/internal/worker/domain"
+	"worker/internal/worker/store"
 	"worker/pkg/logger"
 	"worker/pkg/platform"
 )
 
 var jobCounter int64
 
-// Worker handles job execution with host networking only
+// Worker handles job execution with optional job isolation
 type Worker struct {
 	store          store.Store
 	cgroup         resource.Resource
-	processManager *process.ProcessManager
+	processManager *process.Manager
+	jobIsolation   *unprivileged.JobIsolation
 	platform       platform.Platform
 	config         *Config
 	logger         *logger.Logger
 }
 
-// dependencies contains dependencies for Worker
-type dependencies struct {
-	Store          store.Store
-	Cgroup         resource.Resource
-	ProcessManager *process.ProcessManager
-	Platform       platform.Platform
-	Config         *Config
-}
-
-// NewPlatformWorker creates a simplified Linux worker
 func NewPlatformWorker(store store.Store) interfaces.Worker {
 	platformInterface := platform.NewPlatform()
-
 	processManager := process.NewProcessManager(platformInterface)
-
-	// Create resource management
 	cgroupResource := resource.New()
-
-	// Create configuration with cgroup namespace as prerequisite
+	jobIsolation := unprivileged.NewJobIsolation()
 	config := DefaultConfigWithCgroupNamespace()
 
-	deps := &dependencies{
-		Store:          store,
-		Cgroup:         cgroupResource,
-		ProcessManager: processManager,
-		Platform:       platformInterface,
-		Config:         config,
-	}
-
 	worker := &Worker{
-		store:          deps.Store,
-		cgroup:         deps.Cgroup,
-		processManager: deps.ProcessManager,
-		platform:       deps.Platform,
-		config:         deps.Config,
+		store:          store,
+		cgroup:         cgroupResource,
+		processManager: processManager,
+		jobIsolation:   jobIsolation,
+		platform:       platformInterface,
+		config:         config,
 		logger:         logger.New().WithField("component", "linux-worker"),
 	}
 
@@ -78,12 +58,11 @@ func NewPlatformWorker(store store.Store) interfaces.Worker {
 	return worker
 }
 
-// StartJob starts a job with host networking (no isolation)
 func (w *Worker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
-	log.Info("starting job with host networking")
+	log.Info("starting job")
 
 	// Early context check
 	select {
@@ -123,7 +102,7 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Register job in store
 	w.store.CreateNewJob(job)
 
-	// Start the process with host networking
+	// Start the process (with or without isolation)
 	cmd, err := w.startProcess(ctx, job)
 	if err != nil {
 		w.cleanupFailedJob(job)
@@ -136,81 +115,8 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Start monitoring
 	go w.monitorJob(ctx, cmd, job)
 
-	log.Info("job started successfully with host networking", "pid", job.Pid)
+	log.Info("job started successfully", "pid", job.Pid)
 	return job, nil
-}
-
-// StopJob stops a running job
-func (w *Worker) StopJob(ctx context.Context, jobID string) error {
-	log := w.logger.WithField("jobID", jobID)
-	log.Info("stopping job")
-
-	job, exists := w.store.GetJob(jobID)
-	if !exists {
-		return fmt.Errorf("job not found: %s", jobID)
-	}
-
-	if !job.IsRunning() {
-		return fmt.Errorf("job is not running: %s (status: %s)", jobID, job.Status)
-	}
-
-	// Create cleanup request
-	cleanupReq := &process.CleanupRequest{
-		JobID:           jobID,
-		PID:             job.Pid,
-		CgroupPath:      job.CgroupPath,
-		IsIsolatedJob:   false,
-		ForceKill:       false,
-		GracefulTimeout: w.config.GracefulShutdownTimeout,
-	}
-
-	// Perform process cleanup
-	result, err := w.processManager.CleanupProcess(ctx, cleanupReq)
-	if err != nil {
-		return fmt.Errorf("process cleanup failed: %w", err)
-	}
-
-	// Update job status
-	w.updateJobStatus(job, result)
-
-	// Cleanup cgroup
-	w.cgroup.CleanupCgroup(jobID)
-
-	log.Info("job stopped successfully", "method", result.Method)
-	return nil
-}
-
-// Private helper methods
-func (w *Worker) getNextJobID() string {
-	nextID := atomic.AddInt64(&jobCounter, 1)
-	return fmt.Sprintf("%d", nextID)
-}
-
-func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
-	// Apply defaults
-	if maxCPU <= 0 {
-		maxCPU = 100 // 1 CPU core
-	}
-	if maxMemory <= 0 {
-		maxMemory = 512 // 512 MB
-	}
-	if maxIOBPS <= 0 {
-		maxIOBPS = 0 // Unlimited
-	}
-
-	return &domain.Job{
-		Id:      jobID,
-		Command: resolvedCommand,
-		Args:    append([]string(nil), args...), // Deep copy
-		Limits: domain.ResourceLimits{
-			MaxCPU:    maxCPU,
-			MaxMemory: maxMemory,
-			MaxIOBPS:  maxIOBPS,
-		},
-		Status:     domain.StatusInitializing,
-		CgroupPath: w.config.BuildCgroupPath(jobID),
-		StartTime:  time.Now(),
-	}
 }
 
 func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Command, error) {
@@ -220,17 +126,10 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Co
 		return nil, fmt.Errorf("job-init not found: %w", err)
 	}
 
-	// Prepare environment (no network environment)
+	// Prepare environment
 	env := w.buildJobEnvironment(job)
 
-	// Create process attributes with NO network namespace isolation
-	sysProcAttr := &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWPID | // PID namespace isolation
-			syscall.CLONE_NEWNS | // Mount namespace isolation
-			syscall.CLONE_NEWIPC | // IPC namespace isolation
-			syscall.CLONE_NEWUTS, // UTS namespace isolation
-		Setpgid: true,
-	}
+	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
 
 	// Create launch configuration
 	launchConfig := &process.LaunchConfig{
@@ -239,8 +138,8 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Co
 		SysProcAttr:   sysProcAttr,
 		Stdout:        New(w.store, job.Id),
 		Stderr:        New(w.store, job.Id),
-		NamespacePath: "",    // No namespace path needed
-		NeedsNSJoin:   false, // No namespace joining
+		NamespacePath: "",
+		NeedsNSJoin:   false,
 		JobID:         job.Id,
 		Command:       job.Command,
 		Args:          job.Args,
@@ -252,25 +151,43 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Co
 		return nil, err
 	}
 
-	w.logger.Info("process launched with host networking", "jobID", job.Id, "pid", result.PID)
+	// setup user namespace mappings
+	if e := w.jobIsolation.SetupUserNamespace(int(result.PID)); e != nil {
+		// Kill the process if namespace setup fails
+		w.processManager.KillProcess(result.PID, syscall.SIGKILL)
+		return nil, fmt.Errorf("user namespace setup failed: %w", e)
+	}
+
+	// Move process to cgroup
+	if e := w.addProcessToCgroup(job.CgroupPath, result.PID); e != nil {
+		w.logger.Warn("failed to add process to cgroup", "error", e)
+	}
+
+	w.logger.Info("process launched", "jobID", job.Id, "pid", result.PID)
 	return result.Command, nil
+}
+
+func (w *Worker) addProcessToCgroup(cgroupPath string, pid int32) error {
+	procsFile := filepath.Join(cgroupPath, "cgroup.procs")
+	pidBytes := []byte(fmt.Sprintf("%d", pid))
+	return w.platform.WriteFile(procsFile, pidBytes, 0644)
 }
 
 func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 	baseEnv := w.platform.Environ()
 
-	// In cgroup namespace, the job's cgroup always appears at root
-	namespaceCgroupPath := "/sys/fs/cgroup"
-
 	// Job-specific environment
 	jobEnv := []string{
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", namespaceCgroupPath), // Namespace path
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace path
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
 		"HOST_NETWORKING=true",
-		"CGROUP_NAMESPACE=true", // cgroup namespace is active
+		"CGROUP_NAMESPACE=true",
+		// Add isolation indicator
+		"JOB_ISOLATION=enabled",
+		"USER_NAMESPACE=true",
 	}
 
 	// Add job arguments
@@ -297,9 +214,14 @@ func (w *Worker) validatePlatformSupport() error {
 		return fmt.Errorf("namespace support required but not available")
 	}
 
-	// Validate platform requirements (this will do the cgroup namespace + kernel checks)
+	// Validate platform requirements
 	if err := w.platform.ValidateRequirements(); err != nil {
 		return fmt.Errorf("platform requirements validation failed: %w", err)
+	}
+
+	//  validate its requirements
+	if err := w.jobIsolation.ValidateIsolationSupport(); err != nil {
+		return fmt.Errorf("job isolation validation failed, disabling isolation: %w", err)
 	}
 
 	w.logger.Info("platform support validated",
@@ -309,6 +231,77 @@ func (w *Worker) validatePlatformSupport() error {
 		"namespaces", info.SupportsNamespaces)
 
 	return nil
+}
+
+func (w *Worker) StopJob(ctx context.Context, jobID string) error {
+	log := w.logger.WithField("jobID", jobID)
+	log.Info("stopping job")
+
+	job, exists := w.store.GetJob(jobID)
+	if !exists {
+		return fmt.Errorf("job not found: %s", jobID)
+	}
+
+	if !job.IsRunning() {
+		return fmt.Errorf("job is not running: %s (status: %s)", jobID, job.Status)
+	}
+
+	// Create cleanup request
+	cleanupReq := &process.CleanupRequest{
+		JobID:           jobID,
+		PID:             job.Pid,
+		CgroupPath:      job.CgroupPath,
+		ForceKill:       false,
+		GracefulTimeout: w.config.GracefulShutdownTimeout,
+	}
+
+	// Perform process cleanup
+	result, err := w.processManager.CleanupProcess(ctx, cleanupReq)
+	if err != nil {
+		return fmt.Errorf("process cleanup failed: %w", err)
+	}
+
+	// Update job status
+	w.updateJobStatus(job, result)
+
+	// Cleanup cgroup
+	w.cgroup.CleanupCgroup(jobID)
+
+	log.Info("job stopped successfully", "method", result.Method)
+	return nil
+}
+
+// All other methods remain exactly the same as your current implementation
+func (w *Worker) getNextJobID() string {
+	nextID := atomic.AddInt64(&jobCounter, 1)
+	return fmt.Sprintf("%d", nextID)
+}
+
+func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
+	// Apply defaults
+	if maxCPU <= 0 {
+		maxCPU = 100
+	}
+	if maxMemory <= 0 {
+		maxMemory = 512
+	}
+	if maxIOBPS <= 0 {
+		maxIOBPS = 0
+	}
+
+	return &domain.Job{
+		Id:      jobID,
+		Command: resolvedCommand,
+		Args:    append([]string(nil), args...),
+		Limits: domain.ResourceLimits{
+			MaxCPU:    maxCPU,
+			MaxMemory: maxMemory,
+			MaxIOBPS:  maxIOBPS,
+		},
+		Status:     domain.StatusInitializing,
+		CgroupPath: w.config.BuildCgroupPath(jobID),
+		StartTime:  time.Now(),
+	}
 }
 
 func (w *Worker) getJobInitPath() (string, error) {
@@ -328,7 +321,7 @@ func (w *Worker) getJobInitPath() (string, error) {
 	}
 
 	for _, path := range standardPaths {
-		if _, err := w.platform.Stat(path); err == nil { // CHANGE: Use platform instead of osInterface
+		if _, err := w.platform.Stat(path); err == nil {
 			return path, nil
 		}
 	}
@@ -352,9 +345,7 @@ func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd platform.Command
 		runningJob.Pid = int32(cmd.Pid())
 	}
 
-	//update the reference
 	job.Status = domain.StatusRunning
-
 	runningJob.StartTime = time.Now()
 	w.store.UpdateJob(runningJob)
 }
