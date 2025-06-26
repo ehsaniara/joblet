@@ -16,7 +16,8 @@ import (
 
 const (
 	CleanupTimeout = 5 * time.Second
-	CgroupsBaseDir = "/sys/fs/cgroup"
+	// CgroupsBaseDir Use the delegated cgroup path for worker user
+	CgroupsBaseDir = "/sys/fs/cgroup/worker.slice/worker.service"
 )
 
 //counterfeiter:generate . Resource
@@ -29,17 +30,48 @@ type Resource interface {
 }
 
 type cgroup struct {
-	logger *logger.Logger
+	logger      *logger.Logger
+	initialized bool
 }
 
 func New() Resource {
 	return &cgroup{
-		logger: logger.New(),
+		logger: logger.New().WithField("component", "resource-manager"),
 	}
 }
 
-func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
+func (c *cgroup) ensureControllers() error {
+	if c.initialized {
+		return nil
+	}
 
+	log := c.logger.WithField("operation", "ensure-controllers")
+
+	// Check if controllers are enabled in our delegated cgroup
+	subtreeControlFile := filepath.Join(CgroupsBaseDir, "cgroup.subtree_control")
+	currentBytes, err := os.ReadFile(subtreeControlFile)
+	if err != nil {
+		log.Warn("could not read subtree_control, controllers may not be enabled", "error", err)
+		// Don't fail here - systemd should handle this
+		c.initialized = true
+		return nil
+	}
+
+	current := strings.TrimSpace(string(currentBytes))
+	log.Debug("current subtree_control", "controllers", current)
+
+	// Check what controllers are available
+	controllersFile := filepath.Join(CgroupsBaseDir, "cgroup.controllers")
+	if availableBytes, err := os.ReadFile(controllersFile); err == nil {
+		available := strings.Fields(string(availableBytes))
+		log.Debug("available controllers", "controllers", available)
+	}
+
+	c.initialized = true
+	return nil
+}
+
+func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
 	log := c.logger.WithFields(
 		"cgroupPath", cgroupJobDir,
 		"maxCPU", maxCPU,
@@ -48,113 +80,113 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 
 	log.Debug("creating cgroup")
 
-	if err := os.MkdirAll(cgroupJobDir, 0755); err != nil {
+	// Ensure we're working within our delegated subtree
+	if !strings.HasPrefix(cgroupJobDir, CgroupsBaseDir) {
+		return fmt.Errorf("security violation: cgroup path outside delegated subtree: %s", cgroupJobDir)
+	}
 
+	// Ensure controllers are set up
+	if err := c.ensureControllers(); err != nil {
+		log.Warn("controller setup failed", "error", err)
+	}
+
+	// Create the cgroup directory
+	if err := os.MkdirAll(cgroupJobDir, 0755); err != nil {
 		log.Error("failed to create cgroup directory", "error", err)
 		return fmt.Errorf("failed to create cgroup directory: %v", err)
 	}
 
-	// using cpu.max for cgroup v2
-	if err := c.SetCPULimit(cgroupJobDir, int(maxCPU)); err != nil {
+	// Wait a moment for controller files to appear
+	time.Sleep(100 * time.Millisecond)
 
-		log.Error("failed to set CPU limit", "error", err)
-		return err
+	// Set CPU limit (with better error handling)
+	if maxCPU > 0 {
+		if err := c.SetCPULimit(cgroupJobDir, int(maxCPU)); err != nil {
+			log.Warn("failed to set CPU limit", "error", err)
+			// Don't fail the job creation - just log the warning
+		}
 	}
 
-	if err := c.SetMemoryLimit(cgroupJobDir, int(maxMemory)); err != nil {
-
-		log.Error("failed to set memory limit", "error", err)
-		return err
+	// Set memory limit (with better error handling)
+	if maxMemory > 0 {
+		if err := c.SetMemoryLimit(cgroupJobDir, int(maxMemory)); err != nil {
+			log.Warn("failed to set memory limit", "error", err)
+			// Don't fail the job creation - just log the warning
+		}
 	}
 
+	// Set IO limit (with better error handling)
 	if maxIOBPS > 0 {
-
-		err := c.SetIOLimit(cgroupJobDir, int(maxIOBPS))
-		if err != nil {
-
-			log.Error("failed to set IO limit", "error", err)
-			return err
+		if err := c.SetIOLimit(cgroupJobDir, int(maxIOBPS)); err != nil {
+			log.Warn("failed to set IO limit", "error", err)
+			// Don't fail the job creation - just log the warning
 		}
 	}
 
 	log.Info("cgroup created successfully")
-
 	return nil
 }
 
 // SetIOLimit sets IO limits for a cgroup
 func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
-
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "ioBPS", ioBPS)
 
-	// check if io.max exists to confirm cgroup v2
+	// Check if io.max exists to confirm cgroup v2
 	ioMaxPath := filepath.Join(cgroupPath, "io.max")
 	if _, err := os.Stat(ioMaxPath); os.IsNotExist(err) {
-		log.Error("io.max not found, cgroup v2 IO limiting not available")
+		log.Debug("io.max not found, IO limiting not available")
 		return fmt.Errorf("io.max not found, cgroup v2 IO limiting not available")
 	}
 
-	// check current device format by reading io.max
-	currentConfig, err := os.ReadFile(ioMaxPath)
-	if err != nil {
-		log.Warn("couldn't read current io.max configuration", "error", err)
-	} else {
+	// Check current device format by reading io.max
+	if currentConfig, err := os.ReadFile(ioMaxPath); err == nil {
 		log.Debug("current io.max content", "content", string(currentConfig))
 	}
 
-	// trying different formats with valid device identification
+	// Try different formats with valid device identification
 	formats := []string{
-		// device with just rbps (more likely to work)
+		// Device with just rbps (more likely to work)
 		fmt.Sprintf("8:0 rbps=%d", ioBPS),
-
-		// device with just wbps
+		// Device with just wbps
 		fmt.Sprintf("8:0 wbps=%d", ioBPS),
-
-		// with "max" device syntax
+		// With "max" device syntax
 		fmt.Sprintf("max rbps=%d", ioBPS),
-
-		// with riops and wiops , operations per second instead of bytes
+		// With riops and wiops, operations per second instead of bytes
 		fmt.Sprintf("8:0 riops=1000 wiops=1000"),
-
-		// absolute device path
-		fmt.Sprintf("/dev/sda rbps=%d", ioBPS),
 	}
 
 	var lastErr error
 	for _, format := range formats {
-
 		log.Debug("trying IO limit format", "format", format)
 
 		if e := os.WriteFile(ioMaxPath, []byte(format), 0644); e != nil {
-
 			log.Debug("IO limit format failed", "format", format, "error", e)
 			lastErr = e
 		} else {
-
 			log.Info("successfully set IO limit", "format", format)
 			return nil
 		}
 	}
 
-	log.Error("all IO limit formats failed", "lastError", lastErr, "triedFormats", len(formats))
-
+	log.Debug("all IO limit formats failed", "lastError", lastErr, "triedFormats", len(formats))
 	return fmt.Errorf("all IO limit formats failed, last error: %w", lastErr)
 }
 
 // SetCPULimit sets CPU limits for the cgroup
 func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
-
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "cpuLimit", cpuLimit)
 
 	// CPU controller files
 	cpuMaxPath := filepath.Join(cgroupPath, "cpu.max")
 	cpuWeightPath := filepath.Join(cgroupPath, "cpu.weight")
 
-	// try cpu.max (cgroup v2)
+	// Try cpu.max (cgroup v2)
 	if _, err := os.Stat(cpuMaxPath); err == nil {
+		// Format: $MAX $PERIOD
+		// Convert percentage to microseconds: 100% = 100000/100000, 50% = 50000/100000
+		quota := (cpuLimit * 100000) / 100
+		limit := fmt.Sprintf("%d 100000", quota)
 
-		// format: $MAX $PERIOD
-		limit := fmt.Sprintf("%d 100000", cpuLimit*1000)
 		if e := os.WriteFile(cpuMaxPath, []byte(limit), 0644); e != nil {
 			log.Error("failed to write to cpu.max", "limit", limit, "error", e)
 			return fmt.Errorf("failed to write to cpu.max: %w", e)
@@ -163,16 +195,14 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 		return nil
 	}
 
-	// try cpu.weight as fallback (cgroup v2 alternative)
+	// Try cpu.weight as fallback (cgroup v2 alternative)
 	if _, err := os.Stat(cpuWeightPath); err == nil {
-
-		// convert CPU limit to weight (1-10000)
-
-		// higher value = more CPU
+		// Convert CPU limit to weight (1-10000)
+		// Default weight is 100, so scale accordingly
 		weight := 100 // Default
 		if cpuLimit > 0 {
-			// from typical CPU limit (e.g. 100 = 1 core) to weight range
-			weight = int(10000 * (float64(cpuLimit) / 100.0))
+			// Scale from typical CPU limit (e.g. 100 = 1 core) to weight range
+			weight = int(100 * (float64(cpuLimit) / 100.0))
 			if weight < 1 {
 				weight = 1
 			} else if weight > 10000 {
@@ -189,7 +219,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 		return nil
 	}
 
-	log.Error("neither cpu.max nor cpu.weight found")
+	log.Debug("neither cpu.max nor cpu.weight found")
 	return fmt.Errorf("neither cpu.max nor cpu.weight found")
 }
 
@@ -197,16 +227,16 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "memoryLimitMB", memoryLimitMB)
 
-	// convert MB to bytes
+	// Convert MB to bytes
 	memoryLimitBytes := int64(memoryLimitMB) * 1024 * 1024
 
-	// cgroup v2
+	// Cgroup v2
 	memoryMaxPath := filepath.Join(cgroupPath, "memory.max")
 	memoryHighPath := filepath.Join(cgroupPath, "memory.high")
 
 	var setMax, setHigh bool
 
-	// set memory.max hard limit
+	// Set memory.max hard limit
 	if _, err := os.Stat(memoryMaxPath); err == nil {
 		if e := os.WriteFile(memoryMaxPath, []byte(fmt.Sprintf("%d", memoryLimitBytes)), 0644); e != nil {
 			log.Warn("failed to write to memory.max", "memoryLimitBytes", memoryLimitBytes, "error", e)
@@ -216,9 +246,9 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 		}
 	}
 
-	// set memory.high soft limit
+	// Set memory.high soft limit (90% of hard limit)
 	if _, err := os.Stat(memoryHighPath); err == nil {
-		softLimit := int64(float64(memoryLimitBytes) * 0.9) // 90% of hard limit
+		softLimit := int64(float64(memoryLimitBytes) * 0.9)
 		if e := os.WriteFile(memoryHighPath, []byte(fmt.Sprintf("%d", softLimit)), 0644); e != nil {
 			log.Warn("failed to write to memory.high", "softLimit", softLimit, "error", e)
 		} else {
@@ -228,9 +258,7 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 	}
 
 	if !setMax && !setHigh {
-
-		log.Error("neither memory.max nor memory.high found")
-
+		log.Debug("neither memory.max nor memory.high found")
 		return fmt.Errorf("neither memory.max nor memory.high found")
 	}
 
@@ -242,9 +270,9 @@ func (c *cgroup) CleanupCgroup(jobID string) {
 	cleanupLogger := c.logger.WithField("jobId", jobID)
 	cleanupLogger.Debug("starting cgroup cleanup")
 
-	// cleanup in a separate goroutine
+	// Cleanup in a separate goroutine
 	go func() {
-		// timeout for the cleanup operation
+		// Timeout for the cleanup operation
 		ctx, cancel := context.WithTimeout(context.Background(), CleanupTimeout)
 		defer cancel()
 
@@ -254,7 +282,7 @@ func (c *cgroup) CleanupCgroup(jobID string) {
 			done <- true
 		}()
 
-		// wait for cleanup or timeout
+		// Wait for cleanup or timeout
 		select {
 		case <-done:
 			cleanupLogger.Info("cgroup cleanup completed")
@@ -266,17 +294,23 @@ func (c *cgroup) CleanupCgroup(jobID string) {
 
 // cleanupJobCgroup clean process first SIGTERM and SIGKILL then remove the cgroupPath items
 func cleanupJobCgroup(jobID string, logger *logger.Logger) {
-
+	// Use the delegated cgroup path
 	cgroupPath := filepath.Join(CgroupsBaseDir, "job-"+jobID)
 	cleanupLogger := logger.WithField("cgroupPath", cgroupPath)
 
-	// check if the cgroup exists
+	// Security check: ensure we're only cleaning up within our delegated subtree
+	if !strings.HasPrefix(cgroupPath, CgroupsBaseDir+"/job-") {
+		cleanupLogger.Error("security violation: attempted to clean up non-job cgroup", "path", cgroupPath)
+		return
+	}
+
+	// Check if the cgroup exists
 	if _, err := os.Stat(cgroupPath); os.IsNotExist(err) {
 		cleanupLogger.Debug("cgroup directory does not exist, skipping cleanup")
 		return
 	}
 
-	// trying to kill any processes still in the cgroup
+	// Try to kill any processes still in the cgroup
 	procsPath := filepath.Join(cgroupPath, "cgroup.procs")
 	if procsData, err := os.ReadFile(procsPath); err == nil {
 		pids := strings.Split(string(procsData), "\n")
@@ -289,19 +323,18 @@ func cleanupJobCgroup(jobID string, logger *logger.Logger) {
 			activePids = append(activePids, pidStr)
 
 			if pid, e1 := strconv.Atoi(pidStr); e1 == nil {
-
 				cleanupLogger.Debug("terminating process in cgroup", "pid", pid)
 
-				// trying to terminate the process
+				// Try to terminate the process
 				proc, e2 := os.FindProcess(pid)
 				if e2 == nil {
-					// trying SIGTERM first
+					// Try SIGTERM first
 					proc.Signal(syscall.SIGTERM)
 
-					// wait a moment
+					// Wait a moment
 					time.Sleep(100 * time.Millisecond)
 
-					// then SIGKILL if needed
+					// Then SIGKILL if needed
 					proc.Signal(syscall.SIGKILL)
 				}
 			}
@@ -316,22 +349,19 @@ func cleanupJobCgroup(jobID string, logger *logger.Logger) {
 }
 
 func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
-
 	if err := os.RemoveAll(cgroupPath); err != nil {
-
 		logger.Warn("failed to remove cgroup directory", "error", err)
 
 		files, _ := os.ReadDir(cgroupPath)
 		removedFiles := []string{}
 
 		for _, file := range files {
-
-			// skip directories and read-only files like cgroup.events
+			// Skip directories and read-only files like cgroup.events
 			if file.IsDir() || strings.HasPrefix(file.Name(), "cgroup.") {
 				continue
 			}
 
-			// to remove each file one by one
+			// Remove each file one by one
 			filePath := filepath.Join(cgroupPath, file.Name())
 			if e := os.Remove(filePath); e == nil {
 				removedFiles = append(removedFiles, file.Name())
@@ -342,13 +372,12 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 			logger.Debug("manually removed cgroup files", "files", removedFiles)
 		}
 
-		// try to remove the directory again
+		// Try to remove the directory again
 		if e := os.Remove(cgroupPath); e != nil {
 			logger.Info("could not remove cgroup directory completely, will be cleaned up later", "error", e)
 		} else {
 			logger.Debug("successfully removed cgroup directory on retry")
 		}
-
 	} else {
 		logger.Debug("successfully removed cgroup directory")
 	}

@@ -34,9 +34,7 @@ type ProcessManager struct {
 }
 
 // NewProcessManager creates a new unified process manager
-func NewProcessManager(
-	platform platform.Platform,
-) *ProcessManager {
+func NewProcessManager(platform platform.Platform) *ProcessManager {
 	return &ProcessManager{
 		platform: platform,
 		logger:   logger.New().WithField("component", "process-manager"),

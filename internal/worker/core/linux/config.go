@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	CgroupsBaseDir = "/sys/fs/cgroup"
+	// CgroupsBaseDir Use the delegated cgroup path for worker user
+	CgroupsBaseDir = "/sys/fs/cgroup/worker.slice/worker.service"
 )
 
 type Config struct {
