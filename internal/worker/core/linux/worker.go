@@ -133,16 +133,14 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Co
 
 	// Create launch configuration
 	launchConfig := &process.LaunchConfig{
-		InitPath:      initPath,
-		Environment:   env,
-		SysProcAttr:   sysProcAttr,
-		Stdout:        New(w.store, job.Id),
-		Stderr:        New(w.store, job.Id),
-		NamespacePath: "",
-		NeedsNSJoin:   false,
-		JobID:         job.Id,
-		Command:       job.Command,
-		Args:          job.Args,
+		InitPath:    initPath,
+		Environment: env,
+		SysProcAttr: sysProcAttr,
+		Stdout:      New(w.store, job.Id),
+		Stderr:      New(w.store, job.Id),
+		JobID:       job.Id,
+		Command:     job.Command,
+		Args:        job.Args,
 	}
 
 	// Launch the process
@@ -315,7 +313,7 @@ func (w *Worker) getJobInitPath() (string, error) {
 
 	// Check standard paths
 	standardPaths := []string{
-		"/opt/job-worker/job-init",
+		"/opt/worker/job-init",
 		"/usr/local/bin/job-init",
 		"/usr/bin/job-init",
 	}

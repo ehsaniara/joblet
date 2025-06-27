@@ -36,9 +36,6 @@ func (ji *JobIsolation) CreateIsolatedSysProcAttr() *syscall.SysProcAttr {
 		syscall.CLONE_NEWIPC | // IPC isolation (native)
 		syscall.CLONE_NEWUTS // UTS isolation (native)
 
-	// Skip user namespaces for simplicity and reliability
-	// This gives us strong isolation with native Go support
-
 	ji.logger.Info("created native Go isolation attributes",
 		"approach", "native-go-syscalls",
 		"pidNamespace", true,

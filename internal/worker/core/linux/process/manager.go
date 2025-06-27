@@ -43,16 +43,14 @@ func NewProcessManager(platform platform.Platform) *Manager {
 
 // LaunchConfig contains all configuration for launching a process
 type LaunchConfig struct {
-	InitPath      string
-	Environment   []string
-	SysProcAttr   *syscall.SysProcAttr
-	Stdout        io.Writer
-	Stderr        io.Writer
-	NamespacePath string
-	NeedsNSJoin   bool
-	JobID         string
-	Command       string
-	Args          []string
+	InitPath    string
+	Environment []string
+	SysProcAttr *syscall.SysProcAttr
+	Stdout      io.Writer
+	Stderr      io.Writer
+	JobID       string
+	Command     string
+	Args        []string
 }
 
 // LaunchResult contains the result of a process launch
@@ -69,7 +67,7 @@ func (pm *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*La
 	}
 
 	log := pm.logger.WithFields("jobID", config.JobID, "command", config.Command)
-	log.Info("launching process", "needsNSJoin", config.NeedsNSJoin, "namespacePath", config.NamespacePath)
+	log.Info("launching process")
 
 	// Validate configuration
 	if err := pm.validateLaunchConfig(config); err != nil {
@@ -113,18 +111,6 @@ func (pm *Manager) launchInGoroutine(config *LaunchConfig, resultChan chan<- *La
 	// Lock this goroutine to the OS thread for namespace operations
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-
-	// Join network namespace if needed (before forking)
-	if config.NeedsNSJoin && config.NamespacePath != "" {
-		log.Debug("joining network namespace before fork", "nsPath", config.NamespacePath)
-		if err := pm.joinNetworkNamespace(config.NamespacePath); err != nil {
-			resultChan <- &LaunchResult{
-				Error: fmt.Errorf("failed to join namespace: %w", err),
-			}
-			return
-		}
-		log.Debug("successfully joined network namespace")
-	}
 
 	// Start the process (which will inherit the current namespace)
 	startTime := time.Now()
@@ -382,16 +368,15 @@ func (pm *Manager) forceKillProcess(pid int32, jobID string) *processCleanupResu
 
 // LaunchRequest represents a process launch request for validation
 type LaunchRequest struct {
-	Command        string
-	Args           []string
-	MaxCPU         int32
-	MaxMemory      int32
-	MaxIOBPS       int32
-	NetworkGroupID string
-	JobID          string
-	InitPath       string
-	Environment    []string
-	CgroupPath     string
+	Command     string
+	Args        []string
+	MaxCPU      int32
+	MaxMemory   int32
+	MaxIOBPS    int32
+	JobID       string
+	InitPath    string
+	Environment []string
+	CgroupPath  string
 }
 
 // ValidationError represents a validation error
@@ -420,10 +405,9 @@ func (pm *Manager) ValidateLaunchRequest(req *LaunchRequest) error {
 		func() error { return pm.validateArguments(req.Args) },
 		func() error { return pm.validateResourceLimits(req.MaxCPU, req.MaxMemory, req.MaxIOBPS) },
 		func() error { return pm.validateJobID(req.JobID) },
-		func() error { return pm.validateInitPathIfProvided(req.InitPath) },
-		func() error { return pm.validateCgroupPathIfProvided(req.CgroupPath) },
-		func() error { return pm.validateNetworkGroupIDIfProvided(req.NetworkGroupID) },
-		func() error { return pm.validateEnvironmentIfProvided(req.Environment) },
+		func() error { return pm.validateInitPath(req.InitPath) },
+		func() error { return pm.validateCgroupPath(req.CgroupPath) },
+		func() error { return pm.validateEnvironment(req.Environment) },
 	}
 
 	for _, validation := range validations {
@@ -804,14 +788,6 @@ func (pm *Manager) validateLaunchConfig(config *LaunchConfig) error {
 			return fmt.Errorf("invalid environment: %w", err)
 		}
 	}
-	if config.NeedsNSJoin {
-		if config.NamespacePath == "" {
-			return fmt.Errorf("namespace path required when NeedsNSJoin is true")
-		}
-		if _, err := pm.platform.Stat(config.NamespacePath); err != nil {
-			return fmt.Errorf("namespace file validation failed: %w", err)
-		}
-	}
 	return nil
 }
 
@@ -862,18 +838,6 @@ func (pm *Manager) validateCgroupPath(cgroupPath string) error {
 	return nil
 }
 
-func (pm *Manager) validateNetworkGroupID(groupID string) error {
-	if len(groupID) > 64 {
-		return ValidationError{Field: "networkGroupID", Value: groupID, Message: "network group ID too long (max 64 characters)"}
-	}
-	for _, char := range groupID {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_') {
-			return ValidationError{Field: "networkGroupID", Value: groupID, Message: "network group ID contains invalid characters"}
-		}
-	}
-	return nil
-}
-
 func (pm *Manager) validateEnvironment(env []string) error {
 	if len(env) > MaxEnvironmentVars {
 		return ValidationError{Field: "environment", Value: len(env), Message: fmt.Sprintf("too many environment variables (max %d)", MaxEnvironmentVars)}
@@ -888,35 +852,6 @@ func (pm *Manager) validateEnvironment(env []string) error {
 		if !strings.Contains(envVar, "=") {
 			return ValidationError{Field: "environment", Value: fmt.Sprintf("env[%d]", i), Message: "environment variable missing '=' separator"}
 		}
-	}
-	return nil
-}
-
-// Conditional validation helpers
-func (pm *Manager) validateInitPathIfProvided(initPath string) error {
-	if initPath != "" {
-		return pm.validateInitPath(initPath)
-	}
-	return nil
-}
-
-func (pm *Manager) validateCgroupPathIfProvided(cgroupPath string) error {
-	if cgroupPath != "" {
-		return pm.validateCgroupPath(cgroupPath)
-	}
-	return nil
-}
-
-func (pm *Manager) validateNetworkGroupIDIfProvided(groupID string) error {
-	if groupID != "" {
-		return pm.validateNetworkGroupID(groupID)
-	}
-	return nil
-}
-
-func (pm *Manager) validateEnvironmentIfProvided(env []string) error {
-	if env != nil {
-		return pm.validateEnvironment(env)
 	}
 	return nil
 }

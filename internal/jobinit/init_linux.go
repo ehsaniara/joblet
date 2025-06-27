@@ -13,28 +13,28 @@ import (
 	"worker/pkg/platform"
 )
 
-type nativeJobInitializer struct {
+type jobInitializer struct {
 	platform platform.Platform
 	logger   *logger.Logger
 }
 
-// NewJobInitializer creates a native Go job initializer
+// NewJobInitializer creates a job initializer
 func NewJobInitializer() JobInitializer {
-	return &nativeJobInitializer{
+	return &jobInitializer{
 		platform: platform.NewPlatform(),
-		logger:   logger.New().WithField("component", "native-job-init"),
+		logger:   logger.New().WithField("component", "job-init"),
 	}
 }
 
-func (j *nativeJobInitializer) Run() error {
-	j.logger.Info("native Go job-init starting",
+func (j *jobInitializer) Run() error {
+	j.logger.Info("job-init starting",
 		"platform", runtime.GOOS,
 		"goVersion", runtime.Version(),
 		"pid", os.Getpid())
 
-	// Setup native namespace isolation
-	if err := j.setupNativeIsolation(); err != nil {
-		return fmt.Errorf("native isolation setup failed: %w", err)
+	// Setup namespace isolation
+	if err := j.setupIsolation(); err != nil {
+		return fmt.Errorf("isolation setup failed: %w", err)
 	}
 
 	// Load and execute job
@@ -46,10 +46,10 @@ func (j *nativeJobInitializer) Run() error {
 	return j.ExecuteJob(config)
 }
 
-// setupNativeIsolation uses pure Go syscalls for namespace setup
-func (j *nativeJobInitializer) setupNativeIsolation() error {
+// setupIsolation uses pure Go syscalls for namespace setup
+func (j *jobInitializer) setupIsolation() error {
 	pid := os.Getpid()
-	j.logger.Info("setting up native Go isolation", "pid", pid, "approach", "pure-syscalls")
+	j.logger.Info("setting up Go isolation", "pid", pid, "approach", "pure-syscalls")
 
 	// Only PID 1 should setup isolation
 	if pid != 1 {
@@ -57,20 +57,20 @@ func (j *nativeJobInitializer) setupNativeIsolation() error {
 		return nil
 	}
 
-	// Use native Go to make mounts private
-	if err := j.nativeMakePrivate(); err != nil {
+	// Use Go to make mounts private
+	if err := j.makePrivate(); err != nil {
 		j.logger.Warn("could not make mounts private", "error", err)
 		// Continue - not always required
 	}
 
-	// Use native Go to remount /proc
-	if err := j.nativeRemountProc(); err != nil {
-		j.logger.Error("failed to remount /proc with native Go", "error", err)
-		return fmt.Errorf("native /proc remount failed: %w", err)
+	// Use to remount /proc
+	if err := j.remountProc(); err != nil {
+		j.logger.Error("failed to remount /proc with", "error", err)
+		return fmt.Errorf("proc remount failed: %w", err)
 	}
 
 	// Verify isolation worked
-	if err := j.verifyNativeIsolation(); err != nil {
+	if err := j.verifyIsolation(); err != nil {
 		j.logger.Warn("isolation verification failed", "error", err)
 		// Continue - isolation might still be partial
 	}
@@ -79,8 +79,8 @@ func (j *nativeJobInitializer) setupNativeIsolation() error {
 	return nil
 }
 
-// nativeMakePrivate uses Go's syscall package to make mounts private
-func (j *nativeJobInitializer) nativeMakePrivate() error {
+// makePrivate uses syscall package to make mounts private
+func (j *jobInitializer) makePrivate() error {
 	j.logger.Debug("making mounts private using native Go syscalls")
 
 	// Convert Go strings to C strings for syscall
@@ -105,8 +105,8 @@ func (j *nativeJobInitializer) nativeMakePrivate() error {
 	return nil
 }
 
-// nativeRemountProc uses pure Go to remount /proc
-func (j *nativeJobInitializer) nativeRemountProc() error {
+// remountProc uses pure Go to remount /proc
+func (j *jobInitializer) remountProc() error {
 	j.logger.Info("remounting /proc using native Go syscalls")
 
 	// Step 1: Lazy unmount existing /proc using native Go
@@ -125,8 +125,8 @@ func (j *nativeJobInitializer) nativeRemountProc() error {
 	return nil
 }
 
-// verifyNativeIsolation checks that our native isolation worked
-func (j *nativeJobInitializer) verifyNativeIsolation() error {
+// verifyIsolation checks that our native isolation worked
+func (j *jobInitializer) verifyIsolation() error {
 	j.logger.Debug("verifying native Go isolation effectiveness")
 
 	// Check PID 1 in our namespace
@@ -162,7 +162,7 @@ func (j *nativeJobInitializer) verifyNativeIsolation() error {
 }
 
 // assessIsolationQuality provides feedback on isolation effectiveness
-func (j *nativeJobInitializer) assessIsolationQuality(pidCount int) string {
+func (j *jobInitializer) assessIsolationQuality(pidCount int) string {
 	switch {
 	case pidCount <= 5:
 		return "excellent"
@@ -176,7 +176,7 @@ func (j *nativeJobInitializer) assessIsolationQuality(pidCount int) string {
 }
 
 // LoadConfigFromEnv loads job configuration (same as before)
-func (j *nativeJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
+func (j *jobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 	jobID := os.Getenv("JOB_ID")
 	command := os.Getenv("JOB_COMMAND")
 	argsCountStr := os.Getenv("JOB_ARGS_COUNT")
@@ -208,14 +208,13 @@ func (j *nativeJobInitializer) LoadConfigFromEnv() (*JobConfig, error) {
 }
 
 // ExecuteJob executes the job using native Go
-func (j *nativeJobInitializer) ExecuteJob(config *JobConfig) error {
+func (j *jobInitializer) ExecuteJob(config *JobConfig) error {
 	if config == nil {
 		return fmt.Errorf("job config cannot be nil")
 	}
 
 	j.logger.Info("executing job with native Go",
-		"jobId", config.JobID,
-		"command", config.Command)
+		"jobId", config.JobID, "command", config.Command)
 
 	// Resolve command path using native Go
 	commandPath, err := j.resolveCommandPath(config.Command)
@@ -228,12 +227,11 @@ func (j *nativeJobInitializer) ExecuteJob(config *JobConfig) error {
 	envVars := os.Environ()
 
 	j.logger.Info("executing command with native Go syscall.Exec",
-		"commandPath", commandPath,
-		"args", execArgs)
+		"commandPath", commandPath, "args", execArgs)
 
 	// Native Go exec syscall
-	if err := syscall.Exec(commandPath, execArgs, envVars); err != nil {
-		return fmt.Errorf("native exec syscall failed: %w", err)
+	if e := syscall.Exec(commandPath, execArgs, envVars); e != nil {
+		return fmt.Errorf("native exec syscall failed: %w", e)
 	}
 
 	// This line should never be reached due to exec replacing the process
@@ -241,16 +239,16 @@ func (j *nativeJobInitializer) ExecuteJob(config *JobConfig) error {
 }
 
 // resolveCommandPath resolves command using native Go
-func (j *nativeJobInitializer) resolveCommandPath(command string) (string, error) {
+func (j *jobInitializer) resolveCommandPath(command string) (string, error) {
 	if filepath.IsAbs(command) {
-		if _, err := os.Stat(command); err != nil {
-			return "", fmt.Errorf("absolute command not found: %w", err)
+		if _, e := os.Stat(command); e != nil {
+			return "", fmt.Errorf("absolute command not found: %w", e)
 		}
 		return command, nil
 	}
 
 	// Use native Go exec.LookPath equivalent
-	if resolved, err := j.lookPath(command); err == nil {
+	if resolved, e := j.lookPath(command); e == nil {
 		return resolved, nil
 	}
 
@@ -264,7 +262,7 @@ func (j *nativeJobInitializer) resolveCommandPath(command string) (string, error
 	}
 
 	for _, path := range commonPaths {
-		if _, err := os.Stat(path); err == nil {
+		if _, e := os.Stat(path); e == nil {
 			return path, nil
 		}
 	}
@@ -273,7 +271,7 @@ func (j *nativeJobInitializer) resolveCommandPath(command string) (string, error
 }
 
 // lookPath is a native Go implementation of PATH lookup
-func (j *nativeJobInitializer) lookPath(command string) (string, error) {
+func (j *jobInitializer) lookPath(command string) (string, error) {
 	pathEnv := os.Getenv("PATH")
 	if pathEnv == "" {
 		return "", fmt.Errorf("PATH environment variable not set")
@@ -285,7 +283,7 @@ func (j *nativeJobInitializer) lookPath(command string) (string, error) {
 		}
 
 		path := filepath.Join(dir, command)
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		if info, e := os.Stat(path); e == nil && !info.IsDir() {
 			// Check if executable
 			if info.Mode()&0111 != 0 {
 				return path, nil

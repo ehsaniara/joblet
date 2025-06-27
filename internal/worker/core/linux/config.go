@@ -19,22 +19,11 @@ type Config struct {
 
 	// Process lifecycle timeouts
 	GracefulShutdownTimeout time.Duration
-	ProcessStartTimeout     time.Duration
-	CleanupTimeout          time.Duration
 
 	// Default resource limits
 	DefaultCPULimitPercent int32
 	DefaultMemoryLimitMB   int32
 	DefaultIOBPS           int32
-
-	// Process limits
-	MaxJobArgs           int
-	MaxJobArgLength      int
-	MaxEnvironmentVars   int
-	MaxEnvironmentVarLen int
-
-	// System limits
-	MaxConcurrentJobs int32
 
 	// Mount point inside namespace
 	CgroupNamespaceMount string
@@ -45,16 +34,9 @@ func DefaultConfigWithCgroupNamespace() *Config {
 	return &Config{
 		CgroupsBaseDir:          CgroupsBaseDir,
 		GracefulShutdownTimeout: 100 * time.Millisecond,
-		ProcessStartTimeout:     10 * time.Second,
-		CleanupTimeout:          30 * time.Second,
 		DefaultCPULimitPercent:  100,
 		DefaultMemoryLimitMB:    512,
 		DefaultIOBPS:            0,
-		MaxJobArgs:              100,
-		MaxJobArgLength:         1024,
-		MaxEnvironmentVars:      1000,
-		MaxEnvironmentVarLen:    8192,
-		MaxConcurrentJobs:       100,
 		CgroupNamespaceMount:    "/sys/fs/cgroup", // Standard mount point
 	}
 }
@@ -72,14 +54,6 @@ func (c *Config) Validate() error {
 
 	if c.GracefulShutdownTimeout < 0 {
 		return fmt.Errorf("GracefulShutdownTimeout cannot be negative")
-	}
-
-	if c.ProcessStartTimeout <= 0 {
-		return fmt.Errorf("ProcessStartTimeout must be positive")
-	}
-
-	if c.MaxConcurrentJobs <= 0 {
-		return fmt.Errorf("MaxConcurrentJobs must be positive")
 	}
 
 	if c.CgroupNamespaceMount == "" {
