@@ -8,19 +8,19 @@ import (
 	"sync/atomic"
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/store"
+	"worker/internal/worker/state"
 	"worker/pkg/logger"
 )
 
 // darwinWorker provides a basic implementation for macOS development
 type darwinWorker struct {
-	store      store.Store
+	store      state.Store
 	jobCounter int64
 	logger     *logger.Logger
 }
 
 // NewLinuxWorker creates a basic macOS worker for development
-func NewLinuxWorker(store store.Store) interfaces.Worker {
+func NewLinuxWorker(store state.Store) interfaces.Worker {
 	return &darwinWorker{
 		store:  store,
 		logger: logger.New().WithField("component", "darwin-worker"),

@@ -16,7 +16,7 @@ import (
 	"worker/internal/worker/core/linux/resource"
 	"worker/internal/worker/core/linux/unprivileged"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/store"
+	"worker/internal/worker/state"
 	"worker/pkg/logger"
 	"worker/pkg/platform"
 )
@@ -25,7 +25,7 @@ var jobCounter int64
 
 // Worker handles job execution with optional job isolation
 type Worker struct {
-	store          store.Store
+	store          state.Store
 	cgroup         resource.Resource
 	processManager *process.Manager
 	jobIsolation   *unprivileged.JobIsolation
@@ -34,7 +34,7 @@ type Worker struct {
 	logger         *logger.Logger
 }
 
-func NewPlatformWorker(store store.Store) interfaces.Worker {
+func NewPlatformWorker(store state.Store) interfaces.Worker {
 	platformInterface := platform.NewPlatform()
 	processManager := process.NewProcessManager(platformInterface)
 	cgroupResource := resource.New()

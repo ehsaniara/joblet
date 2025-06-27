@@ -1,15 +1,15 @@
 package linux
 
 import (
-	"worker/internal/worker/store"
+	"worker/internal/worker/state"
 )
 
 type OutputWriter struct {
 	jobId string
-	store store.Store
+	store state.Store
 }
 
-func New(store store.Store, jobId string) *OutputWriter {
+func New(store state.Store, jobId string) *OutputWriter {
 	return &OutputWriter{store: store, jobId: jobId}
 }
 

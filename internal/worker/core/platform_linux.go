@@ -7,7 +7,7 @@ import (
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/core/linux"
 	"worker/internal/worker/domain"
-	"worker/internal/worker/store"
+	"worker/internal/worker/state"
 )
 
 // linuxWorker is a thin wrapper around the Linux worker
@@ -16,7 +16,7 @@ type linuxWorker struct {
 }
 
 // NewLinuxWorker creates a Linux worker
-func NewLinuxWorker(store store.Store) interfaces.Worker {
+func NewLinuxWorker(store state.Store) interfaces.Worker {
 	return &linuxWorker{
 		platformWorker: linux.NewPlatformWorker(store),
 	}

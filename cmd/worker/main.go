@@ -13,7 +13,7 @@ import (
 	"worker/internal/worker"
 	"worker/internal/worker/core/linux/resource"
 	"worker/internal/worker/server"
-	"worker/internal/worker/store"
+	"worker/internal/worker/state"
 	"worker/pkg/logger"
 )
 
@@ -38,7 +38,7 @@ func main() {
 
 	appLogger.Debug("goroutine monitoring started")
 
-	s := store.New()
+	s := state.New()
 	w := worker.NewWorker(s)
 	appLogger.Info("worker and store initialized", "platform", runtime.GOOS)
 

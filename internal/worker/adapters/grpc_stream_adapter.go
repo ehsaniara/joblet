@@ -3,7 +3,7 @@ package adapters
 import (
 	"context"
 	pb "worker/api/gen"
-	"worker/internal/worker/store"
+	"worker/internal/worker/state"
 )
 
 // GrpcStreamAdapter adapts gRPC stream to domain interface
@@ -11,7 +11,7 @@ type GrpcStreamAdapter struct {
 	stream pb.JobService_GetJobLogsServer
 }
 
-func NewGrpcStreamAdapter(stream pb.JobService_GetJobLogsServer) store.DomainStreamer {
+func NewGrpcStreamAdapter(stream pb.JobService_GetJobLogsServer) state.DomainStreamer {
 	return &GrpcStreamAdapter{stream: stream}
 }
 
