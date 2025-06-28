@@ -26,10 +26,9 @@ jobs:
 
       - name: Build release binaries
         run: |
-          # Linux binaries (worker, CLI, and job-init)
+          # Linux binaries (worker, CLI)
           GOOS=linux GOARCH=amd64 go build -o job-worker-linux-amd64 ./cmd/worker
           GOOS=linux GOARCH=amd64 go build -o job-worker-cli-linux-amd64 ./cmd/cli
-          GOOS=linux GOARCH=amd64 go build -o job-init-linux-amd64 ./cmd/job-init
           
           # macOS CLI only
           GOOS=darwin GOARCH=amd64 go build -o job-worker-cli-darwin-amd64 ./cmd/cli
@@ -40,7 +39,7 @@ jobs:
           
           # Create archives
           # Linux (includes all three binaries)
-          tar -czf job-worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz job-worker-linux-amd64 job-worker-cli-linux-amd64 job-init-linux-amd64
+          tar -czf job-worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz job-worker-linux-amd64 job-worker-cli-linux-amd64 
           
           # macOS (CLI only)
           tar -czf job-worker-cli-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz job-worker-cli-darwin-amd64
