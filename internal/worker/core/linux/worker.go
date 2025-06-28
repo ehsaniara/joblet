@@ -62,7 +62,7 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
-	log.Info("starting job")
+	log.Debug("starting job")
 
 	// Early context check
 	select {
@@ -102,8 +102,8 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Register job in store
 	w.store.CreateNewJob(job)
 
-	// Start the process (with or without isolation)
-	cmd, err := w.startProcess(ctx, job)
+	// Start the process using single binary approach
+	cmd, err := w.startProcessSingleBinary(ctx, job)
 	if err != nil {
 		w.cleanupFailedJob(job)
 		return nil, fmt.Errorf("process start failed: %w", err)
@@ -115,25 +115,27 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Start monitoring
 	go w.monitorJob(ctx, cmd, job)
 
-	log.Info("job started successfully", "pid", job.Pid)
+	log.Debug("job started successfully", "pid", job.Pid)
 	return job, nil
 }
 
-func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Command, error) {
-	// Get job-init binary path
-	initPath, err := w.getJobInitPath()
+// startProcessSingleBinary starts a job using the same binary in init mode
+func (w *Worker) startProcessSingleBinary(ctx context.Context, job *domain.Job) (platform.Command, error) {
+	// Get the current executable path (this same binary)
+	execPath, err := w.platform.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("job-init not found: %w", err)
+		return nil, fmt.Errorf("failed to get current executable path: %w", err)
 	}
 
-	// Prepare environment
-	env := w.buildJobEnvironment(job)
+	// Prepare environment with job information and mode indicator
+	env := w.buildJobEnvironmentSingleBinary(job, execPath)
 
+	// Create isolation attributes
 	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
 
 	// Create launch configuration
 	launchConfig := &process.LaunchConfig{
-		InitPath:    initPath,
+		InitPath:    execPath, // Use same binary
 		Environment: env,
 		SysProcAttr: sysProcAttr,
 		Stdout:      New(w.store, job.Id),
@@ -149,7 +151,7 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Co
 		return nil, err
 	}
 
-	// setup user namespace mappings
+	// Setup user namespace mappings
 	if e := w.jobIsolation.SetupUserNamespace(int(result.PID)); e != nil {
 		// Kill the process if namespace setup fails
 		w.processManager.KillProcess(result.PID, syscall.SIGKILL)
@@ -161,21 +163,17 @@ func (w *Worker) startProcess(ctx context.Context, job *domain.Job) (platform.Co
 		w.logger.Warn("failed to add process to cgroup", "error", e)
 	}
 
-	w.logger.Info("process launched", "jobID", job.Id, "pid", result.PID)
+	w.logger.Debug("process launched using single binary", "jobID", job.Id, "pid", result.PID)
 	return result.Command, nil
 }
 
-func (w *Worker) addProcessToCgroup(cgroupPath string, pid int32) error {
-	procsFile := filepath.Join(cgroupPath, "cgroup.procs")
-	pidBytes := []byte(fmt.Sprintf("%d", pid))
-	return w.platform.WriteFile(procsFile, pidBytes, 0644)
-}
-
-func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
+// buildJobEnvironmentSingleBinary builds environment for single binary mode
+func (w *Worker) buildJobEnvironmentSingleBinary(job *domain.Job, execPath string) []string {
 	baseEnv := w.platform.Environ()
 
-	// Job-specific environment
+	// Job-specific environment with mode indicator
 	jobEnv := []string{
+		"WORKER_MODE=init", // This tells the binary to run in init mode
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace path
@@ -183,9 +181,9 @@ func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
 		"HOST_NETWORKING=true",
 		"CGROUP_NAMESPACE=true",
-		// Add isolation indicator
 		"JOB_ISOLATION=enabled",
 		"USER_NAMESPACE=true",
+		fmt.Sprintf("WORKER_BINARY_PATH=%s", execPath), // For reference
 	}
 
 	// Add job arguments
@@ -196,6 +194,14 @@ func (w *Worker) buildJobEnvironment(job *domain.Job) []string {
 	return append(baseEnv, jobEnv...)
 }
 
+// addProcessToCgroup moves a process to the specified cgroup
+func (w *Worker) addProcessToCgroup(cgroupPath string, pid int32) error {
+	procsFile := filepath.Join(cgroupPath, "cgroup.procs")
+	pidBytes := []byte(fmt.Sprintf("%d", pid))
+	return w.platform.WriteFile(procsFile, pidBytes, 0644)
+}
+
+// Rest of the methods remain the same...
 func (w *Worker) validatePlatformSupport() error {
 	// Get platform info
 	info := w.platform.GetInfo()
@@ -217,12 +223,12 @@ func (w *Worker) validatePlatformSupport() error {
 		return fmt.Errorf("platform requirements validation failed: %w", err)
 	}
 
-	//  validate its requirements
+	// Validate job isolation requirements
 	if err := w.jobIsolation.ValidateIsolationSupport(); err != nil {
 		return fmt.Errorf("job isolation validation failed, disabling isolation: %w", err)
 	}
 
-	w.logger.Info("platform support validated",
+	w.logger.Debug("platform support validated",
 		"os", info.OS,
 		"arch", info.Architecture,
 		"cgroups", info.SupportsCgroups,
@@ -233,7 +239,7 @@ func (w *Worker) validatePlatformSupport() error {
 
 func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 	log := w.logger.WithField("jobID", jobID)
-	log.Info("stopping job")
+	log.Debug("stopping job")
 
 	job, exists := w.store.GetJob(jobID)
 	if !exists {
@@ -265,11 +271,11 @@ func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 	// Cleanup cgroup
 	w.cgroup.CleanupCgroup(jobID)
 
-	log.Info("job stopped successfully", "method", result.Method)
+	log.Debug("job stopped successfully", "method", result.Method)
 	return nil
 }
 
-// All other methods remain exactly the same as your current implementation
+// Helper methods (keeping existing implementations)
 func (w *Worker) getNextJobID() string {
 	nextID := atomic.AddInt64(&jobCounter, 1)
 	return fmt.Sprintf("%d", nextID)
@@ -300,31 +306,6 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 		CgroupPath: w.config.BuildCgroupPath(jobID),
 		StartTime:  time.Now(),
 	}
-}
-
-func (w *Worker) getJobInitPath() (string, error) {
-	// Check same directory as main executable
-	if execPath, err := w.platform.Executable(); err == nil {
-		initPath := filepath.Join(filepath.Dir(execPath), "job-init")
-		if _, err := w.platform.Stat(initPath); err == nil {
-			return initPath, nil
-		}
-	}
-
-	// Check standard paths
-	standardPaths := []string{
-		"/opt/worker/job-init",
-		"/usr/local/bin/job-init",
-		"/usr/bin/job-init",
-	}
-
-	for _, path := range standardPaths {
-		if _, err := w.platform.Stat(path); err == nil {
-			return path, nil
-		}
-	}
-
-	return "", fmt.Errorf("job-init binary not found")
 }
 
 func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd platform.Command) {
@@ -385,7 +366,7 @@ func (w *Worker) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 	// Cleanup cgroup
 	w.cgroup.CleanupCgroup(job.Id)
 
-	log.Info("job monitoring completed",
+	log.Debug("job monitoring completed",
 		"finalStatus", finalStatus,
 		"exitCode", exitCode,
 		"duration", duration)

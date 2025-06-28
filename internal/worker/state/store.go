@@ -41,7 +41,7 @@ func New() Store {
 		logger: logger.WithField("component", "store"),
 	}
 
-	s.logger.Info("store initialized")
+	s.logger.Debug("store initialized")
 	return s
 }
 
@@ -86,7 +86,7 @@ func (st *store) CreateNewJob(job *domain.Job) {
 
 	st.tasks[job.Id] = NewTask(job)
 
-	st.logger.Info("new task created", "jobId", job.Id, "command", job.Command, "totalTasks", len(st.tasks))
+	st.logger.Debug("new task created", "jobId", job.Id, "command", job.Command, "totalTasks", len(st.tasks))
 }
 
 func (st *store) UpdateJob(job *domain.Job) {
@@ -108,7 +108,7 @@ func (st *store) UpdateJob(job *domain.Job) {
 
 	// if completed/failed/stopped, shut down subscribers
 	if job.IsCompleted() {
-		st.logger.Info("shutting down completed job", "jobId", job.Id, "finalStatus", string(job.Status))
+		st.logger.Debug("shutting down completed job", "jobId", job.Id, "finalStatus", string(job.Status))
 		tk.Shutdown()
 	}
 }
@@ -160,7 +160,7 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 
 	select {
 	case <-ctx.Done():
-		st.logger.Info("stream cancelled before start", "jobId", id, "error", ctx.Err())
+		st.logger.Debug("stream cancelled before start", "jobId", id, "error", ctx.Err())
 		return ctx.Err()
 	default:
 	}
@@ -174,7 +174,7 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 	updates, unsubscribe := job.Subscribe()
 	defer unsubscribe()
 
-	st.logger.Info("streaming updates started", "jobId", id)
+	st.logger.Debug("streaming updates started", "jobId", id)
 
 	updateCount := 0
 	logBytesSent := 0
@@ -184,19 +184,19 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 		select {
 		case <-ctx.Done():
 			duration := time.Since(startTime)
-			st.logger.Info("stream cancelled by context", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent, "reason", ctx.Err())
+			st.logger.Debug("stream cancelled by context", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent, "reason", ctx.Err())
 			return ctx.Err()
 
 		case <-stream.Context().Done():
 			duration := time.Since(startTime)
-			st.logger.Info("stream cancelled by client", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
+			st.logger.Debug("stream cancelled by client", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
 			return _errors.ErrStreamCancelled
 
 		case update, ok := <-updates:
 			if !ok {
 				// channel closed, job completed or task cleaned up
 				duration := time.Since(startTime)
-				st.logger.Info("update channel closed", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
+				st.logger.Debug("update channel closed", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
 				return nil
 			}
 
@@ -216,7 +216,7 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 			// exit if job is not running
 			if update.Status != "" && update.Status != "RUNNING" {
 				duration := time.Since(startTime)
-				st.logger.Info("job status changed, ending stream", "jobId", id, "newStatus", update.Status, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
+				st.logger.Debug("job status changed, ending stream", "jobId", id, "newStatus", update.Status, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
 				return nil
 			}
 

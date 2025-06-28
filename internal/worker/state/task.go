@@ -112,7 +112,7 @@ func (t *Task) UpdateJob(job *domain.Job) {
 
 	newStatus := string(jobCopy.Status)
 	if oldStatus != newStatus {
-		t.logger.Info("job status updated", "oldStatus", oldStatus, "newStatus", newStatus)
+		t.logger.Debug("job status updated", "oldStatus", oldStatus, "newStatus", newStatus)
 	}
 }
 
@@ -155,7 +155,7 @@ func (t *Task) Publish(update Update) {
 	}
 
 	if update.Status != "" {
-		t.logger.Info("status update published", "status", update.Status, "subscribers", subscriberCount, "successful", successCount)
+		t.logger.Debug("status update published", "status", update.Status, "subscribers", subscriberCount, "successful", successCount)
 	}
 }
 
@@ -204,7 +204,7 @@ func (t *Task) Shutdown() {
 	subscriberCount := len(t.subscribers)
 	t.subMu.RUnlock()
 
-	t.logger.Info("shutting down task", "activeSubscribers", subscriberCount)
+	t.logger.Debug("shutting down task", "activeSubscribers", subscriberCount)
 
 	t.cancel()
 
@@ -223,5 +223,5 @@ func (t *Task) Shutdown() {
 		t.logger.Warn("force closed remaining subscribers", "count", remainingCount)
 	}
 
-	t.logger.Info("task shutdown completed")
+	t.logger.Debug("task shutdown completed")
 }

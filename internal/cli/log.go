@@ -58,7 +58,7 @@ func runLog(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to start log stream: %v", err)
 	}
 
-	fmt.Printf("Streaming logs for job %s (Press Ctrl+C to exit):\n", jobID)
+	fmt.Printf("Logs for job %s (Press Ctrl+C to exit if streaming):\n", jobID)
 
 	for {
 		chunk, e := stream.Recv()

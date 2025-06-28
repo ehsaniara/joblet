@@ -123,7 +123,7 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 		}
 	}
 
-	log.Info("cgroup created successfully")
+	log.Debug("cgroup created successfully")
 	return nil
 }
 
@@ -163,7 +163,7 @@ func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 			log.Debug("IO limit format failed", "format", format, "error", e)
 			lastErr = e
 		} else {
-			log.Info("successfully set IO limit", "format", format)
+			log.Debug("successfully set IO limit", "format", format)
 			return nil
 		}
 	}
@@ -191,7 +191,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 			log.Error("failed to write to cpu.max", "limit", limit, "error", e)
 			return fmt.Errorf("failed to write to cpu.max: %w", e)
 		}
-		log.Info("set CPU limit with cpu.max", "limit", limit)
+		log.Debug("set CPU limit with cpu.max", "limit", limit)
 		return nil
 	}
 
@@ -215,7 +215,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 			return fmt.Errorf("failed to write to cpu.weight: %w", e)
 		}
 
-		log.Info("set CPU weight", "weight", weight)
+		log.Debug("set CPU weight", "weight", weight)
 		return nil
 	}
 
@@ -242,7 +242,7 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 			log.Warn("failed to write to memory.max", "memoryLimitBytes", memoryLimitBytes, "error", e)
 		} else {
 			setMax = true
-			log.Info("set memory.max limit", "memoryLimitBytes", memoryLimitBytes)
+			log.Debug("set memory.max limit", "memoryLimitBytes", memoryLimitBytes)
 		}
 	}
 
@@ -253,7 +253,7 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 			log.Warn("failed to write to memory.high", "softLimit", softLimit, "error", e)
 		} else {
 			setHigh = true
-			log.Info("set memory.high limit", "softLimit", softLimit)
+			log.Debug("set memory.high limit", "softLimit", softLimit)
 		}
 	}
 
@@ -285,7 +285,7 @@ func (c *cgroup) CleanupCgroup(jobID string) {
 		// Wait for cleanup or timeout
 		select {
 		case <-done:
-			cleanupLogger.Info("cgroup cleanup completed")
+			cleanupLogger.Debug("cgroup cleanup completed")
 		case <-ctx.Done():
 			cleanupLogger.Warn("cgroup cleanup timed out")
 		}
@@ -341,7 +341,7 @@ func cleanupJobCgroup(jobID string, logger *logger.Logger) {
 		}
 
 		if len(activePids) > 0 {
-			cleanupLogger.Info("terminated processes in cgroup", "pids", activePids)
+			cleanupLogger.Debug("terminated processes in cgroup", "pids", activePids)
 		}
 	}
 
@@ -374,7 +374,7 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 
 		// Try to remove the directory again
 		if e := os.Remove(cgroupPath); e != nil {
-			logger.Info("could not remove cgroup directory completely, will be cleaned up later", "error", e)
+			logger.Debug("could not remove cgroup directory completely, will be cleaned up later", "error", e)
 		} else {
 			logger.Debug("successfully removed cgroup directory on retry")
 		}

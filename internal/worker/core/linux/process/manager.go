@@ -67,7 +67,7 @@ func (pm *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*La
 	}
 
 	log := pm.logger.WithFields("jobID", config.JobID, "command", config.Command)
-	log.Info("launching process")
+	log.Debug("launching process")
 
 	// Validate configuration
 	if err := pm.validateLaunchConfig(config); err != nil {
@@ -85,7 +85,7 @@ func (pm *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*La
 			log.Error("failed to start process in goroutine", "error", result.Error)
 			return nil, fmt.Errorf("failed to start process: %w", result.Error)
 		}
-		log.Info("process started successfully", "pid", result.PID)
+		log.Debug("process started successfully", "pid", result.PID)
 		return result, nil
 	case <-ctx.Done():
 		log.Warn("context cancelled while starting process")
@@ -204,7 +204,7 @@ func (pm *Manager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cl
 	}
 
 	log := pm.logger.WithFields("jobID", req.JobID, "pid", req.PID)
-	log.Info("starting process cleanup", "forceKill", req.ForceKill, "gracefulTimeout", req.GracefulTimeout)
+	log.Debug("starting process cleanup", "forceKill", req.ForceKill, "gracefulTimeout", req.GracefulTimeout)
 
 	startTime := time.Now()
 	result := &CleanupResult{
@@ -237,7 +237,7 @@ func (pm *Manager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cl
 	if len(result.Errors) > 0 {
 		log.Warn("cleanup completed with errors", "duration", result.Duration, "errorCount", len(result.Errors))
 	} else {
-		log.Info("cleanup completed successfully", "duration", result.Duration)
+		log.Debug("cleanup completed successfully", "duration", result.Duration)
 	}
 
 	return result, nil
@@ -310,7 +310,7 @@ func (pm *Manager) attemptGracefulShutdown(pid int32, timeout time.Duration, job
 
 	// Check if process is still alive
 	if !pm.isProcessAlive(pid) {
-		log.Info("process terminated gracefully")
+		log.Debug("process terminated gracefully")
 		return &processCleanupResult{
 			Killed: true,
 			Method: "graceful",
@@ -358,7 +358,7 @@ func (pm *Manager) forceKillProcess(pid int32, jobID string) *processCleanupResu
 		}
 	}
 
-	log.Info("process force killed successfully")
+	log.Debug("process force killed successfully")
 	return &processCleanupResult{
 		Killed: true,
 		Method: "forced",
@@ -550,7 +550,7 @@ func (pm *Manager) KillProcess(pid int32, signal syscall.Signal) error {
 		return fmt.Errorf("failed to kill process %d with signal %v: %w", pid, signal, err)
 	}
 
-	log.Info("process killed successfully")
+	log.Debug("process killed successfully")
 	return nil
 }
 
@@ -568,7 +568,7 @@ func (pm *Manager) KillProcessGroup(pid int32, signal syscall.Signal) error {
 		return fmt.Errorf("failed to kill process group %d with signal %v: %w", pid, signal, err)
 	}
 
-	log.Info("process group killed successfully")
+	log.Debug("process group killed successfully")
 	return nil
 }
 
@@ -693,7 +693,7 @@ func (pm *Manager) cleanupNamespace(nsPath string, isBound bool) error {
 		return fmt.Errorf("failed to remove namespace file: %w", err)
 	}
 
-	log.Info("namespace cleaned up successfully")
+	log.Debug("namespace cleaned up successfully")
 	return nil
 }
 

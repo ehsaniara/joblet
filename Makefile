@@ -2,18 +2,17 @@ REMOTE_HOST ?= 192.168.1.161
 REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/worker
 
-.PHONY: all clean cli worker init deploy-passwordless deploy-safe certs-local certs-remote-passwordless certs-download-admin certs-download-admin-simple certs-download-viewer live-log help setup-remote-passwordless setup-dev check-certs-remote service-status validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
+.PHONY: all clean cli worker deploy-passwordless deploy-safe certs-local certs-remote-passwordless certs-download-admin certs-download-admin-simple certs-download-viewer live-log help setup-remote-passwordless setup-dev check-certs-remote service-status validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
 
-all: cli worker init
+all: cli worker
 
 help:
 	@echo "Job Worker Makefile"
 	@echo ""
 	@echo "Build targets:"
-	@echo "  make all               - Build all binaries (cli, worker, init)"
+	@echo "  make all               - Build all binaries (cli, worker)"
 	@echo "  make cli               - Build CLI for local development"
 	@echo "  make worker            - Build worker binary for Linux"
-	@echo "  make init              - Build job-init binary for Linux"
 	@echo "  make clean             - Remove build artifacts"
 	@echo ""
 	@echo "User Namespace Setup:"
@@ -66,23 +65,17 @@ worker:
 	@echo "Building worker..."
 	GOOS=linux GOARCH=amd64 go build -o bin/worker ./cmd/worker
 
-init:
-	@echo "Building job-init..."
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o bin/job-init ./cmd/job-init
-
-deploy-passwordless: worker init
+deploy-passwordless: worker
 	@echo "🚀 Passwordless deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/worker/build"
 	scp bin/worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
-	scp bin/job-init $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop worker.service && sudo cp /tmp/worker/build/* $(REMOTE_DIR)/ && sudo chmod +x $(REMOTE_DIR)/* && sudo systemctl start worker.service && echo "✅ Deployed successfully"'
 
-deploy-safe: worker init
+deploy-safe: worker
 	@echo "🔐 Safe deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/worker/build"
 	scp bin/worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
-	scp bin/job-init $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
 	@echo "Files uploaded. Installing with sudo..."
 	@read -s -p "Enter sudo password for $(REMOTE_USER)@$(REMOTE_HOST): " SUDO_PASS; \
 	echo ""; \
@@ -91,8 +84,7 @@ deploy-safe: worker init
 		systemctl stop worker.service 2>/dev/null || echo \"Service not running\"; \
 		echo \"Installing binaries...\"; \
 		cp /tmp/worker/build/worker $(REMOTE_DIR)/; \
-		cp /tmp/worker/build/job-init $(REMOTE_DIR)/; \
-		chmod +x $(REMOTE_DIR)/worker $(REMOTE_DIR)/job-init; \
+		chmod +x $(REMOTE_DIR)/worker; \
 		echo \"Starting service...\"; \
 		systemctl start worker.service; \
 		echo \"Checking service status...\"; \
@@ -135,19 +127,6 @@ certs-remote-passwordless:
 		rm -f /tmp/certs_gen.sh'
 	@echo "✅ Remote certificates generated!"
 
-certs-download-admin:
-	@echo "📥 Downloading Admin certificates from $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@mkdir -p certs
-	@echo "🔧 Fixing certificate permissions on server..."
-	ssh -t $(REMOTE_USER)@$(REMOTE_HOST) "sudo chown jay /opt/worker/certs/ca-cert.pem /opt/worker/certs/admin-client-cert.pem /opt/worker/certs/admin-client-key.pem"
-	ssh -t $(REMOTE_USER)@$(REMOTE_HOST) "sudo chmod 644 /opt/worker/certs/ca-cert.pem /opt/worker/certs/admin-client-cert.pem /opt/worker/certs/admin-client-key.pem"
-	@echo "📥 Downloading certificates..."
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/ca-cert.pem certs/ca-cert.pem
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/admin-client-cert.pem certs/client-cert.pem
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/admin-client-key.pem certs/client-key.pem
-	@echo "✅ Admin Certificates downloaded to ./certs/"
-	@echo "💡 Usage: ./bin/cli --server $(REMOTE_HOST):50051 --cert certs/client-cert.pem --key certs/client-key.pem"
-
 certs-download-admin-simple:
 	@echo "📥 Simple download of Admin certificates from $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@mkdir -p certs
@@ -161,10 +140,7 @@ certs-download-admin-simple:
 certs-download-viewer:
 	@echo "📥 Downloading Viewer certificates from $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@mkdir -p certs
-	@echo "🔧 Fixing certificate permissions on server..."
-	ssh -t $(REMOTE_USER)@$(REMOTE_HOST) "sudo chown jay /opt/worker/certs/ca-cert.pem /opt/worker/certs/viewer-client-cert.pem /opt/worker/certs/viewer-client-key.pem"
-	ssh -t $(REMOTE_USER)@$(REMOTE_HOST) "sudo chmod 644 /opt/worker/certs/ca-cert.pem /opt/worker/certs/viewer-client-cert.pem /opt/worker/certs/viewer-client-key.pem"
-	@echo "📥 Downloading certificates..."
+	@echo "📥 Downloading certificates (assuming permissions are correct)..."
 	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/ca-cert.pem certs/ca-cert.pem
 	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/viewer-client-cert.pem certs/client-cert.pem
 	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/viewer-client-key.pem certs/client-key.pem
@@ -391,14 +367,13 @@ debug-user-namespaces:
 		echo "📋 Service status:"; \
 		sudo systemctl status worker.service --no-pager --lines=5 2>/dev/null || echo "  Service not found"'
 
-deploy-with-user-namespaces: worker init
+deploy-with-user-namespaces: worker
 	@echo "🚀 Deploying with user namespace validation to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@echo "📋 Validating remote user namespace support..."
 	@$(MAKE) validate-user-namespaces || (echo "❌ User namespace validation failed. Running setup..." && $(MAKE) setup-user-namespaces && $(MAKE) validate-user-namespaces)
 	@echo "📤 Uploading binaries..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/worker/build"
 	scp bin/worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
-	scp bin/job-init $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
 	@echo "🔧 Installing with user namespace support..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
 		sudo systemctl stop worker.service 2>/dev/null || echo "Service not running"; \

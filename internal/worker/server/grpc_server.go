@@ -30,7 +30,7 @@ const (
 func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 
-	serverLogger.Info("initializing gRPC server", "address", serverAddress, "tlsEnabled", true)
+	serverLogger.Debug("initializing gRPC server", "address", serverAddress, "tlsEnabled", true)
 
 	serverLogger.Debug("loading server certificates", "certPath", serverCertPath, "keyPath", serverKeyPath)
 
@@ -67,7 +67,7 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker) (*grpc.S
 
 	creds := credentials.NewTLS(tlsConfig)
 
-	serverLogger.Info("TLS configuration completed",
+	serverLogger.Debug("TLS configuration completed",
 		"clientAuth", "RequireAndVerifyClientCert",
 		"minTLSVersion", "1.3")
 
@@ -91,7 +91,7 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker) (*grpc.S
 	jobService := NewJobServiceServer(auth, jobStore, jobWorker)
 	pb.RegisterJobServiceServer(grpcServer, jobService)
 
-	serverLogger.Info("job service registered successfully")
+	serverLogger.Debug("job service registered successfully")
 
 	serverLogger.Debug("creating TCP listener", "address", serverAddress)
 
@@ -101,19 +101,19 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker) (*grpc.S
 		return nil, fmt.Errorf("failed to listen: %w", err)
 	}
 
-	serverLogger.Info("TCP listener created successfully", "address", serverAddress, "network", "tcp")
+	serverLogger.Debug("TCP listener created successfully", "address", serverAddress, "network", "tcp")
 
 	go func() {
-		serverLogger.Info("starting TLS gRPC server", "address", serverAddress, "ready", true)
+		serverLogger.Debug("starting TLS gRPC server", "address", serverAddress, "ready", true)
 
 		if serveErr := grpcServer.Serve(lis); serveErr != nil {
 			serverLogger.Error("gRPC server stopped with error", "error", serveErr)
 		} else {
-			serverLogger.Info("gRPC server stopped gracefully")
+			serverLogger.Debug("gRPC server stopped gracefully")
 		}
 	}()
 
-	serverLogger.Info("gRPC server initialization completed", "address", serverAddress, "tlsEnabled", true, "authRequired", true)
+	serverLogger.Debug("gRPC server initialization completed", "address", serverAddress, "tlsEnabled", true, "authRequired", true)
 
 	return grpcServer, nil
 }

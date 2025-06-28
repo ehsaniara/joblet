@@ -43,7 +43,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, runJobReq *pb.RunJobReq) 
 		"maxIOBPS", runJobReq.MaxIOBPS,
 	)
 
-	log.Info("run job request received")
+	log.Debug("run job request received")
 
 	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
@@ -60,7 +60,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, runJobReq *pb.RunJobReq) 
 	}
 
 	duration := time.Since(startTime)
-	log.Info("job created successfully with host networking", "jobId", newJob.Id, "duration", duration)
+	log.Debug("job created successfully with host networking", "jobId", newJob.Id, "duration", duration)
 
 	return mappers.DomainToRunJobResponse(newJob), nil
 }
@@ -81,7 +81,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		return nil, status.Errorf(codes.NotFound, "job not found %v", req.GetId())
 	}
 
-	log.Info("job retrieved successfully", "status", string(job.Status), "duration", job.Duration())
+	log.Debug("job retrieved successfully", "status", string(job.Status), "duration", job.Duration())
 
 	return mappers.DomainToGetJobStatusResponse(job), nil
 }
@@ -89,7 +89,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb.StopJobRes, error) {
 	log := s.logger.WithFields("operation", "StopJob", "jobId", req.GetId())
 
-	log.Info("stop job request received")
+	log.Debug("stop job request received")
 
 	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
@@ -110,7 +110,7 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 	}
 
 	duration := time.Since(startTime)
-	log.Info("job stopped successfully", "finalStatus", string(job.Status), "duration", duration)
+	log.Debug("job stopped successfully", "finalStatus", string(job.Status), "duration", duration)
 
 	return mappers.DomainToStopJobResponse(job), nil
 }
@@ -137,7 +137,7 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, _ *pb.EmptyRequest) (*p
 	}
 
 	duration := time.Since(startTime)
-	log.Info("jobs listed successfully",
+	log.Debug("jobs listed successfully",
 		"totalJobs", len(jobs),
 		"statusBreakdown", statusCounts,
 		"duration", duration)
@@ -148,7 +148,7 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, _ *pb.EmptyRequest) (*p
 func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
 	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetId())
 
-	log.Info("job logs stream request received")
+	log.Debug("job logs stream request received")
 
 	if err := s.auth.Authorized(stream.Context(), auth2.StreamJobsOp); err != nil {
 		log.Warn("authorization failed", "error", err)
@@ -161,7 +161,7 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 		return status.Errorf(codes.NotFound, "job not found")
 	}
 
-	log.Info("streaming job logs", "jobId", req.GetId(), "existingLogSize", len(existingLogs), "isRunning", isRunning)
+	log.Debug("streaming job logs", "jobId", req.GetId(), "existingLogSize", len(existingLogs), "isRunning", isRunning)
 
 	// streaming the existing logs from the existingLogs
 	if e := stream.Send(&pb.DataChunk{Payload: existingLogs}); e != nil {
@@ -173,7 +173,7 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 
 	// already completed, we're done
 	if !isRunning {
-		log.Info("job already completed, log stream ended", "jobId", req.GetId())
+		log.Debug("job already completed, log stream ended", "jobId", req.GetId())
 		return nil
 	}
 
@@ -186,14 +186,14 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 	streamDuration := time.Since(streamStartTime)
 
 	if e != nil && errors.Is(e, _errors.ErrStreamCancelled) {
-		log.Info("log stream cancelled by client", "duration", streamDuration)
+		log.Debug("log stream cancelled by client", "duration", streamDuration)
 		return status.Error(codes.Canceled, "log stream cancelled by client")
 	}
 
 	if e != nil {
 		log.Error("log stream ended with error", "error", e, "duration", streamDuration)
 	} else {
-		log.Info("log stream completed successfully", "duration", streamDuration)
+		log.Debug("log stream completed successfully", "duration", streamDuration)
 	}
 
 	return e

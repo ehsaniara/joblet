@@ -1,8 +1,9 @@
 [Unit]
-Description=Worker Service - Job Isolation Platform
+Description=Worker Service - Job Isolation Platform (Single Binary)
 After=network.target
 
 [Service]
+# Use single binary that auto-detects execution mode
 ExecStart=/opt/worker/worker
 Restart=always
 RestartSec=10s
@@ -42,6 +43,10 @@ WorkingDirectory=/opt/worker
 LimitNOFILE=4096
 StandardOutput=journal
 StandardError=journal
+
+# Environment variables for the main service
+Environment="WORKER_MODE=server"
+Environment="LOG_LEVEL=DEBUG"
 
 # Cleanup job cgroups on service stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'

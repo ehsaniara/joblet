@@ -36,7 +36,7 @@ func (ji *JobIsolation) CreateIsolatedSysProcAttr() *syscall.SysProcAttr {
 		syscall.CLONE_NEWIPC | // IPC isolation (native)
 		syscall.CLONE_NEWUTS // UTS isolation (native)
 
-	ji.logger.Info("created native Go isolation attributes",
+	ji.logger.Debug("created native Go isolation attributes",
 		"approach", "native-go-syscalls",
 		"pidNamespace", true,
 		"mountNamespace", true,
@@ -52,7 +52,7 @@ func (ji *JobIsolation) SetupUserNamespace(pid int) error {
 
 	// Use native Go approach - let the kernel handle namespace setup
 	// No manual intervention needed with this approach
-	log.Info("using native Go namespace setup (kernel-managed)")
+	log.Debug("using native Go namespace setup (kernel-managed)")
 
 	return nil
 }
@@ -76,7 +76,7 @@ func (ji *JobIsolation) ValidateIsolationSupport() error {
 		return fmt.Errorf("native namespace support test failed: %w", err)
 	}
 
-	log.Info("native Go + Linux isolation validated",
+	log.Debug("native Go + Linux isolation validated",
 		"platform", runtime.GOOS,
 		"goVersion", runtime.Version(),
 		"nativeSupport", true)
