@@ -43,9 +43,6 @@ LimitNOFILE=4096
 StandardOutput=journal
 StandardError=journal
 
-# Setup cgroup controllers after service starts
-ExecStartPost=/bin/bash -c 'sleep 1; echo "+cpu +memory +io +pids" > /sys/fs/cgroup/worker.slice/worker.service/cgroup.subtree_control || true'
-
 # Cleanup job cgroups on service stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'
 
