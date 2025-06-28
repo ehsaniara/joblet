@@ -26,6 +26,16 @@ type FakeResource struct {
 	createReturnsOnCall map[int]struct {
 		result1 error
 	}
+	EnsureControllersStub        func() error
+	ensureControllersMutex       sync.RWMutex
+	ensureControllersArgsForCall []struct {
+	}
+	ensureControllersReturns struct {
+		result1 error
+	}
+	ensureControllersReturnsOnCall map[int]struct {
+		result1 error
+	}
 	SetCPULimitStub        func(string, int) error
 	setCPULimitMutex       sync.RWMutex
 	setCPULimitArgsForCall []struct {
@@ -158,6 +168,59 @@ func (fake *FakeResource) CreateReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.createReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeResource) EnsureControllers() error {
+	fake.ensureControllersMutex.Lock()
+	ret, specificReturn := fake.ensureControllersReturnsOnCall[len(fake.ensureControllersArgsForCall)]
+	fake.ensureControllersArgsForCall = append(fake.ensureControllersArgsForCall, struct {
+	}{})
+	stub := fake.EnsureControllersStub
+	fakeReturns := fake.ensureControllersReturns
+	fake.recordInvocation("EnsureControllers", []interface{}{})
+	fake.ensureControllersMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeResource) EnsureControllersCallCount() int {
+	fake.ensureControllersMutex.RLock()
+	defer fake.ensureControllersMutex.RUnlock()
+	return len(fake.ensureControllersArgsForCall)
+}
+
+func (fake *FakeResource) EnsureControllersCalls(stub func() error) {
+	fake.ensureControllersMutex.Lock()
+	defer fake.ensureControllersMutex.Unlock()
+	fake.EnsureControllersStub = stub
+}
+
+func (fake *FakeResource) EnsureControllersReturns(result1 error) {
+	fake.ensureControllersMutex.Lock()
+	defer fake.ensureControllersMutex.Unlock()
+	fake.EnsureControllersStub = nil
+	fake.ensureControllersReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeResource) EnsureControllersReturnsOnCall(i int, result1 error) {
+	fake.ensureControllersMutex.Lock()
+	defer fake.ensureControllersMutex.Unlock()
+	fake.EnsureControllersStub = nil
+	if fake.ensureControllersReturnsOnCall == nil {
+		fake.ensureControllersReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.ensureControllersReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -355,6 +418,8 @@ func (fake *FakeResource) Invocations() map[string][][]interface{} {
 	defer fake.cleanupCgroupMutex.RUnlock()
 	fake.createMutex.RLock()
 	defer fake.createMutex.RUnlock()
+	fake.ensureControllersMutex.RLock()
+	defer fake.ensureControllersMutex.RUnlock()
 	fake.setCPULimitMutex.RLock()
 	defer fake.setCPULimitMutex.RUnlock()
 	fake.setIOLimitMutex.RLock()

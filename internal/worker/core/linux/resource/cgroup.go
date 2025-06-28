@@ -27,6 +27,7 @@ type Resource interface {
 	SetCPULimit(cgroupPath string, cpuLimit int) error
 	SetMemoryLimit(cgroupPath string, memoryLimitMB int) error
 	CleanupCgroup(jobID string)
+	EnsureControllers() error
 }
 
 type cgroup struct {
@@ -40,35 +41,112 @@ func New() Resource {
 	}
 }
 
-func (c *cgroup) ensureControllers() error {
+func (c *cgroup) EnsureControllers() error {
 	if c.initialized {
 		return nil
 	}
 
 	log := c.logger.WithField("operation", "ensure-controllers")
 
-	// Check if controllers are enabled in our delegated cgroup
-	subtreeControlFile := filepath.Join(CgroupsBaseDir, "cgroup.subtree_control")
-	currentBytes, err := os.ReadFile(subtreeControlFile)
-	if err != nil {
-		log.Warn("could not read subtree_control, controllers may not be enabled", "error", err)
-		// Don't fail here - systemd should handle this
-		c.initialized = true
-		return nil
+	// First, check if we need to move the current process out of the service cgroup
+	// This is required by the "no internal processes" rule in cgroups v2
+	if err := c.moveWorkerProcessToSubgroup(); err != nil {
+		log.Warn("failed to move worker to subgroup", "error", err)
+		// Continue anyway - this might not be fatal
 	}
 
-	current := strings.TrimSpace(string(currentBytes))
-	log.Debug("current subtree_control", "controllers", current)
-
-	// Check what controllers are available
-	controllersFile := filepath.Join(CgroupsBaseDir, "cgroup.controllers")
-	if availableBytes, err := os.ReadFile(controllersFile); err == nil {
-		available := strings.Fields(string(availableBytes))
-		log.Debug("available controllers", "controllers", available)
+	// Now enable controllers in the service cgroup
+	if err := c.enableControllersInServiceCgroup(); err != nil {
+		log.Warn("failed to enable controllers in service cgroup", "error", err)
+		// Continue anyway - jobs might still work with limited functionality
 	}
 
 	c.initialized = true
 	return nil
+}
+
+// moveWorkerProcessToSubgroup moves the main worker process to a subgroup
+// This is required to satisfy the "no internal processes" rule
+func (c *cgroup) moveWorkerProcessToSubgroup() error {
+	log := c.logger.WithField("operation", "move-worker-process")
+
+	// Create a subgroup for the main worker process
+	workerSubgroup := filepath.Join(CgroupsBaseDir, "worker-main")
+	if err := os.MkdirAll(workerSubgroup, 0755); err != nil {
+		return fmt.Errorf("failed to create worker subgroup: %w", err)
+	}
+
+	// Move current process to the subgroup
+	currentPID := os.Getpid()
+	procsFile := filepath.Join(workerSubgroup, "cgroup.procs")
+	pidBytes := []byte(fmt.Sprintf("%d", currentPID))
+
+	if err := os.WriteFile(procsFile, pidBytes, 0644); err != nil {
+		return fmt.Errorf("failed to move worker process to subgroup: %w", err)
+	}
+
+	log.Info("moved worker process to subgroup", "pid", currentPID, "subgroup", workerSubgroup)
+	return nil
+}
+
+// enableControllersInServiceCgroup enables controllers in the service cgroup
+func (c *cgroup) enableControllersInServiceCgroup() error {
+	log := c.logger.WithField("operation", "enable-controllers")
+
+	subtreeControlFile := filepath.Join(CgroupsBaseDir, "cgroup.subtree_control")
+
+	// Check what controllers are available
+	controllersFile := filepath.Join(CgroupsBaseDir, "cgroup.controllers")
+	availableBytes, err := os.ReadFile(controllersFile)
+	if err != nil {
+		return fmt.Errorf("failed to read available controllers: %w", err)
+	}
+
+	availableControllers := strings.Fields(string(availableBytes))
+	log.Debug("available controllers", "controllers", availableControllers)
+
+	// Enable the controllers we need (if available)
+	neededControllers := []string{"cpu", "memory", "io", "pids"}
+	var enabledControllers []string
+
+	for _, controller := range neededControllers {
+		if contains(availableControllers, controller) {
+			enabledControllers = append(enabledControllers, "+"+controller)
+		}
+	}
+
+	if len(enabledControllers) == 0 {
+		log.Warn("no controllers available to enable")
+		return nil
+	}
+
+	// Write the controllers to enable
+	controllersToEnable := strings.Join(enabledControllers, " ")
+	log.Debug("enabling controllers", "controllers", controllersToEnable)
+
+	if err := os.WriteFile(subtreeControlFile, []byte(controllersToEnable), 0644); err != nil {
+		return fmt.Errorf("failed to enable controllers: %w", err)
+	}
+
+	// Verify controllers were enabled
+	currentBytes, err := os.ReadFile(subtreeControlFile)
+	if err != nil {
+		log.Warn("failed to verify enabled controllers", "error", err)
+	} else {
+		log.Debug("controllers enabled successfully", "enabled", strings.TrimSpace(string(currentBytes)))
+	}
+
+	return nil
+}
+
+// contains checks if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
@@ -78,7 +156,7 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 		"maxMemory", maxMemory,
 		"maxIOBPS", maxIOBPS)
 
-	log.Debug("creating cgroup")
+	log.Info("creating cgroup")
 
 	// Ensure we're working within our delegated subtree
 	if !strings.HasPrefix(cgroupJobDir, CgroupsBaseDir) {
@@ -86,7 +164,7 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 	}
 
 	// Ensure controllers are set up
-	if err := c.ensureControllers(); err != nil {
+	if err := c.EnsureControllers(); err != nil {
 		log.Warn("controller setup failed", "error", err)
 	}
 
@@ -123,7 +201,7 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 		}
 	}
 
-	log.Debug("cgroup created successfully")
+	log.Info("cgroup created successfully")
 	return nil
 }
 
@@ -163,7 +241,7 @@ func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 			log.Debug("IO limit format failed", "format", format, "error", e)
 			lastErr = e
 		} else {
-			log.Debug("successfully set IO limit", "format", format)
+			log.Info("successfully set IO limit", "format", format)
 			return nil
 		}
 	}
@@ -191,7 +269,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 			log.Error("failed to write to cpu.max", "limit", limit, "error", e)
 			return fmt.Errorf("failed to write to cpu.max: %w", e)
 		}
-		log.Debug("set CPU limit with cpu.max", "limit", limit)
+		log.Info("set CPU limit with cpu.max", "limit", limit)
 		return nil
 	}
 
@@ -215,7 +293,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 			return fmt.Errorf("failed to write to cpu.weight: %w", e)
 		}
 
-		log.Debug("set CPU weight", "weight", weight)
+		log.Info("set CPU weight", "weight", weight)
 		return nil
 	}
 
@@ -242,7 +320,7 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 			log.Warn("failed to write to memory.max", "memoryLimitBytes", memoryLimitBytes, "error", e)
 		} else {
 			setMax = true
-			log.Debug("set memory.max limit", "memoryLimitBytes", memoryLimitBytes)
+			log.Info("set memory.max limit", "memoryLimitBytes", memoryLimitBytes)
 		}
 	}
 
@@ -253,7 +331,7 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 			log.Warn("failed to write to memory.high", "softLimit", softLimit, "error", e)
 		} else {
 			setHigh = true
-			log.Debug("set memory.high limit", "softLimit", softLimit)
+			log.Info("set memory.high limit", "softLimit", softLimit)
 		}
 	}
 

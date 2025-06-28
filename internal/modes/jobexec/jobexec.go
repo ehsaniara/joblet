@@ -2,12 +2,9 @@ package jobexec
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"syscall"
 
 	"worker/pkg/logger"
 	"worker/pkg/platform"
@@ -21,12 +18,33 @@ type JobConfig struct {
 	CgroupPath string
 }
 
-// LoadConfigFromEnv loads job configuration from environment variables
+// JobExecutor handles job execution using platform abstraction
+type JobExecutor struct {
+	platform platform.Platform
+	logger   *logger.Logger
+}
+
+// NewJobExecutor creates a new job executor with the given platform
+func NewJobExecutor(p platform.Platform, logger *logger.Logger) *JobExecutor {
+	return &JobExecutor{
+		platform: p,
+		logger:   logger.WithField("component", "jobexec"),
+	}
+}
+
+// LoadConfigFromEnv loads job configuration from environment variables using platform abstraction
 func LoadConfigFromEnv(logger *logger.Logger) (*JobConfig, error) {
-	jobID := os.Getenv("JOB_ID")
-	command := os.Getenv("JOB_COMMAND")
-	cgroupPath := os.Getenv("JOB_CGROUP_PATH")
-	argsCountStr := os.Getenv("JOB_ARGS_COUNT")
+	p := platform.NewPlatform()
+	executor := NewJobExecutor(p, logger)
+	return executor.LoadConfigFromEnv()
+}
+
+// LoadConfigFromEnv loads job configuration from environment variables
+func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
+	jobID := je.platform.Getenv("JOB_ID")
+	command := je.platform.Getenv("JOB_COMMAND")
+	cgroupPath := je.platform.Getenv("JOB_CGROUP_PATH")
+	argsCountStr := je.platform.Getenv("JOB_ARGS_COUNT")
 
 	if jobID == "" || command == "" {
 		return nil, fmt.Errorf("missing required environment variables (JOB_ID=%s, JOB_COMMAND=%s)",
@@ -43,11 +61,11 @@ func LoadConfigFromEnv(logger *logger.Logger) (*JobConfig, error) {
 		args = make([]string, argsCount)
 		for i := 0; i < argsCount; i++ {
 			argKey := fmt.Sprintf("JOB_ARG_%d", i)
-			args[i] = os.Getenv(argKey)
+			args[i] = je.platform.Getenv(argKey)
 		}
 	}
 
-	logger.Debug("loaded job configuration",
+	je.logger.Info("loaded job configuration",
 		"jobId", jobID,
 		"command", command,
 		"argsCount", len(args),
@@ -63,91 +81,101 @@ func LoadConfigFromEnv(logger *logger.Logger) (*JobConfig, error) {
 
 // Execute executes the job based on platform
 func Execute(config *JobConfig, logger *logger.Logger) error {
+	p := platform.NewPlatform()
+	executor := NewJobExecutor(p, logger)
+	return executor.Execute(config)
+}
+
+// Execute executes the job based on platform using platform abstraction
+func (je *JobExecutor) Execute(config *JobConfig) error {
 	switch runtime.GOOS {
 	case "linux":
-		return executeLinux(config, logger)
+		return je.executeLinux(config)
 	case "darwin":
-		return executeDarwin(config, logger)
+		return je.executeDarwin(config)
 	default:
 		return fmt.Errorf("unsupported platform for job execution: %s", runtime.GOOS)
 	}
 }
 
-// executeLinux executes job on Linux using syscall.Exec
-func executeLinux(config *JobConfig, logger *logger.Logger) error {
-	logger.Debug("executing job on Linux", "command", config.Command, "args", config.Args)
+// executeLinux executes job on Linux using platform abstraction
+func (je *JobExecutor) executeLinux(config *JobConfig) error {
+	je.logger.Info("executing job on Linux", "command", config.Command, "args", config.Args)
 
-	// Resolve command path
-	commandPath, err := resolveCommandPath(config.Command, logger)
+	// Resolve command path using platform abstraction
+	commandPath, err := je.resolveCommandPath(config.Command)
 	if err != nil {
 		return fmt.Errorf("command resolution failed: %w", err)
 	}
 
-	// Prepare arguments and environment
+	// Prepare arguments and environment using platform abstraction
 	execArgs := append([]string{config.Command}, config.Args...)
-	envVars := os.Environ()
+	envVars := je.platform.Environ()
 
-	logger.Debug("executing command with syscall.Exec",
+	je.logger.Info("executing command with platform exec",
 		"commandPath", commandPath, "args", execArgs)
 
-	// Use syscall.Exec to replace the current process
-	if err := syscall.Exec(commandPath, execArgs, envVars); err != nil {
-		return fmt.Errorf("syscall.Exec failed: %w", err)
+	// Use platform abstraction for exec
+	if err := je.platform.Exec(commandPath, execArgs, envVars); err != nil {
+		return fmt.Errorf("platform exec failed: %w", err)
 	}
 
-	// This line should never be reached
+	// This line should never be reached on successful exec
 	return nil
 }
 
-// executeDarwin executes job on macOS using exec.Command
-func executeDarwin(config *JobConfig, logger *logger.Logger) error {
-	logger.Debug("executing job on macOS", "command", config.Command, "args", config.Args)
+// executeDarwin executes job on macOS using platform abstraction
+func (je *JobExecutor) executeDarwin(config *JobConfig) error {
+	je.logger.Info("executing job on macOS", "command", config.Command, "args", config.Args)
 
-	// Resolve command path
-	commandPath, err := resolveCommandPath(config.Command, logger)
+	// Resolve command path using platform abstraction
+	commandPath, err := je.resolveCommandPath(config.Command)
 	if err != nil {
 		return fmt.Errorf("command resolution failed: %w", err)
 	}
 
-	// Use exec.Command for macOS
-	cmd := exec.Command(commandPath, config.Args...)
-	cmd.Env = os.Environ()
+	// Use platform abstraction to create and run command
+	cmd := je.platform.CreateCommand(commandPath, config.Args...)
+	cmd.SetEnv(je.platform.Environ())
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("command start failed: %w", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("command execution failed: %w", err)
 	}
 
-	logger.Debug("command completed successfully on macOS")
+	je.logger.Info("command completed successfully on macOS")
 	return nil
 }
 
-// resolveCommandPath resolves a command to its full path
-func resolveCommandPath(command string, logger *logger.Logger) (string, error) {
+// resolveCommandPath resolves a command to its full path using platform abstraction
+func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
 	if command == "" {
 		return "", fmt.Errorf("command cannot be empty")
 	}
 
-	// If already absolute path, verify it exists
+	// If already absolute path, verify it exists using platform abstraction
 	if filepath.IsAbs(command) {
-		if _, err := os.Stat(command); err != nil {
+		if _, err := je.platform.Stat(command); err != nil {
 			return "", fmt.Errorf("command %s not found: %w", command, err)
 		}
 		return command, nil
 	}
 
 	// Try to find in PATH using platform abstraction
-	p := platform.NewPlatform()
-	if resolvedPath, err := p.LookPath(command); err == nil {
-		logger.Debug("resolved command via PATH", "command", command, "resolved", resolvedPath)
+	if resolvedPath, err := je.platform.LookPath(command); err == nil {
+		je.logger.Debug("resolved command via PATH", "command", command, "resolved", resolvedPath)
 		return resolvedPath, nil
 	}
 
-	// Check common paths
-	commonPaths := getCommonPaths(command)
+	// Check common paths using platform abstraction
+	commonPaths := je.getCommonPaths(command)
 
 	for _, path := range commonPaths {
-		if _, err := os.Stat(path); err == nil {
-			logger.Debug("found command in common location", "command", command, "path", path)
+		if _, err := je.platform.Stat(path); err == nil {
+			je.logger.Debug("found command in common location", "command", command, "path", path)
 			return path, nil
 		}
 	}
@@ -156,7 +184,7 @@ func resolveCommandPath(command string, logger *logger.Logger) (string, error) {
 }
 
 // getCommonPaths returns platform-specific common command paths
-func getCommonPaths(command string) []string {
+func (je *JobExecutor) getCommonPaths(command string) []string {
 	commonPaths := []string{
 		filepath.Join("/bin", command),
 		filepath.Join("/usr/bin", command),
@@ -181,15 +209,22 @@ func getCommonPaths(command string) []string {
 
 // HandleCompletion handles platform-specific completion logic
 func HandleCompletion(logger *logger.Logger) {
+	p := platform.NewPlatform()
+	executor := NewJobExecutor(p, logger)
+	executor.HandleCompletion()
+}
+
+// HandleCompletion handles platform-specific completion logic using platform abstraction
+func (je *JobExecutor) HandleCompletion() {
 	switch runtime.GOOS {
 	case "linux":
-		// On Linux: This should never be reached since Execute calls syscall.Exec
-		logger.Error("unexpected return from Execute - exec should have replaced process")
-		os.Exit(1)
+		// On Linux: This should never be reached since Execute calls platform.Exec
+		je.logger.Error("unexpected return from Execute - exec should have replaced process")
+		je.platform.Exit(1)
 	case "darwin":
-		// On macOS: This is expected since we use exec.Command.Run() instead of syscall.Exec
-		logger.Debug("job execution completed successfully on macOS")
+		// On macOS: This is expected since we use command execution instead of exec
+		je.logger.Info("job execution completed successfully on macOS")
 	default:
-		logger.Debug("job execution completed", "platform", runtime.GOOS)
+		je.logger.Info("job execution completed", "platform", runtime.GOOS)
 	}
 }

@@ -13,8 +13,6 @@ func NewWorker(store state.Store) interfaces.Worker {
 	switch runtime.GOOS {
 	case "linux":
 		return core.NewLinuxWorker(store)
-	case "darwin":
-		return nil
 	default:
 		return nil
 	}

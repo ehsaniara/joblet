@@ -55,6 +55,13 @@ func NewPlatformWorker(store state.Store) interfaces.Worker {
 		logger.Fatal("platform support validation failed", "error", err)
 	}
 
+	// IMPORTANT: Set up cgroup controllers on startup
+	// This moves the main worker process to a subgroup and enables controllers
+	if err := worker.setupCgroupControllers(); err != nil {
+		logger.Warn("cgroup controller setup failed", "error", err)
+		// Continue anyway - jobs might work with limited functionality
+	}
+
 	return worker
 }
 
@@ -89,6 +96,10 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
 
+	log.Debug("creating cgroup for job with resource limits",
+		"limits", fmt.Sprintf("CPU:%d, Memory:%dMB, IO:%d",
+			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS))
+
 	// Setup cgroup resources
 	if e := w.cgroup.Create(
 		job.CgroupPath,
@@ -117,6 +128,19 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 
 	log.Debug("job started successfully", "pid", job.Pid)
 	return job, nil
+}
+
+// setupCgroupControllers sets up cgroup controllers for job isolation
+func (w *Worker) setupCgroupControllers() error {
+	w.logger.Debug("setting up cgroup controllers for job isolation")
+
+	// This will move the worker process to a subgroup and enable controllers
+	if err := w.cgroup.EnsureControllers(); err != nil {
+		return fmt.Errorf("failed to ensure controllers: %w", err)
+	}
+
+	w.logger.Debug("cgroup controllers setup completed successfully")
+	return nil
 }
 
 // startProcessSingleBinary starts a job using the same binary in init mode
@@ -184,6 +208,9 @@ func (w *Worker) buildJobEnvironmentSingleBinary(job *domain.Job, execPath strin
 		"JOB_ISOLATION=enabled",
 		"USER_NAMESPACE=true",
 		fmt.Sprintf("WORKER_BINARY_PATH=%s", execPath), // For reference
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
 	}
 
 	// Add job arguments
@@ -292,6 +319,13 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 	if maxIOBPS <= 0 {
 		maxIOBPS = 0
 	}
+
+	w.logger.Debug("job resource limits applied",
+		"jobID", jobID,
+		"maxCPU", maxCPU,
+		"maxMemory", maxMemory,
+		"maxIOBPS", maxIOBPS,
+		"source", "client-specified or defaults")
 
 	return &domain.Job{
 		Id:      jobID,
