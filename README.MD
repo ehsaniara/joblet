@@ -141,10 +141,10 @@ while True:
 
 The system implements mutual TLS with role-based access control:
 
-| Role       | Create Jobs | View Jobs | Stop Jobs | Stream Logs | Certificate OU |
-|------------|-------------|-----------|-----------|-------------|----------------|
-| **Admin**  | ✅           | ✅         | ✅         | ✅           | `OU=admin`     |
-| **Viewer** | ❌           | ✅         | ❌         | ✅           | `OU=viewer`    |
+| Role       | Run Jobs | Status Jobs | Stop Jobs | Logs/Stream | Certificate OU |
+|------------|----------|-------------|-----------|-------------|----------------|
+| **Admin**  | ✅        | ✅           | ✅         | ✅           | `OU=admin`     |
+| **Viewer** | ❌        | ✅           | ❌         | ✅           | `OU=viewer`    |
 
 ### Passwordless Certificate Management
 
@@ -332,26 +332,6 @@ make test-server-mode    # Test server mode
 make dev-init            # Test init mode
 ```
 
-### Project Structure
-
-```
-worker/
-├── cmd/worker/           # Single binary entry point
-├── internal/
-│   ├── modes/           # Execution mode management
-│   │   ├── isolation/   # Job isolation setup
-│   │   ├── jobexec/     # Job execution logic
-│   │   └── validation/  # Platform validation
-│   ├── worker/          # Core worker logic
-│   │   ├── core/        # Platform-specific implementations
-│   │   ├── server/      # gRPC server
-│   │   └── state/       # Job state management
-│   └── cli/             # CLI implementation
-├── pkg/                 # Shared packages
-├── scripts/             # Deployment and setup scripts
-└── configs/             # Configuration files
-```
-
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -487,5 +467,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
+  <sub>by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
 </div>
