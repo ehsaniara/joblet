@@ -205,56 +205,6 @@ DelegateControllers=cpu memory io pids
 Environment="WORKER_MODE=server"
 ```
 
-## 🚀 Deployment
-
-### Automated Deployment
-
-```bash
-# Local deployment
-make deploy                    # Complete local setup
-make deploy-quick             # Skip build step
-make deploy-no-start          # Deploy without starting service
-
-# Remote deployment
-make deploy-remote            # Interactive remote deployment
-bash scripts/deploy.sh --remote host.example.com
-bash scripts/deploy.sh --remote 192.168.1.100 --ssh-user ubuntu
-```
-
-### Manual Deployment
-
-```bash
-# Build and install
-make build
-sudo make install
-
-# Generate certificates
-make certs
-
-# Install and start service
-sudo make install-service
-sudo systemctl start worker
-
-# Setup CLI
-make setup-cli
-```
-
-### Deployment Options
-
-The deployment script supports various options:
-
-```bash
-bash scripts/deploy.sh [OPTIONS]
-
-Options:
-  --skip-build     Skip building the binary
-  --skip-certs     Skip certificate generation
-  --skip-service   Skip systemd service setup
-  --no-start       Don't start service after installation
-  --remote HOST    Deploy to remote host via SSH
-  --ssh-user USER  SSH user for remote deployment
-```
-
 ## 📋 API Reference
 
 ### gRPC Service
