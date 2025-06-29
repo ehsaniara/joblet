@@ -15,7 +15,6 @@ type Platform interface {
 	SyscallOperations
 	CommandFactory
 	ExecOperations
-	Capabilities
 }
 
 // OSOperations defines file system and OS-level operations
@@ -96,9 +95,4 @@ type ExecOperations interface {
 type Info struct {
 	OS           string
 	Architecture string
-}
-
-// Capabilities defines what the platform supports
-type Capabilities interface {
-	GetInfo() *Info
 }

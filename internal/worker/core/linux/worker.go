@@ -30,8 +30,7 @@ type Worker struct {
 	processManager *process.Manager
 	jobIsolation   *unprivileged.JobIsolation
 	platform       platform.Platform
-	config         *Config        // Linux-specific config
-	globalConfig   *config.Config // Global application config
+	config         *config.Config
 	logger         *logger.Logger
 }
 
@@ -42,24 +41,13 @@ func NewPlatformWorker(store state.Store, cfg *config.Config) interfaces.Worker 
 	cgroupResource := resource.New(cfg.Cgroup)
 	jobIsolation := unprivileged.NewJobIsolation()
 
-	// Convert global config to Linux-specific config
-	linuxConfig := &Config{
-		CgroupsBaseDir:          cfg.Cgroup.BaseDir,
-		GracefulShutdownTimeout: cfg.Worker.CleanupTimeout,
-		DefaultCPULimitPercent:  cfg.Worker.DefaultCPULimit,
-		DefaultMemoryLimitMB:    cfg.Worker.DefaultMemoryLimit,
-		DefaultIOBPS:            cfg.Worker.DefaultIOLimit,
-		CgroupNamespaceMount:    cfg.Cgroup.NamespaceMount,
-	}
-
 	worker := &Worker{
 		store:          store,
 		cgroup:         cgroupResource,
 		processManager: processManager,
 		jobIsolation:   jobIsolation,
 		platform:       platformInterface,
-		config:         linuxConfig,
-		globalConfig:   cfg,
+		config:         cfg,
 		logger:         logger.New().WithField("component", "linux-worker"),
 	}
 
@@ -84,7 +72,7 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 		"requestedCPU", maxCPU,
 		"requestedMemory", maxMemory,
 		"requestedIO", maxIOBPS,
-		"validateCommands", w.globalConfig.Worker.ValidateCommands)
+		"validateCommands", w.config.Worker.ValidateCommands)
 
 	// Early context check
 	select {
@@ -164,7 +152,7 @@ func (w *Worker) StopJob(ctx context.Context, jobID string) error {
 		PID:             job.Pid,
 		CgroupPath:      job.CgroupPath,
 		ForceKill:       false,
-		GracefulTimeout: w.config.GracefulShutdownTimeout,
+		GracefulTimeout: w.config.Cgroup.CleanupTimeout,
 	}
 
 	// Perform process cleanup
@@ -192,13 +180,13 @@ func (w *Worker) getNextJobID() string {
 func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
 	// Apply defaults from configuration
 	if maxCPU <= 0 {
-		maxCPU = w.globalConfig.Worker.DefaultCPULimit
+		maxCPU = w.config.Worker.DefaultCPULimit
 	}
 	if maxMemory <= 0 {
-		maxMemory = w.globalConfig.Worker.DefaultMemoryLimit
+		maxMemory = w.config.Worker.DefaultMemoryLimit
 	}
 	if maxIOBPS <= 0 {
-		maxIOBPS = w.globalConfig.Worker.DefaultIOLimit
+		maxIOBPS = w.config.Worker.DefaultIOLimit
 	}
 
 	w.logger.Debug("job resource limits applied",
@@ -218,7 +206,7 @@ func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, m
 			MaxIOBPS:  maxIOBPS,
 		},
 		Status:     domain.StatusInitializing,
-		CgroupPath: w.config.BuildCgroupPath(jobID),
+		CgroupPath: filepath.Join(w.config.Cgroup.BaseDir, "job-"+jobID),
 		StartTime:  time.Now(),
 	}
 }

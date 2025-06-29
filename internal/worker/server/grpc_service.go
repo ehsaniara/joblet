@@ -12,7 +12,6 @@ import (
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/mappers"
 	"worker/internal/worker/state"
-	_errors "worker/pkg/errors"
 	"worker/pkg/logger"
 )
 
@@ -185,7 +184,7 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 
 	streamDuration := time.Since(streamStartTime)
 
-	if e != nil && errors.Is(e, _errors.ErrStreamCancelled) {
+	if e != nil && errors.Is(e, errors.New("stream cancelled by client")) {
 		log.Debug("log stream cancelled by client", "duration", streamDuration)
 		return status.Error(codes.Canceled, "log stream cancelled by client")
 	}

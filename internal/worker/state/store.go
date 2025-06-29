@@ -2,10 +2,10 @@ package state
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 	"worker/internal/worker/domain"
-	_errors "worker/pkg/errors"
 	"worker/pkg/logger"
 )
 
@@ -136,7 +136,7 @@ func (st *store) GetOutput(id string) ([]byte, bool, error) {
 
 	if !exists {
 		st.logger.Debug("output requested for non-existent job", "jobId", id)
-		return nil, false, _errors.ErrJobNotFound
+		return nil, false, errors.New("job not found")
 	}
 
 	buffer := tk.GetBuffer()
@@ -155,7 +155,7 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 
 	if !exists {
 		st.logger.Warn("stream requested for non-existent job", "jobId", id)
-		return _errors.ErrJobNotFound
+		return errors.New("job not found")
 	}
 
 	select {
@@ -190,7 +190,7 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 		case <-stream.Context().Done():
 			duration := time.Since(startTime)
 			st.logger.Debug("stream cancelled by client", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
-			return _errors.ErrStreamCancelled
+			return errors.New("stream cancelled by client")
 
 		case update, ok := <-updates:
 			if !ok {

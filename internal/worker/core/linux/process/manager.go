@@ -23,8 +23,6 @@ const (
 	ProcessStartTimeout     = 10 * time.Second
 	MaxJobArgs              = 100
 	MaxJobArgLength         = 1024
-	MaxEnvironmentVars      = 1000
-	MaxEnvironmentVarLen    = 8192
 )
 
 // Manager handles all process-related operations including launching, cleanup, and validation
@@ -366,19 +364,6 @@ func (pm *Manager) forceKillProcess(pid int32, jobID string) *processCleanupResu
 	}
 }
 
-// LaunchRequest represents a process launch request for validation
-type LaunchRequest struct {
-	Command     string
-	Args        []string
-	MaxCPU      int32
-	MaxMemory   int32
-	MaxIOBPS    int32
-	JobID       string
-	InitPath    string
-	Environment []string
-	CgroupPath  string
-}
-
 // ValidationError represents a validation error
 type ValidationError struct {
 	Field   string
@@ -389,35 +374,6 @@ type ValidationError struct {
 func (e ValidationError) Error() string {
 	return fmt.Sprintf("validation error for field '%s' (value: %v): %s",
 		e.Field, e.Value, e.Message)
-}
-
-// ValidateLaunchRequest validates a process launch request
-func (pm *Manager) ValidateLaunchRequest(req *LaunchRequest) error {
-	if req == nil {
-		return fmt.Errorf("launch request cannot be nil")
-	}
-
-	log := pm.logger.WithField("jobID", req.JobID)
-	log.Debug("validating launch request")
-
-	validations := []func() error{
-		func() error { return pm.validateCommand(req.Command) },
-		func() error { return pm.validateArguments(req.Args) },
-		func() error { return pm.validateResourceLimits(req.MaxCPU, req.MaxMemory, req.MaxIOBPS) },
-		func() error { return pm.validateJobID(req.JobID) },
-		func() error { return pm.validateInitPath(req.InitPath) },
-		func() error { return pm.validateCgroupPath(req.CgroupPath) },
-		func() error { return pm.validateEnvironment(req.Environment) },
-	}
-
-	for _, validation := range validations {
-		if err := validation(); err != nil {
-			return err
-		}
-	}
-
-	log.Debug("launch request validation passed")
-	return nil
 }
 
 // ValidateCommand validates a command string
@@ -635,40 +591,6 @@ func (pm *Manager) isProcessAlive(pid int32) bool {
 	return false
 }
 
-// joinNetworkNamespace joins an existing network namespace using setns syscall
-func (pm *Manager) joinNetworkNamespace(nsPath string) error {
-	if nsPath == "" {
-		return fmt.Errorf("namespace path cannot be empty")
-	}
-
-	if _, err := pm.platform.Stat(nsPath); err != nil {
-		return fmt.Errorf("namespace file does not exist: %s (%w)", nsPath, err)
-	}
-
-	pm.logger.Debug("opening namespace file", "nsPath", nsPath)
-
-	fd, err := syscall.Open(nsPath, syscall.O_RDONLY, 0)
-	if err != nil {
-		return fmt.Errorf("failed to open namespace file %s: %w", nsPath, err)
-	}
-	defer func() {
-		if closeErr := syscall.Close(fd); closeErr != nil {
-			pm.logger.Warn("failed to close namespace file descriptor", "error", closeErr)
-		}
-	}()
-
-	pm.logger.Debug("calling setns syscall", "fd", fd, "nsPath", nsPath)
-
-	const SysSetnsX86_64 = 308
-	_, _, errno := syscall.Syscall(SysSetnsX86_64, uintptr(fd), syscall.CLONE_NEWNET, 0)
-	if errno != 0 {
-		return fmt.Errorf("setns syscall failed for %s: %v", nsPath, errno)
-	}
-
-	pm.logger.Debug("successfully joined network namespace", "nsPath", nsPath)
-	return nil
-}
-
 // cleanupNamespace removes a namespace file or symlink
 func (pm *Manager) cleanupNamespace(nsPath string, isBound bool) error {
 	log := pm.logger.WithFields("nsPath", nsPath, "isBound", isBound)
@@ -839,13 +761,8 @@ func (pm *Manager) validateCgroupPath(cgroupPath string) error {
 }
 
 func (pm *Manager) validateEnvironment(env []string) error {
-	if len(env) > MaxEnvironmentVars {
-		return ValidationError{Field: "environment", Value: len(env), Message: fmt.Sprintf("too many environment variables (max %d)", MaxEnvironmentVars)}
-	}
+
 	for i, envVar := range env {
-		if len(envVar) > MaxEnvironmentVarLen {
-			return ValidationError{Field: "environment", Value: fmt.Sprintf("env[%d]", i), Message: fmt.Sprintf("environment variable too long (max %d characters)", MaxEnvironmentVarLen)}
-		}
 		if strings.Contains(envVar, "\x00") {
 			return ValidationError{Field: "environment", Value: fmt.Sprintf("env[%d]", i), Message: "environment variable contains null bytes"}
 		}
