@@ -71,16 +71,6 @@ type FakePlatform struct {
 	exitArgsForCall []struct {
 		arg1 int
 	}
-	GetInfoStub        func() *platform.Info
-	getInfoMutex       sync.RWMutex
-	getInfoArgsForCall []struct {
-	}
-	getInfoReturns struct {
-		result1 *platform.Info
-	}
-	getInfoReturnsOnCall map[int]struct {
-		result1 *platform.Info
-	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
 	getenvArgsForCall []struct {
@@ -570,59 +560,6 @@ func (fake *FakePlatform) ExitArgsForCall(i int) int {
 	defer fake.exitMutex.RUnlock()
 	argsForCall := fake.exitArgsForCall[i]
 	return argsForCall.arg1
-}
-
-func (fake *FakePlatform) GetInfo() *platform.Info {
-	fake.getInfoMutex.Lock()
-	ret, specificReturn := fake.getInfoReturnsOnCall[len(fake.getInfoArgsForCall)]
-	fake.getInfoArgsForCall = append(fake.getInfoArgsForCall, struct {
-	}{})
-	stub := fake.GetInfoStub
-	fakeReturns := fake.getInfoReturns
-	fake.recordInvocation("GetInfo", []interface{}{})
-	fake.getInfoMutex.Unlock()
-	if stub != nil {
-		return stub()
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePlatform) GetInfoCallCount() int {
-	fake.getInfoMutex.RLock()
-	defer fake.getInfoMutex.RUnlock()
-	return len(fake.getInfoArgsForCall)
-}
-
-func (fake *FakePlatform) GetInfoCalls(stub func() *platform.Info) {
-	fake.getInfoMutex.Lock()
-	defer fake.getInfoMutex.Unlock()
-	fake.GetInfoStub = stub
-}
-
-func (fake *FakePlatform) GetInfoReturns(result1 *platform.Info) {
-	fake.getInfoMutex.Lock()
-	defer fake.getInfoMutex.Unlock()
-	fake.GetInfoStub = nil
-	fake.getInfoReturns = struct {
-		result1 *platform.Info
-	}{result1}
-}
-
-func (fake *FakePlatform) GetInfoReturnsOnCall(i int, result1 *platform.Info) {
-	fake.getInfoMutex.Lock()
-	defer fake.getInfoMutex.Unlock()
-	fake.GetInfoStub = nil
-	if fake.getInfoReturnsOnCall == nil {
-		fake.getInfoReturnsOnCall = make(map[int]struct {
-			result1 *platform.Info
-		})
-	}
-	fake.getInfoReturnsOnCall[i] = struct {
-		result1 *platform.Info
-	}{result1}
 }
 
 func (fake *FakePlatform) Getenv(arg1 string) string {
@@ -1449,8 +1386,6 @@ func (fake *FakePlatform) Invocations() map[string][][]interface{} {
 	defer fake.executableMutex.RUnlock()
 	fake.exitMutex.RLock()
 	defer fake.exitMutex.RUnlock()
-	fake.getInfoMutex.RLock()
-	defer fake.getInfoMutex.RUnlock()
 	fake.getenvMutex.RLock()
 	defer fake.getenvMutex.RUnlock()
 	fake.getpidMutex.RLock()

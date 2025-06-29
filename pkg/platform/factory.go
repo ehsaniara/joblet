@@ -34,13 +34,3 @@ func createPlatform() Platform {
 		panic(fmt.Sprintf("unsupported platform: %s", runtime.GOOS))
 	}
 }
-
-// GetCurrentPlatform returns the singleton platform instance
-func GetCurrentPlatform() Platform {
-	return NewPlatform()
-}
-
-// GetPlatformInfo returns information about current platform capabilities
-func GetPlatformInfo() *Info {
-	return GetCurrentPlatform().GetInfo()
-}
