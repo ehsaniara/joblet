@@ -93,15 +93,10 @@ func (mp *MockPlatform) Exec(argv0 string, argv []string, envv []string) error {
 	return nil
 }
 
-func (mp *MockPlatform) GetInfo() *PlatformInfo {
-	return &PlatformInfo{
-		OS:                    "mock",
-		Architecture:          "mock",
-		SupportsNamespaces:    true,
-		SupportsCgroups:       true,
-		SupportsNetworkNS:     true,
-		SupportsMountNS:       true,
-		SupportsResourceLimit: true,
+func (mp *MockPlatform) GetInfo() *Info {
+	return &Info{
+		OS:           "mock",
+		Architecture: "mock",
 	}
 }
 

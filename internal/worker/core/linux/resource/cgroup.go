@@ -9,16 +9,51 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"worker/pkg/config"
 	"worker/pkg/logger"
 )
 
-//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+type cgroup struct {
+	logger      *logger.Logger
+	initialized bool
+	config      config.CgroupConfig
+}
 
-const (
-	CleanupTimeout = 5 * time.Second
-	// CgroupsBaseDir Use the delegated cgroup path for worker user
-	CgroupsBaseDir = "/sys/fs/cgroup/worker.slice/worker.service"
-)
+func New(cfg config.CgroupConfig) Resource {
+	return &cgroup{
+		logger: logger.New().WithField("component", "resource-manager"),
+		config: cfg,
+	}
+}
+
+func (c *cgroup) EnsureControllers() error {
+	if c.initialized {
+		return nil
+	}
+
+	log := c.logger.WithField("operation", "ensure-controllers")
+	log.Debug("initializing cgroup controllers with configuration",
+		"baseDir", c.config.BaseDir,
+		"controllers", c.config.EnableControllers,
+		"cleanupTimeout", c.config.CleanupTimeout)
+
+	// Use configured base directory
+	if err := c.moveWorkerProcessToSubgroup(); err != nil {
+		log.Warn("failed to move worker to subgroup", "error", err)
+	}
+
+	// Enable configured controllers
+	if err := c.enableControllersFromConfig(); err != nil {
+		log.Warn("failed to enable controllers", "error", err)
+	}
+
+	c.initialized = true
+	log.Info("cgroup controllers initialized",
+		"baseDir", c.config.BaseDir,
+		"enabledControllers", c.config.EnableControllers)
+
+	return nil
+}
 
 //counterfeiter:generate . Resource
 type Resource interface {
@@ -30,38 +65,47 @@ type Resource interface {
 	EnsureControllers() error
 }
 
-type cgroup struct {
-	logger      *logger.Logger
-	initialized bool
-}
+func (c *cgroup) enableControllersFromConfig() error {
+	log := c.logger.WithField("operation", "enable-controllers")
 
-func New() Resource {
-	return &cgroup{
-		logger: logger.New().WithField("component", "resource-manager"),
+	subtreeControlFile := filepath.Join(c.config.BaseDir, "cgroup.subtree_control")
+
+	// Check available controllers
+	controllersFile := filepath.Join(c.config.BaseDir, "cgroup.controllers")
+	availableBytes, err := os.ReadFile(controllersFile)
+	if err != nil {
+		return fmt.Errorf("failed to read available controllers: %w", err)
 	}
-}
 
-func (c *cgroup) EnsureControllers() error {
-	if c.initialized {
+	availableControllers := strings.Fields(string(availableBytes))
+	log.Debug("available controllers", "controllers", availableControllers)
+
+	// Enable only the configured controllers that are available
+	var enabledControllers []string
+	for _, controller := range c.config.EnableControllers {
+		if contains(availableControllers, controller) {
+			enabledControllers = append(enabledControllers, "+"+controller)
+			log.Debug("enabling controller from config", "controller", controller)
+		} else {
+			log.Warn("configured controller not available", "controller", controller)
+		}
+	}
+
+	if len(enabledControllers) == 0 {
+		log.Warn("no configured controllers available to enable")
 		return nil
 	}
 
-	log := c.logger.WithField("operation", "ensure-controllers")
-
-	// First, check if we need to move the current process out of the service cgroup
-	// This is required by the "no internal processes" rule in cgroups v2
-	if err := c.moveWorkerProcessToSubgroup(); err != nil {
-		log.Warn("failed to move worker to subgroup", "error", err)
-		// Continue anyway - this might not be fatal
+	// Write enabled controllers
+	controllersToEnable := strings.Join(enabledControllers, " ")
+	if err := os.WriteFile(subtreeControlFile, []byte(controllersToEnable), 0644); err != nil {
+		return fmt.Errorf("failed to enable controllers: %w", err)
 	}
 
-	// Now enable controllers in the service cgroup
-	if err := c.enableControllersInServiceCgroup(); err != nil {
-		log.Warn("failed to enable controllers in service cgroup", "error", err)
-		// Continue anyway - jobs might still work with limited functionality
-	}
+	log.Info("controllers enabled from configuration",
+		"requested", c.config.EnableControllers,
+		"enabled", enabledControllers)
 
-	c.initialized = true
 	return nil
 }
 
@@ -71,7 +115,7 @@ func (c *cgroup) moveWorkerProcessToSubgroup() error {
 	log := c.logger.WithField("operation", "move-worker-process")
 
 	// Create a subgroup for the main worker process
-	workerSubgroup := filepath.Join(CgroupsBaseDir, "worker-main")
+	workerSubgroup := filepath.Join(c.config.BaseDir, "worker-main")
 	if err := os.MkdirAll(workerSubgroup, 0755); err != nil {
 		return fmt.Errorf("failed to create worker subgroup: %w", err)
 	}
@@ -93,10 +137,10 @@ func (c *cgroup) moveWorkerProcessToSubgroup() error {
 func (c *cgroup) enableControllersInServiceCgroup() error {
 	log := c.logger.WithField("operation", "enable-controllers")
 
-	subtreeControlFile := filepath.Join(CgroupsBaseDir, "cgroup.subtree_control")
+	subtreeControlFile := filepath.Join(c.config.BaseDir, "cgroup.subtree_control")
 
 	// Check what controllers are available
-	controllersFile := filepath.Join(CgroupsBaseDir, "cgroup.controllers")
+	controllersFile := filepath.Join(c.config.BaseDir, "cgroup.controllers")
 	availableBytes, err := os.ReadFile(controllersFile)
 	if err != nil {
 		return fmt.Errorf("failed to read available controllers: %w", err)
@@ -159,7 +203,7 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 	log.Info("creating cgroup")
 
 	// Ensure we're working within our delegated subtree
-	if !strings.HasPrefix(cgroupJobDir, CgroupsBaseDir) {
+	if !strings.HasPrefix(cgroupJobDir, c.config.BaseDir) {
 		return fmt.Errorf("security violation: cgroup path outside delegated subtree: %s", cgroupJobDir)
 	}
 
@@ -346,38 +390,37 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 // CleanupCgroup deletes a cgroup after removing job processes
 func (c *cgroup) CleanupCgroup(jobID string) {
 	cleanupLogger := c.logger.WithField("jobId", jobID)
-	cleanupLogger.Debug("starting cgroup cleanup")
+	cleanupLogger.Debug("starting cgroup cleanup with configured timeout",
+		"timeout", c.config.CleanupTimeout)
 
-	// Cleanup in a separate goroutine
 	go func() {
-		// Timeout for the cleanup operation
-		ctx, cancel := context.WithTimeout(context.Background(), CleanupTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), c.config.CleanupTimeout)
 		defer cancel()
 
 		done := make(chan bool)
 		go func() {
-			cleanupJobCgroup(jobID, cleanupLogger)
+			cleanupJobCgroup(jobID, cleanupLogger, &c.config)
 			done <- true
 		}()
 
-		// Wait for cleanup or timeout
 		select {
 		case <-done:
-			cleanupLogger.Debug("cgroup cleanup completed")
+			cleanupLogger.Debug("cgroup cleanup completed within configured timeout")
 		case <-ctx.Done():
-			cleanupLogger.Warn("cgroup cleanup timed out")
+			cleanupLogger.Warn("cgroup cleanup timed out",
+				"configuredTimeout", c.config.CleanupTimeout)
 		}
 	}()
 }
 
 // cleanupJobCgroup clean process first SIGTERM and SIGKILL then remove the cgroupPath items
-func cleanupJobCgroup(jobID string, logger *logger.Logger) {
+func cleanupJobCgroup(jobID string, logger *logger.Logger, cfg *config.CgroupConfig) {
 	// Use the delegated cgroup path
-	cgroupPath := filepath.Join(CgroupsBaseDir, "job-"+jobID)
+	cgroupPath := filepath.Join(cfg.BaseDir, "job-"+jobID)
 	cleanupLogger := logger.WithField("cgroupPath", cgroupPath)
 
 	// Security check: ensure we're only cleaning up within our delegated subtree
-	if !strings.HasPrefix(cgroupPath, CgroupsBaseDir+"/job-") {
+	if !strings.HasPrefix(cgroupPath, cfg.BaseDir+"/job-") {
 		cleanupLogger.Error("security violation: attempted to clean up non-job cgroup", "path", cgroupPath)
 		return
 	}

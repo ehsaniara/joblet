@@ -99,28 +99,3 @@ func (pv *PlatformValidator) validateKernelVersion() error {
 
 	return nil
 }
-
-// ValidateRuntimeRequirements checks runtime-specific requirements
-func (pv *PlatformValidator) ValidateRuntimeRequirements() error {
-	// Check if running as appropriate user
-	if runtime.GOOS == "linux" {
-		// For Linux, we might need root for certain operations
-		// This could be expanded based on actual requirements
-		pv.logger.Debug("validating runtime permissions")
-	}
-
-	// Validate platform capabilities
-	info := pv.platform.GetInfo()
-	pv.logger.Info("platform capabilities",
-		"os", info.OS,
-		"arch", info.Architecture,
-		"namespaces", info.SupportsNamespaces,
-		"cgroups", info.SupportsCgroups)
-
-	// Use platform validation
-	if err := pv.platform.ValidateRequirements(); err != nil {
-		return fmt.Errorf("platform requirements validation failed: %w", err)
-	}
-
-	return nil
-}

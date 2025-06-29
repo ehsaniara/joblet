@@ -29,18 +29,6 @@ type Config struct {
 	CgroupNamespaceMount string
 }
 
-// DefaultConfigWithCgroupNamespace creates config with mandatory cgroup namespaces
-func DefaultConfigWithCgroupNamespace() *Config {
-	return &Config{
-		CgroupsBaseDir:          CgroupsBaseDir,
-		GracefulShutdownTimeout: 100 * time.Millisecond,
-		DefaultCPULimitPercent:  100,
-		DefaultMemoryLimitMB:    512,
-		DefaultIOBPS:            0,
-		CgroupNamespaceMount:    "/sys/fs/cgroup", // Standard mount point
-	}
-}
-
 // BuildCgroupPath constructs the filesystem path for a job's cgroup
 func (c *Config) BuildCgroupPath(jobID string) string {
 	return filepath.Join(c.CgroupsBaseDir, "job-"+jobID)

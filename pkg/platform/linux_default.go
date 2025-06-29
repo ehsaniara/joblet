@@ -19,17 +19,12 @@ func (lp *LinuxPlatform) Unmount(target string, flags int) error {
 	return DefaultUnmount("linux", target, flags)
 }
 
-func (lp *LinuxPlatform) GetInfo() *PlatformInfo {
+func (lp *LinuxPlatform) GetInfo() *Info {
 	// Return Linux platform info even when not on Linux
 	// This is useful for cross-platform information queries
-	return &PlatformInfo{
-		OS:                    "linux",
-		Architecture:          "unknown", // Can't determine target arch
-		SupportsNamespaces:    true,      // Linux capabilities
-		SupportsCgroups:       true,
-		SupportsNetworkNS:     true,
-		SupportsMountNS:       true,
-		SupportsResourceLimit: true,
+	return &Info{
+		OS:           "linux",
+		Architecture: "unknown", // Can't determine target arch
 	}
 }
 

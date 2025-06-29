@@ -41,6 +41,6 @@ func GetCurrentPlatform() Platform {
 }
 
 // GetPlatformInfo returns information about current platform capabilities
-func GetPlatformInfo() *PlatformInfo {
+func GetPlatformInfo() *Info {
 	return GetCurrentPlatform().GetInfo()
 }
