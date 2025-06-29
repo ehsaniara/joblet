@@ -65,7 +65,7 @@ func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 		}
 	}
 
-	je.logger.Info("loaded job configuration",
+	je.logger.Debug("loaded job configuration",
 		"jobId", jobID,
 		"command", command,
 		"argsCount", len(args),
@@ -100,7 +100,7 @@ func (je *JobExecutor) Execute(config *JobConfig) error {
 
 // executeLinux executes job on Linux using platform abstraction
 func (je *JobExecutor) executeLinux(config *JobConfig) error {
-	je.logger.Info("executing job on Linux", "command", config.Command, "args", config.Args)
+	je.logger.Debug("executing job on Linux", "command", config.Command, "args", config.Args)
 
 	// Resolve command path using platform abstraction
 	commandPath, err := je.resolveCommandPath(config.Command)
@@ -112,7 +112,7 @@ func (je *JobExecutor) executeLinux(config *JobConfig) error {
 	execArgs := append([]string{config.Command}, config.Args...)
 	envVars := je.platform.Environ()
 
-	je.logger.Info("executing command with platform exec",
+	je.logger.Debug("executing command with platform exec",
 		"commandPath", commandPath, "args", execArgs)
 
 	// Use platform abstraction for exec

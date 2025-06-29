@@ -46,7 +46,7 @@ func (i *Isolator) Setup() error {
 // setupLinux sets up Linux-specific isolation using platform abstraction
 func (i *Isolator) setupLinux() error {
 	pid := i.platform.Getpid()
-	i.logger.Info("setting up Linux isolation", "pid", pid, "approach", "platform-abstraction")
+	i.logger.Debug("setting up Linux isolation", "pid", pid, "approach", "platform-abstraction")
 
 	// Only PID 1 should setup isolation
 	if pid != 1 {
@@ -72,13 +72,13 @@ func (i *Isolator) setupLinux() error {
 		// Continue - isolation might still be partial
 	}
 
-	i.logger.Info("Linux isolation setup completed successfully")
+	i.logger.Debug("Linux isolation setup completed successfully")
 	return nil
 }
 
 // setupDarwin sets up macOS-specific isolation (minimal)
 func (i *Isolator) setupDarwin() error {
-	i.logger.Info("macOS isolation setup (minimal - no namespaces available)")
+	i.logger.Debug("macOS isolation setup (minimal - no namespaces available)")
 	// macOS doesn't have Linux namespaces, so this is mostly a no-op
 	return nil
 }
@@ -99,7 +99,7 @@ func (i *Isolator) makePrivate() error {
 
 // remountProc remounts /proc using platform abstraction
 func (i *Isolator) remountProc() error {
-	i.logger.Info("remounting /proc using platform abstraction")
+	i.logger.Debug("remounting /proc using platform abstraction")
 
 	// Lazy unmount existing /proc using platform helper
 	if err := i.platform.Unmount("/proc", 0x2); err != nil { // 0x2 for platform.UnmountDetach
@@ -113,7 +113,7 @@ func (i *Isolator) remountProc() error {
 		return fmt.Errorf("platform proc mount failed: %w", err)
 	}
 
-	i.logger.Info("/proc successfully remounted using platform abstraction")
+	i.logger.Debug("/proc successfully remounted using platform abstraction")
 	return nil
 }
 
@@ -124,7 +124,7 @@ func (i *Isolator) verifyIsolation() error {
 	// Check PID 1 in our namespace using platform abstraction
 	if comm, err := i.platform.ReadFile("/proc/1/comm"); err == nil {
 		pid1Process := strings.TrimSpace(string(comm))
-		i.logger.Info("PID 1 in namespace", "process", pid1Process)
+		i.logger.Debug("PID 1 in namespace", "process", pid1Process)
 
 		// In isolated namespace, PID 1 should be our worker binary
 		if !strings.Contains(pid1Process, "worker") {
@@ -146,7 +146,7 @@ func (i *Isolator) verifyIsolation() error {
 		}
 	}
 
-	i.logger.Info("isolation verification",
+	i.logger.Debug("isolation verification",
 		"visibleProcesses", pidCount,
 		"isolationQuality", assessIsolationQuality(pidCount))
 

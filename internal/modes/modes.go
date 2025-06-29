@@ -218,5 +218,5 @@ func logResourceLimits(logger *logger.Logger) {
 		"maxIOBPS":  os.Getenv("JOB_MAX_IOBPS"),
 	}
 
-	logger.Info("resource limits applied", "limits", limits)
+	logger.Debug("resource limits applied", "limits", limits)
 }
