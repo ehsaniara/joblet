@@ -11,8 +11,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "cli",
-	Short: "Job Worker CLI client",
-	Long:  "Command Line Interface to interact with the Job Worker gRPC service running in host machines",
+	Short: "Worker CLI client",
+	Long:  "Command Line Interface to interact with the Worker gRPC service running in host machines",
 }
 
 func Execute() error {

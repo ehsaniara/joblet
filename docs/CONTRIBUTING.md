@@ -1,6 +1,6 @@
-# Contributing to Job Worker
+# Contributing to Worker
 
-Thank you for your interest in contributing to Job Worker! This guide will help you get started with contributing to the project, whether you're reporting bugs, suggesting features, or submitting code changes.
+Thank you for your interest in contributing to Worker! This guide will help you get started with contributing to the project, whether you're reporting bugs, suggesting features, or submitting code changes.
 
 ## Table of Contents
 
@@ -650,8 +650,8 @@ If you have questions about contributing:
 3. Create a new discussion or issue
 4. Tag maintainers if needed
 
-Thank you for contributing to Job Worker! 🚀
+Thank you for contributing to Worker! 🚀
 
 ---
 
-**Happy Contributing!** Every contribution, no matter how small, helps make Job Worker better for everyone.
+**Happy Contributing!** Every contribution, no matter how small, helps make Worker better for everyone.

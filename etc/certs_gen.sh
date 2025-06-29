@@ -2,7 +2,7 @@
 
 set -e
 
-echo "🔐 Generating certificates for Job Worker..."
+echo "🔐 Generating certificates for Worker..."
 
 if [ "$(uname)" = "Linux" ]; then
     CERT_DIR="/opt/worker/certs"
@@ -92,7 +92,7 @@ echo "🧹 Cleaning up temporary files..."
 rm -f *.csr *.cnf *.srl
 
 echo "✅ Certificate generation complete!"
-echo "🚀 Ready to use with Job Worker service!"
+echo "🚀 Ready to use with Worker service!"
 
 if command -v openssl >/dev/null 2>&1; then
     echo ""

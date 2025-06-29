@@ -1,4 +1,4 @@
-# Job Worker Deployment Guide
+# Worker Deployment Guide
 
 This guide covers production deployment of the Job Worker system, including server setup, certificate management,
 systemd service configuration, and operational procedures.
@@ -196,7 +196,7 @@ Create `/etc/systemd/system/job-worker.service`:
 
 ```ini
 [Unit]
-Description=Job Worker Service
+Description=Worker Service
 Documentation=https://github.com/ehsaniara/job-worker
 After=network.target
 Wants=network.target
@@ -256,7 +256,7 @@ sudo systemctl status worker.service
 Create `/etc/rsyslog.d/job-worker.conf`:
 
 ```bash
-# Job Worker logging configuration
+# Worker logging configuration
 if $programname == 'job-worker' then /var/log/job-worker/job-worker.log
 & stop
 ```

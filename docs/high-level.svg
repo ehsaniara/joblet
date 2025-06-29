@@ -63,12 +63,12 @@
         <line x1="500" y1="200" x2="500" y2="260" stroke="#059669" stroke-width="3" marker-end="url(#arrowhead)"/>
     </g>
 
-    <!-- Job Worker Service -->
+    <!-- Worker Service -->
     <g id="job-worker-service">
         <rect x="350" y="260" width="300" height="100" rx="8" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
         <text x="500" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
               fill="white">
-            Job Worker Service
+            Worker Service
         </text>
         <text x="500" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
             - Job Orchestration &amp; Lifecycle

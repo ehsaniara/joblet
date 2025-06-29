@@ -7,7 +7,7 @@ REMOTE_DIR ?= /opt/worker
 all: cli worker
 
 help:
-	@echo "Job Worker Makefile"
+	@echo "Worker Makefile"
 	@echo ""
 	@echo "Build targets:"
 	@echo "  make all               - Build all binaries (cli, worker)"
