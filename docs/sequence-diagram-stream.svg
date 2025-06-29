@@ -4,7 +4,7 @@
 
     <!-- Title -->
     <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">
-        Job Worker Streaming - Sequence Diagram
+        Worker Streaming - Sequence Diagram
     </text>
 
     <!-- Actors -->

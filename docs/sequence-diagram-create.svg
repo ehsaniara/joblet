@@ -4,7 +4,7 @@
 
     <!-- Title -->
     <text x="450" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1a1a1a">
-        Job Worker Creation - Sequence Diagram
+        Worker Creation - Sequence Diagram
     </text>
 
     <!-- Participants -->

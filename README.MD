@@ -1,4 +1,4 @@
-# Job Worker
+# Worker
 
 [![Tests](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/job-worker)](https://goreportcard.com/report/github.com/ehsaniara/job-worker)
@@ -8,7 +8,7 @@
 
 ![worker-thum.png](docs/worker-thum.png)
 
-**Job Worker** is a high-performance distributed job execution system built in Go that provides secure remote command
+**Worker** is a high-performance distributed job execution system built in Go that provides secure remote command
 execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated
 single-binary architecture with gRPC-based communication, mutual TLS authentication, and role-based authorization,
 allowing administrators to securely execute arbitrary commands on remote Linux systems while enforcing strict CPU,

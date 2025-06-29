@@ -1,8 +1,8 @@
-# Job Worker System Design Document
+# Worker System Design Document
 
 ## 1. Overview
 
-The Job Worker is a distributed job execution system that provides secure, resource-controlled execution of arbitrary commands on remote machines. It implements a client-server architecture using gRPC with mutual TLS authentication and fine-grained resource management through Linux cgroups.
+The Worker is a distributed job execution system that provides secure, resource-controlled execution of arbitrary commands on remote machines. It implements a client-server architecture using gRPC with mutual TLS authentication and fine-grained resource management through Linux cgroups.
 
 ### 1.1 Key Features
 
@@ -28,13 +28,13 @@ The Job Worker is a distributed job execution system that provides secure, resou
 
 | Component | Deployment | Responsibility | Key Files |
 |-----------|------------|---------------|-----------|
-| **Job Worker Server** | Server Machine | Core job execution engine, gRPC API, resource management | `cmd/server`, `grpc_server.go`, `grpc_service.go`, `service.go` |
+| **Worker Server** | Server Machine | Core job execution engine, gRPC API, resource management | `cmd/server`, `grpc_server.go`, `grpc_service.go`, `service.go` |
 | **CLI Client** | Client Machine | Command-line interface for remote job operations | `cmd/cli`, `root.go`, `create.go`, `get.go`, `stop.go`, `stream.go`, `list.go` |
 | **job-init Binary** | Server Machine | Process isolation and execution setup (spawned by server) | `cmd/job-init`, `init.go` |
 
-## 3. Server-Side Components (Job Worker)
+## 3. Server-Side Components (Worker)
 
-### 3.1 Job Worker Server
+### 3.1 Worker Server
 
 The server runs as a daemon on the target machine and provides the core job execution capabilities.
 
@@ -43,7 +43,7 @@ The server runs as a daemon on the target machine and provides the core job exec
 | Component | Purpose | Implementation |
 |-----------|---------|---------------|
 | **gRPC Server** | API endpoint with TLS authentication | `grpc_server.go`, `grpc_service.go` |
-| **Job Worker Service** | Core job execution logic and lifecycle management | `service.go` |
+| **Worker Service** | Core job execution logic and lifecycle management | `service.go` |
 | **In-Memory Store** | Job state management and real-time pub/sub | `store.go`, `task.go` |
 | **Resource Manager** | Linux cgroups v2 resource control | `cgroup.go` |
 | **Authorization** | Role-based access control via client certificates | `grpc_authorization.go` |
@@ -88,7 +88,7 @@ Server Process                    job-init Process
 
 ### 4.1 CLI Client Commands
 
-The CLI client connects to remote Job Worker servers via gRPC/TLS.
+The CLI client connects to remote Worker servers via gRPC/TLS.
 
 #### Available Commands
 
@@ -387,4 +387,4 @@ func (cg *cgroup) CleanupCgroup(jobID string) {
 - **Limited Platforms**: Linux-only due to cgroups dependency
 - **Certificate Management**: Manual certificate provisioning
 
-This design document provides a comprehensive overview of the Job Worker system architecture, implementation details, and operational considerations. The system prioritizes security, resource isolation, and real-time monitoring while maintaining simplicity and reliability.
+This design document provides a comprehensive overview of the Worker system architecture, implementation details, and operational considerations. The system prioritizes security, resource isolation, and real-time monitoring while maintaining simplicity and reliability.
