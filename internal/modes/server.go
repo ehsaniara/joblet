@@ -9,51 +9,62 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
-
 	"worker/internal/modes/isolation"
 	"worker/internal/modes/jobexec"
-	"worker/internal/modes/validation"
+
 	"worker/internal/worker"
 	"worker/internal/worker/server"
 	"worker/internal/worker/state"
+	"worker/pkg/config"
 	"worker/pkg/logger"
 )
 
-// RunServer runs the worker in server mode (gRPC server)
-func RunServer() error {
-	ctx := context.Background()
+func RunServer(cfg *config.Config) error {
+	log := logger.WithField("mode", "server")
 
-	appLogger := setupLogger()
-	appLogger.Debug("worker starting in SERVER mode",
-		"version", "1.0.0",
-		"platform", runtime.GOOS,
-		"mode", "server")
+	log.Info("starting worker server",
+		"address", cfg.GetServerAddress(),
+		"tlsEnabled", cfg.Security.TLSEnabled,
+		"maxJobs", cfg.Worker.MaxConcurrentJobs)
 
-	// Platform validation
-	if err := validation.ValidatePlatformRequirements(appLogger); err != nil {
-		return fmt.Errorf("platform requirements not met: %w", err)
+	// Create state store
+	store := state.New()
+
+	// Create worker with configuration
+	workerInstance := worker.NewWorker(store, cfg)
+	if workerInstance == nil {
+		return fmt.Errorf("failed to create worker for current platform")
 	}
 
-	// Initialize store and worker
-	store := state.New()
-	worker := worker.NewWorker(store)
-
-	// Start gRPC server
-	grpcServer, err := server.StartGRPCServer(store, worker)
+	// Start gRPC server with configuration
+	grpcServer, err := server.StartGRPCServer(store, workerInstance, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}
 
-	appLogger.Info("gRPC server started successfully")
+	// Setup graceful shutdown
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// Set up graceful shutdown
-	return handleServerShutdown(ctx, grpcServer, appLogger)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	log.Info("server started successfully", "address", cfg.GetServerAddress())
+
+	// Wait for shutdown signal
+	<-sigChan
+	log.Info("received shutdown signal, stopping server...")
+
+	// Graceful shutdown
+	grpcServer.GracefulStop()
+	log.Info("server stopped gracefully")
+
+	return nil
 }
 
 // RunJobInit runs the worker in job initialization mode
-func RunJobInit() error {
-	initLogger := setupLogger()
+func RunJobInit(cfg *config.Config) error {
+	initLogger := logger.WithField("mode", "init")
 
 	jobID := os.Getenv("JOB_ID")
 	if jobID != "" {
@@ -85,7 +96,7 @@ func RunJobInit() error {
 	logResourceLimits(initLogger)
 
 	// Load job configuration
-	config, err := jobexec.LoadConfigFromEnv(initLogger)
+	jobConfig, err := jobexec.LoadConfigFromEnv(initLogger)
 	if err != nil {
 		return fmt.Errorf("failed to load job config: %w", err)
 	}
@@ -96,68 +107,13 @@ func RunJobInit() error {
 	}
 
 	// Execute the job
-	if err := jobexec.Execute(config, initLogger); err != nil {
+	if err := jobexec.Execute(jobConfig, initLogger); err != nil {
 		return fmt.Errorf("job execution failed: %w", err)
 	}
 
 	// Handle completion
 	jobexec.HandleCompletion(initLogger)
 	return nil
-}
-
-// setupLogger configures the logger based on environment variables
-func setupLogger() *logger.Logger {
-	appLogger := logger.New()
-
-	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		if level, err := logger.ParseLevel(logLevel); err == nil {
-			appLogger.SetLevel(level)
-		}
-	}
-
-	return appLogger
-}
-
-// handleServerShutdown sets up graceful shutdown for the server
-func handleServerShutdown(ctx context.Context, grpcServer interface{}, logger *logger.Logger) error {
-	// Create a channel to receive OS signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Create a context for shutdown timeout
-	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Wait for shutdown signal
-	sig := <-sigChan
-	logger.Info("received shutdown signal", "signal", sig)
-
-	// Graceful shutdown
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-
-		// Type assertion to access GracefulStop method
-		if s, ok := grpcServer.(interface{ GracefulStop() }); ok {
-			s.GracefulStop()
-			logger.Info("gRPC server stopped gracefully")
-		} else {
-			logger.Warn("unable to gracefully stop server")
-		}
-	}()
-
-	// Wait for graceful shutdown or timeout
-	select {
-	case <-done:
-		logger.Info("server shutdown completed")
-		return nil
-	case <-shutdownCtx.Done():
-		logger.Warn("shutdown timeout exceeded, forcing stop")
-		if s, ok := grpcServer.(interface{ Stop() }); ok {
-			s.Stop()
-		}
-		return shutdownCtx.Err()
-	}
 }
 
 // assignToCgroup assigns the current process to the specified cgroup

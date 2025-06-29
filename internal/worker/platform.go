@@ -1,19 +1,13 @@
 package worker
 
 import (
-	"runtime"
 	"worker/internal/worker/core"
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/state"
+	"worker/pkg/config"
 )
 
 // NewWorker creates a platform-specific worker implementation
-// This function works on all platforms and calls the appropriate platform-specific constructor
-func NewWorker(store state.Store) interfaces.Worker {
-	switch runtime.GOOS {
-	case "linux":
-		return core.NewLinuxWorker(store)
-	default:
-		return nil
-	}
+func NewWorker(store state.Store, cfg *config.Config) interfaces.Worker {
+	return core.NewWorker(store, cfg)
 }

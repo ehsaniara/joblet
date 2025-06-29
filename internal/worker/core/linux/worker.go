@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/core/linux/process"
@@ -17,29 +16,41 @@ import (
 	"worker/internal/worker/core/linux/unprivileged"
 	"worker/internal/worker/domain"
 	"worker/internal/worker/state"
+	"worker/pkg/config"
 	"worker/pkg/logger"
 	"worker/pkg/platform"
 )
 
 var jobCounter int64
 
-// Worker handles job execution with optional job isolation
+// Worker handles job execution with configuration
 type Worker struct {
 	store          state.Store
 	cgroup         resource.Resource
 	processManager *process.Manager
 	jobIsolation   *unprivileged.JobIsolation
 	platform       platform.Platform
-	config         *Config
+	config         *Config        // Linux-specific config
+	globalConfig   *config.Config // Global application config
 	logger         *logger.Logger
 }
 
-func NewPlatformWorker(store state.Store) interfaces.Worker {
+// NewPlatformWorker creates a new Linux platform worker
+func NewPlatformWorker(store state.Store, cfg *config.Config) interfaces.Worker {
 	platformInterface := platform.NewPlatform()
 	processManager := process.NewProcessManager(platformInterface)
-	cgroupResource := resource.New()
+	cgroupResource := resource.New(cfg.Cgroup)
 	jobIsolation := unprivileged.NewJobIsolation()
-	config := DefaultConfigWithCgroupNamespace()
+
+	// Convert global config to Linux-specific config
+	linuxConfig := &Config{
+		CgroupsBaseDir:          cfg.Cgroup.BaseDir,
+		GracefulShutdownTimeout: cfg.Worker.CleanupTimeout,
+		DefaultCPULimitPercent:  cfg.Worker.DefaultCPULimit,
+		DefaultMemoryLimitMB:    cfg.Worker.DefaultMemoryLimit,
+		DefaultIOBPS:            cfg.Worker.DefaultIOLimit,
+		CgroupNamespaceMount:    cfg.Cgroup.NamespaceMount,
+	}
 
 	worker := &Worker{
 		store:          store,
@@ -47,20 +58,20 @@ func NewPlatformWorker(store state.Store) interfaces.Worker {
 		processManager: processManager,
 		jobIsolation:   jobIsolation,
 		platform:       platformInterface,
-		config:         config,
+		config:         linuxConfig,
+		globalConfig:   cfg,
 		logger:         logger.New().WithField("component", "linux-worker"),
 	}
 
-	if err := worker.validatePlatformSupport(); err != nil {
-		logger.Fatal("platform support validation failed", "error", err)
+	if err := worker.setupCgroupControllers(); err != nil {
+		worker.logger.Fatal("cgroup controller setup failed", "error", err)
 	}
 
-	// IMPORTANT: Set up cgroup controllers on startup
-	// This moves the main worker process to a subgroup and enables controllers
-	if err := worker.setupCgroupControllers(); err != nil {
-		logger.Warn("cgroup controller setup failed", "error", err)
-		// Continue anyway - jobs might work with limited functionality
-	}
+	worker.logger.Debug("Linux worker initialized",
+		"maxConcurrentJobs", cfg.Worker.MaxConcurrentJobs,
+		"defaultCPU", cfg.Worker.DefaultCPULimit,
+		"defaultMemory", cfg.Worker.DefaultMemoryLimit,
+		"cgroupPath", cfg.Cgroup.BaseDir)
 
 	return worker
 }
@@ -69,7 +80,11 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
-	log.Debug("starting job")
+	log.Debug("starting job with configuration",
+		"requestedCPU", maxCPU,
+		"requestedMemory", maxMemory,
+		"requestedIO", maxIOBPS,
+		"validateCommands", w.globalConfig.Worker.ValidateCommands)
 
 	// Early context check
 	select {
@@ -130,11 +145,87 @@ func (w *Worker) StartJob(ctx context.Context, command string, args []string, ma
 	return job, nil
 }
 
-// setupCgroupControllers sets up cgroup controllers for job isolation
+func (w *Worker) StopJob(ctx context.Context, jobID string) error {
+	log := w.logger.WithField("jobID", jobID)
+	log.Debug("stopping job")
+
+	job, exists := w.store.GetJob(jobID)
+	if !exists {
+		return fmt.Errorf("job not found: %s", jobID)
+	}
+
+	if !job.IsRunning() {
+		return fmt.Errorf("job is not running: %s (status: %s)", jobID, job.Status)
+	}
+
+	// Create cleanup request
+	cleanupReq := &process.CleanupRequest{
+		JobID:           jobID,
+		PID:             job.Pid,
+		CgroupPath:      job.CgroupPath,
+		ForceKill:       false,
+		GracefulTimeout: w.config.GracefulShutdownTimeout,
+	}
+
+	// Perform process cleanup
+	result, err := w.processManager.CleanupProcess(ctx, cleanupReq)
+	if err != nil {
+		return fmt.Errorf("process cleanup failed: %w", err)
+	}
+
+	// Update job status
+	w.updateJobStatus(job, result)
+
+	// Cleanup cgroup
+	w.cgroup.CleanupCgroup(jobID)
+
+	log.Debug("job stopped successfully", "method", result.Method)
+	return nil
+}
+
+// Helper methods (keeping existing implementations)
+func (w *Worker) getNextJobID() string {
+	nextID := atomic.AddInt64(&jobCounter, 1)
+	return fmt.Sprintf("%d", nextID)
+}
+
+func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
+	// Apply defaults from configuration
+	if maxCPU <= 0 {
+		maxCPU = w.globalConfig.Worker.DefaultCPULimit
+	}
+	if maxMemory <= 0 {
+		maxMemory = w.globalConfig.Worker.DefaultMemoryLimit
+	}
+	if maxIOBPS <= 0 {
+		maxIOBPS = w.globalConfig.Worker.DefaultIOLimit
+	}
+
+	w.logger.Debug("job resource limits applied",
+		"jobID", jobID,
+		"maxCPU", maxCPU,
+		"maxMemory", maxMemory,
+		"maxIOBPS", maxIOBPS,
+		"source", "client-specified or defaults")
+
+	return &domain.Job{
+		Id:      jobID,
+		Command: resolvedCommand,
+		Args:    append([]string(nil), args...),
+		Limits: domain.ResourceLimits{
+			MaxCPU:    maxCPU,
+			MaxMemory: maxMemory,
+			MaxIOBPS:  maxIOBPS,
+		},
+		Status:     domain.StatusInitializing,
+		CgroupPath: w.config.BuildCgroupPath(jobID),
+		StartTime:  time.Now(),
+	}
+}
+
 func (w *Worker) setupCgroupControllers() error {
 	w.logger.Debug("setting up cgroup controllers for job isolation")
 
-	// This will move the worker process to a subgroup and enable controllers
 	if err := w.cgroup.EnsureControllers(); err != nil {
 		return fmt.Errorf("failed to ensure controllers: %w", err)
 	}
@@ -173,13 +264,6 @@ func (w *Worker) startProcessSingleBinary(ctx context.Context, job *domain.Job) 
 	result, err := w.processManager.LaunchProcess(ctx, launchConfig)
 	if err != nil {
 		return nil, err
-	}
-
-	// Setup user namespace mappings
-	if e := w.jobIsolation.SetupUserNamespace(int(result.PID)); e != nil {
-		// Kill the process if namespace setup fails
-		w.processManager.KillProcess(result.PID, syscall.SIGKILL)
-		return nil, fmt.Errorf("user namespace setup failed: %w", e)
 	}
 
 	// Move process to cgroup
@@ -226,120 +310,6 @@ func (w *Worker) addProcessToCgroup(cgroupPath string, pid int32) error {
 	procsFile := filepath.Join(cgroupPath, "cgroup.procs")
 	pidBytes := []byte(fmt.Sprintf("%d", pid))
 	return w.platform.WriteFile(procsFile, pidBytes, 0644)
-}
-
-// Rest of the methods remain the same...
-func (w *Worker) validatePlatformSupport() error {
-	// Get platform info
-	info := w.platform.GetInfo()
-
-	if info.OS != "linux" {
-		return fmt.Errorf("Linux worker requires Linux platform, got %s", info.OS)
-	}
-
-	if !info.SupportsCgroups {
-		return fmt.Errorf("cgroups support required but not available")
-	}
-
-	if !info.SupportsNamespaces {
-		return fmt.Errorf("namespace support required but not available")
-	}
-
-	// Validate platform requirements
-	if err := w.platform.ValidateRequirements(); err != nil {
-		return fmt.Errorf("platform requirements validation failed: %w", err)
-	}
-
-	// Validate job isolation requirements
-	if err := w.jobIsolation.ValidateIsolationSupport(); err != nil {
-		return fmt.Errorf("job isolation validation failed, disabling isolation: %w", err)
-	}
-
-	w.logger.Debug("platform support validated",
-		"os", info.OS,
-		"arch", info.Architecture,
-		"cgroups", info.SupportsCgroups,
-		"namespaces", info.SupportsNamespaces)
-
-	return nil
-}
-
-func (w *Worker) StopJob(ctx context.Context, jobID string) error {
-	log := w.logger.WithField("jobID", jobID)
-	log.Debug("stopping job")
-
-	job, exists := w.store.GetJob(jobID)
-	if !exists {
-		return fmt.Errorf("job not found: %s", jobID)
-	}
-
-	if !job.IsRunning() {
-		return fmt.Errorf("job is not running: %s (status: %s)", jobID, job.Status)
-	}
-
-	// Create cleanup request
-	cleanupReq := &process.CleanupRequest{
-		JobID:           jobID,
-		PID:             job.Pid,
-		CgroupPath:      job.CgroupPath,
-		ForceKill:       false,
-		GracefulTimeout: w.config.GracefulShutdownTimeout,
-	}
-
-	// Perform process cleanup
-	result, err := w.processManager.CleanupProcess(ctx, cleanupReq)
-	if err != nil {
-		return fmt.Errorf("process cleanup failed: %w", err)
-	}
-
-	// Update job status
-	w.updateJobStatus(job, result)
-
-	// Cleanup cgroup
-	w.cgroup.CleanupCgroup(jobID)
-
-	log.Debug("job stopped successfully", "method", result.Method)
-	return nil
-}
-
-// Helper methods (keeping existing implementations)
-func (w *Worker) getNextJobID() string {
-	nextID := atomic.AddInt64(&jobCounter, 1)
-	return fmt.Sprintf("%d", nextID)
-}
-
-func (w *Worker) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
-	// Apply defaults
-	if maxCPU <= 0 {
-		maxCPU = 100
-	}
-	if maxMemory <= 0 {
-		maxMemory = 512
-	}
-	if maxIOBPS <= 0 {
-		maxIOBPS = 0
-	}
-
-	w.logger.Debug("job resource limits applied",
-		"jobID", jobID,
-		"maxCPU", maxCPU,
-		"maxMemory", maxMemory,
-		"maxIOBPS", maxIOBPS,
-		"source", "client-specified or defaults")
-
-	return &domain.Job{
-		Id:      jobID,
-		Command: resolvedCommand,
-		Args:    append([]string(nil), args...),
-		Limits: domain.ResourceLimits{
-			MaxCPU:    maxCPU,
-			MaxMemory: maxMemory,
-			MaxIOBPS:  maxIOBPS,
-		},
-		Status:     domain.StatusInitializing,
-		CgroupPath: w.config.BuildCgroupPath(jobID),
-		StartTime:  time.Now(),
-	}
 }
 
 func (w *Worker) updateJobAsRunning(job *domain.Job, processCmd platform.Command) {

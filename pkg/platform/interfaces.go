@@ -15,7 +15,7 @@ type Platform interface {
 	SyscallOperations
 	CommandFactory
 	ExecOperations
-	PlatformCapabilities
+	Capabilities
 }
 
 // OSOperations defines file system and OS-level operations
@@ -92,21 +92,13 @@ type ExecOperations interface {
 	LookPath(file string) (string, error)
 }
 
-// PlatformInfo provides information about the current platform
-type PlatformInfo struct {
+// Info provides information about the current platform
+type Info struct {
 	OS           string
 	Architecture string
-
-	// Feature support flags
-	SupportsNamespaces    bool
-	SupportsCgroups       bool
-	SupportsNetworkNS     bool
-	SupportsMountNS       bool
-	SupportsResourceLimit bool
 }
 
-// PlatformCapabilities defines what the platform supports
-type PlatformCapabilities interface {
-	GetInfo() *PlatformInfo
-	ValidateRequirements() error
+// Capabilities defines what the platform supports
+type Capabilities interface {
+	GetInfo() *Info
 }

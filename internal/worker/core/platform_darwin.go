@@ -5,41 +5,37 @@ package core
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"worker/internal/worker/core/interfaces"
 	"worker/internal/worker/domain"
 	"worker/internal/worker/state"
+	"worker/pkg/config"
 	"worker/pkg/logger"
 )
 
 // darwinWorker provides a basic implementation for macOS development
 type darwinWorker struct {
-	store      state.Store
-	jobCounter int64
-	logger     *logger.Logger
+	logger *logger.Logger
+	config *config.Config
 }
 
-// NewLinuxWorker creates a basic macOS worker for development
-func NewLinuxWorker(store state.Store) interfaces.Worker {
+// NewWorker creates a Darwin worker for development (SAME FUNCTION NAME as Linux)
+func NewWorker(store state.Store, cfg *config.Config) interfaces.Worker {
 	return &darwinWorker{
-		store:  store,
 		logger: logger.New().WithField("component", "darwin-worker"),
+		config: cfg,
 	}
 }
 
 // StartJob provides basic job execution on macOS (for development/testing)
 func (w *darwinWorker) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
-	panic("implement me")
+	w.logger.Warn("Darwin worker has limited functionality - jobs will not be isolated")
+	return nil, fmt.Errorf("Darwin worker not fully implemented - use Linux for production")
 }
 
 // StopJob stops a job on macOS (basic implementation)
 func (w *darwinWorker) StopJob(ctx context.Context, jobId string) error {
-	panic("implement me")
-}
-
-func (w *darwinWorker) getNextJobID() string {
-	nextID := atomic.AddInt64(&w.jobCounter, 1)
-	return fmt.Sprintf("darwin-%d", nextID)
+	w.logger.Warn("Darwin worker stop job called")
+	return fmt.Errorf("Darwin worker not fully implemented")
 }
 
 // Ensure darwinWorker implements interfaces

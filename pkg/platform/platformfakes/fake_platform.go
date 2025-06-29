@@ -71,15 +71,15 @@ type FakePlatform struct {
 	exitArgsForCall []struct {
 		arg1 int
 	}
-	GetInfoStub        func() *platform.PlatformInfo
+	GetInfoStub        func() *platform.Info
 	getInfoMutex       sync.RWMutex
 	getInfoArgsForCall []struct {
 	}
 	getInfoReturns struct {
-		result1 *platform.PlatformInfo
+		result1 *platform.Info
 	}
 	getInfoReturnsOnCall map[int]struct {
-		result1 *platform.PlatformInfo
+		result1 *platform.Info
 	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
@@ -224,16 +224,6 @@ type FakePlatform struct {
 		result1 error
 	}
 	unmountReturnsOnCall map[int]struct {
-		result1 error
-	}
-	ValidateRequirementsStub        func() error
-	validateRequirementsMutex       sync.RWMutex
-	validateRequirementsArgsForCall []struct {
-	}
-	validateRequirementsReturns struct {
-		result1 error
-	}
-	validateRequirementsReturnsOnCall map[int]struct {
 		result1 error
 	}
 	WriteFileStub        func(string, []byte, os.FileMode) error
@@ -582,7 +572,7 @@ func (fake *FakePlatform) ExitArgsForCall(i int) int {
 	return argsForCall.arg1
 }
 
-func (fake *FakePlatform) GetInfo() *platform.PlatformInfo {
+func (fake *FakePlatform) GetInfo() *platform.Info {
 	fake.getInfoMutex.Lock()
 	ret, specificReturn := fake.getInfoReturnsOnCall[len(fake.getInfoArgsForCall)]
 	fake.getInfoArgsForCall = append(fake.getInfoArgsForCall, struct {
@@ -606,32 +596,32 @@ func (fake *FakePlatform) GetInfoCallCount() int {
 	return len(fake.getInfoArgsForCall)
 }
 
-func (fake *FakePlatform) GetInfoCalls(stub func() *platform.PlatformInfo) {
+func (fake *FakePlatform) GetInfoCalls(stub func() *platform.Info) {
 	fake.getInfoMutex.Lock()
 	defer fake.getInfoMutex.Unlock()
 	fake.GetInfoStub = stub
 }
 
-func (fake *FakePlatform) GetInfoReturns(result1 *platform.PlatformInfo) {
+func (fake *FakePlatform) GetInfoReturns(result1 *platform.Info) {
 	fake.getInfoMutex.Lock()
 	defer fake.getInfoMutex.Unlock()
 	fake.GetInfoStub = nil
 	fake.getInfoReturns = struct {
-		result1 *platform.PlatformInfo
+		result1 *platform.Info
 	}{result1}
 }
 
-func (fake *FakePlatform) GetInfoReturnsOnCall(i int, result1 *platform.PlatformInfo) {
+func (fake *FakePlatform) GetInfoReturnsOnCall(i int, result1 *platform.Info) {
 	fake.getInfoMutex.Lock()
 	defer fake.getInfoMutex.Unlock()
 	fake.GetInfoStub = nil
 	if fake.getInfoReturnsOnCall == nil {
 		fake.getInfoReturnsOnCall = make(map[int]struct {
-			result1 *platform.PlatformInfo
+			result1 *platform.Info
 		})
 	}
 	fake.getInfoReturnsOnCall[i] = struct {
-		result1 *platform.PlatformInfo
+		result1 *platform.Info
 	}{result1}
 }
 
@@ -1376,59 +1366,6 @@ func (fake *FakePlatform) UnmountReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakePlatform) ValidateRequirements() error {
-	fake.validateRequirementsMutex.Lock()
-	ret, specificReturn := fake.validateRequirementsReturnsOnCall[len(fake.validateRequirementsArgsForCall)]
-	fake.validateRequirementsArgsForCall = append(fake.validateRequirementsArgsForCall, struct {
-	}{})
-	stub := fake.ValidateRequirementsStub
-	fakeReturns := fake.validateRequirementsReturns
-	fake.recordInvocation("ValidateRequirements", []interface{}{})
-	fake.validateRequirementsMutex.Unlock()
-	if stub != nil {
-		return stub()
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePlatform) ValidateRequirementsCallCount() int {
-	fake.validateRequirementsMutex.RLock()
-	defer fake.validateRequirementsMutex.RUnlock()
-	return len(fake.validateRequirementsArgsForCall)
-}
-
-func (fake *FakePlatform) ValidateRequirementsCalls(stub func() error) {
-	fake.validateRequirementsMutex.Lock()
-	defer fake.validateRequirementsMutex.Unlock()
-	fake.ValidateRequirementsStub = stub
-}
-
-func (fake *FakePlatform) ValidateRequirementsReturns(result1 error) {
-	fake.validateRequirementsMutex.Lock()
-	defer fake.validateRequirementsMutex.Unlock()
-	fake.ValidateRequirementsStub = nil
-	fake.validateRequirementsReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePlatform) ValidateRequirementsReturnsOnCall(i int, result1 error) {
-	fake.validateRequirementsMutex.Lock()
-	defer fake.validateRequirementsMutex.Unlock()
-	fake.ValidateRequirementsStub = nil
-	if fake.validateRequirementsReturnsOnCall == nil {
-		fake.validateRequirementsReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.validateRequirementsReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
 func (fake *FakePlatform) WriteFile(arg1 string, arg2 []byte, arg3 os.FileMode) error {
 	var arg2Copy []byte
 	if arg2 != nil {
@@ -1538,8 +1475,6 @@ func (fake *FakePlatform) Invocations() map[string][][]interface{} {
 	defer fake.symlinkMutex.RUnlock()
 	fake.unmountMutex.RLock()
 	defer fake.unmountMutex.RUnlock()
-	fake.validateRequirementsMutex.RLock()
-	defer fake.validateRequirementsMutex.RUnlock()
 	fake.writeFileMutex.RLock()
 	defer fake.writeFileMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}

@@ -19,17 +19,12 @@ func (dp *DarwinPlatform) Unmount(target string, flags int) error {
 	return DefaultUnmount("darwin", target, flags)
 }
 
-func (dp *DarwinPlatform) GetInfo() *PlatformInfo {
+func (dp *DarwinPlatform) GetInfo() *Info {
 	// Return Darwin platform info even when not on Darwin
 	// This is useful for cross-platform information queries
-	return &PlatformInfo{
-		OS:                    "darwin",
-		Architecture:          "unknown", // Can't determine target arch
-		SupportsNamespaces:    false,     // Darwin limitations
-		SupportsCgroups:       false,
-		SupportsNetworkNS:     false,
-		SupportsMountNS:       false,
-		SupportsResourceLimit: false,
+	return &Info{
+		OS:           "darwin",
+		Architecture: "unknown", // Can't determine target arch
 	}
 }
 

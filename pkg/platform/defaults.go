@@ -20,15 +20,10 @@ func DefaultUnmount(platformName string, target string, flags int) error {
 }
 
 // DefaultGetInfo provides default platform information
-func DefaultGetInfo(platformName string) *PlatformInfo {
-	return &PlatformInfo{
-		OS:                    platformName,
-		Architecture:          runtime.GOARCH,
-		SupportsNamespaces:    false,
-		SupportsCgroups:       false,
-		SupportsNetworkNS:     false,
-		SupportsMountNS:       false,
-		SupportsResourceLimit: false,
+func DefaultGetInfo(platformName string) *Info {
+	return &Info{
+		OS:           platformName,
+		Architecture: runtime.GOARCH,
 	}
 }
 

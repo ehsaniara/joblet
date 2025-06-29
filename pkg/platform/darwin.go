@@ -30,15 +30,10 @@ func (dp *DarwinPlatform) CreateProcessGroup() *syscall.SysProcAttr {
 }
 
 // GetInfo returns Darwin platform information (override default)
-func (dp *DarwinPlatform) GetInfo() *PlatformInfo {
-	return &PlatformInfo{
-		OS:                    "darwin",
-		Architecture:          runtime.GOARCH,
-		SupportsNamespaces:    false,
-		SupportsCgroups:       false,
-		SupportsNetworkNS:     false,
-		SupportsMountNS:       false,
-		SupportsResourceLimit: false,
+func (dp *DarwinPlatform) GetInfo() *Info {
+	return &Info{
+		OS:           "darwin",
+		Architecture: runtime.GOARCH,
 	}
 }
 
