@@ -47,7 +47,7 @@ fi
 cp ./etc/worker.service "$BUILD_DIR/etc/systemd/system/"
 
 # Copy certificate generation script
-cp ./etc/cert_gen.sh "$BUILD_DIR/usr/local/bin/"
+cp ./etc/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
 
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
