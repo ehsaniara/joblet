@@ -1,0 +1,283 @@
+name: Build and Release Worker
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+  PACKAGE_NAME: 'worker'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run linting
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+
+  build-binary:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build worker binary
+        run: |
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
+            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
+            -o worker-${{ matrix.arch }} \
+            ./cmd/worker
+
+      - name: Build CLI binary
+        run: |
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
+            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
+            -o worker-cli-${{ matrix.arch }} \
+            ./cmd/cli
+
+      - name: Upload worker binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: worker-binary-${{ matrix.arch }}
+          path: worker-${{ matrix.arch }}
+
+      - name: Upload CLI binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: worker-cli-binary-${{ matrix.arch }}
+          path: worker-cli-${{ matrix.arch }}
+
+  build-deb-package:
+    needs: [test, build-binary]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download worker binary
+        uses: actions/download-artifact@v3
+        with:
+          name: worker-binary-${{ matrix.arch }}
+          path: ./
+
+      - name: Download CLI binary
+        uses: actions/download-artifact@v3
+        with:
+          name: worker-cli-binary-${{ matrix.arch }}
+          path: ./
+
+      - name: Make binaries executable
+        run: |
+          chmod +x worker-${{ matrix.arch }}
+          chmod +x worker-cli-${{ matrix.arch }}
+          mv worker-${{ matrix.arch }} worker
+          mv worker-cli-${{ matrix.arch }} worker-cli
+
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev build-essential devscripts
+
+      - name: Set version from previous job
+        run: |
+          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Create Debian package structure
+        run: |
+          chmod +x scripts/build-deb.sh
+          ./scripts/build-deb.sh ${{ matrix.arch }} ${{ env.VERSION }}
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v3
+        with:
+          name: debian-package-${{ matrix.arch }}
+          path: "*.deb"
+
+      - name: Test package installation (amd64 only)
+        if: matrix.arch == 'amd64'
+        run: |
+          # Test package can be installed (dry run)
+          sudo dpkg --dry-run -i *.deb
+          
+          # Check package info
+          dpkg-deb -I *.deb
+          dpkg-deb -c *.deb
+
+  security-scan:
+    needs: build-deb-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Debian package (amd64)
+        uses: actions/download-artifact@v3
+        with:
+          name: debian-package-amd64
+          path: ./
+
+      - name: Security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  release:
+    needs: [build-deb-package, security-scan]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all packages
+        uses: actions/download-artifact@v3
+        with:
+          path: packages/
+
+      - name: Organize release artifacts
+        run: |
+          mkdir -p release/
+          find packages/ -name "*.deb" -exec cp {} release/ \;
+          ls -la release/
+
+      - name: Generate checksums
+        run: |
+          cd release/
+          sha256sum *.deb > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/*.deb
+            release/checksums.txt
+          body: |
+            ## Worker ${{ github.ref_name }}
+            
+            ### Installation
+            ```bash
+            # Download the appropriate package for your architecture
+            wget https://github.com/ehsaniara/worker/releases/download/${{ github.ref_name }}/worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            
+            # Install the package
+            sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            
+            # Start the service
+            sudo systemctl start worker
+            sudo systemctl enable worker
+            ```
+            
+            ### Verification
+            ```bash
+            # Verify checksums
+            sha256sum -c checksums.txt
+            
+            # Check service status
+            sudo systemctl status worker
+            ```
+            
+            ### What's Changed
+            - Full changelog available in commit history
+
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-to-repository:
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, 'rc')
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v3
+        with:
+          path: packages/
+
+      - name: Setup APT repository (if you have one)
+        run: |
+          # This would push to your APT repository
+          # Example for packagecloud.io or similar service
+          echo "Would deploy to APT repository here"
+          # gem install package_cloud
+          # package_cloud push ehsaniara/worker-repo/ubuntu/focal packages/debian-package-amd64/*.deb
+
+  notify:
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify Slack on Success
+        if: needs.release.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "🎉 Worker ${{ github.ref_name }} has been released successfully!"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Failure
+        if: needs.release.result == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "❌ Worker release ${{ github.ref_name }} failed!"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

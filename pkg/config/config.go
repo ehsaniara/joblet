@@ -149,10 +149,12 @@ func LoadConfig() (*Config, string, error) {
 func loadFromFile(config *Config) (string, error) {
 	configPaths := []string{
 		os.Getenv("WORKER_CONFIG_PATH"), // Custom path from environment
-		"./config.yaml",                 // Current directory
-		"./config/config.yaml",          // Config subdirectory
-		"/etc/worker/config.yaml",       // System-wide
-		"/opt/worker/config.yaml",       // Installation directory
+		"./config/config.yml",           // Development - relative to project root
+		"./config.yml",                  // Development - current directory
+		"/opt/worker/config.yml",        // Production - installed location
+		"/etc/worker/config.yml",        // System-wide alternative
+		"./config/config.yaml",          // Fallback for old naming
+		"/opt/worker/config.yaml",       // Fallback for old naming
 	}
 
 	for _, path := range configPaths {

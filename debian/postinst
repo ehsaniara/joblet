@@ -1,0 +1,60 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        echo "Configuring worker service (root mode)..."
+
+        # No need to create worker user - running as root
+        # Set ownership and permissions for root
+        chown -R root:root /opt/worker
+        chmod 755 /opt/worker
+        chmod 755 /opt/worker/worker
+        chmod 644 /opt/worker/config.yml
+
+        # Make cert generation script executable
+        chmod +x /usr/local/bin/cert_gen.sh
+
+        # Make CLI executable and create symlink
+        chmod 755 /usr/bin/worker-cli
+        if [ ! -L /usr/bin/worker ]; then
+            ln -sf /usr/bin/worker-cli /usr/bin/worker
+        fi
+
+        # Generate certificates with proper root ownership
+        echo "Generating SSL certificates..."
+        /usr/local/bin/cert_gen.sh
+
+        # Ensure certificates have secure permissions (root only)
+        if [ -d /opt/worker/certs ]; then
+            chown -R root:root /opt/worker/certs
+            chmod 700 /opt/worker/certs
+            chmod 600 /opt/worker/certs/*-key.pem 2>/dev/null || true
+            chmod 644 /opt/worker/certs/*-cert.pem 2>/dev/null || true
+        fi
+
+        # Create necessary directories
+        mkdir -p /var/log/worker
+        chown root:root /var/log/worker
+        chmod 755 /var/log/worker
+
+        # Setup cgroup delegation
+        if [ -d /sys/fs/cgroup ]; then
+            echo "Setting up cgroup delegation..."
+            # Ensure worker.slice exists
+            mkdir -p /sys/fs/cgroup/worker.slice
+            echo "+cpu +memory +io +pids" > /sys/fs/cgroup/worker.slice/cgroup.subtree_control 2>/dev/null || true
+        fi
+
+        # Reload systemd and enable service
+        systemctl daemon-reload
+        systemctl enable worker.service
+
+        echo "✅ Worker service installed successfully (running as root)!"
+        echo "To start: sudo systemctl start worker"
+        echo "To check status: sudo systemctl status worker"
+        echo "CLI usage: worker --help"
+        ;;
+esac
+
+exit 0
