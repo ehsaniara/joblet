@@ -8,324 +8,447 @@
 
 ![worker-thum.png](docs/worker-thum.png)
 
-**Worker** is a high-performance distributed job execution system built in Go that provides secure remote command
-execution with comprehensive resource management and real-time monitoring capabilities. The system uses a sophisticated
-single-binary architecture with gRPC-based communication, mutual TLS authentication, and role-based authorization,
-allowing administrators to securely execute arbitrary commands on remote Linux systems while enforcing strict CPU,
-memory, and I/O bandwidth limits through Linux cgroups v2.
-
-> **Key Innovation**: Single binary with dual execution modes - the same binary acts as both the gRPC server and the job
-> initialization process, providing complete job isolation with PID, mount, IPC, and UTS namespaces while maintaining
-> host
-> networking for maximum compatibility and performance.
+**Worker** is a secure, high-performance job execution platform that lets you run commands remotely on Linux systems
+with comprehensive resource controls and real-time monitoring. Perfect for distributed computing, CI/CD pipelines, batch
+processing, and remote task execution.
 
 ## ✨ Key Features
 
-### 🎛️ **Advanced Resource Management**
+### 🚀 **Remote Job Execution**
 
-- **Linux Cgroups v2**: CPU, memory, and I/O bandwidth limiting
-- **Namespace Isolation**: PID, mount, IPC, and UTS isolation per job
-- **Host Networking**: Jobs use host network interface for maximum compatibility
-- **Resource Enforcement**: Hard limits with automatic cleanup
+- Execute any command or script on remote Linux systems
+- Real-time output streaming with live log monitoring
+- Comprehensive job lifecycle management (start, stop, monitor)
+- Support for long-running services and short-lived tasks
 
-### 📡 **Real-Time Operations**
+### 🛡️ **Enterprise Security**
 
-- **Live Log Streaming**: Real-time output streaming with buffering
-- **Job Lifecycle Management**: Create, monitor, stop, and cleanup jobs
-- **High-Performance gRPC**: Protocol buffer serialization with configurable limits
-- **Comprehensive Monitoring**: Job status tracking and resource usage monitoring
+- **Mutual TLS Authentication**: Certificate-based secure connections
+- **Role-Based Access Control**: Admin and Viewer roles with granular permissions
+- **Process Isolation**: Complete job isolation using Linux namespaces
+- **Secure by Default**: All communications encrypted, no plaintext protocols
 
-## 📖 Usage Examples
+### ⚡ **Resource Management**
 
-### Basic Job Management
+- **CPU Limiting**: Control CPU usage per job (percentage-based)
+- **Memory Control**: Set memory limits in MB with hard enforcement
+- **I/O Bandwidth**: Limit disk I/O operations per second
+- **Host Networking**: Jobs share host network for maximum compatibility
+
+### 🖥️ **Platform Support**
+
+- **Linux Server**: Full job isolation and resource management (production)
+- **macOS/Darwin Client**: CLI client support for remote job management
+
+### 📊 **Real-Time Monitoring**
+
+- Live job status tracking and updates
+- Streaming log output with buffering
+- Job history and execution statistics
+- Resource usage monitoring and alerts
+
+## 🚀 Quick Start
+
+### Installation
+
+**Linux Server (Required for job execution):**
 
 ```bash
-# Create simple jobs (all use host networking)
-./cli run echo "Hello, World!"
-./cli run python3 script.py
-./cli run bash -c "for i in {1..10}; do echo 'Processing $i'; sleep 1; done"
+# Download the latest release
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker_1.0.0_amd64.deb
 
-# List all jobs with status
-./cli list
+# Install the package
+sudo dpkg -i worker_1.0.0_amd64.deb
 
-# Get detailed job information
-./cli get <job-id>
+# Start the service
+sudo systemctl start worker
+sudo systemctl enable worker
+```
 
-# Stop a running job
-./cli stop <job-id>
+**macOS/Darwin Client (CLI only):**
 
-# Stream live job output
-./cli log <job-id>
+```bash
+# Download CLI binary for macOS
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-darwin-amd64.tar.gz
+tar -xzf worker-cli-darwin-amd64.tar.gz
+chmod +x worker-cli
+sudo mv worker-cli /usr/local/bin/
+
+# Connect to remote Linux server
+worker-cli --server your-linux-server.com:50051 run echo "Hello from macOS!"
+```
+
+### Initial Setup
+
+```bash
+# Generate SSL certificates (one-time setup)
+sudo /usr/local/bin/certs_gen.sh
+
+# Check service status
+sudo systemctl status worker
+
+# Copy client certificates for CLI access
+mkdir -p ~/.worker
+sudo cp /opt/worker/certs/admin-client-cert.pem ~/.worker/client-cert.pem
+sudo cp /opt/worker/certs/admin-client-key.pem ~/.worker/client-key.pem
+sudo cp /opt/worker/certs/ca-cert.pem ~/.worker/ca-cert.pem
+```
+
+### First Job
+
+```bash
+# Run your first job
+worker-cli --server localhost:50051 run echo "Hello, Worker!"
+
+# Check job status
+worker-cli list
+
+# Stream job logs
+worker-cli log <job-id>
+```
+
+## 💻 Usage Examples
+
+### Basic Commands
+
+```bash
+# Simple command execution
+worker-cli run echo "Hello World"
+worker-cli run ls -la /tmp
+worker-cli run python3 --version
+
+# Script execution
+worker-cli run bash -c "for i in {1..5}; do echo 'Step $i'; sleep 1; done"
+worker-cli run python3 script.py --input data.csv
+
+# Package installation and usage
+worker-cli run apt update
+worker-cli run pip install requests
 ```
 
 ### Resource-Limited Jobs
 
 ```bash
-# Limit CPU usage to 50% of one core
-./cli run --max-cpu=50 python3 heavy_computation.py
+# Limit CPU to 50% of one core
+worker-cli run --max-cpu=50 stress --cpu 1 --timeout 60s
 
-# Limit memory usage to 512 MB
-./cli run --max-memory=512 java -jar memory-intensive-app.jar
+# Limit memory to 512MB
+worker-cli run --max-memory=512 python3 memory_intensive_script.py
 
-# Limit I/O bandwidth (bytes per second)
-./cli run --max-iobps=1000000 dd if=/dev/zero of=/tmp/test bs=1M count=100
+# Limit I/O bandwidth
+worker-cli run --max-iobps=1000000 dd if=/dev/zero of=/tmp/test bs=1M count=100
 
-# Combine multiple resource limits
-./cli run --max-cpu=25 --max-memory=256 --max-iobps=1000000 intensive-task.sh
+# Combined limits
+worker-cli run --max-cpu=25 --max-memory=256 --max-iobps=500000 heavy_task.sh
 ```
 
-### Network-Enabled Jobs
-
-All jobs share the host network interface and can communicate with external services:
+### Long-Running Services
 
 ```bash
-# Start a web server (accessible on host port 8080)
-./cli run --max-cpu=100 --max-memory=1024 python3 -c "
-import socket
-import time
-s = socket.socket()
-s.bind(('0.0.0.0', 8080))
-s.listen(5)
-print('Server listening on host port 8080')
-while True:
-    print('Server running...')
-    time.sleep(10)
-"
+# Web server (accessible on host network)
+worker-cli run --max-memory=1024 python3 -m http.server 8080
 
-# Access external APIs
-./cli run curl -s https://api.github.com/users/octocat
+# Database service
+worker-cli run --max-cpu=100 --max-memory=2048 mysqld --datadir=/var/lib/mysql
 
-# Database connections
-./cli run mysql -h remote-db.com -u user -p database
+# Background processing
+worker-cli run --max-cpu=50 celery worker -A myapp.celery
 ```
 
-## 🏗️ Architecture
+### Job Management
 
-### Process Flow
+```bash
+# List all jobs with status
+worker-cli list
 
-1. **Server Mode**: Handles gRPC requests, manages job lifecycle
-2. **Job Creation**: Server launches itself in init mode for each job
-3. **Init Mode**: Sets up isolation, executes user command
-4. **Isolation**: PID, mount, IPC, UTS namespaces (host networking)
-5. **Monitoring**: Server monitors job processes and streams output
-6. **Cleanup**: Automatic resource cleanup when jobs complete
+# Get detailed job information
+worker-cli status <job-id>
 
-### Core Components
+# Stop a running job
+worker-cli stop <job-id>
 
-**Execution Modes (`internal/modes/`)**
+# Stream live job output
+worker-cli log -f <job-id>
 
-- **Server Mode**: gRPC server, job management, authentication
-- **Init Mode**: Job isolation setup, command execution, namespace management
+# Monitor job from start
+worker-cli run python3 long_script.py && worker-cli log -f <job-id>
+```
 
-**Platform Abstraction (`pkg/platform/`)**
+## 🔧 Configuration
 
-- Cross-platform compatibility layer
-- Linux-specific implementations for namespaces and cgroups
-- Fallback implementations for development
+### Server Configuration
 
-**Resource Management (`internal/worker/core/linux/resource/`)**
+Edit `/opt/worker/config.yml` to customize server behavior:
 
-- Linux cgroups v2 integration
-- CPU, memory, and I/O bandwidth limiting
-- Automatic resource cleanup
+```yaml
+server:
+  address: "0.0.0.0"    # Listen on all interfaces
+  port: 50051           # gRPC port
 
-**Process Management (`internal/worker/core/linux/process/`)**
+worker:
+  defaultCpuLimit: 100        # Default CPU limit (%)
+  defaultMemoryLimit: 512     # Default memory limit (MB)
+  maxConcurrentJobs: 100      # Max simultaneous jobs
+  jobTimeout: "1h"            # Maximum job runtime
 
-- Process lifecycle management
-- Namespace setup and isolation
-- Signal handling and cleanup
+security:
+  minTlsVersion: "1.3"        # Minimum TLS version
 
-## 🔐 Security & Authentication
+cgroup:
+  enableControllers: [ "cpu", "memory", "io", "pids" ]
+
+logging:
+  level: "INFO"               # DEBUG, INFO, WARN, ERROR
+  format: "text"              # text or json
+```
+
+### Client Configuration
+
+Create `~/.worker/config` for CLI defaults:
+
+```bash
+# Default server connection
+export WORKER_SERVER="your-server.com:50051"
+export WORKER_CERT_PATH="~/.worker/client-cert.pem"
+export WORKER_KEY_PATH="~/.worker/client-key.pem"
+export WORKER_CA_PATH="~/.worker/ca-cert.pem"
+```
+
+## 🔐 Security & Access Control
 
 ### Certificate-Based Authentication
 
-The system implements mutual TLS with role-based access control:
+Worker uses mutual TLS with role-based access:
 
-| Role       | Run Jobs | Status Jobs | Stop Jobs | Logs/Stream | Certificate OU |
-|------------|----------|-------------|-----------|-------------|----------------|
-| **Admin**  | ✅        | ✅           | ✅         | ✅           | `OU=admin`     |
-| **Viewer** | ❌        | ✅           | ❌         | ✅           | `OU=viewer`    |
+| Role   | Permissions                     | Certificate OU |
+|--------|---------------------------------|----------------|
+| Admin  | Full access to all operations   | `OU=admin`     |
+| Viewer | Read-only access (status, logs) | `OU=viewer`    |
 
-### Passwordless Certificate Management
-
-```bash
-# Generate all certificates (no password prompts)
-make certs
-
-# Setup admin CLI certificates
-make setup-cli
-
-# Setup viewer certificates
-bash scripts/setup_cli_certs.sh --type viewer
-
-# Copy certificates from remote server
-bash scripts/setup_cli_certs.sh --remote --server your-server.com
-```
-
-### Process Isolation
-
-Jobs run in isolated namespaces with the following characteristics:
-
-- **PID Namespace**: Jobs see only their own process tree
-- **Mount Namespace**: Isolated filesystem view with `/proc` remounting
-- **IPC Namespace**: Separate inter-process communication
-- **UTS Namespace**: Isolated hostname and domain name
-- **Network**: Uses host networking (no network namespace isolation)
-- **Cgroup Namespace**: Isolated resource management view
-
-## ⚙️ Configuration
-
-### Environment Variables
+### Setting Up Access Roles
 
 ```bash
-# Server Configuration
-export WORKER_MODE="server"              # Execution mode (server|init)
-export LOG_LEVEL="INFO"                  # DEBUG, INFO, WARN, ERROR
+# Generate certificates with specific roles
+sudo /usr/local/bin/certs_gen.sh  # Creates both admin and viewer certs
 
-# Default Resource Limits
-export WORKER_DEFAULT_CPU=100            # 100% of one CPU core
-export WORKER_DEFAULT_MEMORY=512         # 512 MB memory limit
-export WORKER_DEFAULT_IO=0               # Unlimited I/O (0 = disabled)
+# Setup admin access
+cp /opt/worker/certs/admin-client-cert.pem ~/.worker/admin-cert.pem
+cp /opt/worker/certs/admin-client-key.pem ~/.worker/admin-key.pem
 
-# gRPC Configuration
-export MAX_RECV_MSG_SIZE=4194304         # 4MB max receive message size
-export MAX_SEND_MSG_SIZE=4194304         # 4MB max send message size
+# Setup viewer access
+cp /opt/worker/certs/viewer-client-cert.pem ~/.worker/viewer-cert.pem
+cp /opt/worker/certs/viewer-client-key.pem ~/.worker/viewer-key.pem
+
+# Use specific role
+worker-cli --cert ~/.worker/admin-cert.pem --key ~/.worker/admin-key.pem run command
+worker-cli --cert ~/.worker/viewer-cert.pem --key ~/.worker/viewer-key.pem list
 ```
 
-### Systemd Service Configuration
+### Job Isolation
 
-The worker service runs with proper cgroup delegation:
+Every job runs in an isolated environment with:
 
-```ini
-[Service]
-ExecStart=/opt/worker/worker
-User=root
-Delegate=yes
-DelegateControllers=cpu memory io pids
-Environment="WORKER_MODE=server"
+- **Separate Process Tree**: Jobs can't see other system processes
+- **Isolated Filesystem**: Jobs have their own view of `/proc` and mounts
+- **Resource Limits**: CPU, memory, and I/O are strictly controlled
+- **Host Network Access**: Jobs can access network services normally
+
+## 📊 Monitoring & Troubleshooting
+
+### Service Health
+
+```bash
+# Check service status
+sudo systemctl status worker
+
+# View service logs
+sudo journalctl -u worker -f
+
+# Check listening ports
+sudo netstat -tlnp | grep :50051
+
+# Verify certificates
+openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text
 ```
 
-## 📋 API Reference
+### Job Monitoring
 
-### gRPC Service
+```bash
+# Real-time job monitoring
+worker-cli list                    # Show all jobs
+worker-cli status <job-id>         # Detailed job info
+worker-cli log -f <job-id>        # Follow job output
 
-```protobuf
-service JobService {
-  rpc RunJob(RunJobReq) returns (RunJobRes);
-  rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
-  rpc StopJob(StopJobReq) returns (StopJobRes);
-  rpc ListJobs(EmptyRequest) returns (Jobs);
-  rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
-}
+# Resource usage
+worker-cli status <job-id> | grep -E "(CPU|Memory|Status)"
 ```
 
-### Job Resource Specification
+### Common Issues
 
-```protobuf
-message RunJobReq {
-  string command = 1;                    // Command to execute
-  repeated string args = 2;              // Command arguments
-  int32 maxCPU = 3;                     // CPU limit (percentage)
-  int32 maxMemory = 4;                  // Memory limit (MB)
-  int32 maxIOBPS = 5;                   // I/O limit (bytes/second)
-}
+**Connection Refused**
+
+```bash
+# Check if service is running
+sudo systemctl status worker
+
+# Verify port is open
+sudo netstat -tlnp | grep :50051
+
+# Check firewall
+sudo ufw status
 ```
 
-### CLI Commands
+**Certificate Errors**
+
+```bash
+# Regenerate certificates
+sudo /usr/local/bin/certs_gen.sh
+
+# Verify certificate permissions
+ls -la ~/.worker/
+```
+
+**Job Failures**
+
+```bash
+# Check job logs
+worker-cli log <job-id>
+
+# Check system resources
+df -h                    # Disk space
+free -h                  # Memory usage
+sudo systemctl status worker
+```
+
+## 🌐 Remote Access
+
+### Connecting from Different Platforms
+
+**Linux to Linux:**
+
+```bash
+# Connect to remote Worker instance
+worker-cli --server remote-host.com:50051 \
+          --cert ~/.worker/client-cert.pem \
+          --key ~/.worker/client-key.pem \
+          run echo "Remote execution"
+```
+
+**macOS to Linux Server:**
+
+```bash
+# macOS client connecting to Linux server
+worker-cli --server linux-server.com:50051 \
+          --cert ~/.worker/client-cert.pem \
+          --key ~/.worker/client-key.pem \
+          run python3 script.py
+
+# Note: Job execution happens on the Linux server, not locally on macOS
+```
+
+**Windows Client (via WSL):**
+
+```bash
+# Install Worker CLI in WSL2 Ubuntu
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-linux-amd64.tar.gz
+tar -xzf worker-cli-linux-amd64.tar.gz
+chmod +x worker-cli
+sudo mv worker-cli /usr/local/bin/
+```
+
+### Permanent Remote Setup
+
+```bash
+# Set up remote access permanently (any client platform)
+echo 'export WORKER_SERVER="remote-host.com:50051"' >> ~/.bashrc
+echo 'export WORKER_CERT_PATH="~/.worker/client-cert.pem"' >> ~/.bashrc
+echo 'export WORKER_KEY_PATH="~/.worker/client-key.pem"' >> ~/.bashrc
+```
+
+### Firewall Configuration
+
+```bash
+# Open Worker port
+sudo ufw allow 50051/tcp
+
+# For specific IP ranges
+sudo ufw allow from 192.168.1.0/24 to any port 50051
+```
+
+## 📋 CLI Reference
+
+### Command Syntax
+
+```bash
+worker-cli [global-options] <command> [command-options] [arguments]
+```
+
+### Global Options
+
+```bash
+--server=HOST:PORT          # Worker server address
+--cert=PATH                 # Client certificate file
+--key=PATH                  # Client private key file
+--ca=PATH                   # CA certificate file
+```
+
+### Commands
 
 ```bash
 # Job Management
-cli run [--max-cpu=N] [--max-memory=N] [--max-iobps=N] <command> [args...]
-cli get <job-id>          # Get detailed job information
-cli list                  # List all jobs with status
-cli stop <job-id>         # Stop running job
-cli log <job-id>          # Stream real-time job output
+run [options] <command> [args...]    # Execute a new job
+status <job-id>                      # Get job status and details
+stop <job-id>                        # Stop a running job
+list                                 # List all jobs
+log [-f] <job-id>                   # Show/follow job logs
 
-# Connection Configuration
-cli --server=host:port    # Connect to specific server
+# Run Options
+--max-cpu=N                          # CPU limit (percentage)
+--max-memory=N                       # Memory limit (MB)
+--max-iobps=N                        # I/O bandwidth limit (bytes/sec)
 ```
 
-## 🎯 Performance
+## 💡 Use Cases
 
-### System Capabilities
-
-- **Concurrent Jobs**: Hundreds of simultaneous jobs with proper isolation
-- **Resource Enforcement**: Hard limits via cgroups v2
-- **Real-time Streaming**: Low-latency log streaming with buffering
-- **Memory Efficiency**: Minimal overhead per job (~2MB per isolated job)
-- **Network Performance**: Host networking for maximum throughput
-
-### Resource Defaults
-
-When resource limits are not specified:
-
-- **CPU**: 100% (one full core)
-- **Memory**: 512 MB
-- **I/O**: Unlimited
-- **Network**: Host networking (shared with system)
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how to get started:
-
-### Development Setup
+### CI/CD Pipelines
 
 ```bash
-# Clone and setup
-git clone https://github.com/ehsaniara/job-worker.git
-cd job-worker
-make setup-dev
-
-# Run tests
-make test
-
-# Test deployment
-make deploy-quick
+# Build and test
+worker-cli run git clone https://github.com/user/repo.git /tmp/build
+worker-cli run --max-cpu=200 --max-memory=4096 make -C /tmp/build test
+worker-cli run docker build -t myapp /tmp/build
 ```
 
-### Code Quality
-
-- Follow `gofmt` and `golint` standards
-- Comprehensive test coverage
-- Update documentation for new features
-- Ensure security best practices
-
-## 📊 Monitoring
-
-### Built-in Metrics
-
-- Job execution statistics
-- Resource usage tracking
-- System health monitoring
-- Performance metrics
-
-### Integration
+### Batch Processing
 
 ```bash
-# Service status
-systemctl status worker
-
-# Live logs
-journalctl -u worker -f
-
-# Job metrics
-./cli list  # Shows job counts and status
+# Data processing jobs
+worker-cli run --max-memory=8192 python3 process_large_dataset.py
+worker-cli run --max-cpu=50 parallel_processing_job.sh
 ```
+
+### Service Deployment
+
+```bash
+# Deploy and run services
+worker-cli run --max-memory=2048 docker run -d -p 8080:8080 myapp:latest
+worker-cli run --max-cpu=100 nginx -g "daemon off;"
+```
+
+### System Administration
+
+```bash
+# Remote system tasks
+worker-cli run apt update && apt upgrade -y
+worker-cli run systemctl restart apache2
+worker-cli run --max-memory=512 backup_script.sh
+```
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/ehsaniara/worker/issues)
+- **Development**: See [DEVELOPMENT.md](DEVELOPMENT.md) for contributing
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [gRPC](https://grpc.io/) - High-performance RPC framework
-- [Linux Cgroups v2](https://www.kernel.org/doc/Documentation/cgroup-v2.txt) - Resource isolation and management
-- [Cobra](https://github.com/spf13/cobra) - Modern CLI framework for Go
-- [Protocol Buffers](https://developers.google.com/protocol-buffers) - Language-neutral data serialization
-- [Linux Namespaces](https://man7.org/linux/man-pages/man7/namespaces.7.html) - Process isolation mechanisms
-
----
-
-<div align="center">
-  <sub>by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
-</div>
