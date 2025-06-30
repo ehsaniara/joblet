@@ -1,29 +1,18 @@
 #!/bin/bash
 set -e
 
-# Enable debug output in CI
-if [ "$CI" = "true" ]; then
-    set -x
-fi
-
 case "$1" in
     configure)
-        echo "Configuring worker service..."
+        echo "Configuring worker service (root mode)..."
 
-        # Create worker user if it doesn't exist
-        if ! id worker >/dev/null 2>&1; then
-            useradd --system --home /opt/worker --shell /bin/false worker
-            echo "Created worker user"
-        fi
-
-        # Set ownership and permissions
-        chown -R worker:worker /opt/worker
+        # Set ownership and permissions for root
+        chown -R root:root /opt/worker
         chmod 755 /opt/worker
         chmod 755 /opt/worker/worker
-        chmod 644 /opt/worker/config.yaml
+        chmod 644 /opt/worker/config.yml
 
-        # Make cert generation script executable
-        chmod +x /usr/local/bin/cert_gen.sh
+        # Make cert generation script executable - FIXED
+        chmod +x /usr/local/bin/certs_gen.sh
 
         # Make CLI executable and create symlink
         chmod 755 /usr/bin/worker-cli
@@ -31,26 +20,35 @@ case "$1" in
             ln -sf /usr/bin/worker-cli /usr/bin/worker
         fi
 
-        # Generate certificates
+        # Generate certificates with proper root ownership - FIXED
         echo "Generating SSL certificates..."
-        /usr/local/bin/cert_gen.sh
+        /usr/local/bin/certs_gen.sh
 
-        # Ensure certificates have correct ownership
+        # Ensure certificates have secure permissions (root only)
         if [ -d /opt/worker/certs ]; then
-            chown -R worker:worker /opt/worker/certs
+            chown -R root:root /opt/worker/certs
+            chmod 700 /opt/worker/certs
             chmod 600 /opt/worker/certs/*-key.pem 2>/dev/null || true
             chmod 644 /opt/worker/certs/*-cert.pem 2>/dev/null || true
         fi
 
         # Create necessary directories
         mkdir -p /var/log/worker
-        chown worker:worker /var/log/worker
+        chown root:root /var/log/worker
+        chmod 755 /var/log/worker
+
+        # Setup cgroup delegation
+        if [ -d /sys/fs/cgroup ]; then
+            echo "Setting up cgroup delegation..."
+            mkdir -p /sys/fs/cgroup/worker.slice
+            echo "+cpu +memory +io +pids" > /sys/fs/cgroup/worker.slice/cgroup.subtree_control 2>/dev/null || true
+        fi
 
         # Reload systemd and enable service
         systemctl daemon-reload
         systemctl enable worker.service
 
-        echo "✅ Worker service installed successfully!"
+        echo "✅ Worker service installed successfully (running as root)!"
         echo "To start: sudo systemctl start worker"
         echo "To check status: sudo systemctl status worker"
         echo "CLI usage: worker --help"
