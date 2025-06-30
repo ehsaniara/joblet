@@ -133,56 +133,6 @@ func (c *cgroup) moveWorkerProcessToSubgroup() error {
 	return nil
 }
 
-// enableControllersInServiceCgroup enables controllers in the service cgroup
-func (c *cgroup) enableControllersInServiceCgroup() error {
-	log := c.logger.WithField("operation", "enable-controllers")
-
-	subtreeControlFile := filepath.Join(c.config.BaseDir, "cgroup.subtree_control")
-
-	// Check what controllers are available
-	controllersFile := filepath.Join(c.config.BaseDir, "cgroup.controllers")
-	availableBytes, err := os.ReadFile(controllersFile)
-	if err != nil {
-		return fmt.Errorf("failed to read available controllers: %w", err)
-	}
-
-	availableControllers := strings.Fields(string(availableBytes))
-	log.Debug("available controllers", "controllers", availableControllers)
-
-	// Enable the controllers we need (if available)
-	neededControllers := []string{"cpu", "memory", "io", "pids"}
-	var enabledControllers []string
-
-	for _, controller := range neededControllers {
-		if contains(availableControllers, controller) {
-			enabledControllers = append(enabledControllers, "+"+controller)
-		}
-	}
-
-	if len(enabledControllers) == 0 {
-		log.Warn("no controllers available to enable")
-		return nil
-	}
-
-	// Write the controllers to enable
-	controllersToEnable := strings.Join(enabledControllers, " ")
-	log.Debug("enabling controllers", "controllers", controllersToEnable)
-
-	if err := os.WriteFile(subtreeControlFile, []byte(controllersToEnable), 0644); err != nil {
-		return fmt.Errorf("failed to enable controllers: %w", err)
-	}
-
-	// Verify controllers were enabled
-	currentBytes, err := os.ReadFile(subtreeControlFile)
-	if err != nil {
-		log.Warn("failed to verify enabled controllers", "error", err)
-	} else {
-		log.Debug("controllers enabled successfully", "enabled", strings.TrimSpace(string(currentBytes)))
-	}
-
-	return nil
-}
-
 // contains checks if a slice contains a string
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
@@ -274,7 +224,7 @@ func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 		// With "max" device syntax
 		fmt.Sprintf("max rbps=%d", ioBPS),
 		// With riops and wiops, operations per second instead of bytes
-		fmt.Sprintf("8:0 riops=1000 wiops=1000"),
+		"8:0 riops=1000 wiops=1000",
 	}
 
 	var lastErr error
@@ -450,13 +400,16 @@ func cleanupJobCgroup(jobID string, logger *logger.Logger, cfg *config.CgroupCon
 				proc, e2 := os.FindProcess(pid)
 				if e2 == nil {
 					// Try SIGTERM first
-					proc.Signal(syscall.SIGTERM)
+					_ = proc.Signal(syscall.SIGTERM)
 
 					// Wait a moment
 					time.Sleep(100 * time.Millisecond)
 
 					// Then SIGKILL if needed
-					proc.Signal(syscall.SIGKILL)
+					e := proc.Signal(syscall.SIGKILL)
+					if e != nil {
+						return
+					}
 				}
 			}
 		}

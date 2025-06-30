@@ -365,7 +365,7 @@ func BenchmarkGrpcAuthorization_ExtractClientRole(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth.extractClientRole(ctx)
+		_, _ = auth.extractClientRole(ctx)
 	}
 }
 
@@ -384,7 +384,7 @@ func BenchmarkGrpcAuthorization_Authorized(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth.Authorized(ctx, RunJobOp)
+		_ = auth.Authorized(ctx, RunJobOp)
 	}
 }
 
@@ -393,7 +393,4 @@ func TestNewGrpcAuthorization(t *testing.T) {
 	if auth == nil {
 		t.Error("Expected non-nil authorization instance")
 	}
-
-	// Verify it implements the interface
-	var _ GrpcAuthorization = auth
 }
