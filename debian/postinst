@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Enable debug output in CI
+if [ "$CI" = "true" ]; then
+    set -x
+fi
+
 case "$1" in
     configure)
         echo "Configuring worker service..."
@@ -12,10 +17,10 @@ case "$1" in
         fi
 
         # Set ownership and permissions
-        chown -R root:root /opt/worker
+        chown -R worker:worker /opt/worker
         chmod 755 /opt/worker
         chmod 755 /opt/worker/worker
-        chmod 644 /opt/worker/config.yml
+        chmod 644 /opt/worker/config.yaml
 
         # Make cert generation script executable
         chmod +x /usr/local/bin/cert_gen.sh
@@ -32,14 +37,14 @@ case "$1" in
 
         # Ensure certificates have correct ownership
         if [ -d /opt/worker/certs ]; then
-            chown -R root:root /opt/worker/certs
+            chown -R worker:worker /opt/worker/certs
             chmod 600 /opt/worker/certs/*-key.pem 2>/dev/null || true
             chmod 644 /opt/worker/certs/*-cert.pem 2>/dev/null || true
         fi
 
         # Create necessary directories
         mkdir -p /var/log/worker
-        chown root:root /var/log/worker
+        chown worker:worker /var/log/worker
 
         # Reload systemd and enable service
         systemctl daemon-reload
