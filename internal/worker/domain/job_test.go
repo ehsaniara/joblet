@@ -32,10 +32,7 @@ func TestJobStateTransitions(t *testing.T) {
 	}
 
 	// test valid transition: RUNNING -> COMPLETED
-	err = job.Complete(0)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+	job.Complete(0)
 	if job.Status != StatusCompleted {
 		t.Errorf("Expected status COMPLETED, got %v", job.Status)
 	}
@@ -84,14 +81,7 @@ func TestJobFailTransitions(t *testing.T) {
 				Status: tt.initialStatus,
 			}
 
-			err := job.Fail(tt.exitCode)
-
-			if tt.expectError && err == nil {
-				t.Error("Expected error but got none")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("Expected no error but got: %v", err)
-			}
+			job.Fail(tt.exitCode)
 
 			if !tt.expectError {
 				if job.Status != tt.expectedStatus {
@@ -115,10 +105,7 @@ func TestJobStopTransition(t *testing.T) {
 		Pid:    1234,
 	}
 
-	err := job.Stop()
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+	job.Stop()
 
 	if job.Status != StatusStopped {
 		t.Errorf("Expected status STOPPED, got %v", job.Status)

@@ -61,45 +61,27 @@ func (j *Job) MarkAsRunning(pid int32) error {
 }
 
 // Complete marks job as successfully finished with given exit code
-func (j *Job) Complete(exitCode int32) error {
-
-	if j.Status != StatusRunning {
-		return fmt.Errorf("cannot complete job: current status is %s, expected %s", j.Status, StatusRunning)
-	}
-
+func (j *Job) Complete(exitCode int32) {
 	j.Status = StatusCompleted
 	j.ExitCode = exitCode
 	now := time.Now()
 	j.EndTime = &now
-	return nil
 }
 
-// Fail marks job as failed with given exit code (allows INITIALIZING->FAILED transition)
-func (j *Job) Fail(exitCode int32) error {
-
-	if j.Status != StatusRunning && j.Status != StatusInitializing {
-		return fmt.Errorf("cannot fail job: current status is %s, expected %s or %s", j.Status, StatusRunning, StatusInitializing)
-	}
-
+// Fail marks job as failed with given exit code
+func (j *Job) Fail(exitCode int32) {
 	j.Status = StatusFailed
 	j.ExitCode = exitCode
 	now := time.Now()
 	j.EndTime = &now
-	return nil
 }
 
 // Stop forcefully terminates a running job
-func (j *Job) Stop() error {
-
-	if j.Status != StatusRunning {
-		return fmt.Errorf("cannot stop job: current status is %s, expected %s", j.Status, StatusRunning)
-	}
-
+func (j *Job) Stop() {
 	j.Status = StatusStopped
 	j.ExitCode = -1
 	now := time.Now()
 	j.EndTime = &now
-	return nil
 }
 
 // DeepCopy creates independent copy to prevent concurrent modification issues

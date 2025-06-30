@@ -366,12 +366,7 @@ func (w *Worker) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 
 func (w *Worker) cleanupFailedJob(job *domain.Job) {
 	failedJob := job.DeepCopy()
-	if err := failedJob.Fail(-1); err != nil {
-		failedJob.Status = domain.StatusFailed
-		failedJob.ExitCode = -1
-		now := time.Now()
-		failedJob.EndTime = &now
-	}
+	failedJob.Fail(-1)
 	w.store.UpdateJob(failedJob)
 	w.cgroup.CleanupCgroup(job.Id)
 }
