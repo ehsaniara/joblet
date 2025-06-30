@@ -8,15 +8,23 @@
 
 ![worker-thum.png](docs/worker-thum.png)
 
-**Worker** is a secure, high-performance job execution platform that lets you run commands remotely on Linux systems
-with comprehensive resource controls and real-time monitoring. Perfect for distributed computing, CI/CD pipelines, batch
-processing, and remote task execution.
+**Worker** is a secure job execution platform designed to **isolate system calls from clients**, providing safe remote
+command execution on Linux systems. By creating complete process isolation barriers, Worker prevents clients from
+directly accessing the host system while enabling controlled job execution with comprehensive resource management and
+real-time monitoring.
 
 ## ✨ Key Features
 
-### 🚀 **Remote Job Execution**
+### 🛡️ **System Call Isolation**
 
-- Execute any command or script on remote Linux systems
+- **Complete Process Isolation**: Prevents direct client access to host system calls
+- **Linux Namespace Barriers**: PID, mount, IPC, and UTS isolation per job
+- **Controlled Execution Environment**: Jobs run in isolated containers with limited system access
+- **Security by Design**: Clients cannot directly manipulate host system resources
+
+### 🚀 **Safe Remote Execution**
+
+- Execute commands remotely without exposing host system calls
 - Real-time output streaming with live log monitoring
 - Comprehensive job lifecycle management (start, stop, monitor)
 - Support for long-running services and short-lived tasks
@@ -46,6 +54,45 @@ processing, and remote task execution.
 - Streaming log output with buffering
 - Job history and execution statistics
 - Resource usage monitoring and alerts
+
+## 🔍 System Call Isolation in Action
+
+Here's a clear demonstration of how Worker isolates system calls and process visibility:
+
+### **Isolated Job Execution**
+
+```bash
+$ worker-cli run ps aux
+Job started:
+ID: 120
+Command: ps aux
+Status: RUNNING
+StartTime: 2025-06-30T17:34:33Z
+Network: host (shared with system)
+
+$ worker-cli log 120   
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0  10044  1580 ?        R    17:34   0:00 /usr/bin/ps aux
+```
+
+### **Direct Host Execution (for comparison)**
+
+```bash
+$ ps aux
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.3 167744 13132 ?        Ss   Jun26   0:11 /sbin/init
+root           2  0.0  0.0      0     0 ?        S    Jun26   0:00 [kthreadd]
+root           3  0.0  0.0      0     0 ?        I<   Jun26   0:00 [rcu_gp]
+root           4  0.0  0.0      0     0 ?        I<   Jun26   0:00 [rcu_par_gp]
+root           5  0.0  0.0      0     0 ?        I<   Jun26   0:00 [slub_flushwq]
+root           6  0.0  0.0      0     0 ?        I<   Jun26   0:00 [netns]
+...
+worker    544936  0.0  0.0  10072  1608 pts/2    R+   17:37   0:00 ps aux
+```
+
+**Key Difference**: The job sees only its own process (PID 1) in an isolated namespace, while the host system sees all
+processes. This demonstrates how Worker prevents jobs from accessing or discovering host system information through
+system calls.
 
 ## 🚀 Quick Start
 
@@ -246,12 +293,13 @@ worker-cli --cert ~/.worker/viewer-cert.pem --key ~/.worker/viewer-key.pem list
 
 ### Job Isolation
 
-Every job runs in an isolated environment with:
+Every job runs in an isolated environment that **prevents direct system call access**:
 
-- **Separate Process Tree**: Jobs can't see other system processes
-- **Isolated Filesystem**: Jobs have their own view of `/proc` and mounts
-- **Resource Limits**: CPU, memory, and I/O are strictly controlled
-- **Host Network Access**: Jobs can access network services normally
+- **Separate Process Tree**: Jobs can't see or interact with host processes
+- **Isolated Filesystem**: Jobs have restricted view of host filesystem
+- **System Call Filtering**: Jobs cannot directly execute dangerous system calls
+- **Resource Boundaries**: CPU, memory, and I/O are strictly controlled
+- **Network Isolation**: Jobs use host network but cannot access host networking stack directly
 
 ## 📊 Monitoring & Troubleshooting
 
@@ -410,45 +458,62 @@ log [-f] <job-id>                   # Show/follow job logs
 
 ## 💡 Use Cases
 
+### **Why System Call Isolation Matters**
+
+```bash
+# ❌ Without Worker: Direct system access (dangerous)
+$ malicious_script.py
+# Can see all processes, access sensitive files, modify system
+
+# ✅ With Worker: Isolated execution (safe)
+$ worker-cli run malicious_script.py
+# Sees only its own process, limited file access, contained environment
+```
+
+**Security Benefits:**
+
+- **Process Discovery Prevention**: Jobs cannot enumerate host processes
+- **File System Protection**: Limited access to host filesystem
+- **System Information Hiding**: Host system details are not exposed
+- **Resource Containment**: Jobs cannot exhaust host resources
+- **Multi-Tenant Safety**: Jobs cannot interfere with each other
+
 ### CI/CD Pipelines
 
 ```bash
-# Build and test
+# Isolated build and test environment
 worker-cli run git clone https://github.com/user/repo.git /tmp/build
 worker-cli run --max-cpu=200 --max-memory=4096 make -C /tmp/build test
-worker-cli run docker build -t myapp /tmp/build
+worker-cli run docker build -t myapp /tmp/build  # Isolated from host Docker daemon
 ```
 
-### Batch Processing
+### Multi-Tenant Environments
 
 ```bash
-# Data processing jobs
-worker-cli run --max-memory=8192 python3 process_large_dataset.py
-worker-cli run --max-cpu=50 parallel_processing_job.sh
+# Each tenant's jobs are isolated from each other and the host
+worker-cli run --max-memory=1024 tenant_a_workload.py
+worker-cli run --max-cpu=50 tenant_b_processing.sh
 ```
 
-### Service Deployment
+### Untrusted Code Execution
 
 ```bash
-# Deploy and run services
-worker-cli run --max-memory=2048 docker run -d -p 8080:8080 myapp:latest
-worker-cli run --max-cpu=100 nginx -g "daemon off;"
-```
-
-### System Administration
-
-```bash
-# Remote system tasks
-worker-cli run apt update && apt upgrade -y
-worker-cli run systemctl restart apache2
-worker-cli run --max-memory=512 backup_script.sh
+# Safe execution of user-provided code
+worker-cli run --max-memory=512 --max-cpu=25 user_script.py
+worker-cli run --max-iobps=1000000 data_analysis.r
 ```
 
 ## Support
 
-- **Documentation**: [docs/](docs/DESIGN.md) directory
+- **Documentation**: [docs/](docs/) directory
 - **Issues**: [GitHub Issues](https://github.com/ehsaniara/worker/issues)
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+  <sub>by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
+</div>
