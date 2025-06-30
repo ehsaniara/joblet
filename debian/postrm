@@ -18,7 +18,12 @@ case "$1" in
         ;;
 
     purge)
-        # Remove all worker files on purge
+        # Remove user and all data on purge
+        if id worker >/dev/null 2>&1; then
+            userdel worker 2>/dev/null || true
+        fi
+
+        # Remove all worker files
         rm -rf /opt/worker
         rm -rf /var/log/worker
 

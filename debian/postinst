@@ -23,7 +23,7 @@ case "$1" in
         chmod 644 /opt/worker/config.yaml
 
         # Make cert generation script executable
-        chmod +x /usr/local/bin/certs_gen.sh
+        chmod +x /usr/local/bin/cert_gen.sh
 
         # Make CLI executable and create symlink
         chmod 755 /usr/bin/worker-cli
@@ -33,7 +33,7 @@ case "$1" in
 
         # Generate certificates
         echo "Generating SSL certificates..."
-        /usr/local/bin/certs_gen.sh
+        /usr/local/bin/cert_gen.sh
 
         # Ensure certificates have correct ownership
         if [ -d /opt/worker/certs ]; then

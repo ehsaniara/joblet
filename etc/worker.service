@@ -3,7 +3,7 @@ Description=Worker Service - Job Isolation Platform
 After=network.target
 
 [Service]
-# Use single binary that auto-detects execution mode
+Type=simple
 ExecStart=/opt/worker/worker
 Restart=always
 RestartSec=10s
@@ -12,15 +12,15 @@ RestartSec=10s
 User=root
 Group=root
 
-# CRITICAL: Allow new privileges for namespace operations
+# Allow new privileges for namespace operations
 NoNewPrivileges=no
 
-# Security hardening while maintaining isolation capabilities
+# Security hardening
 PrivateTmp=yes
 ProtectHome=yes
 ReadWritePaths=/opt/worker /sys/fs/cgroup /proc /tmp
 
-# CRITICAL: Disable protections that block namespace operations
+# Disable protections that block namespace operations
 ProtectSystem=no
 PrivateDevices=no
 ProtectKernelTunables=no
@@ -29,7 +29,7 @@ RestrictRealtime=no
 RestrictSUIDSGID=no
 MemoryDenyWriteExecute=no
 
-# Cgroup delegation for job resource management
+# Cgroup delegation
 Delegate=yes
 DelegateControllers=cpu memory io pids
 CPUAccounting=yes
@@ -44,12 +44,11 @@ LimitNOFILE=4096
 StandardOutput=journal
 StandardError=journal
 
-# Environment variables for the main service
+# Environment variables
 Environment="WORKER_MODE=server"
 Environment="LOG_LEVEL=INFO"
-Environment="WORKER_CONFIG_PATH=/opt/worker/config.yml"
 
-# Cleanup job cgroups on service stop
+# Cleanup on stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'
 
 [Install]

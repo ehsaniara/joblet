@@ -67,8 +67,18 @@ jobs:
           else
             VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+          
+          # Clean version for Debian package format (remove git commit info)
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
+          
+          # Ensure version starts with digit
+          if [[ ! "$CLEAN_VERSION" =~ ^[0-9] ]]; then
+            CLEAN_VERSION="1.0.0"
+          fi
+          
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "raw_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $CLEAN_VERSION (from $VERSION)"
 
       - name: Build worker binary
         run: |
