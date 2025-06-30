@@ -446,6 +446,7 @@ worker-cli run --max-memory=512 backup_script.sh
 
 ## Support
 
+- **Documentation**: [docs/](docs/) directory
 - **Issues**: [GitHub Issues](https://github.com/ehsaniara/worker/issues)
 - **Development**: See [DEVELOPMENT.md](DEVELOPMENT.md) for contributing
 
