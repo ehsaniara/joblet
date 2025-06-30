@@ -1,203 +1,182 @@
 # Worker Deployment Guide
 
-This guide covers production deployment of the Job Worker system, including server setup, certificate management,
-systemd service configuration, and operational procedures.
+This guide covers production deployment of the Worker distributed job execution system, including server setup,
+certificate management, systemd service configuration, and operational procedures.
 
 ## Table of Contents
 
 - [System Requirements](#system-requirements)
-- [Pre-deployment Setup](#pre-deployment-setup)
-- [Automated Deployment](#automated-deployment)
-- [Manual Deployment](#manual-deployment)
+- [Architecture Deployment](#architecture-deployment)
+- [Installation Methods](#installation-methods)
 - [Service Configuration](#service-configuration)
 - [Certificate Management](#certificate-management)
-- [Monitoring & Maintenance](#monitoring--maintenance)
-- [Security Considerations](#security-considerations)
+- [Monitoring & Observability](#monitoring--observability)
+- [Security Hardening](#security-hardening)
+- [Scaling & Performance](#scaling--performance)
 - [Troubleshooting](#troubleshooting)
 - [Backup & Recovery](#backup--recovery)
 
 ## System Requirements
 
-### Server Requirements
+### Server Requirements (Linux Only)
 
-| Component            | Requirement                               | Notes                            |
-|----------------------|-------------------------------------------|----------------------------------|
-| **Operating System** | Linux (Ubuntu 20.04+, CentOS 8+, RHEL 8+) | Requires systemd                 |
-| **Kernel Version**   | 4.5+                                      | For cgroups v2 support           |
-| **Architecture**     | x86_64 (amd64) or ARM64                   |                                  |
-| **Memory**           | 2GB+ RAM                                  | Scales with concurrent jobs      |
-| **Storage**          | 10GB+ available space                     | For binaries, logs, certificates |
-| **Network**          | Port 50051 accessible                     | gRPC service port                |
-| **Privileges**       | Root access required                      | For cgroup management            |
+Worker requires Linux for job execution due to its dependency on Linux-specific features:
 
-### Software Dependencies
+| Component            | Requirement                               | Notes                                      |
+|----------------------|-------------------------------------------|--------------------------------------------|
+| **Operating System** | Linux (Ubuntu 20.04+, CentOS 8+, RHEL 8+) | Kernel 4.6+ required for cgroup namespaces |
+| **Kernel Features**  | cgroups v2, namespaces, systemd           | `CONFIG_CGROUPS=y`, `CONFIG_NAMESPACES=y`  |
+| **Architecture**     | x86_64 (amd64) or ARM64                   | Single binary supports both                |
+| **Memory**           | 2GB+ RAM (scales with concurrent jobs)    | ~2MB overhead per job                      |
+| **Storage**          | 20GB+ available space                     | Logs, certificates, temporary files        |
+| **Network**          | Port 50051 accessible                     | gRPC service port (configurable)           |
+| **Privileges**       | Root access required                      | For cgroup and namespace management        |
+
+### Client Requirements (Cross-Platform)
+
+Worker CLI clients can run on multiple platforms:
+
+| Platform | Status               | Installation Method       |
+|----------|----------------------|---------------------------|
+| Linux    | ✅ Full Support       | Package manager or binary |
+| macOS    | ✅ CLI Only           | Binary download           |
+| Windows  | ✅ CLI Only (via WSL) | WSL2 + Linux binary       |
+
+### Kernel Verification
 
 ```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y openssl systemd
-
-# CentOS/RHEL
-sudo yum install -y openssl systemd
-
 # Verify cgroups v2 support
 mount | grep cgroup2
-# Should show: cgroup2 on /sys/fs/cgroup type cgroup2
+# Expected: cgroup2 on /sys/fs/cgroup type cgroup2
+
+# Check namespace support
+ls /proc/self/ns/
+# Expected: cgroup, ipc, mnt, net, pid, user, uts
+
+# Verify kernel version (4.6+ required)
+uname -r
+# Expected: 4.6.0 or higher
+
+# Check systemd version (required for cgroup delegation)
+systemctl --version
+# Expected: systemd 219 or higher
 ```
 
-### Network Requirements
+## Architecture Deployment
 
-```bash
-# Firewall configuration
-sudo ufw allow 50051/tcp  # Ubuntu
-sudo firewall-cmd --permanent --add-port=50051/tcp  # CentOS/RHEL
-sudo firewall-cmd --reload
+### Single-Node Deployment
+
+```
+┌─────────────────────────────────────┐
+│           Linux Server              │
+├─────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐   │
+│  │   Worker    │  │  Job Proc   │   │
+│  │   Server    │  │  (init mode)│   │
+│  │             │  │             │   │
+│  │ • gRPC API  │  │ • Namespaces│   │
+│  │ • Job Mgmt  │  │ • Cgroups   │   │
+│  │ • Auth      │  │ • Isolation │   │
+│  └─────────────┘  └─────────────┘   │
+├─────────────────────────────────────┤
+│         Linux Kernel                │
+│  • cgroups v2  • namespaces         │
+└─────────────────────────────────────┘
+
+┌─────────────────┐    ┌─────────────────┐
+│  Client (Any)   │    │  Client (Any)   │
+│  • CLI Tool     │    │  • CLI Tool     │
+│  • TLS Certs    │◄──►│  • TLS Certs    │
+│  • gRPC Client  │    │  • gRPC Client  │
+└─────────────────┘    └─────────────────┘
 ```
 
-## Pre-deployment Setup
+## Installation Methods
 
-### 1. Create System User
+### Method 1: Debian Package (Recommended)
 
 ```bash
-# Create dedicated user for job-worker
-sudo useradd -r -s /bin/false -d /opt/job-worker job-worker
-sudo mkdir -p /opt/job-worker
-sudo chown job-worker:job-worker /opt/job-worker
+# Download latest release
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker_1.0.0_amd64.deb
+
+# Install with dependencies
+sudo dpkg -i worker_1.0.0_amd64.deb
+
+# Fix any dependency issues
+sudo apt-get install -f
+
+# Verify installation
+systemctl status worker
+worker-cli --version
 ```
 
-### 2. Directory Structure
+### Method 2: Manual Binary Installation
 
 ```bash
-# Create required directories
-sudo mkdir -p /opt/job-worker/{bin,certs,logs}
-sudo mkdir -p /var/log/job-worker
-sudo mkdir -p /etc/job-worker
+# Create user and directories
+sudo useradd -r -s /bin/false -d /opt/worker worker
+sudo mkdir -p /opt/worker/{bin,certs,logs}
+sudo mkdir -p /var/log/worker
 
-# Set permissions
-sudo chown -R job-worker:job-worker /opt/job-worker
-sudo chown job-worker:job-worker /var/log/job-worker
+# Download and install binaries
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker-linux-amd64.tar.gz
+tar -xzf worker-linux-amd64.tar.gz
+
+sudo mv worker /opt/worker/bin/
+sudo mv worker-cli /usr/local/bin/
+sudo chmod +x /opt/worker/bin/worker /usr/local/bin/worker-cli
+
+# Set ownership
+sudo chown -R worker:worker /opt/worker
 ```
 
-### 3. Configure SSH Access
-
-For automated deployment, configure passwordless SSH and sudo:
+### Method 3: Build from Source
 
 ```bash
-# On deployment machine, generate SSH key if needed
-ssh-keygen -t ed25519 -C "job-worker-deployment"
+# Prerequisites
+sudo apt-get install -y golang-go protobuf-compiler make git
 
-# Copy public key to server
-ssh-copy-id user@your-server.com
+# Clone and build
+git clone https://github.com/ehsaniara/worker.git
+cd worker
+make build
 
-# Configure passwordless sudo on server
-echo "your-username ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/job-worker-deploy
+# Install binaries
+sudo cp bin/worker /opt/worker/bin/
+sudo cp bin/worker-cli /usr/local/bin/
 ```
 
-## Automated Deployment
-
-### Quick Setup (Recommended)
-
-Use the Makefile for automated deployment:
+### Automated Deployment
 
 ```bash
-# Clone repository
-git clone https://github.com/ehsaniara/job-worker.git
-cd job-worker
+# Using project Makefile (development to production)
+git clone https://github.com/ehsaniara/worker.git
+cd worker
 
-# Configure deployment target
-export REMOTE_HOST=your-server.com
-export REMOTE_USER=your-username
-export REMOTE_DIR=/opt/job-worker
+# Configure target
+export REMOTE_HOST=prod-worker.example.com
+export REMOTE_USER=deploy
+export REMOTE_DIR=/opt/worker
 
-# Complete automated setup
+# Complete deployment
 make setup-remote-passwordless
-```
 
-This will:
-
-1. Generate TLS certificates on the server
-2. Build and deploy binaries
-3. Configure systemd service
-4. Start the service
-
-### Step-by-Step Automated Deployment
-
-```bash
-# 1. Build binaries locally
-make worker init
-
-# 2. Generate certificates on remote server
-make certs-remote-passwordless
-
-# 3. Deploy binaries
-make deploy-passwordless
-
-# 4. Verify deployment
+# Verify deployment
 make service-status
 make live-log
 ```
 
-### Safe Deployment (With Password Prompts)
-
-For production environments where passwordless sudo is not configured:
-
-```bash
-# Deploy with password prompts
-make deploy-safe REMOTE_HOST=prod.example.com
-
-# Download admin certificates for CLI access
-make certs-download-admin-simple
-```
-
-## Manual Deployment
-
-### 1. Build Binaries
-
-```bash
-# On development machine
-git clone https://github.com/ehsaniara/job-worker.git
-cd job-worker
-
-# Build Linux binaries
-make worker init
-# Creates: bin/job-worker, bin/job-init
-```
-
-### 2. Transfer Binaries
-
-```bash
-# Copy binaries to server
-scp bin/job-worker user@server:/tmp/
-scp bin/job-init user@server:/tmp/
-
-# On server, install binaries
-sudo cp /tmp/job-worker /opt/job-worker/
-sudo cp /tmp/job-init /opt/job-worker/
-sudo chmod +x /opt/job-worker/job-worker /opt/job-worker/job-init
-sudo chown job-worker:job-worker /opt/job-worker/job-*
-```
-
-### 3. Generate Certificates
-
-```bash
-# Copy certificate generation script
-scp etc/certs_gen.sh user@server:/tmp/
-
-# On server, generate certificates
-sudo /tmp/certs_gen.sh
-sudo chown -R job-worker:job-worker /opt/job-worker/certs
-```
-
 ## Service Configuration
 
-### 1. Create Systemd Service
+### Systemd Service
 
-Create `/etc/systemd/system/job-worker.service`:
+The Worker service runs as a systemd daemon with proper cgroup delegation:
 
 ```ini
+# /etc/systemd/system/worker.service
 [Unit]
-Description=Worker Service
-Documentation=https://github.com/ehsaniara/job-worker
+Description=Worker Job Execution Platform
+Documentation=https://github.com/ehsaniara/worker
 After=network.target
 Wants=network.target
 
@@ -205,483 +184,545 @@ Wants=network.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/opt/job-worker
-ExecStart=/opt/job-worker/job-worker
+WorkingDirectory=/opt/worker
+
+# Main service binary (single binary architecture)
+ExecStart=/opt/worker/worker
 ExecReload=/bin/kill -HUP $MAINPID
+
+# Process management
 Restart=always
-RestartSec=5
-TimeoutStopSec=30
+RestartSec=10s
+TimeoutStartSec=30s
+TimeoutStopSec=30s
 
-# Security settings
-NoNewPrivileges=false
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/opt/job-worker /var/log/job-worker /sys/fs/cgroup
+# CRITICAL: Allow new privileges for namespace operations
+NoNewPrivileges=no
 
-# Environment
-Environment=WORKER_ADDR=0.0.0.0:50051
-Environment=WORKER_CERT_PATH=/opt/job-worker/certs
-Environment=WORKER_LOG_LEVEL=info
+# Security hardening while maintaining isolation capabilities
+PrivateTmp=yes
+ProtectHome=yes
+ReadWritePaths=/opt/worker /var/log/worker /sys/fs/cgroup /proc /tmp
 
-# Resource limits
+# CRITICAL: Disable protections that block namespace operations
+ProtectSystem=no
+PrivateDevices=no
+ProtectKernelTunables=no
+ProtectControlGroups=no
+RestrictRealtime=no
+RestrictSUIDSGID=no
+MemoryDenyWriteExecute=no
+
+# CRITICAL: Cgroup delegation for job resource management
+Delegate=yes
+DelegateControllers=cpu memory io pids
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+TasksAccounting=yes
+Slice=worker.slice
+
+# Environment configuration
+Environment="WORKER_MODE=server"
+Environment="LOG_LEVEL=INFO"
+Environment="WORKER_CONFIG_PATH=/opt/worker/config.yml"
+
+# Resource limits for the main service
 LimitNOFILE=65536
 LimitNPROC=32768
+LimitMEMLOCK=infinity
 
-# Cgroup settings
-Delegate=yes
+# Process cleanup
 KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+# Cleanup job cgroups on service stop
+ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-### 2. Enable and Start Service
+### Configuration File
+
+```yaml
+# /opt/worker/config.yml
+version: "3.0"
+
+server:
+  address: "0.0.0.0"
+  port: 50051
+  mode: "server"
+  timeout: "30s"
+
+worker:
+  defaultCpuLimit: 100              # 100% of one core
+  defaultMemoryLimit: 512           # 512MB memory limit
+  defaultIoLimit: 0                 # Unlimited I/O
+  maxConcurrentJobs: 100            # Maximum concurrent jobs
+  jobTimeout: "1h"                  # 1-hour job timeout
+  cleanupTimeout: "5s"              # Resource cleanup timeout
+  validateCommands: true            # Enable command validation
+
+security:
+  serverCertPath: "/opt/worker/certs/server-cert.pem"
+  serverKeyPath: "/opt/worker/certs/server-key.pem"
+  caCertPath: "/opt/worker/certs/ca-cert.pem"
+  clientCertPath: "/opt/worker/certs/client-cert.pem"
+  clientKeyPath: "/opt/worker/certs/client-key.pem"
+  minTlsVersion: "1.3"
+
+cgroup:
+  baseDir: "/sys/fs/cgroup/worker.slice/worker.service"
+  namespaceMount: "/sys/fs/cgroup"
+  enableControllers: [ "cpu", "memory", "io", "pids" ]
+  cleanupTimeout: "5s"
+
+grpc:
+  maxRecvMsgSize: 524288            # 512KB
+  maxSendMsgSize: 4194304           # 4MB
+  maxHeaderListSize: 1048576        # 1MB
+  keepAliveTime: "30s"
+  keepAliveTimeout: "5s"
+
+logging:
+  level: "INFO"                     # DEBUG, INFO, WARN, ERROR
+  format: "text"                    # text or json
+  output: "stdout"                  # stdout, stderr, or file path
+```
+
+### Service Management
 
 ```bash
-# Reload systemd configuration
+# Enable and start service
 sudo systemctl daemon-reload
-
-# Enable service to start on boot
 sudo systemctl enable worker.service
-
-# Start service
 sudo systemctl start worker.service
 
-# Check status
-sudo systemctl status worker.service
-```
+# Check service status
+sudo systemctl status worker.service --full
 
-### 3. Configure Logging
+# Monitor logs
+sudo journalctl -u worker.service -f
 
-Create `/etc/rsyslog.d/job-worker.conf`:
+# Performance monitoring
+sudo systemctl show worker.service --property=CPUUsageNSec
+sudo systemctl show worker.service --property=MemoryCurrent
 
-```bash
-# Worker logging configuration
-if $programname == 'job-worker' then /var/log/job-worker/job-worker.log
-& stop
-```
+# Restart service
+sudo systemctl restart worker.service
 
-Restart rsyslog:
-
-```bash
-sudo systemctl restart rsyslog
+# Stop service (graceful)
+sudo systemctl stop worker.service
 ```
 
 ## Certificate Management
 
 ### Automated Certificate Generation
 
-The project includes an automated certificate generation script:
+The Worker includes comprehensive certificate management:
 
 ```bash
-# Generate all certificates (server + clients)
-sudo /opt/job-worker/etc/certs_gen.sh
+# Generate all certificates (CA, server, admin, viewer)
+sudo /usr/local/bin/certs_gen.sh
 
-# Certificate files created:
-# /opt/job-worker/certs/ca-cert.pem       # Certificate Authority
-# /opt/job-worker/certs/ca-key.pem        # CA private key
-# /opt/job-worker/certs/server-cert.pem   # Server certificate
-# /opt/job-worker/certs/server-key.pem    # Server private key
-# /opt/job-worker/certs/admin-client-cert.pem   # Admin client cert
-# /opt/job-worker/certs/admin-client-key.pem    # Admin client key
-# /opt/job-worker/certs/viewer-client-cert.pem  # Viewer client cert
-# /opt/job-worker/certs/viewer-client-key.pem   # Viewer client key
+# Certificate structure created:
+# /opt/worker/certs/
+# ├── ca-cert.pem              # Certificate Authority
+# ├── ca-key.pem               # CA private key (secure)
+# ├── server-cert.pem          # Server certificate with SAN
+# ├── server-key.pem           # Server private key (secure)
+# ├── admin-client-cert.pem    # Admin client certificate (OU=admin)
+# ├── admin-client-key.pem     # Admin client private key (secure)
+# ├── viewer-client-cert.pem   # Viewer client certificate (OU=viewer)
+# └── viewer-client-key.pem    # Viewer client private key (secure)
+```
+
+### Certificate Configuration
+
+The certificate generation includes proper SAN (Subject Alternative Name) configuration:
+
+```bash
+# Server certificate includes multiple SANs
+DNS.1 = worker
+DNS.2 = localhost
+DNS.3 = worker-server
+IP.1 = 192.168.1.161
+IP.2 = 127.0.0.1
+IP.3 = 0.0.0.0
+
+# Verify SAN configuration
+openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A 10 "Subject Alternative Name"
+```
+
+### Certificate Distribution
+
+```bash
+# For admin clients
+scp server:/opt/worker/certs/ca-cert.pem ~/.worker/
+scp server:/opt/worker/certs/admin-client-cert.pem ~/.worker/client-cert.pem
+scp server:/opt/worker/certs/admin-client-key.pem ~/.worker/client-key.pem
+
+# For viewer clients
+scp server:/opt/worker/certs/ca-cert.pem ~/.worker/
+scp server:/opt/worker/certs/viewer-client-cert.pem ~/.worker/client-cert.pem
+scp server:/opt/worker/certs/viewer-client-key.pem ~/.worker/client-key.pem
+
+# Set proper permissions
+chmod 600 ~/.worker/client-key.pem
+chmod 644 ~/.worker/client-cert.pem ~/.worker/ca-cert.pem
 ```
 
 ### Certificate Rotation
 
-For production environments, implement regular certificate rotation:
-
 ```bash
-# Create certificate rotation script
-cat > /opt/job-worker/scripts/rotate-certs.sh << 'EOF'
+# Automated certificate rotation script
+cat > /opt/worker/scripts/rotate-certs.sh << 'EOF'
 #!/bin/bash
-# Certificate rotation script
+set -e
 
-CERT_DIR="/opt/job-worker/certs"
-BACKUP_DIR="/opt/job-worker/backups/certs-$(date +%Y%m%d)"
+CERT_DIR="/opt/worker/certs"
+BACKUP_DIR="/opt/worker/backups/certs-$(date +%Y%m%d-%H%M%S)"
 
-# Backup existing certificates
+echo "Starting certificate rotation..."
+
+# Create backup
 mkdir -p "$BACKUP_DIR"
 cp "$CERT_DIR"/*.pem "$BACKUP_DIR/"
+echo "Certificates backed up to $BACKUP_DIR"
 
 # Generate new certificates
-/opt/job-worker/etc/certs_gen.sh
+/usr/local/bin/certs_gen.sh
 
-# Restart service
-systemctl restart job-worker.service
+# Verify new certificates
+openssl verify -CAfile "$CERT_DIR/ca-cert.pem" "$CERT_DIR/server-cert.pem"
+openssl verify -CAfile "$CERT_DIR/ca-cert.pem" "$CERT_DIR/admin-client-cert.pem"
+openssl verify -CAfile "$CERT_DIR/ca-cert.pem" "$CERT_DIR/viewer-client-cert.pem"
 
-echo "Certificate rotation completed: $(date)"
+# Restart service to use new certificates
+systemctl restart worker.service
+
+# Wait for service to start
+sleep 5
+
+# Verify service is running
+if systemctl is-active --quiet worker.service; then
+    echo "Certificate rotation completed successfully"
+    echo "Backup location: $BACKUP_DIR"
+else
+    echo "Service failed to start with new certificates"
+    echo "Restoring from backup..."
+    cp "$BACKUP_DIR"/*.pem "$CERT_DIR/"
+    systemctl restart worker.service
+    exit 1
+fi
 EOF
 
-chmod +x /opt/job-worker/scripts/rotate-certs.sh
+chmod +x /opt/worker/scripts/rotate-certs.sh
+
+# Schedule rotation (monthly)
+echo "0 2 1 * * /opt/worker/scripts/rotate-certs.sh" | sudo crontab -u root -
 ```
 
-### Certificate Validation
-
-```bash
-# Validate certificate chain
-openssl verify -CAfile /opt/job-worker/certs/ca-cert.pem \
-  /opt/job-worker/certs/server-cert.pem
-
-# Check certificate expiration
-openssl x509 -in /opt/job-worker/certs/server-cert.pem -noout -dates
-
-# Test TLS connection
-openssl s_client -connect localhost:50051 -verify_return_error
-```
-
-## Monitoring & Maintenance
-
-### Health Checks
-
-```bash
-# Service status
-sudo systemctl is-active worker.service
-
-# Process check
-pgrep -f job-worker
-
-# Port check
-netstat -tlnp | grep :50051
-
-# Log tail
-sudo journalctl -u worker.service -f
-```
+## Monitoring & Observability
 
 ### Log Management
 
+optional
+
 ```bash
-# Configure log rotation
-cat > /etc/logrotate.d/job-worker << 'EOF'
-/var/log/job-worker/*.log {
+# Configure logrotate for Worker logs
+cat > /etc/logrotate.d/worker << 'EOF'
+/var/log/worker/*.log {
     daily
     rotate 30
     compress
     delaycompress
     missingok
     notifempty
-    create 644 job-worker job-worker
+    create 644 worker worker
     postrotate
-        systemctl reload job-worker.service
+        systemctl reload worker.service 2>/dev/null || true
     endscript
 }
+
+/opt/worker/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 worker worker
+}
 EOF
+
+# Test logrotate configuration
+sudo logrotate -d /etc/logrotate.d/worker
+```
+
+## Security
+
+### System-Level Security
+
+optional
+
+```bash
+# Configure fail2ban for Worker
+cat > /etc/fail2ban/jail.d/worker.conf << 'EOF'
+[worker]
+enabled = true
+port = 50051
+filter = worker
+logpath = /var/log/worker/worker.log
+maxretry = 5
+bantime = 3600
+findtime = 600
+EOF
+
+# Worker fail2ban filter
+cat > /etc/fail2ban/filter.d/worker.conf << 'EOF'
+[Definition]
+failregex = .*authentication failed.*<HOST>.*
+            .*certificate verification failed.*<HOST>.*
+            .*unauthorized access attempt.*<HOST>.*
+ignoreregex =
+EOF
+
+sudo systemctl restart fail2ban
+```
+
+### Network Security
+
+example
+
+```bash
+# UFW firewall rules
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow SSH (adjust port as needed)
+sudo ufw allow 22/tcp
+
+# Allow Worker from specific networks only
+sudo ufw allow from 192.168.0.0/16 to any port 50051
+sudo ufw allow from 10.0.0.0/8 to any port 50051
+
+# Enable firewall
+sudo ufw --force enable
+```
+
+### File System Security
+
+```bash
+# Secure certificate permissions
+sudo chmod 700 /opt/worker/certs
+sudo chmod 600 /opt/worker/certs/*-key.pem
+sudo chmod 644 /opt/worker/certs/*-cert.pem
+
+# Secure configuration
+sudo chmod 600 /opt/worker/config.yml
+sudo chown worker:worker /opt/worker/config.yml
+
+# Secure log directories
+sudo chmod 750 /var/log/worker
+sudo chown worker:worker /var/log/worker
+
+# Set SELinux contexts (RHEL/CentOS)
+if command -v semanage >/dev/null 2>&1; then
+    sudo semanage fcontext -a -t bin_t "/opt/worker/worker"
+    sudo restorecon -v /opt/worker/worker
+fi
+```
+
+## Scaling & Performance
+
+```bash
+# Optimize for high-concurrency workloads
+cat >> /opt/worker/config.yml << 'EOF'
+worker:
+  maxConcurrentJobs: 500          # Increase concurrent job limit
+  jobTimeout: "30m"               # Shorter timeout for faster turnover
+
+grpc:
+  maxRecvMsgSize: 1048576         # 1MB
+  maxSendMsgSize: 8388608         # 8MB
+  keepAliveTime: "10s"            # More frequent keep-alives
+
+cgroup:
+  cleanupTimeout: "2s"            # Faster cleanup
+EOF
+
+# System-level optimizations
+echo 'net.core.somaxconn = 65535' >> /etc/sysctl.conf
+echo 'fs.file-max = 2097152' >> /etc/sysctl.conf
+echo 'kernel.pid_max = 4194304' >> /etc/sysctl.conf
+sysctl -p
+
+# Service-level optimizations
+systemctl edit worker.service
+# Add:
+# [Service]
+# LimitNOFILE=1048576
+# LimitNPROC=1048576
 ```
 
 ### Performance Monitoring
 
 ```bash
-# Monitor resource usage
-top -p $(pgrep job-worker)
-
-# Check cgroup usage
-cat /sys/fs/cgroup/job-*/memory.current
-cat /sys/fs/cgroup/job-*/cpu.stat
-
-# Network connections
-ss -tlnp | grep :50051
-```
-
-### Backup Script
-
-```bash
-cat > /opt/job-worker/scripts/backup.sh << 'EOF'
+# Performance monitoring script
+cat > /opt/worker/scripts/performance-monitor.sh << 'EOF'
 #!/bin/bash
-# Job Worker backup script
 
-BACKUP_DIR="/opt/job-worker/backups/$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
+echo "=== Worker Performance Report ==="
+echo "Timestamp: $(date)"
+echo
 
-# Backup configuration and certificates
-cp -r /opt/job-worker/certs "$BACKUP_DIR/"
-cp /etc/systemd/system/job-worker.service "$BACKUP_DIR/"
+# Service status
+echo "Service Status:"
+systemctl status worker.service --no-pager -l | head -10
 
-# Backup logs (last 7 days)
-find /var/log/job-worker -name "*.log" -mtime -7 -exec cp {} "$BACKUP_DIR/" \;
+echo
+echo "Resource Usage:"
+echo "Memory: $(systemctl show worker.service --property=MemoryCurrent --value | numfmt --to=iec)"
+echo "Tasks: $(systemctl show worker.service --property=TasksCurrent --value)"
 
-# Create tarball
-tar -czf "$BACKUP_DIR.tar.gz" -C /opt/job-worker/backups "$(basename $BACKUP_DIR)"
-rm -rf "$BACKUP_DIR"
+echo
+echo "Active Jobs:"
+ACTIVE_JOBS=$(find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d 2>/dev/null | wc -l)
+echo "Count: $ACTIVE_JOBS"
 
-echo "Backup created: $BACKUP_DIR.tar.gz"
+if [ "$ACTIVE_JOBS" -gt 0 ]; then
+    echo "Job Resource Usage:"
+    for job_cgroup in /sys/fs/cgroup/worker.slice/worker.service/job-*/; do
+        if [ -d "$job_cgroup" ]; then
+            job_id=$(basename "$job_cgroup")
+            memory=$(cat "$job_cgroup/memory.current" 2>/dev/null | numfmt --to=iec)
+            echo "  $job_id: Memory=$memory"
+        fi
+    done
+fi
+
+echo
+echo "Network Connections:"
+ss -tlnp | grep :50051
+
+echo
+echo "Recent Log Entries:"
+journalctl -u worker.service --since "5 minutes ago" --no-pager | tail -5
 EOF
 
-chmod +x /opt/job-worker/scripts/backup.sh
-```
-
-## Security Considerations
-
-### Firewall Configuration
-
-```bash
-# UFW (Ubuntu)
-sudo ufw allow from trusted.client.ip to any port 50051
-sudo ufw deny 50051
-
-# iptables
-sudo iptables -A INPUT -p tcp --dport 50051 -s trusted.client.ip -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 50051 -j DROP
-```
-
-### File Permissions
-
-```bash
-# Secure certificate permissions
-sudo chmod 600 /opt/job-worker/certs/*-key.pem
-sudo chmod 644 /opt/job-worker/certs/*-cert.pem
-sudo chown job-worker:job-worker /opt/job-worker/certs/*
-```
-
-### SELinux Configuration (RHEL/CentOS)
-
-```bash
-# Configure SELinux for job-worker
-sudo setsebool -P container_manage_cgroup true
-sudo semanage fcontext -a -t bin_t "/opt/job-worker/job-worker"
-sudo restorecon -v /opt/job-worker/job-worker
-```
-
-### Audit Logging
-
-```bash
-# Enable audit logging for job-worker
-echo "-w /opt/job-worker/ -p wa -k job-worker" >> /etc/audit/rules.d/job-worker.rules
-sudo systemctl restart auditd
+chmod +x /opt/worker/scripts/performance-monitor.sh
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
-#### Service Won't Start
+#### 1. Service Won't Start
 
 ```bash
-# Check systemd status
+# Check detailed service status
 sudo systemctl status worker.service -l
 
-# Check logs
-sudo journalctl -u worker.service --since "1 hour ago"
+# Check logs for errors
+sudo journalctl -u worker.service --since "1 hour ago" -f
 
-# Common causes:
-# 1. Missing certificates
-# 2. Port already in use
-# 3. Permission issues
-# 4. Cgroups not available
+# Common solutions:
+# - Check certificate paths and permissions
+# - Verify port availability: sudo netstat -tlnp | grep :50051
+# - Check cgroup delegation: cat /sys/fs/cgroup/worker.slice/cgroup.controllers
+# - Verify binary permissions: ls -la /opt/worker/worker
 ```
 
-#### Certificate Issues
+#### 2. Certificate Issues
 
 ```bash
-# Verify certificate chain
-make verify-cert-chain
+# Verify certificate validity
+openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text
+openssl verify -CAfile /opt/worker/certs/ca-cert.pem /opt/worker/certs/server-cert.pem
 
 # Check certificate expiration
-make examine-certs
-
-# Regenerate certificates
-make certs-remote-passwordless
-```
-
-#### Connection Issues
-
-```bash
-# Test network connectivity
-telnet your-server.com 50051
+openssl x509 -in /opt/worker/certs/server-cert.pem -noout -dates
 
 # Test TLS connection
-make test-tls
+openssl s_client -connect localhost:50051 -cert /opt/worker/certs/admin-client-cert.pem -key /opt/worker/certs/admin-client-key.pem
 
-# Check firewall
-sudo ufw status
-sudo iptables -L
+# Regenerate certificates if needed
+sudo /usr/local/bin/certs_gen.sh
+sudo systemctl restart worker.service
 ```
 
-#### Performance Issues
+#### 3. Job Execution Issues
 
 ```bash
-# Check system resources
-htop
-df -h
-free -h
+# Check cgroup delegation
+cat /sys/fs/cgroup/worker.slice/cgroup.controllers
+cat /sys/fs/cgroup/worker.slice/cgroup.subtree_control
 
-# Check cgroup limits
-cat /sys/fs/cgroup/memory.stat
-cat /sys/fs/cgroup/cpu.stat
+# Verify namespace support
+unshare --help | grep -E "(pid|mount|ipc|uts)"
 
-# Monitor job processes
-ps aux | grep job-
+# Check resource limits
+cat /proc/sys/kernel/pid_max
+cat /proc/sys/vm/max_map_count
+
+# Debug job isolation
+worker-cli run ps aux  # Should show limited process tree
+worker-cli run mount   # Should show isolated mount namespace
+```
+
+#### 4. Performance Issues
+
+```bash
+# Monitor resource usage
+top -p $(pgrep worker)
+sudo iotop -p $(pgrep worker)
+
+# Check job resource consumption
+for job in /sys/fs/cgroup/worker.slice/worker.service/job-*/; do
+    echo "Job: $(basename $job)"
+    echo "  Memory: $(cat $job/memory.current 2>/dev/null | numfmt --to=iec)"
+    echo "  CPU: $(cat $job/cpu.stat 2>/dev/null | grep usage_usec)"
+done
+
+# Optimize configuration
+# - Reduce job timeout
+# - Increase cleanup timeout
+# - Adjust concurrent job limits
 ```
 
 ### Debug Mode
 
-Enable debug logging for troubleshooting:
-
 ```bash
-# Edit systemd service
+# Enable debug logging
 sudo systemctl edit worker.service
+# Add:
+# [Service]
+# Environment=LOG_LEVEL=DEBUG
 
-# Add debug environment
-[Service]
-Environment=WORKER_LOG_LEVEL=debug
-
-# Restart service
 sudo systemctl restart worker.service
+
+# Monitor debug logs
+sudo journalctl -u worker.service -f | grep DEBUG
 ```
 
-### Emergency Procedures
+### Recovery Procedures
 
-#### Service Recovery
+#### Emergency Service Recovery
 
 ```bash
-# Stop all job processes
-sudo pkill -f job-worker
+# Stop all processes
+sudo pkill -f worker
 sudo systemctl stop worker.service
 
 # Clean up cgroups
-sudo find /sys/fs/cgroup -name "job-*" -type d -exec rmdir {} \; 2>/dev/null
+sudo find /sys/fs/cgroup/worker.slice -name "job-*" -type d -exec rmdir {} \; 2>/dev/null
+
+# Reset service state
+sudo systemctl reset-failed worker.service
 
 # Restart service
 sudo systemctl start worker.service
 ```
-
-#### Certificate Recovery
-
-```bash
-# Backup corrupted certificates
-sudo mv /opt/job-worker/certs /opt/job-worker/certs.backup
-
-# Regenerate certificates
-sudo /opt/job-worker/etc/certs_gen.sh
-
-# Restart service
-sudo systemctl restart worker.service
-```
-
-## Backup & Recovery
-
-### Automated Backup
-
-Set up daily backups with cron:
-
-```bash
-# Add to crontab
-echo "0 2 * * * /opt/job-worker/scripts/backup.sh" | sudo crontab -u job-worker -
-```
-
-### Disaster Recovery
-
-```bash
-# 1. Stop service
-sudo systemctl stop worker.service
-
-# 2. Restore from backup
-sudo tar -xzf backup.tar.gz -C /opt/job-worker/
-
-# 3. Fix permissions
-sudo chown -R job-worker:job-worker /opt/job-worker
-sudo chmod 600 /opt/job-worker/certs/*-key.pem
-
-# 4. Start service
-sudo systemctl start worker.service
-```
-
-### Migration to New Server
-
-```bash
-# 1. On old server - create backup
-/opt/job-worker/scripts/backup.sh
-
-# 2. Set up new server
-# Follow standard deployment process
-
-# 3. Transfer backup
-scp backup.tar.gz user@new-server:/tmp/
-
-# 4. On new server - restore
-sudo tar -xzf /tmp/backup.tar.gz -C /opt/job-worker/
-sudo systemctl start worker.service
-```
-
-## Environment-Specific Configurations
-
-### Development Environment
-
-```bash
-# Use make setup-dev for local development
-make setup-dev
-
-# Start local server
-./bin/job-worker
-
-# Test with local CLI
-./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem create echo "test"
-```
-
-### Staging Environment
-
-```bash
-# Deploy to staging
-make deploy-safe REMOTE_HOST=staging.example.com
-
-# Use staging certificates
-make certs-download-admin REMOTE_HOST=staging.example.com
-```
-
-### Production Environment
-
-```bash
-# Production deployment with proper certificates
-make setup-remote-passwordless REMOTE_HOST=prod.example.com
-
-# Enable monitoring and alerting
-# Set up log aggregation
-# Configure backup automation
-# Implement certificate rotation
-```
-
-## Scaling Considerations
-
-### Horizontal Scaling
-
-For high-availability deployments:
-
-1. **Load Balancer**: Deploy multiple job-worker instances behind a load balancer
-2. **Shared Storage**: Use shared storage for certificate distribution
-3. **Service Discovery**: Implement service discovery for dynamic scaling
-4. **Health Checks**: Configure load balancer health checks
-
-### Resource Planning
-
-| Concurrent Jobs | Recommended RAM | Recommended CPU | Storage |
-|-----------------|-----------------|-----------------|---------|
-| 1-10            | 2GB             | 2 cores         | 20GB    |
-| 10-50           | 4GB             | 4 cores         | 50GB    |
-| 50-100          | 8GB             | 8 cores         | 100GB   |
-| 100+            | 16GB+           | 16 cores+       | 200GB+  |
-
-## Maintenance Schedule
-
-### Daily
-
-- Monitor service health
-- Check log files for errors
-- Verify certificate expiration dates
-
-### Weekly
-
-- Review job execution patterns
-- Analyze resource usage
-- Update system packages
-
-### Monthly
-
-- Rotate certificates (if needed)
-- Backup configuration and logs
-- Review security configurations
-
-### Quarterly
-
-- Update job-worker binaries
-- Review and update documentation
-- Conduct disaster recovery tests
