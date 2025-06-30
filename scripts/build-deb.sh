@@ -27,7 +27,21 @@ fi
 
 cp ./worker "$BUILD_DIR/opt/worker/"
 cp ./worker-cli "$BUILD_DIR/usr/bin/"
-cp ./config/config.yml "$BUILD_DIR/opt/worker/"
+# Copy config file with proper handling
+if [ -f "./config/config.yml" ]; then
+    cp ./config/config.yml "$BUILD_DIR/opt/worker/"
+    echo "✅ Copied config/config.yml"
+elif [ -f "./config.yaml" ]; then
+    cp ./config.yaml "$BUILD_DIR/opt/worker/config.yml"
+    echo "✅ Copied config.yaml as config.yml"
+elif [ -f "./config/config.yaml" ]; then
+    cp ./config/config.yaml "$BUILD_DIR/opt/worker/config.yml"
+    echo "✅ Copied config/config.yaml as config.yml"
+else
+    echo "❌ No config file found!"
+    echo "Looked for: ./config/config.yml, ./config.yaml, ./config/config.yaml"
+    exit 1
+fi
 
 # Copy service file
 cp ./etc/worker.service "$BUILD_DIR/etc/systemd/system/"

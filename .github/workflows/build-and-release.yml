@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [ amd64, arm64 ]
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -97,11 +97,11 @@ jobs:
           path: worker-cli-${{ matrix.arch }}
 
   build-deb-package:
-    needs: [test, build-binary]
+    needs: [ test, build-binary ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [ amd64, arm64 ]
     steps:
       - uses: actions/checkout@v4
 
@@ -179,7 +179,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   release:
-    needs: [build-deb-package, security-scan]
+    needs: [ build-deb-package, security-scan ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -242,7 +242,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-to-repository:
-    needs: [release]
+    needs: [ release ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, 'rc')
     steps:
@@ -260,7 +260,7 @@ jobs:
           # package_cloud push ehsaniara/worker-repo/ubuntu/focal packages/debian-package-amd64/*.deb
 
   notify:
-    needs: [release]
+    needs: [ release ]
     runs-on: ubuntu-latest
     if: always()
     steps:
