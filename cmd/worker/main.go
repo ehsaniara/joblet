@@ -23,7 +23,7 @@ func main() {
 	// Create context logger
 	mainLogger := logger.WithField("component", "main")
 
-	mainLogger.Info("Configuration loaded", "path", path)
+	mainLogger.Debug("Configuration loaded", "path", path)
 
 	mainLogger.Debug("worker starting with configuration",
 		"mode", cfg.Server.Mode,

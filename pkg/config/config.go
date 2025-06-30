@@ -42,14 +42,12 @@ type WorkerConfig struct {
 
 // SecurityConfig holds security-related configuration
 type SecurityConfig struct {
-	TLSEnabled        bool   `yaml:"tlsEnabled" json:"tlsEnabled"`
-	ServerCertPath    string `yaml:"serverCertPath" json:"serverCertPath"`
-	ServerKeyPath     string `yaml:"serverKeyPath" json:"serverKeyPath"`
-	CACertPath        string `yaml:"caCertPath" json:"caCertPath"`
-	ClientCertPath    string `yaml:"clientCertPath" json:"clientCertPath"`
-	ClientKeyPath     string `yaml:"clientKeyPath" json:"clientKeyPath"`
-	RequireClientCert bool   `yaml:"requireClientCert" json:"requireClientCert"`
-	MinTLSVersion     string `yaml:"minTlsVersion" json:"minTlsVersion"`
+	ServerCertPath string `yaml:"serverCertPath" json:"serverCertPath"`
+	ServerKeyPath  string `yaml:"serverKeyPath" json:"serverKeyPath"`
+	CACertPath     string `yaml:"caCertPath" json:"caCertPath"`
+	ClientCertPath string `yaml:"clientCertPath" json:"clientCertPath"`
+	ClientKeyPath  string `yaml:"clientKeyPath" json:"clientKeyPath"`
+	MinTLSVersion  string `yaml:"minTlsVersion" json:"minTlsVersion"`
 }
 
 // CgroupConfig holds cgroup-related configuration
@@ -94,14 +92,12 @@ var DefaultConfig = Config{
 		ValidateCommands:   true,
 	},
 	Security: SecurityConfig{
-		TLSEnabled:        true,
-		ServerCertPath:    "./certs/server-cert.pem",
-		ServerKeyPath:     "./certs/server-key.pem",
-		CACertPath:        "./certs/ca-cert.pem",
-		ClientCertPath:    "./certs/client-cert.pem",
-		ClientKeyPath:     "./certs/client-key.pem",
-		RequireClientCert: true,
-		MinTLSVersion:     "1.3",
+		ServerCertPath: "./certs/server-cert.pem",
+		ServerKeyPath:  "./certs/server-key.pem",
+		CACertPath:     "./certs/ca-cert.pem",
+		ClientCertPath: "./certs/client-cert.pem",
+		ClientKeyPath:  "./certs/client-key.pem",
+		MinTLSVersion:  "1.3",
 	},
 	Cgroup: CgroupConfig{
 		BaseDir:           "/sys/fs/cgroup/worker.slice/worker.service",
@@ -239,9 +235,6 @@ func loadFromEnv(config *Config) error {
 	}
 
 	// Security config
-	if val := os.Getenv("WORKER_TLS_ENABLED"); val != "" {
-		config.Security.TLSEnabled = val == "true" || val == "1"
-	}
 	if val := os.Getenv("WORKER_SERVER_CERT_PATH"); val != "" {
 		config.Security.ServerCertPath = val
 	}
@@ -256,9 +249,6 @@ func loadFromEnv(config *Config) error {
 	}
 	if val := os.Getenv("WORKER_CLIENT_KEY_PATH"); val != "" {
 		config.Security.ClientKeyPath = val
-	}
-	if val := os.Getenv("WORKER_REQUIRE_CLIENT_CERT"); val != "" {
-		config.Security.RequireClientCert = val == "true" || val == "1"
 	}
 	if val := os.Getenv("WORKER_MIN_TLS_VERSION"); val != "" {
 		config.Security.MinTLSVersion = val
@@ -343,17 +333,15 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid max concurrent jobs: %d", c.Worker.MaxConcurrentJobs)
 	}
 
-	// Validate certificate paths if TLS is enabled
-	if c.Security.TLSEnabled {
-		if c.Security.ServerCertPath == "" {
-			return fmt.Errorf("server certificate path required when TLS is enabled")
-		}
-		if c.Security.ServerKeyPath == "" {
-			return fmt.Errorf("server key path required when TLS is enabled")
-		}
-		if c.Security.CACertPath == "" {
-			return fmt.Errorf("CA certificate path required when TLS is enabled")
-		}
+	// Validate certificate paths
+	if c.Security.ServerCertPath == "" {
+		return fmt.Errorf("server certificate path required when TLS is enabled")
+	}
+	if c.Security.ServerKeyPath == "" {
+		return fmt.Errorf("server key path required when TLS is enabled")
+	}
+	if c.Security.CACertPath == "" {
+		return fmt.Errorf("CA certificate path required when TLS is enabled")
 	}
 
 	// Validate cgroup base directory

@@ -24,7 +24,6 @@ func RunServer(cfg *config.Config) error {
 
 	log.Info("starting worker server",
 		"address", cfg.GetServerAddress(),
-		"tlsEnabled", cfg.Security.TLSEnabled,
 		"maxJobs", cfg.Worker.MaxConcurrentJobs)
 
 	// Create state store
