@@ -40,7 +40,6 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          args: --out-format=colored-line-number
 
   build-binary:
     needs: test
@@ -86,13 +85,13 @@ jobs:
             ./cmd/cli
 
       - name: Upload worker binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: worker-binary-${{ matrix.arch }}
           path: worker-${{ matrix.arch }}
 
       - name: Upload CLI binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: worker-cli-binary-${{ matrix.arch }}
           path: worker-cli-${{ matrix.arch }}
@@ -107,13 +106,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download worker binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: worker-binary-${{ matrix.arch }}
           path: ./
 
       - name: Download CLI binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: worker-cli-binary-${{ matrix.arch }}
           path: ./
@@ -140,7 +139,7 @@ jobs:
           ./scripts/build-deb.sh ${{ matrix.arch }} ${{ env.VERSION }}
 
       - name: Upload Debian package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: debian-package-${{ matrix.arch }}
           path: "*.deb"
@@ -160,7 +159,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Debian package (amd64)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debian-package-amd64
           path: ./
@@ -187,7 +186,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download all packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: packages/
 
@@ -248,7 +247,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, 'rc')
     steps:
       - name: Download packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: packages/
 
@@ -279,6 +278,6 @@ jobs:
         uses: 8398a7/action-slack@v3
         with:
           status: failure
-          text: "❌ Worker release ${{ github.ref_name }} failed!"
+          text: "Worker release ${{ github.ref_name }} failed!"
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
