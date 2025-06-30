@@ -55,23 +55,15 @@ elif [ -f "./config/config.yaml" ]; then
     echo "✅ Copied config/config.yaml as config.yml"
 else
     echo "❌ No config file found!"
+    echo "Looked for: ./config/config.yml, ./config.yaml, ./config/config.yaml"
     exit 1
 fi
 
 # Copy service file
 cp ./etc/worker.service "$BUILD_DIR/etc/systemd/system/"
 
-# Copy certificate generation script - FIXED TO USE CERTS_GEN.SH
-if [ -f "./etc/certs_gen.sh" ]; then
-    cp ./etc/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
-    echo "✅ Copied etc/certs_gen.sh"
-else
-    echo "❌ Certificate generation script not found!"
-    echo "🔍 Looking for: ./etc/certs_gen.sh"
-    echo "🔍 Contents of ./etc/:"
-    ls -la ./etc/ || echo "etc directory not found"
-    exit 1
-fi
+# Copy certificate generation script
+cp ./etc/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
 
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
