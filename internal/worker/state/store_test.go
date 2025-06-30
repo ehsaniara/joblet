@@ -103,7 +103,7 @@ func TestStore_CreateDuplicateJob(t *testing.T) {
 }
 
 func TestStore_UpdateJob(t *testing.T) {
-	store := New()
+	s := New()
 
 	job := &domain.Job{
 		Id:      "update-test",
@@ -111,16 +111,16 @@ func TestStore_UpdateJob(t *testing.T) {
 		Status:  domain.StatusInitializing,
 	}
 
-	store.CreateNewJob(job)
+	s.CreateNewJob(job)
 
 	// Update the job
 	updatedJob := job.DeepCopy()
-	updatedJob.MarkAsRunning(1234)
+	_ = updatedJob.MarkAsRunning(1234)
 
-	store.UpdateJob(updatedJob)
+	s.UpdateJob(updatedJob)
 
 	// Retrieve and verify update
-	retrievedJob, exists := store.GetJob("update-test")
+	retrievedJob, exists := s.GetJob("update-test")
 	if !exists {
 		t.Fatal("Expected job to exist")
 	}

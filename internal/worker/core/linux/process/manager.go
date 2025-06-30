@@ -648,43 +648,6 @@ func (pm *Manager) validateArguments(args []string) error {
 	return nil
 }
 
-func (pm *Manager) validateResourceLimits(maxCPU, maxMemory, maxIOBPS int32) error {
-	if maxCPU < 0 {
-		return ValidationError{Field: "maxCPU", Value: maxCPU, Message: "CPU limit cannot be negative"}
-	}
-	if maxCPU > 10000 {
-		return ValidationError{Field: "maxCPU", Value: maxCPU, Message: "CPU limit too high (max 10000%)"}
-	}
-	if maxMemory < 0 {
-		return ValidationError{Field: "maxMemory", Value: maxMemory, Message: "memory limit cannot be negative"}
-	}
-	if maxMemory > 1024*1024 {
-		return ValidationError{Field: "maxMemory", Value: maxMemory, Message: "memory limit too high (max 1TB)"}
-	}
-	if maxIOBPS < 0 {
-		return ValidationError{Field: "maxIOBPS", Value: maxIOBPS, Message: "IO limit cannot be negative"}
-	}
-	if maxIOBPS > 10*1024*1024 {
-		return ValidationError{Field: "maxIOBPS", Value: maxIOBPS, Message: "IO limit too high (max 10GB/s)"}
-	}
-	return nil
-}
-
-func (pm *Manager) validateJobID(jobID string) error {
-	if jobID == "" {
-		return ValidationError{Field: "jobID", Value: jobID, Message: "job ID cannot be empty"}
-	}
-	if len(jobID) > 64 {
-		return ValidationError{Field: "jobID", Value: jobID, Message: "job ID too long (max 64 characters)"}
-	}
-	for _, char := range jobID {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_') {
-			return ValidationError{Field: "jobID", Value: jobID, Message: "job ID contains invalid characters (only alphanumeric, dash, underscore allowed)"}
-		}
-	}
-	return nil
-}
-
 func (pm *Manager) validatePID(pid int32) error {
 	if pid <= 0 {
 		return ValidationError{Field: "pid", Value: pid, Message: "PID must be positive"}
@@ -739,23 +702,6 @@ func (pm *Manager) validateInitPath(initPath string) error {
 	}
 	if fileInfo.Mode().Perm()&0111 == 0 {
 		return ValidationError{Field: "initPath", Value: initPath, Message: "init binary is not executable"}
-	}
-	return nil
-}
-
-func (pm *Manager) validateCgroupPath(cgroupPath string) error {
-	if !filepath.IsAbs(cgroupPath) {
-		return ValidationError{Field: "cgroupPath", Value: cgroupPath, Message: "cgroup path must be absolute"}
-	}
-	cleanPath := filepath.Clean(cgroupPath)
-	if cleanPath != cgroupPath {
-		return ValidationError{Field: "cgroupPath", Value: cgroupPath, Message: "cgroup path contains path traversal attempts"}
-	}
-	if _, err := pm.platform.Stat(cgroupPath); err != nil {
-		if pm.platform.IsNotExist(err) {
-			return ValidationError{Field: "cgroupPath", Value: cgroupPath, Message: "cgroup directory does not exist"}
-		}
-		return ValidationError{Field: "cgroupPath", Value: cgroupPath, Message: fmt.Sprintf("failed to stat cgroup directory: %v", err)}
 	}
 	return nil
 }

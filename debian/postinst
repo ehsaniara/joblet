@@ -1,0 +1,55 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        echo "Configuring worker service..."
+
+        # Create worker user if it doesn't exist
+        if ! id worker >/dev/null 2>&1; then
+            useradd --system --home /opt/worker --shell /bin/false worker
+            echo "Created worker user"
+        fi
+
+        # Set ownership and permissions
+        chown -R root:root /opt/worker
+        chmod 755 /opt/worker
+        chmod 755 /opt/worker/worker
+        chmod 644 /opt/worker/config.yml
+
+        # Make cert generation script executable
+        chmod +x /usr/local/bin/cert_gen.sh
+
+        # Make CLI executable and create symlink
+        chmod 755 /usr/bin/worker-cli
+        if [ ! -L /usr/bin/worker ]; then
+            ln -sf /usr/bin/worker-cli /usr/bin/worker
+        fi
+
+        # Generate certificates
+        echo "Generating SSL certificates..."
+        /usr/local/bin/cert_gen.sh
+
+        # Ensure certificates have correct ownership
+        if [ -d /opt/worker/certs ]; then
+            chown -R root:root /opt/worker/certs
+            chmod 600 /opt/worker/certs/*-key.pem 2>/dev/null || true
+            chmod 644 /opt/worker/certs/*-cert.pem 2>/dev/null || true
+        fi
+
+        # Create necessary directories
+        mkdir -p /var/log/worker
+        chown root:root /var/log/worker
+
+        # Reload systemd and enable service
+        systemctl daemon-reload
+        systemctl enable worker.service
+
+        echo "✅ Worker service installed successfully!"
+        echo "To start: sudo systemctl start worker"
+        echo "To check status: sudo systemctl status worker"
+        echo "CLI usage: worker --help"
+        ;;
+esac
+
+exit 0

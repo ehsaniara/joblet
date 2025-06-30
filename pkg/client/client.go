@@ -33,9 +33,9 @@ func NewJobClient(serverAddr string) (*JobClient, error) {
 		return nil, fmt.Errorf("failed to load client cert/key: %w", err)
 	}
 
-	caCert, err := os.ReadFile(caCertPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	caCert, e := os.ReadFile(caCertPath)
+	if e != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", e)
 	}
 
 	certPool := x509.NewCertPool()
@@ -52,13 +52,13 @@ func NewJobClient(serverAddr string) (*JobClient, error) {
 
 	creds := credentials.NewTLS(tlsConfig)
 
-	conn, err := grpc.Dial(
+	conn, er := grpc.NewClient(
 		serverAddr,
 		grpc.WithTransportCredentials(creds),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to server: %w", err)
+	if er != nil {
+		return nil, fmt.Errorf("failed to connect to server: %w", er)
 	}
 
 	return &JobClient{

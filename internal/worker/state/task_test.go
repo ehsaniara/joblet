@@ -75,7 +75,7 @@ func TestTask_UpdateJob(t *testing.T) {
 
 	// Update job
 	updatedJob := originalJob.DeepCopy()
-	updatedJob.MarkAsRunning(5678)
+	_ = updatedJob.MarkAsRunning(5678)
 
 	task.UpdateJob(updatedJob)
 

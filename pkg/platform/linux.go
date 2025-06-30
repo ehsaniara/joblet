@@ -3,7 +3,6 @@
 package platform
 
 import (
-	"fmt"
 	"runtime"
 	"syscall"
 )
@@ -33,33 +32,4 @@ func (lp *LinuxPlatform) GetInfo() *Info {
 		OS:           "linux",
 		Architecture: runtime.GOARCH,
 	}
-}
-
-// checkCgroupSupport checks if cgroups are available
-func (lp *LinuxPlatform) checkCgroupSupport() bool {
-	_, err := lp.Stat("/sys/fs/cgroup")
-	return err == nil
-}
-
-// checkNetworkNamespaceSupport checks if network namespaces are supported
-func (lp *LinuxPlatform) checkNetworkNamespaceSupport() bool {
-	_, err := lp.Stat("/proc/self/ns/net")
-	return err == nil
-}
-
-// validateKernelVersion performs basic kernel version validation
-func (lp *LinuxPlatform) validateKernelVersion() error {
-	version, err := lp.ReadFile("/proc/version")
-	if err != nil {
-		return fmt.Errorf("cannot read kernel version: %w", err)
-	}
-
-	// Simple check for minimum kernel version (4.6+ for cgroup namespaces)
-	versionStr := string(version)
-	if len(versionStr) < 20 {
-		return fmt.Errorf("invalid kernel version format")
-	}
-
-	// More sophisticated version checking could be added here
-	return nil
 }
