@@ -11,8 +11,9 @@ case "$1" in
         # Remove log directory
         rm -rf /var/log/worker
 
-        # Remove CLI symlink
+        # Remove symlinks
         rm -f /usr/bin/worker
+        rm -f /usr/bin/worker-cli
 
         echo "Worker service removed successfully!"
         ;;
@@ -23,9 +24,13 @@ case "$1" in
             userdel worker 2>/dev/null || true
         fi
 
-        # Remove all worker files
+        # Remove all worker files including new structure
         rm -rf /opt/worker
         rm -rf /var/log/worker
+
+        # Remove symlinks
+        rm -f /usr/bin/worker
+        rm -f /usr/bin/worker-cli
 
         echo "Worker service purged successfully!"
         ;;

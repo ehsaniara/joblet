@@ -3,24 +3,31 @@ set -e
 
 case "$1" in
     configure)
-        echo "Configuring worker service (root mode)..."
+        echo "Configuring worker service..."
 
-        # Set ownership and permissions for root
+        # Set ownership and permissions for /opt/worker structure
         chown -R root:root /opt/worker
         chmod 755 /opt/worker
-        chmod 755 /opt/worker/worker
-        chmod 644 /opt/worker/config.yml
 
-        # Make cert generation script executable - FIXED
+        # Make binaries executable - BOTH in /opt/worker/
+        chmod 755 /opt/worker/worker
+        chmod 755 /opt/worker/worker-cli
+
+        # Config file permissions
+        chmod 644 /opt/worker/config/config.yml
+
+        # Make cert generation script executable
         chmod +x /usr/local/bin/certs_gen.sh
 
-        # Make CLI executable and create symlink
-        chmod 755 /usr/bin/worker-cli
+        # Create symlinks for easier access
         if [ ! -L /usr/bin/worker ]; then
-            ln -sf /usr/bin/worker-cli /usr/bin/worker
+            ln -sf /opt/worker/worker-cli /usr/bin/worker
+        fi
+        if [ ! -L /usr/bin/worker-cli ]; then
+            ln -sf /opt/worker/worker-cli /usr/bin/worker-cli
         fi
 
-        # Generate certificates with proper root ownership - FIXED
+        # Generate certificates with proper root ownership
         echo "Generating SSL certificates..."
         /usr/local/bin/certs_gen.sh
 
@@ -48,10 +55,19 @@ case "$1" in
         systemctl daemon-reload
         systemctl enable worker.service
 
-        echo "✅ Worker service installed successfully (running as root)!"
-        echo "To start: sudo systemctl start worker"
-        echo "To check status: sudo systemctl status worker"
-        echo "CLI usage: worker --help"
+        echo "✅ Worker service installed successfully!"
+        echo ""
+        echo "📁 Installation layout:"
+        echo "   Daemon:      /opt/worker/worker"
+        echo "   CLI:         /opt/worker/worker-cli"
+        echo "   Config:      /opt/worker/config/config.yml"
+        echo "   Certificates: /opt/worker/certs/"
+        echo "   Symlinks:    /usr/bin/worker -> /opt/worker/worker-cli"
+        echo "               /usr/bin/worker-cli -> /opt/worker/worker-cli"
+        echo ""
+        echo "🚀 To start: sudo systemctl start worker"
+        echo "📊 To check status: sudo systemctl status worker"
+        echo "💻 CLI usage: worker --help"
         ;;
 esac
 

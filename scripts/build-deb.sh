@@ -26,11 +26,11 @@ mkdir -p "$BUILD_DIR"
 # Create directory structure
 mkdir -p "$BUILD_DIR/DEBIAN"
 mkdir -p "$BUILD_DIR/opt/worker"
+mkdir -p "$BUILD_DIR/opt/worker/config"
 mkdir -p "$BUILD_DIR/etc/systemd/system"
 mkdir -p "$BUILD_DIR/usr/local/bin"
-mkdir -p "$BUILD_DIR/usr/bin"
 
-# Copy binaries
+# Copy binaries - BOTH to /opt/worker/
 if [ ! -f "./worker" ]; then
     echo "❌ Worker binary not found!"
     exit 1
@@ -41,18 +41,18 @@ if [ ! -f "./worker-cli" ]; then
     echo "❌ Worker CLI binary not found!"
     exit 1
 fi
-cp ./worker-cli "$BUILD_DIR/usr/bin/"
+cp ./worker-cli "$BUILD_DIR/opt/worker/"
 
-# Copy config file with proper handling
+# Copy config file to correct location - FIXED
 if [ -f "./config/config.yml" ]; then
-    cp ./config/config.yml "$BUILD_DIR/opt/worker/"
-    echo "✅ Copied config/config.yml"
+    cp ./config/config.yml "$BUILD_DIR/opt/worker/config/"
+    echo "✅ Copied config/config.yml to /opt/worker/config/"
 elif [ -f "./config.yaml" ]; then
-    cp ./config.yaml "$BUILD_DIR/opt/worker/config.yml"
-    echo "✅ Copied config.yaml as config.yml"
+    cp ./config.yaml "$BUILD_DIR/opt/worker/config/config.yml"
+    echo "✅ Copied config.yaml to /opt/worker/config/config.yml"
 elif [ -f "./config/config.yaml" ]; then
-    cp ./config/config.yaml "$BUILD_DIR/opt/worker/config.yml"
-    echo "✅ Copied config/config.yaml as config.yml"
+    cp ./config/config.yaml "$BUILD_DIR/opt/worker/config/config.yml"
+    echo "✅ Copied config/config.yaml to /opt/worker/config/config.yml"
 else
     echo "❌ No config file found!"
     echo "Looked for: ./config/config.yml, ./config.yaml, ./config/config.yaml"
