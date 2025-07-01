@@ -102,10 +102,13 @@ system calls.
 
 ```bash
 # Download the latest release
-wget https://github.com/ehsaniara/worker/releases/latest/download/worker_1.0.0_amd64.deb
+wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
 
-# Install the package
-sudo dpkg -i worker_1.0.0_amd64.deb
+# Or manually download latest version
+# wget https://github.com/ehsaniara/worker/releases/latest/download/worker_VERSION_amd64.deb
+
+# Install the package (replace VERSION with actual version)
+sudo dpkg -i worker_*_amd64.deb
 
 # Start the service
 sudo systemctl start worker
@@ -115,26 +118,76 @@ sudo systemctl enable worker
 **macOS/Darwin Client (CLI only):**
 
 ```bash
-# Download CLI binary for macOS
-wget https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-darwin-amd64.tar.gz
-tar -xzf worker-cli-darwin-amd64.tar.gz
-chmod +x worker-cli
-sudo mv worker-cli /usr/local/bin/
+# For Intel Macs (amd64)
+wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*worker-cli.*darwin-amd64\.tar\.gz" | cut -d '"' -f 4)
+tar -xzf worker-cli-*-darwin-amd64.tar.gz
+chmod +x worker-cli-*-darwin-amd64
+sudo mv worker-cli-*-darwin-amd64 /usr/local/bin/worker-cli
+
+# For Apple Silicon Macs (arm64)
+wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*worker-cli.*darwin-arm64\.tar\.gz" | cut -d '"' -f 4)
+tar -xzf worker-cli-*-darwin-arm64.tar.gz
+chmod +x worker-cli-*-darwin-arm64
+sudo mv worker-cli-*-darwin-arm64 /usr/local/bin/worker-cli
 
 # Connect to remote Linux server
 worker-cli --server your-linux-server.com:50051 run echo "Hello from macOS!"
 ```
 
+### Installation File Structure
+
+After installation, Worker creates the following structure:
+
+```
+/opt/worker/
+├── worker                    # Main daemon binary
+├── worker-cli               # CLI client binary
+├── config/
+│   └── config.yml          # Main configuration file
+└── certs/                  # Auto-generated TLS certificates
+    ├── ca-cert.pem
+    ├── ca-key.pem
+    ├── server-cert.pem
+    ├── server-key.pem
+    ├── admin-client-cert.pem
+    ├── admin-client-key.pem
+    ├── viewer-client-cert.pem
+    └── viewer-client-key.pem
+
+/usr/bin/
+├── worker -> /opt/worker/worker-cli      # Symlink for easy access
+└── worker-cli -> /opt/worker/worker-cli  # Symlink for easy access
+```
+
 ### Initial Setup
 
-```bash
-# Generate SSL certificates (one-time setup)
-sudo /usr/local/bin/certs_gen.sh
+The Debian package automatically:
 
+- ✅ Installs binaries to `/opt/worker/`
+- ✅ Generates TLS certificates in `/opt/worker/certs/`
+- ✅ Creates configuration at `/opt/worker/config/config.yml`
+- ✅ Sets up systemd service
+- ✅ Creates CLI symlinks in `/usr/bin/`
+
+Check installation:
+
+```bash
 # Check service status
 sudo systemctl status worker
 
-# Copy client certificates for CLI access
+# Verify file structure
+ls -la /opt/worker/
+ls -la /opt/worker/certs/
+ls -la /opt/worker/config/
+
+# Test CLI access
+worker --help
+```
+
+### Copy Client Certificates for Remote Access
+
+```bash
+# Copy certificates for remote CLI usage
 mkdir -p ~/.worker
 sudo cp /opt/worker/certs/admin-client-cert.pem ~/.worker/client-cert.pem
 sudo cp /opt/worker/certs/admin-client-key.pem ~/.worker/client-key.pem
@@ -144,7 +197,7 @@ sudo cp /opt/worker/certs/ca-cert.pem ~/.worker/ca-cert.pem
 ### First Job
 
 ```bash
-# Run your first job
+# Run your first job locally
 worker-cli --server localhost:50051 run echo "Hello, Worker!"
 
 # Check job status
@@ -225,7 +278,7 @@ worker-cli run python3 long_script.py && worker-cli log -f <job-id>
 
 ### Server Configuration
 
-Edit `/opt/worker/config.yml` to customize server behavior:
+Edit `/opt/worker/config/config.yml` to customize server behavior:
 
 ```yaml
 server:
@@ -239,6 +292,9 @@ worker:
   jobTimeout: "1h"            # Maximum job runtime
 
 security:
+  serverCertPath: "/opt/worker/certs/server-cert.pem"
+  serverKeyPath: "/opt/worker/certs/server-key.pem"
+  caCertPath: "/opt/worker/certs/ca-cert.pem"
   minTlsVersion: "1.3"        # Minimum TLS version
 
 cgroup:
@@ -274,17 +330,19 @@ Worker uses mutual TLS with role-based access:
 
 ### Setting Up Access Roles
 
-```bash
-# Generate certificates with specific roles
-sudo /usr/local/bin/certs_gen.sh  # Creates both admin and viewer certs
+The installation automatically generates certificates for both roles:
 
-# Setup admin access
+```bash
+# Admin access (full permissions)
 cp /opt/worker/certs/admin-client-cert.pem ~/.worker/admin-cert.pem
 cp /opt/worker/certs/admin-client-key.pem ~/.worker/admin-key.pem
 
-# Setup viewer access
+# Viewer access (read-only)
 cp /opt/worker/certs/viewer-client-cert.pem ~/.worker/viewer-cert.pem
 cp /opt/worker/certs/viewer-client-key.pem ~/.worker/viewer-key.pem
+
+# Copy CA certificate for both
+cp /opt/worker/certs/ca-cert.pem ~/.worker/ca-cert.pem
 
 # Use specific role
 worker-cli --cert ~/.worker/admin-cert.pem --key ~/.worker/admin-key.pem run command
@@ -353,7 +411,7 @@ sudo ufw status
 sudo /usr/local/bin/certs_gen.sh
 
 # Verify certificate permissions
-ls -la ~/.worker/
+ls -la /opt/worker/certs/
 ```
 
 **Job Failures**
@@ -365,6 +423,20 @@ worker-cli log <job-id>
 # Check system resources
 df -h                    # Disk space
 free -h                  # Memory usage
+sudo systemctl status worker
+```
+
+### Configuration File Issues
+
+```bash
+# Check configuration syntax
+worker-cli --help  # Will report config issues
+
+# View current configuration
+cat /opt/worker/config/config.yml
+
+# Test configuration changes
+sudo systemctl restart worker
 sudo systemctl status worker
 ```
 
@@ -397,11 +469,11 @@ worker-cli --server linux-server.com:50051 \
 **Windows Client (via WSL):**
 
 ```bash
-# Install Worker CLI in WSL2 Ubuntu
-wget https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-linux-amd64.tar.gz
-tar -xzf worker-cli-linux-amd64.tar.gz
-chmod +x worker-cli
-sudo mv worker-cli /usr/local/bin/
+# Install Worker CLI in WSL2 Ubuntu (latest version)
+wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*worker-cli.*linux-amd64\.tar\.gz" | cut -d '"' -f 4)
+tar -xzf worker-cli-*-linux-amd64.tar.gz
+chmod +x worker-cli-*-linux-amd64
+sudo mv worker-cli-*-linux-amd64 /usr/local/bin/worker-cli
 ```
 
 ### Permanent Remote Setup

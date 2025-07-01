@@ -92,11 +92,11 @@ var DefaultConfig = Config{
 		ValidateCommands:   true,
 	},
 	Security: SecurityConfig{
-		ServerCertPath: "./certs/server-cert.pem",
-		ServerKeyPath:  "./certs/server-key.pem",
-		CACertPath:     "./certs/ca-cert.pem",
-		ClientCertPath: "./certs/client-cert.pem",
-		ClientKeyPath:  "./certs/client-key.pem",
+		ServerCertPath: "/opt/worker/certs/server-cert.pem",
+		ServerKeyPath:  "/opt/worker/certs/server-key.pem",
+		CACertPath:     "/opt/worker/certs/ca-cert.pem",
+		ClientCertPath: "/opt/worker/certs/client-cert.pem",
+		ClientKeyPath:  "/opt/worker/certs/client-key.pem",
 		MinTLSVersion:  "1.3",
 	},
 	Cgroup: CgroupConfig{
@@ -149,12 +149,12 @@ func LoadConfig() (*Config, string, error) {
 func loadFromFile(config *Config) (string, error) {
 	configPaths := []string{
 		os.Getenv("WORKER_CONFIG_PATH"), // Custom path from environment
+		"/opt/worker/config/config.yml", // Primary production path
 		"./config/config.yml",           // Development - relative to project root
 		"./config.yml",                  // Development - current directory
-		"/opt/worker/config.yml",        // Production - installed location
 		"/etc/worker/config.yml",        // System-wide alternative
-		"./config/config.yaml",          // Fallback for old naming
-		"/opt/worker/config.yaml",       // Fallback for old naming
+		"/opt/worker/config.yaml",       // Fallback for old naming in production
+		"./config/config.yaml",          // Fallback for old naming in development
 	}
 
 	for _, path := range configPaths {

@@ -16,11 +16,11 @@ worker:
   validateCommands: true           # Enable command validation
 
 security:
-  serverCertPath: "./certs/server-cert.pem"
-  serverKeyPath: "./certs/server-key.pem"
-  caCertPath: "./certs/ca-cert.pem"
-  clientCertPath: "./certs/client-cert.pem"
-  clientKeyPath: "./certs/client-key.pem"
+  serverCertPath: "/opt/worker/certs/server-cert.pem"
+  serverKeyPath: "/opt/worker/certs/server-key.pem"
+  caCertPath: "/opt/worker/certs/ca-cert.pem"
+  clientCertPath: "/opt/worker/certs/client-cert.pem"
+  clientKeyPath: "/opt/worker/certs/client-key.pem"
   minTlsVersion: "1.3"
 
 cgroup:
