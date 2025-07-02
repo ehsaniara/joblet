@@ -491,9 +491,7 @@ fmt.Print(string(chunk.Payload))
 
 ## 🏗️ Architecture
 
-Worker implements a client-server architecture with sophisticated multi-layer isolation:
-
-![high-arch.png](docs/high-arch.png)
+![high-level.svg](docs/high-level.svg)
 
 
 ### Component Communication
