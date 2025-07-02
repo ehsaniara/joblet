@@ -1,4 +1,4 @@
-package linux
+package core
 
 import (
 	"worker/internal/worker/state"

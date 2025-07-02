@@ -1,6 +1,6 @@
 //go:build linux
 
-package linux
+package core
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 	"worker/internal/worker/core/interfaces"
-	"worker/internal/worker/core/linux/process"
-	"worker/internal/worker/core/linux/resource"
-	"worker/internal/worker/core/linux/unprivileged"
+	"worker/internal/worker/core/process"
+	"worker/internal/worker/core/resource"
+	"worker/internal/worker/core/unprivileged"
 	"worker/internal/worker/domain"
 	"worker/internal/worker/state"
 	"worker/pkg/config"

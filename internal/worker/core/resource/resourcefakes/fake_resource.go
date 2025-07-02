@@ -3,7 +3,7 @@ package resourcefakes
 
 import (
 	"sync"
-	"worker/internal/worker/core/linux/resource"
+	"worker/internal/worker/core/resource"
 )
 
 type FakeResource struct {
