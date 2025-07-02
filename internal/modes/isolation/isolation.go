@@ -6,21 +6,28 @@ import (
 	"strconv"
 	"strings"
 
+	"worker/internal/worker/core/linux/filesystem"
+	"worker/pkg/config"
 	"worker/pkg/logger"
 	"worker/pkg/platform"
 )
 
 // Isolator provides job isolation functionality
 type Isolator struct {
-	platform platform.Platform
-	logger   *logger.Logger
+	platform   platform.Platform
+	filesystem *filesystem.Isolator
+	logger     *logger.Logger
 }
 
 // NewIsolator creates a new isolator with the given platform
 func NewIsolator(p platform.Platform, logger *logger.Logger) *Isolator {
+	// Load configuration for filesystem isolation
+	cfg, _, _ := config.LoadConfig() // You might want to pass this instead
+
 	return &Isolator{
-		platform: p,
-		logger:   logger.WithField("component", "isolator"),
+		platform:   p,
+		filesystem: filesystem.NewIsolator(cfg.Filesystem, p),
+		logger:     logger.WithField("component", "isolator"),
 	}
 }
 
@@ -46,7 +53,7 @@ func (i *Isolator) Setup() error {
 // setupLinux sets up Linux-specific isolation using platform abstraction
 func (i *Isolator) setupLinux() error {
 	pid := i.platform.Getpid()
-	i.logger.Debug("setting up Linux isolation", "pid", pid, "approach", "platform-abstraction")
+	i.logger.Debug("setting up Linux isolation with filesystem isolation", "pid", pid, "approach", "platform-abstraction")
 
 	// Only PID 1 should setup isolation
 	if pid != 1 {
@@ -60,7 +67,13 @@ func (i *Isolator) setupLinux() error {
 		// Continue - not always required
 	}
 
-	// Remount /proc
+	// Setup filesystem isolation BEFORE remounting /proc
+	if err := i.setupFilesystemIsolation(); err != nil {
+		i.logger.Error("filesystem isolation setup failed", "error", err)
+		return fmt.Errorf("filesystem isolation failed: %w", err)
+	}
+
+	// Remount /proc (this will now be inside the chroot)
 	if err := i.remountProc(); err != nil {
 		i.logger.Error("failed to remount /proc", "error", err)
 		return fmt.Errorf("proc remount failed: %w", err)
@@ -83,6 +96,30 @@ func (i *Isolator) setupDarwin() error {
 	return nil
 }
 
+// setupFilesystemIsolation sets up filesystem isolation for the job
+func (i *Isolator) setupFilesystemIsolation() error {
+	i.logger.Debug("setting up filesystem isolation")
+
+	jobID := i.platform.Getenv("JOB_ID")
+	if jobID == "" {
+		return fmt.Errorf("JOB_ID not set - cannot setup filesystem isolation")
+	}
+
+	// Create isolated filesystem for this job
+	jobFS, err := i.filesystem.CreateJobFilesystem(jobID)
+	if err != nil {
+		return fmt.Errorf("failed to create job filesystem: %w", err)
+	}
+
+	// Setup the filesystem isolation (chroot, mounts, etc.)
+	if err := jobFS.Setup(); err != nil {
+		return fmt.Errorf("failed to setup filesystem isolation: %w", err)
+	}
+
+	i.logger.Debug("filesystem isolation setup completed successfully", "jobID", jobID)
+	return nil
+}
+
 // makePrivate makes mounts private using platform abstraction
 func (i *Isolator) makePrivate() error {
 	i.logger.Debug("making mounts private using platform abstraction")
@@ -97,23 +134,24 @@ func (i *Isolator) makePrivate() error {
 	return nil
 }
 
-// remountProc remounts /proc using platform abstraction
+// remountProc remounts /proc using platform abstraction (now within chroot)
 func (i *Isolator) remountProc() error {
-	i.logger.Debug("remounting /proc using platform abstraction")
+	i.logger.Debug("remounting /proc within isolated filesystem")
 
+	// We're now inside the chroot, so /proc refers to the chrooted /proc
 	// Lazy unmount existing /proc using platform helper
 	if err := i.platform.Unmount("/proc", 0x2); err != nil { // 0x2 for platform.UnmountDetach
-		i.logger.Debug("existing /proc unmount", "error", err)
+		i.logger.Debug("existing /proc unmount (within chroot)", "error", err)
 		// Continue
 	}
 
 	// Mount new proc using platform abstraction
 	if err := i.platform.Mount("proc", "/proc", "proc", 0, ""); err != nil {
-		i.logger.Error("platform proc mount failed", "error", err)
+		i.logger.Error("platform proc mount failed (within chroot)", "error", err)
 		return fmt.Errorf("platform proc mount failed: %w", err)
 	}
 
-	i.logger.Debug("/proc successfully remounted using platform abstraction")
+	i.logger.Debug("/proc successfully remounted within chrooted environment")
 	return nil
 }
 

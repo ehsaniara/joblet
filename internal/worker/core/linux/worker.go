@@ -224,25 +224,25 @@ func (w *Worker) setupCgroupControllers() error {
 
 // startProcessSingleBinary starts a job using the same binary in init mode
 func (w *Worker) startProcessSingleBinary(ctx context.Context, job *domain.Job) (platform.Command, error) {
-	// Get the current executable path (this same binary)
+	// Get the current executable path
 	execPath, err := w.platform.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current executable path: %w", err)
 	}
 
 	// Prepare environment with job information and mode indicator
-	env := w.buildJobEnvironmentSingleBinary(job, execPath)
+	env := w.buildJobEnvironment(job, execPath)
 
 	// Create isolation attributes
 	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
 
 	// Create launch configuration
 	launchConfig := &process.LaunchConfig{
-		InitPath:    execPath, // Use same binary
+		InitPath:    execPath,
 		Environment: env,
 		SysProcAttr: sysProcAttr,
-		Stdout:      New(w.store, job.Id),
-		Stderr:      New(w.store, job.Id),
+		Stdout:      NewWrite(w.store, job.Id),
+		Stderr:      NewWrite(w.store, job.Id),
 		JobID:       job.Id,
 		Command:     job.Command,
 		Args:        job.Args,
@@ -263,8 +263,8 @@ func (w *Worker) startProcessSingleBinary(ctx context.Context, job *domain.Job) 
 	return result.Command, nil
 }
 
-// buildJobEnvironmentSingleBinary builds environment for single binary mode
-func (w *Worker) buildJobEnvironmentSingleBinary(job *domain.Job, execPath string) []string {
+// buildJobEnvironment builds environment for single binary mode
+func (w *Worker) buildJobEnvironment(job *domain.Job, execPath string) []string {
 	baseEnv := w.platform.Environ()
 
 	// Job-specific environment with mode indicator
@@ -275,11 +275,7 @@ func (w *Worker) buildJobEnvironmentSingleBinary(job *domain.Job, execPath strin
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace path
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		"HOST_NETWORKING=true",
-		"CGROUP_NAMESPACE=true",
-		"JOB_ISOLATION=enabled",
-		"USER_NAMESPACE=true",
-		fmt.Sprintf("WORKER_BINARY_PATH=%s", execPath), // For reference
+		fmt.Sprintf("WORKER_BINARY_PATH=%s", execPath),
 		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
 		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),

@@ -29,6 +29,18 @@ cgroup:
   enableControllers: [ "memory", "cpu" ] # Minimal controllers
   cleanupTimeout: "1s"
 
+filesystem:
+  baseDir: "/opt/worker/jobs"              # Base directory for isolated job filesystems
+  tmpDir: "/tmp/job-{JOB_ID}"             # Job-specific tmp directory template
+  allowedMounts: # Read-only mounts from host system
+    - "/usr/bin"                          # Essential binaries
+    - "/bin"                              # System binaries
+    - "/lib"                              # Libraries
+    - "/lib64"                            # 64-bit libraries
+    - "/usr/lib"                          # User libraries
+    - "/usr/lib64"                        # 64-bit user libraries
+  blockDevices: false                     # Block access to devices
+
 grpc:
   maxRecvMsgSize: 262144           # 256KB
   maxSendMsgSize: 1048576          # 1MB
