@@ -5,7 +5,6 @@ package core
 import (
 	"context"
 	"worker/internal/worker/core/interfaces"
-	"worker/internal/worker/core/linux"
 	"worker/internal/worker/domain"
 	"worker/internal/worker/state"
 	"worker/pkg/config"
@@ -19,7 +18,7 @@ type linuxWorker struct {
 // NewWorker creates a Linux worker
 func NewWorker(store state.Store, cfg *config.Config) interfaces.Worker {
 	return &linuxWorker{
-		platformWorker: linux.NewPlatformWorker(store, cfg),
+		platformWorker: NewPlatformWorker(store, cfg),
 	}
 }
 

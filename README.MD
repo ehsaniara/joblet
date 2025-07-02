@@ -1,4 +1,4 @@
-# Worker
+# Worker - Job Isolation Platform
 
 [![Tests](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/job-worker)](https://goreportcard.com/report/github.com/ehsaniara/job-worker)
@@ -6,586 +6,777 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
 
-![worker-thum.png](docs/worker-thum.png)
+<img align="right" width="159px" src="docs/worker-thum.png">
 
 **Worker** is a secure job execution platform designed to **isolate system calls from clients**, providing safe remote
 command execution on Linux systems. By creating complete process isolation barriers, Worker prevents clients from
 directly accessing the host system while enabling controlled job execution with comprehensive resource management and
 real-time monitoring.
 
-## ✨ Key Features
+A high-performance job isolation platform consisting of two main components:
 
-### 🛡️ **System Call Isolation**
+- **Worker Daemon**: A Linux service that provides secure job execution with advanced resource management and namespace
+  isolation
+- **Worker CLI**: A command-line interface that allows users to interact with the daemon to manage jobs remotely
 
-- **Complete Process Isolation**: Prevents direct client access to host system calls
-- **Linux Namespace Barriers**: PID, mount, IPC, and UTS isolation per job
-- **Controlled Execution Environment**: Jobs run in isolated containers with limited system access
-- **Security by Design**: Clients cannot directly manipulate host system resources
-
-### 🚀 **Safe Remote Execution**
-
-- Execute commands remotely without exposing host system calls
-- Real-time output streaming with live log monitoring
-- Comprehensive job lifecycle management (start, stop, monitor)
-- Support for long-running services and short-lived tasks
-
-### 🛡️ **Enterprise Security**
-
-- **Mutual TLS Authentication**: Certificate-based secure connections
-- **Role-Based Access Control**: Admin and Viewer roles with granular permissions
-- **Process Isolation**: Complete job isolation using Linux namespaces
-- **Secure by Default**: All communications encrypted, no plaintext protocols
-
-### ⚡ **Resource Management**
-
-- **CPU Limiting**: Control CPU usage per job (percentage-based)
-- **Memory Control**: Set memory limits in MB with hard enforcement
-- **I/O Bandwidth**: Limit disk I/O operations per second
-- **Host Networking**: Jobs share host network for maximum compatibility
-
-### 🖥️ **Platform Support**
-
-- **Linux Server**: Full job isolation and resource management (production)
-- **macOS/Darwin Client**: CLI client support for remote job management
-
-### 📊 **Real-Time Monitoring**
-
-- Live job status tracking and updates
-- Streaming log output with buffering
-- Job history and execution statistics
-- Resource usage monitoring and alerts
+The platform provides secure execution of workloads with comprehensive monitoring capabilities and enterprise-grade
+isolation.
 
 ## 🔍 System Call Isolation in Action
 
 Here's a clear demonstration of how Worker isolates system calls and process visibility:
 
-### **Isolated Job Execution**
+### **Without Worker: Direct Host Execution (Dangerous)**
 
 ```bash
-$ worker-cli run ps aux
-Job started:
-ID: 120
-Command: ps aux
-Status: RUNNING
-StartTime: 2025-06-30T17:34:33Z
-Network: host (shared with system)
-
-$ worker-cli log 120   
-USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-root           1  0.0  0.0  10044  1580 ?        R    17:34   0:00 /usr/bin/ps aux
-```
-
-### **Direct Host Execution (for comparison)**
-
-```bash
+# Running ps aux directly on the host shows ALL system processes
 $ ps aux
 USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
 root           1  0.0  0.3 167744 13132 ?        Ss   Jun26   0:11 /sbin/init
 root           2  0.0  0.0      0     0 ?        S    Jun26   0:00 [kthreadd]
 root           3  0.0  0.0      0     0 ?        I<   Jun26   0:00 [rcu_gp]
 root           4  0.0  0.0      0     0 ?        I<   Jun26   0:00 [rcu_par_gp]
-root           5  0.0  0.0      0     0 ?        I<   Jun26   0:00 [slub_flushwq]
-root           6  0.0  0.0      0     0 ?        I<   Jun26   0:00 [netns]
+systemd+     564  0.0  0.2  90096  5392 ?        Ss   Jun26   0:00 /lib/systemd/systemd-resolved
+messagebus   565  0.0  0.1   8808  3840 ?        Ss   Jun26   0:02 /usr/bin/dbus-daemon --system
+root         567  0.0  0.4  30104  8448 ?        Ss   Jun26   0:00 /usr/bin/python3 /usr/bin/networkd
+root         789  0.0  0.2  12172  6144 ?        Ss   Jun26   0:00 sshd: /usr/sbin/sshd -D
+worker      1234  0.1  0.5 123456 10240 ?        Sl   Jun26   1:23 /opt/worker/worker
+postgres    2345  0.0  1.2 456789 25600 ?        S    Jun26   0:45 postgres: main process
+mysql       3456  0.2  2.1 789012 43520 ?        Sl   Jun26   2:10 mysqld --datadir=/var/lib/mysql
+apache2     4567  0.0  0.8 234567 16384 ?        S    Jun26   0:30 /usr/sbin/apache2 -DFOREGROUND
 ...
-worker    544936  0.0  0.0  10072  1608 pts/2    R+   17:37   0:00 ps aux
+user        9999  0.0  0.0  10072  1608 pts/2    R+   17:37   0:00 ps aux
 ```
 
-**Key Difference**: The job sees only its own process (PID 1) in an isolated namespace, while the host system sees all
-processes. This demonstrates how Worker prevents jobs from accessing or discovering host system information through
-system calls.
+**⚠️ Security Issues:**
 
-## 🚀 Quick Start
+- Process can see ALL system processes (including sensitive services)
+- Has access to process details, PIDs, and resource usage
+- Can potentially interact with or signal other processes
+- No isolation from host system resources
 
-### Installation
+### **With Worker: Isolated Job Execution (Secure)**
 
-**Linux Server (Required for job execution):**
+```bash
+# Running the same command through Worker shows ONLY the job's process
+$ worker-cli run ps aux
+Job started:
+ID: 120
+Command: ps aux
+Status: RUNNING
+StartTime: 2025-06-30T17:34:33Z
+
+$ worker-cli log 120   
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+0              1  0.0  0.0  10044  1580 ?        R    17:34   0:00 ps aux
+```
+
+**✅ Security Benefits:**
+
+- Job sees ONLY its own process (PID 1 in isolated namespace)
+- Cannot discover or interact with host processes
+- Complete process isolation from host system
+- Protected from interference by other jobs
+
+### **File System Isolation Example**
+
+**Without Worker (Host Access):**
+
+```bash
+$ ls /
+bin   dev  home  lib64  mnt  proc  run   srv  tmp  var
+boot  etc  lib   media  opt  root  sbin  sys  usr
+```
+
+**With Worker (Isolated Filesystem):**
+
+```bash
+$ worker-cli run ls /
+bin  lib  lib64  proc  sys  tmp  usr  work
+
+$ worker-cli run ls /proc
+1  cpuinfo  meminfo  mounts  version
+
+$ worker-cli run cat /proc/cpuinfo
+# Shows limited CPU information for the isolated environment
+```
+
+**Key Isolation Features:**
+
+- **Isolated Root Filesystem**: Each job gets its own `/` directory
+- **Limited System Access**: Only essential directories are available
+- **Private `/tmp`**: Each job has its own temporary space
+- **Controlled `/proc`**: Process information is limited to the job's namespace
+- **Read-only System Binaries**: Access to `/bin`, `/usr/bin`, etc. but cannot modify
+
+### **Resource Limitation Example**
+
+**Without Worker (Unrestricted):**
+
+```bash
+# This could consume all system memory and crash the host
+$ python3 -c "
+data = []
+while True:
+    data.append('x' * 1024 * 1024)  # Allocate 1MB chunks forever
+    print(f'Allocated {len(data)} MB')
+"
+# Will eventually crash the entire system
+```
+
+**With Worker (Resource Protected):**
+
+```bash
+# Same command but with memory limit - safely contained
+$ worker-cli run --max-memory=512 python3 -c "
+data = []
+while True:
+    data.append('x' * 1024 * 1024)
+    print(f'Allocated {len(data)} MB')
+"
+
+$ worker-cli log <job-id>
+Allocated 1 MB
+Allocated 2 MB
+...
+Allocated 500 MB
+Allocated 512 MB
+Killed  # Job terminated when it hit the 512MB limit
+```
+
+**Resource Protection:**
+
+- **Memory Limits**: Jobs cannot exceed allocated memory
+- **CPU Limits**: Prevents CPU starvation of host system
+- **I/O Limits**: Controls disk bandwidth usage
+- **Process Limits**: Restricts number of processes per job
+
+## 🚀 Features
+
+### **Two-Component Architecture**
+
+- **Worker Daemon**: High-performance Linux service providing job execution platform
+- **Worker CLI**: Cross-platform client for remote job management and monitoring
+- **Secure Communication**: mTLS-based gRPC communication between CLI and daemon
+- **Multi-Client Support**: Multiple CLI clients can connect to single daemon simultaneously
+
+### **Advanced Job Isolation (Daemon)**
+
+- **Namespace Isolation**: Complete PID, mount, IPC, UTS, and cgroup namespace isolation
+- **Filesystem Isolation**: Full chroot-based filesystem isolation with per-job isolated root filesystem
+- **Resource Isolation**: CPU, memory, and I/O bandwidth limiting using cgroups v2
+- **Process Isolation**: Jobs run in isolated process groups with controlled privilege escalation
+- **System Call Isolation**: Jobs cannot access host processes or sensitive system information
+
+### **Resource Management (Daemon)**
+
+- **CPU Limiting**: Precise CPU percentage allocation (e.g., 50% = half a CPU core)
+- **Memory Control**: Hard and soft memory limits with OOM protection
+- **I/O Throttling**: Disk I/O bandwidth limiting (bytes per second)
+- **Process Limits**: Control maximum number of processes per job
+
+### **User Experience (CLI)**
+
+- **Intuitive Commands**: Simple and familiar command-line interface
+- **Real-time Monitoring**: Live log streaming and job status updates
+- **Remote Management**: Connect to daemon from anywhere with network access
+- **Cross-Platform**: CLI runs on Linux, macOS, and Windows
+
+### **Security & Authentication**
+
+- **mTLS Authentication**: Certificate-based client authentication with role-based access
+- **Admin/Viewer Roles**: Granular permissions (admin: full access, viewer: read-only)
+- **Certificate Management**: Automated certificate generation and validation
+- **Secure by Default**: All communication encrypted with TLS 1.3+
+
+### **Enterprise Ready**
+
+- **High Performance**: Daemon handles 100+ concurrent jobs with minimal overhead
+- **Service Integration**: Full systemd integration with proper cgroup delegation
+- **Configuration Management**: YAML-based config with environment variable overrides
+- **Production Logging**: Comprehensive logging and monitoring capabilities
+- **Scalable Design**: Support for multiple environments and daemon instances
+
+## 📦 Installation
+
+Worker consists of two main components that work together:
+
+### 🔧 Component Overview
+
+1. **Worker Daemon** (`worker`)
+    - Runs as a Linux systemd service
+    - Handles job execution, isolation, and resource management
+    - Provides gRPC API with mTLS security
+    - Installed at `/opt/worker/worker`
+
+2. **Worker CLI** (`worker-cli`)
+    - Command-line interface for interacting with the daemon
+    - Can run on any machine (Linux, macOS, Windows)
+    - Connects to daemon via secure gRPC
+    - Installed as `/usr/bin/worker` (symlinked to `/opt/worker/worker-cli`)
+
+### Quick Start (Debian/Ubuntu)
 
 ```bash
 # Download the latest release
-wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker_1.0.0_amd64.deb
 
-# Or manually download latest version
-# wget https://github.com/ehsaniara/worker/releases/latest/download/worker_VERSION_amd64.deb
+# Install the package (installs both daemon and CLI)
+sudo dpkg -i worker_1.0.0_amd64.deb
 
-# Install the package (replace VERSION with actual version)
-sudo dpkg -i worker_*_amd64.deb
-
-# Start the service
+# Start the daemon service
 sudo systemctl start worker
 sudo systemctl enable worker
-```
 
-**macOS/Darwin Client (CLI only):**
-
-```bash
-# For Intel Macs (amd64)
-wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*worker-cli.*darwin-amd64\.tar\.gz" | cut -d '"' -f 4)
-tar -xzf worker-cli-*-darwin-amd64.tar.gz
-chmod +x worker-cli-*-darwin-amd64
-sudo mv worker-cli-*-darwin-amd64 /usr/local/bin/worker-cli
-
-# For Apple Silicon Macs (arm64)
-wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*worker-cli.*darwin-arm64\.tar\.gz" | cut -d '"' -f 4)
-tar -xzf worker-cli-*-darwin-arm64.tar.gz
-chmod +x worker-cli-*-darwin-arm64
-sudo mv worker-cli-*-darwin-arm64 /usr/local/bin/worker-cli
-
-# Connect to remote Linux server
-worker-cli --server your-linux-server.com:50051 run echo "Hello from macOS!"
-```
-
-### Installation File Structure
-
-After installation, Worker creates the following structure:
-
-```
-/opt/worker/
-├── worker                    # Main daemon binary
-├── worker-cli               # CLI client binary
-├── config/
-│   └── config.yml          # Main configuration file
-└── certs/                  # Auto-generated TLS certificates
-    ├── ca-cert.pem
-    ├── ca-key.pem
-    ├── server-cert.pem
-    ├── server-key.pem
-    ├── admin-client-cert.pem
-    ├── admin-client-key.pem
-    ├── viewer-client-cert.pem
-    └── viewer-client-key.pem
-
-/usr/bin/
-├── worker -> /opt/worker/worker-cli      # Symlink for easy access
-└── worker-cli -> /opt/worker/worker-cli  # Symlink for easy access
-```
-
-### Initial Setup
-
-The Debian package automatically:
-
-- ✅ Installs binaries to `/opt/worker/`
-- ✅ Generates TLS certificates in `/opt/worker/certs/`
-- ✅ Creates configuration at `/opt/worker/config/config.yml`
-- ✅ Sets up systemd service
-- ✅ Creates CLI symlinks in `/usr/bin/`
-
-Check installation:
-
-```bash
-# Check service status
+# Verify daemon is running
 sudo systemctl status worker
 
-# Verify file structure
-ls -la /opt/worker/
-ls -la /opt/worker/certs/
-ls -la /opt/worker/config/
-
-# Test CLI access
-worker --help
-```
-
-### Copy Client Certificates for Remote Access
-
-```bash
-# Copy certificates for remote CLI usage
-mkdir -p ~/.worker
-sudo cp /opt/worker/certs/admin-client-cert.pem ~/.worker/client-cert.pem
-sudo cp /opt/worker/certs/admin-client-key.pem ~/.worker/client-key.pem
-sudo cp /opt/worker/certs/ca-cert.pem ~/.worker/ca-cert.pem
-```
-
-### First Job
-
-```bash
-# Run your first job locally
-worker-cli --server localhost:50051 run echo "Hello, Worker!"
-
-# Check job status
+# Test CLI connection to daemon
 worker-cli list
-
-# Stream job logs
-worker-cli log <job-id>
 ```
 
-## 💻 Usage Examples
-
-### Basic Commands
+### Manual Installation
 
 ```bash
-# Simple command execution
-worker-cli run echo "Hello World"
-worker-cli run ls -la /tmp
-worker-cli run python3 --version
+# Clone the repository
+git clone https://github.com/ehsaniara/worker.git
+cd worker
 
-# Script execution
-worker-cli run bash -c "for i in {1..5}; do echo 'Step $i'; sleep 1; done"
-worker-cli run python3 script.py --input data.csv
+# Build both binaries
+make build  # Creates: worker (daemon) and worker-cli
 
-# Package installation and usage
-worker-cli run apt update
-worker-cli run pip install requests
+# Generate mTLS certificates
+sudo ./scripts/certs_gen.sh
+
+# Install daemon
+sudo cp worker /opt/worker/
+sudo cp config/config.yml /opt/worker/config/
+sudo cp etc/worker.service /etc/systemd/system/
+
+# Install CLI (with convenient symlink)
+sudo cp worker-cli /opt/worker/
+sudo ln -sf /opt/worker/worker-cli /usr/bin/worker
+
+# Start daemon service
+sudo systemctl daemon-reload
+sudo systemctl enable worker
+sudo systemctl start worker
 ```
 
-### Resource-Limited Jobs
+### CLI-Only Installation (Remote Machines)
+
+If you only need the CLI to connect to a remote Worker daemon:
 
 ```bash
-# Limit CPU to 50% of one core
-worker-cli run --max-cpu=50 stress --cpu 1 --timeout 60s
+# Download CLI binary only
+wget https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-linux-amd64
 
-# Limit memory to 512MB
-worker-cli run --max-memory=512 python3 memory_intensive_script.py
+# Make executable and install
+chmod +x worker-cli-linux-amd64
+sudo mv worker-cli-linux-amd64 /usr/local/bin/worker
 
-# Limit I/O bandwidth
-worker-cli run --max-iobps=1000000 dd if=/dev/zero of=/tmp/test bs=1M count=100
+# Copy certificates from daemon server
+scp server:/opt/worker/certs/ca-cert.pem ./certs/
+scp server:/opt/worker/certs/client-cert.pem ./certs/
+scp server:/opt/worker/certs/client-key.pem ./certs/
 
-# Combined limits
-worker-cli run --max-cpu=25 --max-memory=256 --max-iobps=500000 heavy_task.sh
-```
-
-### Long-Running Services
-
-```bash
-# Web server (accessible on host network)
-worker-cli run --max-memory=1024 python3 -m http.server 8080
-
-# Database service
-worker-cli run --max-cpu=100 --max-memory=2048 mysqld --datadir=/var/lib/mysql
-
-# Background processing
-worker-cli run --max-cpu=50 celery worker -A myapp.celery
-```
-
-### Job Management
-
-```bash
-# List all jobs with status
-worker-cli list
-
-# Get detailed job information
-worker-cli status <job-id>
-
-# Stop a running job
-worker-cli stop <job-id>
-
-# Stream live job output
-worker-cli log -f <job-id>
-
-# Monitor job from start
-worker-cli run python3 long_script.py && worker-cli log -f <job-id>
+# Connect to remote daemon
+worker --server=your-daemon-server:50051 list
 ```
 
 ## 🔧 Configuration
 
-### Server Configuration
+Worker uses a hierarchical configuration system: **Environment Variables** > **Config File** > **Defaults**
 
-Edit `/opt/worker/config/config.yml` to customize server behavior:
+### Example Configuration (`/opt/worker/config/config.yml`)
 
 ```yaml
 server:
-  address: "0.0.0.0"    # Listen on all interfaces
-  port: 50051           # gRPC port
+  address: "0.0.0.0"
+  port: 50051
+  mode: "server"
 
 worker:
-  defaultCpuLimit: 100        # Default CPU limit (%)
-  defaultMemoryLimit: 512     # Default memory limit (MB)
-  maxConcurrentJobs: 100      # Max simultaneous jobs
-  jobTimeout: "1h"            # Maximum job runtime
+  defaultCpuLimit: 100          # 100% CPU (1 full core)
+  defaultMemoryLimit: 512       # 512MB memory limit
+  defaultIoLimit: 10485760      # 10MB/s I/O limit
+  maxConcurrentJobs: 50         # Maximum concurrent jobs
+  jobTimeout: "1h"              # Job execution timeout
+  validateCommands: true        # Enable command validation
 
 security:
   serverCertPath: "/opt/worker/certs/server-cert.pem"
   serverKeyPath: "/opt/worker/certs/server-key.pem"
   caCertPath: "/opt/worker/certs/ca-cert.pem"
-  minTlsVersion: "1.3"        # Minimum TLS version
+  minTlsVersion: "1.3"
 
 cgroup:
+  baseDir: "/sys/fs/cgroup/worker.slice/worker.service"
   enableControllers: [ "cpu", "memory", "io", "pids" ]
+  cleanupTimeout: "5s"
+
+filesystem:
+  baseDir: "/opt/worker/jobs"        # Base directory for isolated job filesystems
+  tmpDir: "/tmp/job-{JOB_ID}"       # Job-specific tmp directory template
+  allowedMounts: # Read-only system directories mounted in isolated filesystems
+    - "/usr/bin"
+    - "/bin"
+    - "/lib"
+    - "/lib64"
+    - "/usr/lib"
+    - "/usr/lib64"
+  blockDevices: false               # Block access to devices
 
 logging:
-  level: "INFO"               # DEBUG, INFO, WARN, ERROR
-  format: "text"              # text or json
+  level: "INFO"
+  format: "text"
+  output: "stdout"
 ```
 
-### Client Configuration
-
-Create `~/.worker/config` for CLI defaults:
+### Environment Variables
 
 ```bash
-# Default server connection
-export WORKER_SERVER="your-server.com:50051"
-export WORKER_CERT_PATH="~/.worker/client-cert.pem"
-export WORKER_KEY_PATH="~/.worker/client-key.pem"
-export WORKER_CA_PATH="~/.worker/ca-cert.pem"
+# Server configuration
+export WORKER_SERVER_ADDRESS="0.0.0.0"
+export WORKER_SERVER_PORT="50051"
+
+# Resource defaults
+export WORKER_DEFAULT_CPU="100"
+export WORKER_DEFAULT_MEMORY="512"
+export WORKER_MAX_CONCURRENT_JOBS="50"
+
+# Security
+export WORKER_MIN_TLS_VERSION="1.3"
+
+# Logging
+export LOG_LEVEL="INFO"
 ```
 
-## 🔐 Security & Access Control
+## 💻 Usage
 
-### Certificate-Based Authentication
+### Worker Daemon (Service Management)
 
-Worker uses mutual TLS with role-based access:
-
-| Role   | Permissions                     | Certificate OU |
-|--------|---------------------------------|----------------|
-| Admin  | Full access to all operations   | `OU=admin`     |
-| Viewer | Read-only access (status, logs) | `OU=viewer`    |
-
-### Setting Up Access Roles
-
-The installation automatically generates certificates for both roles:
+The Worker daemon runs as a systemd service and provides the core job execution platform:
 
 ```bash
-# Admin access (full permissions)
-cp /opt/worker/certs/admin-client-cert.pem ~/.worker/admin-cert.pem
-cp /opt/worker/certs/admin-client-key.pem ~/.worker/admin-key.pem
+# Service management
+sudo systemctl start worker       # Start the daemon
+sudo systemctl stop worker        # Stop the daemon  
+sudo systemctl restart worker     # Restart the daemon
+sudo systemctl status worker      # Check daemon status
+sudo systemctl enable worker      # Enable auto-start on boot
 
-# Viewer access (read-only)
-cp /opt/worker/certs/viewer-client-cert.pem ~/.worker/viewer-cert.pem
-cp /opt/worker/certs/viewer-client-key.pem ~/.worker/viewer-key.pem
+# View daemon logs
+sudo journalctl -u worker -f      # Follow live logs
+sudo journalctl -u worker --since="1 hour ago"  # Recent logs
 
-# Copy CA certificate for both
-cp /opt/worker/certs/ca-cert.pem ~/.worker/ca-cert.pem
-
-# Use specific role
-worker-cli --cert ~/.worker/admin-cert.pem --key ~/.worker/admin-key.pem run command
-worker-cli --cert ~/.worker/viewer-cert.pem --key ~/.worker/viewer-key.pem list
+# Check daemon health
+curl -k https://localhost:50051   # Basic connectivity test
 ```
 
-### Job Isolation
+### Worker CLI (Job Management)
 
-Every job runs in an isolated environment that **prevents direct system call access**:
+The Worker CLI connects to the daemon to manage jobs. It can run locally or remotely:
 
-- **Separate Process Tree**: Jobs can't see or interact with host processes
-- **Isolated Filesystem**: Jobs have restricted view of host filesystem
-- **System Call Filtering**: Jobs cannot directly execute dangerous system calls
-- **Resource Boundaries**: CPU, memory, and I/O are strictly controlled
-- **Network Isolation**: Jobs use host network but cannot access host networking stack directly
-
-## 📊 Monitoring & Troubleshooting
-
-### Service Health
+#### Basic Job Operations
 
 ```bash
-# Check service status
-sudo systemctl status worker
+# Run a simple command
+worker-cli run echo "Hello, World!"
 
-# View service logs
-sudo journalctl -u worker -f
+# Run with resource limits
+worker-cli run --max-cpu=50 --max-memory=256 python3 script.py
 
-# Check listening ports
-sudo netstat -tlnp | grep :50051
+# Run with I/O limits  
+worker-cli run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
 
-# Verify certificates
-openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text
+# Complex commands with arguments
+worker-cli run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
 ```
 
-### Job Monitoring
+#### Job Monitoring & Control
+
+```bash
+# List all jobs
+worker-cli list
+
+# Get detailed job status
+worker-cli status <job-id>
+
+# Stream live logs (follows job output in real-time)
+worker-cli log <job-id>
+
+# Stop a running job gracefully
+worker-cli stop <job-id>
+```
+
+#### Remote Daemon Connection
+
+```bash
+# Connect to remote daemon
+worker-cli --server=192.168.1.100:50051 list
+worker-cli --server=production-server:50051 run python3 script.py
+
+# Set default server in environment
+export WORKER_SERVER=192.168.1.100:50051
+worker-cli list  # Now uses remote server by default
+```
+
+#### Advanced Usage Examples
+
+```bash
+# Long-running background process with monitoring
+worker-cli run --max-cpu=100 --max-memory=1024 python3 long_process.py
+JOB_ID=$(worker-cli list | tail -1 | awk '{print $1}')
+worker-cli log $JOB_ID  # Stream logs in separate terminal
+
+# Batch job processing
+for file in *.py; do
+    worker-cli run --max-memory=512 python3 "$file"
+done
+
+# Resource-constrained testing
+worker-cli run --max-cpu=25 --max-memory=128 npm test
+worker-cli run --max-cpu=50 --max-memory=256 go test ./...
+```
+
+### CLI Configuration
+
+```bash
+# Default CLI configuration
+worker-cli --help
+
+# Available flags:
+#   --server, -s     Server address (default: "192.168.1.161:50051")
+#   --help, -h       Show help
+
+# Environment variables:
+export WORKER_SERVER="your-daemon:50051"  # Default server
+export WORKER_CLIENT_CERT="/path/to/client-cert.pem"
+export WORKER_CLIENT_KEY="/path/to/client-key.pem" 
+export WORKER_CA_CERT="/path/to/ca-cert.pem"
+```
+
+### API Examples (gRPC)
+
+```go
+// Connect to Worker service
+conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(creds))
+client := pb.NewJobServiceClient(conn)
+
+// Run a job
+job := &pb.RunJobReq{
+Command:   "python3",
+Args:      []string{"script.py", "--input", "data.txt"},
+MaxCPU:    50,  // 50% CPU limit
+MaxMemory: 256, // 256MB memory limit
+MaxIOBPS:  1048576, // 1MB/s I/O limit
+}
+
+response, err := client.RunJob(ctx, job)
+fmt.Printf("Job started: %s\n", response.Id)
+
+// Get job status
+status, err := client.GetJobStatus(ctx, &pb.GetJobStatusReq{Id: response.Id})
+fmt.Printf("Status: %s, Exit Code: %d\n", status.Status, status.ExitCode)
+
+// Stream logs
+stream, err := client.GetJobLogs(ctx, &pb.GetJobLogsReq{Id: response.Id})
+for {
+chunk, err := stream.Recv()
+if err == io.EOF { break }
+fmt.Print(string(chunk.Payload))
+}
+```
+
+## 🏗️ Architecture
+
+![high-level.svg](docs/high-level.svg)
+
+### Component Communication
+
+#### Daemon Architecture
+
+- **Single Binary Design**: The `worker` binary auto-detects execution mode (server/init)
+- **Systemd Integration**: Full systemd service integration with proper cgroup delegation
+- **Namespace Management**: Deep Linux namespace integration for complete isolation
+- **Resource Enforcement**: Hardware-level resource limiting via cgroups v2
+- **State Management**: In-memory job state with real-time event streaming
+
+#### CLI Architecture
+
+- **Lightweight Client**: Minimal footprint gRPC client
+- **Cross-Platform**: Runs on Linux, macOS, and Windows
+- **Secure Communication**: mTLS with certificate-based authentication
+- **Real-time Streaming**: Live log streaming and job status updates
+
+### Key Design Principles
+
+1. **Separation of Concerns**: Daemon handles execution, CLI handles user interaction
+2. **Security First**: All communication secured with mTLS and role-based access
+3. **Platform Agnostic CLI**: CLI can run anywhere, daemon optimized for Linux
+4. **Scalable Architecture**: Support for multiple remote CLI clients per daemon
+5. **Enterprise Ready**: Production-grade logging, monitoring, and error handling
+
+## 🔒 Security Model
+
+### Authentication & Authorization
+
+Worker implements a comprehensive security model:
+
+```bash
+# Certificate-based roles
+- Admin Role (OU=admin): Full access to all operations
+- Viewer Role (OU=viewer): Read-only access to jobs and logs
+
+# mTLS Configuration
+- TLS 1.3 minimum version
+- Certificate-based client authentication
+- Role-based operation authorization
+```
+
+### Isolation Guarantees
+
+- **Process Isolation**: Jobs cannot see or interact with host processes
+- **Filesystem Isolation**: Jobs operate in isolated chroot environments
+- **Resource Isolation**: Hardware resource limits prevent resource exhaustion
+- **Network Isolation**: Optional network namespace isolation
+- **Privilege Isolation**: Jobs run with minimal required privileges
+
+## 🎯 Use Cases
+
+### **Development & Testing**
+
+```bash
+# Run test suites in isolation on daemon server from developer workstation
+worker-cli --server=dev-server:50051 run --max-memory=1024 pytest tests/
+
+# Execute build scripts with resource limits
+worker-cli run --max-cpu=200 make build
+
+# Run security scans remotely
+worker-cli --server=security-server:50051 run --max-iobps=10485760 trivy scan .
+```
+
+### **CI/CD Integration**
+
+```bash
+# CI agents connecting to dedicated worker daemon
+export WORKER_SERVER=build-server:50051
+
+# Isolated build environments
+worker-cli run --max-memory=2048 docker build -t myapp .
+
+# Parallel test execution across multiple CI agents
+worker-cli run --max-cpu=50 npm test
+worker-cli run --max-cpu=50 go test ./...
+
+# Deploy from CI to production worker daemon
+worker-cli --server=prod-worker:50051 run kubectl apply -f deployment.yaml
+```
+
+### **Remote Development**
+
+```bash
+# Local CLI connecting to powerful remote development server
+export WORKER_SERVER=dev-box.company.com:50051
+
+# Run resource-intensive tasks on remote server
+worker-cli run --max-memory=8192 cargo build --release
+worker-cli run --max-cpu=400 python3 train_model.py
+
+# Debug remotely with live log streaming
+worker-cli run python3 debug_script.py &
+JOB_ID=$!
+worker-cli log $JOB_ID  # Stream logs locally while job runs remotely
+```
+
+### **Data Processing & Analytics**
+
+```bash
+# Analytics team CLI connecting to data processing server
+worker-cli --server=analytics-server:50051 run --max-memory=4096 python process_data.py large_dataset.csv
+
+# ETL pipelines with I/O throttling
+worker-cli run --max-iobps=52428800 spark-submit etl_job.py
+
+# Batch processing across multiple worker daemons
+for server in worker-1 worker-2 worker-3; do
+    worker-cli --server=$server:50051 run python3 batch_job.py &
+done
+```
+
+### **Security & Compliance**
+
+```bash
+# Security team running sandboxed analysis on dedicated server
+worker-cli --server=sandbox-server:50051 run --max-cpu=25 --max-memory=128 analyze_malware.sh
+
+# Compliance testing with resource monitoring
+worker-cli --server=compliance-server:50051 run --max-memory=512 compliance_check.py
+
+# Isolated penetration testing
+worker-cli --server=pentest-server:50051 run nmap -sS target_network
+```
+
+### **Multi-Environment Management**
+
+```bash
+# Different environments with different worker daemons
+export DEV_WORKER=dev.company.com:50051
+export STAGE_WORKER=staging.company.com:50051  
+export PROD_WORKER=prod.company.com:50051
+
+# Deploy to different environments
+worker-cli --server=$DEV_WORKER run deploy.sh dev
+worker-cli --server=$STAGE_WORKER run deploy.sh staging  
+worker-cli --server=$PROD_WORKER run deploy.sh production
+
+# Monitor across environments
+worker-cli --server=$DEV_WORKER list
+worker-cli --server=$STAGE_WORKER list
+worker-cli --server=$PROD_WORKER list
+```
+
+## 📊 Performance & Monitoring
+
+### Resource Monitoring
 
 ```bash
 # Real-time job monitoring
-worker-cli list                    # Show all jobs
-worker-cli status <job-id>         # Detailed job info
-worker-cli log -f <job-id>        # Follow job output
+worker status <job-id>
 
-# Resource usage
-worker-cli status <job-id> | grep -E "(CPU|Memory|Status)"
+# Resource usage tracking
+worker log <job-id> | grep "resource"
+
+# System-wide monitoring
+sudo systemctl status worker
+journalctl -u worker -f
 ```
 
-### Common Issues
+### Performance Characteristics
 
-**Connection Refused**
+- **Startup Time**: < 100ms for job initialization
+- **Memory Overhead**: ~10MB per job + job memory limit
+- **CPU Overhead**: < 1% for isolation and monitoring
+- **Throughput**: 100+ concurrent jobs on standard hardware
+- **Scalability**: Linear scaling with available system resources
+
+## 🛠️ Development
+
+### Building from Source
 
 ```bash
-# Check if service is running
+# Install dependencies
+go mod download
+
+# Generate protobuf code
+make proto
+
+# Build binaries
+make build
+
+# Run tests
+make test
+
+# Build Debian package
+make package
+```
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### 📋 System Requirements
+
+#### Worker Daemon (Production)
+
+- **OS**: Linux kernel 4.6+ (cgroup v2 support required)
+- **Architecture**: x86_64, ARM64
+- **Memory**: 1GB+ RAM (2GB+ recommended for multiple concurrent jobs)
+- **Disk**: 10GB+ available space for job execution and logs
+- **Privileges**: Root access required for namespace operations and cgroup management
+- **Network**: Port 50051 available for gRPC API (configurable)
+
+#### Worker CLI (Client)
+
+- **OS**: Linux, macOS 10.15+, Windows 10+
+- **Architecture**: x86_64, ARM64 (macOS), x86_64 (Windows)
+- **Memory**: 50MB+ RAM (minimal footprint)
+- **Network**: Network access to daemon server on port 50051
+- **Certificates**: Client certificates for mTLS authentication
+
+#### Network Requirements
+
+- **Daemon**: Listens on configurable port (default: 50051)
+- **Firewall**: Allow inbound connections on daemon port from CLI clients
+- **TLS**: Certificate files must be accessible to both daemon and CLI
+- **DNS**: Hostname resolution for remote connections (or use IP addresses)
+
+## 🤝 Support & Documentation
+
+### Getting Help
+
+- **GitHub Issues**: [Report bugs and request features](https://github.com/ehsaniara/worker/issues)
+- **Discussions**: [Community discussions and Q&A](https://github.com/ehsaniara/worker/discussions)
+- **Documentation**: Full documentation in the `/docs` directory
+- **Examples**: Sample configurations and use cases in `/examples`
+
+### Troubleshooting
+
+#### Daemon Issues
+
+```bash
+# Check daemon status
 sudo systemctl status worker
 
-# Verify port is open
-sudo netstat -tlnp | grep :50051
+# View daemon logs
+sudo journalctl -u worker -f
 
-# Check firewall
-sudo ufw status
+# Test daemon connectivity
+curl -k https://localhost:50051
+
+# Verify certificates
+openssl verify -CAfile /opt/worker/certs/ca-cert.pem /opt/worker/certs/server-cert.pem
 ```
 
-**Certificate Errors**
+#### CLI Connection Issues
 
 ```bash
-# Regenerate certificates
-sudo /usr/local/bin/certs_gen.sh
+# Test CLI connectivity
+worker-cli --server=daemon-host:50051 list
 
-# Verify certificate permissions
-ls -la /opt/worker/certs/
+# Check certificate paths
+ls -la ./certs/ca-cert.pem ./certs/client-cert.pem ./certs/client-key.pem
+
+# Verify certificate details
+openssl x509 -in ./certs/client-cert.pem -noout -subject
 ```
 
-**Job Failures**
+#### Common Solutions
 
-```bash
-# Check job logs
-worker-cli log <job-id>
+- **Connection refused**: Check if daemon is running and port 50051 is accessible
+- **Certificate errors**: Ensure client certificates are valid and accessible
+- **Permission denied**: Verify client certificate has appropriate role (admin/viewer)
+- **Job failures**: Check resource limits and available system resources
 
-# Check system resources
-df -h                    # Disk space
-free -h                  # Memory usage
-sudo systemctl status worker
-```
-
-### Configuration File Issues
-
-```bash
-# Check configuration syntax
-worker-cli --help  # Will report config issues
-
-# View current configuration
-cat /opt/worker/config/config.yml
-
-# Test configuration changes
-sudo systemctl restart worker
-sudo systemctl status worker
-```
-
-## 🌐 Remote Access
-
-### Connecting from Different Platforms
-
-**Linux to Linux:**
-
-```bash
-# Connect to remote Worker instance
-worker-cli --server remote-host.com:50051 \
-          --cert ~/.worker/client-cert.pem \
-          --key ~/.worker/client-key.pem \
-          run echo "Remote execution"
-```
-
-**macOS to Linux Server:**
-
-```bash
-# macOS client connecting to Linux server
-worker-cli --server linux-server.com:50051 \
-          --cert ~/.worker/client-cert.pem \
-          --key ~/.worker/client-key.pem \
-          run python3 script.py
-
-# Note: Job execution happens on the Linux server, not locally on macOS
-```
-
-**Windows Client (via WSL):**
-
-```bash
-# Install Worker CLI in WSL2 Ubuntu (latest version)
-wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*worker-cli.*linux-amd64\.tar\.gz" | cut -d '"' -f 4)
-tar -xzf worker-cli-*-linux-amd64.tar.gz
-chmod +x worker-cli-*-linux-amd64
-sudo mv worker-cli-*-linux-amd64 /usr/local/bin/worker-cli
-```
-
-### Permanent Remote Setup
-
-```bash
-# Set up remote access permanently (any client platform)
-echo 'export WORKER_SERVER="remote-host.com:50051"' >> ~/.bashrc
-echo 'export WORKER_CERT_PATH="~/.worker/client-cert.pem"' >> ~/.bashrc
-echo 'export WORKER_KEY_PATH="~/.worker/client-key.pem"' >> ~/.bashrc
-```
-
-### Firewall Configuration
-
-```bash
-# Open Worker port
-sudo ufw allow 50051/tcp
-
-# For specific IP ranges
-sudo ufw allow from 192.168.1.0/24 to any port 50051
-```
-
-## 📋 CLI Reference
-
-### Command Syntax
-
-```bash
-worker-cli [global-options] <command> [command-options] [arguments]
-```
-
-### Global Options
-
-```bash
---server=HOST:PORT          # Worker server address
---cert=PATH                 # Client certificate file
---key=PATH                  # Client private key file
---ca=PATH                   # CA certificate file
-```
-
-### Commands
-
-```bash
-# Job Management
-run [options] <command> [args...]    # Execute a new job
-status <job-id>                      # Get job status and details
-stop <job-id>                        # Stop a running job
-list                                 # List all jobs
-log [-f] <job-id>                   # Show/follow job logs
-
-# Run Options
---max-cpu=N                          # CPU limit (percentage)
---max-memory=N                       # Memory limit (MB)
---max-iobps=N                        # I/O bandwidth limit (bytes/sec)
-```
-
-## 💡 Use Cases
-
-### **Why System Call Isolation Matters**
-
-```bash
-# ❌ Without Worker: Direct system access (dangerous)
-$ malicious_script.py
-# Can see all processes, access sensitive files, modify system
-
-# ✅ With Worker: Isolated execution (safe)
-$ worker-cli run malicious_script.py
-# Sees only its own process, limited file access, contained environment
-```
-
-**Security Benefits:**
-
-- **Process Discovery Prevention**: Jobs cannot enumerate host processes
-- **File System Protection**: Limited access to host filesystem
-- **System Information Hiding**: Host system details are not exposed
-- **Resource Containment**: Jobs cannot exhaust host resources
-- **Multi-Tenant Safety**: Jobs cannot interfere with each other
-
-### CI/CD Pipelines
-
-```bash
-# Isolated build and test environment
-worker-cli run git clone https://github.com/user/repo.git /tmp/build
-worker-cli run --max-cpu=200 --max-memory=4096 make -C /tmp/build test
-worker-cli run docker build -t myapp /tmp/build  # Isolated from host Docker daemon
-```
-
-### Multi-Tenant Environments
-
-```bash
-# Each tenant's jobs are isolated from each other and the host
-worker-cli run --max-memory=1024 tenant_a_workload.py
-worker-cli run --max-cpu=50 tenant_b_processing.sh
-```
-
-### Untrusted Code Execution
-
-```bash
-# Safe execution of user-provided code
-worker-cli run --max-memory=512 --max-cpu=25 user_script.py
-worker-cli run --max-iobps=1000000 data_analysis.r
-```
-
-## Support
-
-- **Documentation**: [docs/](docs/) directory
-- **Issues**: [GitHub Issues](https://github.com/ehsaniara/worker/issues)
-
-## 📝 License
+### License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
+### Contributing
 
-<div align="center">
-  <sub>by <a href="https://github.com/ehsaniara">Jay Ehsaniara</a></sub>
-</div>
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Setting up development environment
+- Running tests
+- Submitting pull requests
+- Code style guidelines
+
+### Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.

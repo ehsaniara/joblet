@@ -1,226 +1,407 @@
-<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
-    <!-- Background -->
-    <rect width="1000" height="700" fill="#282828"/>
+<svg width="600" height="970" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="clientGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#3498db;stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1"/>
+        </linearGradient>
+        <linearGradient id="apiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#c0392b;stop-opacity:1"/>
+        </linearGradient>
+        <linearGradient id="jobGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1"/>
+        </linearGradient>
+        <linearGradient id="isolationGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1"/>
+        </linearGradient>
+        <linearGradient id="resourceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#f39c12;stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#e67e22;stop-opacity:1"/>
+        </linearGradient>
+        <linearGradient id="platformGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#34495e;stop-opacity:1"/>
+            <stop offset="100%" style="stop-color:#2c3e50;stop-opacity:1"/>
+        </linearGradient>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="4" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.3)"/>
+        </filter>
+    </defs>
 
     <!-- Client Layer -->
-    <g id="client-layer">
-        <!-- CLI Client Box -->
-        <rect x="50" y="80" width="200" height="120" rx="8" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
-        <text x="150" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
-              fill="white">
-            CLI Client
-        </text>
-        <text x="150" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - Admin Role
-        </text>
-        <text x="150" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - Viewer Role
-        </text>
-        <text x="150" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - TLS Certificates
-        </text>
-        <text x="150" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - Command Interface
-        </text>
-    </g>
+    <rect x="25" y="100" width="550" height="100" rx="10" ry="10" fill="url(#clientGrad)" filter="url(#shadow)"/>
+    <text x="300" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+          fill="white">
+        Worker CLI (Remote Client)
+    </text>
+    <rect x="50" y="140" width="500" height="45" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="300" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">
+        gRPC Client + mTLS Authentication
+    </text>
+    <text x="300" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.8)">
+        Certificate-based Security
+    </text>
 
-    <!-- gRPC Connection -->
-    <g id="grpc-connection">
-        <line x1="250" y1="140" x2="350" y2="140" stroke="#059669" stroke-width="3" marker-end="url(#arrowhead)"/>
-        <text x="300" y="127" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
-              fill="#059669">
-            gRPC/TLS
-        </text>
-        <text x="300" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#059669">
-            Mutual Auth
-        </text>
-    </g>
+    <!-- Connection Arrow -->
+    <path d="M 300 200 L 300 230" stroke="#eee" stroke-width="3" marker-end="url(#arrowhead)" fill="none"/>
+    <text x="320" y="220" font-family="Arial, sans-serif" font-size="10" fill="#eee">Secure gRPC</text>
 
-    <!-- Server Layer -->
-    <g id="server-layer">
-        <!-- gRPC Server Box -->
-        <rect x="350" y="80" width="300" height="120" rx="8" fill="#7c3aed" stroke="#5b21b6" stroke-width="2"/>
-        <text x="500" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
-              fill="white">
-            gRPC Server
-        </text>
-        <text x="500" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - Authentication &amp; Authorization
-        </text>
-        <text x="500" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - Job Management API
-        </text>
-        <text x="500" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - Real-time Streaming
-        </text>
-        <text x="500" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e0e7ff">
-            - TLS 1.3 Endpoint
-        </text>
-    </g>
+    <!-- Worker Daemon Container -->
+    <rect x="25" y="240" width="550" height="710" rx="15" ry="15" fill="#333" stroke="#bdc3c7" stroke-width="1"
+          filter="url(#shadow)"/>
+    <text x="300" y="265" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold"
+          fill="#ccc">
+        Worker Daemon (Linux Service)
+    </text>
 
-    <!-- Service Layer Connection -->
-    <g id="service-connection">
-        <line x1="500" y1="200" x2="500" y2="260" stroke="#059669" stroke-width="3" marker-end="url(#arrowhead)"/>
-    </g>
+    <!-- gRPC API Layer -->
+    <rect x="50" y="285" width="500" height="60" rx="10" ry="10" fill="url(#apiGrad)" filter="url(#shadow)"/>
+    <text x="300" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+          fill="white">
+        gRPC API Layer
+    </text>
+    <text x="300" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        mTLS + Role-based Authorization (Admin/Viewer)
+    </text>
 
-    <!-- Worker Service -->
-    <g id="job-worker-service">
-        <rect x="350" y="260" width="300" height="100" rx="8" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
-        <text x="500" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
-              fill="white">
-            Worker Service
-        </text>
-        <text x="500" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
-            - Job Orchestration &amp; Lifecycle
-        </text>
-        <text x="500" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
-            - Process Management
-        </text>
-        <text x="500" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#fecaca">
-            - Two-Stage Execution (job-init)
-        </text>
-    </g>
+    <!-- Job Management Layer -->
+    <rect x="50" y="360" width="500" height="90" rx="10" ry="10" fill="url(#jobGrad)" filter="url(#shadow)"/>
+    <text x="300" y="385" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+          fill="white">
+        Job Management Layer
+    </text>
+    <rect x="70" y="400" width="140" height="30" rx="5" ry="5" fill="rgba(255,255,255,0.2)"/>
+    <text x="140" y="418" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="white">Lifecycle
+        Management
+    </text>
+    <rect x="230" y="400" width="140" height="30" rx="5" ry="5" fill="rgba(255,255,255,0.2)"/>
+    <text x="300" y="418" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="white">State
+        Management
+    </text>
+    <rect x="390" y="400" width="140" height="30" rx="5" ry="5" fill="rgba(255,255,255,0.2)"/>
+    <text x="460" y="418" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="white">Log
+        Streaming
+    </text>
 
-    <!-- Component Connections -->
-    <g id="component-connections">
-        <!-- To Store -->
-        <line x1="420" y1="360" x2="180" y2="440" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead)"/>
-        <!-- To Resource Manager -->
-        <line x1="500" y1="360" x2="500" y2="440" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead)"/>
-        <!-- To Process Executor -->
-        <line x1="580" y1="360" x2="820" y2="440" stroke="#059669" stroke-width="2" marker-end="url(#arrowhead)"/>
-    </g>
+    <!-- Isolation Layer -->
+    <rect x="50" y="465" width="500" height="230" rx="10" ry="10" fill="url(#isolationGrad)" filter="url(#shadow)"/>
+    <text x="300" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+          fill="white">
+        Isolation Layer
+    </text>
 
-    <!-- Component Layer -->
-    <g id="components">
-        <!-- In-Memory Store -->
-        <rect x="80" y="440" width="200" height="140" rx="8" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
-        <text x="180" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
-              fill="white">
-            In-Memory Store
-        </text>
-        <text x="180" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
-            - Job State Management
-        </text>
-        <text x="180" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
-            - Output Buffering
-        </text>
-        <text x="180" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
-            - Pub/Sub System
-        </text>
-        <text x="180" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
-            - Concurrent Access
-        </text>
-        <text x="180" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
-            - Live Streaming
-        </text>
-        <text x="180" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">
-            - Thread-Safe Operations
-        </text>
+    <!-- Namespace Isolation -->
+    <rect x="70" y="505" width="140" height="90" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="140" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold"
+          fill="white">
+        Namespace Isolation
+    </text>
+    <text x="140" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        PID Namespace
+    </text>
+    <text x="140" y="545" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Mount Namespace
+    </text>
+    <text x="140" y="555" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        IPC Namespace
+    </text>
+    <text x="140" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        UTS Namespace
+    </text>
+    <text x="140" y="575" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Cgroup Namespace
+    </text>
+    <text x="140" y="585" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Network (Optional)
+    </text>
 
-        <!-- Resource Manager -->
-        <rect x="400" y="440" width="200" height="140" rx="8" fill="#059669" stroke="#047857" stroke-width="2"/>
-        <text x="500" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
-              fill="white">
-            Resource Manager
-        </text>
-        <text x="500" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
-            - Linux Cgroups v2
-        </text>
-        <text x="500" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
-            - CPU Limiting (cpu.max)
-        </text>
-        <text x="500" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
-            - Memory Limits
-        </text>
-        <text x="500" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
-            - I/O Bandwidth Control
-        </text>
-        <text x="500" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
-            - Process Isolation
-        </text>
-        <text x="500" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">
-            - Automatic Cleanup
-        </text>
+    <!-- Filesystem Isolation -->
+    <rect x="230" y="505" width="140" height="90" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="300" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold"
+          fill="white">
+        Filesystem Isolation
+    </text>
+    <text x="300" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        chroot Environment
+    </text>
+    <text x="300" y="545" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Read-only Mounts
+    </text>
+    <text x="300" y="555" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Isolated /tmp
+    </text>
+    <text x="300" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Essential /dev nodes
+    </text>
+    <text x="300" y="575" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Minimal /proc
+    </text>
+    <text x="300" y="585" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Security Hardening
+    </text>
 
-        <!-- Process Executor -->
-        <rect x="720" y="440" width="200" height="140" rx="8" fill="#8b5cf6" stroke="#7c3aed" stroke-width="2"/>
-        <text x="820" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
-              fill="white">
-            Process Executor
-        </text>
-        <text x="820" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
-            - job-init Binary
-        </text>
-        <text x="820" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
-            - Cgroup Membership
-        </text>
-        <text x="820" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
-            - Command Execution
-        </text>
-        <text x="820" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
-            - Process Monitoring
-        </text>
-        <text x="820" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
-            - Output Capture
-        </text>
-        <text x="820" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">
-            - Graceful Termination
-        </text>
-    </g>
+    <!-- Process Management -->
+    <rect x="390" y="505" width="140" height="90" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="460" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold"
+          fill="white">
+        Process Management
+    </text>
+    <text x="460" y="535" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Single Binary Init
+    </text>
+    <text x="460" y="545" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Process Groups
+    </text>
+    <text x="460" y="555" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Signal Handling
+    </text>
+    <text x="460" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Graceful Cleanup
+    </text>
+    <text x="460" y="575" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Exit Code Capture
+    </text>
+    <text x="460" y="585" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Job Monitoring
+    </text>
 
-    <!-- Job Lifecycle -->
-    <g id="lifecycle">
-        <rect x="50" y="620" width="900" height="60" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
-        <text x="500" y="640" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
-              fill="#1e293b">
-            Job Lifecycle States
-        </text>
+    <!-- Single Binary Mode -->
+    <rect x="70" y="610" width="460" height="70" rx="8" ry="8" fill="rgba(255,255,255,0.15)"
+          stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+    <text x="300" y="630" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold"
+          fill="white">
+        Single Binary Architecture
+    </text>
+    <text x="300" y="645" text-anchor="middle" font-family="Arial, sans-serif" font-size="9"
+          fill="rgba(255,255,255,0.9)">
+        Server Mode: Main daemon with gRPC server
+    </text>
+    <text x="300" y="657" text-anchor="middle" font-family="Arial, sans-serif" font-size="9"
+          fill="rgba(255,255,255,0.9)">
+        Init Mode: Job process executor in isolated namespace
+    </text>
+    <text x="300" y="669" text-anchor="middle" font-family="Arial, sans-serif" font-size="9"
+          fill="rgba(255,255,255,0.9)">
+        Mode detection via WORKER_MODE environment variable
+    </text>
 
-        <!-- States -->
-        <g id="states">
-            <rect x="80" y="650" width="80" height="20" rx="4" fill="#fbbf24" stroke="#f59e0b"/>
-            <text x="120" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-                  fill="white">INITIALIZING
-            </text>
+    <!-- Resource Manager Layer -->
+    <rect x="50" y="710" width="500" height="140" rx="10" ry="10" fill="url(#resourceGrad)" filter="url(#shadow)"/>
+    <text x="300" y="735" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+          fill="white">
+        Resource Manager (cgroups v2)
+    </text>
 
-            <polygon points="170,650 180,660 170,670" fill="#64748b"/>
+    <!-- CPU Control -->
+    <rect x="70" y="750" width="110" height="70" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="125" y="770" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        CPU Control
+    </text>
+    <text x="125" y="783" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        cpu.max limits
+    </text>
+    <text x="125" y="793" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        cpu.weight priority
+    </text>
+    <text x="125" y="803" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        CPU accounting
+    </text>
+    <text x="125" y="813" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Percentage limits
+    </text>
 
-            <rect x="190" y="650" width="80" height="20" rx="4" fill="#22c55e" stroke="#16a34a"/>
-            <text x="230" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-                  fill="white">RUNNING
-            </text>
+    <!-- Memory Control -->
+    <rect x="195" y="750" width="110" height="70" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="250" y="770" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        Memory Control
+    </text>
+    <text x="250" y="783" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        memory.max limits
+    </text>
+    <text x="250" y="793" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        memory.high warn
+    </text>
+    <text x="250" y="803" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        OOM protection
+    </text>
+    <text x="250" y="813" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Swap accounting
+    </text>
 
-            <polygon points="280,650 290,660 280,670" fill="#64748b"/>
+    <!-- I/O Control -->
+    <rect x="320" y="750" width="110" height="70" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="375" y="770" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        I/O Control
+    </text>
+    <text x="375" y="783" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        io.max bandwidth
+    </text>
+    <text x="375" y="793" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Device throttling
+    </text>
+    <text x="375" y="803" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        I/O accounting
+    </text>
+    <text x="375" y="813" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        BPS limits
+    </text>
 
-            <rect x="300" y="650" width="80" height="20" rx="4" fill="#3b82f6" stroke="#2563eb"/>
-            <text x="340" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-                  fill="white">COMPLETED
-            </text>
+    <!-- PID Control -->
+    <rect x="445" y="750" width="90" height="70" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="490" y="770" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        PID Control
+    </text>
+    <text x="490" y="783" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        pids.max limits
+    </text>
+    <text x="490" y="793" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Fork bomb protect
+    </text>
+    <text x="490" y="803" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Process tracking
+    </text>
+    <text x="490" y="813" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Task counting
+    </text>
+    <text>text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        Memory Control
+    </text>
 
-            <text x="400" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#64748b">/
-            </text>
+    <text x="490" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        OOM protection
+    </text>
 
-            <rect x="420" y="650" width="80" height="20" rx="4" fill="#ef4444" stroke="#dc2626"/>
-            <text x="460" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-                  fill="white">FAILED
-            </text>
+    <!-- I/O Control -->
+    <rect x="630" y="810" width="240" height="80" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="750" y="835" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+          fill="white">
+        I/O Control
+    </text>
+    <text x="750" y="850" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        io.max bandwidth
+    </text>
+    <text x="750" y="865" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        Device throttling
+    </text>
+    <text x="750" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        I/O accounting
+    </text>
 
-            <text x="520" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#64748b">/
-            </text>
+    <!-- PID Control -->
+    <rect x="890" y="810" width="200" height="80" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <text x="990" y="835" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+          fill="white">
+        PID Control
+    </text>
+    <text x="990" y="850" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        pids.max limits
+    </text>
+    <text x="990" y="865" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        Fork bomb protection
+    </text>
+    <text x="990" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-size="10"
+          fill="rgba(255,255,255,0.9)">
+        Process tracking
+    </text>
 
-            <rect x="540" y="650" width="80" height="20" rx="4" fill="#6b7280" stroke="#4b5563"/>
-            <text x="580" y="663" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-                  fill="white">STOPPED
-            </text>
-        </g>
-    </g>
+    <!-- Platform Layer -->
+    <rect x="50" y="865" width="500" height="80" rx="10" ry="10" fill="url(#platformGrad)" filter="url(#shadow)"/>
+    <text x="300" y="890" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+          fill="white">
+        Platform Layer
+    </text>
 
-    <!-- Arrow marker definition -->
-    <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7"
-                refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
-        </marker>
-    </defs>
+    <!-- Linux Kernel -->
+    <rect x="70" y="905" width="140" height="30" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <text x="140" y="920" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        Linux Kernel
+    </text>
+    <text x="140" y="930" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Namespaces, cgroups
+    </text>
+
+    <!-- Systemd -->
+    <rect x="230" y="905" width="140" height="30" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <text x="300" y="920" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        Systemd
+    </text>
+    <text x="300" y="930" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        Service, delegation
+    </text>
+
+    <!-- Hardware -->
+    <rect x="390" y="905" width="140" height="30" rx="8" ry="8" fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <text x="460" y="920" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+          fill="white">
+        Hardware
+    </text>
+    <text x="460" y="930" text-anchor="middle" font-family="Arial, sans-serif" font-size="8"
+          fill="rgba(255,255,255,0.9)">
+        CPU, Memory, Storage
+    </text>
+
 </svg>

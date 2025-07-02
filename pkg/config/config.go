@@ -13,12 +13,20 @@ import (
 
 // Config holds the complete application configuration
 type Config struct {
-	Server   ServerConfig   `yaml:"server" json:"server"`
-	Worker   WorkerConfig   `yaml:"worker" json:"worker"`
-	Security SecurityConfig `yaml:"security" json:"security"`
-	Cgroup   CgroupConfig   `yaml:"cgroup" json:"cgroup"`
-	GRPC     GRPCConfig     `yaml:"grpc" json:"grpc"`
-	Logging  LoggingConfig  `yaml:"logging" json:"logging"`
+	Server     ServerConfig     `yaml:"server" json:"server"`
+	Worker     WorkerConfig     `yaml:"worker" json:"worker"`
+	Security   SecurityConfig   `yaml:"security" json:"security"`
+	Cgroup     CgroupConfig     `yaml:"cgroup" json:"cgroup"`
+	Filesystem FilesystemConfig `yaml:"filesystem" json:"filesystem"`
+	GRPC       GRPCConfig       `yaml:"grpc" json:"grpc"`
+	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
+}
+
+type FilesystemConfig struct {
+	BaseDir       string   `yaml:"baseDir" json:"baseDir"`             // Base directory for job filesystems
+	TmpDir        string   `yaml:"tmpDir" json:"tmpDir"`               // Temporary directory template
+	AllowedMounts []string `yaml:"allowedMounts" json:"allowedMounts"` // Read-only mounts from host
+	BlockDevices  bool     `yaml:"blockDevices" json:"blockDevices"`   // Block device access
 }
 
 // ServerConfig holds server-specific configuration
@@ -104,6 +112,12 @@ var DefaultConfig = Config{
 		NamespaceMount:    "/sys/fs/cgroup",
 		EnableControllers: []string{"cpu", "memory", "io", "pids"},
 		CleanupTimeout:    5 * time.Second,
+	},
+	Filesystem: FilesystemConfig{
+		BaseDir:       "/opt/worker/jobs",
+		TmpDir:        "/tmp/job-{JOB_ID}",
+		AllowedMounts: []string{"/usr/bin", "/bin", "/lib", "/lib64"}, // Read-only system directories
+		BlockDevices:  false,
 	},
 	GRPC: GRPCConfig{
 		MaxRecvMsgSize:    512 * 1024,      // 512KB

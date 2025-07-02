@@ -1,4 +1,4 @@
-package linux
+package core
 
 import (
 	"worker/internal/worker/state"
@@ -9,7 +9,7 @@ type OutputWriter struct {
 	store state.Store
 }
 
-func New(store state.Store, jobId string) *OutputWriter {
+func NewWrite(store state.Store, jobId string) *OutputWriter {
 	return &OutputWriter{store: store, jobId: jobId}
 }
 
