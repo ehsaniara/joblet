@@ -493,7 +493,6 @@ fmt.Print(string(chunk.Payload))
 
 ![high-level.svg](docs/high-level.svg)
 
-
 ### Component Communication
 
 #### Daemon Architecture
