@@ -60,10 +60,10 @@ else
 fi
 
 # Copy service file
-cp ./etc/worker.service "$BUILD_DIR/etc/systemd/system/"
+cp ./scripts/worker.service "$BUILD_DIR/etc/systemd/system/"
 
 # Copy certificate generation script
-cp ./etc/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
+cp ./scripts/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
 
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF

@@ -251,7 +251,7 @@ sudo ./scripts/certs_gen.sh
 # Install daemon
 sudo cp worker /opt/worker/
 sudo cp config/config.yml /opt/worker/config/
-sudo cp etc/worker.service /etc/systemd/system/
+sudo cp scripts/worker.service /etc/systemd/system/
 
 # Install CLI (with convenient symlink)
 sudo cp worker-cli /opt/worker/

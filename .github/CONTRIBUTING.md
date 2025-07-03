@@ -755,7 +755,7 @@ setup-dev: generate build certs-local
 	@echo "✅ Development environment setup complete"
 
 certs-local:
-	@./etc/certs_gen.sh
+	@./scripts/certs_gen.sh
 
 clean:
 	rm -rf bin/
