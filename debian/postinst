@@ -192,7 +192,12 @@ case "$1" in
         echo "  1. Start service: sudo systemctl start worker"
         echo "  2. Check status: sudo systemctl status worker"
         echo "  3. View logs: sudo journalctl -u worker -f"
-        echo "  4. Test CLI: worker-cli list"
+        echo "  4. Test CLI: worker-cli --cert /opt/worker/certs/client-cert.pem \
+                                        --key /opt/worker/certs/client-key.pem \
+                                        --ca /opt/worker/certs/ca-cert.pem \
+                                        list"
+        echo " Or: cd /opt/worker/"
+        echo " then: worker-cli list"
         echo
         print_info "🔧 To reconfigure later:"
         echo "  sudo dpkg-reconfigure worker"
