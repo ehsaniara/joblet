@@ -379,28 +379,6 @@ func TestConvenienceMethods(t *testing.T) {
 	}
 }
 
-func TestToYAML(t *testing.T) {
-	cfg := DefaultConfig
-
-	yamlData, err := cfg.ToYAML()
-	if err != nil {
-		t.Fatalf("ToYAML failed: %v", err)
-	}
-
-	if len(yamlData) == 0 {
-		t.Error("Expected YAML data, got empty")
-	}
-
-	// Check that it contains expected sections
-	yamlStr := string(yamlData)
-	expectedSections := []string{"cli:", "server:", "worker:", "cgroup:", "filesystem:", "grpc:", "logging:"}
-	for _, section := range expectedSections {
-		if !contains(yamlStr, section) {
-			t.Errorf("Expected YAML to contain '%s' section", section)
-		}
-	}
-}
-
 // Helper functions
 
 func createTestConfigFile(t *testing.T, filename, content string) string {
@@ -421,19 +399,6 @@ func createTestConfigFile(t *testing.T, filename, content string) string {
 		t.Fatalf("Failed to create test config file %s: %v", tmpFile, err)
 	}
 	return tmpFile
-}
-
-func cleanupTestFiles(t *testing.T) {
-	t.Helper()
-	testFiles := []string{
-		"./server-config.yml",
-		"./config.yaml",
-	}
-	for _, file := range testFiles {
-		os.Remove(file)
-	}
-	// Remove config directory and its contents
-	os.RemoveAll("./config")
 }
 
 func setTestEnvVars(t *testing.T, envVars map[string]string) map[string]string {

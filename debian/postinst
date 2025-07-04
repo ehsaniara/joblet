@@ -80,14 +80,14 @@ get_configuration() {
     WORKER_ADDITIONAL_NAMES=${WORKER_ADDITIONAL_NAMES:-}
 }
 
-# Function to update configuration file
-update_config_file() {
-    local config_file="/opt/worker/config/config.yml"
+# Function to update SERVER configuration file
+update_server_config_file() {
+    local config_file="/opt/worker/config/server-config.yml"
     local server_addr="${WORKER_SERVER_ADDRESS}"
     local server_port="${WORKER_SERVER_PORT}"
 
     if [ -f "$config_file" ]; then
-        print_info "Updating configuration file..."
+        print_info "Updating server configuration file..."
 
         # Update server address
         sed -i "s/address: \"[^\"]*\"/address: \"$server_addr\"/" "$config_file"
@@ -95,12 +95,34 @@ update_config_file() {
         # Update server port
         sed -i "s/port: [0-9]*/port: $server_port/" "$config_file"
 
-        # Update CLI serverAddr
-        sed -i "s/serverAddr: \"[^\"]*\"/serverAddr: \"$server_addr:$server_port\"/" "$config_file"
-
-        print_success "Configuration updated successfully"
+        print_success "Server configuration updated successfully"
     else
-        print_error "Configuration file not found: $config_file"
+        print_error "Server configuration file not found: $config_file"
+    fi
+}
+
+# Function to update CLIENT configuration file
+update_client_config_file() {
+    local config_file="/opt/worker/config/client-config.yml"
+    local server_addr="${WORKER_SERVER_ADDRESS}"
+    local server_port="${WORKER_SERVER_PORT}"
+
+    if [ -f "$config_file" ]; then
+        print_info "Updating client configuration file..."
+
+        # Update default node address
+        sed -i "/nodes:/,/default:/{
+            /address:/s/address: \"[^\"]*\"/address: \"$server_addr:$server_port\"/
+        }" "$config_file"
+
+        # Update production node address (if it exists)
+        sed -i "/production:/,/address:/{
+            s/address: \"[^\"]*\"/address: \"$server_addr:$server_port\"/
+        }" "$config_file"
+
+        print_success "Client configuration updated successfully"
+    else
+        print_error "Client configuration file not found: $config_file"
     fi
 }
 
@@ -129,6 +151,7 @@ case "$1" in
         chmod 755 /opt/worker/worker
         chmod 755 /opt/worker/worker-cli
         chmod 644 /opt/worker/config/server-config.yml
+        chmod 644 /opt/worker/config/client-config.yml
         chmod +x /usr/local/bin/certs_gen.sh
 
         # Create symlinks
@@ -148,8 +171,9 @@ case "$1" in
         echo "  Additional Names: ${WORKER_ADDITIONAL_NAMES:-none}"
         echo
 
-        # Update configuration
-        update_config_file
+        # Update both configuration files
+        update_server_config_file
+        update_client_config_file
 
         # Generate certificates
         generate_certificates
@@ -184,7 +208,8 @@ case "$1" in
         print_info "📁 Installation Summary:"
         echo "  Server Address: $WORKER_SERVER_ADDRESS"
         echo "  Server Port: $WORKER_SERVER_PORT"
-        echo "  Configuration: /opt/worker/config/config.yml"
+        echo "  Server Config: /opt/worker/config/server-config.yml"
+        echo "  Client Config: /opt/worker/config/client-config.yml"
         echo "  Certificates: /opt/worker/certs/"
         echo "  CLI Command: worker-cli --help"
         echo
@@ -192,7 +217,8 @@ case "$1" in
         echo "  1. Start service: sudo systemctl start worker"
         echo "  2. Check status: sudo systemctl status worker"
         echo "  3. View logs: sudo journalctl -u worker -f"
-        echo "  4. Test CLI: /opt/worker/worker-cli list"
+        echo "  4. Test CLI: worker-cli list"
+        echo "  5. Test with config: worker-cli --config=/opt/worker/config/client-config.yml list"
         echo
         print_info "🔧 To reconfigure later:"
         echo "  sudo dpkg-reconfigure worker"

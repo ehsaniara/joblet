@@ -182,36 +182,6 @@ func loadFromFile(config *Config) (string, error) {
 	return "built-in defaults (no config file found)", nil
 }
 
-// loadCLIFromFile loads configuration from YAML file (CLI paths)
-func loadCLIFromFile() (*Config, error) {
-	configPaths := []string{
-		"./config/server-config.yml", // Primary location (relative to current directory)
-		"./server-config.yml",        // Alternative location
-		"./config/config.yaml",       // YAML extension variant
-		"./config.yaml",              // YAML extension variant in current dir
-	}
-
-	for _, path := range configPaths {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			continue
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue // Try next path
-		}
-
-		var config Config
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			continue // Try next path
-		}
-
-		return &config, nil
-	}
-
-	return &Config{}, os.ErrNotExist
-}
-
 // GetServerAddress Server-specific convenience methods
 func (c *Config) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", c.Server.Address, c.Server.Port)

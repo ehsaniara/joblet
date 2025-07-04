@@ -23,7 +23,7 @@ echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Create directory structure (FIXED - removed confmodule directory)
+# Create directory structure
 mkdir -p "$BUILD_DIR/DEBIAN"
 mkdir -p "$BUILD_DIR/opt/worker"
 mkdir -p "$BUILD_DIR/opt/worker/config"
@@ -43,29 +43,41 @@ if [ ! -f "./worker-cli" ]; then
 fi
 cp ./worker-cli "$BUILD_DIR/opt/worker/"
 
-# Copy config file (now as template)
-if [ -f "./config/config.yml" ]; then
+# Copy SERVER config file
+if [ -f "./config/server-config.yml" ]; then
     cp ./config/server-config.yml "$BUILD_DIR/opt/worker/config/"
-    echo "✅ Copied config/config.yml to /opt/worker/config/"
-elif [ -f "./config.yaml" ]; then
-    cp ./config.yaml "$BUILD_DIR/opt/worker/config/config.yml"
-    echo "✅ Copied config.yaml to /opt/worker/config/config.yml"
-elif [ -f "./config/config.yaml" ]; then
-    cp ./config/config.yaml "$BUILD_DIR/opt/worker/config/config.yml"
-    echo "✅ Copied config/config.yaml to /opt/worker/config/config.yml"
+    echo "✅ Copied server-config.yml to /opt/worker/config/"
 else
-    echo "❌ No config file found!"
-    echo "Looked for: ./config/config.yml, ./config.yaml, ./config/config.yaml"
+    echo "❌ Server config file not found: ./config/server-config.yml"
     exit 1
 fi
+
+# Generate CLIENT config file template
+cat > "$BUILD_DIR/opt/worker/config/client-config.yml" << 'EOF'
+version: "3.0"
+
+nodes:
+  default:
+    address: "localhost:50051"
+    cert: "/opt/worker/certs/client-cert.pem"
+    key: "/opt/worker/certs/client-key.pem"
+    ca: "/opt/worker/certs/ca-cert.pem"
+
+  production:
+    address: "production-server:50051"
+    cert: "/opt/worker/certs/client-cert.pem"
+    key: "/opt/worker/certs/client-key.pem"
+    ca: "/opt/worker/certs/ca-cert.pem"
+EOF
+echo "✅ Generated client-config.yml template"
 
 # Copy service file
 cp ./scripts/worker.service "$BUILD_DIR/etc/systemd/system/"
 
-# Copy certificate generation script (enhanced version)
+# Copy certificate generation script
 cp ./scripts/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
 
-# Create control file with debconf dependency
+# Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
 Package: $PACKAGE_NAME
 Version: $CLEAN_VERSION
@@ -84,7 +96,7 @@ Description: Worker Job Isolation Platform
 Installed-Size: $(du -sk $BUILD_DIR | cut -f1)
 EOF
 
-# Copy install scripts (enhanced versions)
+# Copy install scripts
 cp ./debian/postinst "$BUILD_DIR/DEBIAN/"
 cp ./debian/prerm "$BUILD_DIR/DEBIAN/"
 cp ./debian/postrm "$BUILD_DIR/DEBIAN/"
@@ -124,6 +136,7 @@ echo
 echo "📦 Package Features:"
 echo "  ✅ Interactive installation with server IP configuration"
 echo "  ✅ Automatic certificate generation for the specified IP"
+echo "  ✅ Both server and client config files included"
 echo "  ✅ Debconf support for reconfiguration (dpkg-reconfigure worker)"
 echo "  ✅ Environment variable support for automation"
 echo "  ✅ Non-interactive mode for CI/CD pipelines"
