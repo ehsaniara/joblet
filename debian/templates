@@ -1,13 +1,40 @@
-Template: worker/server_ip
+Template: worker/server_address
 Type: string
 Default: 127.0.0.1
-Description: Server IP address for client connections
- Enter the IP address that clients will use to connect to the Worker service.
+Description: Server IP address or hostname
+ Enter the IP address or hostname that clients will use to connect to the
+ Worker service. This should be the address clients can reach, which may
+ be different from the server's local IP if behind a reverse proxy, load
+ balancer, or NAT.
  .
- This should be the IP address that clients can reach:
-  - Local network: 192.168.1.100, 10.0.1.100, etc.
-  - Public IP: Your server's public IP address
-  - Default: Uses auto-detected IP from your network interface
+ Examples:
+  - Direct connection: 192.168.1.100
+  - Reverse proxy: api.company.com
+  - Load balancer: lb.company.com
+  - Cloud instance: 203.0.113.100
+
+Template: worker/server_port
+Type: string
+Default: 50051
+Description: Server port number
+ Enter the port number that clients will use to connect to the Worker service.
+ This should be the port that clients can reach (may be different from the
+ internal port if behind a reverse proxy).
  .
- The service will bind to this IP address and generate SSL certificates
- that are valid for this IP.
+ Default is 50051 for direct connections.
+ Common alternatives: 443 (HTTPS), 80 (HTTP), 8080 (HTTP-alt).
+
+Template: worker/additional_names
+Type: string
+Default:
+Description: Additional hostnames or IP addresses (optional)
+ Enter additional hostnames or IP addresses that clients might use to connect,
+ separated by commas. This ensures the SSL certificate will be valid for all
+ connection methods.
+ .
+ Examples:
+  - Multiple hostnames: api.company.com,internal.company.com
+  - Mixed: api.company.com,192.168.1.100,10.0.1.100
+  - Load balancer: lb-internal.company.com,10.0.1.50
+ .
+ Leave empty if clients will only use the primary address above.

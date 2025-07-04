@@ -15,21 +15,32 @@ detect_current_ip() {
 
 # Set detected IP as default
 DETECTED_IP=$(detect_current_ip)
-db_set worker/server_ip "$DETECTED_IP"
+db_set worker/server_address "$DETECTED_IP"
+db_set worker/server_port "50051"
 
-# Ask for server IP only
-db_input high worker/server_ip || true
+# Ask configuration questions
+db_input high worker/server_address || true
+db_input high worker/server_port || true
+db_input medium worker/additional_names || true
 
 # Process the configuration
 db_go
 
-# Get the value and store it for postinst
-db_get worker/server_ip
-SERVER_IP="$RET"
+# Get the values and store them for postinst
+db_get worker/server_address
+SERVER_ADDRESS="$RET"
+
+db_get worker/server_port
+SERVER_PORT="$RET"
+
+db_get worker/additional_names
+ADDITIONAL_NAMES="$RET"
 
 # Store configuration in environment file for postinst
 cat > /tmp/worker-install-config << EOF
-WORKER_SERVER_IP="$SERVER_IP"
+WORKER_SERVER_ADDRESS="$SERVER_ADDRESS"
+WORKER_SERVER_PORT="$SERVER_PORT"
+WORKER_ADDITIONAL_NAMES="$ADDITIONAL_NAMES"
 EOF
 
 exit 0
