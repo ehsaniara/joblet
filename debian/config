@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+
+# Source debconf library
+. /usr/share/debconf/confmodule
+
+# Function to detect current IP
+detect_current_ip() {
+    local current_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
+    if [ -z "$current_ip" ]; then
+        current_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
+    fi
+    echo "${current_ip:-127.0.0.1}"
+}
+
+# Set detected IP as default
+DETECTED_IP=$(detect_current_ip)
+db_set worker/server_ip "$DETECTED_IP"
+
+# Ask for server IP only
+db_input high worker/server_ip || true
+
+# Process the configuration
+db_go
+
+# Get the value and store it for postinst
+db_get worker/server_ip
+SERVER_IP="$RET"
+
+# Store configuration in environment file for postinst
+cat > /tmp/worker-install-config << EOF
+WORKER_SERVER_IP="$SERVER_IP"
+EOF
+
+exit 0

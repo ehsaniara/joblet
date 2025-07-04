@@ -1,0 +1,13 @@
+Template: worker/server_ip
+Type: string
+Default: 127.0.0.1
+Description: Server IP address for client connections
+ Enter the IP address that clients will use to connect to the Worker service.
+ .
+ This should be the IP address that clients can reach:
+  - Local network: 192.168.1.100, 10.0.1.100, etc.
+  - Public IP: Your server's public IP address
+  - Default: Uses auto-detected IP from your network interface
+ .
+ The service will bind to this IP address and generate SSL certificates
+ that are valid for this IP.

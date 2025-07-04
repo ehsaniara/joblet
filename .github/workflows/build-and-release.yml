@@ -232,12 +232,14 @@ jobs:
           body: |
             ## Worker ${{ github.ref_name }}
             
-            ### Installation
+            🚀 **Interactive Installation** - Automatically configures network settings during installation!
+            
+            ### Quick Installation
             ```bash
             # Download the appropriate package for your architecture
             wget https://github.com/ehsaniara/worker/releases/download/${{ github.ref_name }}/worker_${{ needs.build-binary.outputs.version }}_amd64.deb
             
-            # Install the package
+            # Interactive installation (recommended)
             sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
             
             # Start the service
@@ -245,17 +247,94 @@ jobs:
             sudo systemctl enable worker
             ```
             
-            ### Verification
+            ### Installation Options
+            
+            #### 🖥️ Interactive Mode (Default)
+            ```bash
+            sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            ```
+            Prompts for server IP address - the IP that clients will use to connect.
+            
+            #### 🤖 Automated Mode
+            ```bash
+            # Pre-configured installation
+            WORKER_SERVER_IP="192.168.1.100" \
+            sudo -E dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            ```
+            
+            #### 🔧 CI/CD Mode
+            ```bash
+            # Non-interactive installation (uses auto-detected IP)
+            DEBIAN_FRONTEND=noninteractive sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            ```
+            
+            ### Common Examples
+            
+            **Local Network:**
+            ```bash
+            WORKER_SERVER_IP="192.168.1.100" \
+            sudo -E dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            ```
+            
+            **Public IP:**
+            ```bash
+            WORKER_SERVER_IP="203.0.113.100" \
+            sudo -E dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            ```
+            
+            **Auto-detected (Default):**
+            ```bash
+            # Uses the IP from your primary network interface
+            sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            ```
+            
+            ### Post-Installation
+            
+            #### Verification
             ```bash
             # Verify checksums
             sha256sum -c checksums.txt
             
             # Check service status
             sudo systemctl status worker
+            
+            # Test CLI connection
+            worker-cli list
             ```
             
-            ### What's Changed
-            - Full changelog available in commit history
+            #### Reconfiguration
+            ```bash
+            # Reconfigure network settings
+            sudo dpkg-reconfigure worker
+            
+            # Or manually edit config and regenerate certificates
+            sudo nano /opt/worker/config/config.yml
+            sudo /usr/local/bin/certs_gen.sh
+            sudo systemctl restart worker
+            ```
+            
+            ### Features
+            - ✅ **Simple Installation** - Just asks for server IP address
+            - ✅ **Auto-Detection** - Automatically detects your network IP
+            - ✅ **SSL Certificates** - Generates certificates for the server IP
+            - ✅ **Multiple Client Types** - Admin and viewer certificates
+            - ✅ **Easy Configuration** - Environment variables support
+            - ✅ **Production Ready** - Systemd service with proper isolation
+            - ✅ **Cross-Architecture** - AMD64 and ARM64 support
+            
+            ### What's New
+            - Interactive installation asks for server IP address
+            - Automatic certificate generation for the specified IP
+            - Simplified configuration - just one IP address needed
+            - Enhanced user experience with clear prompts
+            - Support for both interactive and automated installation
+            
+            ### Documentation
+            - Installation Guide: See release notes above
+            - Configuration: `/opt/worker/config/config.yml`
+            - Certificates: `/opt/worker/certs/`
+            - Logs: `sudo journalctl -u worker -f`
+            - CLI Help: `worker-cli --help`
 
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
