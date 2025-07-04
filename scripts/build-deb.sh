@@ -23,13 +23,12 @@ echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Create directory structure
+# Create directory structure (FIXED - removed confmodule directory)
 mkdir -p "$BUILD_DIR/DEBIAN"
 mkdir -p "$BUILD_DIR/opt/worker"
 mkdir -p "$BUILD_DIR/opt/worker/config"
 mkdir -p "$BUILD_DIR/etc/systemd/system"
 mkdir -p "$BUILD_DIR/usr/local/bin"
-mkdir -p "$BUILD_DIR/usr/share/debconf/confmodule"  # For debconf support
 
 # Copy binaries - BOTH to /opt/worker/
 if [ ! -f "./worker" ]; then
@@ -123,15 +122,14 @@ dpkg-deb -c "$PACKAGE_FILE"
 
 echo
 echo "📦 Package Features:"
-echo "  ✅ Interactive installation with network configuration prompts"
-echo "  ✅ Support for reverse proxy, load balancer, and NAT scenarios"
-echo "  ✅ Automatic certificate generation with custom hostnames/IPs"
+echo "  ✅ Interactive installation with server IP configuration"
+echo "  ✅ Automatic certificate generation for the specified IP"
 echo "  ✅ Debconf support for reconfiguration (dpkg-reconfigure worker)"
 echo "  ✅ Environment variable support for automation"
 echo "  ✅ Non-interactive mode for CI/CD pipelines"
 echo
 echo "🚀 Installation methods:"
 echo "  Interactive:    sudo dpkg -i $PACKAGE_FILE"
-echo "  Pre-configured: WORKER_SERVER_ADDRESS='your-ip' sudo -E dpkg -i $PACKAGE_FILE"
+echo "  Pre-configured: WORKER_SERVER_IP='your-ip' sudo -E dpkg -i $PACKAGE_FILE"
 echo "  Automated:      DEBIAN_FRONTEND=noninteractive sudo dpkg -i $PACKAGE_FILE"
 echo "  Reconfigure:    sudo dpkg-reconfigure worker"
