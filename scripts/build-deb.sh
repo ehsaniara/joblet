@@ -45,7 +45,7 @@ cp ./worker-cli "$BUILD_DIR/opt/worker/"
 
 # Copy config file (now as template)
 if [ -f "./config/config.yml" ]; then
-    cp ./config/config.yml "$BUILD_DIR/opt/worker/config/"
+    cp ./config/server-config.yml "$BUILD_DIR/opt/worker/config/"
     echo "✅ Copied config/config.yml to /opt/worker/config/"
 elif [ -f "./config.yaml" ]; then
     cp ./config.yaml "$BUILD_DIR/opt/worker/config/config.yml"

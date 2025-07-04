@@ -10,14 +10,6 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig
 
-	// Test CLI defaults
-	if cfg.CLI.ServerAddr != "localhost:50051" {
-		t.Errorf("Expected CLI ServerAddr 'localhost:50051', got '%s'", cfg.CLI.ServerAddr)
-	}
-	if cfg.CLI.ClientCertPath != "./certs/client-cert.pem" {
-		t.Errorf("Expected CLI ClientCertPath './certs/client-cert.pem', got '%s'", cfg.CLI.ClientCertPath)
-	}
-
 	// Test Server defaults
 	if cfg.Server.Address != "0.0.0.0" {
 		t.Errorf("Expected Server Address '0.0.0.0', got '%s'", cfg.Server.Address)
@@ -35,92 +27,6 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.Worker.MaxConcurrentJobs != 100 {
 		t.Errorf("Expected Worker MaxConcurrentJobs 100, got %d", cfg.Worker.MaxConcurrentJobs)
-	}
-}
-
-func TestLoadCLIConfig_Defaults(t *testing.T) {
-	// Ensure no config files exist in test directory
-	cleanupTestFiles(t)
-	defer cleanupTestFiles(t) // Cleanup after test
-
-	cfg := LoadCLIConfig()
-
-	// Should return CLI defaults
-	if cfg.ServerAddr != "localhost:50051" {
-		t.Errorf("Expected default ServerAddr 'localhost:50051', got '%s'", cfg.ServerAddr)
-	}
-	if cfg.ClientCertPath != "./certs/client-cert.pem" {
-		t.Errorf("Expected default ClientCertPath './certs/client-cert.pem', got '%s'", cfg.ClientCertPath)
-	}
-	if cfg.ClientKeyPath != "./certs/client-key.pem" {
-		t.Errorf("Expected default ClientKeyPath './certs/client-key.pem', got '%s'", cfg.ClientKeyPath)
-	}
-	if cfg.CACertPath != "./certs/ca-cert.pem" {
-		t.Errorf("Expected default CACertPath './certs/ca-cert.pem', got '%s'", cfg.CACertPath)
-	}
-}
-
-func TestLoadCLIConfig_FromFile(t *testing.T) {
-	// Create test config file
-	testConfig := `
-cli:
-  serverAddr: "production.example.com:50051"
-  clientCertPath: "/custom/client-cert.pem"
-  clientKeyPath: "/custom/client-key.pem"
-  caCertPath: "/custom/ca-cert.pem"
-
-server:
-  address: "192.168.1.100"
-  port: 9999
-`
-
-	configFile := createTestConfigFile(t, "config.yml", testConfig)
-	defer os.Remove(configFile)
-
-	cfg := LoadCLIConfig()
-
-	// Should load from CLI section
-	if cfg.ServerAddr != "production.example.com:50051" {
-		t.Errorf("Expected ServerAddr 'production.example.com:50051', got '%s'", cfg.ServerAddr)
-	}
-	if cfg.ClientCertPath != "/custom/client-cert.pem" {
-		t.Errorf("Expected ClientCertPath '/custom/client-cert.pem', got '%s'", cfg.ClientCertPath)
-	}
-	if cfg.ClientKeyPath != "/custom/client-key.pem" {
-		t.Errorf("Expected ClientKeyPath '/custom/client-key.pem', got '%s'", cfg.ClientKeyPath)
-	}
-	if cfg.CACertPath != "/custom/ca-cert.pem" {
-		t.Errorf("Expected CACertPath '/custom/ca-cert.pem', got '%s'", cfg.CACertPath)
-	}
-}
-
-func TestLoadCLIConfig_FallbackToServer(t *testing.T) {
-	// Config file with only server section (no CLI section)
-	testConfig := `
-server:
-  address: "fallback.example.com"
-  port: 8080
-  caCertPath: "/server/ca-cert.pem"
-`
-
-	configFile := createTestConfigFile(t, "config.yml", testConfig)
-	defer os.Remove(configFile)
-
-	cfg := LoadCLIConfig()
-
-	// Should fallback to server section for address
-	if cfg.ServerAddr != "fallback.example.com:8080" {
-		t.Errorf("Expected ServerAddr 'fallback.example.com:8080', got '%s'", cfg.ServerAddr)
-	}
-
-	// Should fallback to server CA cert
-	if cfg.CACertPath != "/server/ca-cert.pem" {
-		t.Errorf("Expected CACertPath '/server/ca-cert.pem', got '%s'", cfg.CACertPath)
-	}
-
-	// Should use CLI defaults for client certs (no fallback)
-	if cfg.ClientCertPath != "./certs/client-cert.pem" {
-		t.Errorf("Expected default ClientCertPath './certs/client-cert.pem', got '%s'", cfg.ClientCertPath)
 	}
 }
 
@@ -151,7 +57,7 @@ cgroup:
   baseDir: "/test/cgroup"
 `
 
-	configFile := createTestConfigFile(t, "config.yml", testConfig)
+	configFile := createTestConfigFile(t, "server-config.yml", testConfig)
 	defer os.Remove(configFile)
 
 	cfg, path, err := LoadConfig()
@@ -237,17 +143,12 @@ logging:
   output: "file"
 `
 
-	configFile := createTestConfigFile(t, "config.yml", testConfig)
+	configFile := createTestConfigFile(t, "server-config.yml", testConfig)
 	defer os.Remove(configFile)
 
 	cfg, path, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("LoadConfig failed: %v", err)
-	}
-
-	// Test CLI config
-	if cfg.CLI.ServerAddr != "cli.example.com:50051" {
-		t.Errorf("Expected CLI ServerAddr 'cli.example.com:50051', got '%s'", cfg.CLI.ServerAddr)
 	}
 
 	// Test Server config
@@ -435,21 +336,6 @@ func TestConfigValidation(t *testing.T) {
 	}
 }
 
-func TestCLIConfigValidation(t *testing.T) {
-	cfg := &CLIConfig{
-		ServerAddr:     "localhost:50051",
-		ClientCertPath: "./non-existent-cert.pem",
-		ClientKeyPath:  "./non-existent-key.pem",
-		CACertPath:     "./non-existent-ca.pem",
-	}
-
-	// CLI validation should be soft - no errors for missing files
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("CLI validation should be soft, got error: %v", err)
-	}
-}
-
 func TestConvenienceMethods(t *testing.T) {
 	cfg := &Config{
 		Server: ServerConfig{
@@ -540,7 +426,7 @@ func createTestConfigFile(t *testing.T, filename, content string) string {
 func cleanupTestFiles(t *testing.T) {
 	t.Helper()
 	testFiles := []string{
-		"./config.yml",
+		"./server-config.yml",
 		"./config.yaml",
 	}
 	for _, file := range testFiles {

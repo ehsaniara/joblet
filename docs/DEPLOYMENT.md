@@ -247,7 +247,7 @@ WantedBy=multi-user.target
 ### Configuration File
 
 ```yaml
-# /opt/worker/config.yml
+# /opt/worker/server-config.yml
 version: "3.0"
 
 server:
@@ -522,8 +522,8 @@ sudo chmod 600 /opt/worker/certs/*-key.pem
 sudo chmod 644 /opt/worker/certs/*-cert.pem
 
 # Secure configuration
-sudo chmod 600 /opt/worker/config.yml
-sudo chown worker:worker /opt/worker/config.yml
+sudo chmod 600 /opt/worker/server-config.yml
+sudo chown worker:worker /opt/worker/server-config.yml
 
 # Secure log directories
 sudo chmod 750 /var/log/worker
@@ -540,7 +540,7 @@ fi
 
 ```bash
 # Optimize for high-concurrency workloads
-cat >> /opt/worker/config.yml << 'EOF'
+cat >> /opt/worker/server-config.yml << 'EOF'
 worker:
   maxConcurrentJobs: 500          # Increase concurrent job limit
   jobTimeout: "30m"               # Shorter timeout for faster turnover

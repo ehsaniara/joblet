@@ -1,0 +1,14 @@
+version: "3.0"
+
+# CLI-specific configuration (used by CLI client)
+nodes:
+  default:
+    address: "localhost:50051"       # Override default localhost:50051
+    cert: "./certs/client-cert.pem"  # Override default ./certs/client-cert.pem (renamed from admin-client-cert.pem)
+    key: "./certs/client-key.pem"    # Override default ./certs/client-key.pem (renamed from admin-client-key.pem)
+    ca: "./certs/ca-cert.pem"        # Override default ./certs/ca-cert.pem
+  srv1:
+    address: "192.168.1.161:50051"        # Override default 192.168.1.161:50051
+    cert: "./certs/srv1/client-cert.pem"  # Override default ./certs/client-cert.pem (renamed from admin-client-cert.pem)
+    key: "./certs/srv1/client-key.pem"    # Override default ./certs/client-key.pem (renamed from admin-client-key.pem)
+    ca: "./certs/srv1/ca-cert.pem"        # Override default ./certs/ca-cert.pem

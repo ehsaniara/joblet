@@ -15,6 +15,9 @@ case "$1" in
         rm -f /usr/bin/worker
         rm -f /usr/bin/worker-cli
 
+        # Remove user-accessible certificate symlinks
+        rm -rf /etc/worker
+
         echo "Worker service removed successfully!"
         ;;
 
@@ -27,6 +30,7 @@ case "$1" in
         # Remove all worker files including new structure
         rm -rf /opt/worker
         rm -rf /var/log/worker
+        rm -rf /etc/worker
 
         # Remove symlinks
         rm -f /usr/bin/worker
