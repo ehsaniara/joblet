@@ -1,12 +1,5 @@
 version: "3.0"
 
-# CLI-specific configuration (used by CLI client)
-cli:
-  serverAddr: "192.168.1.161:50051"                    # Override default localhost:50051
-  clientCertPath: "./certs/client-cert.pem"  # Override default ./certs/client-cert.pem (renamed from admin-client-cert.pem)
-  clientKeyPath: "./certs/client-key.pem"    # Override default ./certs/client-key.pem (renamed from admin-client-key.pem)
-  caCertPath: "./certs/ca-cert.pem"          # Override default ./certs/ca-cert.pem
-
 # Server configuration (used by worker daemon)
 server:
   address: "192.168.1.161"                             # Will be combined with port if cli.serverAddr not set

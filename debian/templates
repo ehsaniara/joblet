@@ -22,7 +22,6 @@ Description: Server port number
  internal port if behind a reverse proxy).
  .
  Default is 50051 for direct connections.
- Common alternatives: 443 (HTTPS), 80 (HTTP), 8080 (HTTP-alt).
 
 Template: worker/additional_names
 Type: string

@@ -47,7 +47,7 @@ StandardError=journal
 # Environment variables for the main service
 Environment="WORKER_MODE=server"
 Environment="LOG_LEVEL=INFO"
-Environment="WORKER_CONFIG_PATH=/opt/worker/config.yml"
+Environment="WORKER_CONFIG_PATH=/opt/worker/config/server-config.yml"
 
 # Cleanup job cgroups on service stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/worker.slice/worker.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'

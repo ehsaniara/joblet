@@ -13,21 +13,12 @@ import (
 
 // Config holds the complete application configuration
 type Config struct {
-	CLI        CLIConfig        `yaml:"cli" json:"cli"`
 	Server     ServerConfig     `yaml:"server" json:"server"`
 	Worker     WorkerConfig     `yaml:"worker" json:"worker"`
 	Cgroup     CgroupConfig     `yaml:"cgroup" json:"cgroup"`
 	Filesystem FilesystemConfig `yaml:"filesystem" json:"filesystem"`
 	GRPC       GRPCConfig       `yaml:"grpc" json:"grpc"`
 	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
-}
-
-// CLIConfig holds CLI-specific configuration
-type CLIConfig struct {
-	ServerAddr     string `yaml:"serverAddr" json:"serverAddr"`
-	ClientCertPath string `yaml:"clientCertPath" json:"clientCertPath"`
-	ClientKeyPath  string `yaml:"clientKeyPath" json:"clientKeyPath"`
-	CACertPath     string `yaml:"caCertPath" json:"caCertPath"`
 }
 
 // ServerConfig holds server-specific configuration (includes security settings)
@@ -87,12 +78,6 @@ type LoggingConfig struct {
 
 // DefaultConfig provides default configuration values
 var DefaultConfig = Config{
-	CLI: CLIConfig{
-		ServerAddr:     "localhost:50051",
-		ClientCertPath: "./certs/client-cert.pem",
-		ClientKeyPath:  "./certs/client-key.pem",
-		CACertPath:     "./certs/ca-cert.pem",
-	},
 	Server: ServerConfig{
 		Address:        "0.0.0.0",
 		Port:           50051,
@@ -161,49 +146,16 @@ func LoadConfig() (*Config, string, error) {
 	return &config, path, nil
 }
 
-// LoadCLIConfig loads configuration for CLI (no environment variables)
-func LoadCLIConfig() *CLIConfig {
-	config := DefaultConfig.CLI // Start with CLI defaults
-
-	// Try to load from config file (CLI paths)
-	if fileConfig, err := loadCLIFromFile(); err == nil {
-		// Override defaults with file values if they exist
-		if fileConfig.CLI.ServerAddr != "" {
-			config.ServerAddr = fileConfig.CLI.ServerAddr
-		} else if fileConfig.Server.Address != "" && fileConfig.Server.Port != 0 {
-			// Fallback to server section if CLI section doesn't exist
-			config.ServerAddr = fmt.Sprintf("%s:%d", fileConfig.Server.Address, fileConfig.Server.Port)
-		}
-
-		if fileConfig.CLI.ClientCertPath != "" {
-			config.ClientCertPath = fileConfig.CLI.ClientCertPath
-		}
-
-		if fileConfig.CLI.ClientKeyPath != "" {
-			config.ClientKeyPath = fileConfig.CLI.ClientKeyPath
-		}
-
-		if fileConfig.CLI.CACertPath != "" {
-			config.CACertPath = fileConfig.CLI.CACertPath
-		} else if fileConfig.Server.CACertPath != "" {
-			// Fallback to server CA cert if CLI doesn't specify one
-			config.CACertPath = fileConfig.Server.CACertPath
-		}
-	}
-
-	return &config
-}
-
 // loadFromFile loads configuration from YAML file (server paths)
 func loadFromFile(config *Config) (string, error) {
 	configPaths := []string{
-		os.Getenv("WORKER_CONFIG_PATH"), // Custom path from environment
-		"/opt/worker/config/config.yml", // Primary production path
-		"./config/config.yml",           // Development - relative to project root
-		"./config.yml",                  // Development - current directory
-		"/etc/worker/config.yml",        // System-wide alternative
-		"/opt/worker/config.yaml",       // Fallback for old naming
-		"./config/config.yaml",          // Fallback for old naming in development
+		os.Getenv("WORKER_CONFIG_PATH"),        // Custom path from environment
+		"/opt/worker/config/server-config.yml", // Primary production path
+		"./config/server-config.yml",           // Development - relative to project root
+		"./server-config.yml",                  // Development - current directory
+		"/etc/worker/server-config.yml",        // System-wide alternative
+		"/opt/worker/config.yaml",              // Fallback for old naming
+		"./config/config.yaml",                 // Fallback for old naming in development
 	}
 
 	for _, path := range configPaths {
@@ -228,44 +180,6 @@ func loadFromFile(config *Config) (string, error) {
 	}
 
 	return "built-in defaults (no config file found)", nil
-}
-
-// loadCLIFromFile loads configuration from YAML file (CLI paths)
-func loadCLIFromFile() (*Config, error) {
-	configPaths := []string{
-		"./config/config.yml",  // Primary location (relative to current directory)
-		"./config.yml",         // Alternative location
-		"./config/config.yaml", // YAML extension variant
-		"./config.yaml",        // YAML extension variant in current dir
-	}
-
-	for _, path := range configPaths {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			continue
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue // Try next path
-		}
-
-		var config Config
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			continue // Try next path
-		}
-
-		return &config, nil
-	}
-
-	return &Config{}, os.ErrNotExist
-}
-
-// ClientConfig for pkg/client (to avoid import cycles)
-type ClientConfig struct {
-	ServerAddr     string
-	ClientCertPath string
-	ClientKeyPath  string
-	CACertPath     string
 }
 
 // GetServerAddress Server-specific convenience methods
@@ -457,27 +371,6 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Validate validates CLI-specific configuration
-func (c *CLIConfig) Validate() error {
-	// Check if certificate files exist (soft validation)
-	certPaths := map[string]string{
-		"client certificate": c.ClientCertPath,
-		"client key":         c.ClientKeyPath,
-		"CA certificate":     c.CACertPath,
-	}
-
-	for _, path := range certPaths {
-		if path != "" {
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				// Don't fail validation, just warn that certs don't exist
-				continue
-			}
-		}
-	}
-
-	return nil
-}
-
 func (c *Config) ToYAML() ([]byte, error) {
 	return yaml.Marshal(c)
 }
@@ -488,4 +381,106 @@ func (c *Config) SaveToFile(path string) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
+}
+
+// ClientConfig represents the client-side configuration with multiple nodes
+type ClientConfig struct {
+	Version string           `yaml:"version"`
+	Nodes   map[string]*Node `yaml:"nodes"`
+}
+
+// Node represents a single server configuration
+type Node struct {
+	Address string `yaml:"address"`
+	Cert    string `yaml:"cert"`
+	Key     string `yaml:"key"`
+	CA      string `yaml:"ca"`
+}
+
+// LoadClientConfig loads client configuration from file - REQUIRED, no fallbacks
+func LoadClientConfig(configPath string) (*ClientConfig, error) {
+	if configPath == "" {
+		// Look for client-config.yml in common locations
+		configPath = findClientConfig()
+		if configPath == "" {
+			return nil, fmt.Errorf("client configuration file not found. Please create client-config.yml or specify path with --config")
+		}
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("client configuration file not found: %s", configPath)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read client config file %s: %w", configPath, err)
+	}
+
+	var config ClientConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse client config: %w", err)
+	}
+
+	// Validate that we have nodes
+	if len(config.Nodes) == 0 {
+		return nil, fmt.Errorf("no nodes configured in %s", configPath)
+	}
+
+	return &config, nil
+}
+
+// GetNode returns the configuration for a specific node
+func (c *ClientConfig) GetNode(nodeName string) (*Node, error) {
+	if nodeName == "" {
+		nodeName = "default"
+	}
+
+	node, exists := c.Nodes[nodeName]
+	if !exists {
+		return nil, fmt.Errorf("node '%s' not found in configuration", nodeName)
+	}
+
+	return node, nil
+}
+
+// ListNodes returns all available node names
+func (c *ClientConfig) ListNodes() []string {
+	var nodes []string
+	for name := range c.Nodes {
+		nodes = append(nodes, name)
+	}
+	return nodes
+}
+
+// findClientConfig looks for client-config.yml in common locations
+// Returns empty string if not found (no fallback creation)
+func findClientConfig() string {
+	locations := []string{
+		"./client-config.yml",
+		"./config/client-config.yml",
+		filepath.Join(os.Getenv("HOME"), ".worker", "client-config.yml"),
+		"/etc/worker/client-config.yml",
+	}
+
+	for _, path := range locations {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	fmt.Printf("Error: no client-config.yml found\n")
+	return "" // Return empty string if not found
+}
+
+// ExpandPaths expands relative paths based on config file location
+func (n *Node) ExpandPaths(configDir string) {
+	if !filepath.IsAbs(n.Cert) {
+		n.Cert = filepath.Join(configDir, n.Cert)
+	}
+	if !filepath.IsAbs(n.Key) {
+		n.Key = filepath.Join(configDir, n.Key)
+	}
+	if !filepath.IsAbs(n.CA) {
+		n.CA = filepath.Join(configDir, n.CA)
+	}
 }

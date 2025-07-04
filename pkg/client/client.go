@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	pb "worker/api/gen"
-	"worker/pkg/config"
 )
 
 type JobClient struct {
@@ -21,8 +20,15 @@ type JobClient struct {
 	conn   *grpc.ClientConn
 }
 
+type ClientConfig struct {
+	ServerAddr     string
+	ClientCertPath string
+	ClientKeyPath  string
+	CACertPath     string
+}
+
 // NewJobClient creates a new job client with the provided configuration
-func NewJobClient(clientConfig config.ClientConfig) (*JobClient, error) {
+func NewJobClient(clientConfig ClientConfig) (*JobClient, error) {
 	// Load client certificate
 	clientCert, err := tls.LoadX509KeyPair(clientConfig.ClientCertPath, clientConfig.ClientKeyPath)
 	if err != nil {
@@ -63,16 +69,6 @@ func NewJobClient(clientConfig config.ClientConfig) (*JobClient, error) {
 		client: pb.NewJobServiceClient(conn),
 		conn:   conn,
 	}, nil
-}
-
-// NewJobClientFromCLIConfig convenience function for CLI usage
-func NewJobClientFromCLIConfig(cliConfig *config.CLIConfig) (*JobClient, error) {
-	return NewJobClient(config.ClientConfig{
-		ServerAddr:     cliConfig.ServerAddr,
-		ClientCertPath: cliConfig.ClientCertPath,
-		ClientKeyPath:  cliConfig.ClientKeyPath,
-		CACertPath:     cliConfig.CACertPath,
-	})
 }
 
 func (c *JobClient) Close() error {

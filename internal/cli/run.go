@@ -3,12 +3,17 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	pb "worker/api/gen"
+)
+
+var (
+	runMaxCPU    int32
+	runMaxMemory int32
+	runMaxIOBPS  int32
 )
 
 func newRunCmd() *cobra.Command {
@@ -18,60 +23,34 @@ func newRunCmd() *cobra.Command {
 		Long: `Run a new job with the specified command and arguments.
 
 Examples:
-  cli run nginx
-  cli run python3 script.py
-  cli run bash -c "curl http://example.com"
+  worker-cli run nginx
+  worker-cli run python3 script.py
+  worker-cli run bash -c "curl https://example.com"
+  worker-cli --node=srv1 run ps aux
 
 Flags:
   --max-cpu=N         Max CPU percentage
   --max-memory=N      Max Memory in MB  
   --max-iobps=N       Max IO BPS`,
-		Args:               cobra.MinimumNArgs(1),
-		RunE:               runRun,
-		DisableFlagParsing: true,
+		Args: cobra.MinimumNArgs(1),
+		RunE: runRun,
+		// Remove DisableFlagParsing to allow proper flag handling
 	}
+
+	// Add local flags for resource limits
+	cmd.Flags().Int32Var(&runMaxCPU, "max-cpu", 0, "Maximum CPU percentage")
+	cmd.Flags().Int32Var(&runMaxMemory, "max-memory", 0, "Maximum memory in MB")
+	cmd.Flags().Int32Var(&runMaxIOBPS, "max-iobps", 0, "Maximum IO bytes per second")
 
 	return cmd
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
-	var (
-		maxCPU    int32
-		maxMemory int32
-		maxIOBPS  int32
-	)
+	// args now contains just the command and its arguments
+	command := args[0]
+	cmdArgs := args[1:]
 
-	commandStartIndex := 0
-	for i, arg := range args {
-		if strings.HasPrefix(arg, "--max-cpu=") {
-			if val, err := parseIntFlag(arg, "--max-cpu="); err == nil {
-				maxCPU = int32(val)
-			}
-		} else if strings.HasPrefix(arg, "--max-memory=") {
-			if val, err := parseIntFlag(arg, "--max-memory="); err == nil {
-				maxMemory = int32(val)
-			}
-		} else if strings.HasPrefix(arg, "--max-iobps=") {
-			if val, err := parseIntFlag(arg, "--max-iobps="); err == nil {
-				maxIOBPS = int32(val)
-			}
-		} else if !strings.HasPrefix(arg, "--") {
-			commandStartIndex = i
-			break
-		} else {
-			return fmt.Errorf("unknown flag: %s", arg)
-		}
-	}
-
-	if commandStartIndex >= len(args) {
-		return fmt.Errorf("must specify a command")
-	}
-
-	commandArgs := args[commandStartIndex:]
-	command := commandArgs[0]
-	cmdArgs := commandArgs[1:]
-
-	// SIMPLIFIED: One line client creation using unified config
+	// Create job client using the global configuration
 	jobClient, err := newJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
@@ -84,9 +63,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	job := &pb.RunJobReq{
 		Command:   command,
 		Args:      cmdArgs,
-		MaxCPU:    maxCPU,
-		MaxMemory: maxMemory,
-		MaxIOBPS:  maxIOBPS,
+		MaxCPU:    runMaxCPU,
+		MaxMemory: runMaxMemory,
+		MaxIOBPS:  runMaxIOBPS,
 	}
 
 	response, err := jobClient.RunJob(ctx, job)
@@ -96,14 +75,18 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Job started:\n")
 	fmt.Printf("ID: %s\n", response.Id)
-	fmt.Printf("Command: %s\n", strings.Join(commandArgs, " "))
+	fmt.Printf("Command: %s %s\n", command, strings.Join(cmdArgs, " "))
 	fmt.Printf("Status: %s\n", response.Status)
 	fmt.Printf("StartTime: %s\n", response.StartTime)
+	if runMaxCPU > 0 {
+		fmt.Printf("Max CPU: %d%%\n", runMaxCPU)
+	}
+	if runMaxMemory > 0 {
+		fmt.Printf("Max Memory: %d MB\n", runMaxMemory)
+	}
+	if runMaxIOBPS > 0 {
+		fmt.Printf("Max IO: %d BPS\n", runMaxIOBPS)
+	}
 
 	return nil
-}
-
-func parseIntFlag(arg, prefix string) (int64, error) {
-	valueStr := strings.TrimPrefix(arg, prefix)
-	return strconv.ParseInt(valueStr, 10, 32)
 }
