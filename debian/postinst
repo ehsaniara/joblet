@@ -40,13 +40,27 @@ detect_current_ip() {
 get_configuration() {
     # First try debconf
     if [ -x /usr/bin/debconf-get ]; then
-        db_get worker/server_ip || true
-        WORKER_SERVER_IP="$RET"
+        db_get worker/server_address || true
+        WORKER_SERVER_ADDRESS="$RET"
+
+        db_get worker/server_port || true
+        WORKER_SERVER_PORT="$RET"
+
+        db_get worker/additional_names || true
+        WORKER_ADDITIONAL_NAMES="$RET"
     fi
 
     # Then try environment variables (override debconf)
-    if [ -n "$WORKER_SERVER_IP_ENV" ]; then
-        WORKER_SERVER_IP="$WORKER_SERVER_IP_ENV"
+    if [ -n "$WORKER_SERVER_ADDRESS_ENV" ]; then
+        WORKER_SERVER_ADDRESS="$WORKER_SERVER_ADDRESS_ENV"
+    fi
+
+    if [ -n "$WORKER_SERVER_PORT_ENV" ]; then
+        WORKER_SERVER_PORT="$WORKER_SERVER_PORT_ENV"
+    fi
+
+    if [ -n "$WORKER_ADDITIONAL_NAMES_ENV" ]; then
+        WORKER_ADDITIONAL_NAMES="$WORKER_ADDITIONAL_NAMES_ENV"
     fi
 
     # Finally try config file if it exists
@@ -56,25 +70,33 @@ get_configuration() {
     fi
 
     # Use detected IP as ultimate fallback
-    if [ -z "$WORKER_SERVER_IP" ]; then
-        WORKER_SERVER_IP=$(detect_current_ip)
-        print_warning "No server IP configured, using detected IP: $WORKER_SERVER_IP"
+    if [ -z "$WORKER_SERVER_ADDRESS" ]; then
+        WORKER_SERVER_ADDRESS=$(detect_current_ip)
+        print_warning "No server address configured, using detected IP: $WORKER_SERVER_ADDRESS"
     fi
+
+    # Set defaults
+    WORKER_SERVER_PORT=${WORKER_SERVER_PORT:-50051}
+    WORKER_ADDITIONAL_NAMES=${WORKER_ADDITIONAL_NAMES:-}
 }
 
 # Function to update configuration file
 update_config_file() {
     local config_file="/opt/worker/config/config.yml"
-    local server_ip="${WORKER_SERVER_IP}"
+    local server_addr="${WORKER_SERVER_ADDRESS}"
+    local server_port="${WORKER_SERVER_PORT}"
 
     if [ -f "$config_file" ]; then
         print_info "Updating configuration file..."
 
         # Update server address
-        sed -i "s/address: \"[^\"]*\"/address: \"$server_ip\"/" "$config_file"
+        sed -i "s/address: \"[^\"]*\"/address: \"$server_addr\"/" "$config_file"
+
+        # Update server port
+        sed -i "s/port: [0-9]*/port: $server_port/" "$config_file"
 
         # Update CLI serverAddr
-        sed -i "s/serverAddr: \"[^\"]*\"/serverAddr: \"$server_ip:50051\"/" "$config_file"
+        sed -i "s/serverAddr: \"[^\"]*\"/serverAddr: \"$server_addr:$server_port\"/" "$config_file"
 
         print_success "Configuration updated successfully"
     else
@@ -87,8 +109,8 @@ generate_certificates() {
     print_info "Generating SSL certificates..."
 
     # Export variables for the certificate generation script
-    export WORKER_SERVER_ADDRESS="$WORKER_SERVER_IP"
-    export WORKER_ADDITIONAL_NAMES=""
+    export WORKER_SERVER_ADDRESS
+    export WORKER_ADDITIONAL_NAMES
 
     # Run the certificate generation script
     /usr/local/bin/certs_gen.sh
@@ -121,8 +143,9 @@ case "$1" in
         get_configuration
 
         print_info "Configuration Summary:"
-        echo "  Server IP: $WORKER_SERVER_IP"
-        echo "  Server Port: 50051"
+        echo "  Server Address: $WORKER_SERVER_ADDRESS"
+        echo "  Server Port: $WORKER_SERVER_PORT"
+        echo "  Additional Names: ${WORKER_ADDITIONAL_NAMES:-none}"
         echo
 
         # Update configuration
@@ -159,8 +182,8 @@ case "$1" in
         print_success "Worker service installed successfully!"
         echo
         print_info "📁 Installation Summary:"
-        echo "  Server IP: $WORKER_SERVER_IP"
-        echo "  Server Port: 50051"
+        echo "  Server Address: $WORKER_SERVER_ADDRESS"
+        echo "  Server Port: $WORKER_SERVER_PORT"
         echo "  Configuration: /opt/worker/config/config.yml"
         echo "  Certificates: /opt/worker/certs/"
         echo "  CLI Command: worker-cli --help"

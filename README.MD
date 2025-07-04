@@ -219,20 +219,20 @@ Worker consists of two main components that work together:
 
 ```bash
 # Download the latest release
-wget https://github.com/ehsaniara/worker/releases/latest/download/worker_1.0.0_amd64.deb
+wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
 
-# Install the package (installs both daemon and CLI)
-sudo dpkg -i worker_1.0.0_amd64.deb
+# Or manually download latest version
+# wget https://github.com/ehsaniara/worker/releases/latest/download/worker_VERSION_amd64.deb
 
-# Start the daemon service
-sudo systemctl start worker
-sudo systemctl enable worker
+# Install the package (replace VERSION with actual version)
+sudo dpkg -i worker_*_amd64.deb
 
 # Verify daemon is running
 sudo systemctl status worker
 
-# Test CLI connection to daemon
-worker-cli list
+# Start the service
+sudo systemctl start worker
+sudo systemctl enable worker
 ```
 
 ### Manual Installation
