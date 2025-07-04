@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"worker/pkg/client"
 
 	"github.com/spf13/cobra"
 )
@@ -21,9 +20,10 @@ func newListCmd() *cobra.Command {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	jobClient, err := client.NewJobClient(cfg.ServerAddr)
+	// SIMPLIFIED: One line client creation using unified config
+	jobClient, err := newJobClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 	defer jobClient.Close()
 

@@ -25,19 +25,19 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker, cfg *con
 		"maxRecvMsgSize", cfg.GRPC.MaxRecvMsgSize,
 		"maxSendMsgSize", cfg.GRPC.MaxSendMsgSize)
 
-	serverCert, err := tls.LoadX509KeyPair(cfg.Security.ServerCertPath, cfg.Security.ServerKeyPath)
+	serverCert, err := tls.LoadX509KeyPair(cfg.Server.ServerCertPath, cfg.Server.ServerKeyPath)
 	if err != nil {
-		serverLogger.Error("failed to load server cert/key", "certPath", cfg.Security.ServerCertPath, "keyPath", cfg.Security.ServerKeyPath, "error", err)
+		serverLogger.Error("failed to load server cert/key", "certPath", cfg.Server.ServerCertPath, "keyPath", cfg.Server.ServerKeyPath, "error", err)
 		return nil, fmt.Errorf("failed to load server cert/key: %w", err)
 	}
 
 	serverLogger.Debug("server certificate loaded successfully")
 
-	serverLogger.Debug("loading CA certificate", "caPath", cfg.Security.CACertPath)
+	serverLogger.Debug("loading CA certificate", "caPath", cfg.Server.CACertPath)
 
-	caCert, err := os.ReadFile(cfg.Security.CACertPath)
+	caCert, err := os.ReadFile(cfg.Server.CACertPath)
 	if err != nil {
-		serverLogger.Error("failed to read CA cert", "caPath", cfg.Security.CACertPath, "error", err)
+		serverLogger.Error("failed to read CA cert", "caPath", cfg.Server.CACertPath, "error", err)
 		return nil, fmt.Errorf("failed to read CA cert: %w", err)
 	}
 

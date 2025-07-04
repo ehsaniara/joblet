@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"worker/pkg/client"
 
 	"github.com/spf13/cobra"
 	pb "worker/api/gen"
@@ -18,21 +17,15 @@ func newRunCmd() *cobra.Command {
 		Short: "Run a new job",
 		Long: `Run a new job with the specified command and arguments.
 
-All jobs run with host networking (no isolation).
-
 Examples:
   cli run nginx
-  cli run mysql
   cli run python3 script.py
   cli run bash -c "curl http://example.com"
 
 Flags:
   --max-cpu=N         Max CPU percentage
   --max-memory=N      Max Memory in MB  
-  --max-iobps=N       Max IO BPS
-
-All jobs share the host network interface and can communicate
-with each other and external services directly.`,
+  --max-iobps=N       Max IO BPS`,
 		Args:               cobra.MinimumNArgs(1),
 		RunE:               runRun,
 		DisableFlagParsing: true,
@@ -78,9 +71,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	command := commandArgs[0]
 	cmdArgs := commandArgs[1:]
 
-	jobClient, err := client.NewJobClient(cfg.ServerAddr)
+	// SIMPLIFIED: One line client creation using unified config
+	jobClient, err := newJobClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 	defer jobClient.Close()
 
@@ -105,7 +99,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Command: %s\n", strings.Join(commandArgs, " "))
 	fmt.Printf("Status: %s\n", response.Status)
 	fmt.Printf("StartTime: %s\n", response.StartTime)
-	fmt.Printf("Network: host (shared with system)\n")
 
 	return nil
 }

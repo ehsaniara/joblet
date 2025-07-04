@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"worker/pkg/client"
 
 	"github.com/spf13/cobra"
 )
@@ -24,9 +23,9 @@ func newStatusCmd() *cobra.Command {
 func runStatus(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 
-	jobClient, err := client.NewJobClient(cfg.ServerAddr)
+	jobClient, err := newJobClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 	defer jobClient.Close()
 

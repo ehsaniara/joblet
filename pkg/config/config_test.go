@@ -1,0 +1,585 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig
+
+	// Test CLI defaults
+	if cfg.CLI.ServerAddr != "localhost:50051" {
+		t.Errorf("Expected CLI ServerAddr 'localhost:50051', got '%s'", cfg.CLI.ServerAddr)
+	}
+	if cfg.CLI.ClientCertPath != "./certs/client-cert.pem" {
+		t.Errorf("Expected CLI ClientCertPath './certs/client-cert.pem', got '%s'", cfg.CLI.ClientCertPath)
+	}
+
+	// Test Server defaults
+	if cfg.Server.Address != "0.0.0.0" {
+		t.Errorf("Expected Server Address '0.0.0.0', got '%s'", cfg.Server.Address)
+	}
+	if cfg.Server.Port != 50051 {
+		t.Errorf("Expected Server Port 50051, got %d", cfg.Server.Port)
+	}
+	if cfg.Server.ServerCertPath != "/opt/worker/certs/server-cert.pem" {
+		t.Errorf("Expected Server ServerCertPath '/opt/worker/certs/server-cert.pem', got '%s'", cfg.Server.ServerCertPath)
+	}
+
+	// Test Worker defaults
+	if cfg.Worker.DefaultCPULimit != 100 {
+		t.Errorf("Expected Worker DefaultCPULimit 100, got %d", cfg.Worker.DefaultCPULimit)
+	}
+	if cfg.Worker.MaxConcurrentJobs != 100 {
+		t.Errorf("Expected Worker MaxConcurrentJobs 100, got %d", cfg.Worker.MaxConcurrentJobs)
+	}
+}
+
+func TestLoadCLIConfig_Defaults(t *testing.T) {
+	// Ensure no config files exist in test directory
+	cleanupTestFiles(t)
+	defer cleanupTestFiles(t) // Cleanup after test
+
+	cfg := LoadCLIConfig()
+
+	// Should return CLI defaults
+	if cfg.ServerAddr != "localhost:50051" {
+		t.Errorf("Expected default ServerAddr 'localhost:50051', got '%s'", cfg.ServerAddr)
+	}
+	if cfg.ClientCertPath != "./certs/client-cert.pem" {
+		t.Errorf("Expected default ClientCertPath './certs/client-cert.pem', got '%s'", cfg.ClientCertPath)
+	}
+	if cfg.ClientKeyPath != "./certs/client-key.pem" {
+		t.Errorf("Expected default ClientKeyPath './certs/client-key.pem', got '%s'", cfg.ClientKeyPath)
+	}
+	if cfg.CACertPath != "./certs/ca-cert.pem" {
+		t.Errorf("Expected default CACertPath './certs/ca-cert.pem', got '%s'", cfg.CACertPath)
+	}
+}
+
+func TestLoadCLIConfig_FromFile(t *testing.T) {
+	// Create test config file
+	testConfig := `
+cli:
+  serverAddr: "production.example.com:50051"
+  clientCertPath: "/custom/client-cert.pem"
+  clientKeyPath: "/custom/client-key.pem"
+  caCertPath: "/custom/ca-cert.pem"
+
+server:
+  address: "192.168.1.100"
+  port: 9999
+`
+
+	configFile := createTestConfigFile(t, "config.yml", testConfig)
+	defer os.Remove(configFile)
+
+	cfg := LoadCLIConfig()
+
+	// Should load from CLI section
+	if cfg.ServerAddr != "production.example.com:50051" {
+		t.Errorf("Expected ServerAddr 'production.example.com:50051', got '%s'", cfg.ServerAddr)
+	}
+	if cfg.ClientCertPath != "/custom/client-cert.pem" {
+		t.Errorf("Expected ClientCertPath '/custom/client-cert.pem', got '%s'", cfg.ClientCertPath)
+	}
+	if cfg.ClientKeyPath != "/custom/client-key.pem" {
+		t.Errorf("Expected ClientKeyPath '/custom/client-key.pem', got '%s'", cfg.ClientKeyPath)
+	}
+	if cfg.CACertPath != "/custom/ca-cert.pem" {
+		t.Errorf("Expected CACertPath '/custom/ca-cert.pem', got '%s'", cfg.CACertPath)
+	}
+}
+
+func TestLoadCLIConfig_FallbackToServer(t *testing.T) {
+	// Config file with only server section (no CLI section)
+	testConfig := `
+server:
+  address: "fallback.example.com"
+  port: 8080
+  caCertPath: "/server/ca-cert.pem"
+`
+
+	configFile := createTestConfigFile(t, "config.yml", testConfig)
+	defer os.Remove(configFile)
+
+	cfg := LoadCLIConfig()
+
+	// Should fallback to server section for address
+	if cfg.ServerAddr != "fallback.example.com:8080" {
+		t.Errorf("Expected ServerAddr 'fallback.example.com:8080', got '%s'", cfg.ServerAddr)
+	}
+
+	// Should fallback to server CA cert
+	if cfg.CACertPath != "/server/ca-cert.pem" {
+		t.Errorf("Expected CACertPath '/server/ca-cert.pem', got '%s'", cfg.CACertPath)
+	}
+
+	// Should use CLI defaults for client certs (no fallback)
+	if cfg.ClientCertPath != "./certs/client-cert.pem" {
+		t.Errorf("Expected default ClientCertPath './certs/client-cert.pem', got '%s'", cfg.ClientCertPath)
+	}
+}
+
+func TestLoadConfig_WithEnvironmentVariables(t *testing.T) {
+	// Set environment variables
+	originalEnvVars := setTestEnvVars(t, map[string]string{
+		"WORKER_SERVER_ADDRESS": "env.example.com",
+		"WORKER_SERVER_PORT":    "7777",
+		"WORKER_DEFAULT_CPU":    "200",
+		"WORKER_DEFAULT_MEMORY": "1024",
+		"LOG_LEVEL":             "DEBUG",
+		"WORKER_MODE":           "server", // Use valid mode
+	})
+	defer restoreEnvVars(t, originalEnvVars)
+
+	// Create basic config file
+	testConfig := `
+server:
+  address: "file.example.com"
+  port: 6666
+  serverCertPath: "/test/server-cert.pem"
+  serverKeyPath: "/test/server-key.pem"
+  caCertPath: "/test/ca-cert.pem"
+worker:
+  defaultCpuLimit: 50
+  defaultMemoryLimit: 256
+cgroup:
+  baseDir: "/test/cgroup"
+`
+
+	configFile := createTestConfigFile(t, "config.yml", testConfig)
+	defer os.Remove(configFile)
+
+	cfg, path, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Environment variables should override file config
+	if cfg.Server.Address != "env.example.com" {
+		t.Errorf("Expected Server Address 'env.example.com', got '%s'", cfg.Server.Address)
+	}
+	if cfg.Server.Port != 7777 {
+		t.Errorf("Expected Server Port 7777, got %d", cfg.Server.Port)
+	}
+	if cfg.Server.Mode != "server" {
+		t.Errorf("Expected Server Mode 'server', got '%s'", cfg.Server.Mode)
+	}
+	if cfg.Worker.DefaultCPULimit != 200 {
+		t.Errorf("Expected Worker DefaultCPULimit 200, got %d", cfg.Worker.DefaultCPULimit)
+	}
+	if cfg.Worker.DefaultMemoryLimit != 1024 {
+		t.Errorf("Expected Worker DefaultMemoryLimit 1024, got %d", cfg.Worker.DefaultMemoryLimit)
+	}
+	if cfg.Logging.Level != "DEBUG" {
+		t.Errorf("Expected Logging Level 'DEBUG', got '%s'", cfg.Logging.Level)
+	}
+
+	// Path should be reported
+	if path == "" {
+		t.Error("Expected config path to be reported")
+	}
+}
+
+func TestLoadConfig_CompleteConfigFile(t *testing.T) {
+	testConfig := `
+cli:
+  serverAddr: "cli.example.com:50051"
+  clientCertPath: "./test-certs/client-cert.pem"
+  clientKeyPath: "./test-certs/client-key.pem"
+  caCertPath: "./test-certs/ca-cert.pem"
+
+server:
+  address: "server.example.com"
+  port: 50052
+  mode: "server"
+  timeout: "60s"
+  serverCertPath: "/opt/test/server-cert.pem"
+  serverKeyPath: "/opt/test/server-key.pem"
+  caCertPath: "/opt/test/ca-cert.pem"
+  minTlsVersion: "1.2"
+
+worker:
+  defaultCpuLimit: 150
+  defaultMemoryLimit: 768
+  defaultIoLimit: 1000000
+  maxConcurrentJobs: 50
+  jobTimeout: "2h"
+  cleanupTimeout: "10s"
+  validateCommands: false
+
+cgroup:
+  baseDir: "/custom/cgroup/path"
+  namespaceMount: "/custom/mount"
+  enableControllers: ["cpu", "memory"]
+  cleanupTimeout: "3s"
+
+filesystem:
+  baseDir: "/custom/jobs"
+  tmpDir: "/custom/tmp/job-{JOB_ID}"
+  allowedMounts: ["/usr/bin", "/bin"]
+  blockDevices: true
+
+grpc:
+  maxRecvMsgSize: 1048576
+  maxSendMsgSize: 2097152
+  maxHeaderListSize: 524288
+  keepAliveTime: "45s"
+  keepAliveTimeout: "10s"
+
+logging:
+  level: "WARN"
+  format: "json"
+  output: "file"
+`
+
+	configFile := createTestConfigFile(t, "config.yml", testConfig)
+	defer os.Remove(configFile)
+
+	cfg, path, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Test CLI config
+	if cfg.CLI.ServerAddr != "cli.example.com:50051" {
+		t.Errorf("Expected CLI ServerAddr 'cli.example.com:50051', got '%s'", cfg.CLI.ServerAddr)
+	}
+
+	// Test Server config
+	if cfg.Server.Address != "server.example.com" {
+		t.Errorf("Expected Server Address 'server.example.com', got '%s'", cfg.Server.Address)
+	}
+	if cfg.Server.Port != 50052 {
+		t.Errorf("Expected Server Port 50052, got %d", cfg.Server.Port)
+	}
+	if cfg.Server.MinTLSVersion != "1.2" {
+		t.Errorf("Expected Server MinTLSVersion '1.2', got '%s'", cfg.Server.MinTLSVersion)
+	}
+
+	// Test Worker config
+	if cfg.Worker.DefaultCPULimit != 150 {
+		t.Errorf("Expected Worker DefaultCPULimit 150, got %d", cfg.Worker.DefaultCPULimit)
+	}
+	if cfg.Worker.JobTimeout != 2*time.Hour {
+		t.Errorf("Expected Worker JobTimeout 2h, got %v", cfg.Worker.JobTimeout)
+	}
+	if cfg.Worker.ValidateCommands != false {
+		t.Errorf("Expected Worker ValidateCommands false, got %v", cfg.Worker.ValidateCommands)
+	}
+
+	// Test Cgroup config
+	if cfg.Cgroup.BaseDir != "/custom/cgroup/path" {
+		t.Errorf("Expected Cgroup BaseDir '/custom/cgroup/path', got '%s'", cfg.Cgroup.BaseDir)
+	}
+
+	// Test Filesystem config
+	if cfg.Filesystem.BlockDevices != true {
+		t.Errorf("Expected Filesystem BlockDevices true, got %v", cfg.Filesystem.BlockDevices)
+	}
+
+	// Test GRPC config
+	if cfg.GRPC.MaxRecvMsgSize != 1048576 {
+		t.Errorf("Expected GRPC MaxRecvMsgSize 1048576, got %d", cfg.GRPC.MaxRecvMsgSize)
+	}
+
+	// Test Logging config
+	if cfg.Logging.Level != "WARN" {
+		t.Errorf("Expected Logging Level 'WARN', got '%s'", cfg.Logging.Level)
+	}
+
+	// Verify path is reported
+	if path == "" {
+		t.Error("Expected config path to be reported")
+	}
+}
+
+func TestConfigValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      Config
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid config",
+			config:      DefaultConfig,
+			expectError: false,
+		},
+		{
+			name: "invalid port - too low",
+			config: Config{
+				Server: ServerConfig{Port: 0},
+			},
+			expectError: true,
+			errorMsg:    "invalid server port",
+		},
+		{
+			name: "invalid port - too high",
+			config: Config{
+				Server: ServerConfig{Port: 70000},
+			},
+			expectError: true,
+			errorMsg:    "invalid server port",
+		},
+		{
+			name: "invalid server mode",
+			config: Config{
+				Server: ServerConfig{
+					Port: 50051,
+					Mode: "invalid-mode",
+				},
+			},
+			expectError: true,
+			errorMsg:    "invalid server mode",
+		},
+		{
+			name: "negative CPU limit",
+			config: Config{
+				Server: ServerConfig{Port: 50051, Mode: "server"},
+				Worker: WorkerConfig{DefaultCPULimit: -1},
+			},
+			expectError: true,
+			errorMsg:    "invalid default CPU limit",
+		},
+		{
+			name: "negative memory limit",
+			config: Config{
+				Server: ServerConfig{Port: 50051, Mode: "server"},
+				Worker: WorkerConfig{DefaultMemoryLimit: -1},
+			},
+			expectError: true,
+			errorMsg:    "invalid default memory limit",
+		},
+		{
+			name: "zero max concurrent jobs",
+			config: Config{
+				Server: ServerConfig{Port: 50051, Mode: "server"},
+				Worker: WorkerConfig{MaxConcurrentJobs: 0},
+			},
+			expectError: true,
+			errorMsg:    "invalid max concurrent jobs",
+		},
+		{
+			name: "missing server cert path",
+			config: Config{
+				Server: ServerConfig{
+					Port:           50051,
+					Mode:           "server",
+					ServerCertPath: "", // Missing
+					ServerKeyPath:  "/path/to/key",
+					CACertPath:     "/path/to/ca",
+				},
+				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Cgroup:  CgroupConfig{BaseDir: "/absolute/path"},
+				Logging: LoggingConfig{Level: "INFO"},
+			},
+			expectError: true,
+			errorMsg:    "server certificate path required",
+		},
+		{
+			name: "relative cgroup path",
+			config: Config{
+				Server: ServerConfig{
+					Port:           50051,
+					Mode:           "server",
+					ServerCertPath: "/path/to/cert",
+					ServerKeyPath:  "/path/to/key",
+					CACertPath:     "/path/to/ca",
+				},
+				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Cgroup:  CgroupConfig{BaseDir: "relative/path"}, // Should be absolute
+				Logging: LoggingConfig{Level: "INFO"},
+			},
+			expectError: true,
+			errorMsg:    "cgroup base directory must be absolute path",
+		},
+		{
+			name: "invalid log level",
+			config: Config{
+				Server: ServerConfig{
+					Port:           50051,
+					Mode:           "server",
+					ServerCertPath: "/path/to/cert",
+					ServerKeyPath:  "/path/to/key",
+					CACertPath:     "/path/to/ca",
+				},
+				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Cgroup:  CgroupConfig{BaseDir: "/absolute/path"},
+				Logging: LoggingConfig{Level: "INVALID"},
+			},
+			expectError: true,
+			errorMsg:    "invalid log level",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected validation error for %s, but got none", tt.name)
+				} else if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Expected error message to contain '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected validation error for %s: %v", tt.name, err)
+				}
+			}
+		})
+	}
+}
+
+func TestCLIConfigValidation(t *testing.T) {
+	cfg := &CLIConfig{
+		ServerAddr:     "localhost:50051",
+		ClientCertPath: "./non-existent-cert.pem",
+		ClientKeyPath:  "./non-existent-key.pem",
+		CACertPath:     "./non-existent-ca.pem",
+	}
+
+	// CLI validation should be soft - no errors for missing files
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("CLI validation should be soft, got error: %v", err)
+	}
+}
+
+func TestConvenienceMethods(t *testing.T) {
+	cfg := &Config{
+		Server: ServerConfig{
+			Address: "test.example.com",
+			Port:    9999,
+		},
+		Cgroup: CgroupConfig{
+			BaseDir: "/test/cgroup",
+		},
+	}
+
+	// Test GetServerAddress
+	addr := cfg.GetServerAddress()
+	expected := "test.example.com:9999"
+	if addr != expected {
+		t.Errorf("Expected GetServerAddress '%s', got '%s'", expected, addr)
+	}
+
+	// Test GetCgroupPath
+	jobID := "test-job-123"
+	cgroupPath := cfg.GetCgroupPath(jobID)
+	expectedPath := "/test/cgroup/job-test-job-123"
+	if cgroupPath != expectedPath {
+		t.Errorf("Expected GetCgroupPath '%s', got '%s'", expectedPath, cgroupPath)
+	}
+
+	// Test GetServerSecurityConfig
+	cfg.Server.ServerCertPath = "/path/to/server.pem"
+	cfg.Server.ServerKeyPath = "/path/to/server.key"
+	cfg.Server.CACertPath = "/path/to/ca.pem"
+
+	serverCert, serverKey, caCert := cfg.GetServerSecurityConfig()
+	if serverCert != "/path/to/server.pem" {
+		t.Errorf("Expected serverCert '/path/to/server.pem', got '%s'", serverCert)
+	}
+	if serverKey != "/path/to/server.key" {
+		t.Errorf("Expected serverKey '/path/to/server.key', got '%s'", serverKey)
+	}
+	if caCert != "/path/to/ca.pem" {
+		t.Errorf("Expected caCert '/path/to/ca.pem', got '%s'", caCert)
+	}
+}
+
+func TestToYAML(t *testing.T) {
+	cfg := DefaultConfig
+
+	yamlData, err := cfg.ToYAML()
+	if err != nil {
+		t.Fatalf("ToYAML failed: %v", err)
+	}
+
+	if len(yamlData) == 0 {
+		t.Error("Expected YAML data, got empty")
+	}
+
+	// Check that it contains expected sections
+	yamlStr := string(yamlData)
+	expectedSections := []string{"cli:", "server:", "worker:", "cgroup:", "filesystem:", "grpc:", "logging:"}
+	for _, section := range expectedSections {
+		if !contains(yamlStr, section) {
+			t.Errorf("Expected YAML to contain '%s' section", section)
+		}
+	}
+}
+
+// Helper functions
+
+func createTestConfigFile(t *testing.T, filename, content string) string {
+	t.Helper()
+
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filename)
+	if dir != "." && dir != "" {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory %s: %v", dir, err)
+		}
+	}
+
+	tmpFile := filepath.Join(".", filename)
+	err := os.WriteFile(tmpFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file %s: %v", tmpFile, err)
+	}
+	return tmpFile
+}
+
+func cleanupTestFiles(t *testing.T) {
+	t.Helper()
+	testFiles := []string{
+		"./config.yml",
+		"./config.yaml",
+	}
+	for _, file := range testFiles {
+		os.Remove(file)
+	}
+	// Remove config directory and its contents
+	os.RemoveAll("./config")
+}
+
+func setTestEnvVars(t *testing.T, envVars map[string]string) map[string]string {
+	t.Helper()
+	original := make(map[string]string)
+	for key, value := range envVars {
+		original[key] = os.Getenv(key)
+		os.Setenv(key, value)
+	}
+	return original
+}
+
+func restoreEnvVars(t *testing.T, envVars map[string]string) {
+	t.Helper()
+	for key, value := range envVars {
+		if value == "" {
+			os.Unsetenv(key)
+		} else {
+			os.Setenv(key, value)
+		}
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsAtAnyPosition(s, substr)))
+}
+
+func containsAtAnyPosition(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
