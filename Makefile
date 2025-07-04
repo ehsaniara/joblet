@@ -100,22 +100,22 @@ clean:
 
 certs-local:
 	@echo "🔐 Generating certificates locally..."
-	@if [ ! -f ./etc/certs_gen.sh ]; then \
-		echo "❌ ./etc/certs_gen.sh script not found"; \
+	@if [ ! -f ./scripts/certs_gen.sh ]; then \
+		echo "❌ ./scripts/certs_gen.sh script not found"; \
 		exit 1; \
 	fi
-	@chmod +x ./etc/certs_gen.sh
-	@./etc/certs_gen.sh
+	@chmod +x ./scripts/certs_gen.sh
+	@./scripts/certs_gen.sh
 	@echo "✅ Local certificates generated in ./certs/"
 
 certs-remote-passwordless:
 	@echo "🔐 Generating certificates on $(REMOTE_USER)@$(REMOTE_HOST) (passwordless)..."
-	@if [ ! -f ./etc/certs_gen.sh ]; then \
-		echo "❌ ./etc/certs_gen.sh script not found"; \
+	@if [ ! -f ./scripts/certs_gen.sh ]; then \
+		echo "❌ ./scripts/certs_gen.sh script not found"; \
 		exit 1; \
 	fi
 	@echo "📤 Uploading certificate generation script..."
-	scp ./etc/certs_gen.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
+	scp ./scripts/certs_gen.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
 	@echo "🏗️  Generating certificates on remote server..."
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\

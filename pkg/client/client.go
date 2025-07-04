@@ -5,21 +5,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"google.golang.org/grpc/credentials"
 	"os"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	pb "worker/api/gen"
-)
-
-const (
-	clientCertPath = "./certs/client-cert.pem"
-	clientKeyPath  = "./certs/client-key.pem"
-
-	caCertPath = "./certs/ca-cert.pem"
+	"worker/pkg/config"
 )
 
 type JobClient struct {
@@ -27,15 +21,19 @@ type JobClient struct {
 	conn   *grpc.ClientConn
 }
 
-func NewJobClient(serverAddr string) (*JobClient, error) {
-	clientCert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+// NewJobClient creates a new job client with the provided configuration
+func NewJobClient(clientConfig config.ClientConfig) (*JobClient, error) {
+	// Load client certificate
+	clientCert, err := tls.LoadX509KeyPair(clientConfig.ClientCertPath, clientConfig.ClientKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load client cert/key: %w", err)
+		return nil, fmt.Errorf("failed to load client cert/key from %s and %s: %w",
+			clientConfig.ClientCertPath, clientConfig.ClientKeyPath, err)
 	}
 
-	caCert, e := os.ReadFile(caCertPath)
-	if e != nil {
-		return nil, fmt.Errorf("failed to read CA certificate: %w", e)
+	// Load CA certificate
+	caCert, err := os.ReadFile(clientConfig.CACertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate from %s: %w", clientConfig.CACertPath, err)
 	}
 
 	certPool := x509.NewCertPool()
@@ -52,19 +50,29 @@ func NewJobClient(serverAddr string) (*JobClient, error) {
 
 	creds := credentials.NewTLS(tlsConfig)
 
-	conn, er := grpc.NewClient(
-		serverAddr,
+	conn, err := grpc.NewClient(
+		clientConfig.ServerAddr,
 		grpc.WithTransportCredentials(creds),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
-	if er != nil {
-		return nil, fmt.Errorf("failed to connect to server: %w", er)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to server %s: %w", clientConfig.ServerAddr, err)
 	}
 
 	return &JobClient{
 		client: pb.NewJobServiceClient(conn),
 		conn:   conn,
 	}, nil
+}
+
+// NewJobClientFromCLIConfig convenience function for CLI usage
+func NewJobClientFromCLIConfig(cliConfig *config.CLIConfig) (*JobClient, error) {
+	return NewJobClient(config.ClientConfig{
+		ServerAddr:     cliConfig.ServerAddr,
+		ClientCertPath: cliConfig.ClientCertPath,
+		ClientKeyPath:  cliConfig.ClientKeyPath,
+		CACertPath:     cliConfig.CACertPath,
+	})
 }
 
 func (c *JobClient) Close() error {

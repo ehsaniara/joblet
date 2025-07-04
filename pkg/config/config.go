@@ -13,28 +13,33 @@ import (
 
 // Config holds the complete application configuration
 type Config struct {
+	CLI        CLIConfig        `yaml:"cli" json:"cli"`
 	Server     ServerConfig     `yaml:"server" json:"server"`
 	Worker     WorkerConfig     `yaml:"worker" json:"worker"`
-	Security   SecurityConfig   `yaml:"security" json:"security"`
 	Cgroup     CgroupConfig     `yaml:"cgroup" json:"cgroup"`
 	Filesystem FilesystemConfig `yaml:"filesystem" json:"filesystem"`
 	GRPC       GRPCConfig       `yaml:"grpc" json:"grpc"`
 	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
 }
 
-type FilesystemConfig struct {
-	BaseDir       string   `yaml:"baseDir" json:"baseDir"`             // Base directory for job filesystems
-	TmpDir        string   `yaml:"tmpDir" json:"tmpDir"`               // Temporary directory template
-	AllowedMounts []string `yaml:"allowedMounts" json:"allowedMounts"` // Read-only mounts from host
-	BlockDevices  bool     `yaml:"blockDevices" json:"blockDevices"`   // Block device access
+// CLIConfig holds CLI-specific configuration
+type CLIConfig struct {
+	ServerAddr     string `yaml:"serverAddr" json:"serverAddr"`
+	ClientCertPath string `yaml:"clientCertPath" json:"clientCertPath"`
+	ClientKeyPath  string `yaml:"clientKeyPath" json:"clientKeyPath"`
+	CACertPath     string `yaml:"caCertPath" json:"caCertPath"`
 }
 
-// ServerConfig holds server-specific configuration
+// ServerConfig holds server-specific configuration (includes security settings)
 type ServerConfig struct {
-	Address string        `yaml:"address" json:"address"`
-	Port    int           `yaml:"port" json:"port"`
-	Mode    string        `yaml:"mode" json:"mode"`
-	Timeout time.Duration `yaml:"timeout" json:"timeout"`
+	Address        string        `yaml:"address" json:"address"`
+	Port           int           `yaml:"port" json:"port"`
+	Mode           string        `yaml:"mode" json:"mode"`
+	Timeout        time.Duration `yaml:"timeout" json:"timeout"`
+	ServerCertPath string        `yaml:"serverCertPath" json:"serverCertPath"`
+	ServerKeyPath  string        `yaml:"serverKeyPath" json:"serverKeyPath"`
+	CACertPath     string        `yaml:"caCertPath" json:"caCertPath"`
+	MinTLSVersion  string        `yaml:"minTlsVersion" json:"minTlsVersion"`
 }
 
 // WorkerConfig holds worker-specific configuration
@@ -48,22 +53,20 @@ type WorkerConfig struct {
 	ValidateCommands   bool          `yaml:"validateCommands" json:"validateCommands"`
 }
 
-// SecurityConfig holds security-related configuration
-type SecurityConfig struct {
-	ServerCertPath string `yaml:"serverCertPath" json:"serverCertPath"`
-	ServerKeyPath  string `yaml:"serverKeyPath" json:"serverKeyPath"`
-	CACertPath     string `yaml:"caCertPath" json:"caCertPath"`
-	ClientCertPath string `yaml:"clientCertPath" json:"clientCertPath"`
-	ClientKeyPath  string `yaml:"clientKeyPath" json:"clientKeyPath"`
-	MinTLSVersion  string `yaml:"minTlsVersion" json:"minTlsVersion"`
-}
-
 // CgroupConfig holds cgroup-related configuration
 type CgroupConfig struct {
 	BaseDir           string        `yaml:"baseDir" json:"baseDir"`
 	NamespaceMount    string        `yaml:"namespaceMount" json:"namespaceMount"`
 	EnableControllers []string      `yaml:"enableControllers" json:"enableControllers"`
 	CleanupTimeout    time.Duration `yaml:"cleanupTimeout" json:"cleanupTimeout"`
+}
+
+// FilesystemConfig holds filesystem configuration
+type FilesystemConfig struct {
+	BaseDir       string   `yaml:"baseDir" json:"baseDir"`
+	TmpDir        string   `yaml:"tmpDir" json:"tmpDir"`
+	AllowedMounts []string `yaml:"allowedMounts" json:"allowedMounts"`
+	BlockDevices  bool     `yaml:"blockDevices" json:"blockDevices"`
 }
 
 // GRPCConfig holds gRPC-specific configuration
@@ -82,13 +85,23 @@ type LoggingConfig struct {
 	Output string `yaml:"output" json:"output"`
 }
 
-// DefaultConfig Default configuration values
+// DefaultConfig provides default configuration values
 var DefaultConfig = Config{
+	CLI: CLIConfig{
+		ServerAddr:     "localhost:50051",
+		ClientCertPath: "./certs/client-cert.pem",
+		ClientKeyPath:  "./certs/client-key.pem",
+		CACertPath:     "./certs/ca-cert.pem",
+	},
 	Server: ServerConfig{
-		Address: "0.0.0.0",
-		Port:    50051,
-		Mode:    "server",
-		Timeout: 30 * time.Second,
+		Address:        "0.0.0.0",
+		Port:           50051,
+		Mode:           "server",
+		Timeout:        30 * time.Second,
+		ServerCertPath: "/opt/worker/certs/server-cert.pem",
+		ServerKeyPath:  "/opt/worker/certs/server-key.pem",
+		CACertPath:     "/opt/worker/certs/ca-cert.pem",
+		MinTLSVersion:  "1.3",
 	},
 	Worker: WorkerConfig{
 		DefaultCPULimit:    100,
@@ -99,14 +112,6 @@ var DefaultConfig = Config{
 		CleanupTimeout:     5 * time.Second,
 		ValidateCommands:   true,
 	},
-	Security: SecurityConfig{
-		ServerCertPath: "/opt/worker/certs/server-cert.pem",
-		ServerKeyPath:  "/opt/worker/certs/server-key.pem",
-		CACertPath:     "/opt/worker/certs/ca-cert.pem",
-		ClientCertPath: "/opt/worker/certs/client-cert.pem",
-		ClientKeyPath:  "/opt/worker/certs/client-key.pem",
-		MinTLSVersion:  "1.3",
-	},
 	Cgroup: CgroupConfig{
 		BaseDir:           "/sys/fs/cgroup/worker.slice/worker.service",
 		NamespaceMount:    "/sys/fs/cgroup",
@@ -116,13 +121,13 @@ var DefaultConfig = Config{
 	Filesystem: FilesystemConfig{
 		BaseDir:       "/opt/worker/jobs",
 		TmpDir:        "/tmp/job-{JOB_ID}",
-		AllowedMounts: []string{"/usr/bin", "/bin", "/lib", "/lib64"}, // Read-only system directories
+		AllowedMounts: []string{"/usr/bin", "/bin", "/lib", "/lib64"},
 		BlockDevices:  false,
 	},
 	GRPC: GRPCConfig{
-		MaxRecvMsgSize:    512 * 1024,      // 512KB
-		MaxSendMsgSize:    4 * 1024 * 1024, // 4MB
-		MaxHeaderListSize: 1 * 1024 * 1024, // 1MB
+		MaxRecvMsgSize:    512 * 1024,
+		MaxSendMsgSize:    4 * 1024 * 1024,
+		MaxHeaderListSize: 1 * 1024 * 1024,
 		KeepAliveTime:     30 * time.Second,
 		KeepAliveTimeout:  5 * time.Second,
 	},
@@ -133,10 +138,7 @@ var DefaultConfig = Config{
 	},
 }
 
-// LoadConfig loads configuration from multiple sources in order of precedence:
-// 1. Environment variables (highest precedence)
-// 2. Configuration file
-// 3. Default values (lowest precedence)
+// LoadConfig loads configuration for server/daemon (full config with environment variables)
 func LoadConfig() (*Config, string, error) {
 	config := DefaultConfig
 
@@ -146,7 +148,7 @@ func LoadConfig() (*Config, string, error) {
 		return nil, "", fmt.Errorf("failed to load config file: %w", err)
 	}
 
-	// Override with environment variables
+	// Override with environment variables (server only)
 	if e := loadFromEnv(&config); e != nil {
 		return nil, "", fmt.Errorf("failed to load environment variables: %w", e)
 	}
@@ -159,7 +161,40 @@ func LoadConfig() (*Config, string, error) {
 	return &config, path, nil
 }
 
-// loadFromFile loads configuration from YAML file
+// LoadCLIConfig loads configuration for CLI (no environment variables)
+func LoadCLIConfig() *CLIConfig {
+	config := DefaultConfig.CLI // Start with CLI defaults
+
+	// Try to load from config file (CLI paths)
+	if fileConfig, err := loadCLIFromFile(); err == nil {
+		// Override defaults with file values if they exist
+		if fileConfig.CLI.ServerAddr != "" {
+			config.ServerAddr = fileConfig.CLI.ServerAddr
+		} else if fileConfig.Server.Address != "" && fileConfig.Server.Port != 0 {
+			// Fallback to server section if CLI section doesn't exist
+			config.ServerAddr = fmt.Sprintf("%s:%d", fileConfig.Server.Address, fileConfig.Server.Port)
+		}
+
+		if fileConfig.CLI.ClientCertPath != "" {
+			config.ClientCertPath = fileConfig.CLI.ClientCertPath
+		}
+
+		if fileConfig.CLI.ClientKeyPath != "" {
+			config.ClientKeyPath = fileConfig.CLI.ClientKeyPath
+		}
+
+		if fileConfig.CLI.CACertPath != "" {
+			config.CACertPath = fileConfig.CLI.CACertPath
+		} else if fileConfig.Server.CACertPath != "" {
+			// Fallback to server CA cert if CLI doesn't specify one
+			config.CACertPath = fileConfig.Server.CACertPath
+		}
+	}
+
+	return &config
+}
+
+// loadFromFile loads configuration from YAML file (server paths)
 func loadFromFile(config *Config) (string, error) {
 	configPaths := []string{
 		os.Getenv("WORKER_CONFIG_PATH"), // Custom path from environment
@@ -167,7 +202,7 @@ func loadFromFile(config *Config) (string, error) {
 		"./config/config.yml",           // Development - relative to project root
 		"./config.yml",                  // Development - current directory
 		"/etc/worker/config.yml",        // System-wide alternative
-		"/opt/worker/config.yaml",       // Fallback for old naming in production
+		"/opt/worker/config.yaml",       // Fallback for old naming
 		"./config/config.yaml",          // Fallback for old naming in development
 	}
 
@@ -195,7 +230,58 @@ func loadFromFile(config *Config) (string, error) {
 	return "built-in defaults (no config file found)", nil
 }
 
-// loadFromEnv loads configuration from environment variables
+// loadCLIFromFile loads configuration from YAML file (CLI paths)
+func loadCLIFromFile() (*Config, error) {
+	configPaths := []string{
+		"./config/config.yml",  // Primary location (relative to current directory)
+		"./config.yml",         // Alternative location
+		"./config/config.yaml", // YAML extension variant
+		"./config.yaml",        // YAML extension variant in current dir
+	}
+
+	for _, path := range configPaths {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // Try next path
+		}
+
+		var config Config
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			continue // Try next path
+		}
+
+		return &config, nil
+	}
+
+	return &Config{}, os.ErrNotExist
+}
+
+// ClientConfig for pkg/client (to avoid import cycles)
+type ClientConfig struct {
+	ServerAddr     string
+	ClientCertPath string
+	ClientKeyPath  string
+	CACertPath     string
+}
+
+// GetServerAddress Server-specific convenience methods
+func (c *Config) GetServerAddress() string {
+	return fmt.Sprintf("%s:%d", c.Server.Address, c.Server.Port)
+}
+
+func (c *Config) GetCgroupPath(jobID string) string {
+	return filepath.Join(c.Cgroup.BaseDir, "job-"+jobID)
+}
+
+func (c *Config) GetServerSecurityConfig() (serverCert, serverKey, caCert string) {
+	return c.Server.ServerCertPath, c.Server.ServerKeyPath, c.Server.CACertPath
+}
+
+// Environment variable loading (server only)
 func loadFromEnv(config *Config) error {
 	// Server config
 	if val := os.Getenv("WORKER_SERVER_ADDRESS"); val != "" {
@@ -213,6 +299,20 @@ func loadFromEnv(config *Config) error {
 		if timeout, err := time.ParseDuration(val); err == nil {
 			config.Server.Timeout = timeout
 		}
+	}
+
+	// Server security config
+	if val := os.Getenv("WORKER_SERVER_CERT_PATH"); val != "" {
+		config.Server.ServerCertPath = val
+	}
+	if val := os.Getenv("WORKER_SERVER_KEY_PATH"); val != "" {
+		config.Server.ServerKeyPath = val
+	}
+	if val := os.Getenv("WORKER_CA_CERT_PATH"); val != "" {
+		config.Server.CACertPath = val
+	}
+	if val := os.Getenv("WORKER_MIN_TLS_VERSION"); val != "" {
+		config.Server.MinTLSVersion = val
 	}
 
 	// Worker config
@@ -248,26 +348,6 @@ func loadFromEnv(config *Config) error {
 	}
 	if val := os.Getenv("WORKER_VALIDATE_COMMANDS"); val != "" {
 		config.Worker.ValidateCommands = val == "true" || val == "1"
-	}
-
-	// Security config
-	if val := os.Getenv("WORKER_SERVER_CERT_PATH"); val != "" {
-		config.Security.ServerCertPath = val
-	}
-	if val := os.Getenv("WORKER_SERVER_KEY_PATH"); val != "" {
-		config.Security.ServerKeyPath = val
-	}
-	if val := os.Getenv("WORKER_CA_CERT_PATH"); val != "" {
-		config.Security.CACertPath = val
-	}
-	if val := os.Getenv("WORKER_CLIENT_CERT_PATH"); val != "" {
-		config.Security.ClientCertPath = val
-	}
-	if val := os.Getenv("WORKER_CLIENT_KEY_PATH"); val != "" {
-		config.Security.ClientKeyPath = val
-	}
-	if val := os.Getenv("WORKER_MIN_TLS_VERSION"); val != "" {
-		config.Security.MinTLSVersion = val
 	}
 
 	// Cgroup config
@@ -349,15 +429,15 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid max concurrent jobs: %d", c.Worker.MaxConcurrentJobs)
 	}
 
-	// Validate certificate paths
-	if c.Security.ServerCertPath == "" {
-		return fmt.Errorf("server certificate path required when TLS is enabled")
+	// Validate certificate paths for server
+	if c.Server.ServerCertPath == "" {
+		return fmt.Errorf("server certificate path required")
 	}
-	if c.Security.ServerKeyPath == "" {
-		return fmt.Errorf("server key path required when TLS is enabled")
+	if c.Server.ServerKeyPath == "" {
+		return fmt.Errorf("server key path required")
 	}
-	if c.Security.CACertPath == "" {
-		return fmt.Errorf("CA certificate path required when TLS is enabled")
+	if c.Server.CACertPath == "" {
+		return fmt.Errorf("CA certificate path required")
 	}
 
 	// Validate cgroup base directory
@@ -377,12 +457,25 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func (c *Config) GetServerAddress() string {
-	return fmt.Sprintf("%s:%d", c.Server.Address, c.Server.Port)
-}
+// Validate validates CLI-specific configuration
+func (c *CLIConfig) Validate() error {
+	// Check if certificate files exist (soft validation)
+	certPaths := map[string]string{
+		"client certificate": c.ClientCertPath,
+		"client key":         c.ClientKeyPath,
+		"CA certificate":     c.CACertPath,
+	}
 
-func (c *Config) GetCgroupPath(jobID string) string {
-	return filepath.Join(c.Cgroup.BaseDir, "job-"+jobID)
+	for _, path := range certPaths {
+		if path != "" {
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				// Don't fail validation, just warn that certs don't exist
+				continue
+			}
+		}
+	}
+
+	return nil
 }
 
 func (c *Config) ToYAML() ([]byte, error) {
@@ -395,40 +488,4 @@ func (c *Config) SaveToFile(path string) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
-}
-
-// LoadFromFile loads a specific configuration file
-func LoadFromFile(path string) (*Config, error) {
-	config := DefaultConfig
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
-	}
-
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("configuration validation failed: %w", err)
-	}
-
-	return &config, nil
-}
-
-// GenerateDefaultConfig creates a default configuration file
-func GenerateDefaultConfig(path string) error {
-	config := DefaultConfig
-	return config.SaveToFile(path)
-}
-
-// IsProductionMode returns true if running in production mode
-func (c *Config) IsProductionMode() bool {
-	return c.Logging.Level == "INFO" || c.Logging.Level == "WARN" || c.Logging.Level == "ERROR"
-}
-
-// IsDevelopmentMode returns true if running in development mode
-func (c *Config) IsDevelopmentMode() bool {
-	return c.Logging.Level == "DEBUG"
 }

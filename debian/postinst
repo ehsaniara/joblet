@@ -1,25 +1,115 @@
 #!/bin/bash
 set -e
 
+# Source debconf library
+. /usr/share/debconf/confmodule
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Function to detect current IP (fallback)
+detect_current_ip() {
+    local current_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
+    if [ -z "$current_ip" ]; then
+        current_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
+    fi
+    echo "${current_ip:-127.0.0.1}"
+}
+
+# Function to get configuration from debconf or environment
+get_configuration() {
+    # First try debconf
+    if [ -x /usr/bin/debconf-get ]; then
+        db_get worker/server_ip || true
+        WORKER_SERVER_IP="$RET"
+    fi
+
+    # Then try environment variables (override debconf)
+    if [ -n "$WORKER_SERVER_IP_ENV" ]; then
+        WORKER_SERVER_IP="$WORKER_SERVER_IP_ENV"
+    fi
+
+    # Finally try config file if it exists
+    if [ -f "/tmp/worker-install-config" ]; then
+        source /tmp/worker-install-config
+        rm -f /tmp/worker-install-config
+    fi
+
+    # Use detected IP as ultimate fallback
+    if [ -z "$WORKER_SERVER_IP" ]; then
+        WORKER_SERVER_IP=$(detect_current_ip)
+        print_warning "No server IP configured, using detected IP: $WORKER_SERVER_IP"
+    fi
+}
+
+# Function to update configuration file
+update_config_file() {
+    local config_file="/opt/worker/config/config.yml"
+    local server_ip="${WORKER_SERVER_IP}"
+
+    if [ -f "$config_file" ]; then
+        print_info "Updating configuration file..."
+
+        # Update server address
+        sed -i "s/address: \"[^\"]*\"/address: \"$server_ip\"/" "$config_file"
+
+        # Update CLI serverAddr
+        sed -i "s/serverAddr: \"[^\"]*\"/serverAddr: \"$server_ip:50051\"/" "$config_file"
+
+        print_success "Configuration updated successfully"
+    else
+        print_error "Configuration file not found: $config_file"
+    fi
+}
+
+# Function to generate certificates
+generate_certificates() {
+    print_info "Generating SSL certificates..."
+
+    # Export variables for the certificate generation script
+    export WORKER_SERVER_ADDRESS="$WORKER_SERVER_IP"
+    export WORKER_ADDITIONAL_NAMES=""
+
+    # Run the certificate generation script
+    /usr/local/bin/certs_gen.sh
+
+    print_success "SSL certificates generated successfully"
+}
+
 case "$1" in
     configure)
-        echo "Configuring worker service..."
+        print_info "🔧 Configuring Worker Service..."
+        echo
 
-        # Set ownership and permissions for /opt/worker structure
+        # Set basic permissions first
         chown -R root:root /opt/worker
         chmod 755 /opt/worker
-
-        # Make binaries executable - BOTH in /opt/worker/
         chmod 755 /opt/worker/worker
         chmod 755 /opt/worker/worker-cli
-
-        # Config file permissions
         chmod 644 /opt/worker/config/config.yml
-
-        # Make cert generation script executable
         chmod +x /usr/local/bin/certs_gen.sh
 
-        # Create symlinks for easier access
+        # Create symlinks
         if [ ! -L /usr/bin/worker ]; then
             ln -sf /opt/worker/worker-cli /usr/bin/worker
         fi
@@ -27,11 +117,21 @@ case "$1" in
             ln -sf /opt/worker/worker-cli /usr/bin/worker-cli
         fi
 
-        # Generate certificates with proper root ownership
-        echo "Generating SSL certificates..."
-        /usr/local/bin/certs_gen.sh
+        # Get configuration from debconf/environment
+        get_configuration
 
-        # Ensure certificates have secure permissions (root only)
+        print_info "Configuration Summary:"
+        echo "  Server IP: $WORKER_SERVER_IP"
+        echo "  Server Port: 50051"
+        echo
+
+        # Update configuration
+        update_config_file
+
+        # Generate certificates
+        generate_certificates
+
+        # Set certificate permissions
         if [ -d /opt/worker/certs ]; then
             chown -R root:root /opt/worker/certs
             chmod 700 /opt/worker/certs
@@ -39,35 +139,41 @@ case "$1" in
             chmod 644 /opt/worker/certs/*-cert.pem 2>/dev/null || true
         fi
 
-        # Create necessary directories
+        # Create log directory
         mkdir -p /var/log/worker
         chown root:root /var/log/worker
         chmod 755 /var/log/worker
 
         # Setup cgroup delegation
         if [ -d /sys/fs/cgroup ]; then
-            echo "Setting up cgroup delegation..."
+            print_info "Setting up cgroup delegation..."
             mkdir -p /sys/fs/cgroup/worker.slice
             echo "+cpu +memory +io +pids" > /sys/fs/cgroup/worker.slice/cgroup.subtree_control 2>/dev/null || true
         fi
 
-        # Reload systemd and enable service
+        # Enable systemd service
         systemctl daemon-reload
         systemctl enable worker.service
 
-        echo "✅ Worker service installed successfully!"
-        echo ""
-        echo "📁 Installation layout:"
-        echo "   Daemon:      /opt/worker/worker"
-        echo "   CLI:         /opt/worker/worker-cli"
-        echo "   Config:      /opt/worker/config/config.yml"
-        echo "   Certificates: /opt/worker/certs/"
-        echo "   Symlinks:    /usr/bin/worker -> /opt/worker/worker-cli"
-        echo "               /usr/bin/worker-cli -> /opt/worker/worker-cli"
-        echo ""
-        echo "🚀 To start: sudo systemctl start worker"
-        echo "📊 To check status: sudo systemctl status worker"
-        echo "💻 CLI usage: worker --help"
+        echo
+        print_success "Worker service installed successfully!"
+        echo
+        print_info "📁 Installation Summary:"
+        echo "  Server IP: $WORKER_SERVER_IP"
+        echo "  Server Port: 50051"
+        echo "  Configuration: /opt/worker/config/config.yml"
+        echo "  Certificates: /opt/worker/certs/"
+        echo "  CLI Command: worker-cli --help"
+        echo
+        print_info "🚀 Next Steps:"
+        echo "  1. Start service: sudo systemctl start worker"
+        echo "  2. Check status: sudo systemctl status worker"
+        echo "  3. View logs: sudo journalctl -u worker -f"
+        echo "  4. Test CLI: worker-cli list"
+        echo
+        print_info "🔧 To reconfigure later:"
+        echo "  sudo dpkg-reconfigure worker"
+        echo
         ;;
 esac
 

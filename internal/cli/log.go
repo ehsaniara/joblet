@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"worker/pkg/client"
 )
 
 func newLogCmd() *cobra.Command {
@@ -47,9 +46,9 @@ func runLog(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	jobClient, err := client.NewJobClient(cfg.ServerAddr)
+	jobClient, err := newJobClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 	defer jobClient.Close()
 
