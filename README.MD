@@ -204,16 +204,16 @@ Worker consists of two main components that work together:
 ### 🔧 Component Overview
 
 1. **Worker Daemon** (`worker`)
-    - Runs as a Linux systemd service
-    - Handles job execution, isolation, and resource management
-    - Provides gRPC API with mTLS security
-    - Installed at `/opt/worker/worker`
+   - Runs as a Linux systemd service
+   - Handles job execution, isolation, and resource management
+   - Provides gRPC API with mTLS security
+   - Installed at `/opt/worker/worker`
 
 2. **Worker CLI** (`worker-cli`)
-    - Command-line interface for interacting with the daemon
-    - Can run on any machine (Linux, macOS, Windows)
-    - Connects to daemon via secure gRPC
-    - Installed as `/usr/bin/worker` (symlinked to `/opt/worker/worker-cli`)
+   - Command-line interface for interacting with the daemon
+   - Can run on any machine (Linux, macOS, Windows)
+   - Connects to daemon via secure gRPC
+   - Installed as `/usr/bin/worker-cli` (symlinked to `/opt/worker/worker-cli`)
 
 ### Quick Start (Debian/Ubuntu)
 
@@ -224,18 +224,21 @@ wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | g
 # Or manually download latest version
 # wget https://github.com/ehsaniara/worker/releases/latest/download/worker_VERSION_amd64.deb
 
-# Install the package (replace VERSION with actual version)
+# Interactive installation (recommended - prompts for server IP)
 sudo dpkg -i worker_*_amd64.deb
 
-# Verify daemon is running
-sudo systemctl status worker
+# Or automated installation with pre-configured IP
+WORKER_SERVER_IP="192.168.1.100" sudo -E dpkg -i worker_*_amd64.deb
 
 # Start the service
 sudo systemctl start worker
 sudo systemctl enable worker
+
+# Verify daemon is running
+sudo systemctl status worker
 ```
 
-### Manual Installation
+### Manual Installation (Development)
 
 ```bash
 # Clone the repository
@@ -245,17 +248,19 @@ cd worker
 # Build both binaries
 make build  # Creates: worker (daemon) and worker-cli
 
-# Generate mTLS certificates
+# Generate mTLS certificates (requires server IP configuration)
+export WORKER_SERVER_ADDRESS="192.168.1.100"  # Replace with your server IP
 sudo ./scripts/certs_gen.sh
 
 # Install daemon
+sudo mkdir -p /opt/worker/config
 sudo cp worker /opt/worker/
 sudo cp config/server-config.yml /opt/worker/config/
 sudo cp scripts/worker.service /etc/systemd/system/
 
-# Install CLI (with convenient symlink)
+# Install CLI
 sudo cp worker-cli /opt/worker/
-sudo ln -sf /opt/worker/worker-cli /usr/bin/worker
+sudo ln -sf /opt/worker/worker-cli /usr/bin/worker-cli
 
 # Start daemon service
 sudo systemctl daemon-reload
@@ -267,89 +272,183 @@ sudo systemctl start worker
 
 If you only need the CLI to connect to a remote Worker daemon:
 
+#### Linux CLI Installation
 ```bash
 # Download CLI binary only
 wget https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-linux-amd64
-
-# Make executable and install
 chmod +x worker-cli-linux-amd64
-sudo mv worker-cli-linux-amd64 /usr/local/bin/worker
+sudo mv worker-cli-linux-amd64 /usr/local/bin/worker-cli
+
+# Create client configuration
+mkdir -p ~/.worker
+cat > ~/.worker/client-config.yml << EOF
+version: "3.0"
+nodes:
+  default:
+    address: "your-daemon-server:50051"
+    cert: "~/.worker/certs/client-cert.pem"
+    key: "~/.worker/certs/client-key.pem"
+    ca: "~/.worker/certs/ca-cert.pem"
+EOF
 
 # Copy certificates from daemon server
-scp server:/opt/worker/certs/ca-cert.pem ./certs/
-scp server:/opt/worker/certs/client-cert.pem ./certs/
-scp server:/opt/worker/certs/client-key.pem ./certs/
+mkdir -p ~/.worker/certs
+scp server:/opt/worker/certs/ca-cert.pem ~/.worker/certs/
+scp server:/opt/worker/certs/client-cert.pem ~/.worker/certs/
+scp server:/opt/worker/certs/client-key.pem ~/.worker/certs/
 
-# Connect to remote daemon
-worker --server=your-daemon-server:50051 list
+# Test connection
+worker-cli --config=~/.worker/client-config.yml list
 ```
 
-## 🔧 Configuration
+#### macOS CLI Installation
+```bash
+# Download macOS binary
+curl -L -o worker-cli https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-darwin-amd64
+chmod +x worker-cli
+sudo mv worker-cli /usr/local/bin/
 
-Worker uses a hierarchical configuration system: **Environment Variables** > **Config File** > **Defaults**
+# Setup configuration (same as Linux)
+mkdir -p ~/.worker
+# ... copy configuration and certificates as above ...
+```
 
-### Example Configuration (`/opt/worker/config/config.yml`)
+#### Windows CLI Installation
+```powershell
+# Download Windows binary
+Invoke-WebRequest -Uri "https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-windows-amd64.exe" -OutFile "worker-cli.exe"
 
+# Move to PATH location
+Move-Item worker-cli.exe "C:\Program Files\worker-cli.exe"
+
+# Setup configuration directory
+New-Item -ItemType Directory -Path "$env:USERPROFILE\.worker\certs" -Force
+
+# Copy client-config.yml and certificates from daemon server
+# ... configure as needed ...
+```
+
+### Post-Installation Configuration
+
+#### 1. Verify Installation
+```bash
+# Check daemon status
+sudo systemctl status worker
+
+# Test CLI connection (local)
+worker-cli list
+
+# Test CLI connection (with config file)
+worker-cli --config=/opt/worker/config/client-config.yml list
+```
+
+#### 2. Configuration Files Location
+```
+/opt/worker/
+├── worker                           # Daemon binary
+├── worker-cli                      # CLI binary  
+├── config/
+│   ├── server-config.yml          # Daemon configuration
+│   └── client-config.yml          # CLI configuration template
+└── certs/                         # mTLS certificates
+    ├── server-cert.pem            # Server certificate
+    ├── server-key.pem             # Server private key
+    ├── client-cert.pem            # Client certificate (admin)
+    ├── client-key.pem             # Client private key
+    └── ca-cert.pem                # Certificate Authority
+```
+
+#### 3. Client Configuration Examples
+
+**Local connection (same machine):**
 ```yaml
-server:
-  address: "0.0.0.0"
-  port: 50051
-  mode: "server"
-
-worker:
-  defaultCpuLimit: 100          # 100% CPU (1 full core)
-  defaultMemoryLimit: 512       # 512MB memory limit
-  defaultIoLimit: 10485760      # 10MB/s I/O limit
-  maxConcurrentJobs: 50         # Maximum concurrent jobs
-  jobTimeout: "1h"              # Job execution timeout
-  validateCommands: true        # Enable command validation
-
-security:
-  serverCertPath: "/opt/worker/certs/server-cert.pem"
-  serverKeyPath: "/opt/worker/certs/server-key.pem"
-  caCertPath: "/opt/worker/certs/ca-cert.pem"
-  minTlsVersion: "1.3"
-
-cgroup:
-  baseDir: "/sys/fs/cgroup/worker.slice/worker.service"
-  enableControllers: [ "cpu", "memory", "io", "pids" ]
-  cleanupTimeout: "5s"
-
-filesystem:
-  baseDir: "/opt/worker/jobs"        # Base directory for isolated job filesystems
-  tmpDir: "/tmp/job-{JOB_ID}"       # Job-specific tmp directory template
-  allowedMounts: # Read-only system directories mounted in isolated filesystems
-    - "/usr/bin"
-    - "/bin"
-    - "/lib"
-    - "/lib64"
-    - "/usr/lib"
-    - "/usr/lib64"
-  blockDevices: false               # Block access to devices
-
-logging:
-  level: "INFO"
-  format: "text"
-  output: "stdout"
+# ~/.worker/client-config.yml or ./client-config.yml
+version: "3.0"
+nodes:
+  default:
+    address: "localhost:50051"
+    cert: "/opt/worker/certs/client-cert.pem"
+    key: "/opt/worker/certs/client-key.pem" 
+    ca: "/opt/worker/certs/ca-cert.pem"
 ```
 
-### Environment Variables
+**Remote connection:**
+```yaml
+# ~/.worker/client-config.yml
+version: "3.0"
+nodes:
+  default:
+    address: "192.168.1.100:50051"
+    cert: "~/.worker/certs/client-cert.pem"
+    key: "~/.worker/certs/client-key.pem"
+    ca: "~/.worker/certs/ca-cert.pem"
+  
+  production:
+    address: "prod-worker.company.com:50051"
+    cert: "~/.worker/certs/prod-client-cert.pem"
+    key: "~/.worker/certs/prod-client-key.pem" 
+    ca: "~/.worker/certs/prod-ca-cert.pem"
+```
+
+#### 4. Usage Examples
 
 ```bash
-# Server configuration
-export WORKER_SERVER_ADDRESS="0.0.0.0"
-export WORKER_SERVER_PORT="50051"
+# Using default node
+worker-cli list
+worker-cli run ps aux
 
-# Resource defaults
-export WORKER_DEFAULT_CPU="100"
-export WORKER_DEFAULT_MEMORY="512"
-export WORKER_MAX_CONCURRENT_JOBS="50"
+# Using specific node
+worker-cli --node=production list
+worker-cli --node=production run python3 script.py
 
-# Security
-export WORKER_MIN_TLS_VERSION="1.3"
+# Direct connection (bypasses config file)
+worker-cli --server=192.168.1.100:50051 \
+  --cert=/path/to/client-cert.pem \
+  --key=/path/to/client-key.pem \
+  --ca=/path/to/ca-cert.pem \
+  list
+```
 
-# Logging
-export LOG_LEVEL="INFO"
+### Troubleshooting Installation
+
+#### Common Issues
+
+**1. Certificate errors:**
+```bash
+# Regenerate certificates with correct IP
+export WORKER_SERVER_ADDRESS="your-actual-ip"
+sudo /usr/local/bin/certs_gen.sh
+
+# Check certificate validity
+openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A5 "Subject Alternative Name"
+```
+
+**2. CLI configuration not found:**
+```bash
+# Check config file locations (searched in order):
+ls -la ./client-config.yml                                    # Current directory
+ls -la ./config/client-config.yml                            # Config subdirectory  
+ls -la ~/.worker/client-config.yml                           # User directory
+ls -la /etc/worker/client-config.yml                         # System directory
+
+# Create client config if missing
+worker-cli config-help  # Shows configuration examples
+```
+
+**3. Permission issues:**
+```bash
+# Fix certificate permissions
+sudo chmod 600 /opt/worker/certs/*-key.pem
+sudo chmod 644 /opt/worker/certs/*-cert.pem
+```
+
+**4. Service won't start:**
+```bash
+# Check service logs
+sudo journalctl -u worker -f
+
+# Verify configuration
+sudo /opt/worker/worker --help  # Should show help without errors
 ```
 
 ## 💻 Usage
