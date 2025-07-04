@@ -46,9 +46,9 @@ func init() {
 		"Path to CA certificate file")
 
 	// Mark certificate flags as hidden since they're usually configured via config file
-	rootCmd.PersistentFlags().MarkHidden("cert")
-	rootCmd.PersistentFlags().MarkHidden("key")
-	rootCmd.PersistentFlags().MarkHidden("ca")
+	_ = rootCmd.PersistentFlags().MarkHidden("cert")
+	_ = rootCmd.PersistentFlags().MarkHidden("key")
+	_ = rootCmd.PersistentFlags().MarkHidden("ca")
 
 	rootCmd.AddCommand(newRunCmd())
 	rootCmd.AddCommand(newStatusCmd())
