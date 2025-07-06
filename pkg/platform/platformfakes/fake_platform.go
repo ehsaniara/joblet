@@ -92,6 +92,17 @@ type FakePlatform struct {
 	getpidReturnsOnCall map[int]struct {
 		result1 int
 	}
+	IsExistStub        func(error) bool
+	isExistMutex       sync.RWMutex
+	isExistArgsForCall []struct {
+		arg1 error
+	}
+	isExistReturns struct {
+		result1 bool
+	}
+	isExistReturnsOnCall map[int]struct {
+		result1 bool
+	}
 	IsNotExistStub        func(error) bool
 	isNotExistMutex       sync.RWMutex
 	isNotExistArgsForCall []struct {
@@ -155,6 +166,19 @@ type FakePlatform struct {
 	mountReturnsOnCall map[int]struct {
 		result1 error
 	}
+	ReadDirStub        func(string) ([]os.DirEntry, error)
+	readDirMutex       sync.RWMutex
+	readDirArgsForCall []struct {
+		arg1 string
+	}
+	readDirReturns struct {
+		result1 []os.DirEntry
+		result2 error
+	}
+	readDirReturnsOnCall map[int]struct {
+		result1 []os.DirEntry
+		result2 error
+	}
 	ReadFileStub        func(string) ([]byte, error)
 	readFileMutex       sync.RWMutex
 	readFileArgsForCall []struct {
@@ -177,6 +201,17 @@ type FakePlatform struct {
 		result1 error
 	}
 	removeReturnsOnCall map[int]struct {
+		result1 error
+	}
+	RemoveAllStub        func(string) error
+	removeAllMutex       sync.RWMutex
+	removeAllArgsForCall []struct {
+		arg1 string
+	}
+	removeAllReturns struct {
+		result1 error
+	}
+	removeAllReturnsOnCall map[int]struct {
 		result1 error
 	}
 	StatStub        func(string) (os.FileInfo, error)
@@ -676,6 +711,67 @@ func (fake *FakePlatform) GetpidReturnsOnCall(i int, result1 int) {
 	}{result1}
 }
 
+func (fake *FakePlatform) IsExist(arg1 error) bool {
+	fake.isExistMutex.Lock()
+	ret, specificReturn := fake.isExistReturnsOnCall[len(fake.isExistArgsForCall)]
+	fake.isExistArgsForCall = append(fake.isExistArgsForCall, struct {
+		arg1 error
+	}{arg1})
+	stub := fake.IsExistStub
+	fakeReturns := fake.isExistReturns
+	fake.recordInvocation("IsExist", []interface{}{arg1})
+	fake.isExistMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePlatform) IsExistCallCount() int {
+	fake.isExistMutex.RLock()
+	defer fake.isExistMutex.RUnlock()
+	return len(fake.isExistArgsForCall)
+}
+
+func (fake *FakePlatform) IsExistCalls(stub func(error) bool) {
+	fake.isExistMutex.Lock()
+	defer fake.isExistMutex.Unlock()
+	fake.IsExistStub = stub
+}
+
+func (fake *FakePlatform) IsExistArgsForCall(i int) error {
+	fake.isExistMutex.RLock()
+	defer fake.isExistMutex.RUnlock()
+	argsForCall := fake.isExistArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) IsExistReturns(result1 bool) {
+	fake.isExistMutex.Lock()
+	defer fake.isExistMutex.Unlock()
+	fake.IsExistStub = nil
+	fake.isExistReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakePlatform) IsExistReturnsOnCall(i int, result1 bool) {
+	fake.isExistMutex.Lock()
+	defer fake.isExistMutex.Unlock()
+	fake.IsExistStub = nil
+	if fake.isExistReturnsOnCall == nil {
+		fake.isExistReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.isExistReturnsOnCall[i] = struct {
+		result1 bool
+	}{result1}
+}
+
 func (fake *FakePlatform) IsNotExist(arg1 error) bool {
 	fake.isNotExistMutex.Lock()
 	ret, specificReturn := fake.isNotExistReturnsOnCall[len(fake.isNotExistArgsForCall)]
@@ -990,6 +1086,70 @@ func (fake *FakePlatform) MountReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakePlatform) ReadDir(arg1 string) ([]os.DirEntry, error) {
+	fake.readDirMutex.Lock()
+	ret, specificReturn := fake.readDirReturnsOnCall[len(fake.readDirArgsForCall)]
+	fake.readDirArgsForCall = append(fake.readDirArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ReadDirStub
+	fakeReturns := fake.readDirReturns
+	fake.recordInvocation("ReadDir", []interface{}{arg1})
+	fake.readDirMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakePlatform) ReadDirCallCount() int {
+	fake.readDirMutex.RLock()
+	defer fake.readDirMutex.RUnlock()
+	return len(fake.readDirArgsForCall)
+}
+
+func (fake *FakePlatform) ReadDirCalls(stub func(string) ([]os.DirEntry, error)) {
+	fake.readDirMutex.Lock()
+	defer fake.readDirMutex.Unlock()
+	fake.ReadDirStub = stub
+}
+
+func (fake *FakePlatform) ReadDirArgsForCall(i int) string {
+	fake.readDirMutex.RLock()
+	defer fake.readDirMutex.RUnlock()
+	argsForCall := fake.readDirArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) ReadDirReturns(result1 []os.DirEntry, result2 error) {
+	fake.readDirMutex.Lock()
+	defer fake.readDirMutex.Unlock()
+	fake.ReadDirStub = nil
+	fake.readDirReturns = struct {
+		result1 []os.DirEntry
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePlatform) ReadDirReturnsOnCall(i int, result1 []os.DirEntry, result2 error) {
+	fake.readDirMutex.Lock()
+	defer fake.readDirMutex.Unlock()
+	fake.ReadDirStub = nil
+	if fake.readDirReturnsOnCall == nil {
+		fake.readDirReturnsOnCall = make(map[int]struct {
+			result1 []os.DirEntry
+			result2 error
+		})
+	}
+	fake.readDirReturnsOnCall[i] = struct {
+		result1 []os.DirEntry
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakePlatform) ReadFile(arg1 string) ([]byte, error) {
 	fake.readFileMutex.Lock()
 	ret, specificReturn := fake.readFileReturnsOnCall[len(fake.readFileArgsForCall)]
@@ -1111,6 +1271,67 @@ func (fake *FakePlatform) RemoveReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.removeReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePlatform) RemoveAll(arg1 string) error {
+	fake.removeAllMutex.Lock()
+	ret, specificReturn := fake.removeAllReturnsOnCall[len(fake.removeAllArgsForCall)]
+	fake.removeAllArgsForCall = append(fake.removeAllArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.RemoveAllStub
+	fakeReturns := fake.removeAllReturns
+	fake.recordInvocation("RemoveAll", []interface{}{arg1})
+	fake.removeAllMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePlatform) RemoveAllCallCount() int {
+	fake.removeAllMutex.RLock()
+	defer fake.removeAllMutex.RUnlock()
+	return len(fake.removeAllArgsForCall)
+}
+
+func (fake *FakePlatform) RemoveAllCalls(stub func(string) error) {
+	fake.removeAllMutex.Lock()
+	defer fake.removeAllMutex.Unlock()
+	fake.RemoveAllStub = stub
+}
+
+func (fake *FakePlatform) RemoveAllArgsForCall(i int) string {
+	fake.removeAllMutex.RLock()
+	defer fake.removeAllMutex.RUnlock()
+	argsForCall := fake.removeAllArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) RemoveAllReturns(result1 error) {
+	fake.removeAllMutex.Lock()
+	defer fake.removeAllMutex.Unlock()
+	fake.RemoveAllStub = nil
+	fake.removeAllReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePlatform) RemoveAllReturnsOnCall(i int, result1 error) {
+	fake.removeAllMutex.Lock()
+	defer fake.removeAllMutex.Unlock()
+	fake.RemoveAllStub = nil
+	if fake.removeAllReturnsOnCall == nil {
+		fake.removeAllReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.removeAllReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -1390,6 +1611,8 @@ func (fake *FakePlatform) Invocations() map[string][][]interface{} {
 	defer fake.getenvMutex.RUnlock()
 	fake.getpidMutex.RLock()
 	defer fake.getpidMutex.RUnlock()
+	fake.isExistMutex.RLock()
+	defer fake.isExistMutex.RUnlock()
 	fake.isNotExistMutex.RLock()
 	defer fake.isNotExistMutex.RUnlock()
 	fake.killMutex.RLock()
@@ -1400,10 +1623,14 @@ func (fake *FakePlatform) Invocations() map[string][][]interface{} {
 	defer fake.mkdirAllMutex.RUnlock()
 	fake.mountMutex.RLock()
 	defer fake.mountMutex.RUnlock()
+	fake.readDirMutex.RLock()
+	defer fake.readDirMutex.RUnlock()
 	fake.readFileMutex.RLock()
 	defer fake.readFileMutex.RUnlock()
 	fake.removeMutex.RLock()
 	defer fake.removeMutex.RUnlock()
+	fake.removeAllMutex.RLock()
+	defer fake.removeAllMutex.RUnlock()
 	fake.statMutex.RLock()
 	defer fake.statMutex.RUnlock()
 	fake.symlinkMutex.RLock()

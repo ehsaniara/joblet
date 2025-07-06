@@ -4,7 +4,6 @@ package filesystem
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -246,28 +245,28 @@ func (f *JobFilesystem) mountEssentialFS() error {
 func (f *JobFilesystem) createEssentialDevices() error {
 	// Create /dev/null
 	if err := syscall.Mknod("/dev/null", syscall.S_IFCHR|0666, int(makedev(1, 3))); err != nil {
-		if !os.IsExist(err) {
+		if !f.platform.IsExist(err) {
 			return fmt.Errorf("failed to create /dev/null: %w", err)
 		}
 	}
 
 	// Create /dev/zero
 	if err := syscall.Mknod("/dev/zero", syscall.S_IFCHR|0666, int(makedev(1, 5))); err != nil {
-		if !os.IsExist(err) {
+		if !f.platform.IsExist(err) {
 			return fmt.Errorf("failed to create /dev/zero: %w", err)
 		}
 	}
 
 	// Create /dev/random
 	if err := syscall.Mknod("/dev/random", syscall.S_IFCHR|0666, int(makedev(1, 8))); err != nil {
-		if !os.IsExist(err) {
+		if !f.platform.IsExist(err) {
 			f.logger.Debug("failed to create /dev/random", "error", err)
 		}
 	}
 
 	// Create /dev/urandom
 	if err := syscall.Mknod("/dev/urandom", syscall.S_IFCHR|0666, int(makedev(1, 9))); err != nil {
-		if !os.IsExist(err) {
+		if !f.platform.IsExist(err) {
 			f.logger.Debug("failed to create /dev/urandom", "error", err)
 		}
 	}
@@ -281,11 +280,11 @@ func (f *JobFilesystem) Cleanup() error {
 	log.Debug("cleaning up job filesystem")
 
 	// Remove the job-specific directories
-	if err := os.RemoveAll(f.RootDir); err != nil {
+	if err := f.platform.RemoveAll(f.RootDir); err != nil {
 		log.Warn("failed to remove job root directory", "error", err)
 	}
 
-	if err := os.RemoveAll(f.TmpDir); err != nil {
+	if err := f.platform.RemoveAll(f.TmpDir); err != nil {
 		log.Warn("failed to remove job tmp directory", "error", err)
 	}
 
@@ -313,7 +312,7 @@ func (f *JobFilesystem) validateInJobContext() error {
 	// Check we're not already in a chroot by trying to access host root
 	if _, err := f.platform.Stat("/proc/1/root"); err == nil {
 		// Additional check: see if we can read host's root filesystem
-		if entries, e := os.ReadDir("/"); e == nil && len(entries) > 10 {
+		if entries, e := f.platform.ReadDir("/"); e == nil && len(entries) > 10 {
 			// If we can see many entries in /, we're likely on the host filesystem
 			f.logger.Debug("safety check: many root entries visible, may be on host", "entries", len(entries))
 		}

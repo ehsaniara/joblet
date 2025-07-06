@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	"worker/internal/worker/utils"
 )
 
 type JobStatus string
@@ -95,7 +94,7 @@ func (j *Job) DeepCopy() *Job {
 	return &Job{
 		Id:         j.Id,
 		Command:    j.Command,
-		Args:       utils.CopyStringSlice(j.Args),
+		Args:       copyStringSlice(j.Args),
 		Limits:     j.Limits,
 		Status:     j.Status,
 		Pid:        j.Pid,
@@ -115,4 +114,19 @@ func (j *Job) Duration() time.Duration {
 		return time.Since(j.StartTime)
 	}
 	return 0
+}
+
+func copyStringSlice(src []string) []string {
+	if src == nil {
+		return nil
+	}
+
+	if len(src) == 0 {
+		return []string{}
+	}
+
+	dst := make([]string, len(src))
+	copy(dst, src)
+
+	return dst
 }
