@@ -309,18 +309,8 @@ jobs:
             
             # Or manually edit config and regenerate certificates
             sudo nano /opt/worker/config/config.yml
-            sudo /usr/local/bin/certs_gen.sh
             sudo systemctl restart worker
             ```
-            
-            ### Features
-            - ✅ **Simple Installation** - Just asks for server IP address
-            - ✅ **Auto-Detection** - Automatically detects your network IP
-            - ✅ **SSL Certificates** - Generates certificates for the server IP
-            - ✅ **Multiple Client Types** - Admin and viewer certificates
-            - ✅ **Easy Configuration** - Environment variables support
-            - ✅ **Production Ready** - Systemd service with proper isolation
-            - ✅ **Cross-Architecture** - AMD64 and ARM64 support
             
             ### What's New
             - Interactive installation asks for server IP address
@@ -331,7 +321,8 @@ jobs:
             
             ### Documentation
             - Installation Guide: See release notes above
-            - Configuration: `/opt/worker/config/config.yml`
+            - Configuration: `/opt/worker/config/server-config.yml`
+            - Configuration: `/opt/worker/config/client-config.yml` (for remote use)
             - Certificates: `/opt/worker/certs/`
             - Logs: `sudo journalctl -u worker -f`
             - CLI Help: `worker-cli --help`

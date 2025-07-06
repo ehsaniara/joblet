@@ -82,8 +82,6 @@ type LoggingConfig struct {
 	Output string `yaml:"output" json:"output"`
 }
 
-// ===== CLIENT CONFIGURATION =====
-
 // ClientConfig represents the client-side configuration with multiple nodes
 type ClientConfig struct {
 	Version string           `yaml:"version"`
@@ -226,8 +224,19 @@ func LoadConfig() (*Config, string, error) {
 		return nil, "", fmt.Errorf("failed to load config file: %w", err)
 	}
 
-	// Apply environment variable overrides
-	applyEnvironmentOverrides(&config)
+	if val := os.Getenv("WORKER_SERVER_ADDRESS"); val != "" {
+		config.Server.Address = val
+	}
+	if val := os.Getenv("WORKER_MODE"); val != "" {
+		config.Server.Mode = val
+	}
+
+	if val := os.Getenv("WORKER_LOG_LEVEL"); val != "" {
+		config.Logging.Level = val
+	}
+	if val := os.Getenv("WORKER_LOG_FORMAT"); val != "" {
+		config.Logging.Format = val
+	}
 
 	// Validate the configuration
 	if e := config.Validate(); e != nil {
@@ -269,25 +278,6 @@ func loadFromFile(config *Config) (string, error) {
 	}
 
 	return "built-in defaults (no config file found)", nil
-}
-
-// applyEnvironmentOverrides applies environment variable overrides to configuration
-func applyEnvironmentOverrides(config *Config) {
-	// Server overrides
-	if val := os.Getenv("WORKER_SERVER_ADDRESS"); val != "" {
-		config.Server.Address = val
-	}
-	if val := os.Getenv("WORKER_MODE"); val != "" {
-		config.Server.Mode = val
-	}
-
-	// Logging overrides
-	if val := os.Getenv("WORKER_LOG_LEVEL"); val != "" {
-		config.Logging.Level = val
-	}
-	if val := os.Getenv("WORKER_LOG_FORMAT"); val != "" {
-		config.Logging.Format = val
-	}
 }
 
 // Validate validates the configuration
@@ -405,12 +395,6 @@ func findClientConfig() string {
 	}
 
 	return ""
-}
-
-// ExpandPaths expands relative paths based on config file location
-func (n *Node) ExpandPaths(configDir string) {
-	// Note: With embedded certificates, this function is no longer needed
-	// but kept for compatibility
 }
 
 func (c *Config) ToYAML() ([]byte, error) {
