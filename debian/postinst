@@ -83,8 +83,8 @@ generate_and_embed_certificates() {
     fi
 
     # Run the embedded certificate generation script
-    if [ -x /usr/local/bin/certs_gen.sh ]; then
-        /usr/local/bin/certs_gen.sh
+    if [ -x /usr/local/bin/certs_gen_embedded.sh ]; then
+        /usr/local/bin/certs_gen_embedded.sh
     else
         print_error "Certificate generation script not found or not executable"
         return 1
@@ -173,7 +173,7 @@ case "$1" in
         echo
         print_info "🔧 To reconfigure later:"
         echo "  sudo dpkg-reconfigure worker"
-        echo "  Or manually: WORKER_SERVER_ADDRESS='new-ip' /usr/local/bin/certs_gen.sh"
+        echo "  Or manually: WORKER_SERVER_ADDRESS='new-ip' /usr/local/bin/certs_gen_embedded.sh"
         echo
         ;;
 esac

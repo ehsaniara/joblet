@@ -65,8 +65,8 @@ fi
 cp ./scripts/worker.service "$BUILD_DIR/etc/systemd/system/"
 
 # Copy certificate generation script (embedded version)
-cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen.sh"
-chmod +x "$BUILD_DIR/usr/local/bin/certs_gen.sh"
+cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
+chmod +x "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
 
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
@@ -88,7 +88,6 @@ Description: Worker Job Isolation Platform with Embedded Certificates
 Installed-Size: $(du -sk $BUILD_DIR | cut -f1)
 EOF
 
-# Copy install scripts
 cp ./debian/postinst "$BUILD_DIR/DEBIAN/"
 cp ./debian/prerm "$BUILD_DIR/DEBIAN/"
 cp ./debian/postrm "$BUILD_DIR/DEBIAN/"

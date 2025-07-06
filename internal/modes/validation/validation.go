@@ -15,21 +15,6 @@ type PlatformValidator struct {
 	logger   *logger.Logger
 }
 
-// NewPlatformValidator creates a new platform validator
-func NewPlatformValidator(p platform.Platform, logger *logger.Logger) *PlatformValidator {
-	return &PlatformValidator{
-		platform: p,
-		logger:   logger.WithField("component", "validator"),
-	}
-}
-
-// ValidatePlatformRequirements checks platform-specific requirements
-func ValidatePlatformRequirements(logger *logger.Logger) error {
-	p := platform.NewPlatform()
-	validator := NewPlatformValidator(p, logger)
-	return validator.ValidatePlatformRequirements()
-}
-
 // ValidatePlatformRequirements checks platform-specific requirements using platform abstraction
 func (pv *PlatformValidator) ValidatePlatformRequirements() error {
 	switch runtime.GOOS {

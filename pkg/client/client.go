@@ -47,20 +47,6 @@ func NewJobClient(node *config.Node) (*JobClient, error) {
 	}, nil
 }
 
-// NewJobClientFromConfig creates a client from client config and node name
-func NewJobClientFromConfig(clientConfig *config.ClientConfig, nodeName string) (*JobClient, error) {
-	if clientConfig == nil {
-		return nil, fmt.Errorf("client configuration cannot be nil")
-	}
-
-	node, err := clientConfig.GetNode(nodeName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get node configuration: %w", err)
-	}
-
-	return NewJobClient(node)
-}
-
 func (c *JobClient) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()

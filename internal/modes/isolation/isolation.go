@@ -21,8 +21,7 @@ type Isolator struct {
 
 // NewIsolator creates a new isolator with the given platform
 func NewIsolator(p platform.Platform, logger *logger.Logger) *Isolator {
-	// Load configuration for filesystem isolation
-	cfg, _, _ := config.LoadConfig() // You might want to pass this instead
+	cfg, _, _ := config.LoadConfig()
 
 	return &Isolator{
 		platform:   p,
@@ -55,7 +54,7 @@ func (i *Isolator) setupLinux() error {
 	pid := i.platform.Getpid()
 	i.logger.Debug("setting up Linux isolation with filesystem isolation", "pid", pid, "approach", "platform-abstraction")
 
-	// Only PID 1 should setup isolation
+	// Only PID 1 should set up isolation
 	if pid != 1 {
 		i.logger.Debug("not PID 1, skipping isolation setup", "pid", pid)
 		return nil
@@ -111,7 +110,7 @@ func (i *Isolator) setupFilesystemIsolation() error {
 		return fmt.Errorf("failed to create job filesystem: %w", err)
 	}
 
-	// Setup the filesystem isolation (chroot, mounts, etc.)
+	// Set up the filesystem isolation (chroot, mounts, etc.)
 	if err := jobFS.Setup(); err != nil {
 		return fmt.Errorf("failed to setup filesystem isolation: %w", err)
 	}
@@ -193,7 +192,6 @@ func (i *Isolator) verifyIsolation() error {
 
 // readProcDir reads /proc directory entries using platform abstraction
 func (i *Isolator) readProcDir() ([]string, error) {
-	// Since platform.Platform doesn't have ReadDir, we need to work around this
 	// For now, we'll use a simple approach - this could be extended to the platform interface
 	entries := []string{}
 
