@@ -277,20 +277,8 @@ func applyEnvironmentOverrides(config *Config) {
 	if val := os.Getenv("WORKER_SERVER_ADDRESS"); val != "" {
 		config.Server.Address = val
 	}
-	if val := os.Getenv("WORKER_SERVER_PORT"); val != "" {
-		if port, err := fmt.Sscanf(val, "%d", &config.Server.Port); err == nil && port == 1 {
-			// Port was successfully parsed
-		}
-	}
 	if val := os.Getenv("WORKER_MODE"); val != "" {
 		config.Server.Mode = val
-	}
-
-	// Worker overrides
-	if val := os.Getenv("WORKER_MAX_JOBS"); val != "" {
-		if maxJobs, err := fmt.Sscanf(val, "%d", &config.Worker.MaxConcurrentJobs); err == nil && maxJobs == 1 {
-			// MaxConcurrentJobs was successfully parsed
-		}
 	}
 
 	// Logging overrides
