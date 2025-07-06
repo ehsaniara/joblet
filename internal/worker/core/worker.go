@@ -231,7 +231,7 @@ func (w *Worker) startProcessSingleBinary(ctx context.Context, job *domain.Job) 
 	}
 
 	// Prepare environment with job information and mode indicator
-	env := w.buildJobEnvironment(job, execPath)
+	env := w.processManager.BuildJobEnvironment(job, execPath)
 
 	// Create isolation attributes
 	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
@@ -261,32 +261,6 @@ func (w *Worker) startProcessSingleBinary(ctx context.Context, job *domain.Job) 
 
 	w.logger.Debug("process launched using single binary", "jobID", job.Id, "pid", result.PID)
 	return result.Command, nil
-}
-
-// buildJobEnvironment builds environment for single binary mode
-func (w *Worker) buildJobEnvironment(job *domain.Job, execPath string) []string {
-	baseEnv := w.platform.Environ()
-
-	// Job-specific environment with mode indicator
-	jobEnv := []string{
-		"WORKER_MODE=init", // This tells the binary to run in init mode
-		fmt.Sprintf("JOB_ID=%s", job.Id),
-		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace path
-		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
-		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		fmt.Sprintf("WORKER_BINARY_PATH=%s", execPath),
-		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
-		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
-		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
-	}
-
-	// Add job arguments
-	for i, arg := range job.Args {
-		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-
-	return append(baseEnv, jobEnv...)
 }
 
 // addProcessToCgroup moves a process to the specified cgroup

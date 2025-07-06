@@ -396,15 +396,3 @@ func findClientConfig() string {
 
 	return ""
 }
-
-func (c *Config) ToYAML() ([]byte, error) {
-	return yaml.Marshal(c)
-}
-
-func (c *Config) SaveToFile(path string) error {
-	data, err := c.ToYAML()
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}

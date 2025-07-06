@@ -162,9 +162,10 @@ print_success "Viewer client certificate generated"
 # Function to read and indent certificate content for YAML
 read_cert_for_yaml() {
     local file="$1"
-    # Add 4 spaces indentation to each line
+    local indent="${2:-      }"  # Default to 6 spaces if not specified
+    # Add proper indentation to each line
     while IFS= read -r line; do
-        echo "    $line"
+        echo "${indent}${line}"
     done < "$file"
 }
 
@@ -186,11 +187,11 @@ if [ -f "$SERVER_TEMPLATE" ]; then
 # Security configuration with embedded certificates
 security:
   serverCert: |
-$(read_cert_for_yaml server-cert.pem)
+$(read_cert_for_yaml server-cert.pem "    ")
   serverKey: |
-$(read_cert_for_yaml server-key.pem)
+$(read_cert_for_yaml server-key.pem "    ")
   caCert: |
-$(read_cert_for_yaml ca-cert.pem)
+$(read_cert_for_yaml ca-cert.pem "    ")
 EOF
 
     print_success "Server configuration updated with embedded certificates"
@@ -211,20 +212,20 @@ nodes:
   default:
     address: "$SERVER_ADDRESS:50051"
     cert: |
-$(read_cert_for_yaml admin-client-cert.pem)
+$(read_cert_for_yaml admin-client-cert.pem "      ")
     key: |
-$(read_cert_for_yaml admin-client-key.pem)
+$(read_cert_for_yaml admin-client-key.pem "      ")
     ca: |
-$(read_cert_for_yaml ca-cert.pem)
+$(read_cert_for_yaml ca-cert.pem "      ")
 
   viewer:
     address: "$SERVER_ADDRESS:50051"
     cert: |
-$(read_cert_for_yaml viewer-client-cert.pem)
+$(read_cert_for_yaml viewer-client-cert.pem "      ")
     key: |
-$(read_cert_for_yaml viewer-client-key.pem)
+$(read_cert_for_yaml viewer-client-key.pem "      ")
     ca: |
-$(read_cert_for_yaml ca-cert.pem)
+$(read_cert_for_yaml ca-cert.pem "      ")
 EOF
 
 print_success "Client configuration created with embedded certificates"

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"worker/internal/worker/domain"
 	"worker/pkg/platform"
 
 	"worker/pkg/logger"
@@ -21,8 +22,6 @@ import (
 const (
 	GracefulShutdownTimeout = 100 * time.Millisecond
 	StartTimeout            = 10 * time.Second
-	MaxJobArgs              = 100
-	MaxJobArgLength         = 1024
 )
 
 // Manager handles all process-related operations including launching, cleanup, and validation
@@ -456,25 +455,29 @@ func (m *Manager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
 }
 
 // BuildJobEnvironment builds environment variables for a specific job
-func (m *Manager) BuildJobEnvironment(jobID, command, cgroupPath string, args []string, networkEnvVars []string) []string {
-	jobEnvVars := []string{
-		fmt.Sprintf("JOB_ID=%s", jobID),
-		fmt.Sprintf("JOB_COMMAND=%s", command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", cgroupPath),
+func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string {
+	baseEnv := m.platform.Environ()
+
+	// Job-specific environment with mode indicator
+	jobEnv := []string{
+		"WORKER_MODE=init", // This tells the binary to run in init mode
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace path
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host path for debugging
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		fmt.Sprintf("WORKER_BINARY_PATH=%s", execPath),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
 	}
 
 	// Add job arguments
-	for i, arg := range args {
-		jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-	jobEnvVars = append(jobEnvVars, fmt.Sprintf("JOB_ARGS_COUNT=%d", len(args)))
-
-	// Add network environment variables if provided
-	if networkEnvVars != nil {
-		jobEnvVars = append(jobEnvVars, networkEnvVars...)
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
 
-	return jobEnvVars
+	return append(baseEnv, jobEnv...)
 }
 
 // PrepareEnvironment prepares the environment variables for a job
@@ -634,13 +637,7 @@ func (m *Manager) validateCommand(command string) error {
 }
 
 func (m *Manager) validateArguments(args []string) error {
-	if len(args) > MaxJobArgs {
-		return ValidationError{Field: "args", Value: len(args), Message: fmt.Sprintf("too many arguments (max %d)", MaxJobArgs)}
-	}
 	for i, arg := range args {
-		if len(arg) > MaxJobArgLength {
-			return ValidationError{Field: "args", Value: fmt.Sprintf("arg[%d]", i), Message: fmt.Sprintf("argument too long (max %d characters)", MaxJobArgLength)}
-		}
 		if strings.Contains(arg, "\x00") {
 			return ValidationError{Field: "args", Value: fmt.Sprintf("arg[%d]", i), Message: "argument contains null bytes"}
 		}
