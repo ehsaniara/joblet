@@ -162,7 +162,10 @@ print_success "Viewer client certificate generated"
 # Function to read and indent certificate content for YAML
 read_cert_for_yaml() {
     local file="$1"
-    sed 's/^/    /' "$file"
+    # Add 4 spaces indentation to each line
+    while IFS= read -r line; do
+        echo "    $line"
+    done < "$file"
 }
 
 # Update server configuration with embedded certificates

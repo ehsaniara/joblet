@@ -74,9 +74,21 @@ generate_and_embed_certificates() {
     # Export variables for the certificate generation script
     export WORKER_SERVER_ADDRESS
     export WORKER_ADDITIONAL_NAMES
+    export WORKER_MODE="package-install"  # Special mode for package installation
+
+    # Ensure scripts directory exists and has correct permissions
+    if [ -d "/opt/worker/scripts" ]; then
+        chmod 755 /opt/worker/scripts
+        chmod 644 /opt/worker/scripts/*.yml 2>/dev/null || true
+    fi
 
     # Run the embedded certificate generation script
-    /usr/local/bin/certs_gen.sh
+    if [ -x /usr/local/bin/certs_gen.sh ]; then
+        /usr/local/bin/certs_gen.sh
+    else
+        print_error "Certificate generation script not found or not executable"
+        return 1
+    fi
 
     print_success "Certificates generated and embedded successfully"
 }

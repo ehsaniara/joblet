@@ -20,7 +20,7 @@ import (
 
 const (
 	GracefulShutdownTimeout = 100 * time.Millisecond
-	ProcessStartTimeout     = 10 * time.Second
+	StartTimeout            = 10 * time.Second
 	MaxJobArgs              = 100
 	MaxJobArgLength         = 1024
 )
@@ -88,7 +88,7 @@ func (m *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*Lau
 	case <-ctx.Done():
 		log.Warn("context cancelled while starting process")
 		return nil, ctx.Err()
-	case <-time.After(ProcessStartTimeout):
+	case <-time.After(StartTimeout):
 		log.Error("timeout waiting for process to start")
 		return nil, fmt.Errorf("timeout waiting for process to start")
 	}
