@@ -11,7 +11,7 @@ func newNodesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "nodes",
 		Short: "List available nodes from configuration",
-		Long:  "Display all configured nodes and their connection details from client-config.yml",
+		Long:  "Display all configured nodes and their connection details from client-config-template.yml",
 		RunE:  runNodes,
 	}
 
@@ -21,12 +21,12 @@ func newNodesCmd() *cobra.Command {
 func runNodes(cmd *cobra.Command, args []string) error {
 	// nodeConfig should be loaded by PersistentPreRun, but check anyway
 	if nodeConfig == nil {
-		return fmt.Errorf("no client configuration loaded. Please ensure client-config.yml exists")
+		return fmt.Errorf("no client configuration loaded. Please ensure client-config-template.yml exists")
 	}
 
 	nodes := nodeConfig.ListNodes()
 	if len(nodes) == 0 {
-		return fmt.Errorf("no nodes configured in client-config.yml")
+		return fmt.Errorf("no nodes configured in client-config-template.yml")
 	}
 
 	// Sort nodes for consistent output

@@ -255,7 +255,7 @@ sudo ./scripts/certs_gen.sh
 # Install daemon
 sudo mkdir -p /opt/worker/config
 sudo cp worker /opt/worker/
-sudo cp config/server-config.yml /opt/worker/config/
+sudo cp config/server-config-template.yml /opt/worker/config/
 sudo cp scripts/worker.service /etc/systemd/system/
 
 # Install CLI
@@ -281,7 +281,7 @@ sudo mv worker-cli-linux-amd64 /usr/local/bin/worker-cli
 
 # Create client configuration
 mkdir -p ~/.worker
-cat > ~/.worker/client-config.yml << EOF
+cat > ~/.worker/client-config-template.yml << EOF
 version: "3.0"
 nodes:
   default:
@@ -298,7 +298,7 @@ scp server:/opt/worker/certs/client-cert.pem ~/.worker/certs/
 scp server:/opt/worker/certs/client-key.pem ~/.worker/certs/
 
 # Test connection
-worker-cli --config=~/.worker/client-config.yml list
+worker-cli --config=~/.worker/client-config-template.yml list
 ```
 
 #### macOS CLI Installation
@@ -339,7 +339,7 @@ sudo systemctl status worker
 worker-cli list
 
 # Test CLI connection (with config file)
-worker-cli --config=/opt/worker/config/client-config.yml list
+worker-cli --config=/opt/worker/config/client-config-template.yml list
 ```
 
 #### 2. Configuration Files Location
@@ -362,7 +362,7 @@ worker-cli --config=/opt/worker/config/client-config.yml list
 
 **Local connection (same machine):**
 ```yaml
-# ~/.worker/client-config.yml or ./client-config.yml
+# ~/.worker/client-config-template.yml or ./client-config-template.yml
 version: "3.0"
 nodes:
   default:
@@ -374,7 +374,7 @@ nodes:
 
 **Remote connection:**
 ```yaml
-# ~/.worker/client-config.yml
+# ~/.worker/client-config-template.yml
 version: "3.0"
 nodes:
   default:
@@ -426,10 +426,10 @@ openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A5 "Subj
 **2. CLI configuration not found:**
 ```bash
 # Check config file locations (searched in order):
-ls -la ./client-config.yml                                    # Current directory
-ls -la ./config/client-config.yml                            # Config subdirectory  
-ls -la ~/.worker/client-config.yml                           # User directory
-ls -la /etc/worker/client-config.yml                         # System directory
+ls -la ./client-config-template.yml                                    # Current directory
+ls -la ./config/client-config-template.yml                            # Config subdirectory  
+ls -la ~/.worker/client-config-template.yml                           # User directory
+ls -la /etc/worker/client-config-template.yml                         # System directory
 
 # Create client config if missing
 worker-cli config-help  # Shows configuration examples

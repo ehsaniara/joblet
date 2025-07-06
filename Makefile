@@ -2,18 +2,32 @@ REMOTE_HOST ?= 192.168.1.161
 REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/worker
 
-.PHONY: all clean cli worker deploy-passwordless deploy-safe certs-local certs-remote-passwordless certs-download-admin certs-download-admin-simple certs-download-viewer live-log help setup-remote-passwordless setup-dev check-certs-remote service-status validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
+.PHONY: all clean cli worker deploy-passwordless deploy-safe config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
 
 all: cli worker
 
 help:
-	@echo "Worker Makefile"
+	@echo "Worker Makefile - Embedded Certificates Version"
 	@echo ""
 	@echo "Build targets:"
 	@echo "  make all               - Build all binaries (cli, worker)"
 	@echo "  make cli               - Build CLI for local development"
 	@echo "  make worker            - Build worker binary for Linux"
 	@echo "  make clean             - Remove build artifacts"
+	@echo ""
+	@echo "Configuration targets (Embedded Certificates):"
+	@echo "  make config-generate   - Generate local configs with embedded certs"
+	@echo "  make config-remote-generate - Generate configs on remote server"
+	@echo "  make config-download   - Download client config from remote"
+	@echo "  make config-view       - View embedded certificates in config"
+	@echo ""
+	@echo "Deployment targets:"
+	@echo "  make deploy-passwordless - Deploy without password (requires sudo setup)"
+	@echo "  make deploy-safe       - Deploy with password prompt (safe)"
+	@echo ""
+	@echo "Quick setup:"
+	@echo "  make setup-remote-passwordless - Complete passwordless setup"
+	@echo "  make setup-dev         - Development setup with embedded certs"
 	@echo ""
 	@echo "User Namespace Setup:"
 	@echo "  make validate-user-namespaces  - Check user namespace support"
@@ -22,27 +36,8 @@ help:
 	@echo "  make deploy-with-user-namespaces - Deploy with user namespace validation"
 	@echo "  make test-user-namespace-job   - Test job isolation"
 	@echo ""
-	@echo "Deployment targets:"
-	@echo "  make deploy-passwordless - Deploy without password (requires sudo setup)"
-	@echo "  make deploy-safe       - Deploy with password prompt (safe)"
-	@echo ""
-	@echo "Certificate targets:"
-	@echo "  make certs-local       - Generate certificates locally (./certs/)"
-	@echo "  make certs-remote-passwordless - Generate certificates on remote server (passwordless)"
-	@echo "  make certs-download-admin - Download admin client certificates (with sudo)"
-	@echo "  make certs-download-admin-simple - Download admin certificates (no sudo)"
-	@echo "  make certs-download-viewer - Download viewer client certificates"
-	@echo ""
-	@echo "Quick setup:"
-	@echo "  make setup-remote-passwordless - Complete passwordless setup"
-	@echo "  make setup-dev         - Development setup"
-	@echo ""
 	@echo "Debugging:"
-	@echo "  make check-certs-remote - Check certificate status on server"
-	@echo "  make examine-certs     - Examine local and remote certificates"
-	@echo "  make examine-server-cert - Detailed server certificate examination"
-	@echo "  make verify-cert-chain - Verify certificate chain validity"
-	@echo "  make test-tls          - Test TLS connection to server"
+	@echo "  make config-check-remote - Check config status on server"
 	@echo "  make service-status    - Check service status"
 	@echo "  make test-connection   - Test SSH connection"
 	@echo "  make live-log          - View live service logs"
@@ -54,7 +49,7 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make deploy-passwordless REMOTE_HOST=prod.example.com"
-	@echo "  make certs-download-admin-simple"
+	@echo "  make config-download"
 	@echo "  make setup-remote-passwordless"
 
 cli:
@@ -97,174 +92,105 @@ live-log:
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	rm -rf bin/
+	rm -rf config/
 
-certs-local:
-	@echo "🔐 Generating certificates locally..."
-	@if [ ! -f ./scripts/certs_gen.sh ]; then \
-		echo "❌ ./scripts/certs_gen.sh script not found"; \
+config-generate:
+	@echo "🔐 Generating local configuration with embedded certificates..."
+	@if [ ! -f ./scripts/certs_gen_embedded.sh ]; then \
+		echo "❌ ./scripts/certs_gen_embedded.sh script not found"; \
 		exit 1; \
 	fi
-	@chmod +x ./scripts/certs_gen.sh
-	@./scripts/certs_gen.sh
-	@echo "✅ Local certificates generated in ./certs/"
+	@chmod +x ./scripts/certs_gen_embedded.sh
+	@WORKER_SERVER_ADDRESS="localhost" ./scripts/certs_gen_embedded.sh
+	@echo "✅ Local configuration generated with embedded certificates:"
+	@echo "   Server config: ./config/server-config.yml"
+	@echo "   Client config: ./config/client-config.yml"
 
-certs-remote-passwordless:
-	@echo "🔐 Generating certificates on $(REMOTE_USER)@$(REMOTE_HOST) (passwordless)..."
-	@if [ ! -f ./scripts/certs_gen.sh ]; then \
-		echo "❌ ./scripts/certs_gen.sh script not found"; \
+config-remote-generate:
+	@echo "🔐 Generating configuration on $(REMOTE_USER)@$(REMOTE_HOST) with embedded certificates..."
+	@if [ ! -f ./scripts/certs_gen_embedded.sh ]; then \
+		echo "❌ ./scripts/certs_gen_embedded.sh script not found"; \
 		exit 1; \
 	fi
 	@echo "📤 Uploading certificate generation script..."
-	scp ./scripts/certs_gen.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
-	@echo "🏗️  Generating certificates on remote server..."
+	scp ./scripts/certs_gen_embedded.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
+	@echo "🏗️  Generating configuration with embedded certificates on remote server..."
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		chmod +x /tmp/certs_gen.sh; \
-		sudo /tmp/certs_gen.sh; \
+		chmod +x /tmp/certs_gen_embedded.sh; \
+		sudo WORKER_SERVER_ADDRESS=$(REMOTE_HOST) /tmp/certs_gen_embedded.sh; \
 		echo ""; \
-		echo "📋 Certificate files created:"; \
-		sudo ls -la /opt/worker/certs/ 2>/dev/null || echo "No certificates found"; \
-		rm -f /tmp/certs_gen.sh'
-	@echo "✅ Remote certificates generated!"
+		echo "📋 Configuration files created:"; \
+		sudo ls -la /opt/worker/config/ 2>/dev/null || echo "No configuration found"; \
+		rm -f /tmp/certs_gen_embedded.sh'
+	@echo "✅ Remote configuration generated with embedded certificates!"
 
-certs-download-admin-simple:
-	@echo "📥 Simple download of Admin certificates from $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@mkdir -p certs
-	@echo "📥 Downloading certificates (assuming permissions are correct)..."
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/ca-cert.pem certs/ca-cert.pem || echo "❌ Failed to download ca-cert.pem"
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/admin-client-cert.pem certs/client-cert.pem || echo "❌ Failed to download admin-client-cert.pem"
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/admin-client-key.pem certs/client-key.pem || echo "❌ Failed to download admin-client-key.pem"
-	@echo "✅ Download attempt completed. Check for any error messages above."
-	@echo "💡 Usage: ./bin/cli --server $(REMOTE_HOST):50051 --cert certs/client-cert.pem --key certs/client-key.pem"
+config-download:
+	@echo "📥 Downloading client configuration from $(REMOTE_USER)@$(REMOTE_HOST)..."
+	@mkdir -p config
+	@echo "📥 Downloading client-config.yml with embedded certificates..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cat /opt/worker/config/client-config.yml' > config/client-config.yml 2>/dev/null || \
+		(echo "❌ Failed to download config. Trying with temporary copy..." && \
+		ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp /opt/worker/config/client-config.yml /tmp/client-config-$${USER}.yml && sudo chmod 644 /tmp/client-config-$${USER}.yml' && \
+		scp $(REMOTE_USER)@$(REMOTE_HOST):/tmp/client-config-$${USER}.yml config/client-config.yml && \
+		ssh $(REMOTE_USER)@$(REMOTE_HOST) 'rm -f /tmp/client-config-$${USER}.yml')
+	@chmod 600 config/client-config.yml
+	@echo "✅ Client configuration downloaded to ./config/client-config.yml"
+	@echo "💡 Usage: ./bin/cli --config config/client-config.yml list"
+	@echo "💡 Or: ./bin/cli list  (will auto-find config/client-config.yml)"
 
-certs-download-viewer:
-	@echo "📥 Downloading Viewer certificates from $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@mkdir -p certs
-	@echo "📥 Downloading certificates (assuming permissions are correct)..."
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/ca-cert.pem certs/ca-cert.pem
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/viewer-client-cert.pem certs/client-cert.pem
-	scp $(REMOTE_USER)@$(REMOTE_HOST):/opt/worker/certs/viewer-client-key.pem certs/client-key.pem
-	@echo "✅ Viewer Certificates downloaded to ./certs/"
-	@echo "💡 Usage: ./bin/cli --server $(REMOTE_HOST):50051 --cert certs/client-cert.pem --key certs/client-key.pem"
+config-view:
+	@echo "🔍 Viewing embedded certificates in configuration..."
+	@if [ -f config/client-config.yml ]; then \
+		echo "📋 Client configuration nodes:"; \
+		grep -E "^  [a-zA-Z]+:|address:" config/client-config.yml | head -20; \
+		echo ""; \
+		echo "🔐 Embedded certificates found:"; \
+		grep -c "BEGIN CERTIFICATE" config/client-config.yml | xargs echo "  Certificates:"; \
+		grep -c "BEGIN PRIVATE KEY" config/client-config.yml | xargs echo "  Private keys:"; \
+	else \
+		echo "❌ No client configuration found at config/client-config.yml"; \
+		echo "💡 Run 'make config-download' to download from server"; \
+	fi
 
-setup-remote-passwordless: certs-remote-passwordless deploy-passwordless
+setup-remote-passwordless: config-remote-generate deploy-passwordless
 	@echo "🎉 Complete passwordless setup finished!"
 	@echo "   Server: $(REMOTE_USER)@$(REMOTE_HOST)"
-	@echo "   Certificates: /opt/worker/certs/"
+	@echo "   Configuration: /opt/worker/config/ (with embedded certificates)"
 	@echo "   Service: worker.service"
 	@echo ""
 	@echo "📥 Next steps:"
-	@echo "   make certs-download-admin-simple  # Download admin certificates"
-	@echo "   ./bin/cli --server $(REMOTE_HOST):50051 --cert certs/client-cert.pem --key certs/client-key.pem run echo 'Hello World'"
+	@echo "   make config-download  # Download client configuration"
+	@echo "   ./bin/cli list        # Test connection"
+	@echo "   ./bin/cli run echo 'Hello World'"
 
-setup-dev: certs-local all
+setup-dev: config-generate all
 	@echo "🎉 Development setup complete!"
-	@echo "   Certificates: ./certs/"
+	@echo "   Configuration: ./config/ (with embedded certificates)"
 	@echo "   Binaries: ./bin/"
 	@echo ""
 	@echo "🚀 To test locally:"
-	@echo "   ./bin/worker  # Start server"
-	@echo "   ./bin/cli --cert certs/admin-client-cert.pem --key certs/admin-client-key.pem run echo 'Hello World'"
+	@echo "   ./bin/worker  # Start server (uses config/server-config.yml)"
+	@echo "   ./bin/cli list  # Connect as client (uses config/client-config.yml)"
 
-check-certs-remote:
-	@echo "🔍 Checking certificate status on $(REMOTE_USER)@$(REMOTE_HOST)..."
+config-check-remote:
+	@echo "🔍 Checking configuration status on $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@echo "📁 Checking directory structure..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/worker/ || echo 'Directory /opt/worker/ not found'"
-	@echo "📋 Checking certificate files..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/worker/certs/ || echo 'Certificate directory not found'"
+	@echo "📋 Checking configuration files..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/worker/config/ || echo 'Configuration directory not found'"
+	@echo "🔐 Checking embedded certificates in server config..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo grep -c 'BEGIN CERTIFICATE' /opt/worker/config/server-config.yml 2>/dev/null | xargs echo 'Certificates found:' || echo 'No embedded certificates found'"
 
 service-status:
 	@echo "📊 Checking service status on $(REMOTE_USER)@$(REMOTE_HOST)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo systemctl status worker.service --no-pager"
-
-fix-cert-permissions:
-	@echo "🔧 Fixing certificate permissions on $(REMOTE_USER)@$(REMOTE_HOST)..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo chown jay /opt/worker/certs/*.pem && sudo chmod 644 /opt/worker/certs/*.pem"
-	@echo "✅ Certificate permissions fixed!"
 
 test-connection:
 	@echo "🔍 Testing connection to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "echo '✅ SSH connection successful'"
 	@echo "📊 Checking if worker service exists..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "systemctl list-units --type=service | grep worker || echo '❌ worker service not found'"
-
-examine-certs:
-	@echo "🔍 Examining certificates..."
-	@echo ""
-	@echo "📋 LOCAL CERTIFICATES:"
-	@if [ -f certs/ca-cert.pem ]; then \
-		echo "✅ Local CA certificate:"; \
-		openssl x509 -in certs/ca-cert.pem -noout -subject -issuer -dates; \
-		echo ""; \
-	else \
-		echo "❌ No local CA certificate found"; \
-	fi
-	@if [ -f certs/client-cert.pem ]; then \
-		echo "✅ Local client certificate:"; \
-		openssl x509 -in certs/client-cert.pem -noout -subject -issuer -dates; \
-		echo "   Client Role (OU): $(openssl x509 -in certs/client-cert.pem -noout -subject | grep -o 'OU=[^/,]*' | cut -d= -f2)"; \
-		echo ""; \
-	else \
-		echo "❌ No local client certificate found"; \
-	fi
-	@echo "📋 REMOTE SERVER CERTIFICATES:"
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		if [ -f /opt/worker/certs/server-cert.pem ]; then \
-			echo "✅ Remote server certificate:"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -subject -issuer -dates; \
-			echo "   🌐 Subject Alternative Names (SAN):"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A 10 "Subject Alternative Name" | grep -E "(DNS:|IP Address:)" || echo "   ❌ No SAN found"; \
-			echo ""; \
-		else \
-			echo "❌ No remote server certificate found"; \
-		fi'
-
-examine-server-cert:
-	@echo "🔍 Detailed examination of server certificate on $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		if [ -f /opt/worker/certs/server-cert.pem ]; then \
-			echo "📋 Certificate Subject:"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -subject; \
-			echo ""; \
-			echo "📅 Certificate Validity:"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -dates; \
-			echo ""; \
-			echo "🌐 Subject Alternative Names (SAN):"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A 20 "Subject Alternative Name" || echo "   ❌ No SAN extension found"; \
-			echo ""; \
-			echo "🔑 Certificate Key Usage:"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A 5 "Key Usage" || echo "   ❌ No Key Usage found"; \
-			echo ""; \
-			echo "🎯 Extended Key Usage:"; \
-			openssl x509 -in /opt/worker/certs/server-cert.pem -noout -text | grep -A 5 "Extended Key Usage" || echo "   ❌ No Extended Key Usage found"; \
-		else \
-			echo "❌ Server certificate not found at /opt/worker/certs/server-cert.pem"; \
-		fi'
-
-test-tls:
-	@echo "🔐 Testing TLS connection to $(REMOTE_HOST):50051..."
-	@echo "📡 Attempting to connect and examine server certificate..."
-	@echo | openssl s_client -connect $(REMOTE_HOST):50051 -servername $(REMOTE_HOST) 2>/dev/null | openssl x509 -noout -text | grep -A 20 "Subject Alternative Name" || echo "❌ Failed to connect or no SAN found"
-
-verify-cert-chain:
-	@echo "🔗 Verifying certificate chain on $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		cd /opt/worker/certs && \
-		if [ -f ca-cert.pem ] && [ -f server-cert.pem ]; then \
-			echo "✅ Verifying server certificate against CA:"; \
-			openssl verify -CAfile ca-cert.pem server-cert.pem; \
-			echo ""; \
-			if [ -f admin-client-cert.pem ]; then \
-				echo "✅ Verifying admin client certificate against CA:"; \
-				openssl verify -CAfile ca-cert.pem admin-client-cert.pem; \
-			fi; \
-			if [ -f viewer-client-cert.pem ]; then \
-				echo "✅ Verifying viewer client certificate against CA:"; \
-				openssl verify -CAfile ca-cert.pem viewer-client-cert.pem; \
-			fi; \
-		else \
-			echo "❌ Missing certificates for verification"; \
-		fi'
 
 validate-user-namespaces:
 	@echo "🔍 Validating user namespace support on $(REMOTE_HOST)..."
@@ -391,15 +317,36 @@ deploy-with-user-namespaces: worker
 			sudo journalctl -u worker.service --no-pager --lines=10; \
 		fi'
 
-test-user-namespace-job: certs-download-admin-simple
+test-user-namespace-job: config-download
 	@echo "🧪 Testing job execution with user namespace isolation..."
 	@echo "📋 Creating test jobs to verify isolation..."
-	./bin/cli --server $(REMOTE_HOST):50051 run whoami || echo "❌ Failed to run whoami job"
+	./bin/cli --config config/client-config.yml run whoami || echo "❌ Failed to run whoami job"
 	sleep 1
-	./bin/cli --server $(REMOTE_HOST):50051 run id || echo "❌ Failed to run id job"
+	./bin/cli --config config/client-config.yml run id || echo "❌ Failed to run id job"
 	sleep 1
-	./bin/cli --server $(REMOTE_HOST):50051 run "ps aux | head -10" || echo "❌ Failed to run ps job"
+	./bin/cli --config config/client-config.yml run ps aux || echo "❌ Failed to run ps job"
 	@echo "✅ Test jobs submitted. Check logs to verify each job runs with different UID:"
 	@echo "   Expected: Each job should run as different UID (100000+)"
 	@echo "   Expected: Jobs should not see each other's processes"
 	@echo "💡 View logs with: make live-log"
+
+# Migration helper targets
+migrate-check:
+	@echo "🔍 Checking for old certificate files..."
+	@if ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls /opt/worker/certs/ 2>/dev/null" > /dev/null; then \
+		echo "⚠️  Old certificate directory found at /opt/worker/certs/"; \
+		echo "💡 Run 'make migrate-to-embedded' to migrate to embedded certificates"; \
+	else \
+		echo "✅ No old certificate directory found"; \
+	fi
+
+migrate-to-embedded:
+	@echo "🔄 Migrating from file-based to embedded certificates..."
+	@echo "📦 Backing up old certificates..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp -r /opt/worker/certs /opt/worker/certs.backup 2>/dev/null || echo "No old certs to backup"'
+	@echo "🔐 Generating new configuration with embedded certificates..."
+	@$(MAKE) config-remote-generate
+	@echo "🧹 Cleaning up old certificate directory..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo rm -rf /opt/worker/certs'
+	@echo "✅ Migration completed! Old certs backed up to /opt/worker/certs.backup"
+	@echo "💡 Download new client config with: make config-download"

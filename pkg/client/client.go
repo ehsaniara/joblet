@@ -2,10 +2,7 @@ package client
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -13,6 +10,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	pb "worker/api/gen"
+	"worker/pkg/config"
 )
 
 type JobClient struct {
@@ -20,55 +18,47 @@ type JobClient struct {
 	conn   *grpc.ClientConn
 }
 
-type ClientConfig struct {
-	ServerAddr     string
-	ClientCertPath string
-	ClientKeyPath  string
-	CACertPath     string
-}
+// NewJobClient creates a new job client from a node configuration
+func NewJobClient(node *config.Node) (*JobClient, error) {
+	if node == nil {
+		return nil, fmt.Errorf("node configuration cannot be nil")
+	}
 
-// NewJobClient creates a new job client with the provided configuration
-func NewJobClient(clientConfig ClientConfig) (*JobClient, error) {
-	// Load client certificate
-	clientCert, err := tls.LoadX509KeyPair(clientConfig.ClientCertPath, clientConfig.ClientKeyPath)
+	// Get TLS configuration from embedded certificates
+	tlsConfig, err := node.GetClientTLSConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load client cert/key from %s and %s: %w",
-			clientConfig.ClientCertPath, clientConfig.ClientKeyPath, err)
-	}
-
-	// Load CA certificate
-	caCert, err := os.ReadFile(clientConfig.CACertPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CA certificate from %s: %w", clientConfig.CACertPath, err)
-	}
-
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(caCert); !ok {
-		return nil, fmt.Errorf("failed to add CA certificate to pool")
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      certPool,
-		MinVersion:   tls.VersionTLS13,
-		ServerName:   "worker",
+		return nil, fmt.Errorf("failed to create TLS config: %w", err)
 	}
 
 	creds := credentials.NewTLS(tlsConfig)
 
 	conn, err := grpc.NewClient(
-		clientConfig.ServerAddr,
+		node.Address,
 		grpc.WithTransportCredentials(creds),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to server %s: %w", clientConfig.ServerAddr, err)
+		return nil, fmt.Errorf("failed to connect to server %s: %w", node.Address, err)
 	}
 
 	return &JobClient{
 		client: pb.NewJobServiceClient(conn),
 		conn:   conn,
 	}, nil
+}
+
+// NewJobClientFromConfig creates a client from client config and node name
+func NewJobClientFromConfig(clientConfig *config.ClientConfig, nodeName string) (*JobClient, error) {
+	if clientConfig == nil {
+		return nil, fmt.Errorf("client configuration cannot be nil")
+	}
+
+	node, err := clientConfig.GetNode(nodeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node configuration: %w", err)
+	}
+
+	return NewJobClient(node)
 }
 
 func (c *JobClient) Close() error {

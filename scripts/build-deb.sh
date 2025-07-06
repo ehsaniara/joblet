@@ -27,10 +27,11 @@ mkdir -p "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/DEBIAN"
 mkdir -p "$BUILD_DIR/opt/worker"
 mkdir -p "$BUILD_DIR/opt/worker/config"
+mkdir -p "$BUILD_DIR/opt/worker/scripts"
 mkdir -p "$BUILD_DIR/etc/systemd/system"
 mkdir -p "$BUILD_DIR/usr/local/bin"
 
-# Copy binaries - BOTH to /opt/worker/
+# Copy binaries
 if [ ! -f "./worker" ]; then
     echo "❌ Worker binary not found!"
     exit 1
@@ -43,39 +44,29 @@ if [ ! -f "./worker-cli" ]; then
 fi
 cp ./worker-cli "$BUILD_DIR/opt/worker/"
 
-# Copy SERVER config file
-if [ -f "./config/server-config.yml" ]; then
-    cp ./config/server-config.yml "$BUILD_DIR/opt/worker/config/"
-    echo "✅ Copied server-config.yml to /opt/worker/config/"
+# Copy template files (NOT actual configs with certificates)
+if [ -f "./scripts/server-config-template.yml" ]; then
+    cp ./scripts/server-config-template.yml "$BUILD_DIR/opt/worker/scripts/"
+    echo "✅ Copied server-config-template.yml"
 else
-    echo "❌ Server config file not found: ./config/server-config.yml"
+    echo "❌ Server config template not found: ./scripts/server-config-template.yml"
     exit 1
 fi
 
-# Generate CLIENT config file template
-cat > "$BUILD_DIR/opt/worker/config/client-config.yml" << 'EOF'
-version: "3.0"
-
-nodes:
-  default:
-    address: "localhost:50051"
-    cert: "/opt/worker/certs/client-cert.pem"
-    key: "/opt/worker/certs/client-key.pem"
-    ca: "/opt/worker/certs/ca-cert.pem"
-
-  production:
-    address: "production-server:50051"
-    cert: "/opt/worker/certs/client-cert.pem"
-    key: "/opt/worker/certs/client-key.pem"
-    ca: "/opt/worker/certs/ca-cert.pem"
-EOF
-echo "✅ Generated client-config.yml template"
+if [ -f "./scripts/client-config-template.yml" ]; then
+    cp ./scripts/client-config-template.yml "$BUILD_DIR/opt/worker/scripts/"
+    echo "✅ Copied client-config-template.yml"
+else
+    echo "❌ Client config template not found: ./scripts/client-config-template.yml"
+    exit 1
+fi
 
 # Copy service file
 cp ./scripts/worker.service "$BUILD_DIR/etc/systemd/system/"
 
-# Copy certificate generation script
-cp ./scripts/certs_gen.sh "$BUILD_DIR/usr/local/bin/"
+# Copy certificate generation script (embedded version)
+cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen.sh"
+chmod +x "$BUILD_DIR/usr/local/bin/certs_gen.sh"
 
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
@@ -87,12 +78,13 @@ Architecture: $ARCH
 Depends: openssl (>= 1.1.1), systemd, debconf (>= 0.5) | debconf-2.0
 Maintainer: Jay Ehsaniara <ehsaniara@gmail.com>
 Homepage: https://github.com/ehsaniara/worker
-Description: Worker Job Isolation Platform
+Description: Worker Job Isolation Platform with Embedded Certificates
  A job isolation platform that provides secure execution of containerized
  workloads with resource management and namespace isolation.
  .
- This package includes the worker daemon, CLI tools, certificate generation,
- and systemd service configuration with interactive setup.
+ This package includes the worker daemon, CLI tools, and embedded certificate
+ management. All certificates are embedded directly in configuration files
+ for simplified deployment and management.
 Installed-Size: $(du -sk $BUILD_DIR | cut -f1)
 EOF
 
@@ -132,14 +124,6 @@ dpkg-deb -I "$PACKAGE_FILE"
 echo "📁 Package contents:"
 dpkg-deb -c "$PACKAGE_FILE"
 
-echo
-echo "📦 Package Features:"
-echo "  ✅ Interactive installation with server IP configuration"
-echo "  ✅ Automatic certificate generation for the specified IP"
-echo "  ✅ Both server and client config files included"
-echo "  ✅ Debconf support for reconfiguration (dpkg-reconfigure worker)"
-echo "  ✅ Environment variable support for automation"
-echo "  ✅ Non-interactive mode for CI/CD pipelines"
 echo
 echo "🚀 Installation methods:"
 echo "  Interactive:    sudo dpkg -i $PACKAGE_FILE"

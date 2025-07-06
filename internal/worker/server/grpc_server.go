@@ -1,13 +1,10 @@
 package server
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"net"
-	"os"
 	pb "worker/api/gen"
 	auth2 "worker/internal/worker/auth"
 	"worker/internal/worker/core/interfaces"
@@ -20,47 +17,23 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker, cfg *con
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
-	serverLogger.Debug("initializing gRPC server",
+	serverLogger.Debug("initializing gRPC server with embedded certificates",
 		"address", serverAddress,
 		"maxRecvMsgSize", cfg.GRPC.MaxRecvMsgSize,
 		"maxSendMsgSize", cfg.GRPC.MaxSendMsgSize)
 
-	serverCert, err := tls.LoadX509KeyPair(cfg.Server.ServerCertPath, cfg.Server.ServerKeyPath)
+	// Get TLS configuration from embedded certificates
+	tlsConfig, err := cfg.GetServerTLSConfig()
 	if err != nil {
-		serverLogger.Error("failed to load server cert/key", "certPath", cfg.Server.ServerCertPath, "keyPath", cfg.Server.ServerKeyPath, "error", err)
-		return nil, fmt.Errorf("failed to load server cert/key: %w", err)
+		serverLogger.Error("failed to create TLS config from embedded certificates", "error", err)
+		return nil, fmt.Errorf("failed to create TLS config: %w", err)
 	}
 
-	serverLogger.Debug("server certificate loaded successfully")
-
-	serverLogger.Debug("loading CA certificate", "caPath", cfg.Server.CACertPath)
-
-	caCert, err := os.ReadFile(cfg.Server.CACertPath)
-	if err != nil {
-		serverLogger.Error("failed to read CA cert", "caPath", cfg.Server.CACertPath, "error", err)
-		return nil, fmt.Errorf("failed to read CA cert: %w", err)
-	}
-
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(caCert); !ok {
-		serverLogger.Error("failed to add CA cert to pool")
-		return nil, fmt.Errorf("failed to add CA cert to pool")
-	}
-
-	serverLogger.Debug("CA certificate loaded successfully")
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{serverCert},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    certPool,
-		MinVersion:   tls.VersionTLS13,
-	}
-
-	creds := credentials.NewTLS(tlsConfig)
-
-	serverLogger.Debug("TLS configuration completed",
+	serverLogger.Debug("TLS configuration created from embedded certificates",
 		"clientAuth", "RequireAndVerifyClientCert",
 		"minTLSVersion", "1.3")
+
+	creds := credentials.NewTLS(tlsConfig)
 
 	grpcOptions := []grpc.ServerOption{
 		grpc.Creds(creds),
@@ -95,7 +68,8 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker, cfg *con
 	serverLogger.Debug("TCP listener created successfully", "address", serverAddress, "network", "tcp")
 
 	go func() {
-		serverLogger.Debug("starting TLS gRPC server", "address", serverAddress, "ready", true)
+		serverLogger.Debug("starting TLS gRPC server with embedded certificates",
+			"address", serverAddress, "ready", true)
 
 		if serveErr := grpcServer.Serve(lis); serveErr != nil {
 			serverLogger.Error("gRPC server stopped with error", "error", serveErr)
@@ -104,7 +78,8 @@ func StartGRPCServer(jobStore state.Store, jobWorker interfaces.Worker, cfg *con
 		}
 	}()
 
-	serverLogger.Debug("gRPC server initialization completed", "address", serverAddress, "tlsEnabled", true, "authRequired", true)
+	serverLogger.Debug("gRPC server initialization completed",
+		"address", serverAddress, "tlsEnabled", true, "authRequired", true, "certType", "embedded")
 
 	return grpcServer, nil
 }

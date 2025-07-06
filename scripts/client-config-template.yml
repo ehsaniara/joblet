@@ -1,0 +1,39 @@
+version: "3.0"
+
+# This template file is used by certs_gen_embedded.sh
+# to generate the actual client-config.yml with embedded certificates
+# DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
+
+# Nodes section will be populated by the certificate generation script
+# with the following structure:
+#
+# nodes:
+#   default:
+#     address: "SERVER_ADDRESS:50051"
+#     cert: |
+#       -----BEGIN CERTIFICATE-----
+#       [admin certificate content]
+#       -----END CERTIFICATE-----
+#     key: |
+#       -----BEGIN PRIVATE KEY-----
+#       [admin private key content]
+#       -----END PRIVATE KEY-----
+#     ca: |
+#       -----BEGIN CERTIFICATE-----
+#       [CA certificate content]
+#       -----END CERTIFICATE-----
+#
+#   viewer:
+#     address: "SERVER_ADDRESS:50051"
+#     cert: |
+#       -----BEGIN CERTIFICATE-----
+#       [viewer certificate content]
+#       -----END CERTIFICATE-----
+#     key: |
+#       -----BEGIN PRIVATE KEY-----
+#       [viewer private key content]
+#       -----END PRIVATE KEY-----
+#     ca: |
+#       -----BEGIN CERTIFICATE-----
+#       [CA certificate content]
+#       -----END CERTIFICATE-----
