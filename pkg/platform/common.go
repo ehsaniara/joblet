@@ -94,6 +94,18 @@ func (bp *BasePlatform) CreateCommand(name string, args ...string) Command {
 	return &ExecCommand{cmd: exec.Command(name, args...)}
 }
 
+func (bp *BasePlatform) IsExist(err error) bool {
+	return os.IsExist(err)
+}
+
+func (lp *LinuxPlatform) RemoveAll(dir string) error {
+	return os.RemoveAll(dir)
+}
+
+func (lp *LinuxPlatform) ReadDir(s string) ([]os.DirEntry, error) {
+	return os.ReadDir(s)
+}
+
 // ExecCommand wraps exec.Cmd to implement Command interface
 type ExecCommand struct {
 	cmd *exec.Cmd

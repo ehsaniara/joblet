@@ -40,6 +40,10 @@ type OSOperations interface {
 	// Environment
 	Environ() []string
 	Getenv(key string) string
+
+	IsExist(err error) bool
+	RemoveAll(dir string) error
+	ReadDir(s string) ([]os.DirEntry, error)
 }
 
 // SyscallOperations defines low-level system call operations
