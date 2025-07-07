@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="464pt" height="371pt" viewBox="0.00 0.00 464.03 371.20">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 367.2)">
+<title>JobProcessFlow</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-367.2 460.03,-367.2 460.03,4 -4,4"/>
+<!-- JobProcess -->
+<g id="node1" class="node">
+<title>JobProcess</title>
+<polygon fill="none" stroke="black" points="396.89,-363.2 315.17,-363.2 315.17,-327.2 396.89,-327.2 396.89,-363.2"/>
+<text text-anchor="middle" x="356.03" y="-341" font-family="Times,serif" font-size="14.00">Job Process</text>
+</g>
+<!-- OutputBuffer -->
+<g id="node2" class="node">
+<title>OutputBuffer</title>
+<polygon fill="none" stroke="black" points="346.5,-291.2 251.57,-291.2 251.57,-255.2 346.5,-255.2 346.5,-291.2"/>
+<text text-anchor="middle" x="299.03" y="-269" font-family="Times,serif" font-size="14.00">Output Buffer</text>
+</g>
+<!-- JobProcess&#45;&gt;OutputBuffer -->
+<g id="edge1" class="edge">
+<title>JobProcess-&gt;OutputBuffer</title>
+<path fill="none" stroke="black" d="M341.94,-326.9C335.39,-318.84 327.45,-309.09 320.19,-300.18"/>
+<polygon fill="black" stroke="black" points="322.94,-298.02 313.92,-292.48 317.52,-302.44 322.94,-298.02"/>
+</g>
+<!-- StdoutStderr -->
+<g id="node5" class="node">
+<title>StdoutStderr</title>
+<polygon fill="none" stroke="black" points="456.03,-55.6 370.04,-55.6 370.04,-19.6 456.03,-19.6 456.03,-55.6"/>
+<text text-anchor="middle" x="413.03" y="-33.4" font-family="Times,serif" font-size="14.00">stdout/stderr</text>
+</g>
+<!-- JobProcess&#45;&gt;StdoutStderr -->
+<g id="edge4" class="edge">
+<title>JobProcess-&gt;StdoutStderr</title>
+<path fill="none" stroke="black" d="M359.26,-326.89C368.66,-276.48 396.1,-129.38 407.73,-67.04"/>
+<polygon fill="black" stroke="black" points="411.1,-68.06 409.49,-57.58 404.22,-66.77 411.1,-68.06"/>
+</g>
+<!-- StateStore -->
+<g id="node3" class="node">
+<title>StateStore</title>
+<polygon fill="none" stroke="black" points="210.56,-219.2 133.51,-219.2 133.51,-183.2 210.56,-183.2 210.56,-219.2"/>
+<text text-anchor="middle" x="172.03" y="-197" font-family="Times,serif" font-size="14.00">State Store</text>
+</g>
+<!-- OutputBuffer&#45;&gt;StateStore -->
+<g id="edge2" class="edge">
+<title>OutputBuffer-&gt;StateStore</title>
+<path fill="none" stroke="black" d="M267.31,-254.72C250.98,-245.71 230.86,-234.62 213.32,-224.96"/>
+<polygon fill="black" stroke="black" points="215.12,-221.95 204.67,-220.19 211.74,-228.08 215.12,-221.95"/>
+</g>
+<!-- BufferedWriter -->
+<g id="node6" class="node">
+<title>BufferedWriter</title>
+<polygon fill="none" stroke="black" points="351.92,-75.2 246.14,-75.2 246.14,0 351.92,0 351.92,-75.2"/>
+<text text-anchor="middle" x="299.03" y="-58.6" font-family="Times,serif" font-size="14.00">Buffered Writer</text>
+<text text-anchor="middle" x="299.03" y="-41.8" font-family="Times,serif" font-size="14.00">• Capture</text>
+<text text-anchor="middle" x="299.03" y="-25" font-family="Times,serif" font-size="14.00">• Buffer</text>
+<text text-anchor="middle" x="299.03" y="-8.2" font-family="Times,serif" font-size="14.00">• Forward</text>
+</g>
+<!-- OutputBuffer&#45;&gt;BufferedWriter -->
+<g id="edge5" class="edge">
+<title>OutputBuffer-&gt;BufferedWriter</title>
+<path fill="none" stroke="black" d="M299.03,-255.02C299.03,-219.95 299.03,-139.02 299.03,-86.68"/>
+<polygon fill="black" stroke="black" points="302.53,-86.84 299.03,-76.84 295.53,-86.84 302.53,-86.84"/>
+</g>
+<!-- Subscribers -->
+<g id="node4" class="node">
+<title>Subscribers</title>
+<polygon fill="none" stroke="black" points="116.69,-147.2 35.37,-147.2 35.37,-111.2 116.69,-111.2 116.69,-147.2"/>
+<text text-anchor="middle" x="76.03" y="-125" font-family="Times,serif" font-size="14.00">Subscribers</text>
+</g>
+<!-- StateStore&#45;&gt;Subscribers -->
+<g id="edge3" class="edge">
+<title>StateStore-&gt;Subscribers</title>
+<path fill="none" stroke="black" d="M148.3,-182.9C136.42,-174.23 121.84,-163.6 108.9,-154.16"/>
+<polygon fill="black" stroke="black" points="111.19,-151.5 101.05,-148.44 107.06,-157.16 111.19,-151.5"/>
+</g>
+<!-- PubSubUpdates -->
+<g id="node7" class="node">
+<title>PubSubUpdates</title>
+<polygon fill="none" stroke="black" points="228.45,-75.2 115.61,-75.2 115.61,0 228.45,0 228.45,-75.2"/>
+<text text-anchor="middle" x="172.03" y="-58.6" font-family="Times,serif" font-size="14.00">Pub/Sub Updates</text>
+<text text-anchor="middle" x="172.03" y="-41.8" font-family="Times,serif" font-size="14.00">• Multi</text>
+<text text-anchor="middle" x="172.03" y="-25" font-family="Times,serif" font-size="14.00">• Real-time</text>
+<text text-anchor="middle" x="172.03" y="-8.2" font-family="Times,serif" font-size="14.00">• Fast</text>
+</g>
+<!-- StateStore&#45;&gt;PubSubUpdates -->
+<g id="edge6" class="edge">
+<title>StateStore-&gt;PubSubUpdates</title>
+<path fill="none" stroke="black" d="M172.03,-182.91C172.03,-160.11 172.03,-119.09 172.03,-86.6"/>
+<polygon fill="black" stroke="black" points="175.53,-87.02 172.03,-77.02 168.53,-87.02 175.53,-87.02"/>
+</g>
+<!-- gRPCStreams -->
+<g id="node8" class="node">
+<title>gRPCStreams</title>
+<polygon fill="none" stroke="black" points="98.07,-75.2 0,-75.2 0,0 98.07,0 98.07,-75.2"/>
+<text text-anchor="middle" x="49.03" y="-58.6" font-family="Times,serif" font-size="14.00">gRPC Streams</text>
+<text text-anchor="middle" x="49.03" y="-41.8" font-family="Times,serif" font-size="14.00">• Client</text>
+<text text-anchor="middle" x="49.03" y="-25" font-family="Times,serif" font-size="14.00">• Live</text>
+<text text-anchor="middle" x="49.03" y="-8.2" font-family="Times,serif" font-size="14.00">• Buffer</text>
+</g>
+<!-- Subscribers&#45;&gt;gRPCStreams -->
+<g id="edge7" class="edge">
+<title>Subscribers-&gt;gRPCStreams</title>
+<path fill="none" stroke="black" d="M70.83,-110.92C68.67,-103.77 66.05,-95.08 63.39,-86.24"/>
+<polygon fill="black" stroke="black" points="66.82,-85.49 60.58,-76.93 60.12,-87.51 66.82,-85.49"/>
+</g>
+</g>
+</svg>

@@ -1,6 +1,6 @@
-# Worker API Documentation
+# Joblet API Documentation
 
-This document describes the gRPC API for the Worker system, including service definitions, message formats,
+This document describes the gRPC API for the Joblet system, including service definitions, message formats,
 authentication, and usage examples.
 
 ## Table of Contents
@@ -16,7 +16,7 @@ authentication, and usage examples.
 
 ## Overview
 
-The Worker API is built on gRPC and uses Protocol Buffers for message serialization. All communication is secured with
+The Joblet API is built on gRPC and uses Protocol Buffers for message serialization. All communication is secured with
 mutual TLS authentication and supports role-based authorization.
 
 ### API Characteristics
@@ -74,9 +74,9 @@ certs/
 
 ```protobuf
 syntax = "proto3";
-package worker;
+package joblet;
 
-service JobService {
+service JobletService {
   // Create and start a new job
   rpc RunJob(RunJobReq) returns (RunJobRes);
 
@@ -130,7 +130,7 @@ rpc RunJob(RunJobReq) returns (RunJobRes);
 
 ```bash
 # CLI
-worker-cli run --max-cpu=50 --max-memory=512 python3 script.py
+rnx run --max-cpu=50 --max-memory=512 python3 script.py
 
 # Expected Response
 Job started:
@@ -165,7 +165,7 @@ rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
 
 ```bash
 # CLI
-worker-cli status 1
+rnx status 1
 
 # Expected Response
 Id: 1
@@ -209,7 +209,7 @@ rpc StopJob(StopJobReq) returns (StopJobRes);
 
 ```bash
 # CLI
-worker-cli stop 1
+rnx stop 1
 
 # Expected Response
 Job stopped successfully:
@@ -239,7 +239,7 @@ rpc ListJobs(EmptyRequest) returns (Jobs);
 
 ```bash
 # CLI
-worker-cli list
+rnx list
 
 # Expected Response
 1 COMPLETED StartTime: 2024-01-15T10:30:00Z Command: echo hello
@@ -278,7 +278,7 @@ rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
 
 ```bash
 # CLI
-worker-cli log -f 1
+rnx log -f 1
 
 # Expected Response (streaming)
 Logs for job 1 (Press Ctrl+C to exit if streaming):
@@ -322,7 +322,7 @@ STOPPED       - Process terminated by user request or timeout
 
 ### Resource Limits
 
-Default values when not specified in configuration (`config.yml`):
+Default values when not specified in configuration (`joblet-config.yml`):
 
 ```go
 DefaultCPULimitPercent = 100 // 100% of one core
@@ -437,7 +437,7 @@ Error: failed to create isolated environment: operation not permitted
 Create and start a new job with optional resource limits.
 
 ```bash
-worker-cli run [flags] <command> [args...]
+rnx run [flags] <command> [args...]
 
 Flags:
   --max-cpu int      Max CPU percentage (default: from config)
@@ -445,10 +445,10 @@ Flags:
   --max-iobps int    Max I/O bytes per second (default: 0=unlimited)
 
 Examples:
-  worker-cli run echo "hello world"
-  worker-cli run --max-cpu=50 python3 script.py
-  worker-cli run --max-memory=1024 java -jar app.jar
-  worker-cli run bash -c "sleep 10 && echo done"
+  rnx run echo "hello world"
+  rnx run --max-cpu=50 python3 script.py
+  rnx run --max-memory=1024 java -jar app.jar
+  rnx run bash -c "sleep 10 && echo done"
 ```
 
 #### status
@@ -456,10 +456,10 @@ Examples:
 Get detailed information about a job by ID.
 
 ```bash
-worker-cli status <job-id>
+rnx status <job-id>
 
 Example:
-  worker-cli status 1
+  rnx status 1
 ```
 
 #### list
@@ -467,10 +467,10 @@ Example:
 List all jobs with their current status.
 
 ```bash
-worker-cli list
+rnx list
 
 Example:
-  worker-cli list
+  rnx list
 ```
 
 #### stop
@@ -478,10 +478,10 @@ Example:
 Stop a running job gracefully (SIGTERM) or forcefully (SIGKILL).
 
 ```bash
-worker-cli stop <job-id>
+rnx stop <job-id>
 
 Example:
-  worker-cli stop 1
+  rnx stop 1
 ```
 
 #### log
@@ -489,15 +489,15 @@ Example:
 Stream job output in real-time or view historical logs.
 
 ```bash
-worker-cli log [flags] <job-id>
+rnx log [flags] <job-id>
 
 Flags:
   --follow, -f   Follow the log stream (default true)
 
 Examples:
-  worker-cli log 1              # View all logs
-  worker-cli log -f 1           # Follow live output
-  worker-cli log --follow=false 1  # Historical logs only
+  rnx log 1              # View all logs
+  rnx log -f 1           # Follow live output
+  rnx log --follow=false 1  # Historical logs only
 ```
 
 ### Configuration Examples
@@ -506,7 +506,7 @@ Examples:
 
 ```bash
 # Connect to remote Linux server from any platform
-worker-cli --server=prod.example.com:50051 \
+rnx --server=prod.example.com:50051 \
   --cert=certs/admin-client-cert.pem \
   --key=certs/admin-client-key.pem \
   run echo "remote execution on Linux"
@@ -515,22 +515,22 @@ worker-cli --server=prod.example.com:50051 \
 #### Environment Variables
 
 ```bash
-export WORKER_SERVER="prod.example.com:50051"
-export WORKER_CERT_PATH="./certs/admin-client-cert.pem"
-export WORKER_KEY_PATH="./certs/admin-client-key.pem"
-export WORKER_CA_PATH="./certs/ca-cert.pem"
+export JOBLET_SERVER="prod.example.com:50051"
+export JOBLET_CERT_PATH="./certs/admin-client-cert.pem"
+export JOBLET_KEY_PATH="./certs/admin-client-key.pem"
+export JOBLET_CA_PATH="./certs/ca-cert.pem"
 
-worker-cli run python3 script.py
+rnx run python3 script.py
 ```
 
 ## Configuration & Limits
 
 ### Server Configuration
 
-Resource limits and timeouts are configured in `/opt/worker/config.yml`:
+Resource limits and timeouts are configured in `/opt/joblet/joblet-config.yml`:
 
 ```yaml
-worker:
+joblet:
   defaultCpuLimit: 100        # Default CPU percentage
   defaultMemoryLimit: 512     # Default memory in MB
   defaultIoLimit: 0           # Default I/O limit (0=unlimited)
@@ -579,19 +579,19 @@ ERROR - Job failures, system errors, authentication failures
 
 ```bash
 # Check server health
-worker-cli list
+rnx list
 
 # Verify certificate and connection
-worker-cli --server=your-server:50051 list
+rnx --server=your-server:50051 list
 
 # Monitor service status (systemd)
-sudo systemctl status worker
-sudo journalctl -u worker -f
+sudo systemctl status joblet
+sudo journalctl -u joblet -f
 ```
 
 ### Performance Monitoring
 
-- **Concurrent Jobs**: Monitor via `worker-cli list`
-- **Resource Usage**: Check cgroup statistics in `/sys/fs/cgroup/worker.slice/`
+- **Concurrent Jobs**: Monitor via `rnx list`
+- **Resource Usage**: Check cgroup statistics in `/sys/fs/cgroup/joblet.slice/`
 - **Network**: Monitor gRPC connection count and latency
 - **Memory**: Track job output buffer sizes and cleanup efficiency

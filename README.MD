@@ -8,11 +8,16 @@
 
 <img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
-**Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process isolation, resource limits, and real-time monitoring - protecting your host system from malicious or resource-hungry processes.
+📝 **Note:** Project recently renamed from _Worker_ to **Joblet** and **RNX** (CLI)
+
+**Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process
+isolation, resource limits, and real-time monitoring - protecting your host system from malicious or resource-hungry
+processes.
 
 ## 🎯 Why Use Joblet?
 
 ### The Problem: Unsafe Remote Execution
+
 ```bash
 # DANGEROUS: Running commands directly on your server
 ssh production-server "python3 untrusted-script.py"
@@ -22,6 +27,7 @@ ssh production-server "python3 untrusted-script.py"
 ```
 
 ### The Solution: Isolated Job Execution
+
 ```bash
 # SAFE: Running commands through Joblet
 rnx run --max-memory=512 python3 untrusted-script.py
@@ -36,17 +42,9 @@ rnx run --max-memory=512 python3 untrusted-script.py
 Joblet consists of two components:
 
 1. **Joblet Daemon** - Runs on Linux servers, executes jobs in isolated environments
-2. **RNX (cli)** - Connects from anywhere (Linux/macOS/Windows) to manage jobs
+2. **RNX CLI** - Connects from anywhere (Linux/macOS/Windows) to manage jobs
 
-```
-┌─────────────────┐    gRPC/mTLS     ┌───────────────────┐
-│      RNX        │ ───────────────► │  Joblet Daemon    │
-│                 │                  │                   │
-│ • Linux/macOS   │                  │ • Linux only      │
-│ • Windows       │                  │ • Systemd service │
-│ • Remote client │                  │ • Job isolation   │
-└─────────────────┘                  └───────────────────┘
-```
+![joblet-how-it-works.svg](docs/joblet-how-it-works.svg)
 
 ### Security & Isolation Features
 
@@ -69,15 +67,12 @@ wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | g
 # Interactive installation (prompts for server IP)
 sudo dpkg -i joblet_*_amd64.deb
 
-# Or automated installation
-JOBLET_SERVER_IP="192.168.1.100" sudo -E dpkg -i joblet_*_amd64.deb
-
 # Start the daemon
 sudo systemctl start joblet
 sudo systemctl enable joblet
 
 # Test locally
-rnx list
+rnx --config=/opt/joblet/config/rnx-config.yml list
 ```
 
 ### Manual Installation
@@ -116,23 +111,25 @@ sudo systemctl enable joblet
 sudo systemctl start joblet
 ```
 
-#### 3. Install Joblet CLI (Client Machine)
+#### 3. Install RNX CLI (Client Machine)
 
 ##### Linux/macOS CLI Setup
+
 ```bash
 # Install CLI binary
-sudo cp bin/cli /usr/local/bin/rnx
+sudo cp bin/rnx /usr/local/bin/rnx
 sudo chmod +x /usr/local/bin/rnx
 
 # Download client configuration from daemon server
 mkdir -p ~/.rnx
-scp your-server:/opt/rnx/config/rnx-config.yml ~/.rnx/
+scp your-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 
 # Test connection
 rnx --config ~/.rnx/rnx-config.yml list
 ```
 
 ##### Windows CLI Setup
+
 ```powershell
 # Download Windows CLI from releases
 Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/latest/download/rnx-windows-amd64.exe" -OutFile "rnx.exe"
@@ -185,7 +182,7 @@ rnx stop <job-id>
 rnx --server=production:50051 run python3 script.py
 
 # Use different configurations
-rnx --config=prod-config.yml list
+rnx --config=prod-rnx-config.yml list
 rnx --node=production run deploy.sh
 
 # Set default server
@@ -196,6 +193,7 @@ rnx list  # Uses production server
 ### Real-World Examples
 
 #### Development Workflow
+
 ```bash
 # Test on remote development server
 rnx --server=dev-server:50051 run --max-memory=1024 pytest tests/
@@ -208,6 +206,7 @@ rnx run --max-memory=512 trivy scan .
 ```
 
 #### CI/CD Integration
+
 ```bash
 # In CI pipeline
 export JOBLET_SERVER=build-server:50051
@@ -216,6 +215,7 @@ rnx run --max-cpu=50 npm test
 ```
 
 #### Data Processing
+
 ```bash
 # Process large datasets with limits
 rnx --server=data-server:50051 run --max-memory=4096 python process_data.py
@@ -256,7 +256,7 @@ security:
     ...
 ```
 
-### RNX (CLI) Configuration
+### RNX CLI Configuration
 
 The CLI uses configuration with embedded certificates:
 
@@ -275,7 +275,7 @@ nodes:
     ca: |
       -----BEGIN CERTIFICATE-----
       ...
-  
+
   production:
     address: "prod-server:50051"
     # ... additional certificates for production
@@ -303,7 +303,7 @@ nodes:
 ```bash
 # On daemon server - regenerate with new IP
 export JOBLET_SERVER_ADDRESS="new-server-ip"
-sudo /usr/local/bin/certs_gen.sh
+sudo /usr/local/bin/certs_gen_embedded.sh
 
 # Restart daemon
 sudo systemctl restart joblet
@@ -320,11 +320,11 @@ nodes:
   development:
     address: "dev.company.com:50051"
     # ... dev certificates
-  
+
   staging:
     address: "staging.company.com:50051"
     # ... staging certificates
-    
+
   production:
     address: "prod.company.com:50051"
     # ... production certificates
@@ -354,6 +354,7 @@ sudo dpkg-reconfigure joblet   # Reconfigure package
 ### Common Issues
 
 **Connection refused**
+
 ```bash
 # Check daemon status
 sudo systemctl status joblet
@@ -364,15 +365,17 @@ telnet your-server 50051
 ```
 
 **Certificate errors**
+
 ```bash
 # Verify certificates
 openssl x509 -in ~/.rnx/rnx-config.yml -noout -text
 
 # Regenerate if needed
-sudo /usr/local/bin/certs_gen.sh
+sudo /usr/local/bin/certs_gen_embedded.sh
 ```
 
 **CLI not found**
+
 ```bash
 # Check CLI installation
 which rnx
@@ -392,13 +395,15 @@ sudo ln -sf /opt/joblet/rnx /usr/local/bin/rnx
 ## 📊 System Requirements
 
 ### Joblet Daemon (Linux Server)
+
 - **OS**: Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+)
 - **Memory**: 1GB+ RAM
 - **Disk**: 5GB+ available space
 - **Network**: Port 50051 (configurable)
 - **Privileges**: Root access for namespace operations
 
-### RNX (rnx)
+### RNX CLI (Client)
+
 - **OS**: Linux, macOS 10.15+, Windows 10+
 - **Memory**: 50MB+ RAM
 - **Network**: Access to daemon port 50051
@@ -418,6 +423,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Quick Links:**
+
 - [Releases](https://github.com/ehsaniara/joblet/releases) - Download latest version
 - [Examples](https://github.com/ehsaniara/joblet/tree/main/examples) - Usage examples
 - [Contributing](.github/CONTRIBUTING.md) - Development guide
+
+## 💡 Project Name History
+
+This project was previously known as "Worker" but was renamed to:
+
+- **Joblet** (daemon) - Better describes the job execution platform
+- **RNX** (CLI) - Remote eXecution, a concise and memorable name
+
+The rename provides clearer branding and eliminates confusion with other "worker" tools in the ecosystem.

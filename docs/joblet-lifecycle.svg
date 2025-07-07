@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="516pt" height="155pt" viewBox="0.00 0.00 515.74 155.20">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 151.2)">
+<title>workflow</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-151.2 511.74,-151.2 511.74,4 -4,4"/>
+<!-- ClientRequest -->
+<g id="node1" class="node">
+<title>ClientRequest</title>
+<polygon fill="lightgrey" stroke="black" points="98.82,-147.2 0,-147.2 0,-111.2 98.82,-111.2 98.82,-147.2"/>
+<text text-anchor="middle" x="49.41" y="-125" font-family="Times,serif" font-size="14.00">Client Request</text>
+</g>
+<!-- JobCreation -->
+<g id="node2" class="node">
+<title>JobCreation</title>
+<polygon fill="lightgrey" stroke="black" points="203.99,-147.2 116.83,-147.2 116.83,-111.2 203.99,-111.2 203.99,-147.2"/>
+<text text-anchor="middle" x="160.41" y="-125" font-family="Times,serif" font-size="14.00">Job Creation</text>
+</g>
+<!-- ClientRequest&#45;&gt;JobCreation -->
+<g id="edge1" class="edge">
+<title>ClientRequest-&gt;JobCreation</title>
+<path fill="none" stroke="black" d="M99.28,-129.2C101.25,-129.2 103.22,-129.2 105.19,-129.2"/>
+<polygon fill="black" stroke="black" points="104.96,-132.7 114.96,-129.2 104.96,-125.7 104.96,-132.7"/>
+</g>
+<!-- ProcessLaunch -->
+<g id="node3" class="node">
+<title>ProcessLaunch</title>
+<polygon fill="lightgrey" stroke="black" points="329.54,-147.2 225.29,-147.2 225.29,-111.2 329.54,-111.2 329.54,-147.2"/>
+<text text-anchor="middle" x="277.41" y="-125" font-family="Times,serif" font-size="14.00">Process Launch</text>
+</g>
+<!-- JobCreation&#45;&gt;ProcessLaunch -->
+<g id="edge2" class="edge">
+<title>JobCreation-&gt;ProcessLaunch</title>
+<path fill="none" stroke="black" d="M204.29,-129.2C207.39,-129.2 210.5,-129.2 213.61,-129.2"/>
+<polygon fill="black" stroke="black" points="213.34,-132.7 223.34,-129.2 213.34,-125.7 213.34,-132.7"/>
+</g>
+<!-- RNXCLI -->
+<g id="node6" class="node">
+<title>RNXCLI</title>
+<polygon fill="lightgrey" stroke="black" points="95.22,-58.4 23.61,-58.4 23.61,-16.8 95.22,-16.8 95.22,-58.4"/>
+<text text-anchor="middle" x="59.41" y="-41.8" font-family="Times,serif" font-size="14.00">RNX CLI</text>
+<text text-anchor="middle" x="59.41" y="-25" font-family="Times,serif" font-size="14.00">run cmd</text>
+</g>
+<!-- JobCreation&#45;&gt;RNXCLI -->
+<g id="edge5" class="edge">
+<title>JobCreation-&gt;RNXCLI</title>
+<path fill="none" stroke="black" d="M140.94,-110.92C126.59,-98.19 106.78,-80.62 90.28,-65.98"/>
+<polygon fill="black" stroke="black" points="92.94,-63.66 83.13,-59.64 88.29,-68.9 92.94,-63.66"/>
+</g>
+<!-- Server -->
+<g id="node7" class="node">
+<title>Server</title>
+<polygon fill="lightgrey" stroke="black" points="207.67,-75.2 113.15,-75.2 113.15,0 207.67,0 207.67,-75.2"/>
+<text text-anchor="middle" x="160.41" y="-58.6" font-family="Times,serif" font-size="14.00">Server</text>
+<text text-anchor="middle" x="160.41" y="-41.8" font-family="Times,serif" font-size="14.00">• Validate</text>
+<text text-anchor="middle" x="160.41" y="-25" font-family="Times,serif" font-size="14.00">• Cgroup</text>
+<text text-anchor="middle" x="160.41" y="-8.2" font-family="Times,serif" font-size="14.00">• Namespace</text>
+</g>
+<!-- JobCreation&#45;&gt;Server -->
+<g id="edge6" class="edge">
+<title>JobCreation-&gt;Server</title>
+<path fill="none" stroke="black" d="M160.41,-110.92C160.41,-103.92 160.41,-95.46 160.41,-86.82"/>
+<polygon fill="black" stroke="black" points="163.91,-86.99 160.41,-76.99 156.91,-86.99 163.91,-86.99"/>
+</g>
+<!-- Monitoring -->
+<g id="node4" class="node">
+<title>Monitoring</title>
+<polygon fill="lightgrey" stroke="black" points="427.3,-147.2 347.52,-147.2 347.52,-111.2 427.3,-111.2 427.3,-147.2"/>
+<text text-anchor="middle" x="387.41" y="-125" font-family="Times,serif" font-size="14.00">Monitoring</text>
+</g>
+<!-- ProcessLaunch&#45;&gt;Monitoring -->
+<g id="edge3" class="edge">
+<title>ProcessLaunch-&gt;Monitoring</title>
+<path fill="none" stroke="black" d="M329.83,-129.2C331.84,-129.2 333.85,-129.2 335.86,-129.2"/>
+<polygon fill="black" stroke="black" points="335.86,-132.7 345.86,-129.2 335.86,-125.7 335.86,-132.7"/>
+</g>
+<!-- IsolatedProcess -->
+<g id="node8" class="node">
+<title>IsolatedProcess</title>
+<polygon fill="lightgrey" stroke="black" points="332.71,-66.8 226.12,-66.8 226.12,-8.4 332.71,-8.4 332.71,-66.8"/>
+<text text-anchor="middle" x="279.41" y="-50.2" font-family="Times,serif" font-size="14.00">Isolated Process</text>
+<text text-anchor="middle" x="279.41" y="-33.4" font-family="Times,serif" font-size="14.00">• Exec</text>
+<text text-anchor="middle" x="279.41" y="-16.6" font-family="Times,serif" font-size="14.00">• Report</text>
+</g>
+<!-- ProcessLaunch&#45;&gt;IsolatedProcess -->
+<g id="edge7" class="edge">
+<title>ProcessLaunch-&gt;IsolatedProcess</title>
+<path fill="none" stroke="black" d="M277.8,-110.92C278.01,-101.62 278.27,-89.72 278.53,-78.28"/>
+<polygon fill="black" stroke="black" points="282.02,-78.69 278.74,-68.62 275.02,-78.54 282.02,-78.69"/>
+</g>
+<!-- Cleanup -->
+<g id="node5" class="node">
+<title>Cleanup</title>
+<polygon fill="lightgrey" stroke="black" points="507.74,-147.2 445.08,-147.2 445.08,-111.2 507.74,-111.2 507.74,-147.2"/>
+<text text-anchor="middle" x="476.41" y="-125" font-family="Times,serif" font-size="14.00">Cleanup</text>
+</g>
+<!-- Monitoring&#45;&gt;Cleanup -->
+<g id="edge4" class="edge">
+<title>Monitoring-&gt;Cleanup</title>
+<path fill="none" stroke="black" d="M427.74,-129.2C429.61,-129.2 431.48,-129.2 433.35,-129.2"/>
+<polygon fill="black" stroke="black" points="433.34,-132.7 443.34,-129.2 433.34,-125.7 433.34,-132.7"/>
+</g>
+<!-- Monitor -->
+<g id="node9" class="node">
+<title>Monitor</title>
+<polygon fill="lightgrey" stroke="black" points="422.24,-75.2 352.58,-75.2 352.58,0 422.24,0 422.24,-75.2"/>
+<text text-anchor="middle" x="387.41" y="-58.6" font-family="Times,serif" font-size="14.00">Monitor</text>
+<text text-anchor="middle" x="387.41" y="-41.8" font-family="Times,serif" font-size="14.00">• Status</text>
+<text text-anchor="middle" x="387.41" y="-25" font-family="Times,serif" font-size="14.00">• Logs</text>
+<text text-anchor="middle" x="387.41" y="-8.2" font-family="Times,serif" font-size="14.00">• Stream</text>
+</g>
+<!-- Monitoring&#45;&gt;Monitor -->
+<g id="edge8" class="edge">
+<title>Monitoring-&gt;Monitor</title>
+<path fill="none" stroke="black" d="M387.41,-110.92C387.41,-103.92 387.41,-95.46 387.41,-86.82"/>
+<polygon fill="black" stroke="black" points="390.91,-86.99 387.41,-76.99 383.91,-86.99 390.91,-86.99"/>
+</g>
+<!-- Clean -->
+<g id="node10" class="node">
+<title>Clean</title>
+<polygon fill="lightgrey" stroke="black" points="504.25,-75.2 448.57,-75.2 448.57,0 504.25,0 504.25,-75.2"/>
+<text text-anchor="middle" x="476.41" y="-58.6" font-family="Times,serif" font-size="14.00">Clean</text>
+<text text-anchor="middle" x="476.41" y="-41.8" font-family="Times,serif" font-size="14.00">• Stop</text>
+<text text-anchor="middle" x="476.41" y="-25" font-family="Times,serif" font-size="14.00">• Kill</text>
+<text text-anchor="middle" x="476.41" y="-8.2" font-family="Times,serif" font-size="14.00">• GC</text>
+</g>
+<!-- Cleanup&#45;&gt;Clean -->
+<g id="edge9" class="edge">
+<title>Cleanup-&gt;Clean</title>
+<path fill="none" stroke="black" d="M476.41,-110.92C476.41,-103.92 476.41,-95.46 476.41,-86.82"/>
+<polygon fill="black" stroke="black" points="479.91,-86.99 476.41,-76.99 472.91,-86.99 479.91,-86.99"/>
+</g>
+</g>
+</svg>

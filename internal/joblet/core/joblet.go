@@ -48,7 +48,7 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 		jobIsolation:   jobIsolation,
 		platform:       platformInterface,
 		config:         cfg,
-		logger:         logger.New().WithField("component", "linux-w"),
+		logger:         logger.New().WithField("component", "linux-joblet"),
 	}
 
 	if err := w.setupCgroupControllers(); err != nil {
