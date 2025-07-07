@@ -44,15 +44,7 @@ Joblet consists of two components:
 1. **Joblet Daemon** - Runs on Linux servers, executes jobs in isolated environments
 2. **RNX CLI** - Connects from anywhere (Linux/macOS/Windows) to manage jobs
 
-```
-┌─────────────────┐    gRPC/mTLS     ┌───────────────────┐
-│    RNX CLI      │ ───────────────► │  Joblet Daemon    │
-│                 │                  │                   │
-│ • Linux/macOS   │                  │ • Linux only      │
-│ • Windows       │                  │ • Systemd service │
-│ • Remote client │                  │ • Job isolation   │
-└─────────────────┘                  └───────────────────┘
-```
+![joblet-how-it-works.svg](docs/joblet-how-it-works.svg)
 
 ### Security & Isolation Features
 
