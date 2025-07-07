@@ -20,7 +20,21 @@ processes.
 
 ```bash
 # DANGEROUS: Running commands directly on your server
-ssh production-server "python3 untrusted-script.py"
+# SSH into server (dangerous)
+ssh production-server "ps aux"
+
+# Output shows ALL system processes (security risk!)
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.1 225596  8964   ?      Ss   Jan15   0:02 /sbin/init
+root         2  0.0  0.0      0     0   ?      S    Jan15   0:00 [kthreadd]
+systemd+   534  0.0  0.1  90812  5984   ?      Ssl  Jan15   0:15 /lib/systemd/systemd-resolved
+mysql     1234  0.2  2.1 1725932 175184 ?      Ssl  Jan15   2:45 /usr/sbin/mysqld
+nginx     1456  0.0  0.1  55180  8932   ?      S    Jan15   0:00 nginx: worker process
+postgres  1789  0.1  1.8 394532 151234  ?      Ss   Jan15   1:23 postgres: main process
+root      2341  0.0  0.0  72132  3456   ?      S    10:30   0:00 sshd: user [priv]
+user      2567  5.2  0.1  21532  2134 pts/0    Rs+  10:42   0:00 ps aux
+... (hundreds more system processes)
+
 # ❌ Can see all processes, access sensitive files, consume unlimited resources
 # ❌ Can interfere with other applications
 # ❌ No resource controls or monitoring
@@ -29,8 +43,12 @@ ssh production-server "python3 untrusted-script.py"
 ### The Solution: Isolated Job Execution
 
 ```bash
-# SAFE: Running commands through Joblet
-rnx run --max-memory=512 python3 untrusted-script.py
+# Safe execution through Joblet
+rnx run ps aux
+# Job output (streamed in real-time):
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.0   2304   768 ?        S    10:45   0:00 ps aux
+
 # ✅ Process isolation - can only see its own processes
 # ✅ Filesystem isolation - limited access to host files  
 # ✅ Resource limits - memory, CPU, I/O controls
