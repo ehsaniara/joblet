@@ -26,33 +26,33 @@ jobs:
 
       - name: Build release binaries
         run: |
-          # Linux binaries (worker, CLI)
-          GOOS=linux GOARCH=amd64 go build -o worker-linux-amd64 ./cmd/worker
-          GOOS=linux GOARCH=amd64 go build -o worker-cli-linux-amd64 ./cmd/cli
+          # Linux binaries (joblet, rnx)
+          GOOS=linux GOARCH=amd64 go build -o joblet-linux-amd64 ./cmd/joblet
+          GOOS=linux GOARCH=amd64 go build -o rnx-linux-amd64 ./cmd/cli
           
           # macOS CLI only
-          GOOS=darwin GOARCH=amd64 go build -o worker-cli-darwin-amd64 ./cmd/cli
-          GOOS=darwin GOARCH=arm64 go build -o worker-cli-darwin-arm64 ./cmd/cli
+          GOOS=darwin GOARCH=amd64 go build -o rnx-darwin-amd64 ./cmd/cli
+          GOOS=darwin GOARCH=arm64 go build -o rnx-darwin-arm64 ./cmd/cli
           
           # Windows CLI only
-          GOOS=windows GOARCH=amd64 go build -o worker-cli-windows-amd64.exe ./cmd/cli
+          GOOS=windows GOARCH=amd64 go build -o rnx-windows-amd64.exe ./cmd/cli
           
           # Create archives
           # Linux (includes all three binaries)
-          tar -czf worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz worker-linux-amd64 worker-cli-linux-amd64 
+          tar -czf joblet-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz joblet-linux-amd64 rnx-linux-amd64 
           
           # macOS (CLI only)
-          tar -czf worker-cli-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz worker-cli-darwin-amd64
-          tar -czf worker-cli-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz worker-cli-darwin-arm64
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz rnx-darwin-amd64
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz rnx-darwin-arm64
           
           # Windows (CLI only)
-          zip worker-cli-${{ steps.version.outputs.VERSION }}-windows-amd64.zip worker-cli-windows-amd64.exe
+          zip rnx-${{ steps.version.outputs.VERSION }}-windows-amd64.zip rnx-windows-amd64.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            worker-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz
-            worker-cli-${{ steps.version.outputs.VERSION }}-*.tar.gz
-            worker-cli-${{ steps.version.outputs.VERSION }}-*.zip
+            joblet-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz
+            rnx-${{ steps.version.outputs.VERSION }}-*.tar.gz
+            rnx-${{ steps.version.outputs.VERSION }}-*.zip
           generate_release_notes: true

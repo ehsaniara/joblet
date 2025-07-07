@@ -1,0 +1,56 @@
+[Unit]
+Description=Joblet Service - Process Isolation Platform
+After=network.target
+
+[Service]
+# Use single binary that auto-detects execution mode
+ExecStart=/opt/joblet/joblet
+Restart=always
+RestartSec=10s
+
+# Run as root to enable full namespace isolation capabilities
+User=root
+Group=root
+
+# CRITICAL: Allow new privileges for namespace operations
+NoNewPrivileges=no
+
+# Security hardening while maintaining isolation capabilities
+PrivateTmp=yes
+ProtectHome=yes
+ReadWritePaths=/opt/joblet /sys/fs/cgroup /proc /tmp
+
+# CRITICAL: Disable protections that block namespace operations
+ProtectSystem=no
+PrivateDevices=no
+ProtectKernelTunables=no
+ProtectControlGroups=no
+RestrictRealtime=no
+RestrictSUIDSGID=no
+MemoryDenyWriteExecute=no
+
+# Cgroup delegation for job resource management
+Delegate=yes
+DelegateControllers=cpu memory io pids
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+TasksAccounting=yes
+Slice=joblet.slice
+
+# Runtime settings
+WorkingDirectory=/opt/joblet
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables for the main service
+Environment="JOBLET_MODE=server"
+Environment="LOG_LEVEL=INFO"
+Environment="JOBLET_CONFIG_PATH=/opt/joblet/config/server-config.yml"
+
+# Cleanup job cgroups on service stop
+ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/joblet.slice/joblet.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target

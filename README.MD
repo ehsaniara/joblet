@@ -1,16 +1,16 @@
-# Worker - Secure Job Execution Platform
+# Joblet / RNX - Secure Linux Process Execution Platform
 
-[![Tests](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/job-worker/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/job-worker)](https://goreportcard.com/report/github.com/ehsaniara/job-worker)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/ehsaniara/job-worker)](https://golang.org/)
+[![Tests](https://github.com/ehsaniara/joblet/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/joblet/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/joblet)](https://goreportcard.com/report/github.com/ehsaniara/joblet)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/ehsaniara/joblet)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/github/release/ehsaniara/job-worker.svg)](https://github.com/ehsaniara/job-worker/releases/latest)
+[![Release](https://img.shields.io/github/release/ehsaniara/joblet.svg)](https://github.com/ehsaniara/joblet/releases/latest)
 
-<img align="right" width="159px" src="docs/worker-thum.png">
+<img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
-**Worker** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process isolation, resource limits, and real-time monitoring - protecting your host system from malicious or resource-hungry processes.
+**Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process isolation, resource limits, and real-time monitoring - protecting your host system from malicious or resource-hungry processes.
 
-## 🎯 Why Use Worker?
+## 🎯 Why Use Joblet?
 
 ### The Problem: Unsafe Remote Execution
 ```bash
@@ -23,8 +23,8 @@ ssh production-server "python3 untrusted-script.py"
 
 ### The Solution: Isolated Job Execution
 ```bash
-# SAFE: Running commands through Worker
-worker-cli --server=production-server:50051 run --max-memory=512 python3 untrusted-script.py
+# SAFE: Running commands through Joblet
+rnx run --max-memory=512 python3 untrusted-script.py
 # ✅ Process isolation - can only see its own processes
 # ✅ Filesystem isolation - limited access to host files  
 # ✅ Resource limits - memory, CPU, I/O controls
@@ -33,14 +33,14 @@ worker-cli --server=production-server:50051 run --max-memory=512 python3 untrust
 
 ## 🔧 How It Works
 
-Worker consists of two components:
+Joblet consists of two components:
 
-1. **Worker Daemon** - Runs on Linux servers, executes jobs in isolated environments
-2. **Worker CLI** - Connects from anywhere (Linux/macOS/Windows) to manage jobs
+1. **Joblet Daemon** - Runs on Linux servers, executes jobs in isolated environments
+2. **RNX (cli)** - Connects from anywhere (Linux/macOS/Windows) to manage jobs
 
 ```
 ┌─────────────────┐    gRPC/mTLS     ┌───────────────────┐
-│   Worker CLI    │ ───────────────► │  Worker Daemon    │
+│      RNX        │ ───────────────► │  Joblet Daemon    │
 │                 │                  │                   │
 │ • Linux/macOS   │                  │ • Linux only      │
 │ • Windows       │                  │ • Systemd service │
@@ -64,20 +64,20 @@ Install both daemon and CLI with embedded certificates:
 
 ```bash
 # Download latest release
-wget $(curl -s https://api.github.com/repos/ehsaniara/worker/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
 
 # Interactive installation (prompts for server IP)
-sudo dpkg -i worker_*_amd64.deb
+sudo dpkg -i joblet_*_amd64.deb
 
 # Or automated installation
-WORKER_SERVER_IP="192.168.1.100" sudo -E dpkg -i worker_*_amd64.deb
+JOBLET_SERVER_IP="192.168.1.100" sudo -E dpkg -i joblet_*_amd64.deb
 
 # Start the daemon
-sudo systemctl start worker
-sudo systemctl enable worker
+sudo systemctl start joblet
+sudo systemctl enable joblet
 
 # Test locally
-worker-cli list
+rnx list
 ```
 
 ### Manual Installation
@@ -85,63 +85,63 @@ worker-cli list
 #### 1. Build from Source
 
 ```bash
-git clone https://github.com/ehsaniara/worker.git
-cd worker
+git clone https://github.com/ehsaniara/joblet.git
+cd joblet
 
 # Build binaries
-make all  # Creates: bin/worker, bin/cli
+make all  # Creates: bin/joblet, bin/rnx
 
 # Or download pre-built binaries from releases
 ```
 
-#### 2. Install Worker Daemon (Linux Server)
+#### 2. Install Joblet Daemon (Linux Server)
 
 ```bash
 # Install daemon binary
-sudo mkdir -p /opt/worker/config /opt/worker/scripts
-sudo cp bin/worker /opt/worker/
-sudo chmod +x /opt/worker/worker
+sudo mkdir -p /opt/joblet/config /opt/joblet/scripts
+sudo cp bin/joblet /opt/joblet/
+sudo chmod +x /opt/joblet/joblet
 
 # Copy configuration templates
-sudo cp scripts/server-config-template.yml /opt/worker/scripts/
-sudo cp scripts/worker.service /etc/systemd/system/
+sudo cp scripts/joblet-config-template.yml /opt/joblet/scripts/
+sudo cp scripts/joblet.service /etc/systemd/system/
 
 # Generate certificates with embedded configuration
-export WORKER_SERVER_ADDRESS="192.168.1.100"  # Your server IP
+export JOBLET_SERVER_ADDRESS="192.168.1.100"  # Your server IP
 sudo ./scripts/certs_gen_embedded.sh
 
 # Start daemon service
 sudo systemctl daemon-reload
-sudo systemctl enable worker
-sudo systemctl start worker
+sudo systemctl enable joblet
+sudo systemctl start joblet
 ```
 
-#### 3. Install Worker CLI (Client Machine)
+#### 3. Install Joblet CLI (Client Machine)
 
 ##### Linux/macOS CLI Setup
 ```bash
 # Install CLI binary
-sudo cp bin/cli /usr/local/bin/worker-cli
-sudo chmod +x /usr/local/bin/worker-cli
+sudo cp bin/cli /usr/local/bin/rnx
+sudo chmod +x /usr/local/bin/rnx
 
 # Download client configuration from daemon server
-mkdir -p ~/.worker
-scp your-server:/opt/worker/config/client-config.yml ~/.worker/
+mkdir -p ~/.rnx
+scp your-server:/opt/rnx/config/rnx-config.yml ~/.rnx/
 
 # Test connection
-worker-cli --config ~/.worker/client-config.yml list
+rnx --config ~/.rnx/rnx-config.yml list
 ```
 
 ##### Windows CLI Setup
 ```powershell
 # Download Windows CLI from releases
-Invoke-WebRequest -Uri "https://github.com/ehsaniara/worker/releases/latest/download/worker-cli-windows-amd64.exe" -OutFile "worker-cli.exe"
+Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/latest/download/rnx-windows-amd64.exe" -OutFile "rnx.exe"
 
 # Copy to PATH
-Move-Item worker-cli.exe "C:\Program Files\worker-cli.exe"
+Move-Item rnx.exe "C:\Program Files\rnx.exe"
 
 # Copy client config from daemon server to:
-# %USERPROFILE%\.worker\client-config.yml
+# %USERPROFILE%\.rnx\rnx-config.yml
 ```
 
 ## 🚀 Usage
@@ -150,47 +150,47 @@ Move-Item worker-cli.exe "C:\Program Files\worker-cli.exe"
 
 ```bash
 # Run simple commands
-worker-cli run echo "Hello World"
-worker-cli run ps aux
-worker-cli run python3 --version
+rnx run echo "Hello World"
+rnx run ps aux
+rnx run python3 --version
 
 # Run with resource limits
-worker-cli run --max-cpu=50 --max-memory=256 python3 script.py
-worker-cli run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
+rnx run --max-cpu=50 --max-memory=256 python3 script.py
+rnx run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
 
 # Complex commands
-worker-cli run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
+rnx run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
 ```
 
 ### Job Monitoring
 
 ```bash
 # List all jobs
-worker-cli list
+rnx list
 
 # Get job details
-worker-cli status <job-id>
+rnx status <job-id>
 
 # Stream live logs
-worker-cli log <job-id>
+rnx log <job-id>
 
 # Stop running job
-worker-cli stop <job-id>
+rnx stop <job-id>
 ```
 
 ### Remote Server Connection
 
 ```bash
 # Connect to remote daemon
-worker-cli --server=production:50051 run python3 script.py
+rnx --server=production:50051 run python3 script.py
 
 # Use different configurations
-worker-cli --config=prod-config.yml list
-worker-cli --node=production run deploy.sh
+rnx --config=prod-config.yml list
+rnx --node=production run deploy.sh
 
 # Set default server
-export WORKER_SERVER=production:50051
-worker-cli list  # Uses production server
+export JOBLET_SERVER=production:50051
+rnx list  # Uses production server
 ```
 
 ### Real-World Examples
@@ -198,30 +198,30 @@ worker-cli list  # Uses production server
 #### Development Workflow
 ```bash
 # Test on remote development server
-worker-cli --server=dev-server:50051 run --max-memory=1024 pytest tests/
+rnx --server=dev-server:50051 run --max-memory=1024 pytest tests/
 
 # Build project with resource limits
-worker-cli run --max-cpu=200 --max-memory=2048 make build
+rnx run --max-cpu=200 --max-memory=2048 make build
 
 # Run security scans safely
-worker-cli run --max-memory=512 trivy scan .
+rnx run --max-memory=512 trivy scan .
 ```
 
 #### CI/CD Integration
 ```bash
 # In CI pipeline
-export WORKER_SERVER=build-server:50051
-worker-cli run --max-memory=2048 docker build -t myapp .
-worker-cli run --max-cpu=50 npm test
+export JOBLET_SERVER=build-server:50051
+rnx run --max-memory=2048 docker build -t myapp .
+rnx run --max-cpu=50 npm test
 ```
 
 #### Data Processing
 ```bash
 # Process large datasets with limits
-worker-cli --server=data-server:50051 run --max-memory=4096 python process_data.py
+rnx --server=data-server:50051 run --max-memory=4096 python process_data.py
 
 # ETL with I/O throttling
-worker-cli run --max-iobps=52428800 spark-submit etl_job.py
+rnx run --max-iobps=52428800 spark-submit etl_job.py
 ```
 
 ## ⚙️ Configuration
@@ -231,14 +231,14 @@ worker-cli run --max-iobps=52428800 spark-submit etl_job.py
 The daemon uses embedded certificates generated during installation:
 
 ```yaml
-# /opt/worker/config/server-config.yml (auto-generated)
+# /opt/joblet/config/joblet-config.yml (auto-generated)
 version: "3.0"
 server:
   address: "192.168.1.100"
   port: 50051
   mode: "server"
 
-worker:
+joblet:
   defaultCpuLimit: 50
   defaultMemoryLimit: 256
   maxConcurrentJobs: 100
@@ -256,12 +256,12 @@ security:
     ...
 ```
 
-### CLI Configuration
+### RNX (CLI) Configuration
 
 The CLI uses configuration with embedded certificates:
 
 ```yaml
-# ~/.worker/client-config.yml (auto-generated)
+# ~/.rnx/rnx-config.yml (auto-generated)
 version: "3.0"
 nodes:
   default:
@@ -302,20 +302,20 @@ nodes:
 
 ```bash
 # On daemon server - regenerate with new IP
-export WORKER_SERVER_ADDRESS="new-server-ip"
+export JOBLET_SERVER_ADDRESS="new-server-ip"
 sudo /usr/local/bin/certs_gen.sh
 
 # Restart daemon
-sudo systemctl restart worker
+sudo systemctl restart joblet
 
 # Update clients with new configuration
-scp server:/opt/worker/config/client-config.yml ~/.worker/
+scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
 ### Multiple Environments
 
 ```yaml
-# ~/.worker/client-config.yml
+# ~/.rnx/rnx-config.yml
 nodes:
   development:
     address: "dev.company.com:50051"
@@ -332,21 +332,21 @@ nodes:
 
 ```bash
 # Use specific environment
-worker-cli --node=development run pytest
-worker-cli --node=production run deploy.sh
+rnx --node=development run pytest
+rnx --node=production run deploy.sh
 ```
 
 ### Service Management
 
 ```bash
 # Daemon management
-sudo systemctl start worker    # Start daemon
-sudo systemctl stop worker     # Stop daemon
-sudo systemctl status worker   # Check status
-sudo journalctl -u worker -f   # View logs
+sudo systemctl start joblet    # Start daemon
+sudo systemctl stop joblet     # Stop daemon
+sudo systemctl status joblet   # Check status
+sudo journalctl -u joblet -f   # View logs
 
 # Configuration management
-sudo dpkg-reconfigure worker   # Reconfigure package
+sudo dpkg-reconfigure joblet   # Reconfigure package
 ```
 
 ## 🚨 Troubleshooting
@@ -356,8 +356,8 @@ sudo dpkg-reconfigure worker   # Reconfigure package
 **Connection refused**
 ```bash
 # Check daemon status
-sudo systemctl status worker
-sudo journalctl -u worker --lines=20
+sudo systemctl status joblet
+sudo journalctl -u joblet --lines=20
 
 # Test connectivity
 telnet your-server 50051
@@ -366,7 +366,7 @@ telnet your-server 50051
 **Certificate errors**
 ```bash
 # Verify certificates
-openssl x509 -in ~/.worker/client-config.yml -noout -text
+openssl x509 -in ~/.rnx/rnx-config.yml -noout -text
 
 # Regenerate if needed
 sudo /usr/local/bin/certs_gen.sh
@@ -375,30 +375,30 @@ sudo /usr/local/bin/certs_gen.sh
 **CLI not found**
 ```bash
 # Check CLI installation
-which worker-cli
-ls -la /usr/local/bin/worker-cli
+which rnx
+ls -la /usr/local/bin/rnx
 
 # Install if missing
-sudo ln -sf /opt/worker/worker-cli /usr/local/bin/worker-cli
+sudo ln -sf /opt/joblet/rnx /usr/local/bin/rnx
 ```
 
 ### Getting Help
 
-- **Configuration Examples**: `worker-cli config-help`
-- **Node Information**: `worker-cli nodes`
-- **GitHub Issues**: [Report bugs](https://github.com/ehsaniara/worker/issues)
+- **Configuration Examples**: `rnx config-help`
+- **Node Information**: `rnx nodes`
+- **GitHub Issues**: [Report bugs](https://github.com/ehsaniara/joblet/issues)
 - **Documentation**: Full docs in `/docs` directory
 
 ## 📊 System Requirements
 
-### Worker Daemon (Linux Server)
+### Joblet Daemon (Linux Server)
 - **OS**: Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+)
 - **Memory**: 1GB+ RAM
 - **Disk**: 5GB+ available space
 - **Network**: Port 50051 (configurable)
 - **Privileges**: Root access for namespace operations
 
-### Worker CLI (Client)
+### RNX (rnx)
 - **OS**: Linux, macOS 10.15+, Windows 10+
 - **Memory**: 50MB+ RAM
 - **Network**: Access to daemon port 50051
@@ -418,6 +418,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Quick Links:**
-- [Releases](https://github.com/ehsaniara/worker/releases) - Download latest version
-- [Examples](https://github.com/ehsaniara/worker/tree/main/examples) - Usage examples
+- [Releases](https://github.com/ehsaniara/joblet/releases) - Download latest version
+- [Examples](https://github.com/ehsaniara/joblet/tree/main/examples) - Usage examples
 - [Contributing](.github/CONTRIBUTING.md) - Development guide

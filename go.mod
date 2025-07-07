@@ -1,4 +1,4 @@
-module worker
+module joblet
 
 go 1.24
 

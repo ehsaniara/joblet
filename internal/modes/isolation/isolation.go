@@ -2,14 +2,14 @@ package isolation
 
 import (
 	"fmt"
+	"joblet/internal/joblet/core/filesystem"
 	"runtime"
 	"strconv"
 	"strings"
-	"worker/internal/worker/core/filesystem"
 
-	"worker/pkg/config"
-	"worker/pkg/logger"
-	"worker/pkg/platform"
+	"joblet/pkg/config"
+	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 )
 
 // Isolator provides job isolation functionality
@@ -163,9 +163,9 @@ func (i *Isolator) verifyIsolation() error {
 		pid1Process := strings.TrimSpace(string(comm))
 		i.logger.Debug("PID 1 in namespace", "process", pid1Process)
 
-		// In isolated namespace, PID 1 should be our worker binary
-		if !strings.Contains(pid1Process, "worker") {
-			i.logger.Warn("PID 1 is not worker binary, isolation may be incomplete",
+		// In isolated namespace, PID 1 should be our joblet binary
+		if !strings.Contains(pid1Process, "joblet") {
+			i.logger.Warn("PID 1 is not joblet binary, isolation may be incomplete",
 				"actualPid1", pid1Process)
 		}
 	}

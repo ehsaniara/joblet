@@ -4,7 +4,7 @@
 
     <!-- Title -->
     <text x="450" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1a1a1a">
-        Worker Creation - Sequence Diagram
+        Joblet Creation - Sequence Diagram
     </text>
 
     <!-- Participants -->
@@ -15,7 +15,7 @@
     <text x="215" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">gRPC Service</text>
 
     <rect x="300" y="70" width="90" height="45" rx="10" fill="#ff9800" stroke="#f57c00" stroke-width="2"/>
-    <text x="345" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Worker</text>
+    <text x="345" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Joblet</text>
 
     <rect x="430" y="70" width="90" height="45" rx="10" fill="#4caf50" stroke="#388e3c" stroke-width="2"/>
     <text x="475" y="97" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Store</text>

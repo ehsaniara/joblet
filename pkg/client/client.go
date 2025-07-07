@@ -9,12 +9,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
-	pb "worker/api/gen"
-	"worker/pkg/config"
+	pb "joblet/api/gen"
+	"joblet/pkg/config"
 )
 
 type JobClient struct {
-	client pb.JobServiceClient
+	client pb.JobletServiceClient
 	conn   *grpc.ClientConn
 }
 
@@ -42,7 +42,7 @@ func NewJobClient(node *config.Node) (*JobClient, error) {
 	}
 
 	return &JobClient{
-		client: pb.NewJobServiceClient(conn),
+		client: pb.NewJobletServiceClient(conn),
 		conn:   conn,
 	}, nil
 }
@@ -82,7 +82,7 @@ func (c *JobClient) ListJobs(ctx context.Context) (*pb.Jobs, error) {
 	return c.client.ListJobs(ctx, &pb.EmptyRequest{})
 }
 
-func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_GetJobLogsClient, error) {
+func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobletService_GetJobLogsClient, error) {
 	stream, err := c.client.GetJobLogs(ctx, &pb.GetJobLogsReq{Id: id})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start log stream: %v", err)

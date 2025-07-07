@@ -1,18 +1,18 @@
 REMOTE_HOST ?= 192.168.1.161
 REMOTE_USER ?= jay
-REMOTE_DIR ?= /opt/worker
+REMOTE_DIR ?= /opt/joblet
 
-.PHONY: all clean cli worker deploy-passwordless deploy-safe config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
+.PHONY: all clean rnx joblet deploy-passwordless deploy-safe config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
 
-all: cli worker
+all: rnx joblet
 
 help:
-	@echo "Worker Makefile - Embedded Certificates Version"
+	@echo "Joblet Makefile - Embedded Certificates Version"
 	@echo ""
 	@echo "Build targets:"
-	@echo "  make all               - Build all binaries (cli, worker)"
-	@echo "  make cli               - Build CLI for local development"
-	@echo "  make worker            - Build worker binary for Linux"
+	@echo "  make all               - Build all binaries (rnx, joblet)"
+	@echo "  make rnx               - Build RNX CLI for local development"
+	@echo "  make joblet            - Build joblet binary for Linux"
 	@echo "  make clean             - Remove build artifacts"
 	@echo ""
 	@echo "Configuration targets (Embedded Certificates):"
@@ -52,42 +52,42 @@ help:
 	@echo "  make config-download"
 	@echo "  make setup-remote-passwordless"
 
-cli:
-	@echo "Building CLI..."
-	GOOS=darwin GOARCH=amd64 go build -o bin/cli ./cmd/cli
+rnx:
+	@echo "Building RNX CLI..."
+	GOOS=darwin GOARCH=amd64 go build -o bin/rnx ./cmd/rnx
 
-worker:
-	@echo "Building worker..."
-	GOOS=linux GOARCH=amd64 go build -o bin/worker ./cmd/worker
+joblet:
+	@echo "Building Joblet..."
+	GOOS=linux GOARCH=amd64 go build -o bin/joblet ./cmd/joblet
 
-deploy-passwordless: worker
+deploy-passwordless: joblet
 	@echo "🚀 Passwordless deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/worker/build"
-	scp bin/worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
+	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop worker.service && sudo cp /tmp/worker/build/* $(REMOTE_DIR)/ && sudo chmod +x $(REMOTE_DIR)/* && sudo systemctl start worker.service && echo "✅ Deployed successfully"'
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service && sudo cp /tmp/joblet/build/* $(REMOTE_DIR)/ && sudo chmod +x $(REMOTE_DIR)/* && sudo systemctl start joblet.service && echo "✅ Deployed successfully"'
 
-deploy-safe: worker
+deploy-safe: joblet
 	@echo "🔐 Safe deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/worker/build"
-	scp bin/worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
+	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "Files uploaded. Installing with sudo..."
 	@read -s -p "Enter sudo password for $(REMOTE_USER)@$(REMOTE_HOST): " SUDO_PASS; \
 	echo ""; \
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "echo '$$SUDO_PASS' | sudo -S bash -c '\
 		echo \"Stopping service...\"; \
-		systemctl stop worker.service 2>/dev/null || echo \"Service not running\"; \
+		systemctl stop joblet.service 2>/dev/null || echo \"Service not running\"; \
 		echo \"Installing binaries...\"; \
-		cp /tmp/worker/build/worker $(REMOTE_DIR)/; \
-		chmod +x $(REMOTE_DIR)/worker; \
+		cp /tmp/joblet/build/joblet $(REMOTE_DIR)/; \
+		chmod +x $(REMOTE_DIR)/joblet; \
 		echo \"Starting service...\"; \
-		systemctl start worker.service; \
+		systemctl start joblet.service; \
 		echo \"Checking service status...\"; \
-		systemctl is-active worker.service >/dev/null && echo \"✅ Service started successfully\" || echo \"❌ Service failed to start\"'"
+		systemctl is-active joblet.service >/dev/null && echo \"✅ Service started successfully\" || echo \"❌ Service failed to start\"'"
 
 live-log:
 	@echo "📊 Viewing live logs from $(REMOTE_USER)@$(REMOTE_HOST)..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'journalctl -u worker.service -f'
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'journalctl -u joblet.service -f'
 
 clean:
 	@echo "🧹 Cleaning build artifacts..."
@@ -101,10 +101,10 @@ config-generate:
 		exit 1; \
 	fi
 	@chmod +x ./scripts/certs_gen_embedded.sh
-	@WORKER_SERVER_ADDRESS="localhost" ./scripts/certs_gen_embedded.sh
+	@JOBLET_SERVER_ADDRESS="localhost" ./scripts/certs_gen_embedded.sh
 	@echo "✅ Local configuration generated with embedded certificates:"
-	@echo "   Server config: ./config/server-config.yml"
-	@echo "   Client config: ./config/client-config.yml"
+	@echo "   Server config: ./config/joblet-config.yml"
+	@echo "   Client config: ./config/rnx-config.yml"
 
 config-remote-generate:
 	@echo "🔐 Generating configuration on $(REMOTE_USER)@$(REMOTE_HOST) with embedded certificates..."
@@ -118,51 +118,51 @@ config-remote-generate:
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
 		chmod +x /tmp/certs_gen_embedded.sh; \
-		sudo WORKER_SERVER_ADDRESS=$(REMOTE_HOST) /tmp/certs_gen_embedded.sh; \
+		sudo JOBLET_SERVER_ADDRESS=$(REMOTE_HOST) /tmp/certs_gen_embedded.sh; \
 		echo ""; \
 		echo "📋 Configuration files created:"; \
-		sudo ls -la /opt/worker/config/ 2>/dev/null || echo "No configuration found"; \
+		sudo ls -la /opt/joblet/config/ 2>/dev/null || echo "No configuration found"; \
 		rm -f /tmp/certs_gen_embedded.sh'
 	@echo "✅ Remote configuration generated with embedded certificates!"
 
 config-download:
 	@echo "📥 Downloading client configuration from $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@mkdir -p config
-	@echo "📥 Downloading client-config.yml with embedded certificates..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cat /opt/worker/config/client-config.yml' > config/client-config.yml 2>/dev/null || \
+	@echo "📥 Downloading rnx-config.yml with embedded certificates..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cat /opt/joblet/config/rnx-config.yml' > config/rnx-config.yml 2>/dev/null || \
 		(echo "❌ Failed to download config. Trying with temporary copy..." && \
-		ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp /opt/worker/config/client-config.yml /tmp/client-config-$${USER}.yml && sudo chmod 644 /tmp/client-config-$${USER}.yml' && \
-		scp $(REMOTE_USER)@$(REMOTE_HOST):/tmp/client-config-$${USER}.yml config/client-config.yml && \
-		ssh $(REMOTE_USER)@$(REMOTE_HOST) 'rm -f /tmp/client-config-$${USER}.yml')
-	@chmod 600 config/client-config.yml
-	@echo "✅ Client configuration downloaded to ./config/client-config.yml"
-	@echo "💡 Usage: ./bin/cli --config config/client-config.yml list"
-	@echo "💡 Or: ./bin/cli list  (will auto-find config/client-config.yml)"
+		ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp /opt/joblet/config/rnx-config.yml /tmp/rnx-config-$${USER}.yml && sudo chmod 644 /tmp/rnx-config-$${USER}.yml' && \
+		scp $(REMOTE_USER)@$(REMOTE_HOST):/tmp/rnx-config-$${USER}.yml config/rnx-config.yml && \
+		ssh $(REMOTE_USER)@$(REMOTE_HOST) 'rm -f /tmp/rnx-config-$${USER}.yml')
+	@chmod 600 config/rnx-config.yml
+	@echo "✅ Client configuration downloaded to ./config/rnx-config.yml"
+	@echo "💡 Usage: ./bin/rnx --config config/rnx-config.yml list"
+	@echo "💡 Or: ./bin/rnx list  (will auto-find config/rnx-config.yml)"
 
 config-view:
 	@echo "🔍 Viewing embedded certificates in configuration..."
-	@if [ -f config/client-config.yml ]; then \
+	@if [ -f config/rnx-config.yml ]; then \
 		echo "📋 Client configuration nodes:"; \
-		grep -E "^  [a-zA-Z]+:|address:" config/client-config.yml | head -20; \
+		grep -E "^  [a-zA-Z]+:|address:" config/rnx-config.yml | head -20; \
 		echo ""; \
 		echo "🔐 Embedded certificates found:"; \
-		grep -c "BEGIN CERTIFICATE" config/client-config.yml | xargs echo "  Certificates:"; \
-		grep -c "BEGIN PRIVATE KEY" config/client-config.yml | xargs echo "  Private keys:"; \
+		grep -c "BEGIN CERTIFICATE" config/rnx-config.yml | xargs echo "  Certificates:"; \
+		grep -c "BEGIN PRIVATE KEY" config/rnx-config.yml | xargs echo "  Private keys:"; \
 	else \
-		echo "❌ No client configuration found at config/client-config.yml"; \
+		echo "❌ No client configuration found at config/rnx-config.yml"; \
 		echo "💡 Run 'make config-download' to download from server"; \
 	fi
 
 setup-remote-passwordless: config-remote-generate deploy-passwordless
 	@echo "🎉 Complete passwordless setup finished!"
 	@echo "   Server: $(REMOTE_USER)@$(REMOTE_HOST)"
-	@echo "   Configuration: /opt/worker/config/ (with embedded certificates)"
-	@echo "   Service: worker.service"
+	@echo "   Configuration: /opt/joblet/config/ (with embedded certificates)"
+	@echo "   Service: joblet.service"
 	@echo ""
 	@echo "📥 Next steps:"
 	@echo "   make config-download  # Download client configuration"
-	@echo "   ./bin/cli list        # Test connection"
-	@echo "   ./bin/cli run echo 'Hello World'"
+	@echo "   ./bin/rnx list        # Test connection"
+	@echo "   ./bin/rnx run echo 'Hello World'"
 
 setup-dev: config-generate all
 	@echo "🎉 Development setup complete!"
@@ -170,27 +170,27 @@ setup-dev: config-generate all
 	@echo "   Binaries: ./bin/"
 	@echo ""
 	@echo "🚀 To test locally:"
-	@echo "   ./bin/worker  # Start server (uses config/server-config.yml)"
-	@echo "   ./bin/cli list  # Connect as client (uses config/client-config.yml)"
+	@echo "   ./bin/joblet  # Start server (uses config/joblet-config.yml)"
+	@echo "   ./bin/rnx list  # Connect as client (uses config/rnx-config.yml)"
 
 config-check-remote:
 	@echo "🔍 Checking configuration status on $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@echo "📁 Checking directory structure..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/worker/ || echo 'Directory /opt/worker/ not found'"
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/joblet/ || echo 'Directory /opt/joblet/ not found'"
 	@echo "📋 Checking configuration files..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/worker/config/ || echo 'Configuration directory not found'"
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/joblet/config/ || echo 'Configuration directory not found'"
 	@echo "🔐 Checking embedded certificates in server config..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo grep -c 'BEGIN CERTIFICATE' /opt/worker/config/server-config.yml 2>/dev/null | xargs echo 'Certificates found:' || echo 'No embedded certificates found'"
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo grep -c 'BEGIN CERTIFICATE' /opt/joblet/config/joblet-config.yml 2>/dev/null | xargs echo 'Certificates found:' || echo 'No embedded certificates found'"
 
 service-status:
 	@echo "📊 Checking service status on $(REMOTE_USER)@$(REMOTE_HOST)..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo systemctl status worker.service --no-pager"
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo systemctl status joblet.service --no-pager"
 
 test-connection:
 	@echo "🔍 Testing connection to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "echo '✅ SSH connection successful'"
-	@echo "📊 Checking if worker service exists..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "systemctl list-units --type=service | grep worker || echo '❌ worker service not found'"
+	@echo "📊 Checking if joblet service exists..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "systemctl list-units --type=service | grep joblet || echo '❌ joblet service not found'"
 
 validate-user-namespaces:
 	@echo "🔍 Validating user namespace support on $(REMOTE_HOST)..."
@@ -235,13 +235,13 @@ validate-user-namespaces:
 			echo "❌ /etc/subgid not found"; \
 			exit 1; \
 		fi; \
-		echo "📋 Checking worker user configuration..."; \
-		if ! grep -q "worker:" /etc/subuid; then \
-			echo "❌ worker not configured in /etc/subuid"; \
+		echo "📋 Checking joblet user configuration..."; \
+		if ! grep -q "joblet:" /etc/subuid; then \
+			echo "❌ joblet not configured in /etc/subuid"; \
 			exit 1; \
 		fi; \
-		if ! grep -q "worker:" /etc/subgid; then \
-			echo "❌ worker not configured in /etc/subgid"; \
+		if ! grep -q "joblet:" /etc/subgid; then \
+			echo "❌ joblet not configured in /etc/subgid"; \
 			exit 1; \
 		fi; \
 		echo "✅ All user namespace requirements validated successfully!"'
@@ -249,32 +249,32 @@ validate-user-namespaces:
 setup-user-namespaces:
 	@echo "🚀 Setting up user namespace environment on $(REMOTE_HOST)..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		echo "📋 Creating worker user if not exists..."; \
-		if ! id worker >/dev/null 2>&1; then \
-			echo "Creating worker user..."; \
-			sudo useradd -r -s /bin/false worker; \
-			echo "✅ worker user created"; \
+		echo "📋 Creating joblet user if not exists..."; \
+		if ! id joblet >/dev/null 2>&1; then \
+			echo "Creating joblet user..."; \
+			sudo useradd -r -s /bin/false joblet; \
+			echo "✅ joblet user created"; \
 		else \
-			echo "✅ worker user already exists"; \
+			echo "✅ joblet user already exists"; \
 		fi; \
 		echo "📋 Creating subuid/subgid files if needed..."; \
 		sudo touch /etc/subuid /etc/subgid; \
 		echo "📋 Setting up subuid/subgid ranges..."; \
-		if ! grep -q "^worker:" /etc/subuid 2>/dev/null; then \
-			echo "worker:100000:6553600" | sudo tee -a /etc/subuid; \
-			echo "✅ Added subuid entry for worker"; \
+		if ! grep -q "^joblet:" /etc/subuid 2>/dev/null; then \
+			echo "joblet:100000:6553600" | sudo tee -a /etc/subuid; \
+			echo "✅ Added subuid entry for joblet"; \
 		else \
-			echo "✅ subuid entry already exists for worker"; \
+			echo "✅ subuid entry already exists for joblet"; \
 		fi; \
-		if ! grep -q "^worker:" /etc/subgid 2>/dev/null; then \
-			echo "worker:100000:6553600" | sudo tee -a /etc/subgid; \
-			echo "✅ Added subgid entry for worker"; \
+		if ! grep -q "^joblet:" /etc/subgid 2>/dev/null; then \
+			echo "joblet:100000:6553600" | sudo tee -a /etc/subgid; \
+			echo "✅ Added subgid entry for joblet"; \
 		else \
-			echo "✅ subgid entry already exists for worker"; \
+			echo "✅ subgid entry already exists for joblet"; \
 		fi; \
 		echo "📋 Setting up cgroup permissions..."; \
 		sudo mkdir -p /sys/fs/cgroup; \
-		sudo chown worker:worker /sys/fs/cgroup 2>/dev/null || echo "Note: Could not change cgroup ownership (may be read-only)"; \
+		sudo chown joblet:joblet /sys/fs/cgroup 2>/dev/null || echo "Note: Could not change cgroup ownership (may be read-only)"; \
 		echo "✅ User namespace environment setup completed!"'
 
 debug-user-namespaces:
@@ -288,65 +288,44 @@ debug-user-namespaces:
 		cat /etc/subuid 2>/dev/null || echo "  File not found"; \
 		echo "  /etc/subgid entries:"; \
 		cat /etc/subgid 2>/dev/null || echo "  File not found"; \
-		echo "📋 Job-worker user info:"; \
-		id worker 2>/dev/null || echo "  worker user not found"; \
+		echo "📋 Joblet user info:"; \
+		id joblet 2>/dev/null || echo "  joblet user not found"; \
 		echo "📋 Service status:"; \
-		sudo systemctl status worker.service --no-pager --lines=5 2>/dev/null || echo "  Service not found"'
+		sudo systemctl status joblet.service --no-pager --lines=5 2>/dev/null || echo "  Service not found"'
 
-deploy-with-user-namespaces: worker
+deploy-with-user-namespaces: joblet
 	@echo "🚀 Deploying with user namespace validation to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@echo "📋 Validating remote user namespace support..."
 	@$(MAKE) validate-user-namespaces || (echo "❌ User namespace validation failed. Running setup..." && $(MAKE) setup-user-namespaces && $(MAKE) validate-user-namespaces)
 	@echo "📤 Uploading binaries..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/worker/build"
-	scp bin/worker $(REMOTE_USER)@$(REMOTE_HOST):/tmp/worker/build/
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
+	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "🔧 Installing with user namespace support..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		sudo systemctl stop worker.service 2>/dev/null || echo "Service not running"; \
-		sudo cp /tmp/worker/build/* $(REMOTE_DIR)/; \
+		sudo systemctl stop joblet.service 2>/dev/null || echo "Service not running"; \
+		sudo cp /tmp/joblet/build/* $(REMOTE_DIR)/; \
 		sudo chmod +x $(REMOTE_DIR)/*; \
-		sudo chown worker:worker $(REMOTE_DIR)/*; \
+		sudo chown joblet:joblet $(REMOTE_DIR)/*; \
 		echo "Starting service..."; \
-		sudo systemctl start worker.service; \
+		sudo systemctl start joblet.service; \
 		echo "Checking service status..."; \
 		sleep 2; \
-		if sudo systemctl is-active worker.service >/dev/null; then \
+		if sudo systemctl is-active joblet.service >/dev/null; then \
 			echo "✅ Service started successfully with user namespace support"; \
 		else \
 			echo "❌ Service failed to start. Checking logs..."; \
-			sudo journalctl -u worker.service --no-pager --lines=10; \
+			sudo journalctl -u joblet.service --no-pager --lines=10; \
 		fi'
 
 test-user-namespace-job: config-download
 	@echo "🧪 Testing job execution with user namespace isolation..."
 	@echo "📋 Creating test jobs to verify isolation..."
-	./bin/cli --config config/client-config.yml run whoami || echo "❌ Failed to run whoami job"
+	./bin/rnx --config config/rnx-config.yml run whoami || echo "❌ Failed to run whoami job"
 	sleep 1
-	./bin/cli --config config/client-config.yml run id || echo "❌ Failed to run id job"
+	./bin/rnx --config config/rnx-config.yml run id || echo "❌ Failed to run id job"
 	sleep 1
-	./bin/cli --config config/client-config.yml run ps aux || echo "❌ Failed to run ps job"
+	./bin/rnx --config config/rnx-config.yml run ps aux || echo "❌ Failed to run ps job"
 	@echo "✅ Test jobs submitted. Check logs to verify each job runs with different UID:"
 	@echo "   Expected: Each job should run as different UID (100000+)"
 	@echo "   Expected: Jobs should not see each other's processes"
 	@echo "💡 View logs with: make live-log"
-
-# Migration helper targets
-migrate-check:
-	@echo "🔍 Checking for old certificate files..."
-	@if ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls /opt/worker/certs/ 2>/dev/null" > /dev/null; then \
-		echo "⚠️  Old certificate directory found at /opt/worker/certs/"; \
-		echo "💡 Run 'make migrate-to-embedded' to migrate to embedded certificates"; \
-	else \
-		echo "✅ No old certificate directory found"; \
-	fi
-
-migrate-to-embedded:
-	@echo "🔄 Migrating from file-based to embedded certificates..."
-	@echo "📦 Backing up old certificates..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp -r /opt/worker/certs /opt/worker/certs.backup 2>/dev/null || echo "No old certs to backup"'
-	@echo "🔐 Generating new configuration with embedded certificates..."
-	@$(MAKE) config-remote-generate
-	@echo "🧹 Cleaning up old certificate directory..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo rm -rf /opt/worker/certs'
-	@echo "✅ Migration completed! Old certs backed up to /opt/worker/certs.backup"
-	@echo "💡 Download new client config with: make config-download"

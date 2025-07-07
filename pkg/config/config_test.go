@@ -17,8 +17,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Expected default port 50051, got %d", DefaultConfig.Server.Port)
 	}
 
-	if DefaultConfig.Worker.DefaultMemoryLimit != 512 {
-		t.Errorf("Expected default memory limit 512, got %d", DefaultConfig.Worker.DefaultMemoryLimit)
+	if DefaultConfig.Joblet.DefaultMemoryLimit != 512 {
+		t.Errorf("Expected default memory limit 512, got %d", DefaultConfig.Joblet.DefaultMemoryLimit)
 	}
 }
 
@@ -63,12 +63,12 @@ func TestGetServerAddress(t *testing.T) {
 func TestGetCgroupPath(t *testing.T) {
 	config := Config{
 		Cgroup: CgroupConfig{
-			BaseDir: "/sys/fs/cgroup/worker.slice/worker.service",
+			BaseDir: "/sys/fs/cgroup/joblet.slice/joblet.service",
 		},
 	}
 
 	jobID := "12345"
-	expected := "/sys/fs/cgroup/worker.slice/worker.service/job-12345"
+	expected := "/sys/fs/cgroup/joblet.slice/joblet.service/job-12345"
 	result := config.GetCgroupPath(jobID)
 
 	if result != expected {
@@ -92,7 +92,7 @@ func TestValidate(t *testing.T) {
 			name: "invalid port - too low",
 			config: Config{
 				Server:  ServerConfig{Port: 0},
-				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Joblet:  JobletConfig{MaxConcurrentJobs: 1},
 				Cgroup:  CgroupConfig{BaseDir: "/sys/fs/cgroup"},
 				Logging: LoggingConfig{Level: "INFO"},
 			},
@@ -103,7 +103,7 @@ func TestValidate(t *testing.T) {
 			name: "invalid port - too high",
 			config: Config{
 				Server:  ServerConfig{Port: 70000},
-				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Joblet:  JobletConfig{MaxConcurrentJobs: 1},
 				Cgroup:  CgroupConfig{BaseDir: "/sys/fs/cgroup"},
 				Logging: LoggingConfig{Level: "INFO"},
 			},
@@ -114,7 +114,7 @@ func TestValidate(t *testing.T) {
 			name: "invalid server mode",
 			config: Config{
 				Server:  ServerConfig{Port: 50051, Mode: "invalid"},
-				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Joblet:  JobletConfig{MaxConcurrentJobs: 1},
 				Cgroup:  CgroupConfig{BaseDir: "/sys/fs/cgroup"},
 				Logging: LoggingConfig{Level: "INFO"},
 			},
@@ -125,7 +125,7 @@ func TestValidate(t *testing.T) {
 			name: "negative CPU limit",
 			config: Config{
 				Server:  ServerConfig{Port: 50051, Mode: "server"},
-				Worker:  WorkerConfig{DefaultCPULimit: -1, MaxConcurrentJobs: 1},
+				Joblet:  JobletConfig{DefaultCPULimit: -1, MaxConcurrentJobs: 1},
 				Cgroup:  CgroupConfig{BaseDir: "/sys/fs/cgroup"},
 				Logging: LoggingConfig{Level: "INFO"},
 			},
@@ -136,7 +136,7 @@ func TestValidate(t *testing.T) {
 			name: "relative cgroup path",
 			config: Config{
 				Server:  ServerConfig{Port: 50051, Mode: "server"},
-				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Joblet:  JobletConfig{MaxConcurrentJobs: 1},
 				Cgroup:  CgroupConfig{BaseDir: "relative/path"},
 				Logging: LoggingConfig{Level: "INFO"},
 			},
@@ -147,7 +147,7 @@ func TestValidate(t *testing.T) {
 			name: "invalid log level",
 			config: Config{
 				Server:  ServerConfig{Port: 50051, Mode: "server"},
-				Worker:  WorkerConfig{MaxConcurrentJobs: 1},
+				Joblet:  JobletConfig{MaxConcurrentJobs: 1},
 				Cgroup:  CgroupConfig{BaseDir: "/sys/fs/cgroup"},
 				Logging: LoggingConfig{Level: "INVALID"},
 			},
@@ -273,8 +273,8 @@ MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBALr6hQ7lhZhh3j1f
 				if tlsConfig.MinVersion != tls.VersionTLS13 {
 					t.Errorf("Expected TLS 1.3, got %d", tlsConfig.MinVersion)
 				}
-				if tlsConfig.ServerName != "worker" {
-					t.Errorf("Expected ServerName 'worker', got '%s'", tlsConfig.ServerName)
+				if tlsConfig.ServerName != "joblet" {
+					t.Errorf("Expected ServerName 'joblet', got '%s'", tlsConfig.ServerName)
 				}
 			}
 		})
@@ -285,13 +285,13 @@ func TestLoadConfig(t *testing.T) {
 	// Test environment variable overrides
 	t.Run("environment overrides", func(t *testing.T) {
 		// Set environment variables
-		os.Setenv("WORKER_SERVER_ADDRESS", "192.168.1.100")
-		os.Setenv("WORKER_MODE", "init")
-		os.Setenv("WORKER_LOG_LEVEL", "DEBUG")
+		os.Setenv("JOBLET_SERVER_ADDRESS", "192.168.1.100")
+		os.Setenv("JOBLET_MODE", "init")
+		os.Setenv("JOBLET_LOG_LEVEL", "DEBUG")
 		defer func() {
-			os.Unsetenv("WORKER_SERVER_ADDRESS")
-			os.Unsetenv("WORKER_MODE")
-			os.Unsetenv("WORKER_LOG_LEVEL")
+			os.Unsetenv("JOBLET_SERVER_ADDRESS")
+			os.Unsetenv("JOBLET_MODE")
+			os.Unsetenv("JOBLET_LOG_LEVEL")
 		}()
 
 		config, _, err := LoadConfig()
@@ -314,7 +314,7 @@ func TestLoadConfig(t *testing.T) {
 func TestLoadClientConfig(t *testing.T) {
 	// Create a temporary config file
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "client-config.yml")
+	configPath := filepath.Join(tmpDir, "rnx-config.yml")
 
 	validConfig := `version: "3.0"
 nodes:

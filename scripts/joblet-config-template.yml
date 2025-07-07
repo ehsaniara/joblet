@@ -1,0 +1,50 @@
+version: "3.0"
+
+server:
+  address: "0.0.0.0"
+  port: 50051
+  mode: "server"
+  timeout: "10s"
+  minTlsVersion: "1.3"
+
+# Security section will be added by certs_gen_embedded.sh
+# DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
+
+joblet:
+  defaultCpuLimit: 50
+  defaultMemoryLimit: 256
+  defaultIoLimit: 0
+  maxConcurrentJobs: 5
+  jobTimeout: "30m"
+  cleanupTimeout: "2s"
+  validateCommands: true
+
+cgroup:
+  baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service"
+  namespaceMount: "/sys/fs/cgroup"
+  enableControllers: [ "memory", "cpu" ]
+  cleanupTimeout: "1s"
+
+filesystem:
+  baseDir: "/opt/joblet/jobs"
+  tmpDir: "/tmp/job-{JOB_ID}"
+  allowedMounts:
+    - "/usr/bin"
+    - "/bin"
+    - "/lib"
+    - "/lib64"
+    - "/usr/lib"
+    - "/usr/lib64"
+  blockDevices: false
+
+grpc:
+  maxRecvMsgSize: 262144
+  maxSendMsgSize: 1048576
+  maxHeaderListSize: 524288
+  keepAliveTime: "30s"
+  keepAliveTimeout: "5s"
+
+logging:
+  level: "INFO"
+  format: "text"
+  output: "stdout"

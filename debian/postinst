@@ -39,32 +39,32 @@ detect_current_ip() {
 # Function to get configuration from debconf or environment
 get_configuration() {
     # First try environment variables (for automated installation)
-    if [ -n "$WORKER_SERVER_IP" ]; then
-        WORKER_SERVER_ADDRESS="$WORKER_SERVER_IP"
-        print_info "Using server address from environment: $WORKER_SERVER_ADDRESS"
+    if [ -n "$JOBLET_SERVER_IP" ]; then
+        JOBLET_SERVER_ADDRESS="$JOBLET_SERVER_IP"
+        print_info "Using server address from environment: $JOBLET_SERVER_ADDRESS"
     else
         # Try debconf
         if command -v db_get >/dev/null 2>&1; then
-            db_get worker/server_address || true
-            WORKER_SERVER_ADDRESS="$RET"
+            db_get joblet/server_address || true
+            JOBLET_SERVER_ADDRESS="$RET"
 
-            db_get worker/server_port || true
-            WORKER_SERVER_PORT="$RET"
+            db_get joblet/server_port || true
+            JOBLET_SERVER_PORT="$RET"
 
-            db_get worker/additional_names || true
-            WORKER_ADDITIONAL_NAMES="$RET"
+            db_get joblet/additional_names || true
+            JOBLET_ADDITIONAL_NAMES="$RET"
         fi
     fi
 
     # Use detected IP as ultimate fallback
-    if [ -z "$WORKER_SERVER_ADDRESS" ]; then
-        WORKER_SERVER_ADDRESS=$(detect_current_ip)
-        print_warning "No server address configured, using detected IP: $WORKER_SERVER_ADDRESS"
+    if [ -z "$JOBLET_SERVER_ADDRESS" ]; then
+        JOBLET_SERVER_ADDRESS=$(detect_current_ip)
+        print_warning "No server address configured, using detected IP: $JOBLET_SERVER_ADDRESS"
     fi
 
     # Set defaults
-    WORKER_SERVER_PORT=${WORKER_SERVER_PORT:-50051}
-    WORKER_ADDITIONAL_NAMES=${WORKER_ADDITIONAL_NAMES:-}
+    JOBLET_SERVER_PORT=${JOBLET_SERVER_PORT:-50051}
+    JOBLET_ADDITIONAL_NAMES=${JOBLET_ADDITIONAL_NAMES:-}
 }
 
 # Function to generate and embed certificates
@@ -72,14 +72,14 @@ generate_and_embed_certificates() {
     print_info "Generating certificates and embedding them in config files..."
 
     # Export variables for the certificate generation script
-    export WORKER_SERVER_ADDRESS
-    export WORKER_ADDITIONAL_NAMES
-    export WORKER_MODE="package-install"  # Special mode for package installation
+    export JOBLET_SERVER_ADDRESS
+    export JOBLET_ADDITIONAL_NAMES
+    export JOBLET_MODE="package-install"  # Special mode for package installation
 
     # Ensure scripts directory exists and has correct permissions
-    if [ -d "/opt/worker/scripts" ]; then
-        chmod 755 /opt/worker/scripts
-        chmod 644 /opt/worker/scripts/*.yml 2>/dev/null || true
+    if [ -d "/opt/joblet/scripts" ]; then
+        chmod 755 /opt/joblet/scripts
+        chmod 644 /opt/joblet/scripts/*.yml 2>/dev/null || true
     fi
 
     # Run the embedded certificate generation script
@@ -95,85 +95,72 @@ generate_and_embed_certificates() {
 
 case "$1" in
     configure)
-        print_info "🔧 Configuring Worker Service with Embedded Certificates..."
+        print_info "🔧 Configuring Joblet Service with Embedded Certificates..."
         echo
 
         # Set basic permissions first
-        chown -R root:root /opt/worker
-        chmod 755 /opt/worker
-        chmod 755 /opt/worker/worker
-        chmod 755 /opt/worker/worker-cli
-        chmod 755 /opt/worker/scripts
-        chmod 644 /opt/worker/scripts/server-config-template.yml
-        chmod 644 /opt/worker/scripts/client-config-template.yml
-        chmod +x /usr/local/bin/certs_gen.sh
+        chown -R root:root /opt/joblet
+        chmod 755 /opt/joblet
+        chmod 755 /opt/joblet/joblet
+        chmod 755 /opt/joblet/rnx
+        chmod 755 /opt/joblet/scripts
+        chmod 644 /opt/joblet/scripts/joblet-config-template.yml
+        chmod 644 /opt/joblet/scripts/rnx-config-template.yml
+        chmod +x /usr/local/bin/certs_gen_embedded.sh
 
         # Create config directory
-        mkdir -p /opt/worker/config
-        chmod 700 /opt/worker/config  # Restricted since it will contain private keys
+        mkdir -p /opt/joblet/config
+        chmod 700 /opt/joblet/config  # Restricted since it will contain private keys
 
         # Create symlinks
-        if [ ! -L /usr/bin/worker-cli ]; then
-            ln -sf /opt/worker/worker-cli /usr/bin/worker-cli
+        if [ ! -L /usr/bin/rnx ]; then
+            ln -sf /opt/joblet/rnx /usr/bin/rnx
         fi
 
         # Get configuration from debconf/environment
         get_configuration
 
         print_info "Configuration Summary:"
-        echo "  Server Address: $WORKER_SERVER_ADDRESS"
-        echo "  Server Port: $WORKER_SERVER_PORT"
-        echo "  Additional Names: ${WORKER_ADDITIONAL_NAMES:-none}"
+        echo "  Server Address: $JOBLET_SERVER_ADDRESS"
+        echo "  Server Port: $JOBLET_SERVER_PORT"
+        echo "  Additional Names: ${JOBLET_ADDITIONAL_NAMES:-none}"
         echo
 
         # Generate certificates and embed them in config files
         generate_and_embed_certificates
 
         # Set secure permissions on config files (they now contain private keys)
-        chmod 600 /opt/worker/config/server-config.yml  # Server config has private keys
-        chmod 600 /opt/worker/config/client-config.yml  # Client config has private keys
+        chmod 600 /opt/joblet/config/joblet-config.yml  # Server config has private keys
+        chmod 600 /opt/joblet/config/rnx-config.yml     # Client config has private keys
 
         # Create log directory
-        mkdir -p /var/log/worker
-        chown root:root /var/log/worker
-        chmod 755 /var/log/worker
+        mkdir -p /var/log/joblet
+        chown root:root /var/log/joblet
+        chmod 755 /var/log/joblet
 
         # Setup cgroup delegation
         if [ -d /sys/fs/cgroup ]; then
             print_info "Setting up cgroup delegation..."
-            mkdir -p /sys/fs/cgroup/worker.slice
-            echo "+cpu +memory +io +pids" > /sys/fs/cgroup/worker.slice/cgroup.subtree_control 2>/dev/null || true
+            mkdir -p /sys/fs/cgroup/joblet.slice
+            echo "+cpu +memory +io +pids" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
         fi
 
         # Enable systemd service
         systemctl daemon-reload
-        systemctl enable worker.service
+        systemctl enable joblet.service
 
         echo
-        print_success "Worker service installed successfully with embedded certificates!"
+        print_success "Joblet service installed successfully with embedded certificates!"
         echo
-        print_info "📁 Installation Summary:"
-        echo "  Server Address: $WORKER_SERVER_ADDRESS"
-        echo "  Server Port: $WORKER_SERVER_PORT"
-        echo "  Server Config: /opt/worker/config/server-config.yml (with embedded certs)"
-        echo "  Client Config: /opt/worker/config/client-config.yml (with embedded certs)"
-        echo "  🔐 All certificates are embedded in configuration files"
-        echo "  🗑️  No separate certificate files to manage"
-        echo
-        print_info "🚀 Next Steps:"
-        echo "  1. Start service: sudo systemctl start worker"
-        echo "  2. Check status: sudo systemctl status worker"
-        echo "  3. View logs: sudo journalctl -u worker -f"
-        echo "  4. Test CLI: worker-cli list"
-        echo "  5. Use CLI with config: worker-cli --config=/opt/worker/config/client-config.yml list"
+
         echo
         print_info "📱 Remote CLI Setup:"
-        echo "  Copy /opt/worker/config/client-config.yml to remote machines"
-        echo "  Remote usage: worker-cli --config=client-config.yml list"
+        echo "  Copy /opt/joblet/config/rnx-config.yml to remote machines"
+        echo "  Remote usage: rnx --config=rnx-config.yml list"
         echo
         print_info "🔧 To reconfigure later:"
-        echo "  sudo dpkg-reconfigure worker"
-        echo "  Or manually: WORKER_SERVER_ADDRESS='new-ip' /usr/local/bin/certs_gen_embedded.sh"
+        echo "  sudo dpkg-reconfigure joblet"
+        echo "  Or manually: JOBLET_SERVER_ADDRESS='new-ip' /usr/local/bin/certs_gen_embedded.sh"
         echo
         ;;
 esac
