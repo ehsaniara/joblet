@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="549pt" height="298pt" viewBox="0.00 0.00 549.42 297.60">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 293.6)">
+<title>JobletSystem</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-293.6 545.42,-293.6 545.42,4 -4,4"/>
+<!-- JobletSystemLabel -->
+<g id="node1" class="node">
+<title>JobletSystemLabel</title>
+<text text-anchor="middle" x="63.83" y="-229.2" font-family="Times,serif" font-size="20.00">Joblet System</text>
+</g>
+<!-- RNXClient -->
+<g id="node2" class="node">
+<title>RNXClient</title>
+<polygon fill="none" stroke="black" points="265.8,-289.6 163.87,-289.6 163.87,-180.8 265.8,-180.8 265.8,-289.6"/>
+<text text-anchor="middle" x="214.83" y="-273" font-family="Times,serif" font-size="14.00">RNX Client</text>
+<text text-anchor="middle" x="214.83" y="-256.2" font-family="Times,serif" font-size="14.00">(Any Platform)</text>
+<text text-anchor="middle" x="214.83" y="-239.4" font-family="Times,serif" font-size="14.00">• gRPC Client</text>
+<text text-anchor="middle" x="214.83" y="-222.6" font-family="Times,serif" font-size="14.00">• TLS Auth</text>
+<text text-anchor="middle" x="214.83" y="-205.8" font-family="Times,serif" font-size="14.00">• Streaming</text>
+<text text-anchor="middle" x="214.83" y="-189" font-family="Times,serif" font-size="14.00">• CLI</text>
+</g>
+<!-- JobletServer -->
+<g id="node3" class="node">
+<title>JobletServer</title>
+<polygon fill="none" stroke="black" points="341.02,-108.8 212.65,-108.8 212.65,0 341.02,0 341.02,-108.8"/>
+<text text-anchor="middle" x="276.83" y="-92.2" font-family="Times,serif" font-size="14.00">Joblet Server</text>
+<text text-anchor="middle" x="276.83" y="-75.4" font-family="Times,serif" font-size="14.00">(Linux)</text>
+<text text-anchor="middle" x="276.83" y="-58.6" font-family="Times,serif" font-size="14.00">• Job Manager</text>
+<text text-anchor="middle" x="276.83" y="-41.8" font-family="Times,serif" font-size="14.00">• State Store</text>
+<text text-anchor="middle" x="276.83" y="-25" font-family="Times,serif" font-size="14.00">• gRPC API</text>
+<text text-anchor="middle" x="276.83" y="-8.2" font-family="Times,serif" font-size="14.00">• Resource Control</text>
+</g>
+<!-- RNXClient&#45;&gt;JobletServer -->
+<g id="edge1" class="edge">
+<title>RNXClient-&gt;JobletServer</title>
+<path fill="none" stroke="black" stroke-dasharray="5,2" d="M237.2,-169.71C242.86,-153.38 248.94,-135.84 254.6,-119.53"/>
+<polygon fill="black" stroke="black" points="233.9,-168.53 233.93,-179.12 240.52,-170.82 233.9,-168.53"/>
+<polygon fill="black" stroke="black" points="257.78,-121.03 257.75,-110.44 251.17,-118.74 257.78,-121.03"/>
+</g>
+<!-- JobProc -->
+<g id="node4" class="node">
+<title>JobProc</title>
+<polygon fill="none" stroke="black" points="377.78,-281.2 301.89,-281.2 301.89,-189.2 377.78,-189.2 377.78,-281.2"/>
+<text text-anchor="middle" x="339.83" y="-264.6" font-family="Times,serif" font-size="14.00">Job Proc</text>
+<text text-anchor="middle" x="339.83" y="-247.8" font-family="Times,serif" font-size="14.00">(Isolated)</text>
+<text text-anchor="middle" x="339.83" y="-231" font-family="Times,serif" font-size="14.00">• Init</text>
+<text text-anchor="middle" x="339.83" y="-214.2" font-family="Times,serif" font-size="14.00">• Exec</text>
+<text text-anchor="middle" x="339.83" y="-197.4" font-family="Times,serif" font-size="14.00">• Monitor</text>
+</g>
+<!-- JobletServer&#45;&gt;JobProc -->
+<g id="edge2" class="edge">
+<title>JobletServer-&gt;JobProc</title>
+<path fill="none" stroke="black" stroke-dasharray="5,2" d="M299.55,-119.87C306.31,-139.06 313.66,-159.92 320.21,-178.51"/>
+<polygon fill="black" stroke="black" points="302.88,-118.79 296.26,-110.53 296.28,-121.12 302.88,-118.79"/>
+<polygon fill="black" stroke="black" points="316.81,-179.39 323.43,-187.65 323.41,-177.06 316.81,-179.39"/>
+</g>
+<!-- LinuxKernelLayer -->
+<g id="node5" class="node">
+<title>LinuxKernelLayer</title>
+<polygon fill="lightgray" stroke="black" points="541.42,-281.2 414.25,-281.2 414.25,-189.2 541.42,-189.2 541.42,-281.2"/>
+<text text-anchor="middle" x="477.83" y="-264.6" font-family="Times,serif" font-size="14.00">Linux Kernel Layer</text>
+<text text-anchor="middle" x="477.83" y="-247.8" font-family="Times,serif" font-size="14.00">• cgroups v2</text>
+<text text-anchor="middle" x="477.83" y="-231" font-family="Times,serif" font-size="14.00">• namespaces</text>
+<text text-anchor="middle" x="477.83" y="-214.2" font-family="Times,serif" font-size="14.00">• systemd</text>
+<text text-anchor="middle" x="477.83" y="-197.4" font-family="Times,serif" font-size="14.00">• capabilities</text>
+</g>
+</g>
+</svg>

@@ -158,10 +158,6 @@ case "$1" in
         echo "  Copy /opt/joblet/config/rnx-config.yml to remote machines"
         echo "  Remote usage: rnx --config=rnx-config.yml list"
         echo
-        print_info "🔧 To reconfigure later:"
-        echo "  sudo dpkg-reconfigure joblet"
-        echo "  Or manually: JOBLET_SERVER_ADDRESS='new-ip' /usr/local/bin/certs_gen_embedded.sh"
-        echo
         ;;
 esac
 
