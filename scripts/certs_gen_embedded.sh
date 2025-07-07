@@ -29,9 +29,9 @@ echo "🔐 Generating certificates and embedding them in config files..."
 
 # Determine working directory
 if [ "$(uname)" = "Linux" ]; then
-    WORK_DIR="/opt/worker"
-    CONFIG_DIR="/opt/worker/config"
-    TEMPLATE_DIR="/opt/worker/scripts"
+    WORK_DIR="/opt/joblet"
+    CONFIG_DIR="/opt/joblet/config"
+    TEMPLATE_DIR="/opt/joblet/scripts"
     print_info "Using production directories: $WORK_DIR"
 else
     WORK_DIR="."
@@ -50,8 +50,8 @@ trap "rm -rf $TEMP_DIR" EXIT
 cd "$TEMP_DIR"
 
 # Get configuration from environment variables or defaults
-SERVER_ADDRESS="${WORKER_SERVER_ADDRESS:-}"
-ADDITIONAL_NAMES="${WORKER_ADDITIONAL_NAMES:-}"
+SERVER_ADDRESS="${JOBLET_SERVER_ADDRESS:-}"
+ADDITIONAL_NAMES="${JOBLET_ADDITIONAL_NAMES:-}"
 
 # If no configuration provided, try to detect or use defaults
 if [ -z "$SERVER_ADDRESS" ]; then
@@ -61,7 +61,7 @@ if [ -z "$SERVER_ADDRESS" ]; then
         SERVER_ADDRESS=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
     fi
     SERVER_ADDRESS=${SERVER_ADDRESS:-127.0.0.1}
-    print_warning "No WORKER_SERVER_ADDRESS specified, using detected/default: $SERVER_ADDRESS"
+    print_warning "No JOBLET_SERVER_ADDRESS specified, using detected/default: $SERVER_ADDRESS"
 fi
 
 print_info "Certificate configuration:"
@@ -72,14 +72,14 @@ echo "  Additional Names: ${ADDITIONAL_NAMES:-none}"
 print_info "Generating CA certificate..."
 openssl genrsa -out ca-key.pem 4096
 openssl req -new -x509 -days 1095 -key ca-key.pem -out ca-cert.pem \
-    -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=CA/CN=Worker-CA"
+    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=CA/CN=Joblet-CA"
 print_success "CA certificate generated"
 
 # Generate server certificate
 print_info "Generating server certificate..."
 openssl genrsa -out server-key.pem 2048
 openssl req -new -key server-key.pem -out server.csr \
-    -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=Server/CN=worker-server"
+    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=Server/CN=joblet-server"
 
 # Create dynamic SAN configuration
 cat > server-ext.cnf << 'EOF'
@@ -96,9 +96,9 @@ extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1 = worker
+DNS.1 = joblet
 DNS.2 = localhost
-DNS.3 = worker-server
+DNS.3 = joblet-server
 IP.1 = 127.0.0.1
 IP.2 = 0.0.0.0
 EOF
@@ -145,7 +145,7 @@ print_success "Server certificate generated"
 print_info "Generating admin client certificate..."
 openssl genrsa -out admin-client-key.pem 2048
 openssl req -new -key admin-client-key.pem -out admin-client.csr \
-    -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=admin/CN=admin-client"
+    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=admin/CN=admin-client"
 openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.pem \
     -CAcreateserial -out admin-client-cert.pem
 print_success "Admin client certificate generated"
@@ -154,7 +154,7 @@ print_success "Admin client certificate generated"
 print_info "Generating viewer client certificate..."
 openssl genrsa -out viewer-client-key.pem 2048
 openssl req -new -key viewer-client-key.pem -out viewer-client.csr \
-    -subj "/C=US/ST=CA/L=Los Angeles/O=Worker/OU=viewer/CN=viewer-client"
+    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=viewer/CN=viewer-client"
 openssl x509 -req -days 365 -in viewer-client.csr -CA ca-cert.pem -CAkey ca-key.pem \
     -CAcreateserial -out viewer-client-cert.pem
 print_success "Viewer client certificate generated"
@@ -171,8 +171,8 @@ read_cert_for_yaml() {
 
 # Update server configuration with embedded certificates
 print_info "Updating server configuration with embedded certificates..."
-SERVER_TEMPLATE="$TEMPLATE_DIR/server-config-template.yml"
-SERVER_CONFIG="$CONFIG_DIR/server-config.yml"
+SERVER_TEMPLATE="$TEMPLATE_DIR/joblet-config-template.yml"
+SERVER_CONFIG="$CONFIG_DIR/joblet-config.yml"
 
 if [ -f "$SERVER_TEMPLATE" ]; then
     # Copy template
@@ -201,8 +201,8 @@ fi
 
 # Update client configuration with embedded certificates
 print_info "Updating client configuration with embedded certificates..."
-CLIENT_TEMPLATE="$TEMPLATE_DIR/client-config-template.yml"
-CLIENT_CONFIG="$CONFIG_DIR/client-config.yml"
+CLIENT_TEMPLATE="$TEMPLATE_DIR/rnx-config-template.yml"
+CLIENT_CONFIG="$CONFIG_DIR/rnx-config.yml"
 
 # Create client configuration with embedded certificates
 cat > "$CLIENT_CONFIG" << EOF
@@ -277,12 +277,12 @@ echo "  🗑️  No separate certificate files needed"
 echo
 
 print_info "🚀 Usage:"
-echo "  Server: systemctl start worker  # Uses embedded certs from server-config.yml"
-echo "  CLI: worker-cli --config=$CLIENT_CONFIG list  # Uses embedded certs"
+echo "  Server: systemctl start joblet  # Uses embedded certs from joblet-config.yml"
+echo "  CLI: rnx --config=$CLIENT_CONFIG list  # Uses embedded certs"
 echo
 
 print_info "🔧 To regenerate certificates:"
-echo "  WORKER_SERVER_ADDRESS='your-server' $0"
+echo "  JOBLET_SERVER_ADDRESS='your-server' $0"
 echo
 
 print_success "Ready to use with embedded certificates!"

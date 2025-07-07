@@ -247,7 +247,7 @@ WantedBy=multi-user.target
 ### Configuration File
 
 ```yaml
-# /opt/worker/server-config-template.yml
+# /opt/worker/joblet-config-template.yml
 version: "3.0"
 
 server:
@@ -274,7 +274,7 @@ security:
   minTlsVersion: "1.3"
 
 cgroup:
-  baseDir: "/sys/fs/cgroup/worker.slice/worker.service"
+  baseDir: "/sys/fs/cgroup/worker.slice/joblet.service"
   namespaceMount: "/sys/fs/cgroup"
   enableControllers: [ "cpu", "memory", "io", "pids" ]
   cleanupTimeout: "5s"
@@ -297,24 +297,24 @@ logging:
 ```bash
 # Enable and start service
 sudo systemctl daemon-reload
-sudo systemctl enable worker.service
-sudo systemctl start worker.service
+sudo systemctl enable joblet.service
+sudo systemctl start joblet.service
 
 # Check service status
-sudo systemctl status worker.service --full
+sudo systemctl status joblet.service --full
 
 # Monitor logs
-sudo journalctl -u worker.service -f
+sudo journalctl -u joblet.service -f
 
 # Performance monitoring
-sudo systemctl show worker.service --property=CPUUsageNSec
-sudo systemctl show worker.service --property=MemoryCurrent
+sudo systemctl show joblet.service --property=CPUUsageNSec
+sudo systemctl show joblet.service --property=MemoryCurrent
 
 # Restart service
-sudo systemctl restart worker.service
+sudo systemctl restart joblet.service
 
 # Stop service (graceful)
-sudo systemctl stop worker.service
+sudo systemctl stop joblet.service
 ```
 
 ## Certificate Management
@@ -522,8 +522,8 @@ sudo chmod 600 /opt/worker/certs/*-key.pem
 sudo chmod 644 /opt/worker/certs/*-cert.pem
 
 # Secure configuration
-sudo chmod 600 /opt/worker/server-config-template.yml
-sudo chown worker:worker /opt/worker/server-config-template.yml
+sudo chmod 600 /opt/worker/joblet-config-template.yml
+sudo chown worker:worker /opt/worker/joblet-config-template.yml
 
 # Secure log directories
 sudo chmod 750 /var/log/worker
@@ -540,7 +540,7 @@ fi
 
 ```bash
 # Optimize for high-concurrency workloads
-cat >> /opt/worker/server-config-template.yml << 'EOF'
+cat >> /opt/worker/joblet-config-template.yml << 'EOF'
 worker:
   maxConcurrentJobs: 500          # Increase concurrent job limit
   jobTimeout: "30m"               # Shorter timeout for faster turnover
@@ -561,7 +561,7 @@ echo 'kernel.pid_max = 4194304' >> /etc/sysctl.conf
 sysctl -p
 
 # Service-level optimizations
-systemctl edit worker.service
+systemctl edit joblet.service
 # Add:
 # [Service]
 # LimitNOFILE=1048576
@@ -624,10 +624,10 @@ chmod +x /opt/worker/scripts/performance-monitor.sh
 
 ```bash
 # Check detailed service status
-sudo systemctl status worker.service -l
+sudo systemctl status joblet.service -l
 
 # Check logs for errors
-sudo journalctl -u worker.service --since "1 hour ago" -f
+sudo journalctl -u joblet.service --since "1 hour ago" -f
 
 # Common solutions:
 # - Check certificate paths and permissions
@@ -651,7 +651,7 @@ openssl s_client -connect localhost:50051 -cert /opt/worker/certs/admin-client-c
 
 # Regenerate certificates if needed
 sudo /usr/local/bin/certs_gen.sh
-sudo systemctl restart worker.service
+sudo systemctl restart joblet.service
 ```
 
 #### 3. Job Execution Issues
@@ -681,7 +681,7 @@ top -p $(pgrep worker)
 sudo iotop -p $(pgrep worker)
 
 # Check job resource consumption
-for job in /sys/fs/cgroup/worker.slice/worker.service/job-*/; do
+for job in /sys/fs/cgroup/worker.slice/joblet.service/job-*/; do
     echo "Job: $(basename $job)"
     echo "  Memory: $(cat $job/memory.current 2>/dev/null | numfmt --to=iec)"
     echo "  CPU: $(cat $job/cpu.stat 2>/dev/null | grep usage_usec)"
@@ -697,15 +697,15 @@ done
 
 ```bash
 # Enable debug logging
-sudo systemctl edit worker.service
+sudo systemctl edit joblet.service
 # Add:
 # [Service]
 # Environment=LOG_LEVEL=DEBUG
 
-sudo systemctl restart worker.service
+sudo systemctl restart joblet.service
 
 # Monitor debug logs
-sudo journalctl -u worker.service -f | grep DEBUG
+sudo journalctl -u joblet.service -f | grep DEBUG
 ```
 
 ### Recovery Procedures
@@ -715,14 +715,14 @@ sudo journalctl -u worker.service -f | grep DEBUG
 ```bash
 # Stop all processes
 sudo pkill -f worker
-sudo systemctl stop worker.service
+sudo systemctl stop joblet.service
 
 # Clean up cgroups
 sudo find /sys/fs/cgroup/worker.slice -name "job-*" -type d -exec rmdir {} \; 2>/dev/null
 
 # Reset service state
-sudo systemctl reset-failed worker.service
+sudo systemctl reset-failed joblet.service
 
 # Restart service
-sudo systemctl start worker.service
+sudo systemctl start joblet.service
 ```

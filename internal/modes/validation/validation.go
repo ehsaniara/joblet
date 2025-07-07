@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"strings"
 
-	"worker/pkg/logger"
-	"worker/pkg/platform"
+	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 )
 
 // PlatformValidator validates platform requirements
@@ -30,7 +30,7 @@ func (pv *PlatformValidator) ValidatePlatformRequirements() error {
 // validateLinux validates Linux-specific requirements using platform abstraction
 func (pv *PlatformValidator) validateLinux() error {
 	// Check cgroups v2 using platform abstraction
-	cgroupPath := "/sys/fs/cgroup/worker.slice/worker.service"
+	cgroupPath := "/sys/fs/cgroup/joblet.slice/joblet.service"
 	if _, err := pv.platform.Stat(cgroupPath); pv.platform.IsNotExist(err) {
 		return fmt.Errorf("cgroups not available at %s", cgroupPath)
 	}

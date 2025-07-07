@@ -3,8 +3,8 @@ set -e
 
 ARCH=${1:-amd64}
 VERSION=${2:-1.0.0}
-PACKAGE_NAME="worker"
-BUILD_DIR="worker-deb-${ARCH}"
+PACKAGE_NAME="joblet"
+BUILD_DIR="joblet-deb-${ARCH}"
 
 # Clean up version string for Debian package format
 CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
@@ -25,44 +25,44 @@ mkdir -p "$BUILD_DIR"
 
 # Create directory structure
 mkdir -p "$BUILD_DIR/DEBIAN"
-mkdir -p "$BUILD_DIR/opt/worker"
-mkdir -p "$BUILD_DIR/opt/worker/config"
-mkdir -p "$BUILD_DIR/opt/worker/scripts"
+mkdir -p "$BUILD_DIR/opt/joblet"
+mkdir -p "$BUILD_DIR/opt/joblet/config"
+mkdir -p "$BUILD_DIR/opt/joblet/scripts"
 mkdir -p "$BUILD_DIR/etc/systemd/system"
 mkdir -p "$BUILD_DIR/usr/local/bin"
 
 # Copy binaries
-if [ ! -f "./worker" ]; then
-    echo "❌ Worker binary not found!"
+if [ ! -f "./joblet" ]; then
+    echo "❌ Joblet binary not found!"
     exit 1
 fi
-cp ./worker "$BUILD_DIR/opt/worker/"
+cp ./joblet "$BUILD_DIR/opt/joblet/"
 
-if [ ! -f "./worker-cli" ]; then
-    echo "❌ Worker CLI binary not found!"
+if [ ! -f "./rnx" ]; then
+    echo "❌ RNX CLI binary not found!"
     exit 1
 fi
-cp ./worker-cli "$BUILD_DIR/opt/worker/"
+cp ./rnx "$BUILD_DIR/opt/joblet/"
 
 # Copy template files (NOT actual configs with certificates)
-if [ -f "./scripts/server-config-template.yml" ]; then
-    cp ./scripts/server-config-template.yml "$BUILD_DIR/opt/worker/scripts/"
-    echo "✅ Copied server-config-template.yml"
+if [ -f "./scripts/joblet-config-template.yml" ]; then
+    cp ./scripts/joblet-config-template.yml "$BUILD_DIR/opt/joblet/scripts/"
+    echo "✅ Copied joblet-config-template.yml"
 else
-    echo "❌ Server config template not found: ./scripts/server-config-template.yml"
+    echo "❌ Server config template not found: ./scripts/joblet-config-template.yml"
     exit 1
 fi
 
-if [ -f "./scripts/client-config-template.yml" ]; then
-    cp ./scripts/client-config-template.yml "$BUILD_DIR/opt/worker/scripts/"
-    echo "✅ Copied client-config-template.yml"
+if [ -f "./scripts/rnx-config-template.yml" ]; then
+    cp ./scripts/rnx-config-template.yml "$BUILD_DIR/opt/joblet/scripts/"
+    echo "✅ Copied rnx-config-template.yml"
 else
-    echo "❌ Client config template not found: ./scripts/client-config-template.yml"
+    echo "❌ Client config template not found: ./scripts/rnx-config-template.yml"
     exit 1
 fi
 
 # Copy service file
-cp ./scripts/worker.service "$BUILD_DIR/etc/systemd/system/"
+cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"
 
 # Copy certificate generation script (embedded version)
 cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
@@ -77,12 +77,12 @@ Priority: optional
 Architecture: $ARCH
 Depends: openssl (>= 1.1.1), systemd, debconf (>= 0.5) | debconf-2.0
 Maintainer: Jay Ehsaniara <ehsaniara@gmail.com>
-Homepage: https://github.com/ehsaniara/worker
-Description: Worker Job Isolation Platform with Embedded Certificates
+Homepage: https://github.com/ehsaniara/joblet
+Description: Joblet Job Isolation Platform with Embedded Certificates
  A job isolation platform that provides secure execution of containerized
  workloads with resource management and namespace isolation.
  .
- This package includes the worker daemon, CLI tools, and embedded certificate
+ This package includes the joblet daemon, rnx CLI tools, and embedded certificate
  management. All certificates are embedded directly in configuration files
  for simplified deployment and management.
 Installed-Size: $(du -sk $BUILD_DIR | cut -f1)
@@ -126,6 +126,6 @@ dpkg-deb -c "$PACKAGE_FILE"
 echo
 echo "🚀 Installation methods:"
 echo "  Interactive:    sudo dpkg -i $PACKAGE_FILE"
-echo "  Pre-configured: WORKER_SERVER_IP='your-ip' sudo -E dpkg -i $PACKAGE_FILE"
+echo "  Pre-configured: JOBLET_SERVER_IP='your-ip' sudo -E dpkg -i $PACKAGE_FILE"
 echo "  Automated:      DEBIAN_FRONTEND=noninteractive sudo dpkg -i $PACKAGE_FILE"
-echo "  Reconfigure:    sudo dpkg-reconfigure worker"
+echo "  Reconfigure:    sudo dpkg-reconfigure joblet"

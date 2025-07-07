@@ -3,40 +3,40 @@ package modes
 import (
 	"context"
 	"fmt"
+	"joblet/internal/modes/isolation"
+	"joblet/internal/modes/jobexec"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
-	"worker/internal/modes/isolation"
-	"worker/internal/modes/jobexec"
 
-	"worker/internal/worker"
-	"worker/internal/worker/server"
-	"worker/internal/worker/state"
-	"worker/pkg/config"
-	"worker/pkg/logger"
+	"joblet/internal/joblet"
+	"joblet/internal/joblet/server"
+	"joblet/internal/joblet/state"
+	"joblet/pkg/config"
+	"joblet/pkg/logger"
 )
 
 func RunServer(cfg *config.Config) error {
 	log := logger.WithField("mode", "server")
 
-	log.Info("starting worker server",
+	log.Info("starting joblet server",
 		"address", cfg.GetServerAddress(),
-		"maxJobs", cfg.Worker.MaxConcurrentJobs)
+		"maxJobs", cfg.Joblet.MaxConcurrentJobs)
 
 	// Create state store
 	store := state.New()
 
-	// Create worker with configuration
-	workerInstance := worker.NewWorker(store, cfg)
-	if workerInstance == nil {
-		return fmt.Errorf("failed to create worker for current platform")
+	// Create joblet with configuration
+	jobletInstance := joblet.NewJoblet(store, cfg)
+	if jobletInstance == nil {
+		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
 	// Start gRPC server with configuration
-	grpcServer, err := server.StartGRPCServer(store, workerInstance, cfg)
+	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}
@@ -61,7 +61,7 @@ func RunServer(cfg *config.Config) error {
 	return nil
 }
 
-// RunJobInit runs the worker in job initialization mode
+// RunJobInit runs the joblet in job initialization mode
 func RunJobInit(cfg *config.Config) error {
 	initLogger := logger.WithField("mode", "init")
 
@@ -70,7 +70,7 @@ func RunJobInit(cfg *config.Config) error {
 		initLogger = initLogger.WithField("jobId", jobID)
 	}
 
-	initLogger.Debug("worker starting in INIT mode",
+	initLogger.Debug("joblet starting in INIT mode",
 		"platform", runtime.GOOS,
 		"mode", "init",
 		"jobId", jobID)

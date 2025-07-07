@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"strconv"
 
-	"worker/pkg/logger"
-	"worker/pkg/platform"
+	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 )
 
 // JobConfig represents job configuration

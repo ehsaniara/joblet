@@ -4,13 +4,13 @@ set -e
 case "$1" in
     remove|upgrade|deconfigure)
         # Stop the service
-        if systemctl is-active --quiet worker; then
-            systemctl stop worker
+        if systemctl is-active --quiet joblet; then
+            systemctl stop joblet
         fi
 
         # Disable the service
-        if systemctl is-enabled --quiet worker; then
-            systemctl disable worker
+        if systemctl is-enabled --quiet joblet; then
+            systemctl disable joblet
         fi
         ;;
 esac

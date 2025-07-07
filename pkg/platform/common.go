@@ -2,10 +2,10 @@ package platform
 
 import (
 	"io"
+	"joblet/pkg/logger"
 	"os"
 	"os/exec"
 	"syscall"
-	"worker/pkg/logger"
 )
 
 // BasePlatform provides common functionality shared across platforms

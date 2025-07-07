@@ -2,9 +2,9 @@
 package platformfakes
 
 import (
+	"joblet/pkg/platform"
 	"sync"
 	"syscall"
-	"worker/pkg/platform"
 )
 
 type FakeSyscallOperations struct {

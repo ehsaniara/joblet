@@ -4,39 +4,39 @@ set -e
 case "$1" in
     remove)
         # Clean up cgroup directories
-        if [ -d "/sys/fs/cgroup/worker.slice" ]; then
-            find /sys/fs/cgroup/worker.slice -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true
+        if [ -d "/sys/fs/cgroup/joblet.slice" ]; then
+            find /sys/fs/cgroup/joblet.slice -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true
         fi
 
         # Remove log directory
-        rm -rf /var/log/worker
+        rm -rf /var/log/joblet
 
         # Remove symlinks
-        rm -f /usr/bin/worker
-        rm -f /usr/bin/worker-cli
+        rm -f /usr/bin/joblet
+        rm -f /usr/bin/rnx
 
         # Remove user-accessible certificate symlinks
-        rm -rf /etc/worker
+        rm -rf /etc/joblet
 
-        echo "Worker service removed successfully!"
+        echo "Joblet service removed successfully!"
         ;;
 
     purge)
         # Remove user and all data on purge
-        if id worker >/dev/null 2>&1; then
-            userdel worker 2>/dev/null || true
+        if id joblet >/dev/null 2>&1; then
+            userdel joblet 2>/dev/null || true
         fi
 
-        # Remove all worker files including new structure
-        rm -rf /opt/worker
-        rm -rf /var/log/worker
-        rm -rf /etc/worker
+        # Remove all joblet files including new structure
+        rm -rf /opt/joblet
+        rm -rf /var/log/joblet
+        rm -rf /etc/joblet
 
         # Remove symlinks
-        rm -f /usr/bin/worker
-        rm -f /usr/bin/worker-cli
+        rm -f /usr/bin/joblet
+        rm -f /usr/bin/rnx
 
-        echo "Worker service purged successfully!"
+        echo "Joblet service purged successfully!"
         ;;
 esac
 

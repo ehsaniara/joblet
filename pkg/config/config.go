@@ -16,7 +16,7 @@ type Config struct {
 	Version    string           `yaml:"version" json:"version"`
 	Server     ServerConfig     `yaml:"server" json:"server"`
 	Security   SecurityConfig   `yaml:"security" json:"security"`
-	Worker     WorkerConfig     `yaml:"worker" json:"worker"`
+	Joblet     JobletConfig     `yaml:"joblet" json:"joblet"`
 	Cgroup     CgroupConfig     `yaml:"cgroup" json:"cgroup"`
 	Filesystem FilesystemConfig `yaml:"filesystem" json:"filesystem"`
 	GRPC       GRPCConfig       `yaml:"grpc" json:"grpc"`
@@ -39,8 +39,8 @@ type SecurityConfig struct {
 	CACert     string `yaml:"caCert" json:"caCert"`
 }
 
-// WorkerConfig holds worker-specific configuration
-type WorkerConfig struct {
+// JobletConfig holds joblet-specific configuration
+type JobletConfig struct {
 	DefaultCPULimit    int32         `yaml:"defaultCpuLimit" json:"defaultCpuLimit"`
 	DefaultMemoryLimit int32         `yaml:"defaultMemoryLimit" json:"defaultMemoryLimit"`
 	DefaultIOLimit     int32         `yaml:"defaultIoLimit" json:"defaultIoLimit"`
@@ -112,7 +112,7 @@ var DefaultConfig = Config{
 		ServerKey:  "",
 		CACert:     "",
 	},
-	Worker: WorkerConfig{
+	Joblet: JobletConfig{
 		DefaultCPULimit:    100,
 		DefaultMemoryLimit: 512,
 		DefaultIOLimit:     0,
@@ -122,13 +122,13 @@ var DefaultConfig = Config{
 		ValidateCommands:   true,
 	},
 	Cgroup: CgroupConfig{
-		BaseDir:           "/sys/fs/cgroup/worker.slice/worker.service",
+		BaseDir:           "/sys/fs/cgroup/joblet.slice/joblet.service",
 		NamespaceMount:    "/sys/fs/cgroup",
 		EnableControllers: []string{"cpu", "memory", "io", "pids"},
 		CleanupTimeout:    5 * time.Second,
 	},
 	Filesystem: FilesystemConfig{
-		BaseDir:       "/opt/worker/jobs",
+		BaseDir:       "/opt/joblet/jobs",
 		TmpDir:        "/tmp/job-{JOB_ID}",
 		AllowedMounts: []string{"/usr/bin", "/bin", "/lib", "/lib64"},
 		BlockDevices:  false,
@@ -208,7 +208,7 @@ func (n *Node) GetClientTLSConfig() (*tls.Config, error) {
 		Certificates: []tls.Certificate{clientCert},
 		RootCAs:      caCertPool,
 		MinVersion:   tls.VersionTLS13,
-		ServerName:   "worker", // Must match server certificate
+		ServerName:   "joblet", // Must match server certificate
 	}
 
 	return tlsConfig, nil
@@ -224,17 +224,17 @@ func LoadConfig() (*Config, string, error) {
 		return nil, "", fmt.Errorf("failed to load config file: %w", err)
 	}
 
-	if val := os.Getenv("WORKER_SERVER_ADDRESS"); val != "" {
+	if val := os.Getenv("JOBLET_SERVER_ADDRESS"); val != "" {
 		config.Server.Address = val
 	}
-	if val := os.Getenv("WORKER_MODE"); val != "" {
+	if val := os.Getenv("JOBLET_MODE"); val != "" {
 		config.Server.Mode = val
 	}
 
-	if val := os.Getenv("WORKER_LOG_LEVEL"); val != "" {
+	if val := os.Getenv("JOBLET_LOG_LEVEL"); val != "" {
 		config.Logging.Level = val
 	}
-	if val := os.Getenv("WORKER_LOG_FORMAT"); val != "" {
+	if val := os.Getenv("JOBLET_LOG_FORMAT"); val != "" {
 		config.Logging.Format = val
 	}
 
@@ -249,11 +249,11 @@ func LoadConfig() (*Config, string, error) {
 // loadFromFile loads configuration from YAML file
 func loadFromFile(config *Config) (string, error) {
 	configPaths := []string{
-		os.Getenv("WORKER_CONFIG_PATH"),
-		"/opt/worker/config/server-config.yml",
-		"./config/server-config.yml",
-		"./server-config.yml",
-		"/etc/worker/server-config.yml",
+		os.Getenv("JOBLET_CONFIG_PATH"),
+		"/opt/joblet/config/joblet-config.yml",
+		"./config/joblet-config.yml",
+		"./joblet-config.yml",
+		"/etc/joblet/joblet-config.yml",
 	}
 
 	for _, path := range configPaths {
@@ -290,16 +290,16 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid server mode: %s", c.Server.Mode)
 	}
 
-	if c.Worker.DefaultCPULimit < 0 {
-		return fmt.Errorf("invalid default CPU limit: %d", c.Worker.DefaultCPULimit)
+	if c.Joblet.DefaultCPULimit < 0 {
+		return fmt.Errorf("invalid default CPU limit: %d", c.Joblet.DefaultCPULimit)
 	}
 
-	if c.Worker.DefaultMemoryLimit < 0 {
-		return fmt.Errorf("invalid default memory limit: %d", c.Worker.DefaultMemoryLimit)
+	if c.Joblet.DefaultMemoryLimit < 0 {
+		return fmt.Errorf("invalid default memory limit: %d", c.Joblet.DefaultMemoryLimit)
 	}
 
-	if c.Worker.MaxConcurrentJobs < 1 {
-		return fmt.Errorf("invalid max concurrent jobs: %d", c.Worker.MaxConcurrentJobs)
+	if c.Joblet.MaxConcurrentJobs < 1 {
+		return fmt.Errorf("invalid max concurrent jobs: %d", c.Joblet.MaxConcurrentJobs)
 	}
 
 	// Note: We don't validate certificates here as they might be populated later
@@ -325,10 +325,10 @@ func (c *Config) Validate() error {
 // LoadClientConfig loads client configuration from file
 func LoadClientConfig(configPath string) (*ClientConfig, error) {
 	if configPath == "" {
-		// Look for client-config.yml in common locations
+		// Look for rnx-config.yml in common locations
 		configPath = findClientConfig()
 		if configPath == "" {
-			return nil, fmt.Errorf("client configuration file not found. Please create client-config.yml or specify path with --config")
+			return nil, fmt.Errorf("client configuration file not found. Please create rnx-config.yml or specify path with --config")
 		}
 	}
 
@@ -378,14 +378,14 @@ func (c *ClientConfig) ListNodes() []string {
 	return nodes
 }
 
-// findClientConfig looks for client-config.yml in common locations
+// findClientConfig looks for rnx-config.yml in common locations
 func findClientConfig() string {
 	locations := []string{
-		"./client-config.yml",
-		"./config/client-config.yml",
-		filepath.Join(os.Getenv("HOME"), ".worker", "client-config.yml"),
-		"/etc/worker/client-config.yml",
-		"/opt/worker/config/client-config.yml",
+		"./rnx-config.yml",
+		"./config/rnx-config.yml",
+		filepath.Join(os.Getenv("HOME"), ".rnx", "rnx-config.yml"),
+		"/etc/joblet/rnx-config.yml",
+		"/opt/joblet/config/rnx-config.yml",
 	}
 
 	for _, path := range locations {

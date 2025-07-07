@@ -1,4 +1,4 @@
-name: Build and Release Worker
+name: Build and Release Joblet
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 env:
   GO_VERSION: '1.24'
-  PACKAGE_NAME: 'worker'
+  PACKAGE_NAME: 'joblet'
 
 jobs:
   test:
@@ -85,31 +85,31 @@ jobs:
           echo "raw_version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $CLEAN_VERSION (from $VERSION)"
 
-      - name: Build worker binary
+      - name: Build joblet binary
         run: |
           GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
             -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o worker-${{ matrix.arch }} \
-            ./cmd/worker
+            -o joblet-${{ matrix.arch }} \
+            ./cmd/joblet
 
-      - name: Build CLI binary
+      - name: Build RNX CLI binary
         run: |
           GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
             -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o worker-cli-${{ matrix.arch }} \
-            ./cmd/cli
+            -o rnx-${{ matrix.arch }} \
+            ./cmd/rnx
 
-      - name: Upload worker binary
+      - name: Upload joblet binary
         uses: actions/upload-artifact@v4
         with:
-          name: worker-binary-${{ matrix.arch }}
-          path: worker-${{ matrix.arch }}
+          name: joblet-binary-${{ matrix.arch }}
+          path: joblet-${{ matrix.arch }}
 
-      - name: Upload CLI binary
+      - name: Upload RNX CLI binary
         uses: actions/upload-artifact@v4
         with:
-          name: worker-cli-binary-${{ matrix.arch }}
-          path: worker-cli-${{ matrix.arch }}
+          name: rnx-binary-${{ matrix.arch }}
+          path: rnx-${{ matrix.arch }}
 
   build-deb-package:
     needs: [ test, build-binary ]
@@ -120,24 +120,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download worker binary
+      - name: Download joblet binary
         uses: actions/download-artifact@v4
         with:
-          name: worker-binary-${{ matrix.arch }}
+          name: joblet-binary-${{ matrix.arch }}
           path: ./
 
-      - name: Download CLI binary
+      - name: Download RNX CLI binary
         uses: actions/download-artifact@v4
         with:
-          name: worker-cli-binary-${{ matrix.arch }}
+          name: rnx-binary-${{ matrix.arch }}
           path: ./
 
       - name: Make binaries executable
         run: |
-          chmod +x worker-${{ matrix.arch }}
-          chmod +x worker-cli-${{ matrix.arch }}
-          mv worker-${{ matrix.arch }} worker
-          mv worker-cli-${{ matrix.arch }} worker-cli
+          chmod +x joblet-${{ matrix.arch }}
+          chmod +x rnx-${{ matrix.arch }}
+          mv joblet-${{ matrix.arch }} joblet
+          mv rnx-${{ matrix.arch }} rnx
 
       - name: Install packaging dependencies
         run: |
@@ -230,62 +230,62 @@ jobs:
             release/*.deb
             release/checksums.txt
           body: |
-            ## Worker ${{ github.ref_name }}
+            ## Joblet ${{ github.ref_name }}
             
             🚀 **Interactive Installation** - Automatically configures network settings during installation!
             
             ### Quick Installation
             ```bash
             # Download the appropriate package for your architecture
-            wget https://github.com/ehsaniara/worker/releases/download/${{ github.ref_name }}/worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
             # Interactive installation (recommended)
-            sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
             # Start the service
-            sudo systemctl start worker
-            sudo systemctl enable worker
+            sudo systemctl start joblet
+            sudo systemctl enable joblet
             ```
             
             ### Installation Options
             
             #### 🖥️ Interactive Mode (Default)
             ```bash
-            sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             ```
             Prompts for server IP address - the IP that clients will use to connect.
             
             #### 🤖 Automated Mode
             ```bash
             # Pre-configured installation
-            WORKER_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            JOBLET_SERVER_IP="192.168.1.100" \
+            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             ```
             
             #### 🔧 CI/CD Mode
             ```bash
             # Non-interactive installation (uses auto-detected IP)
-            DEBIAN_FRONTEND=noninteractive sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            DEBIAN_FRONTEND=noninteractive sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             ```
             
             ### Common Examples
             
             **Local Network:**
             ```bash
-            WORKER_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            JOBLET_SERVER_IP="192.168.1.100" \
+            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             ```
             
             **Public IP:**
             ```bash
-            WORKER_SERVER_IP="203.0.113.100" \
-            sudo -E dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            JOBLET_SERVER_IP="203.0.113.100" \
+            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             ```
             
             **Auto-detected (Default):**
             ```bash
             # Uses the IP from your primary network interface
-            sudo dpkg -i worker_${{ needs.build-binary.outputs.version }}_amd64.deb
+            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             ```
             
             ### Post-Installation
@@ -296,20 +296,20 @@ jobs:
             sha256sum -c checksums.txt
             
             # Check service status
-            sudo systemctl status worker
+            sudo systemctl status joblet
             
             # Test CLI connection
-            worker-cli list
+            rnx list
             ```
             
             #### Reconfiguration
             ```bash
             # Reconfigure network settings
-            sudo dpkg-reconfigure worker
+            sudo dpkg-reconfigure joblet
             
             # Or manually edit config and regenerate certificates
-            sudo nano /opt/worker/config/config.yml
-            sudo systemctl restart worker
+            sudo nano /opt/joblet/config/config.yml
+            sudo systemctl restart joblet
             ```
             
             ### What's New
@@ -319,13 +319,29 @@ jobs:
             - Enhanced user experience with clear prompts
             - Support for both interactive and automated installation
             
+            ### CLI Usage (RNX)
+                        
+            ```bash
+            # Basic commands
+            rnx list                              # List all jobs
+            rnx run echo "Hello World"            # Run a simple command
+            rnx run --max-memory=512 python3 script.py  # Run with resource limits
+            rnx status <job-id>                   # Get job status
+            rnx log <job-id>                      # Stream job logs
+            rnx stop <job-id>                     # Stop a job
+            
+            # Remote connections
+            rnx --server=remote:50051 run pytest   # Connect to remote server
+            rnx --node=production run deploy.sh    # Use specific configuration
+            ```
+            
             ### Documentation
             - Installation Guide: See release notes above
-            - Configuration: `/opt/worker/config/server-config.yml`
-            - Configuration: `/opt/worker/config/client-config.yml` (for remote use)
-            - Certificates: `/opt/worker/certs/`
-            - Logs: `sudo journalctl -u worker -f`
-            - CLI Help: `worker-cli --help`
+            - Configuration: `/opt/joblet/config/server-config.yml`
+            - Client Configuration: `/opt/joblet/config/client-config.yml` (for remote use)
+            - Certificates: Embedded in configuration files
+            - Logs: `sudo journalctl -u joblet -f`
+            - CLI Help: `rnx --help`
 
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}

@@ -1,8 +1,8 @@
-# Worker System Design Document
+# Joblet System Design Document
 
 ## 1. Overview
 
-The Worker is a distributed job execution platform that provides secure, resource-controlled execution of arbitrary commands on Linux systems. It implements a sophisticated single-binary architecture using gRPC with mutual TLS authentication, complete process isolation through Linux namespaces, and fine-grained resource management via cgroups v2.
+The Joblet is a distributed job execution platform that provides secure, resource-controlled execution of arbitrary commands on Linux systems. It implements a sophisticated single-binary architecture using gRPC with mutual TLS authentication, complete process isolation through Linux namespaces, and fine-grained resource management via cgroups v2.
 
 ### 1.1 Key Features
 

@@ -15,32 +15,32 @@ detect_current_ip() {
 
 # Set detected IP as default
 DETECTED_IP=$(detect_current_ip)
-db_set worker/server_address "$DETECTED_IP"
-db_set worker/server_port "50051"
+db_set joblet/server_address "$DETECTED_IP"
+db_set joblet/server_port "50051"
 
 # Ask configuration questions
-db_input high worker/server_address || true
-db_input high worker/server_port || true
-db_input medium worker/additional_names || true
+db_input high joblet/server_address || true
+db_input high joblet/server_port || true
+db_input medium joblet/additional_names || true
 
 # Process the configuration
 db_go
 
 # Get the values and store them for postinst
-db_get worker/server_address
+db_get joblet/server_address
 SERVER_ADDRESS="$RET"
 
-db_get worker/server_port
+db_get joblet/server_port
 SERVER_PORT="$RET"
 
-db_get worker/additional_names
+db_get joblet/additional_names
 ADDITIONAL_NAMES="$RET"
 
 # Store configuration in environment file for postinst
-cat > /tmp/worker-install-config << EOF
-WORKER_SERVER_ADDRESS="$SERVER_ADDRESS"
-WORKER_SERVER_PORT="$SERVER_PORT"
-WORKER_ADDITIONAL_NAMES="$ADDITIONAL_NAMES"
+cat > /tmp/joblet-install-config << EOF
+JOBLET_SERVER_ADDRESS="$SERVER_ADDRESS"
+JOBLET_SERVER_PORT="$SERVER_PORT"
+JOBLET_ADDITIONAL_NAMES="$ADDITIONAL_NAMES"
 EOF
 
 exit 0
