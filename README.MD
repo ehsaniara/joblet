@@ -101,7 +101,7 @@ sudo rnx list
 # should see the a COMPLETED job
 ```
 
-[](docs/installation.mov)![docs/installation.screen.png](docs/installation.screen.png)
+![Joblet Installation Demo](docs/installation.gif)
 
 ### Manual Installation
 
