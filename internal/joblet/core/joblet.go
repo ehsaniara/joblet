@@ -17,9 +17,14 @@ import (
 	"joblet/pkg/platform"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
+
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 var jobCounter int64
 
@@ -64,7 +69,7 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 	return w
 }
 
-func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error) {
 	jobID := w.getNextJobID()
 	log := w.logger.WithFields("jobID", jobID, "command", command)
 
@@ -97,11 +102,11 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	}
 
 	// Create job domain object
-	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS)
+	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS, cpuCores)
 
 	log.Debug("creating cgroup for job with resource limits",
-		"limits", fmt.Sprintf("CPU:%d, Memory:%dMB, IO:%d",
-			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS))
+		"limits", fmt.Sprintf("CPU:%d, Memory:%dMB, IO:%d, Cores:%s",
+			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS, job.Limits.CPUCores))
 
 	// Setup cgroup resources
 	if e := w.cgroup.Create(
@@ -111,6 +116,14 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		job.Limits.MaxIOBPS,
 	); e != nil {
 		return nil, fmt.Errorf("cgroup setup failed: %w", e)
+	}
+
+	// Set CPU core restrictions if specified
+	if job.Limits.CPUCores != "" {
+		if e := w.setupCPUCoreRestrictions(job); e != nil {
+			w.cleanupFailedJob(job)
+			return nil, fmt.Errorf("CPU core setup failed: %w", e)
+		}
 	}
 
 	// Register job in store
@@ -131,6 +144,117 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 
 	log.Debug("job started successfully", "pid", job.Pid)
 	return job, nil
+}
+
+func (w *Joblet) setupCPUCoreRestrictions(job *domain.Job) error {
+	log := w.logger.WithFields("jobID", job.Id, "cpuCores", job.Limits.CPUCores)
+	log.Debug("setting up CPU core restrictions")
+
+	// Validate core specification format
+	if err := w.validateCoreSpecification(job.Limits.CPUCores); err != nil {
+		return fmt.Errorf("invalid CPU core specification '%s': %w", job.Limits.CPUCores, err)
+	}
+
+	// Check if requested cores are available
+	if err := w.validateCoreAvailability(job.Limits.CPUCores); err != nil {
+		log.Warn("requested cores may not be optimal", "error", err)
+		// Don't fail the job, just warn
+	}
+
+	// Set the CPU cores using cgroup
+	if err := w.cgroup.SetCPUCores(job.CgroupPath, job.Limits.CPUCores); err != nil {
+		return fmt.Errorf("failed to set CPU cores: %w", err)
+	}
+
+	log.Info("CPU core restrictions applied successfully",
+		"cores", job.Limits.CPUCores,
+		"coreCount", w.parseCoreCount(job.Limits.CPUCores))
+
+	return nil
+}
+
+func (w *Joblet) validateCoreSpecification(cores string) error {
+	if cores == "" {
+		return fmt.Errorf("empty core specification")
+	}
+
+	// Validate format: "0-3", "1,3,5", "2", etc.
+	if strings.Contains(cores, "-") {
+		// Range format: "0-3"
+		parts := strings.Split(cores, "-")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid range format, expected 'start-end'")
+		}
+
+		start, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+		end, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+
+		if err1 != nil || err2 != nil {
+			return fmt.Errorf("invalid range numbers")
+		}
+
+		if start < 0 || end < 0 || start > end {
+			return fmt.Errorf("invalid range: start=%d, end=%d", start, end)
+		}
+	} else {
+		// List format: "1,3,5" or single core "2"
+		coreList := strings.Split(cores, ",")
+		for _, coreStr := range coreList {
+			coreNum, err := strconv.Atoi(strings.TrimSpace(coreStr))
+			if err != nil || coreNum < 0 {
+				return fmt.Errorf("invalid core number: %s", coreStr)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (w *Joblet) validateCoreAvailability(cores string) error {
+	availableCores := w.getSystemCoreCount()
+	requestedCores := w.expandCoreSpecification(cores)
+
+	for _, coreNum := range requestedCores {
+		if coreNum >= availableCores {
+			return fmt.Errorf("core %d not available (system has %d cores)", coreNum, availableCores)
+		}
+	}
+
+	return nil
+}
+
+func (w *Joblet) getSystemCoreCount() int {
+	// Read from /proc/cpuinfo or use runtime
+	return runtime.NumCPU()
+}
+
+func (w *Joblet) expandCoreSpecification(cores string) []int {
+	var result []int
+
+	if strings.Contains(cores, "-") {
+		// Range: "0-3" -> [0,1,2,3]
+		parts := strings.Split(cores, "-")
+		start, _ := strconv.Atoi(strings.TrimSpace(parts[0]))
+		end, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
+
+		for i := start; i <= end; i++ {
+			result = append(result, i)
+		}
+	} else {
+		// List: "1,3,5" -> [1,3,5]
+		coreList := strings.Split(cores, ",")
+		for _, coreStr := range coreList {
+			if coreNum, err := strconv.Atoi(strings.TrimSpace(coreStr)); err == nil {
+				result = append(result, coreNum)
+			}
+		}
+	}
+
+	return result
+}
+
+func (w *Joblet) parseCoreCount(cores string) int {
+	return len(w.expandCoreSpecification(cores))
 }
 
 func (w *Joblet) StopJob(ctx context.Context, jobID string) error {
@@ -177,7 +301,7 @@ func (w *Joblet) getNextJobID() string {
 	return fmt.Sprintf("%d", nextID)
 }
 
-func (w *Joblet) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32) *domain.Job {
+func (w *Joblet) createJobDomain(jobID, resolvedCommand string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) *domain.Job {
 	// Apply defaults from configuration
 	if maxCPU <= 0 {
 		maxCPU = w.config.Joblet.DefaultCPULimit
@@ -202,6 +326,7 @@ func (w *Joblet) createJobDomain(jobID, resolvedCommand string, args []string, m
 		Args:    append([]string(nil), args...),
 		Limits: domain.ResourceLimits{
 			MaxCPU:    maxCPU,
+			CPUCores:  cpuCores,
 			MaxMemory: maxMemory,
 			MaxIOBPS:  maxIOBPS,
 		},

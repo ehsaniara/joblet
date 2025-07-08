@@ -32,14 +32,14 @@ func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore state.Store, job
 	}
 }
 
-func (s *JobServiceServer) RunJob(ctx context.Context, runJobReq *pb.RunJobReq) (*pb.RunJobRes, error) {
+func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.RunJobRes, error) {
 	log := s.logger.WithFields(
 		"operation", "RunJob",
-		"command", runJobReq.Command,
-		"args", runJobReq.Args,
-		"maxCPU", runJobReq.MaxCPU,
-		"maxMemory", runJobReq.MaxMemory,
-		"maxIOBPS", runJobReq.MaxIOBPS,
+		"command", req.Command,
+		"args", req.Args,
+		"maxCPU", req.MaxCPU,
+		"maxMemory", req.MaxMemory,
+		"maxIOBPS", req.MaxIOBPS,
 	)
 
 	log.Debug("run job request received")
@@ -50,7 +50,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, runJobReq *pb.RunJobReq) 
 	}
 
 	startTime := time.Now()
-	newJob, err := s.joblet.StartJob(ctx, runJobReq.Command, runJobReq.Args, runJobReq.MaxCPU, runJobReq.MaxMemory, runJobReq.MaxIOBPS)
+	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores)
 
 	if err != nil {
 		duration := time.Since(startTime)

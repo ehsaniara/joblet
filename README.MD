@@ -68,7 +68,8 @@ Joblet consists of two components:
 
 - **Process Isolation**: Jobs run in separate PID namespaces
 - **Filesystem Isolation**: Chroot environments with limited host access
-- **Resource Limits**: CPU, memory, and I/O bandwidth controls
+- **Resource Limits**: CPU, memory, I/O bandwidth, and CPU core controls
+- **CPU Core Binding**: Limit jobs to specific CPU cores for performance isolation
 - **Network Security**: mTLS encryption with certificate-based authentication
 - **Role-Based Access**: Admin (full control) and Viewer (read-only) roles
 
@@ -177,13 +178,48 @@ rnx run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
 rnx run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
 ```
 
+### CPU Core Management
+
+```bash
+# Limit to specific CPU cores (range)
+rnx run --cpu-cores="0-3" python3 training.py          # Use cores 0,1,2,3
+
+# Limit to specific cores (list)
+rnx run --cpu-cores="1,3,5,7" simulation_app           # Use cores 1,3,5,7
+
+# Single core allocation
+rnx run --cpu-cores="2" lightweight_task               # Use only core 2
+
+# Combine core limiting with other resource limits
+rnx run --cpu-cores="0-1" --max-cpu=150 --max-memory=512 heavy_computation
+
+# Reserve cores for system (use all except core 0)
+rnx run --cpu-cores="1-7" user_workload                # Leave core 0 for system
+```
+
+### Resource Limiting Examples
+
+```bash
+# CPU percentage limiting (can use multiple cores at reduced time)
+rnx run --max-cpu=50 stress --cpu 4                    # 50% across all cores
+
+# CPU core limiting (dedicated cores at full speed)
+rnx run --cpu-cores="0-1" stress --cpu 2               # Full speed on cores 0-1
+
+# Combine both for precise control
+rnx run --cpu-cores="2-3" --max-cpu=150 workload       # 150% across cores 2-3 only
+
+# Memory and I/O limits
+rnx run --max-memory=1024 --max-iobps=10485760 data_processor
+```
+
 ### Job Monitoring
 
 ```bash
 # List all jobs
 rnx list
 
-# Get job details
+# Get job details (including CPU core assignment)
 rnx status <job-id>
 
 # Stream live logs
@@ -210,36 +246,52 @@ rnx list  # Uses production server
 
 ### Real-World Examples
 
+#### High-Performance Computing
+
+```bash
+# Parallel processing with dedicated cores
+rnx run --cpu-cores="0-3" --max-memory=4096 mpi_simulation
+
+# CPU-intensive tasks with core isolation
+rnx run --cpu-cores="4-7" --max-memory=2048 scientific_computation
+
+# Reserve cores for real-time applications
+rnx run --cpu-cores="8-11" realtime_data_processor
+```
+
 #### Development Workflow
 
 ```bash
-# Test on remote development server
-rnx --server=dev-server:50051 run --max-memory=1024 pytest tests/
+# Test on remote development server with limited resources
+rnx --server=dev-server:50051 run --cpu-cores="0-1" --max-memory=1024 pytest tests/
 
-# Build project with resource limits
-rnx run --max-cpu=200 --max-memory=2048 make build
+# Build project with dedicated cores
+rnx run --cpu-cores="2-5" --max-memory=2048 make build
 
-# Run security scans safely
-rnx run --max-memory=512 trivy scan .
+# Run security scans safely on specific cores
+rnx run --cpu-cores="6" --max-memory=512 trivy scan .
 ```
 
 #### CI/CD Integration
 
 ```bash
-# In CI pipeline
+# In CI pipeline with core allocation
 export JOBLET_SERVER=build-server:50051
-rnx run --max-memory=2048 docker build -t myapp .
-rnx run --max-cpu=50 npm test
+rnx run --cpu-cores="0-3" --max-memory=2048 docker build -t myapp .
+rnx run --cpu-cores="4-5" --max-cpu=50 npm test
 ```
 
 #### Data Processing
 
 ```bash
-# Process large datasets with limits
-rnx --server=data-server:50051 run --max-memory=4096 python process_data.py
+# Process large datasets with dedicated cores
+rnx --server=data-server:50051 run --cpu-cores="0-7" --max-memory=8192 python process_data.py
 
-# ETL with I/O throttling
-rnx run --max-iobps=52428800 spark-submit etl_job.py
+# ETL with I/O throttling and core limiting
+rnx run --cpu-cores="8-15" --max-iobps=52428800 spark-submit etl_job.py
+
+# Parallel data processing with core isolation
+rnx run --cpu-cores="0,2,4,6" --max-memory=4096 parallel_processor
 ```
 
 ## ⚙️ Configuration
@@ -260,6 +312,10 @@ joblet:
   defaultCpuLimit: 50
   defaultMemoryLimit: 256
   maxConcurrentJobs: 100
+
+cgroup:
+  baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service"
+  enableControllers: [ "memory", "cpu", "io", "pids", "cpuset" ]  # cpuset for core limiting
 
 security:
   # Certificates embedded here automatically
@@ -312,9 +368,54 @@ nodes:
 - **Process Isolation**: Each job runs in separate PID namespace (can only see its own processes)
 - **Filesystem Isolation**: Jobs run in chroot with limited host access
 - **Resource Isolation**: CPU, memory, and I/O limits prevent resource exhaustion
+- **CPU Core Isolation**: Jobs are bound to specific CPU cores for performance isolation
 - **Network Isolation**: Optional network namespace isolation
 
 ## 🛠️ Advanced Configuration
+
+### CPU Core Management
+
+#### System Core Allocation Strategy
+
+```bash
+# Check available cores
+nproc                           # Show total cores
+cat /proc/cpuinfo | grep processor | wc -l  # Alternative method
+
+# View current core usage
+htop                           # Interactive view
+mpstat -P ALL 1                # Per-core statistics
+
+# Check job core assignments
+taskset -cp $(pgrep your_process)  # View process CPU affinity
+```
+
+#### Multi-Tenant Core Allocation
+
+```bash
+# User 1: Cores 0-3 for development
+rnx run --cpu-cores="0-3" dev_workload
+
+# User 2: Cores 4-7 for testing  
+rnx run --cpu-cores="4-7" test_suite
+
+# User 3: Cores 8-11 for production tasks
+rnx run --cpu-cores="8-11" prod_service
+
+# System: Reserve cores 12-15 for OS and services
+# (no job allocation on these cores)
+```
+
+#### NUMA-Aware Core Allocation
+
+```bash
+# Check NUMA topology
+numactl --hardware
+
+# Allocate cores from specific NUMA nodes
+rnx run --cpu-cores="0-7" numa_node_0_workload     # NUMA node 0
+rnx run --cpu-cores="8-15" numa_node_1_workload    # NUMA node 1
+```
 
 ### Regenerate Certificates
 
@@ -392,6 +493,19 @@ openssl x509 -in ~/.rnx/rnx-config.yml -noout -text
 sudo /usr/local/bin/certs_gen_embedded.sh
 ```
 
+**CPU core limiting not working**
+
+```bash
+# Check if cpuset controller is enabled
+cat /sys/fs/cgroup/cgroup.controllers | grep cpuset
+
+# Verify cgroup configuration
+sudo cat /sys/fs/cgroup/joblet.slice/joblet.service/cgroup.subtree_control
+
+# Check job core assignment
+sudo find /sys/fs/cgroup -name "job-*" -exec sh -c 'echo "Job: {}"; cat {}/cpuset.cpus 2>/dev/null || echo "no cpuset"' \;
+```
+
 **CLI not found**
 
 ```bash
@@ -401,6 +515,20 @@ ls -la /usr/local/bin/rnx
 
 # Install if missing
 sudo ln -sf /opt/joblet/rnx /usr/local/bin/rnx
+```
+
+### Performance Monitoring
+
+```bash
+# Monitor CPU core usage
+mpstat -P ALL 2                               # Per-core statistics every 2 seconds
+
+# Check process CPU affinity
+ps -eo pid,comm,psr,pcpu | grep your_process  # PSR column shows current core
+
+# Monitor cgroup resource usage
+cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/cpuset.cpus
+cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/memory.current
 ```
 
 ### Getting Help
@@ -415,16 +543,39 @@ sudo ln -sf /opt/joblet/rnx /usr/local/bin/rnx
 ### Joblet Daemon (Linux Server)
 
 - **OS**: Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+)
+- **CPU**: Multi-core CPU recommended for core limiting features
 - **Memory**: 1GB+ RAM
 - **Disk**: 5GB+ available space
 - **Network**: Port 50051 (configurable)
 - **Privileges**: Root access for namespace operations
+- **Cgroups**: cgroups v2 with cpuset controller support
 
 ### RNX CLI (Client)
 
 - **OS**: Linux, macOS 10.15+, Windows 10+
 - **Memory**: 50MB+ RAM
 - **Network**: Access to daemon port 50051
+
+## 🚀 Command Reference
+
+### Resource Limiting Flags
+
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--max-cpu=N` | CPU time percentage limit | `--max-cpu=50` (50% CPU time) |
+| `--max-memory=N` | Memory limit in MB | `--max-memory=1024` (1GB) |
+| `--max-iobps=N` | I/O bandwidth in bytes/sec | `--max-iobps=10485760` (10MB/s) |
+| `--cpu-cores=SPEC` | CPU cores specification | `--cpu-cores="0-3"` or `--cpu-cores="1,3,5"` |
+
+### CPU Core Specification Examples
+
+| Format | Description | Cores Used |
+|--------|-------------|------------|
+| `"0"` | Single core | Core 0 only |
+| `"0-3"` | Core range | Cores 0, 1, 2, 3 |
+| `"1,3,5"` | Specific cores | Cores 1, 3, 5 only |
+| `"0-1,4-5"` | Multiple ranges | Cores 0, 1, 4, 5 |
+| `""` or omitted | No restriction | All available cores |
 
 ## 🤝 Contributing
 

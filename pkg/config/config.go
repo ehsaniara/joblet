@@ -124,7 +124,7 @@ var DefaultConfig = Config{
 	Cgroup: CgroupConfig{
 		BaseDir:           "/sys/fs/cgroup/joblet.slice/joblet.service",
 		NamespaceMount:    "/sys/fs/cgroup",
-		EnableControllers: []string{"cpu", "memory", "io", "pids"},
+		EnableControllers: []string{"cpu", "memory", "io", "pids", "cpuset"},
 		CleanupTimeout:    5 * time.Second,
 	},
 	Filesystem: FilesystemConfig{

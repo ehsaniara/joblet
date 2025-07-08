@@ -9,6 +9,6 @@ import (
 
 //counterfeiter:generate . Joblet
 type Joblet interface {
-	StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error)
+	StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error)
 	StopJob(ctx context.Context, jobId string) error
 }

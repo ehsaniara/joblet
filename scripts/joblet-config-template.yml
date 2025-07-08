@@ -22,7 +22,7 @@ joblet:
 cgroup:
   baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service"
   namespaceMount: "/sys/fs/cgroup"
-  enableControllers: [ "memory", "cpu" ]
+  enableControllers: [ "memory", "cpu", "io", "pids", "cpuset" ]
   cleanupTimeout: "1s"
 
 filesystem:

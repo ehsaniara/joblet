@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 type cgroup struct {
 	logger      *logger.Logger
 	initialized bool
@@ -60,6 +62,7 @@ type Resource interface {
 	Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error
 	SetIOLimit(cgroupPath string, ioBPS int) error
 	SetCPULimit(cgroupPath string, cpuLimit int) error
+	SetCPUCores(cgroupPath string, cores string) error
 	SetMemoryLimit(cgroupPath string, memoryLimitMB int) error
 	CleanupCgroup(jobID string)
 	EnsureControllers() error
@@ -196,6 +199,30 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 	}
 
 	log.Info("cgroup created successfully")
+	return nil
+}
+
+// SetCPUCores for setting CPU cores
+func (c *cgroup) SetCPUCores(cgroupPath string, cores string) error {
+	if cores == "" {
+		// No core restriction
+		return nil
+	}
+
+	log := c.logger.WithFields("cgroupPath", cgroupPath, "cores", cores)
+
+	cpusetPath := filepath.Join(cgroupPath, "cpuset.cpus")
+	if err := os.WriteFile(cpusetPath, []byte(cores), 0644); err != nil {
+		return fmt.Errorf("failed to set CPU cores: %w", err)
+	}
+
+	// Set memory nodes (required for cpuset)
+	memsPath := filepath.Join(cgroupPath, "cpuset.mems")
+	if err := os.WriteFile(memsPath, []byte("0"), 0644); err != nil {
+		log.Warn("failed to set memory nodes", "error", err)
+	}
+
+	log.Info("CPU cores set successfully", "cores", cores)
 	return nil
 }
 

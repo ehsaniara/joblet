@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,9 +19,10 @@ const (
 )
 
 type ResourceLimits struct {
-	MaxCPU    int32
-	MaxMemory int32
-	MaxIOBPS  int32
+	MaxCPU    int32  // Percentage of CPU time (0-100+ for multiple cores)
+	MaxMemory int32  // Memory in MB
+	MaxIOBPS  int32  // IO bandwidth
+	CPUCores  string // Core specification: "0-3", "1,3,5", "2", or "" for no limit
 }
 
 type Job struct {
@@ -33,6 +36,31 @@ type Job struct {
 	StartTime  time.Time      // Job creation timestamp
 	EndTime    *time.Time     // Completion timestamp (nil if running)
 	ExitCode   int32          // Process exit status
+}
+
+func (r *ResourceLimits) HasCoreRestriction() bool {
+	return r.CPUCores != ""
+}
+
+func (r *ResourceLimits) ParseCoreCount() int {
+	if r.CPUCores == "" {
+		return 0
+	}
+
+	// Parse "0-3" -> 4 cores, "1,3,5" -> 3 cores, "2" -> 1 core
+	cores := strings.Split(strings.ReplaceAll(r.CPUCores, "-", ","), ",")
+
+	// Handle ranges like "0-3"
+	if strings.Contains(r.CPUCores, "-") {
+		parts := strings.Split(r.CPUCores, "-")
+		if len(parts) == 2 {
+			start, _ := strconv.Atoi(parts[0])
+			end, _ := strconv.Atoi(parts[1])
+			return end - start + 1
+		}
+	}
+
+	return len(cores)
 }
 
 func (j *Job) IsRunning() bool {
