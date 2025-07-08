@@ -36,6 +36,18 @@ type FakeResource struct {
 	ensureControllersReturnsOnCall map[int]struct {
 		result1 error
 	}
+	SetCPUCoresStub        func(string, string) error
+	setCPUCoresMutex       sync.RWMutex
+	setCPUCoresArgsForCall []struct {
+		arg1 string
+		arg2 string
+	}
+	setCPUCoresReturns struct {
+		result1 error
+	}
+	setCPUCoresReturnsOnCall map[int]struct {
+		result1 error
+	}
 	SetCPULimitStub        func(string, int) error
 	setCPULimitMutex       sync.RWMutex
 	setCPULimitArgsForCall []struct {
@@ -221,6 +233,68 @@ func (fake *FakeResource) EnsureControllersReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.ensureControllersReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeResource) SetCPUCores(arg1 string, arg2 string) error {
+	fake.setCPUCoresMutex.Lock()
+	ret, specificReturn := fake.setCPUCoresReturnsOnCall[len(fake.setCPUCoresArgsForCall)]
+	fake.setCPUCoresArgsForCall = append(fake.setCPUCoresArgsForCall, struct {
+		arg1 string
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.SetCPUCoresStub
+	fakeReturns := fake.setCPUCoresReturns
+	fake.recordInvocation("SetCPUCores", []interface{}{arg1, arg2})
+	fake.setCPUCoresMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeResource) SetCPUCoresCallCount() int {
+	fake.setCPUCoresMutex.RLock()
+	defer fake.setCPUCoresMutex.RUnlock()
+	return len(fake.setCPUCoresArgsForCall)
+}
+
+func (fake *FakeResource) SetCPUCoresCalls(stub func(string, string) error) {
+	fake.setCPUCoresMutex.Lock()
+	defer fake.setCPUCoresMutex.Unlock()
+	fake.SetCPUCoresStub = stub
+}
+
+func (fake *FakeResource) SetCPUCoresArgsForCall(i int) (string, string) {
+	fake.setCPUCoresMutex.RLock()
+	defer fake.setCPUCoresMutex.RUnlock()
+	argsForCall := fake.setCPUCoresArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeResource) SetCPUCoresReturns(result1 error) {
+	fake.setCPUCoresMutex.Lock()
+	defer fake.setCPUCoresMutex.Unlock()
+	fake.SetCPUCoresStub = nil
+	fake.setCPUCoresReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeResource) SetCPUCoresReturnsOnCall(i int, result1 error) {
+	fake.setCPUCoresMutex.Lock()
+	defer fake.setCPUCoresMutex.Unlock()
+	fake.SetCPUCoresStub = nil
+	if fake.setCPUCoresReturnsOnCall == nil {
+		fake.setCPUCoresReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.setCPUCoresReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -420,6 +494,8 @@ func (fake *FakeResource) Invocations() map[string][][]interface{} {
 	defer fake.createMutex.RUnlock()
 	fake.ensureControllersMutex.RLock()
 	defer fake.ensureControllersMutex.RUnlock()
+	fake.setCPUCoresMutex.RLock()
+	defer fake.setCPUCoresMutex.RUnlock()
 	fake.setCPULimitMutex.RLock()
 	defer fake.setCPULimitMutex.RUnlock()
 	fake.setIOLimitMutex.RLock()

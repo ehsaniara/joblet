@@ -27,7 +27,7 @@ func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
 }
 
 // StartJob provides basic job execution on macOS (for development/testing)
-func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32) (*domain.Job, error) {
+func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error) {
 	w.logger.Warn("Darwin joblet has limited functionality - jobs will not be isolated")
 	return nil, fmt.Errorf("Darwin joblet not fully implemented - use Linux for production")
 }

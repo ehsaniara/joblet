@@ -38,13 +38,16 @@ Flags:
 func runRun(cmd *cobra.Command, args []string) error {
 	var (
 		maxCPU    int32
+		cpuCores  string
 		maxMemory int32
 		maxIOBPS  int32
 	)
 
 	commandStartIndex := 0
 	for i, arg := range args {
-		if strings.HasPrefix(arg, "--max-cpu=") {
+		if strings.HasPrefix(arg, "--cpu-cores=") {
+			cpuCores = strings.TrimPrefix(arg, "--cpu-cores=")
+		} else if strings.HasPrefix(arg, "--max-cpu=") {
 			if val, err := parseIntFlag(arg, "--max-cpu="); err == nil {
 				maxCPU = int32(val)
 			}
@@ -86,6 +89,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		Command:   command,
 		Args:      cmdArgs,
 		MaxCPU:    maxCPU,
+		CpuCores:  cpuCores,
 		MaxMemory: maxMemory,
 		MaxIOBPS:  maxIOBPS,
 	}
