@@ -90,9 +90,18 @@ sudo dpkg -i joblet_*_amd64.deb
 sudo systemctl start joblet
 sudo systemctl enable joblet
 
-# Test locally
-rnx --config=/opt/joblet/config/rnx-config.yml list
+# Test locally 
+
+sudo rnx list
+# should return `No jobs found`
+# create a job
+sudo rnx run ps aux
+# check the list of jobs
+sudo rnx list
+# should see the a COMPLETED job
 ```
+
+[](docs/installation.mov)![docs/installation.screen.png](docs/installation.screen.png)
 
 ### Manual Installation
 
