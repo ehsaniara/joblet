@@ -153,7 +153,7 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 		"maxMemory", maxMemory,
 		"maxIOBPS", maxIOBPS)
 
-	log.Info("creating cgroup")
+	log.Debug("creating cgroup with strict resource enforcement")
 
 	// Ensure we're working within our delegated subtree
 	if !strings.HasPrefix(cgroupJobDir, c.config.BaseDir) {
@@ -162,43 +162,69 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 
 	// Ensure controllers are set up
 	if err := c.EnsureControllers(); err != nil {
-		log.Warn("controller setup failed", "error", err)
+		return fmt.Errorf("controller setup failed: %w", err)
 	}
 
 	// Create the cgroup directory
 	if err := os.MkdirAll(cgroupJobDir, 0755); err != nil {
-		log.Error("failed to create cgroup directory", "error", err)
-		return fmt.Errorf("failed to create cgroup directory: %v", err)
+		return fmt.Errorf("failed to create cgroup directory: %w", err)
 	}
 
-	// Wait a moment for controller files to appear
+	// Wait for controller files to appear
 	time.Sleep(100 * time.Millisecond)
 
-	// Set CPU limit (with better error handling)
+	// STRICT ENFORCEMENT: All requested limits must be applied successfully
+	var enforcementErrors []error
+
+	// Set CPU limit - FAIL if requested but can't be applied
 	if maxCPU > 0 {
 		if err := c.SetCPULimit(cgroupJobDir, int(maxCPU)); err != nil {
-			log.Warn("failed to set CPU limit", "error", err)
-			// Don't fail the job creation - just log the warning
+			enforcementErrors = append(enforcementErrors,
+				fmt.Errorf("failed to enforce CPU limit %d%%: %w", maxCPU, err))
+		} else {
+			log.Info("CPU limit enforced successfully", "limit", maxCPU)
 		}
 	}
 
-	// Set memory limit (with better error handling)
+	// Set memory limit - FAIL if requested but can't be applied
 	if maxMemory > 0 {
 		if err := c.SetMemoryLimit(cgroupJobDir, int(maxMemory)); err != nil {
-			log.Warn("failed to set memory limit", "error", err)
-			// Don't fail the job creation - just log the warning
+			enforcementErrors = append(enforcementErrors,
+				fmt.Errorf("failed to enforce memory limit %dMB: %w", maxMemory, err))
+		} else {
+			log.Info("memory limit enforced successfully", "limit", maxMemory)
 		}
 	}
 
-	// Set IO limit (with better error handling)
+	// Set IO limit - FAIL if requested but can't be applied
 	if maxIOBPS > 0 {
 		if err := c.SetIOLimit(cgroupJobDir, int(maxIOBPS)); err != nil {
-			log.Warn("failed to set IO limit", "error", err)
-			// Don't fail the job creation - just log the warning
+			enforcementErrors = append(enforcementErrors,
+				fmt.Errorf("failed to enforce IO limit %d BPS: %w", maxIOBPS, err))
+		} else {
+			log.Info("IO limit enforced successfully", "limit", maxIOBPS)
 		}
 	}
 
-	log.Info("cgroup created successfully")
+	// If any enforcement failed, clean up and fail the job
+	if len(enforcementErrors) > 0 {
+		log.Error("resource limit enforcement failed, cleaning up",
+			"failedLimits", len(enforcementErrors))
+
+		// Clean up the cgroup since we can't enforce limits
+		c.CleanupCgroup(filepath.Base(cgroupJobDir))
+
+		// Combine all errors
+		var errorMsgs []string
+		for _, err := range enforcementErrors {
+			errorMsgs = append(errorMsgs, err.Error())
+		}
+
+		return fmt.Errorf("resource limit enforcement failed: %s",
+			strings.Join(errorMsgs, "; "))
+	}
+
+	log.Info("cgroup created successfully with all requested limits enforced")
 	return nil
 }
 

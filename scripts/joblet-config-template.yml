@@ -11,10 +11,10 @@ server:
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
 
 joblet:
-  defaultCpuLimit: 50
-  defaultMemoryLimit: 256
+  defaultCpuLimit: 100
+  defaultMemoryLimit: 512
   defaultIoLimit: 0
-  maxConcurrentJobs: 5
+  maxConcurrentJobs: 100
   jobTimeout: "30m"
   cleanupTimeout: "2s"
   validateCommands: true
