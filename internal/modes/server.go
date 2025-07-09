@@ -121,15 +121,40 @@ func assignToCgroup(cgroupPath string, logger *logger.Logger) error {
 		return fmt.Errorf("cgroup path cannot be empty")
 	}
 
+	// The cgroupPath from environment is the namespace view (/sys/fs/cgroup)
+	// But we need to write to the HOST view of the cgroup
+	// Convert from namespace path to host path using JOB_CGROUP_HOST_PATH
+	hostCgroupPath := os.Getenv("JOB_CGROUP_HOST_PATH")
+	if hostCgroupPath == "" {
+		// Fallback: try to construct it
+		jobID := os.Getenv("JOB_ID")
+		if jobID == "" {
+			return fmt.Errorf("cannot determine cgroup path: JOB_CGROUP_HOST_PATH and JOB_ID not set")
+		}
+		hostCgroupPath = fmt.Sprintf("/sys/fs/cgroup/joblet.slice/joblet.service/job-%s", jobID)
+	}
+
 	pid := os.Getpid()
-	procsFile := filepath.Join(cgroupPath, "cgroup.procs")
+	procsFile := filepath.Join(hostCgroupPath, "cgroup.procs")
 	pidBytes := []byte(fmt.Sprintf("%d", pid))
 
 	logger.Debug("assigning process to cgroup",
 		"pid", pid,
-		"cgroupPath", cgroupPath,
+		"namespaceCgroupPath", cgroupPath,
+		"hostCgroupPath", hostCgroupPath,
 		"procsFile", procsFile)
 
+	// Verify the host cgroup directory exists
+	if _, err := os.Stat(hostCgroupPath); err != nil {
+		return fmt.Errorf("host cgroup directory does not exist: %s: %w", hostCgroupPath, err)
+	}
+
+	// Verify the cgroup.procs file exists
+	if _, err := os.Stat(procsFile); err != nil {
+		return fmt.Errorf("cgroup.procs file does not exist: %s: %w", procsFile, err)
+	}
+
+	// Write our PID to the cgroup
 	if err := os.WriteFile(procsFile, pidBytes, 0644); err != nil {
 		return fmt.Errorf("failed to write PID %d to %s: %w", pid, procsFile, err)
 	}
@@ -154,11 +179,19 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger) er
 	logger.Debug("cgroup assignment verification",
 		"pid", pid,
 		"cgroupView", cgroupContent,
-		"expectedHostPath", expectedCgroupPath)
+		"expectedPath", expectedCgroupPath)
 
-	// In cgroup namespace, expect "0::/" format
-	if !strings.HasPrefix(cgroupContent, "0::") {
-		return fmt.Errorf("process not in cgroup namespace (expected format '0::/...', got: %q)", cgroupContent)
+	// In cgroup namespace, we expect something like "0::/job-1" or similar
+	// The key is that it should NOT be "0::/" (root cgroup)
+	if cgroupContent == "0::/" {
+		return fmt.Errorf("process still in root cgroup after assignment attempt")
+	}
+
+	// Extract job ID from expected path and verify it's in our cgroup view
+	jobID := os.Getenv("JOB_ID")
+	if jobID != "" && !strings.Contains(cgroupContent, jobID) {
+		logger.Warn("cgroup content doesn't contain job ID, but assignment may still be correct",
+			"jobID", jobID, "cgroupContent", cgroupContent)
 	}
 
 	logger.Debug("cgroup assignment verified successfully", "pid", pid)

@@ -104,8 +104,8 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS, cpuCores)
 
-	log.Debug("creating cgroup for job with resource limits",
-		"limits", fmt.Sprintf("CPU:%d, Memory:%dMB, IO:%d, Cores:%s",
+	log.Debug("creating cgroup with strict resource limit enforcement",
+		"limits", fmt.Sprintf("CPU:%d%%, Memory:%dMB, IO:%d BPS, Cores:%s",
 			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS, job.Limits.CPUCores))
 
 	// Setup cgroup resources
@@ -115,14 +115,14 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
-		return nil, fmt.Errorf("cgroup setup failed: %w", e)
+		return nil, fmt.Errorf("resource limit enforcement failed: %w", e)
 	}
 
 	// Set CPU core restrictions if specified
 	if job.Limits.CPUCores != "" {
 		if e := w.setupCPUCoreRestrictions(job); e != nil {
-			w.cleanupFailedJob(job)
-			return nil, fmt.Errorf("CPU core setup failed: %w", e)
+			w.cgroup.CleanupCgroup(job.Id)
+			return nil, fmt.Errorf("CPU core enforcement failed: %w", e)
 		}
 	}
 
@@ -148,7 +148,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 
 func (w *Joblet) setupCPUCoreRestrictions(job *domain.Job) error {
 	log := w.logger.WithFields("jobID", job.Id, "cpuCores", job.Limits.CPUCores)
-	log.Debug("setting up CPU core restrictions")
+	log.Debug("enforcing CPU core restrictions")
 
 	// Validate core specification format
 	if err := w.validateCoreSpecification(job.Limits.CPUCores); err != nil {
@@ -157,16 +157,16 @@ func (w *Joblet) setupCPUCoreRestrictions(job *domain.Job) error {
 
 	// Check if requested cores are available
 	if err := w.validateCoreAvailability(job.Limits.CPUCores); err != nil {
-		log.Warn("requested cores may not be optimal", "error", err)
-		// Don't fail the job, just warn
+		return fmt.Errorf("requested CPU cores not available: %w", err)
 	}
 
-	// Set the CPU cores using cgroup
+	// STRICT: CPU cores MUST be set successfully
 	if err := w.cgroup.SetCPUCores(job.CgroupPath, job.Limits.CPUCores); err != nil {
-		return fmt.Errorf("failed to set CPU cores: %w", err)
+		return fmt.Errorf("failed to enforce CPU core restriction '%s': %w",
+			job.Limits.CPUCores, err)
 	}
 
-	log.Info("CPU core restrictions applied successfully",
+	log.Info("CPU core restrictions enforced successfully",
 		"cores", job.Limits.CPUCores,
 		"coreCount", w.parseCoreCount(job.Limits.CPUCores))
 
@@ -355,7 +355,7 @@ func (w *Joblet) startProcessSingleBinary(ctx context.Context, job *domain.Job) 
 		return nil, fmt.Errorf("failed to get current executable path: %w", err)
 	}
 
-	// Prepare environment with job information and mode indicator
+	// environment with job information and mode indicator
 	env := w.processManager.BuildJobEnvironment(job, execPath)
 
 	// Create isolation attributes
@@ -379,20 +379,10 @@ func (w *Joblet) startProcessSingleBinary(ctx context.Context, job *domain.Job) 
 		return nil, err
 	}
 
-	// Move process to cgroup
-	if e := w.addProcessToCgroup(job.CgroupPath, result.PID); e != nil {
-		w.logger.Warn("failed to add process to cgroup", "error", e)
-	}
+	w.logger.Debug("process launched using two-stage init with self-cgroup-assignment",
+		"jobID", job.Id, "pid", result.PID)
 
-	w.logger.Debug("process launched using single binary", "jobID", job.Id, "pid", result.PID)
 	return result.Command, nil
-}
-
-// addProcessToCgroup moves a process to the specified cgroup
-func (w *Joblet) addProcessToCgroup(cgroupPath string, pid int32) error {
-	procsFile := filepath.Join(cgroupPath, "cgroup.procs")
-	pidBytes := []byte(fmt.Sprintf("%d", pid))
-	return w.platform.WriteFile(procsFile, pidBytes, 0644)
 }
 
 func (w *Joblet) updateJobAsRunning(job *domain.Job, processCmd platform.Command) {
