@@ -24,15 +24,183 @@ detect_internal_ip() {
     echo "${ip:-127.0.0.1}"
 }
 
+is_ec2_instance() {
+    # Method 1: Check for EC2 instance identity document (most reliable)
+    if curl -s --max-time 1 http://169.254.169.254/latest/dynamic/instance-identity/document >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # Method 2: Check for EC2 hypervisor UUID
+    if [ -r /sys/hypervisor/uuid ] && grep -qi "^ec2" /sys/hypervisor/uuid 2>/dev/null; then
+        return 0
+    fi
+
+    # Method 3: Check DMI product information
+    if [ -r /sys/class/dmi/id/product_uuid ]; then
+        local uuid=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        if [[ "$uuid" =~ ^ec2 ]] || [[ "$uuid" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; then
+            # Check if vendor is Amazon
+            if grep -qi "amazon\|ec2" /sys/class/dmi/id/sys_vendor 2>/dev/null; then
+                return 0
+            fi
+        fi
+    fi
+
+    # Method 4: Check for EC2 in various system files
+    if grep -qi "amazon\|ec2" /sys/class/dmi/id/bios_vendor 2>/dev/null || \
+       grep -qi "amazon\|ec2" /sys/class/dmi/id/board_vendor 2>/dev/null || \
+       grep -qi "amazon\|ec2" /sys/class/dmi/id/chassis_vendor 2>/dev/null; then
+        return 0
+    fi
+
+    return 1
+}
+
+get_ec2_metadata() {
+    local metadata_item="$1"
+    local result=$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/$metadata_item 2>/dev/null)
+    echo "$result"
+}
+
+# detect public IP (with EC2 awareness)
 detect_public_ip() {
-    # Try to get public IP from external services (with timeout)
     local public_ip=""
 
+    # First, check if we're on EC2
+    if is_ec2_instance; then
+        # Try to get public IP from EC2 metadata
+        public_ip=$(get_ec2_metadata "public-ipv4")
+        if [ -n "$public_ip" ] && [[ "$public_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "$public_ip"
+            return
+        fi
+    fi
+
+    # Fallback to external services
     # Only try if we have internet connectivity
     if ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
         # Try multiple services with short timeout
-        for service in "https://api.ipify.org" "https://ipinfo.io/ip" "https://checkip.amazonaws.com"; do
-            public_ip=$(curl -s --max-time 2 "$service" 2>/dev/null | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
+        for service in "https://checkip.amazonaws.com" "https://api.ipify.org" "https://ipinfo.io/ip"; do
+            public_ip=$(curl -s --max-time 2 "$service" 2>/dev/null | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}
+
+# Set defaults
+db_set joblet/server_address "0.0.0.0"
+db_set joblet/server_port "50051"
+
+# Detect and set internal IP
+DETECTED_INTERNAL_IP=$(detect_internal_ip)
+db_set joblet/cert_internal_ip "$DETECTED_INTERNAL_IP"
+
+# Check if we're on EC2 and get additional information
+IS_EC2=false
+EC2_INSTANCE_ID=""
+EC2_PUBLIC_HOSTNAME=""
+EC2_REGION=""
+
+if is_ec2_instance; then
+    IS_EC2=true
+    EC2_INSTANCE_ID=$(get_ec2_metadata "instance-id")
+    EC2_PUBLIC_HOSTNAME=$(get_ec2_metadata "public-hostname")
+    EC2_REGION=$(get_ec2_metadata "placement/availability-zone" | sed 's/[a-z]$//')
+
+    # Store EC2 info for display
+    cat > /tmp/joblet-ec2-info << EOF
+IS_EC2=true
+EC2_INSTANCE_ID="$EC2_INSTANCE_ID"
+EC2_PUBLIC_HOSTNAME="$EC2_PUBLIC_HOSTNAME"
+EC2_REGION="$EC2_REGION"
+EOF
+fi
+
+# Try to detect public IP (with EC2 awareness)
+DETECTED_PUBLIC_IP=$(detect_public_ip)
+if [ -n "$DETECTED_PUBLIC_IP" ]; then
+    if [ "$IS_EC2" = true ]; then
+        # For EC2, pre-fill the public IP since it's almost certainly needed
+        db_set joblet/cert_public_ip "$DETECTED_PUBLIC_IP"
+
+        # Also suggest the public hostname as domain if available
+        if [ -n "$EC2_PUBLIC_HOSTNAME" ]; then
+            db_set joblet/cert_domain "$EC2_PUBLIC_HOSTNAME"
+        fi
+    else
+        # For non-EC2, just store for informational purposes
+        echo "# Detected public IP: $DETECTED_PUBLIC_IP" > /tmp/joblet-detected-public-ip
+    fi
+fi
+
+# PAGE 1: gRPC Server Configuration
+db_beginblock
+db_input high joblet/server_address || true
+db_input high joblet/server_port || true
+db_endblock
+db_go || true
+
+# PAGE 2: Certificate Configuration
+db_beginblock
+db_input high joblet/cert_internal_ip || true
+db_input medium joblet/cert_public_ip || true
+db_input medium joblet/cert_domain || true
+db_endblock
+db_go || true
+
+# Get all the values for postinst
+db_get joblet/server_address
+SERVER_ADDRESS="$RET"
+
+db_get joblet/server_port
+SERVER_PORT="$RET"
+
+db_get joblet/cert_internal_ip
+CERT_INTERNAL_IP="$RET"
+
+db_get joblet/cert_public_ip
+CERT_PUBLIC_IP="$RET"
+
+db_get joblet/cert_domain
+CERT_DOMAIN="$RET"
+
+# Build additional names list for certificate generation
+ADDITIONAL_NAMES=""
+
+# Always include localhost
+ADDITIONAL_NAMES="localhost"
+
+# Add internal IP if different from bind address
+if [ -n "$CERT_INTERNAL_IP" ] && [ "$CERT_INTERNAL_IP" != "$SERVER_ADDRESS" ] && [ "$SERVER_ADDRESS" != "0.0.0.0" ]; then
+    ADDITIONAL_NAMES="$ADDITIONAL_NAMES,$CERT_INTERNAL_IP"
+fi
+
+# Add public IP if provided
+if [ -n "$CERT_PUBLIC_IP" ]; then
+    ADDITIONAL_NAMES="$ADDITIONAL_NAMES,$CERT_PUBLIC_IP"
+fi
+
+# Add domains if provided
+if [ -n "$CERT_DOMAIN" ]; then
+    ADDITIONAL_NAMES="$ADDITIONAL_NAMES,$CERT_DOMAIN"
+fi
+
+# Store configuration for postinst
+cat > /tmp/joblet-install-config << EOF
+JOBLET_SERVER_ADDRESS="$SERVER_ADDRESS"
+JOBLET_SERVER_PORT="$SERVER_PORT"
+JOBLET_CERT_INTERNAL_IP="$CERT_INTERNAL_IP"
+JOBLET_CERT_PUBLIC_IP="$CERT_PUBLIC_IP"
+JOBLET_CERT_DOMAIN="$CERT_DOMAIN"
+JOBLET_ADDITIONAL_NAMES="$ADDITIONAL_NAMES"
+# Primary certificate address (for certificate CN)
+# Use internal IP as primary, as it's always available
+JOBLET_CERT_PRIMARY="$CERT_INTERNAL_IP"
+EOF
+
+# Show summary
+echo "Configuration Summary:"
+echo "  gRPC Server: $SERVER_ADDRESS:$SERVER_PORT"
+echo "  Certificate IPs: $CERT_INTERNAL_IP${CERT_PUBLIC_IP:+, $CERT_PUBLIC_IP}"
+echo "  Certificate Domains: ${CERT_DOMAIN:-none}"
+
+exit 0)
             if [ -n "$public_ip" ]; then
                 break
             fi

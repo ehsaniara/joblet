@@ -37,7 +37,7 @@ Default:
 Description: Public IP Address for Certificate (Optional)
  Enter your server's public IP address if clients will connect from the internet.
  .
- Examples:
+ ${EC2_DETECTED}Examples:
   - Cloud instance: 203.0.113.100
   - Static IP: 198.51.100.42
   - Behind NAT: Your router's public IP
@@ -50,7 +50,7 @@ Default:
 Description: Domain Name for Certificate (Optional)
  Enter the domain name(s) that clients will use to connect to your server.
  .
- Examples:
+ ${EC2_HOSTNAME}Examples:
   - Single domain: api.example.com
   - Multiple domains: api.example.com,joblet.example.com
   - With subdomain: joblet.internal.company.com
