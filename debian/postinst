@@ -102,7 +102,6 @@ get_configuration() {
     fi
 }
 
-# Function to generate and embed certificates
 generate_and_embed_certificates() {
     print_info "Generating certificates with configured IPs and domains..."
 
@@ -180,7 +179,24 @@ case "$1" in
 
         get_configuration
 
-        print_info "Configuration Summary:"
+        # Check for EC2-specific information
+        EC2_INFO=""
+        if [ -f /tmp/joblet-ec2-info ]; then
+            source /tmp/joblet-ec2-info
+            if [ "$IS_EC2" = "true" ]; then
+                EC2_INFO=" (AWS EC2 Instance)"
+                print_info "🌩️  AWS EC2 instance detected!"
+                if [ -n "$EC2_INSTANCE_ID" ]; then
+                    echo "  Instance ID: $EC2_INSTANCE_ID"
+                fi
+                if [ -n "$EC2_REGION" ]; then
+                    echo "  Region: $EC2_REGION"
+                fi
+                echo
+            fi
+        fi
+
+        print_info "Configuration Summary:$EC2_INFO"
         echo "  gRPC Server Bind: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
         echo "  Certificate Primary IP: $JOBLET_CERT_PRIMARY"
         if [ -n "$JOBLET_CERT_PUBLIC_IP" ]; then
@@ -228,6 +244,7 @@ case "$1" in
         # Clean up temporary files
         rm -f /tmp/joblet-install-config
         rm -f /tmp/joblet-detected-public-ip
+        rm -f /tmp/joblet-ec2-info
 
         echo
         print_success "Joblet service installed successfully!"
