@@ -1,39 +1,58 @@
 Template: joblet/server_address
 Type: string
-Default: 127.0.0.1
-Description: Server IP address or hostname
- Enter the IP address or hostname that clients will use to connect to the
- Joblet service. This should be the address clients can reach, which may
- be different from the server's local IP if behind a reverse proxy, load
- balancer, or NAT.
+Default: 0.0.0.0
+Description: gRPC Server Bind Address
+ Enter the IP address that the Joblet gRPC server will bind to on this machine.
  .
- Examples:
-  - Direct connection: 192.168.1.100
-  - Reverse proxy: api.company.com
-  - Load balancer: lb.company.com
-  - Cloud instance: 203.0.113.100
+ Common values:
+  - 0.0.0.0 : Listen on all interfaces (recommended)
+  - 127.0.0.1 : Listen only on localhost
+  - Specific IP : Listen on a specific network interface
+ .
+ This is the address the server will listen on, NOT the address clients use to connect.
 
 Template: joblet/server_port
 Type: string
 Default: 50051
-Description: Server port number
- Enter the port number that clients will use to connect to the Joblet service.
- This should be the port that clients can reach (may be different from the
- internal port if behind a reverse proxy).
+Description: gRPC Server Port
+ Enter the port number that the Joblet gRPC server will listen on.
  .
- Default is 50051 for direct connections.
+ Default port is 50051. Make sure this port is not already in use and is
+ accessible through your firewall if clients are connecting remotely.
 
-Template: joblet/additional_names
+Template: joblet/cert_internal_ip
 Type: string
 Default:
-Description: Additional hostnames or IP addresses (optional)
- Enter additional hostnames or IP addresses that clients might use to connect,
- separated by commas. This ensures the SSL certificate will be valid for all
- connection methods.
+Description: Internal/Private IP Address for Certificate
+ This is the internal IP address of your server (auto-detected).
+ .
+ This IP will be included in the SSL certificate to allow connections
+ from within your private network (LAN).
+ .
+ Auto-detected value shown. Modify only if the detection is incorrect.
+
+Template: joblet/cert_public_ip
+Type: string
+Default:
+Description: Public IP Address for Certificate (Optional)
+ Enter your server's public IP address if clients will connect from the internet.
  .
  Examples:
-  - Multiple hostnames: api.company.com,internal.company.com
-  - Mixed: api.company.com,192.168.1.100,10.0.1.100
-  - Load balancer: lb-internal.company.com,10.0.1.50
+  - Cloud instance: 203.0.113.100
+  - Static IP: 198.51.100.42
+  - Behind NAT: Your router's public IP
  .
- Leave empty if clients will only use the primary address above.
+ Leave empty if clients will only connect from the local network.
+
+Template: joblet/cert_domain
+Type: string
+Default:
+Description: Domain Name for Certificate (Optional)
+ Enter the domain name(s) that clients will use to connect to your server.
+ .
+ Examples:
+  - Single domain: api.example.com
+  - Multiple domains: api.example.com,joblet.example.com
+  - With subdomain: joblet.internal.company.com
+ .
+ Leave empty if clients will only use IP addresses to connect.

@@ -4,43 +4,128 @@ set -e
 # Source debconf library
 . /usr/share/debconf/confmodule
 
-# Function to detect current IP
-detect_current_ip() {
-    local current_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
-    if [ -z "$current_ip" ]; then
-        current_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
+detect_internal_ip() {
+    # Try multiple methods to get the most reliable internal IP
+    local ip=""
+
+    # Method 1: Get IP from default route
+    ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
+
+    # Method 2: If that fails, get first non-localhost IP
+    if [ -z "$ip" ]; then
+        ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
     fi
-    echo "${current_ip:-127.0.0.1}"
+
+    # Method 3: Try hostname -I
+    if [ -z "$ip" ]; then
+        ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+
+    echo "${ip:-127.0.0.1}"
 }
 
-# Set detected IP as default
-DETECTED_IP=$(detect_current_ip)
-db_set joblet/server_address "$DETECTED_IP"
+detect_public_ip() {
+    # Try to get public IP from external services (with timeout)
+    local public_ip=""
+
+    # Only try if we have internet connectivity
+    if ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
+        # Try multiple services with short timeout
+        for service in "https://api.ipify.org" "https://ipinfo.io/ip" "https://checkip.amazonaws.com"; do
+            public_ip=$(curl -s --max-time 2 "$service" 2>/dev/null | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
+            if [ -n "$public_ip" ]; then
+                break
+            fi
+        done
+    fi
+
+    echo "$public_ip"
+}
+
+# Set defaults
+db_set joblet/server_address "0.0.0.0"
 db_set joblet/server_port "50051"
 
-# Ask configuration questions
+# Detect and set internal IP
+DETECTED_INTERNAL_IP=$(detect_internal_ip)
+db_set joblet/cert_internal_ip "$DETECTED_INTERNAL_IP"
+
+# Try to detect public IP (but don't set it by default)
+DETECTED_PUBLIC_IP=$(detect_public_ip)
+if [ -n "$DETECTED_PUBLIC_IP" ]; then
+    # Store for informational purposes but don't pre-fill
+    echo "# Detected public IP: $DETECTED_PUBLIC_IP" > /tmp/joblet-detected-public-ip
+fi
+
+# PAGE 1: gRPC Server Configuration
+db_beginblock
 db_input high joblet/server_address || true
 db_input high joblet/server_port || true
-db_input medium joblet/additional_names || true
+db_endblock
+db_go || true
 
-# Process the configuration
-db_go
+# PAGE 2: Certificate Configuration
+db_beginblock
+db_input high joblet/cert_internal_ip || true
+db_input medium joblet/cert_public_ip || true
+db_input medium joblet/cert_domain || true
+db_endblock
+db_go || true
 
-# Get the values and store them for postinst
+# Get all the values for postinst
 db_get joblet/server_address
 SERVER_ADDRESS="$RET"
 
 db_get joblet/server_port
 SERVER_PORT="$RET"
 
-db_get joblet/additional_names
-ADDITIONAL_NAMES="$RET"
+db_get joblet/cert_internal_ip
+CERT_INTERNAL_IP="$RET"
 
-# Store configuration in environment file for postinst
+db_get joblet/cert_public_ip
+CERT_PUBLIC_IP="$RET"
+
+db_get joblet/cert_domain
+CERT_DOMAIN="$RET"
+
+# Build additional names list for certificate generation
+ADDITIONAL_NAMES=""
+
+# Always include localhost
+ADDITIONAL_NAMES="localhost"
+
+# Add internal IP if different from bind address
+if [ -n "$CERT_INTERNAL_IP" ] && [ "$CERT_INTERNAL_IP" != "$SERVER_ADDRESS" ] && [ "$SERVER_ADDRESS" != "0.0.0.0" ]; then
+    ADDITIONAL_NAMES="$ADDITIONAL_NAMES,$CERT_INTERNAL_IP"
+fi
+
+# Add public IP if provided
+if [ -n "$CERT_PUBLIC_IP" ]; then
+    ADDITIONAL_NAMES="$ADDITIONAL_NAMES,$CERT_PUBLIC_IP"
+fi
+
+# Add domains if provided
+if [ -n "$CERT_DOMAIN" ]; then
+    ADDITIONAL_NAMES="$ADDITIONAL_NAMES,$CERT_DOMAIN"
+fi
+
+# Store configuration for postinst
 cat > /tmp/joblet-install-config << EOF
 JOBLET_SERVER_ADDRESS="$SERVER_ADDRESS"
 JOBLET_SERVER_PORT="$SERVER_PORT"
+JOBLET_CERT_INTERNAL_IP="$CERT_INTERNAL_IP"
+JOBLET_CERT_PUBLIC_IP="$CERT_PUBLIC_IP"
+JOBLET_CERT_DOMAIN="$CERT_DOMAIN"
 JOBLET_ADDITIONAL_NAMES="$ADDITIONAL_NAMES"
+# Primary certificate address (for certificate CN)
+# Use internal IP as primary, as it's always available
+JOBLET_CERT_PRIMARY="$CERT_INTERNAL_IP"
 EOF
+
+# Show summary
+echo "Configuration Summary:"
+echo "  gRPC Server: $SERVER_ADDRESS:$SERVER_PORT"
+echo "  Certificate IPs: $CERT_INTERNAL_IP${CERT_PUBLIC_IP:+, $CERT_PUBLIC_IP}"
+echo "  Certificate Domains: ${CERT_DOMAIN:-none}"
 
 exit 0

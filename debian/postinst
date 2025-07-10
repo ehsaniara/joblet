@@ -27,75 +27,133 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-# Function to detect current IP (fallback)
-detect_current_ip() {
-    local current_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
-    if [ -z "$current_ip" ]; then
-        current_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
+detect_internal_ip() {
+    local ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
+    if [ -z "$ip" ]; then
+        ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
     fi
-    echo "${current_ip:-127.0.0.1}"
+    echo "${ip:-127.0.0.1}"
 }
 
-# Function to get configuration from debconf or environment
 get_configuration() {
-    # First try environment variables (for automated installation)
-    if [ -n "$JOBLET_SERVER_IP" ]; then
-        JOBLET_SERVER_ADDRESS="$JOBLET_SERVER_IP"
-        print_info "Using server address from environment: $JOBLET_SERVER_ADDRESS"
+    # Load saved config from debian/config if it exists
+    if [ -f /tmp/joblet-install-config ]; then
+        source /tmp/joblet-install-config
+        print_info "Loaded configuration from installation"
     else
-        # Try debconf
-        if command -v db_get >/dev/null 2>&1; then
-            db_get joblet/server_address || true
-            JOBLET_SERVER_ADDRESS="$RET"
+        # Fallback to environment variables for automated installation
+        if [ -n "$JOBLET_SERVER_IP" ]; then
+            # Legacy support: JOBLET_SERVER_IP sets the certificate primary IP
+            JOBLET_CERT_PRIMARY="$JOBLET_SERVER_IP"
+            JOBLET_CERT_INTERNAL_IP="$JOBLET_SERVER_IP"
+            JOBLET_SERVER_ADDRESS="${JOBLET_SERVER_ADDRESS:-0.0.0.0}"
+            print_info "Using legacy JOBLET_SERVER_IP for certificate: $JOBLET_SERVER_IP"
+        else
+            # Try to get from debconf
+            if command -v db_get >/dev/null 2>&1; then
+                db_get joblet/server_address || true
+                JOBLET_SERVER_ADDRESS="${RET:-0.0.0.0}"
 
-            db_get joblet/server_port || true
-            JOBLET_SERVER_PORT="$RET"
+                db_get joblet/server_port || true
+                JOBLET_SERVER_PORT="${RET:-50051}"
 
-            db_get joblet/additional_names || true
-            JOBLET_ADDITIONAL_NAMES="$RET"
+                db_get joblet/cert_internal_ip || true
+                JOBLET_CERT_INTERNAL_IP="${RET}"
+
+                db_get joblet/cert_public_ip || true
+                JOBLET_CERT_PUBLIC_IP="${RET}"
+
+                db_get joblet/cert_domain || true
+                JOBLET_CERT_DOMAIN="${RET}"
+            fi
         fi
     fi
 
-    # Use detected IP as ultimate fallback
-    if [ -z "$JOBLET_SERVER_ADDRESS" ]; then
-        JOBLET_SERVER_ADDRESS=$(detect_current_ip)
-        print_warning "No server address configured, using detected IP: $JOBLET_SERVER_ADDRESS"
+    # Set defaults
+    JOBLET_SERVER_ADDRESS=${JOBLET_SERVER_ADDRESS:-0.0.0.0}
+    JOBLET_SERVER_PORT=${JOBLET_SERVER_PORT:-50051}
+
+    # Auto-detect internal IP if not set
+    if [ -z "$JOBLET_CERT_INTERNAL_IP" ]; then
+        JOBLET_CERT_INTERNAL_IP=$(detect_internal_ip)
+        print_warning "No certificate IP configured, using detected IP: $JOBLET_CERT_INTERNAL_IP"
     fi
 
-    # Set defaults
-    JOBLET_SERVER_PORT=${JOBLET_SERVER_PORT:-50051}
-    JOBLET_ADDITIONAL_NAMES=${JOBLET_ADDITIONAL_NAMES:-}
+    # Set primary certificate address (used for CN)
+    JOBLET_CERT_PRIMARY=${JOBLET_CERT_PRIMARY:-$JOBLET_CERT_INTERNAL_IP}
+
+    # Build additional names if not already set
+    if [ -z "$JOBLET_ADDITIONAL_NAMES" ]; then
+        JOBLET_ADDITIONAL_NAMES="localhost"
+
+        # Add IPs
+        if [ -n "$JOBLET_CERT_INTERNAL_IP" ] && [ "$JOBLET_CERT_INTERNAL_IP" != "$JOBLET_CERT_PRIMARY" ]; then
+            JOBLET_ADDITIONAL_NAMES="$JOBLET_ADDITIONAL_NAMES,$JOBLET_CERT_INTERNAL_IP"
+        fi
+
+        if [ -n "$JOBLET_CERT_PUBLIC_IP" ]; then
+            JOBLET_ADDITIONAL_NAMES="$JOBLET_ADDITIONAL_NAMES,$JOBLET_CERT_PUBLIC_IP"
+        fi
+
+        # Add domains
+        if [ -n "$JOBLET_CERT_DOMAIN" ]; then
+            JOBLET_ADDITIONAL_NAMES="$JOBLET_ADDITIONAL_NAMES,$JOBLET_CERT_DOMAIN"
+        fi
+    fi
 }
 
 # Function to generate and embed certificates
 generate_and_embed_certificates() {
-    print_info "Generating certificates and embedding them in config files..."
+    print_info "Generating certificates with configured IPs and domains..."
 
     # Export variables for the certificate generation script
-    export JOBLET_SERVER_ADDRESS
-    export JOBLET_ADDITIONAL_NAMES
-    export JOBLET_MODE="package-install"  # Special mode for package installation
+    export JOBLET_SERVER_ADDRESS="$JOBLET_CERT_PRIMARY"  # Primary address for certificate CN
+    export JOBLET_ADDITIONAL_NAMES="$JOBLET_ADDITIONAL_NAMES"
+    export JOBLET_MODE="package-install"
 
-    # Ensure scripts directory exists and has correct permissions
-    if [ -d "/opt/joblet/scripts" ]; then
-        chmod 755 /opt/joblet/scripts
-        chmod 644 /opt/joblet/scripts/*.yml 2>/dev/null || true
+    # Show what will be in the certificate
+    print_info "Certificate will be valid for:"
+    echo "  Primary: $JOBLET_CERT_PRIMARY"
+    if [ -n "$JOBLET_ADDITIONAL_NAMES" ]; then
+        echo "  Additional: $JOBLET_ADDITIONAL_NAMES"
     fi
 
     # Run the embedded certificate generation script
     if [ -x /usr/local/bin/certs_gen_embedded.sh ]; then
-        /usr/local/bin/certs_gen_embedded.sh
+        if /usr/local/bin/certs_gen_embedded.sh; then
+            print_success "Certificates generated successfully"
+
+            # Update the server configuration with the actual bind address and port
+            if [ -f /opt/joblet/config/joblet-config.yml ]; then
+                # Update server bind address and port in the config
+                sed -i "s/^  address:.*/  address: \"$JOBLET_SERVER_ADDRESS\"/" /opt/joblet/config/joblet-config.yml
+                sed -i "s/^  port:.*/  port: $JOBLET_SERVER_PORT/" /opt/joblet/config/joblet-config.yml
+                print_success "Updated server configuration: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
+            fi
+
+            # Update client configuration files with all valid connection endpoints
+            if [ -f /opt/joblet/config/rnx-config.yml ]; then
+                # For each node in the client config, we need to update the address
+                # The address in rnx-config.yml should be how clients connect, not the bind address
+                # Use the certificate primary address as it's what clients should connect to
+                sed -i "s/address: \"[^:]*:50051\"/address: \"$JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT\"/" /opt/joblet/config/rnx-config.yml
+                print_success "Updated client configuration with connection endpoint: $JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT"
+            fi
+
+            return 0
+        else
+            print_error "Certificate generation failed"
+            return 1
+        fi
     else
         print_error "Certificate generation script not found or not executable"
         return 1
     fi
-
-    print_success "Certificates generated and embedded successfully"
 }
 
 case "$1" in
     configure)
-        print_info "🔧 Configuring Joblet Service with Embedded Certificates..."
+        print_info "🔧 Configuring Joblet Service with Enhanced Certificate Support..."
         echo
 
         # Set basic permissions first
@@ -108,7 +166,6 @@ case "$1" in
         chmod 644 /opt/joblet/scripts/rnx-config-template.yml
         chmod +x /usr/local/bin/certs_gen_embedded.sh
 
-        # Create config directory
         mkdir -p /opt/joblet/config
         chmod 700 /opt/joblet/config  # Restricted since it will contain private keys
 
@@ -117,21 +174,40 @@ case "$1" in
             ln -sf /opt/joblet/rnx /usr/bin/rnx
         fi
 
-        # Get configuration from debconf/environment
+        if [ ! -L /usr/local/bin/rnx ]; then
+            ln -sf /opt/joblet/rnx /usr/local/bin/rnx
+        fi
+
         get_configuration
 
         print_info "Configuration Summary:"
-        echo "  Server Address: $JOBLET_SERVER_ADDRESS"
-        echo "  Server Port: $JOBLET_SERVER_PORT"
-        echo "  Additional Names: ${JOBLET_ADDITIONAL_NAMES:-none}"
+        echo "  gRPC Server Bind: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
+        echo "  Certificate Primary IP: $JOBLET_CERT_PRIMARY"
+        if [ -n "$JOBLET_CERT_PUBLIC_IP" ]; then
+            echo "  Certificate Public IP: $JOBLET_CERT_PUBLIC_IP"
+        fi
+        if [ -n "$JOBLET_CERT_DOMAIN" ]; then
+            echo "  Certificate Domain(s): $JOBLET_CERT_DOMAIN"
+        fi
         echo
 
         # Generate certificates and embed them in config files
-        generate_and_embed_certificates
+        if generate_and_embed_certificates; then
+            # Set secure permissions on config files (they now contain private keys)
+            chmod 600 /opt/joblet/config/joblet-config.yml
+            chmod 600 /opt/joblet/config/rnx-config.yml
 
-        # Set secure permissions on config files (they now contain private keys)
-        chmod 600 /opt/joblet/config/joblet-config.yml  # Server config has private keys
-        chmod 600 /opt/joblet/config/rnx-config.yml     # Client config has private keys
+            # Create convenience copy for local CLI usage
+            if [ -f /opt/joblet/config/rnx-config.yml ]; then
+                mkdir -p /etc/joblet
+                cp /opt/joblet/config/rnx-config.yml /etc/joblet/rnx-config.yml
+                chmod 644 /etc/joblet/rnx-config.yml
+                print_success "Client config available at /etc/joblet/rnx-config.yml"
+            fi
+        else
+            print_error "Failed to generate certificates"
+            exit 1
+        fi
 
         # Create log directory
         mkdir -p /var/log/joblet
@@ -142,21 +218,42 @@ case "$1" in
         if [ -d /sys/fs/cgroup ]; then
             print_info "Setting up cgroup delegation..."
             mkdir -p /sys/fs/cgroup/joblet.slice
-            echo "+cpu +memory +io +pids" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
+            echo "+cpu +memory +io +pids +cpuset" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
         fi
 
         # Enable systemd service
         systemctl daemon-reload
         systemctl enable joblet.service
 
-        echo
-        print_success "Joblet service installed successfully with embedded certificates!"
-        echo
+        # Clean up temporary files
+        rm -f /tmp/joblet-install-config
+        rm -f /tmp/joblet-detected-public-ip
 
         echo
-        print_info "📱 Remote CLI Setup:"
-        echo "  Copy /opt/joblet/config/rnx-config.yml to remote machines"
-        echo "  Remote usage: rnx --config=rnx-config.yml list"
+        print_success "Joblet service installed successfully!"
+        echo
+        print_info "🚀 Quick Start:"
+        echo "  sudo systemctl start joblet    # Start the service"
+        echo "  sudo rnx list                  # Test local connection"
+        echo
+        print_info "📱 Remote Access:"
+        echo "  The service accepts connections on: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
+        echo "  Clients can connect using any of these addresses:"
+        echo "    - $JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT (Internal network)"
+        if [ -n "$JOBLET_CERT_PUBLIC_IP" ]; then
+            echo "    - $JOBLET_CERT_PUBLIC_IP:$JOBLET_SERVER_PORT (Internet)"
+        fi
+        if [ -n "$JOBLET_CERT_DOMAIN" ]; then
+            # Split domains by comma and display each
+            IFS=',' read -ra DOMAINS <<< "$JOBLET_CERT_DOMAIN"
+            for domain in "${DOMAINS[@]}"; do
+                echo "    - ${domain}:$JOBLET_SERVER_PORT"
+            done
+        fi
+        echo
+        print_info "📋 Client Configuration:"
+        echo "  Copy /opt/joblet/config/rnx-config.yml to client machines"
+        echo "  Or use: scp root@$JOBLET_CERT_PRIMARY:/opt/joblet/config/rnx-config.yml ~/.rnx/"
         echo
         ;;
 esac
