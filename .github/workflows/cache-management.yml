@@ -1,0 +1,306 @@
+name: Cache Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_type:
+        description: 'Type of cache to clear'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - go-modules
+          - go-build
+          - apt-packages
+          - trivy-db
+          - lint-cache
+      force_clear:
+        description: 'Force clear all caches (dangerous)'
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Clear caches weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  clear-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: List current caches
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            console.log(`Total caches: ${caches.data.total_count}`);
+            console.log('Current caches:');
+            
+            const cacheTypes = {};
+            for (const cache of caches.data.actions_caches) {
+              const type = cache.key.split('-')[0];
+              cacheTypes[type] = (cacheTypes[type] || 0) + 1;
+              console.log(`  ${cache.key} (${(cache.size_in_bytes / 1024 / 1024).toFixed(2)} MB)`);
+            }
+            
+            console.log('\nCache summary by type:');
+            for (const [type, count] of Object.entries(cacheTypes)) {
+              console.log(`  ${type}: ${count} caches`);
+            }
+
+      - name: Clear Go module caches
+        if: ${{ github.event.inputs.cache_type == 'go-modules' || github.event.inputs.cache_type == 'all' || github.event.inputs.force_clear == 'true' || github.event_name == 'schedule' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            let deletedCount = 0;
+            for (const cache of caches.data.actions_caches) {
+              if (cache.key.includes('go-') && cache.key.includes('mod')) {
+                console.log(`Deleting Go module cache: ${cache.key}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                deletedCount++;
+              }
+            }
+            console.log(`Deleted ${deletedCount} Go module caches`);
+
+      - name: Clear Go build caches
+        if: ${{ github.event.inputs.cache_type == 'go-build' || github.event.inputs.cache_type == 'all' || github.event.inputs.force_clear == 'true' || github.event_name == 'schedule' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            let deletedCount = 0;
+            for (const cache of caches.data.actions_caches) {
+              if (cache.key.includes('go-build')) {
+                console.log(`Deleting Go build cache: ${cache.key}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                deletedCount++;
+              }
+            }
+            console.log(`Deleted ${deletedCount} Go build caches`);
+
+      - name: Clear APT package caches
+        if: ${{ github.event.inputs.cache_type == 'apt-packages' || github.event.inputs.cache_type == 'all' || github.event.inputs.force_clear == 'true' || github.event_name == 'schedule' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            let deletedCount = 0;
+            for (const cache of caches.data.actions_caches) {
+              if (cache.key.includes('apt-')) {
+                console.log(`Deleting APT cache: ${cache.key}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                deletedCount++;
+              }
+            }
+            console.log(`Deleted ${deletedCount} APT caches`);
+
+      - name: Clear Trivy database caches
+        if: ${{ github.event.inputs.cache_type == 'trivy-db' || github.event.inputs.cache_type == 'all' || github.event.inputs.force_clear == 'true' || github.event_name == 'schedule' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            let deletedCount = 0;
+            for (const cache of caches.data.actions_caches) {
+              if (cache.key.includes('trivy-')) {
+                console.log(`Deleting Trivy cache: ${cache.key}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                deletedCount++;
+              }
+            }
+            console.log(`Deleted ${deletedCount} Trivy caches`);
+
+      - name: Clear lint caches
+        if: ${{ github.event.inputs.cache_type == 'lint-cache' || github.event.inputs.cache_type == 'all' || github.event.inputs.force_clear == 'true' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            let deletedCount = 0;
+            for (const cache of caches.data.actions_caches) {
+              if (cache.key.includes('lint-') || cache.key.includes('golangci-')) {
+                console.log(`Deleting lint cache: ${cache.key}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                deletedCount++;
+              }
+            }
+            console.log(`Deleted ${deletedCount} lint caches`);
+
+      - name: Force clear ALL caches (dangerous)
+        if: ${{ github.event.inputs.force_clear == 'true' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            console.log(`🚨 FORCE CLEARING ALL ${caches.data.total_count} CACHES 🚨`);
+            
+            let deletedCount = 0;
+            for (const cache of caches.data.actions_caches) {
+              console.log(`Deleting cache: ${cache.key}`);
+              await github.rest.actions.deleteActionsCacheById({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                cache_id: cache.id,
+              });
+              deletedCount++;
+            }
+            console.log(`🚨 FORCE DELETED ALL ${deletedCount} CACHES 🚨`);
+
+      - name: Show remaining caches
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            console.log(`Remaining caches: ${caches.data.total_count}`);
+            if (caches.data.total_count > 0) {
+              console.log('Remaining cache keys:');
+              for (const cache of caches.data.actions_caches) {
+                console.log(`  ${cache.key} (${(cache.size_in_bytes / 1024 / 1024).toFixed(2)} MB)`);
+              }
+            } else {
+              console.log('✅ All selected caches have been cleared');
+            }
+
+  cleanup-old-artifacts:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.cache_type == 'all' || github.event.inputs.force_clear == 'true' || github.event_name == 'schedule' }}
+    steps:
+      - name: Cleanup old workflow artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 7); // Keep artifacts for 7 days
+            
+            console.log(`Total artifacts: ${artifacts.data.total_count}`);
+            
+            let deletedCount = 0;
+            for (const artifact of artifacts.data.artifacts) {
+              const createdAt = new Date(artifact.created_at);
+              if (createdAt < cutoff) {
+                console.log(`Deleting old artifact: ${artifact.name} (${artifact.created_at})`);
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deletedCount++;
+              }
+            }
+            
+            console.log(`Deleted ${deletedCount} old artifacts`);
+            console.log(`Remaining artifacts: ${artifacts.data.total_count - deletedCount}`);
+
+  cleanup-old-workflow-runs:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.force_clear == 'true' || github.event_name == 'schedule' }}
+    steps:
+      - name: Cleanup old workflow runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflows = await github.rest.actions.listRepoWorkflows({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 30); // Keep runs for 30 days
+            
+            let deletedCount = 0;
+            
+            for (const workflow of workflows.data.workflows) {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: workflow.id,
+                status: 'completed',
+                per_page: 100,
+              });
+            
+              for (const run of runs.data.workflow_runs) {
+                const createdAt = new Date(run.created_at);
+                if (createdAt < cutoff && run.conclusion !== 'success') {
+                  // Only delete failed/cancelled runs older than 30 days
+                  console.log(`Deleting old workflow run: ${workflow.name} - ${run.created_at} (${run.conclusion})`);
+                  try {
+                    await github.rest.actions.deleteWorkflowRun({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      run_id: run.id,
+                    });
+                    deletedCount++;
+                  } catch (error) {
+                    console.log(`Failed to delete run ${run.id}: ${error.message}`);
+                  }
+                }
+              }
+            }
+            
+            console.log(`Deleted ${deletedCount} old workflow runs`);
