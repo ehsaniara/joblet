@@ -1,39 +1,66 @@
-Template: joblet/server_address
-Type: string
-Default: 127.0.0.1
-Description: Server IP address or hostname
- Enter the IP address or hostname that clients will use to connect to the
- Joblet service. This should be the address clients can reach, which may
- be different from the server's local IP if behind a reverse proxy, load
- balancer, or NAT.
- .
- Examples:
-  - Direct connection: 192.168.1.100
-  - Reverse proxy: api.company.com
-  - Load balancer: lb.company.com
-  - Cloud instance: 203.0.113.100
-
-Template: joblet/server_port
-Type: string
-Default: 50051
-Description: Server port number
- Enter the port number that clients will use to connect to the Joblet service.
- This should be the port that clients can reach (may be different from the
- internal port if behind a reverse proxy).
- .
- Default is 50051 for direct connections.
-
-Template: joblet/additional_names
+Template: joblet/grpc_server_ip
 Type: string
 Default:
-Description: Additional hostnames or IP addresses (optional)
- Enter additional hostnames or IP addresses that clients might use to connect,
- separated by commas. This ensures the SSL certificate will be valid for all
- connection methods.
+Description: gRPC Server IP Address
+ Enter the IP address where the Joblet gRPC server will listen for connections.
+ This is the network interface the server will bind to.
+ .
+ Options:
+  - 0.0.0.0 (listen on all network interfaces - recommended for most setups)
+  - 192.168.1.100 (listen only on specific internal IP)
+  - 127.0.0.1 (localhost only - for testing/development)
+ .
+ For production deployments, 0.0.0.0 is usually the best choice as it allows
+ connections from any network interface while maintaining security through
+ certificate-based authentication.
+
+Template: joblet/grpc_server_port
+Type: string
+Default: 50051
+Description: gRPC Server Port
+ Enter the port number where the Joblet gRPC server will listen for connections.
+ .
+ Default is 50051. Make sure this port is:
+  - Not already in use by another service
+  - Open in your firewall if clients connect from other machines
+  - Accessible to client machines that need to connect
+
+Template: joblet/cert_primary_ip
+Type: string
+Default:
+Description: Primary Certificate IP Address (auto-detected)
+ This is the primary IP address that will be included in the SSL certificate.
+ Clients will use this IP to connect to the Joblet service.
+ .
+ Auto-detected value is usually correct for most setups. Only change if:
+  - You're behind a load balancer or reverse proxy
+  - Clients connect via a different IP than detected
+  - You're using NAT or port forwarding
+
+Template: joblet/cert_public_ip
+Type: string
+Default:
+Description: Public IP Address (optional)
+ If clients will connect from the internet, enter your public IP address.
+ This will be added to the SSL certificate to ensure secure connections
+ from external clients.
  .
  Examples:
-  - Multiple hostnames: api.company.com,internal.company.com
-  - Mixed: api.company.com,192.168.1.100,10.0.1.100
-  - Load balancer: lb-internal.company.com,10.0.1.50
+  - Cloud instance public IP: 203.0.113.100
+  - Home/office public IP: Check with whatismyip.com
  .
- Leave empty if clients will only use the primary address above.
+ Leave empty if all clients connect from the same local network.
+
+Template: joblet/cert_domain
+Type: string
+Default:
+Description: Domain Name (optional)
+ If clients will connect using a domain name, enter it here.
+ This will be added to the SSL certificate.
+ .
+ Examples:
+  - api.company.com
+  - joblet.mydomain.com
+  - internal.company.local
+ .
+ Leave empty if clients only connect via IP addresses.

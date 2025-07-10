@@ -36,35 +36,99 @@ detect_current_ip() {
     echo "${current_ip:-127.0.0.1}"
 }
 
-# Function to get configuration from debconf or environment
+# Function to get configuration from debconf or environment or config file
 get_configuration() {
-    # First try environment variables (for automated installation)
+    # First try loading from config file (if exists from previous install)
+    if [ -f "/tmp/joblet-install-config" ]; then
+        print_info "Loading configuration from installation..."
+        source /tmp/joblet-install-config
+    fi
+
+    # Environment variables override (for automated installation)
     if [ -n "$JOBLET_SERVER_IP" ]; then
-        JOBLET_SERVER_ADDRESS="$JOBLET_SERVER_IP"
-        print_info "Using server address from environment: $JOBLET_SERVER_ADDRESS"
-    else
-        # Try debconf
-        if command -v db_get >/dev/null 2>&1; then
-            db_get joblet/server_address || true
-            JOBLET_SERVER_ADDRESS="$RET"
+        # Legacy environment variable support
+        JOBLET_GRPC_SERVER_IP="$JOBLET_SERVER_IP"
+        JOBLET_CERT_PRIMARY_IP="$JOBLET_SERVER_IP"
+        print_info "Using legacy environment variable JOBLET_SERVER_IP"
+    fi
 
-            db_get joblet/server_port || true
-            JOBLET_SERVER_PORT="$RET"
+    # Try debconf if not set from config file
+    if [ -z "$JOBLET_GRPC_SERVER_IP" ] && command -v db_get >/dev/null 2>&1; then
+        db_get joblet/grpc_server_ip || true
+        JOBLET_GRPC_SERVER_IP="$RET"
 
-            db_get joblet/additional_names || true
-            JOBLET_ADDITIONAL_NAMES="$RET"
+        db_get joblet/grpc_server_port || true
+        JOBLET_GRPC_SERVER_PORT="$RET"
+
+        db_get joblet/cert_primary_ip || true
+        JOBLET_CERT_PRIMARY_IP="$RET"
+
+        db_get joblet/cert_public_ip || true
+        CERT_PUBLIC_IP="$RET"
+
+        db_get joblet/cert_domain || true
+        CERT_DOMAIN="$RET"
+
+        # Build additional names from debconf
+        JOBLET_CERT_ADDITIONAL_NAMES=""
+        if [ -n "$CERT_PUBLIC_IP" ]; then
+            JOBLET_CERT_ADDITIONAL_NAMES="$CERT_PUBLIC_IP"
+        fi
+        if [ -n "$CERT_DOMAIN" ]; then
+            if [ -n "$JOBLET_CERT_ADDITIONAL_NAMES" ]; then
+                JOBLET_CERT_ADDITIONAL_NAMES="$JOBLET_CERT_ADDITIONAL_NAMES,$CERT_DOMAIN"
+            else
+                JOBLET_CERT_ADDITIONAL_NAMES="$CERT_DOMAIN"
+            fi
         fi
     fi
 
-    # Use detected IP as ultimate fallback
-    if [ -z "$JOBLET_SERVER_ADDRESS" ]; then
-        JOBLET_SERVER_ADDRESS=$(detect_current_ip)
-        print_warning "No server address configured, using detected IP: $JOBLET_SERVER_ADDRESS"
-    fi
+    # Apply defaults for any missing values
+    DETECTED_IP=$(detect_current_ip)
+    JOBLET_GRPC_SERVER_IP=${JOBLET_GRPC_SERVER_IP:-"0.0.0.0"}
+    JOBLET_GRPC_SERVER_PORT=${JOBLET_GRPC_SERVER_PORT:-50051}
+    JOBLET_CERT_PRIMARY_IP=${JOBLET_CERT_PRIMARY_IP:-$DETECTED_IP}
+    JOBLET_CERT_ADDITIONAL_NAMES=${JOBLET_CERT_ADDITIONAL_NAMES:-}
 
-    # Set defaults
-    JOBLET_SERVER_PORT=${JOBLET_SERVER_PORT:-50051}
-    JOBLET_ADDITIONAL_NAMES=${JOBLET_ADDITIONAL_NAMES:-}
+    # Set legacy compatibility variables
+    JOBLET_SERVER_ADDRESS="$JOBLET_CERT_PRIMARY_IP"
+    JOBLET_SERVER_PORT="$JOBLET_GRPC_SERVER_PORT"
+    JOBLET_ADDITIONAL_NAMES="$JOBLET_CERT_ADDITIONAL_NAMES"
+}
+
+# Function to update joblet-config.yml with gRPC server settings
+update_server_config() {
+    local config_file="/opt/joblet/config/joblet-config.yml"
+
+    print_info "Updating server configuration with gRPC settings..."
+
+    # Create a temporary config update script
+    cat > /tmp/update_server_config.sh << 'EOF'
+#!/bin/bash
+CONFIG_FILE="$1"
+GRPC_IP="$2"
+GRPC_PORT="$3"
+
+# Check if config file exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Config file $CONFIG_FILE not found"
+    exit 1
+fi
+
+# Use sed to update the server address and port
+sed -i "s/address: \".*\"/address: \"$GRPC_IP\"/" "$CONFIG_FILE"
+sed -i "s/port: .*/port: $GRPC_PORT/" "$CONFIG_FILE"
+
+echo "Updated server configuration:"
+echo "  address: $GRPC_IP"
+echo "  port: $GRPC_PORT"
+EOF
+
+    chmod +x /tmp/update_server_config.sh
+    /tmp/update_server_config.sh "$config_file" "$JOBLET_GRPC_SERVER_IP" "$JOBLET_GRPC_SERVER_PORT"
+    rm -f /tmp/update_server_config.sh
+
+    print_success "Server configuration updated successfully"
 }
 
 # Function to generate and embed certificates
@@ -72,9 +136,13 @@ generate_and_embed_certificates() {
     print_info "Generating certificates and embedding them in config files..."
 
     # Export variables for the certificate generation script
-    export JOBLET_SERVER_ADDRESS
-    export JOBLET_ADDITIONAL_NAMES
+    export JOBLET_SERVER_ADDRESS="$JOBLET_CERT_PRIMARY_IP"
+    export JOBLET_ADDITIONAL_NAMES="$JOBLET_CERT_ADDITIONAL_NAMES"
     export JOBLET_MODE="package-install"  # Special mode for package installation
+
+    print_info "Certificate configuration:"
+    echo "  Primary IP: $JOBLET_CERT_PRIMARY_IP"
+    echo "  Additional names: ${JOBLET_CERT_ADDITIONAL_NAMES:-none}"
 
     # Ensure scripts directory exists and has correct permissions
     if [ -d "/opt/joblet/scripts" ]; then
@@ -121,13 +189,16 @@ case "$1" in
         get_configuration
 
         print_info "Configuration Summary:"
-        echo "  Server Address: $JOBLET_SERVER_ADDRESS"
-        echo "  Server Port: $JOBLET_SERVER_PORT"
-        echo "  Additional Names: ${JOBLET_ADDITIONAL_NAMES:-none}"
+        echo "  gRPC Server: $JOBLET_GRPC_SERVER_IP:$JOBLET_GRPC_SERVER_PORT"
+        echo "  Certificate Primary IP: $JOBLET_CERT_PRIMARY_IP"
+        echo "  Certificate Additional Names: ${JOBLET_CERT_ADDITIONAL_NAMES:-none}"
         echo
 
         # Generate certificates and embed them in config files
         generate_and_embed_certificates
+
+        # Update the joblet-config.yml with gRPC server settings
+        update_server_config
 
         # Set secure permissions on config files (they now contain private keys)
         chmod 600 /opt/joblet/config/joblet-config.yml  # Server config has private keys
@@ -149,15 +220,27 @@ case "$1" in
         systemctl daemon-reload
         systemctl enable joblet.service
 
+        # Clean up temporary config file
+        rm -f /tmp/joblet-install-config
+
         echo
         print_success "Joblet service installed successfully with embedded certificates!"
         echo
 
+        print_info "🚀 Service Configuration:"
+        echo "  gRPC Server listening on: $JOBLET_GRPC_SERVER_IP:$JOBLET_GRPC_SERVER_PORT"
+        echo "  SSL Certificate valid for: $JOBLET_CERT_PRIMARY_IP${JOBLET_CERT_ADDITIONAL_NAMES:+, $JOBLET_CERT_ADDITIONAL_NAMES}"
         echo
+
         print_info "📱 Remote CLI Setup:"
         echo "  Copy /opt/joblet/config/rnx-config.yml to remote machines"
         echo "  Remote usage: rnx --config=rnx-config.yml list"
         echo
+
+        print_info "🔧 Next Steps:"
+        echo "  sudo systemctl start joblet    # Start the service"
+        echo "  rnx list                       # Test local connection"
+        echo "  sudo journalctl -u joblet -f   # View service logs"
         ;;
 esac
 

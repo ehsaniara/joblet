@@ -178,8 +178,13 @@ if [ -f "$SERVER_TEMPLATE" ]; then
     # Copy template
     cp "$SERVER_TEMPLATE" "$SERVER_CONFIG"
 
-    # Update server address in the config
-    sed -i "s/address: \".*\"/address: \"$SERVER_ADDRESS\"/" "$SERVER_CONFIG"
+    # Get gRPC server settings from environment or use defaults
+    GRPC_SERVER_IP="${JOBLET_GRPC_SERVER_IP:-0.0.0.0}"
+    GRPC_SERVER_PORT="${JOBLET_GRPC_SERVER_PORT:-50051}"
+
+    # Update server address and port in the config
+    sed -i "s/address: \".*\"/address: \"$GRPC_SERVER_IP\"/" "$SERVER_CONFIG"
+    sed -i "s/port: .*/port: $GRPC_SERVER_PORT/" "$SERVER_CONFIG"
 
     # Append security section with embedded certificates
     cat >> "$SERVER_CONFIG" << EOF
@@ -195,13 +200,13 @@ $(read_cert_for_yaml ca-cert.pem "    ")
 EOF
 
     print_success "Server configuration updated with embedded certificates"
+    print_info "gRPC Server configured: $GRPC_SERVER_IP:$GRPC_SERVER_PORT"
 else
     print_error "Server template not found: $SERVER_TEMPLATE"
 fi
 
 # Update client configuration with embedded certificates
 print_info "Updating client configuration with embedded certificates..."
-CLIENT_TEMPLATE="$TEMPLATE_DIR/rnx-config-template.yml"
 CLIENT_CONFIG="$CONFIG_DIR/rnx-config.yml"
 
 # Create client configuration with embedded certificates
@@ -210,7 +215,7 @@ version: "3.0"
 
 nodes:
   default:
-    address: "$SERVER_ADDRESS:50051"
+    address: "$SERVER_ADDRESS:${JOBLET_GRPC_SERVER_PORT:-50051}"
     cert: |
 $(read_cert_for_yaml admin-client-cert.pem "      ")
     key: |
@@ -219,7 +224,7 @@ $(read_cert_for_yaml admin-client-key.pem "      ")
 $(read_cert_for_yaml ca-cert.pem "      ")
 
   viewer:
-    address: "$SERVER_ADDRESS:50051"
+    address: "$SERVER_ADDRESS:${JOBLET_GRPC_SERVER_PORT:-50051}"
     cert: |
 $(read_cert_for_yaml viewer-client-cert.pem "      ")
     key: |
@@ -281,8 +286,9 @@ echo "  Server: systemctl start joblet  # Uses embedded certs from joblet-config
 echo "  CLI: rnx --config=$CLIENT_CONFIG list  # Uses embedded certs"
 echo
 
-print_info "🔧 To regenerate certificates:"
-echo "  JOBLET_SERVER_ADDRESS='your-server' $0"
+print_info "🔧 Configuration Summary:"
+echo "  gRPC Server: ${GRPC_SERVER_IP:-0.0.0.0}:${JOBLET_GRPC_SERVER_PORT:-50051}"
+echo "  Certificate for: $SERVER_ADDRESS${ADDITIONAL_NAMES:+, $ADDITIONAL_NAMES}"
 echo
 
 print_success "Ready to use with embedded certificates!"
