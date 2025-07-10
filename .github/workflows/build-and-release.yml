@@ -15,10 +15,38 @@ permissions:
 env:
   GO_VERSION: '1.24'
   PACKAGE_NAME: 'joblet'
+  # Cache version - increment this to invalidate all caches
+  CACHE_VERSION: 'v2'
 
 jobs:
+  clear-cache:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[clear-cache]') || contains(github.event.head_commit.message, '[cache-clear]')
+    steps:
+      - name: Clear Go module cache
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const caches = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            for (const cache of caches.data.actions_caches) {
+              if (cache.key.includes('go-') || cache.key.includes('build-')) {
+                console.log(`Deleting cache: ${cache.key}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+              }
+            }
+
   test:
     runs-on: ubuntu-latest
+    needs: [ clear-cache ]
+    if: always() && (needs.clear-cache.result == 'success' || needs.clear-cache.result == 'skipped')
     steps:
       - uses: actions/checkout@v4
 
@@ -28,12 +56,20 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Cache Go modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-go-
+
+      - name: Clean Go module cache (if requested)
+        if: contains(github.event.head_commit.message, '[clean-modules]')
+        run: |
+          go clean -modcache
+          go clean -cache
 
       - name: Install dependencies
         run: go mod download
@@ -45,6 +81,8 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
+          # Skip cache on lint issues
+          skip-cache: ${{ contains(github.event.head_commit.message, '[skip-lint-cache]') }}
 
   build-binary:
     needs: test
@@ -63,6 +101,23 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-go-build-${{ matrix.arch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-go-build-${{ matrix.arch }}-
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-go-
+
+      - name: Clean build cache (if requested)
+        if: contains(github.event.head_commit.message, '[clean-build]')
+        run: |
+          go clean -cache
+          rm -rf ~/.cache/go-build/*
 
       - name: Determine version
         id: version
@@ -104,12 +159,14 @@ jobs:
         with:
           name: joblet-binary-${{ matrix.arch }}
           path: joblet-${{ matrix.arch }}
+          retention-days: 1
 
       - name: Upload RNX CLI binary
         uses: actions/upload-artifact@v4
         with:
           name: rnx-binary-${{ matrix.arch }}
           path: rnx-${{ matrix.arch }}
+          retention-days: 1
 
   build-deb-package:
     needs: [ test, build-binary ]
@@ -139,6 +196,14 @@ jobs:
           mv joblet-${{ matrix.arch }} joblet
           mv rnx-${{ matrix.arch }} rnx
 
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-apt-${{ hashFiles('scripts/build-deb.sh') }}
+          restore-keys: |
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-apt-
+
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
@@ -158,6 +223,7 @@ jobs:
         with:
           name: debian-package-${{ matrix.arch }}
           path: "*.deb"
+          retention-days: 5
 
       - name: Test package installation (amd64 only)
         if: matrix.arch == 'amd64'
@@ -184,6 +250,14 @@ jobs:
         with:
           name: debian-package-amd64
           path: ./packages/
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-trivy-${{ github.run_id }}
+          restore-keys: |
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-trivy-
 
       - name: Security scan with Trivy
         uses: aquasecurity/trivy-action@master
@@ -320,7 +394,7 @@ jobs:
             - Support for both interactive and automated installation
             
             ### CLI Usage (RNX)
-                        
+            
             ```bash
             # Basic commands
             rnx list                              # List all jobs
@@ -347,3 +421,32 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [ release ]
+    if: always()
+    steps:
+      - name: Cleanup old artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 7); // Keep artifacts for 7 days
+            
+            for (const artifact of artifacts.data.artifacts) {
+              const createdAt = new Date(artifact.created_at);
+              if (createdAt < cutoff) {
+                console.log(`Deleting old artifact: ${artifact.name} (${artifact.created_at})`);
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+              }
+            }

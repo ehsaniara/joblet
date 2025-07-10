@@ -149,7 +149,7 @@ var DefaultConfig = Config{
 
 // GetServerAddress Server-specific convenience methods
 func (c *Config) GetServerAddress() string {
-	return fmt.Sprintf(":%d", c.Server.Address, c.Server.Port)
+	return fmt.Sprintf("%s:%d", c.Server.Address, c.Server.Port)
 }
 
 func (c *Config) GetCgroupPath(jobID string) string {
