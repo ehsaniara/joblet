@@ -15,7 +15,6 @@ permissions:
 env:
   GO_VERSION: '1.24'
   PACKAGE_NAME: 'joblet'
-  # Cache version - increment this to invalidate all caches
   CACHE_VERSION: 'v2'
 
 jobs:
@@ -45,8 +44,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: [ clear-cache ]
-    if: always() && (needs.clear-cache.result == 'success' || needs.clear-cache.result == 'skipped')
     steps:
       - uses: actions/checkout@v4
 
@@ -81,7 +78,6 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          # Skip cache on lint issues
           skip-cache: ${{ contains(github.event.head_commit.message, '[skip-lint-cache]') }}
 
   build-binary:
@@ -128,10 +124,8 @@ jobs:
             VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
           fi
           
-          # Clean version for Debian package format (remove git commit info)
           CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
           
-          # Ensure version starts with digit
           if [[ ! "$CLEAN_VERSION" =~ ^[0-9] ]]; then
             CLEAN_VERSION="1.0.0"
           fi
@@ -228,10 +222,7 @@ jobs:
       - name: Test package installation (amd64 only)
         if: matrix.arch == 'amd64'
         run: |
-          # Test package can be installed (dry run)
           sudo dpkg --dry-run -i *.deb
-          
-          # Check package info
           dpkg-deb -I *.deb
           dpkg-deb -c *.deb
 
@@ -297,6 +288,16 @@ jobs:
           sha256sum *.deb > checksums.txt
           cat checksums.txt
 
+      - name: Get version for release
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="0.0.0"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -311,111 +312,15 @@ jobs:
             ### Quick Installation
             ```bash
             # Download the appropriate package for your architecture
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/joblet_${{ steps.get_version.outputs.version }}_amd64.deb
             
             # Interactive installation (recommended)
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
+            sudo dpkg -i joblet_${{ steps.get_version.outputs.version }}_amd64.deb
             
             # Start the service
             sudo systemctl start joblet
             sudo systemctl enable joblet
             ```
-            
-            ### Installation Options
-            
-            #### 🖥️ Interactive Mode (Default)
-            ```bash
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            Prompts for server IP address - the IP that clients will use to connect.
-            
-            #### 🤖 Automated Mode
-            ```bash
-            # Pre-configured installation
-            JOBLET_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            #### 🔧 CI/CD Mode
-            ```bash
-            # Non-interactive installation (uses auto-detected IP)
-            DEBIAN_FRONTEND=noninteractive sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            ### Common Examples
-            
-            **Local Network:**
-            ```bash
-            JOBLET_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            **Public IP:**
-            ```bash
-            JOBLET_SERVER_IP="203.0.113.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            **Auto-detected (Default):**
-            ```bash
-            # Uses the IP from your primary network interface
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            ### Post-Installation
-            
-            #### Verification
-            ```bash
-            # Verify checksums
-            sha256sum -c checksums.txt
-            
-            # Check service status
-            sudo systemctl status joblet
-            
-            # Test CLI connection
-            rnx list
-            ```
-            
-            #### Reconfiguration
-            ```bash
-            # Reconfigure network settings
-            sudo dpkg-reconfigure joblet
-            
-            # Or manually edit config and regenerate certificates
-            sudo nano /opt/joblet/config/config.yml
-            sudo systemctl restart joblet
-            ```
-            
-            ### What's New
-            - Interactive installation asks for server IP address
-            - Automatic certificate generation for the specified IP
-            - Simplified configuration - just one IP address needed
-            - Enhanced user experience with clear prompts
-            - Support for both interactive and automated installation
-            
-            ### CLI Usage (RNX)
-            
-            ```bash
-            # Basic commands
-            rnx list                              # List all jobs
-            rnx run echo "Hello World"            # Run a simple command
-            rnx run --max-memory=512 python3 script.py  # Run with resource limits
-            rnx status <job-id>                   # Get job status
-            rnx log <job-id>                      # Stream job logs
-            rnx stop <job-id>                     # Stop a job
-            
-            # Remote connections
-            rnx --server=remote:50051 run pytest   # Connect to remote server
-            rnx --node=production run deploy.sh    # Use specific configuration
-            ```
-            
-            ### Documentation
-            - Installation Guide: See release notes above
-            - Configuration: `/opt/joblet/config/server-config.yml`
-            - Client Configuration: `/opt/joblet/config/client-config.yml` (for remote use)
-            - Certificates: Embedded in configuration files
-            - Logs: `sudo journalctl -u joblet -f`
-            - CLI Help: `rnx --help`
 
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
@@ -437,7 +342,7 @@ jobs:
             });
             
             const cutoff = new Date();
-            cutoff.setDate(cutoff.getDate() - 7); // Keep artifacts for 7 days
+            cutoff.setDate(cutoff.getDate() - 7);
             
             for (const artifact of artifacts.data.artifacts) {
               const createdAt = new Date(artifact.created_at);
