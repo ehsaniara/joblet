@@ -13,34 +13,83 @@ detect_current_ip() {
     echo "${current_ip:-127.0.0.1}"
 }
 
-# Set detected IP as default
+# Set defaults
 DETECTED_IP=$(detect_current_ip)
-db_set joblet/server_address "$DETECTED_IP"
-db_set joblet/server_port "50051"
 
-# Ask configuration questions
-db_input high joblet/server_address || true
-db_input high joblet/server_port || true
-db_input medium joblet/additional_names || true
+# Set default values
+db_set joblet/grpc_server_ip "0.0.0.0"
+db_set joblet/grpc_server_port "50051"
+db_set joblet/cert_primary_ip "$DETECTED_IP"
 
-# Process the configuration
+# Page 1: gRPC Server Configuration
+db_settitle joblet/grpc_server_ip "Joblet gRPC Server Configuration"
+db_input high joblet/grpc_server_ip || true
+db_input high joblet/grpc_server_port || true
 db_go
 
-# Get the values and store them for postinst
-db_get joblet/server_address
-SERVER_ADDRESS="$RET"
+# Page 2: Certificate Configuration
+db_settitle joblet/cert_primary_ip "Joblet SSL Certificate Configuration"
+db_input high joblet/cert_primary_ip || true
+db_input medium joblet/cert_public_ip || true
+db_input medium joblet/cert_domain || true
+db_go
 
-db_get joblet/server_port
-SERVER_PORT="$RET"
+# Get all values and store them for postinst
+db_get joblet/grpc_server_ip
+GRPC_SERVER_IP="$RET"
 
-db_get joblet/additional_names
-ADDITIONAL_NAMES="$RET"
+db_get joblet/grpc_server_port
+GRPC_SERVER_PORT="$RET"
+
+db_get joblet/cert_primary_ip
+CERT_PRIMARY_IP="$RET"
+
+db_get joblet/cert_public_ip
+CERT_PUBLIC_IP="$RET"
+
+db_get joblet/cert_domain
+CERT_DOMAIN="$RET"
+
+# Validate inputs
+if [ -z "$GRPC_SERVER_IP" ]; then
+    GRPC_SERVER_IP="0.0.0.0"
+fi
+
+if [ -z "$GRPC_SERVER_PORT" ]; then
+    GRPC_SERVER_PORT="50051"
+fi
+
+if [ -z "$CERT_PRIMARY_IP" ]; then
+    CERT_PRIMARY_IP="$DETECTED_IP"
+fi
+
+# Build certificate additional names
+CERT_ADDITIONAL_NAMES=""
+if [ -n "$CERT_PUBLIC_IP" ]; then
+    CERT_ADDITIONAL_NAMES="$CERT_PUBLIC_IP"
+fi
+if [ -n "$CERT_DOMAIN" ]; then
+    if [ -n "$CERT_ADDITIONAL_NAMES" ]; then
+        CERT_ADDITIONAL_NAMES="$CERT_ADDITIONAL_NAMES,$CERT_DOMAIN"
+    else
+        CERT_ADDITIONAL_NAMES="$CERT_DOMAIN"
+    fi
+fi
 
 # Store configuration in environment file for postinst
 cat > /tmp/joblet-install-config << EOF
-JOBLET_SERVER_ADDRESS="$SERVER_ADDRESS"
-JOBLET_SERVER_PORT="$SERVER_PORT"
-JOBLET_ADDITIONAL_NAMES="$ADDITIONAL_NAMES"
+# gRPC Server Configuration
+JOBLET_GRPC_SERVER_IP="$GRPC_SERVER_IP"
+JOBLET_GRPC_SERVER_PORT="$GRPC_SERVER_PORT"
+
+# Certificate Configuration
+JOBLET_CERT_PRIMARY_IP="$CERT_PRIMARY_IP"
+JOBLET_CERT_ADDITIONAL_NAMES="$CERT_ADDITIONAL_NAMES"
+
+# Legacy compatibility (for existing scripts)
+JOBLET_SERVER_ADDRESS="$CERT_PRIMARY_IP"
+JOBLET_SERVER_PORT="$GRPC_SERVER_PORT"
+JOBLET_ADDITIONAL_NAMES="$CERT_ADDITIONAL_NAMES"
 EOF
 
 exit 0
