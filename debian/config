@@ -24,35 +24,26 @@ detect_internal_ip() {
     echo "${ip:-127.0.0.1}"
 }
 
-# Function to detect if running on AWS EC2
 is_ec2_instance() {
-    # Check for EC2 instance identity document
-    if curl -s --max-time 1 http://169.254.169.254/latest/dynamic/instance-identity/document >/dev/null 2>&1; then
+    if curl -s --max-time 1 --connect-timeout 1 http://169.254.169.254/latest/dynamic/instance-identity/document >/dev/null 2>&1; then
         return 0
     fi
 
-    # Check for EC2 hypervisor UUID
-    if [ -r /sys/hypervisor/uuid ] && grep -qi "^ec2" /sys/hypervisor/uuid 2>/dev/null; then
-        return 0
-    fi
-
-    # Check DMI product information
-    if [ -r /sys/class/dmi/id/product_uuid ]; then
-        local uuid=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null | tr '[:upper:]' '[:lower:]')
-        if [[ "$uuid" =~ ^ec2 ]] || [[ "$uuid" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; then
-            # Check vendor
-            if grep -qi "amazon\|ec2" /sys/class/dmi/id/sys_vendor 2>/dev/null; then
-                return 0
-            fi
+    # Check hypervisor UUID if exists
+    if [ -r /sys/hypervisor/uuid ]; then
+        if grep -qi "^ec2" /sys/hypervisor/uuid 2>/dev/null; then
+            return 0
         fi
     fi
 
-    # Check for EC2 in system files
-    if grep -qi "amazon\|ec2" /sys/class/dmi/id/bios_vendor 2>/dev/null || \
-       grep -qi "amazon\|ec2" /sys/class/dmi/id/board_vendor 2>/dev/null || \
-       grep -qi "amazon\|ec2" /sys/class/dmi/id/chassis_vendor 2>/dev/null; then
-        return 0
-    fi
+    # Check DMI for Amazon
+    for dmi_file in /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/bios_vendor /sys/class/dmi/id/board_vendor; do
+        if [ -r "$dmi_file" ]; then
+            if grep -qi "amazon\|ec2" "$dmi_file" 2>/dev/null; then
+                return 0
+            fi
+        fi
+    done
 
     return 1
 }
@@ -87,23 +78,21 @@ detect_public_ip() {
 db_set joblet/server_address "0.0.0.0"
 db_set joblet/server_port "50051"
 
-# Detect and set internal IP
+# Detect internal IP
 DETECTED_INTERNAL_IP=$(detect_internal_ip)
 db_set joblet/cert_internal_ip "$DETECTED_INTERNAL_IP"
 
-# Check if we're on EC2 and get additional information
+# Simple EC2 detection
 IS_EC2=false
-EC2_INSTANCE_ID=""
-EC2_PUBLIC_HOSTNAME=""
-EC2_REGION=""
-
 if is_ec2_instance; then
     IS_EC2=true
+
+    # Get EC2 info if available
     EC2_INSTANCE_ID=$(get_ec2_metadata "instance-id")
     EC2_PUBLIC_HOSTNAME=$(get_ec2_metadata "public-hostname")
     EC2_REGION=$(get_ec2_metadata "placement/availability-zone" | sed 's/[a-z]$//')
 
-    # Store EC2 info for display
+    # Save for later use
     cat > /tmp/joblet-ec2-info << EOF
 IS_EC2=true
 EC2_INSTANCE_ID="$EC2_INSTANCE_ID"
@@ -112,20 +101,15 @@ EC2_REGION="$EC2_REGION"
 EOF
 fi
 
-# Try to detect public IP with EC2 awareness
+# Detect public IP
 DETECTED_PUBLIC_IP=$(detect_public_ip)
 if [ -n "$DETECTED_PUBLIC_IP" ]; then
     if [ "$IS_EC2" = true ]; then
-        # For EC2, pre-fill the public IP
+        # Pre-fill for EC2
         db_set joblet/cert_public_ip "$DETECTED_PUBLIC_IP"
-
-        # Also suggest the public hostname as domain if available
         if [ -n "$EC2_PUBLIC_HOSTNAME" ]; then
             db_set joblet/cert_domain "$EC2_PUBLIC_HOSTNAME"
         fi
-    else
-        # For non-EC2, store for informational purposes
-        echo "# Detected public IP: $DETECTED_PUBLIC_IP" > /tmp/joblet-detected-public-ip
     fi
 fi
 
