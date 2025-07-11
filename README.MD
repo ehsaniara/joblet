@@ -222,6 +222,23 @@ rnx run --cpu-cores="2-3" --max-cpu=150 workload       # 150% across cores 2-3 o
 rnx run --max-memory=1024 --max-iobps=10485760 data_processor
 ```
 
+#### Example
+
+```bash
+rnx --cpu-cores="1" --max-cpu=50 run bash -c "while true; do :; done"
+Job started:
+ID: 2
+Command: bash -c while true; do :; done
+Status: RUNNING
+StartTime: 2025-07-11T06:18:54Z
+```
+
+`CPU LIMIT = 50%`
+
+`SELECTED CPU CORE ID = 1`
+
+![cpu-50-core-1.png](docs/cpu-50-core-1.png)
+
 ### Job Monitoring
 
 ```bash
@@ -237,23 +254,6 @@ rnx log <job-id>
 # Stop running job
 rnx stop <job-id>
 ```
-
-#### Example
-
-```bash
-rnx --cpu-cores="1" --max-cpu=50  run bash -c "while true; do :; done"
-Job started:
-ID: 2
-Command: bash -c while true; do :; done
-Status: RUNNING
-StartTime: 2025-07-11T06:18:54Z
-```
-
-`CPU LIMIT = 50%`
-
-`SELECTED CPU CORE ID = 1`
-
-![cpu-50-core-1.png](docs/cpu-50-core-1.png)
 
 ### Remote Server Connection
 
