@@ -40,7 +40,6 @@ mkdir -p "$BUILDROOT/opt/joblet/config"
 mkdir -p "$BUILDROOT/opt/joblet/scripts"
 mkdir -p "$BUILDROOT/etc/systemd/system"
 mkdir -p "$BUILDROOT/usr/local/bin"
-mkdir -p "$BUILDROOT/var/log/joblet"
 
 # Copy binaries
 if [ ! -f "./joblet" ]; then
@@ -79,12 +78,6 @@ cp ./scripts/joblet.service "$BUILDROOT/etc/systemd/system/"
 cp ./scripts/certs_gen_embedded.sh "$BUILDROOT/usr/local/bin/certs_gen_embedded.sh"
 chmod +x "$BUILDROOT/usr/local/bin/certs_gen_embedded.sh"
 
-# Copy cloud detection script for EC2
-if [ -f "./scripts/detect_cloud.sh" ]; then
-    cp ./scripts/detect_cloud.sh "$BUILDROOT/usr/local/bin/detect_cloud.sh"
-    chmod +x "$BUILDROOT/usr/local/bin/detect_cloud.sh"
-fi
-
 # Create the RPM spec file
 cat > "$BUILD_DIR/SPECS/${PACKAGE_NAME}.spec" << EOF
 Name:           ${PACKAGE_NAME}
@@ -99,11 +92,6 @@ BuildArch:      ${ARCH}
 # Dependencies for Amazon Linux 2/2023
 Requires:       openssl >= 1.0.2
 Requires:       systemd
-Requires:       curl
-Requires:       iproute
-
-# Build requirements
-BuildRequires:  systemd-rpm-macros
 
 %description
 A job isolation platform that provides secure execution of containerized
@@ -112,9 +100,6 @@ workloads with resource management and namespace isolation.
 This package includes the joblet daemon, rnx CLI tools, and embedded certificate
 management. All certificates are embedded directly in configuration files
 for simplified deployment and management.
-
-Optimized for Amazon Linux with automatic EC2 metadata detection and
-cloud-aware configuration.
 
 %prep
 # No prep needed for pre-built binaries
@@ -126,16 +111,8 @@ cloud-aware configuration.
 # Copy files from buildroot (already prepared)
 cp -r %{_builddir}/../BUILDROOT/%{name}-%{version}-%{release}.%{_arch}/* %{buildroot}/
 
-%pre
-# Pre-installation script (user creation, etc.)
-# Create joblet user if it doesn't exist
-if ! id joblet >/dev/null 2>&1; then
-    useradd -r -s /bin/false -d /opt/joblet -c "Joblet Service User" joblet
-fi
-
 %post
-# Post-installation script
-echo "🔧 Configuring Joblet Service for Amazon Linux..."
+echo "🔧 Configuring Joblet Service..."
 
 # Set basic permissions
 chown -R root:root /opt/joblet
@@ -159,41 +136,12 @@ if [ ! -L /usr/local/bin/rnx ]; then
     ln -sf /opt/joblet/rnx /usr/local/bin/rnx
 fi
 
-# Detect cloud environment (especially AWS EC2)
-CLOUD_INFO=""
-if [ -x /usr/local/bin/detect_cloud.sh ]; then
-    eval "\$(/usr/local/bin/detect_cloud.sh --source)"
-    if [ "\$CLOUD_PROVIDER" = "aws_ec2" ]; then
-        CLOUD_INFO=" (AWS EC2 Instance)"
-        echo "🌩️  AWS EC2 instance detected!"
-        if [ -n "\$CLOUD_INSTANCE_ID" ]; then
-            echo "  Instance ID: \$CLOUD_INSTANCE_ID"
-        fi
-        if [ -n "\$CLOUD_REGION" ]; then
-            echo "  Region: \$CLOUD_REGION"
-        fi
-
-        # Use EC2 metadata for certificate configuration if available
-        if [ -n "\$CLOUD_PRIVATE_IP" ]; then
-            export JOBLET_CERT_INTERNAL_IP="\$CLOUD_PRIVATE_IP"
-        fi
-        if [ -n "\$CLOUD_PUBLIC_IP" ]; then
-            export JOBLET_CERT_PUBLIC_IP="\$CLOUD_PUBLIC_IP"
-        fi
-        if [ -n "\$CLOUD_HOSTNAME" ]; then
-            export JOBLET_CERT_DOMAIN="\$CLOUD_HOSTNAME"
-        fi
-    fi
-fi
-
-# Auto-detect internal IP if not set
+# Auto-detect internal IP
+JOBLET_CERT_INTERNAL_IP=\$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
 if [ -z "\$JOBLET_CERT_INTERNAL_IP" ]; then
-    JOBLET_CERT_INTERNAL_IP=\$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
-    if [ -z "\$JOBLET_CERT_INTERNAL_IP" ]; then
-        JOBLET_CERT_INTERNAL_IP=\$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
-    fi
-    JOBLET_CERT_INTERNAL_IP=\${JOBLET_CERT_INTERNAL_IP:-127.0.0.1}
+    JOBLET_CERT_INTERNAL_IP=\$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -1)
 fi
+JOBLET_CERT_INTERNAL_IP=\${JOBLET_CERT_INTERNAL_IP:-127.0.0.1}
 
 # Set server configuration
 JOBLET_SERVER_ADDRESS=\${JOBLET_SERVER_ADDRESS:-0.0.0.0}
@@ -205,22 +153,10 @@ JOBLET_ADDITIONAL_NAMES="localhost"
 if [ -n "\$JOBLET_CERT_INTERNAL_IP" ] && [ "\$JOBLET_CERT_INTERNAL_IP" != "\$JOBLET_CERT_PRIMARY" ]; then
     JOBLET_ADDITIONAL_NAMES="\$JOBLET_ADDITIONAL_NAMES,\$JOBLET_CERT_INTERNAL_IP"
 fi
-if [ -n "\$JOBLET_CERT_PUBLIC_IP" ]; then
-    JOBLET_ADDITIONAL_NAMES="\$JOBLET_ADDITIONAL_NAMES,\$JOBLET_CERT_PUBLIC_IP"
-fi
-if [ -n "\$JOBLET_CERT_DOMAIN" ]; then
-    JOBLET_ADDITIONAL_NAMES="\$JOBLET_ADDITIONAL_NAMES,\$JOBLET_CERT_DOMAIN"
-fi
 
-echo "Configuration Summary:\$CLOUD_INFO"
+echo "Configuration Summary:"
 echo "  gRPC Server Bind: \$JOBLET_SERVER_ADDRESS:\$JOBLET_SERVER_PORT"
 echo "  Certificate Primary IP: \$JOBLET_CERT_PRIMARY"
-if [ -n "\$JOBLET_CERT_PUBLIC_IP" ]; then
-    echo "  Certificate Public IP: \$JOBLET_CERT_PUBLIC_IP"
-fi
-if [ -n "\$JOBLET_CERT_DOMAIN" ]; then
-    echo "  Certificate Domain(s): \$JOBLET_CERT_DOMAIN"
-fi
 
 # Generate certificates and embed them in config files
 echo "Generating certificates with embedded configuration..."
@@ -259,9 +195,9 @@ else
     exit 1
 fi
 
-# Setup cgroup delegation for Amazon Linux
+# Setup cgroup delegation
 if [ -d /sys/fs/cgroup ]; then
-    echo "Setting up cgroup delegation for Amazon Linux..."
+    echo "Setting up cgroup delegation..."
     mkdir -p /sys/fs/cgroup/joblet.slice
     echo "+cpu +memory +io +pids +cpuset" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
 fi
@@ -271,12 +207,12 @@ mkdir -p /var/log/joblet
 chown root:root /var/log/joblet
 chmod 755 /var/log/joblet
 
-# Enable systemd service (Amazon Linux 2/2023)
+# Enable systemd service
 systemctl daemon-reload
 systemctl enable joblet.service
 
 echo
-echo "✅ Joblet service installed successfully on Amazon Linux!"
+echo "✅ Joblet service installed successfully!"
 echo
 echo "🚀 Quick Start:"
 echo "  sudo systemctl start joblet    # Start the service"
@@ -284,9 +220,6 @@ echo "  sudo rnx list                  # Test local connection"
 echo
 echo "📱 Remote Access:"
 echo "  Clients can connect using: \$JOBLET_CERT_PRIMARY:\$JOBLET_SERVER_PORT"
-if [ -n "\$JOBLET_CERT_PUBLIC_IP" ]; then
-    echo "  Public access: \$JOBLET_CERT_PUBLIC_IP:\$JOBLET_SERVER_PORT"
-fi
 echo
 echo "📋 Client Configuration:"
 echo "  Copy /opt/joblet/config/rnx-config.yml to client machines"
@@ -321,11 +254,6 @@ fi
 
 if [ \$1 -eq 0 ]; then
     # Purge (complete removal)
-    # Remove user
-    if id joblet >/dev/null 2>&1; then
-        userdel joblet 2>/dev/null || true
-    fi
-
     # Remove all joblet files
     rm -rf /opt/joblet
     rm -rf /var/log/joblet
@@ -342,25 +270,15 @@ fi
 /opt/joblet/scripts/rnx-config-template.yml
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
-%if 0%{?rhel} >= 8 || 0%{?fedora}
-%{_unitdir}/joblet.service
-%endif
-
-# Optional files
-%if 0%{?detect_cloud:1}
-/usr/local/bin/detect_cloud.sh
-%endif
 
 %dir /opt/joblet
 %dir /opt/joblet/scripts
-%dir /var/log/joblet
 
 %changelog
 * $(date '+%a %b %d %Y') Joblet Build System <build@joblet.dev> - ${CLEAN_VERSION}-${RELEASE}
-- Automatic build for Amazon Linux
-- Enhanced AWS EC2 integration
+- RPM package for Amazon Linux
 - Embedded certificate management
-- Cloud-aware configuration
+- Equivalent to Debian package functionality
 
 EOF
 
