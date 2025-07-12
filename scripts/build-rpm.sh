@@ -65,7 +65,14 @@ Summary:        Joblet Job Isolation Platform with Embedded Certificates
 License:        MIT
 URL:            https://github.com/ehsaniara/joblet
 Source0:        %{name}-%{version}.tar.gz
-BuildArch:      ${ARCH}
+
+# Handle architecture - don't restrict build architecture since we're using pre-built binaries
+%if "%{_target_cpu}" == "x86_64"
+BuildArch:      x86_64
+%endif
+%if "%{_target_cpu}" == "aarch64"
+BuildArch:      aarch64
+%endif
 
 # Dependencies for Amazon Linux 2/2023
 Requires:       openssl >= 1.0.2
@@ -294,6 +301,19 @@ tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD
 cp "$BUILD_DIR/SOURCES/src/"* "$BUILD_DIR/SOURCES/"
 
 cd "$BUILD_DIR"
+
+# For cross-compilation, we need to define the target CPU explicitly
+if [ "$ARCH" = "aarch64" ]; then
+    TARGET_CPU="aarch64"
+    TARGET_ARCH="aarch64"
+elif [ "$ARCH" = "x86_64" ]; then
+    TARGET_CPU="x86_64"
+    TARGET_ARCH="x86_64"
+else
+    echo "❌ Unsupported architecture: $ARCH"
+    exit 1
+fi
+
 rpmbuild --define "_topdir $(pwd)" \
          --define "_builddir $(pwd)/BUILD" \
          --define "_buildrootdir $(pwd)/BUILDROOT" \
@@ -301,7 +321,9 @@ rpmbuild --define "_topdir $(pwd)" \
          --define "_sourcedir $(pwd)/SOURCES" \
          --define "_specdir $(pwd)/SPECS" \
          --define "_srcrpmdir $(pwd)/SRPMS" \
-         --target "${ARCH}" \
+         --define "_target_cpu ${TARGET_CPU}" \
+         --define "_target_os linux" \
+         --target "${TARGET_ARCH}-linux" \
          -bb SPECS/${PACKAGE_NAME}.spec
 
 cd ..
