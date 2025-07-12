@@ -108,19 +108,7 @@ for simplified deployment and management.
 # No build needed for pre-built binaries
 
 %install
-# Create directory structure in buildroot
-mkdir -p %{buildroot}/opt/joblet
-mkdir -p %{buildroot}/opt/joblet/scripts
-mkdir -p %{buildroot}/etc/systemd/system
-mkdir -p %{buildroot}/usr/local/bin
-
-# Copy files from our source directory to buildroot
-cp %{_sourcedir}/../../../joblet %{buildroot}/opt/joblet/
-cp %{_sourcedir}/../../../rnx %{buildroot}/opt/joblet/
-cp %{_sourcedir}/../../../scripts/joblet-config-template.yml %{buildroot}/opt/joblet/scripts/
-cp %{_sourcedir}/../../../scripts/rnx-config-template.yml %{buildroot}/opt/joblet/scripts/
-cp %{_sourcedir}/../../../scripts/joblet.service %{buildroot}/etc/systemd/system/
-cp %{_sourcedir}/../../../scripts/certs_gen_embedded.sh %{buildroot}/usr/local/bin/
+cp -r %{_builddir}/../BUILDROOT/%{name}-%{version}-%{release}.%{_arch}/* %{buildroot}/
 
 %post
 # Post-installation script (same as Debian postinst but adapted for RPM)
@@ -295,7 +283,15 @@ fi
 EOF
 
 # Create source tarball (RPM expects this even for binary packages)
-tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR" --exclude="SOURCES" --exclude="SPECS" --exclude="BUILD*" --exclude="RPMS" --exclude="SRPMS" .
+mkdir -p "$BUILD_DIR/SOURCES/source"
+cp ./joblet "$BUILD_DIR/SOURCES/source/"
+cp ./rnx "$BUILD_DIR/SOURCES/source/"
+cp ./scripts/joblet-config-template.yml "$BUILD_DIR/SOURCES/source/"
+cp ./scripts/rnx-config-template.yml "$BUILD_DIR/SOURCES/source/"
+cp ./scripts/joblet.service "$BUILD_DIR/SOURCES/source/"
+cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/SOURCES/source/"
+
+tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR/SOURCES" source
 
 # Build the RPM package
 cd "$BUILD_DIR"
