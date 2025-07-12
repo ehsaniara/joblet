@@ -32,51 +32,29 @@ mkdir -p "$BUILD_DIR/SOURCES"
 mkdir -p "$BUILD_DIR/SPECS"
 mkdir -p "$BUILD_DIR/SRPMS"
 
-# Create buildroot structure
-BUILDROOT="$BUILD_DIR/BUILDROOT/${PACKAGE_NAME}-${CLEAN_VERSION}-${RELEASE}.${ARCH}"
-mkdir -p "$BUILDROOT"
-mkdir -p "$BUILDROOT/opt/joblet"
-mkdir -p "$BUILDROOT/opt/joblet/config"
-mkdir -p "$BUILDROOT/opt/joblet/scripts"
-mkdir -p "$BUILDROOT/etc/systemd/system"
-mkdir -p "$BUILDROOT/usr/local/bin"
-
-# Copy binaries
 if [ ! -f "./joblet" ]; then
     echo "❌ Joblet binary not found!"
     exit 1
 fi
-cp ./joblet "$BUILDROOT/opt/joblet/"
 
 if [ ! -f "./rnx" ]; then
     echo "❌ RNX CLI binary not found!"
     exit 1
 fi
-cp ./rnx "$BUILDROOT/opt/joblet/"
 
-# Copy template files (NOT actual configs with certificates)
-if [ -f "./scripts/joblet-config-template.yml" ]; then
-    cp ./scripts/joblet-config-template.yml "$BUILDROOT/opt/joblet/scripts/"
-    echo "✅ Copied joblet-config-template.yml"
-else
+# Verify template files exist
+if [ ! -f "./scripts/joblet-config-template.yml" ]; then
     echo "❌ Server config template not found: ./scripts/joblet-config-template.yml"
     exit 1
 fi
 
-if [ -f "./scripts/rnx-config-template.yml" ]; then
-    cp ./scripts/rnx-config-template.yml "$BUILDROOT/opt/joblet/scripts/"
-    echo "✅ Copied rnx-config-template.yml"
-else
+if [ ! -f "./scripts/rnx-config-template.yml" ]; then
     echo "❌ Client config template not found: ./scripts/rnx-config-template.yml"
     exit 1
 fi
 
-# Copy service file
-cp ./scripts/joblet.service "$BUILDROOT/etc/systemd/system/"
-
-# Copy certificate generation script (embedded version)
-cp ./scripts/certs_gen_embedded.sh "$BUILDROOT/usr/local/bin/certs_gen_embedded.sh"
-chmod +x "$BUILDROOT/usr/local/bin/certs_gen_embedded.sh"
+echo "✅ Copied joblet-config-template.yml"
+echo "✅ Copied rnx-config-template.yml"
 
 # Create the RPM spec file
 cat > "$BUILD_DIR/SPECS/${PACKAGE_NAME}.spec" << EOF
@@ -108,7 +86,24 @@ for simplified deployment and management.
 # No build needed for pre-built binaries
 
 %install
-cp -r %{_builddir}/../BUILDROOT/%{name}-%{version}-%{release}.%{_arch}/* %{buildroot}/
+# Create directory structure in buildroot
+mkdir -p %{buildroot}/opt/joblet
+mkdir -p %{buildroot}/opt/joblet/scripts
+mkdir -p %{buildroot}/etc/systemd/system
+mkdir -p %{buildroot}/usr/local/bin
+
+# Copy files from the source directory where we placed them
+cp %{_sourcedir}/joblet %{buildroot}/opt/joblet/
+cp %{_sourcedir}/rnx %{buildroot}/opt/joblet/
+cp %{_sourcedir}/joblet-config-template.yml %{buildroot}/opt/joblet/scripts/
+cp %{_sourcedir}/rnx-config-template.yml %{buildroot}/opt/joblet/scripts/
+cp %{_sourcedir}/joblet.service %{buildroot}/etc/systemd/system/
+cp %{_sourcedir}/certs_gen_embedded.sh %{buildroot}/usr/local/bin/
+
+# Set permissions
+chmod +x %{buildroot}/opt/joblet/joblet
+chmod +x %{buildroot}/opt/joblet/rnx
+chmod +x %{buildroot}/usr/local/bin/certs_gen_embedded.sh
 
 %post
 # Post-installation script (same as Debian postinst but adapted for RPM)
@@ -282,16 +277,17 @@ fi
 
 EOF
 
-# Create source tarball (RPM expects this even for binary packages)
-mkdir -p "$BUILD_DIR/SOURCES/source"
-cp ./joblet "$BUILD_DIR/SOURCES/source/"
-cp ./rnx "$BUILD_DIR/SOURCES/source/"
-cp ./scripts/joblet-config-template.yml "$BUILD_DIR/SOURCES/source/"
-cp ./scripts/rnx-config-template.yml "$BUILD_DIR/SOURCES/source/"
-cp ./scripts/joblet.service "$BUILD_DIR/SOURCES/source/"
-cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/SOURCES/source/"
+# Create source directory and copy files there for RPM to use
+mkdir -p "$BUILD_DIR/SOURCES"
+cp ./joblet "$BUILD_DIR/SOURCES/"
+cp ./rnx "$BUILD_DIR/SOURCES/"
+cp ./scripts/joblet-config-template.yml "$BUILD_DIR/SOURCES/"
+cp ./scripts/rnx-config-template.yml "$BUILD_DIR/SOURCES/"
+cp ./scripts/joblet.service "$BUILD_DIR/SOURCES/"
+cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/SOURCES/"
 
-tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR/SOURCES" source
+# Create source tarball (RPM expects this even for binary packages)
+tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR/SOURCES" --exclude="*.tar.gz" .
 
 # Build the RPM package
 cd "$BUILD_DIR"
