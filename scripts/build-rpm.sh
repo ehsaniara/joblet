@@ -279,17 +279,20 @@ EOF
 
 # Create source directory and copy files there for RPM to use
 mkdir -p "$BUILD_DIR/SOURCES"
-cp ./joblet "$BUILD_DIR/SOURCES/"
-cp ./rnx "$BUILD_DIR/SOURCES/"
-cp ./scripts/joblet-config-template.yml "$BUILD_DIR/SOURCES/"
-cp ./scripts/rnx-config-template.yml "$BUILD_DIR/SOURCES/"
-cp ./scripts/joblet.service "$BUILD_DIR/SOURCES/"
-cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/SOURCES/"
+mkdir -p "$BUILD_DIR/SOURCES/src"
+cp ./joblet "$BUILD_DIR/SOURCES/src/"
+cp ./rnx "$BUILD_DIR/SOURCES/src/"
+cp ./scripts/joblet-config-template.yml "$BUILD_DIR/SOURCES/src/"
+cp ./scripts/rnx-config-template.yml "$BUILD_DIR/SOURCES/src/"
+cp ./scripts/joblet.service "$BUILD_DIR/SOURCES/src/"
+cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/SOURCES/src/"
 
 # Create source tarball (RPM expects this even for binary packages)
-tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR/SOURCES" --exclude="*.tar.gz" .
+tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR/SOURCES" src
 
-# Build the RPM package
+# Now copy the files to the SOURCES root for the spec file to find them
+cp "$BUILD_DIR/SOURCES/src/"* "$BUILD_DIR/SOURCES/"
+
 cd "$BUILD_DIR"
 rpmbuild --define "_topdir $(pwd)" \
          --define "_builddir $(pwd)/BUILD" \
