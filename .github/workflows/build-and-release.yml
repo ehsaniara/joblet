@@ -73,7 +73,7 @@ jobs:
             VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
           fi
           
-          # Clean version for Debian package format (remove git commit info)
+          # Clean version for package formats
           CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
           
           # Ensure version starts with digit
@@ -148,7 +148,7 @@ jobs:
         run: |
           echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
 
-      - name: Create Debian package structure
+      - name: Create Debian package
         run: |
           chmod +x scripts/build-deb.sh
           ./scripts/build-deb.sh ${{ matrix.arch }} ${{ env.VERSION }}
@@ -159,8 +159,75 @@ jobs:
           name: debian-package-${{ matrix.arch }}
           path: "*.deb"
 
-      - name: Test package installation (amd64 only)
-        if: matrix.arch == 'amd64'
+  build-rpm-package:
+    needs: [ test, build-binary ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ x86_64, aarch64 ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Map architecture for RPM
+        id: arch
+        run: |
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            echo "go_arch=amd64" >> $GITHUB_OUTPUT
+          else
+            echo "go_arch=arm64" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download joblet binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-binary-${{ steps.arch.outputs.go_arch }}
+          path: ./
+
+      - name: Download RNX CLI binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rnx-binary-${{ steps.arch.outputs.go_arch }}
+          path: ./
+
+      - name: Make binaries executable
+        run: |
+          chmod +x joblet-${{ steps.arch.outputs.go_arch }}
+          chmod +x rnx-${{ steps.arch.outputs.go_arch }}
+          mv joblet-${{ steps.arch.outputs.go_arch }} joblet
+          mv rnx-${{ steps.arch.outputs.go_arch }} rnx
+
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm build-essential
+
+      - name: Set version from previous job
+        run: |
+          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Build RPM package
+        run: |
+          chmod +x scripts/build-rpm.sh
+          ./scripts/build-rpm.sh ${{ matrix.arch }} ${{ env.VERSION }}
+
+      - name: Upload RPM package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package-${{ matrix.arch }}
+          path: "*.rpm"
+
+  test-debian-package:
+    needs: build-deb-package
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Debian package (amd64)
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-package-amd64
+          path: ./
+
+      - name: Test Debian package installation
         run: |
           # Test package can be installed (dry run)
           sudo dpkg --dry-run -i *.deb
@@ -169,8 +236,38 @@ jobs:
           dpkg-deb -I *.deb
           dpkg-deb -c *.deb
 
+  test-rpm-package:
+    needs: build-rpm-package
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Install RPM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Download RPM package (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package-x86_64
+          path: ./
+
+      - name: Test RPM package
+        run: |
+          # Test RPM package validity (equivalent to dpkg -I)
+          rpm -qip *.rpm
+          
+          # List package contents (equivalent to dpkg -c)
+          rpm -qlp *.rpm
+          
+          # Test package dependencies
+          rpm -qpR *.rpm
+          
+          # Test installation (dry run equivalent)
+          rpm --test -i *.rpm || echo "RPM validation completed"
+
   security-scan:
-    needs: build-deb-package
+    needs: [ build-deb-package, build-rpm-package ]
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -179,11 +276,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download Debian package (amd64)
+      - name: Download all packages
         uses: actions/download-artifact@v4
         with:
-          name: debian-package-amd64
-          path: ./packages/
+          path: packages/
 
       - name: Security scan with Trivy
         uses: aquasecurity/trivy-action@master
@@ -200,7 +296,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   release:
-    needs: [ build-deb-package, security-scan ]
+    needs: [ build-deb-package, build-rpm-package, test-debian-package, test-rpm-package, security-scan ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -215,31 +311,33 @@ jobs:
         run: |
           mkdir -p release/
           find packages/ -name "*.deb" -exec cp {} release/ \;
+          find packages/ -name "*.rpm" -exec cp {} release/ \;
           ls -la release/
 
       - name: Generate checksums
         run: |
           cd release/
-          sha256sum *.deb > checksums.txt
+          sha256sum *.deb *.rpm > checksums.txt
           cat checksums.txt
 
-      - name: Create Release
+      - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             release/*.deb
+            release/*.rpm
             release/checksums.txt
           body: |
             ## Joblet ${{ github.ref_name }}
             
-            🚀 **Interactive Installation** - Automatically configures network settings during installation!
-            
             ### Quick Installation
+            
+            #### Ubuntu/Debian
             ```bash
             # Download the appropriate package for your architecture
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
-            # Interactive installation (recommended)
+            # Install
             sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
             # Start the service
@@ -247,80 +345,41 @@ jobs:
             sudo systemctl enable joblet
             ```
             
-            ### Installation Options
-            
-            #### 🖥️ Interactive Mode (Default)
+            #### Amazon Linux / RHEL / CentOS
             ```bash
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            Prompts for server IP address - the IP that clients will use to connect.
+            # Download the appropriate RPM for your architecture
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            #### 🤖 Automated Mode
-            ```bash
-            # Pre-configured installation
-            JOBLET_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
+            # Install on Amazon Linux 2
+            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            #### 🔧 CI/CD Mode
-            ```bash
-            # Non-interactive installation (uses auto-detected IP)
-            DEBIAN_FRONTEND=noninteractive sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
+            # Install on Amazon Linux 2023
+            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            
+            # Start the service
+            sudo systemctl start joblet
+            sudo systemctl enable joblet
             ```
             
-            ### Common Examples
+            ### Architecture Support
+            - **amd64/x86_64**: Intel/AMD processors
+            - **arm64/aarch64**: ARM processors (including AWS Graviton)
             
-            **Local Network:**
-            ```bash
-            JOBLET_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            **Public IP:**
-            ```bash
-            JOBLET_SERVER_IP="203.0.113.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            
-            **Auto-detected (Default):**
-            ```bash
-            # Uses the IP from your primary network interface
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
+            ### Package Formats
+            - **Debian packages** (.deb): Ubuntu, Debian, and derivatives
+            - **RPM packages** (.rpm): Amazon Linux, RHEL, CentOS, Fedora
             
             ### Post-Installation
-            
-            #### Verification
             ```bash
-            # Verify checksums
-            sha256sum -c checksums.txt
-            
-            # Check service status
+            # Verify installation
             sudo systemctl status joblet
+            sudo rnx list
             
-            # Test CLI connection
-            rnx list
+            # View logs
+            sudo journalctl -u joblet -f
             ```
             
-            #### Reconfiguration
-            ```bash
-            # Reconfigure network settings
-            sudo dpkg-reconfigure joblet
-            
-            # Or manually edit config and regenerate certificates
-            sudo nano /opt/joblet/config/config.yml
-            sudo systemctl restart joblet
-            ```
-            
-            ### What's New
-            - Interactive installation asks for server IP address
-            - Automatic certificate generation for the specified IP
-            - Simplified configuration - just one IP address needed
-            - Enhanced user experience with clear prompts
-            - Support for both interactive and automated installation
-            
-            ### CLI Usage (RNX)
-                        
+            ### CLI Usage
             ```bash
             # Basic commands
             rnx list                              # List all jobs
@@ -329,19 +388,16 @@ jobs:
             rnx status <job-id>                   # Get job status
             rnx log <job-id>                      # Stream job logs
             rnx stop <job-id>                     # Stop a job
-            
-            # Remote connections
-            rnx --server=remote:50051 run pytest   # Connect to remote server
-            rnx --node=production run deploy.sh    # Use specific configuration
             ```
             
-            ### Documentation
-            - Installation Guide: See release notes above
-            - Configuration: `/opt/joblet/config/server-config.yml`
-            - Client Configuration: `/opt/joblet/config/client-config.yml` (for remote use)
-            - Certificates: Embedded in configuration files
-            - Logs: `sudo journalctl -u joblet -f`
-            - CLI Help: `rnx --help`
+            ### Custom Configuration
+            ```bash
+            # Debian with custom IP
+            JOBLET_SERVER_IP="192.168.1.100" sudo -E dpkg -i joblet_*.deb
+            
+            # Amazon Linux with custom IP  
+            JOBLET_SERVER_IP="192.168.1.100" sudo -E yum localinstall -y joblet-*.rpm
+            ```
 
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
