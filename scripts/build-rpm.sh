@@ -301,6 +301,7 @@ rpmbuild --define "_topdir $(pwd)" \
          --define "_sourcedir $(pwd)/SOURCES" \
          --define "_specdir $(pwd)/SPECS" \
          --define "_srcrpmdir $(pwd)/SRPMS" \
+         --target "${ARCH}" \
          -bb SPECS/${PACKAGE_NAME}.spec
 
 cd ..
