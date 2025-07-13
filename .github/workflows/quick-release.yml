@@ -1,0 +1,126 @@
+name: Quick Release
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  quick-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build all binaries
+        run: |
+          echo "🚀 Building joblet server binaries..."
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o joblet-linux-amd64 ./cmd/joblet
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o joblet-linux-arm64 ./cmd/joblet
+          
+          echo "🚀 Building RNX CLI for all platforms..."
+          # Linux server versions
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-server-linux-amd64 ./cmd/rnx
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-server-linux-arm64 ./cmd/rnx
+          
+          # Cross-platform CLI
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-linux-amd64 ./cmd/rnx
+          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-linux-arm64 ./cmd/rnx
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-darwin-amd64 ./cmd/rnx
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-darwin-arm64 ./cmd/rnx
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-windows-amd64.exe ./cmd/rnx
+          GOOS=windows GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o rnx-windows-arm64.exe ./cmd/rnx
+
+      - name: Build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev build-essential rpm
+          
+          # Build packages for both architectures
+          for arch in amd64 arm64; do
+            echo "📦 Building packages for $arch..."
+          
+            # Copy binaries for this architecture
+            cp joblet-linux-$arch joblet
+            cp rnx-server-linux-$arch rnx
+            chmod +x joblet rnx
+          
+            # Build Debian package
+            ./scripts/build-deb.sh $arch ${{ steps.version.outputs.version }}
+          
+            # Build RPM package
+            rpm_arch=$arch
+            if [ "$arch" = "arm64" ]; then
+              rpm_arch="aarch64"
+            else
+              rpm_arch="x86_64"
+            fi
+            ./scripts/build-rpm.sh $rpm_arch ${{ steps.version.outputs.version }}
+          
+            # Rename to avoid conflicts
+            mv *.deb joblet_${{ steps.version.outputs.version }}_$arch.deb || true
+            mv *.rpm joblet-${{ steps.version.outputs.version }}-1.$rpm_arch.rpm || true
+          done
+
+      - name: Create archives
+        run: |
+          # Create CLI archives
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-amd64.tar.gz rnx-linux-amd64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-arm64.tar.gz rnx-linux-arm64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-amd64.tar.gz rnx-darwin-amd64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-arm64.tar.gz rnx-darwin-arm64
+          zip rnx-${{ steps.version.outputs.tag_version }}-windows-amd64.zip rnx-windows-amd64.exe
+          zip rnx-${{ steps.version.outputs.tag_version }}-windows-arm64.zip rnx-windows-arm64.exe
+          
+          # Generate checksums
+          sha256sum *.deb *.rpm *.tar.gz *.zip > joblet-${{ steps.version.outputs.tag_version }}-checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: "Joblet ${{ github.ref_name }}"
+          files: |
+            *.deb
+            *.rpm
+            rnx-${{ steps.version.outputs.tag_version }}-*.tar.gz
+            rnx-${{ steps.version.outputs.tag_version }}-*.zip
+            joblet-${{ steps.version.outputs.tag_version }}-checksums.txt
+          body: |
+            ## 🚀 Joblet ${{ github.ref_name }} Release
+            
+            ### 📦 Server Packages
+            - **Debian**: `joblet_${{ steps.version.outputs.version }}_amd64.deb`, `joblet_${{ steps.version.outputs.version }}_arm64.deb`
+            - **RPM**: `joblet-${{ steps.version.outputs.version }}-1.x86_64.rpm`, `joblet-${{ steps.version.outputs.version }}-1.aarch64.rpm`
+            
+            ### 📱 RNX CLI
+            - **Linux**: `rnx-${{ steps.version.outputs.tag_version }}-linux-amd64.tar.gz`, `rnx-${{ steps.version.outputs.tag_version }}-linux-arm64.tar.gz`
+            - **macOS**: `rnx-${{ steps.version.outputs.tag_version }}-darwin-amd64.tar.gz`, `rnx-${{ steps.version.outputs.tag_version }}-darwin-arm64.tar.gz`
+            - **Windows**: `rnx-${{ steps.version.outputs.tag_version }}-windows-amd64.zip`, `rnx-${{ steps.version.outputs.tag_version }}-windows-arm64.zip`
+            
+            ### 🔐 Verification
+            ```bash
+            sha256sum -c joblet-${{ steps.version.outputs.tag_version }}-checksums.txt
+            ```
+          draft: false
+          prerelease: false
