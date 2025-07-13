@@ -129,19 +129,21 @@ Features:
 # No build needed for pre-built binaries
 
 %install
-# Create directory structure in buildroot
+rm -rf %{buildroot}
+
+# Create directory structure
 mkdir -p %{buildroot}/opt/joblet
 mkdir -p %{buildroot}/opt/joblet/scripts
 mkdir -p %{buildroot}/etc/systemd/system
 mkdir -p %{buildroot}/usr/local/bin
 
-# Copy files from our source directory to buildroot
-cp %{_sourcedir}/../../../joblet %{buildroot}/opt/joblet/
-cp %{_sourcedir}/../../../rnx %{buildroot}/opt/joblet/
-cp %{_sourcedir}/../../../scripts/joblet-config-template.yml %{buildroot}/opt/joblet/scripts/
-cp %{_sourcedir}/../../../scripts/rnx-config-template.yml %{buildroot}/opt/joblet/scripts/
-cp %{_sourcedir}/../../../scripts/joblet.service %{buildroot}/etc/systemd/system/
-cp %{_sourcedir}/../../../scripts/certs_gen_embedded.sh %{buildroot}/usr/local/bin/
+# Copy files (they should be in the current directory)
+cp joblet %{buildroot}/opt/joblet/
+cp rnx %{buildroot}/opt/joblet/
+cp scripts/joblet-config-template.yml %{buildroot}/opt/joblet/scripts/
+cp scripts/rnx-config-template.yml %{buildroot}/opt/joblet/scripts/
+cp scripts/joblet.service %{buildroot}/etc/systemd/system/
+cp scripts/certs_gen_embedded.sh %{buildroot}/usr/local/bin/
 
 %post
 # Post-installation script adapted for multiple distributions
@@ -318,7 +320,21 @@ EOF
 
 tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" -C "$BUILD_DIR" --exclude="SOURCES" --exclude="SPECS" --exclude="BUILD*" --exclude="RPMS" --exclude="SRPMS" .
 
+mkdir -p "$BUILD_DIR/BUILD"
+cp joblet "$BUILD_DIR/BUILD/"
+cp rnx "$BUILD_DIR/BUILD/"
+cp -r scripts "$BUILD_DIR/BUILD/"
+
 cd "$BUILD_DIR"
+
+if [ "$ARCH" = "aarch64" ] && [ "$(uname -m)" = "x86_64" ]; then
+    echo "Setting up cross-compilation for aarch64 on x86_64..."
+    # Add --target for cross-compilation
+    RPMBUILD_OPTS="--target ${ARCH}"
+else
+    RPMBUILD_OPTS=""
+fi
+
 rpmbuild --define "_topdir $(pwd)" \
          --define "_builddir $(pwd)/BUILD" \
          --define "_buildrootdir $(pwd)/BUILDROOT" \
@@ -326,6 +342,7 @@ rpmbuild --define "_topdir $(pwd)" \
          --define "_sourcedir $(pwd)/SOURCES" \
          --define "_specdir $(pwd)/SPECS" \
          --define "_srcrpmdir $(pwd)/SRPMS" \
+         $RPMBUILD_OPTS \
          -bb SPECS/${PACKAGE_NAME}.spec
 
 cd ..

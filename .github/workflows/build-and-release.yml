@@ -111,7 +111,6 @@ jobs:
           name: rnx-binary-${{ matrix.arch }}
           path: rnx-${{ matrix.arch }}
 
-  # Debian Package Jobs - Separated by Architecture
   build-deb-package-amd64:
     needs: [ test, build-binary ]
     runs-on: ubuntu-latest
@@ -202,7 +201,6 @@ jobs:
           name: debian-package-arm64
           path: "*.deb"
 
-  # RPM Package Jobs - Separated by Architecture
   build-rpm-package-x86_64:
     needs: [ test, build-binary ]
     runs-on: ubuntu-latest
@@ -285,6 +283,7 @@ jobs:
       - name: Build RPM package (aarch64)
         run: |
           chmod +x scripts/build-rpm.sh
+          # Use --target to specify target architecture for cross-compilation
           ./scripts/build-rpm.sh aarch64 ${{ env.VERSION }}
 
       - name: Upload RPM package (aarch64)
@@ -293,7 +292,6 @@ jobs:
           name: rpm-package-aarch64
           path: "*.rpm"
 
-  # Test Jobs - Separated by Package Type and Architecture
   test-debian-package-amd64:
     needs: build-deb-package-amd64
     runs-on: ubuntu-latest
@@ -305,17 +303,32 @@ jobs:
           name: debian-package-amd64
           path: ./
 
-      - name: Test Debian package installation (amd64)
+      - name: Test Debian package metadata (amd64)
         run: |
-          # Test package can be installed (dry run)
-          sudo dpkg --dry-run -i *.deb
-          
           # Check package info
           dpkg-deb -I *.deb
+          
+          # List package contents
           dpkg-deb -c *.deb
           
           # Test dependencies
           dpkg-deb --field *.deb Depends
+          
+          # Verify architecture
+          dpkg-deb --field *.deb Architecture
+          
+          # Check if this is the native architecture (can test installation)
+          PACKAGE_ARCH=$(dpkg-deb --field *.deb Architecture)
+          SYSTEM_ARCH=$(dpkg --print-architecture)
+          echo "Package architecture: $PACKAGE_ARCH"
+          echo "System architecture: $SYSTEM_ARCH"
+          
+          if [ "$PACKAGE_ARCH" = "$SYSTEM_ARCH" ]; then
+            echo "Testing installation (native architecture)..."
+            sudo dpkg --dry-run -i *.deb
+          else
+            echo "Skipping installation test (cross-architecture)"
+          fi
 
   test-debian-package-arm64:
     needs: build-deb-package-arm64
@@ -328,17 +341,30 @@ jobs:
           name: debian-package-arm64
           path: ./
 
-      - name: Test Debian package installation (arm64)
+      - name: Test Debian package metadata (arm64)
         run: |
-          # Test package can be installed (dry run)
-          sudo dpkg --dry-run -i *.deb
-          
           # Check package info
           dpkg-deb -I *.deb
+          
+          # List package contents
           dpkg-deb -c *.deb
           
           # Test dependencies
           dpkg-deb --field *.deb Depends
+          
+          # Verify architecture
+          PACKAGE_ARCH=$(dpkg-deb --field *.deb Architecture)
+          echo "Package architecture: $PACKAGE_ARCH"
+          
+          # Verify it's arm64
+          if [ "$PACKAGE_ARCH" = "arm64" ]; then
+            echo "✓ Package correctly built for arm64"
+          else
+            echo "✗ Expected arm64, got $PACKAGE_ARCH"
+            exit 1
+          fi
+          
+          echo "Skipping installation test (cross-architecture)"
 
   test-rpm-package-x86_64:
     needs: build-rpm-package-x86_64
@@ -406,7 +432,6 @@ jobs:
           # Verify architecture
           rpm -qp --queryformat '%{ARCH}\n' *.rpm
 
-  # Security Scans - Separated by Package Type and Architecture
   security-scan-debian-amd64:
     needs: build-deb-package-amd64
     runs-on: ubuntu-latest
