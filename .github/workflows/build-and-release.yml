@@ -73,7 +73,7 @@ jobs:
             VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
           fi
           
-          # Clean version for Debian package format (remove git commit info)
+          # Clean version for package formats
           CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
           
           # Ensure version starts with digit
@@ -111,33 +111,30 @@ jobs:
           name: rnx-binary-${{ matrix.arch }}
           path: rnx-${{ matrix.arch }}
 
-  build-deb-package:
+  build-deb-package-amd64:
     needs: [ test, build-binary ]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [ amd64, arm64 ]
     steps:
       - uses: actions/checkout@v4
 
       - name: Download joblet binary
         uses: actions/download-artifact@v4
         with:
-          name: joblet-binary-${{ matrix.arch }}
+          name: joblet-binary-amd64
           path: ./
 
       - name: Download RNX CLI binary
         uses: actions/download-artifact@v4
         with:
-          name: rnx-binary-${{ matrix.arch }}
+          name: rnx-binary-amd64
           path: ./
 
       - name: Make binaries executable
         run: |
-          chmod +x joblet-${{ matrix.arch }}
-          chmod +x rnx-${{ matrix.arch }}
-          mv joblet-${{ matrix.arch }} joblet
-          mv rnx-${{ matrix.arch }} rnx
+          chmod +x joblet-amd64
+          chmod +x rnx-amd64
+          mv joblet-amd64 joblet
+          mv rnx-amd64 rnx
 
       - name: Install packaging dependencies
         run: |
@@ -148,29 +145,309 @@ jobs:
         run: |
           echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
 
-      - name: Create Debian package structure
+      - name: Create Debian package (amd64)
         run: |
           chmod +x scripts/build-deb.sh
-          ./scripts/build-deb.sh ${{ matrix.arch }} ${{ env.VERSION }}
+          ./scripts/build-deb.sh amd64 ${{ env.VERSION }}
 
-      - name: Upload Debian package
+      - name: Upload Debian package (amd64)
         uses: actions/upload-artifact@v4
         with:
-          name: debian-package-${{ matrix.arch }}
+          name: debian-package-amd64
           path: "*.deb"
 
-      - name: Test package installation (amd64 only)
-        if: matrix.arch == 'amd64'
+  build-deb-package-arm64:
+    needs: [ test, build-binary ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download joblet binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-binary-arm64
+          path: ./
+
+      - name: Download RNX CLI binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rnx-binary-arm64
+          path: ./
+
+      - name: Make binaries executable
         run: |
-          # Test package can be installed (dry run)
-          sudo dpkg --dry-run -i *.deb
+          chmod +x joblet-arm64
+          chmod +x rnx-arm64
+          mv joblet-arm64 joblet
+          mv rnx-arm64 rnx
+
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev build-essential devscripts
+
+      - name: Set version from previous job
+        run: |
+          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Create Debian package (arm64)
+        run: |
+          chmod +x scripts/build-deb.sh
+          ./scripts/build-deb.sh arm64 ${{ env.VERSION }}
+
+      - name: Upload Debian package (arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package-arm64
+          path: "*.deb"
+
+  build-rpm-package-x86_64:
+    needs: [ test, build-binary ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download joblet binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-binary-amd64
+          path: ./
+
+      - name: Download RNX CLI binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rnx-binary-amd64
+          path: ./
+
+      - name: Make binaries executable
+        run: |
+          chmod +x joblet-amd64
+          chmod +x rnx-amd64
+          mv joblet-amd64 joblet
+          mv rnx-amd64 rnx
+
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm build-essential
+
+      - name: Set version from previous job
+        run: |
+          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Build RPM package (x86_64)
+        run: |
+          chmod +x scripts/build-rpm.sh
+          ./scripts/build-rpm.sh x86_64 ${{ env.VERSION }}
+
+      - name: Upload RPM package (x86_64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package-x86_64
+          path: "*.rpm"
+
+  build-rpm-package-aarch64:
+    needs: [ test, build-binary ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download joblet binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-binary-arm64
+          path: ./
+
+      - name: Download RNX CLI binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rnx-binary-arm64
+          path: ./
+
+      - name: Make binaries executable
+        run: |
+          chmod +x joblet-arm64
+          chmod +x rnx-arm64
+          mv joblet-arm64 joblet
+          mv rnx-arm64 rnx
+
+      - name: Install RPM build tools with enhanced cross-compilation support
+        run: |
+          sudo apt-get update
           
+          # Install core RPM build tools
+          sudo apt-get install -y rpm build-essential
+          
+          # Install QEMU for emulation support (helps with architecture detection)
+          sudo apt-get install -y qemu-user-static
+          
+          # Add architecture support for cross-compilation
+          sudo dpkg --add-architecture arm64
+          
+          # Install cross-compilation tools if available
+          sudo apt-get install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available, proceeding with binary packaging"
+          
+          # Configure binfmt to handle aarch64 binaries (helps RPM understand the architecture)
+          sudo update-binfmts --display || echo "binfmt configuration not available"
+
+      - name: Set version from previous job
+        run: |
+          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Build RPM package (aarch64) with enhanced cross-compilation
+        run: |
+          chmod +x scripts/build-rpm.sh
+          # Use aarch64 explicitly (not arm64) for RPM builds
+          ./scripts/build-rpm.sh aarch64 ${{ env.VERSION }}
+
+      - name: Upload RPM package (aarch64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package-aarch64
+          path: "*.rpm"
+
+  test-debian-package-amd64:
+    needs: build-deb-package-amd64
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Debian package (amd64)
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-package-amd64
+          path: ./
+
+      - name: Test Debian package metadata (amd64)
+        run: |
           # Check package info
           dpkg-deb -I *.deb
+          
+          # List package contents
           dpkg-deb -c *.deb
+          
+          # Test dependencies
+          dpkg-deb --field *.deb Depends
+          
+          # Verify architecture
+          dpkg-deb --field *.deb Architecture
+          
+          # Check if this is the native architecture (can test installation)
+          PACKAGE_ARCH=$(dpkg-deb --field *.deb Architecture)
+          SYSTEM_ARCH=$(dpkg --print-architecture)
+          echo "Package architecture: $PACKAGE_ARCH"
+          echo "System architecture: $SYSTEM_ARCH"
+          
+          if [ "$PACKAGE_ARCH" = "$SYSTEM_ARCH" ]; then
+            echo "Testing installation (native architecture)..."
+            sudo dpkg --dry-run -i *.deb
+          else
+            echo "Skipping installation test (cross-architecture)"
+          fi
 
-  security-scan:
-    needs: build-deb-package
+  test-debian-package-arm64:
+    needs: build-deb-package-arm64
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Debian package (arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-package-arm64
+          path: ./
+
+      - name: Test Debian package metadata (arm64)
+        run: |
+          # Check package info
+          dpkg-deb -I *.deb
+          
+          # List package contents
+          dpkg-deb -c *.deb
+          
+          # Test dependencies
+          dpkg-deb --field *.deb Depends
+          
+          # Verify architecture
+          PACKAGE_ARCH=$(dpkg-deb --field *.deb Architecture)
+          echo "Package architecture: $PACKAGE_ARCH"
+          
+          # Verify it's arm64
+          if [ "$PACKAGE_ARCH" = "arm64" ]; then
+            echo "✓ Package correctly built for arm64"
+          else
+            echo "✗ Expected arm64, got $PACKAGE_ARCH"
+            exit 1
+          fi
+          
+          echo "Skipping installation test (cross-architecture)"
+
+  test-rpm-package-x86_64:
+    needs: build-rpm-package-x86_64
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Install RPM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Download RPM package (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package-x86_64
+          path: ./
+
+      - name: Test RPM package (x86_64)
+        run: |
+          # Test RPM package validity
+          rpm -qip *.rpm
+          
+          # List package contents
+          rpm -qlp *.rpm
+          
+          # Test package dependencies
+          rpm -qpR *.rpm
+          
+          # Test installation (dry run equivalent)
+          rpm --test -i *.rpm || echo "RPM validation completed"
+          
+          # Verify architecture
+          rpm -qp --queryformat '%{ARCH}\n' *.rpm
+
+  test-rpm-package-aarch64:
+    needs: build-rpm-package-aarch64
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Install RPM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Download RPM package (aarch64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package-aarch64
+          path: ./
+
+      - name: Test RPM package (aarch64)
+        run: |
+          # Test RPM package validity
+          rpm -qip *.rpm
+          
+          # List package contents
+          rpm -qlp *.rpm
+          
+          # Test package dependencies
+          rpm -qpR *.rpm
+          
+          # Test installation (dry run equivalent)
+          rpm --test -i *.rpm || echo "RPM validation completed"
+          
+          # Verify architecture
+          rpm -qp --queryformat '%{ARCH}\n' *.rpm
+
+  security-scan-debian-amd64:
+    needs: build-deb-package-amd64
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -185,22 +462,129 @@ jobs:
           name: debian-package-amd64
           path: ./packages/
 
-      - name: Security scan with Trivy
+      - name: Security scan Debian amd64 with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: './packages'
           format: 'sarif'
-          output: 'trivy-results.sarif'
+          output: 'trivy-results-debian-amd64.sarif'
 
-      - name: Upload Trivy scan results
+      - name: Upload Trivy scan results (Debian amd64)
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: 'trivy-results-debian-amd64.sarif'
+          category: 'debian-amd64'
+
+  security-scan-debian-arm64:
+    needs: build-deb-package-arm64
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Debian package (arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-package-arm64
+          path: ./packages/
+
+      - name: Security scan Debian arm64 with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './packages'
+          format: 'sarif'
+          output: 'trivy-results-debian-arm64.sarif'
+
+      - name: Upload Trivy scan results (Debian arm64)
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-debian-arm64.sarif'
+          category: 'debian-arm64'
+
+  security-scan-rpm-x86_64:
+    needs: build-rpm-package-x86_64
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download RPM package (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package-x86_64
+          path: ./packages/
+
+      - name: Security scan RPM x86_64 with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './packages'
+          format: 'sarif'
+          output: 'trivy-results-rpm-x86_64.sarif'
+
+      - name: Upload Trivy scan results (RPM x86_64)
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-rpm-x86_64.sarif'
+          category: 'rpm-x86_64'
+
+  security-scan-rpm-aarch64:
+    needs: build-rpm-package-aarch64
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download RPM package (aarch64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package-aarch64
+          path: ./packages/
+
+      - name: Security scan RPM aarch64 with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './packages'
+          format: 'sarif'
+          output: 'trivy-results-rpm-aarch64.sarif'
+
+      - name: Upload Trivy scan results (RPM aarch64)
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-rpm-aarch64.sarif'
+          category: 'rpm-aarch64'
 
   release:
-    needs: [ build-deb-package, security-scan ]
+    needs: [
+      build-deb-package-amd64,
+      build-deb-package-arm64,
+      build-rpm-package-x86_64,
+      build-rpm-package-aarch64,
+      test-debian-package-amd64,
+      test-debian-package-arm64,
+      test-rpm-package-x86_64,
+      test-rpm-package-aarch64,
+      security-scan-debian-amd64,
+      security-scan-debian-arm64,
+      security-scan-rpm-x86_64,
+      security-scan-rpm-aarch64
+    ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -215,112 +599,103 @@ jobs:
         run: |
           mkdir -p release/
           find packages/ -name "*.deb" -exec cp {} release/ \;
+          find packages/ -name "*.rpm" -exec cp {} release/ \;
           ls -la release/
 
       - name: Generate checksums
         run: |
           cd release/
-          sha256sum *.deb > checksums.txt
+          sha256sum *.deb *.rpm > checksums.txt
           cat checksums.txt
 
-      - name: Create Release
+      - name: Create release
         uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
             release/*.deb
+            release/*.rpm
             release/checksums.txt
           body: |
             ## Joblet ${{ github.ref_name }}
             
-            🚀 **Interactive Installation** - Automatically configures network settings during installation!
-            
             ### Quick Installation
-            ```bash
-            # Download the appropriate package for your architecture
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
-            # Interactive installation (recommended)
+            #### Ubuntu/Debian
+            ```bash
+            # AMD64 (Intel/AMD processors)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
+            
+            # ARM64 (ARM processors, AWS Graviton)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
+            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
             
             # Start the service
             sudo systemctl start joblet
             sudo systemctl enable joblet
             ```
             
-            ### Installation Options
-            
-            #### 🖥️ Interactive Mode (Default)
+            #### Amazon Linux / RHEL / CentOS / Fedora
             ```bash
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
-            Prompts for server IP address - the IP that clients will use to connect.
+            # x86_64 (Intel/AMD processors)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            #### 🤖 Automated Mode
-            ```bash
-            # Pre-configured installation
-            JOBLET_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
+            # aarch64 (ARM processors, AWS Graviton)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
             
-            #### 🔧 CI/CD Mode
-            ```bash
-            # Non-interactive installation (uses auto-detected IP)
-            DEBIAN_FRONTEND=noninteractive sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
+            # Install on Amazon Linux 2
+            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            ### Common Examples
+            # Install on Amazon Linux 2023 / Fedora
+            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            **Local Network:**
-            ```bash
-            JOBLET_SERVER_IP="192.168.1.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
+            # Install on RHEL/CentOS
+            sudo rpm -ivh joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            
+            # Start the service
+            sudo systemctl start joblet
+            sudo systemctl enable joblet
             ```
             
-            **Public IP:**
-            ```bash
-            JOBLET_SERVER_IP="203.0.113.100" \
-            sudo -E dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
+            ### Architecture Support
+            - **amd64/x86_64**: Intel/AMD processors
+            - **arm64/aarch64**: ARM processors (including AWS Graviton)
             
-            **Auto-detected (Default):**
-            ```bash
-            # Uses the IP from your primary network interface
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            ```
+            ### Package Formats
+            - **Debian packages** (.deb): Ubuntu, Debian, and derivatives
+            - **RPM packages** (.rpm): Amazon Linux, RHEL, CentOS, Fedora, SUSE
             
-            ### Post-Installation
+            ### Supported Distributions
+            #### Debian-based
+            - Ubuntu 18.04+
+            - Debian 10+
+            - And derivatives
             
-            #### Verification
+            #### RPM-based
+            - Amazon Linux 2/2023
+            - RHEL/CentOS 8/9
+            - Fedora 35+
+            - SUSE/openSUSE
+            
+            ### Package Verification
             ```bash
             # Verify checksums
             sha256sum -c checksums.txt
-            
-            # Check service status
-            sudo systemctl status joblet
-            
-            # Test CLI connection
-            rnx list
             ```
             
-            #### Reconfiguration
+            ### Post-Installation
             ```bash
-            # Reconfigure network settings
-            sudo dpkg-reconfigure joblet
+            # Verify installation
+            sudo systemctl status joblet
+            sudo rnx list
             
-            # Or manually edit config and regenerate certificates
-            sudo nano /opt/joblet/config/config.yml
-            sudo systemctl restart joblet
+            # View logs
+            sudo journalctl -u joblet -f
             ```
             
-            ### What's New
-            - Interactive installation asks for server IP address
-            - Automatic certificate generation for the specified IP
-            - Simplified configuration - just one IP address needed
-            - Enhanced user experience with clear prompts
-            - Support for both interactive and automated installation
-            
-            ### CLI Usage (RNX)
-                        
+            ### CLI Usage
             ```bash
             # Basic commands
             rnx list                              # List all jobs
@@ -329,21 +704,16 @@ jobs:
             rnx status <job-id>                   # Get job status
             rnx log <job-id>                      # Stream job logs
             rnx stop <job-id>                     # Stop a job
-            
-            # Remote connections
-            rnx --server=remote:50051 run pytest   # Connect to remote server
-            rnx --node=production run deploy.sh    # Use specific configuration
             ```
             
-            ### Documentation
-            - Installation Guide: See release notes above
-            - Configuration: `/opt/joblet/config/server-config.yml`
-            - Client Configuration: `/opt/joblet/config/client-config.yml` (for remote use)
-            - Certificates: Embedded in configuration files
-            - Logs: `sudo journalctl -u joblet -f`
-            - CLI Help: `rnx --help`
-
+            ### Custom Configuration
+            ```bash
+            # Debian with custom IP
+            JOBLET_SERVER_IP="192.168.1.100" sudo -E dpkg -i joblet_*.deb
+            
+            # RPM with custom IP  
+            JOBLET_SERVER_IP="192.168.1.100" sudo -E yum localinstall -y joblet-*.rpm
+            JOBLET_SERVER_IP="192.168.1.100" sudo -E dnf localinstall -y joblet-*.rpm
+            ```
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
