@@ -329,50 +329,16 @@ cd "$BUILD_DIR"
 
 echo "🏗️  Building RPM package for ${ARCH}..."
 
-# Since Go binaries are statically linked and our package has no architecture-specific
-# dependencies, we can build as noarch and rename for cross-compilation
-if [ "$ARCH" = "aarch64" ] && [ "$(uname -m)" = "x86_64" ]; then
-    echo "🔄 Using simplified cross-compilation approach for ${ARCH}..."
-
-    # Temporarily modify spec to build as noarch
-    sed -i "s/BuildArch:.*${ARCH}/BuildArch: noarch/" SPECS/${PACKAGE_NAME}.spec
-
-    # Build as noarch
-    rpmbuild --define "_topdir $(pwd)" \
-             --define "_builddir $(pwd)/BUILD" \
-             --define "_buildrootdir $(pwd)/BUILDROOT" \
-             --define "_rpmdir $(pwd)/RPMS" \
-             --define "_sourcedir $(pwd)/SOURCES" \
-             --define "_specdir $(pwd)/SPECS" \
-             --define "_srcrpmdir $(pwd)/SRPMS" \
-             -bb SPECS/${PACKAGE_NAME}.spec
-
-    # Create target architecture directory
-    mkdir -p "RPMS/${ARCH}"
-
-    # Copy and rename the package
-    NOARCH_PKG="RPMS/noarch/${PACKAGE_NAME}-${CLEAN_VERSION}-${RELEASE}.noarch.rpm"
-    TARGET_PKG="RPMS/${ARCH}/${PACKAGE_NAME}-${CLEAN_VERSION}-${RELEASE}.${ARCH}.rpm"
-
-    if [ -f "$NOARCH_PKG" ]; then
-        cp "$NOARCH_PKG" "$TARGET_PKG"
-        echo "✅ Package built and renamed for ${ARCH}"
-    else
-        echo "❌ Failed to build noarch package"
-        exit 1
-    fi
-else
-    echo "🏗️  Native build for ${ARCH}..."
-    # For native builds, use the original architecture
-    rpmbuild --define "_topdir $(pwd)" \
-             --define "_builddir $(pwd)/BUILD" \
-             --define "_buildrootdir $(pwd)/BUILDROOT" \
-             --define "_rpmdir $(pwd)/RPMS" \
-             --define "_sourcedir $(pwd)/SOURCES" \
-             --define "_specdir $(pwd)/SPECS" \
-             --define "_srcrpmdir $(pwd)/SRPMS" \
-             -bb SPECS/${PACKAGE_NAME}.spec
-fi
+# Always build for the correct architecture - no cross-compilation workarounds
+# Go binaries are architecture-specific and should be packaged correctly
+rpmbuild --define "_topdir $(pwd)" \
+         --define "_builddir $(pwd)/BUILD" \
+         --define "_buildrootdir $(pwd)/BUILDROOT" \
+         --define "_rpmdir $(pwd)/RPMS" \
+         --define "_sourcedir $(pwd)/SOURCES" \
+         --define "_specdir $(pwd)/SPECS" \
+         --define "_srcrpmdir $(pwd)/SRPMS" \
+         -bb SPECS/${PACKAGE_NAME}.spec
 
 cd ..
 
@@ -382,6 +348,10 @@ if [ -f "$BUILD_DIR/RPMS/${ARCH}/${PACKAGE_FILE}" ]; then
     echo "✅ Package built successfully: $PACKAGE_FILE"
 else
     echo "❌ Package build failed - RPM not found"
+    ls -la "$BUILD_DIR/RPMS/"
+    if [ -d "$BUILD_DIR/RPMS/${ARCH}" ]; then
+        ls -la "$BUILD_DIR/RPMS/${ARCH}/"
+    fi
     exit 1
 fi
 
