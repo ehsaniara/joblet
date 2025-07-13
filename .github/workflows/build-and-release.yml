@@ -743,7 +743,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: "Joblet ${{ github.ref_name }} - Complete Release"
+          name: "Joblet ${{ github.ref_name }}"
           files: |
             release/*.deb
             release/*.rpm
@@ -782,3 +782,129 @@ jobs:
             
             # aarch64 servers (AWS Graviton, ARM servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
+            
+            # Install based on your distribution:
+            sudo yum localinstall -y joblet-*.rpm     # Amazon Linux 2
+            sudo dnf localinstall -y joblet-*.rpm     # Amazon Linux 2023/Fedora
+            sudo rpm -ivh joblet-*.rpm                # RHEL/CentOS
+            
+            # Start the service
+            sudo systemctl start joblet && sudo systemctl enable joblet
+            ```
+            
+            ---
+            
+            ## 📱 RNX CLI Installation (Desktop/Laptop Client)
+            
+            Install the RNX CLI on your desktop/laptop to connect to Joblet servers:
+            
+            ### 🍎 macOS
+            ```bash
+            # Intel Macs
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-amd64.tar.gz | tar xz
+            sudo mv rnx-darwin-amd64 /usr/local/bin/rnx
+            
+            # Apple Silicon (M1/M2/M3/M4)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-arm64.tar.gz | tar xz
+            sudo mv rnx-darwin-arm64 /usr/local/bin/rnx
+            
+            # Universal installer (auto-detects architecture)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-universal.tar.gz | tar xz
+            sudo bash install.sh
+            ```
+            
+            ### 🪟 Windows
+            ```powershell
+            # AMD64 (Intel/AMD)
+            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-amd64.zip" -OutFile "rnx.zip"
+            Expand-Archive rnx.zip
+            Move-Item rnx\rnx-windows-amd64.exe "C:\Program Files\rnx.exe"
+            
+            # ARM64 (Surface Pro X, other ARM Windows)
+            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-arm64.zip" -OutFile "rnx.zip"
+            ```
+            
+            ### 🐧 Linux Desktop
+            ```bash
+            # AMD64 (Intel/AMD)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-amd64.tar.gz | tar xz
+            sudo mv rnx-linux-amd64 /usr/local/bin/rnx
+            
+            # ARM64 (Raspberry Pi 4, Pine64, etc.)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-arm64.tar.gz | tar xz
+            sudo mv rnx-linux-arm64 /usr/local/bin/rnx
+            
+            # i386 (older 32-bit systems)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-386.tar.gz | tar xz
+            sudo mv rnx-linux-386 /usr/local/bin/rnx
+            ```
+            
+            ### 😈 FreeBSD
+            ```bash
+            # AMD64
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-freebsd-amd64.tar.gz | tar xz
+            sudo mv rnx-freebsd-amd64 /usr/local/bin/rnx
+            ```
+            
+            ---
+            
+            ## 🎯 What You Get
+            
+            | Component | Purpose | Platforms |
+            |-----------|---------|-----------|
+            | **Server Packages** | Deploy Joblet daemon | Linux servers (.deb/.rpm) |
+            | **RNX CLI** | Connect to servers | macOS, Windows, Linux, FreeBSD |
+            
+            ### 🖥️ Server Packages Include:
+            - ✅ **Joblet daemon** - Main server process
+            - ✅ **RNX CLI** - Command-line client  
+            - ✅ **Embedded certificates** - Automatic mTLS setup
+            - ✅ **Systemd service** - Auto-start configuration
+            - ✅ **Certificate generator** - Easy certificate management
+            
+            ### 📱 Cross-Platform RNX CLI:
+            - ✅ **macOS** (Intel + Apple Silicon + Universal)
+            - ✅ **Windows** (AMD64 + ARM64 + i386)
+            - ✅ **Linux Desktop** (AMD64 + ARM64 + i386)
+            - ✅ **FreeBSD** (AMD64 + ARM64)
+            
+            ---
+            
+            ## 🚀 Quick Start
+            
+            ```bash
+            # 1. Install server package on your Linux server (see above)
+            # 2. Install RNX CLI on your desktop/laptop (see above)
+            # 3. Copy client configuration from server
+            scp your-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+            
+            # 4. Test connection and run jobs
+            rnx list
+            rnx run echo "Hello from Joblet!"
+            rnx run --max-cpu=50 --max-memory=512 python3 script.py
+            rnx log <job-id>
+            ```
+            
+            ## 🔐 Package Verification
+            
+            ```bash
+            # Verify all checksums
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-complete-checksums.txt
+            sha256sum -c joblet-complete-checksums.txt
+            ```
+            
+            ---
+            
+            ## 📊 Architecture Support Matrix
+            
+            | Package Type | AMD64/x86_64 | ARM64/aarch64 | i386 |
+            |-------------|--------------|---------------|------|
+            | **Debian (.deb)** | ✅ | ✅ | ❌ |
+            | **RPM (.rpm)** | ✅ | ✅ | ❌ |
+            | **RNX CLI** | ✅ | ✅ | ✅ |
+            
+            Perfect for modern cloud environments including **AWS Graviton**, **Azure ARM**, and traditional **Intel/AMD** servers.
+          generate_release_notes: false
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          make_latest: true
