@@ -271,24 +271,33 @@ jobs:
           mv joblet-arm64 joblet
           mv rnx-arm64 rnx
 
-      - name: Install RPM build tools with cross-compilation support
+      - name: Install RPM build tools with enhanced cross-compilation support
         run: |
           sudo apt-get update
+          
+          # Install core RPM build tools
           sudo apt-get install -y rpm build-essential
+          
+          # Install QEMU for emulation support (helps with architecture detection)
+          sudo apt-get install -y qemu-user-static
           
           # Add architecture support for cross-compilation
           sudo dpkg --add-architecture arm64
           
           # Install cross-compilation tools if available
-          sudo apt-get install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available, proceeding with noarch build"
+          sudo apt-get install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available, proceeding with binary packaging"
+          
+          # Configure binfmt to handle aarch64 binaries (helps RPM understand the architecture)
+          sudo update-binfmts --display || echo "binfmt configuration not available"
 
       - name: Set version from previous job
         run: |
           echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
 
-      - name: Build RPM package (aarch64)
+      - name: Build RPM package (aarch64) with enhanced cross-compilation
         run: |
           chmod +x scripts/build-rpm.sh
+          # Use aarch64 explicitly (not arm64) for RPM builds
           ./scripts/build-rpm.sh aarch64 ${{ env.VERSION }}
 
       - name: Upload RPM package (aarch64)
