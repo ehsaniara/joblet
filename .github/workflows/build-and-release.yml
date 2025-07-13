@@ -709,7 +709,6 @@ jobs:
       build-binary
     ]
     runs-on: ubuntu-latest
-    if: always()
     steps:
       - uses: actions/checkout@v4
 
