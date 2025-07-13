@@ -111,6 +111,115 @@ jobs:
           name: rnx-binary-${{ matrix.arch }}
           path: rnx-${{ matrix.arch }}
 
+  build-cross-platform-cli:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG_VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
+            TAG_VERSION="v${VERSION}"
+          fi
+          
+          # Clean version for package formats
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
+          
+          # Ensure version starts with digit
+          if [[ ! "$CLEAN_VERSION" =~ ^[0-9] ]]; then
+            CLEAN_VERSION="1.0.0"
+          fi
+          
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build cross-platform RNX CLI
+        run: |
+          echo "🚀 Building RNX CLI for all platforms..."
+          mkdir -p cli-dist
+          
+          # Linux (Desktop/Client usage)
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-linux-amd64 ./cmd/rnx
+          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-linux-arm64 ./cmd/rnx
+          GOOS=linux GOARCH=386 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-linux-386 ./cmd/rnx
+          
+          # macOS (Intel and Apple Silicon)
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-darwin-amd64 ./cmd/rnx
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-darwin-arm64 ./cmd/rnx
+          
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-windows-amd64.exe ./cmd/rnx
+          GOOS=windows GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-windows-arm64.exe ./cmd/rnx
+          GOOS=windows GOARCH=386 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-windows-386.exe ./cmd/rnx
+          
+          # FreeBSD
+          GOOS=freebsd GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-freebsd-amd64 ./cmd/rnx
+          GOOS=freebsd GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-freebsd-arm64 ./cmd/rnx
+
+      - name: Create cross-platform archives
+        run: |
+          cd cli-dist
+          
+          # Create archives
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-amd64.tar.gz rnx-linux-amd64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-arm64.tar.gz rnx-linux-arm64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-386.tar.gz rnx-linux-386
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-amd64.tar.gz rnx-darwin-amd64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-arm64.tar.gz rnx-darwin-arm64
+          
+          # Universal macOS archive
+          mkdir -p universal-macos
+          cp rnx-darwin-amd64 universal-macos/rnx-intel
+          cp rnx-darwin-arm64 universal-macos/rnx-apple-silicon
+          cat > universal-macos/install.sh << 'EOF'
+          #!/bin/bash
+          # Universal macOS installer for RNX CLI
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+              echo "Installing RNX for Apple Silicon (M1/M2/M3)..."
+              cp rnx-apple-silicon /usr/local/bin/rnx
+          else
+              echo "Installing RNX for Intel..."
+              cp rnx-intel /usr/local/bin/rnx
+          fi
+          chmod +x /usr/local/bin/rnx
+          echo "✅ RNX CLI installed successfully!"
+          echo "Usage: rnx --help"
+          EOF
+          chmod +x universal-macos/install.sh
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-universal.tar.gz -C universal-macos .
+          
+          # Windows archives
+          zip rnx-${{ steps.version.outputs.tag_version }}-windows-amd64.zip rnx-windows-amd64.exe
+          zip rnx-${{ steps.version.outputs.tag_version }}-windows-arm64.zip rnx-windows-arm64.exe
+          zip rnx-${{ steps.version.outputs.tag_version }}-windows-386.zip rnx-windows-386.exe
+          
+          # FreeBSD archives
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-freebsd-amd64.tar.gz rnx-freebsd-amd64
+          tar -czf rnx-${{ steps.version.outputs.tag_version }}-freebsd-arm64.tar.gz rnx-freebsd-arm64
+          
+          # Generate checksums for CLI
+          sha256sum *.tar.gz *.zip > rnx-cli-checksums.txt
+
+      - name: Upload cross-platform CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-platform-cli
+          path: cli-dist/*
+
   build-deb-package-amd64:
     needs: [ test, build-binary ]
     runs-on: ubuntu-latest
@@ -583,7 +692,8 @@ jobs:
       security-scan-debian-amd64,
       security-scan-debian-arm64,
       security-scan-rpm-x86_64,
-      security-scan-rpm-aarch64
+      security-scan-rpm-aarch64,
+      build-cross-platform-cli
     ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
@@ -598,166 +708,190 @@ jobs:
       - name: Organize release artifacts
         run: |
           mkdir -p release/
+          
+          # Server packages (.deb and .rpm)
           find packages/ -name "*.deb" -exec cp {} release/ \;
           find packages/ -name "*.rpm" -exec cp {} release/ \;
-          ls -la release/
-
-      - name: Generate checksums
-        run: |
+          
+          # Cross-platform CLI archives
+          find packages/cross-platform-cli -name "*.tar.gz" -exec cp {} release/ \;
+          find packages/cross-platform-cli -name "*.zip" -exec cp {} release/ \;
+          find packages/cross-platform-cli -name "*-checksums.txt" -exec cp {} release/ \;
+          
+          # Generate comprehensive checksums
           cd release/
-          sha256sum *.deb *.rpm > joblet-server-checksums.txt
-          cat joblet-server-checksums.txt
+          sha256sum *.deb *.rpm *.tar.gz *.zip > joblet-complete-checksums.txt
+          
+          echo "📦 Release contents:"
+          ls -la
 
-      - name: Create Linux Server Package Release
+      - name: Create comprehensive release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: "Joblet Server ${{ github.ref_name }} - Linux Packages"
+          name: "Joblet ${{ github.ref_name }} - Complete Release"
           files: |
             release/*.deb
             release/*.rpm
-            release/joblet-server-checksums.txt
+            release/*.tar.gz
+            release/*.zip
+            release/*-checksums.txt
           body: |
-            # 🖥️ Joblet Server ${{ github.ref_name }} - Linux Server Packages
+            # 🚀 Joblet ${{ github.ref_name }} - Complete Release
             
-            **Complete Linux server deployment packages** including both the Joblet daemon and RNX CLI with embedded certificates.
+            **Complete Joblet release** with both Linux server packages and cross-platform RNX CLI.
             
-            ## 📦 Package Types
+            ---
             
-            | Package Type | Distributions | Architectures |
-            |-------------|---------------|---------------|
-            | **Debian (.deb)** | Ubuntu 18.04+, Debian 10+ | AMD64, ARM64 |
-            | **RPM (.rpm)** | Amazon Linux, RHEL, CentOS, Fedora | x86_64, aarch64 |
+            ## 🖥️ Linux Server Installation (Full Joblet + RNX)
             
-            ## 🚀 Quick Server Installation
+            Choose your Linux distribution and architecture:
             
-            ### 📋 Debian/Ubuntu Server
+            ### 📋 Debian/Ubuntu (.deb packages)
             ```bash
-            # AMD64 (Intel/AMD servers)
+            # AMD64 servers (Intel/AMD)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
-            # ARM64 (AWS Graviton, ARM servers)
+            # ARM64 servers (AWS Graviton, ARM servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
             sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
             
             # Start the service
-            sudo systemctl start joblet
-            sudo systemctl enable joblet
+            sudo systemctl start joblet && sudo systemctl enable joblet
             ```
             
-            ### 🔴 RHEL/CentOS/Fedora Server  
+            ### 🔴 RHEL/CentOS/Fedora/Amazon Linux (.rpm packages)
             ```bash
-            # x86_64 (Intel/AMD servers)
+            # x86_64 servers (Intel/AMD)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            # aarch64 (AWS Graviton, ARM servers)
+            # aarch64 servers (AWS Graviton, ARM servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
             
             # Install based on your distribution:
-            # Amazon Linux 2
-            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
-            
-            # Amazon Linux 2023 / Fedora
-            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
-            
-            # RHEL/CentOS
-            sudo rpm -ivh joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            sudo yum localinstall -y joblet-*.rpm     # Amazon Linux 2
+            sudo dnf localinstall -y joblet-*.rpm     # Amazon Linux 2023/Fedora
+            sudo rpm -ivh joblet-*.rpm                # RHEL/CentOS
             
             # Start the service
-            sudo systemctl start joblet
-            sudo systemctl enable joblet
+            sudo systemctl start joblet && sudo systemctl enable joblet
             ```
             
-            ### 🟠 Amazon Web Services (AWS)
+            ---
+            
+            ## 📱 RNX CLI Installation (Desktop/Laptop Client)
+            
+            Install the RNX CLI on your desktop/laptop to connect to Joblet servers:
+            
+            ### 🍎 macOS
             ```bash
-            # Amazon Linux 2 (x86_64)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
-            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            # Intel Macs
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-amd64.tar.gz | tar xz
+            sudo mv rnx-darwin-amd64 /usr/local/bin/rnx
             
-            # Amazon Linux 2 (ARM64/Graviton)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
-            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
+            # Apple Silicon (M1/M2/M3/M4)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-arm64.tar.gz | tar xz
+            sudo mv rnx-darwin-arm64 /usr/local/bin/rnx
             
-            # Amazon Linux 2023 (x86_64)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
-            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
-            
-            # Amazon Linux 2023 (ARM64/Graviton)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
-            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
+            # Universal installer (auto-detects architecture)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-universal.tar.gz | tar xz
+            sudo bash install.sh
             ```
             
-            ## 🔧 Post-Installation
+            ### 🪟 Windows
+            ```powershell
+            # AMD64 (Intel/AMD)
+            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-amd64.zip" -OutFile "rnx.zip"
+            Expand-Archive rnx.zip
+            Move-Item rnx\rnx-windows-amd64.exe "C:\Program Files\rnx.exe"
             
+            # ARM64 (Surface Pro X, other ARM Windows)
+            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-arm64.zip" -OutFile "rnx.zip"
+            ```
+            
+            ### 🐧 Linux Desktop
             ```bash
-            # Verify installation
-            sudo systemctl status joblet
-            sudo rnx list
+            # AMD64 (Intel/AMD)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-amd64.tar.gz | tar xz
+            sudo mv rnx-linux-amd64 /usr/local/bin/rnx
             
-            # View service logs
-            sudo journalctl -u joblet -f
+            # ARM64 (Raspberry Pi 4, Pine64, etc.)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-arm64.tar.gz | tar xz
+            sudo mv rnx-linux-arm64 /usr/local/bin/rnx
             
-            # Test job execution
-            sudo rnx run echo "Hello from Joblet Server!"
+            # i386 (older 32-bit systems)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-386.tar.gz | tar xz
+            sudo mv rnx-linux-386 /usr/local/bin/rnx
             ```
             
-            ## 📋 What's Included
+            ### 😈 FreeBSD
+            ```bash
+            # AMD64
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-freebsd-amd64.tar.gz | tar xz
+            sudo mv rnx-freebsd-amd64 /usr/local/bin/rnx
+            ```
             
-            Each package contains:
-            - ✅ **Joblet daemon** (`/opt/joblet/joblet`) - The main server process
-            - ✅ **RNX CLI** (`/opt/joblet/rnx`) - Command-line client
-            - ✅ **Systemd service** (`joblet.service`) - Auto-start configuration  
+            ---
+            
+            ## 🎯 What You Get
+            
+            | Component | Purpose | Platforms |
+            |-----------|---------|-----------|
+            | **Server Packages** | Deploy Joblet daemon | Linux servers (.deb/.rpm) |
+            | **RNX CLI** | Connect to servers | macOS, Windows, Linux, FreeBSD |
+            
+            ### 🖥️ Server Packages Include:
+            - ✅ **Joblet daemon** - Main server process
+            - ✅ **RNX CLI** - Command-line client  
             - ✅ **Embedded certificates** - Automatic mTLS setup
-            - ✅ **Configuration templates** - Ready-to-use configs
+            - ✅ **Systemd service** - Auto-start configuration
             - ✅ **Certificate generator** - Easy certificate management
             
-            ## 🌐 Architecture Support
+            ### 📱 Cross-Platform RNX CLI:
+            - ✅ **macOS** (Intel + Apple Silicon + Universal)
+            - ✅ **Windows** (AMD64 + ARM64 + i386)
+            - ✅ **Linux Desktop** (AMD64 + ARM64 + i386)
+            - ✅ **FreeBSD** (AMD64 + ARM64)
             
-            | Architecture | Description | Cloud Examples |
-            |-------------|-------------|----------------|
-            | **AMD64/x86_64** | Intel/AMD 64-bit | EC2 c5, m5, r5 series |
-            | **ARM64/aarch64** | ARM 64-bit | EC2 Graviton (c6g, m6g, r6g) |
+            ---
             
-            ## 🔐 Security Features
+            ## 🚀 Quick Start
             
-            - ✅ **Process isolation** using Linux namespaces
-            - ✅ **Resource limits** (CPU, memory, I/O)
-            - ✅ **mTLS encryption** with embedded certificates
-            - ✅ **Role-based access** (admin/viewer roles)
-            - ✅ **Filesystem isolation** with chroot
-            - ✅ **Cgroup-based resource management**
+            ```bash
+            # 1. Install server package on your Linux server (see above)
+            # 2. Install RNX CLI on your desktop/laptop (see above)
+            # 3. Copy client configuration from server
+            scp your-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
             
-            ## 🚀 Production Ready
-            
-            - ✅ **Multi-architecture support** for modern cloud environments
-            - ✅ **Enterprise distributions** (RHEL, Ubuntu LTS, Amazon Linux)
-            - ✅ **Automated certificate management** with embedded configs
-            - ✅ **Systemd integration** for reliable service management
-            - ✅ **Security scanned** packages with vulnerability checks
-            
-            ## 📖 Next Steps
-            
-            1. **Install the server package** on your Linux server
-            2. **Download the RNX CLI** for your desktop from our [cross-platform CLI releases](https://github.com/ehsaniara/joblet/releases)
-            3. **Copy the client configuration** from `/opt/joblet/config/rnx-config.yml`
-            4. **Start managing jobs remotely** with `rnx run <command>`
+            # 4. Test connection and run jobs
+            rnx list
+            rnx run echo "Hello from Joblet!"
+            rnx run --max-cpu=50 --max-memory=512 python3 script.py
+            rnx log <job-id>
+            ```
             
             ## 🔐 Package Verification
             
             ```bash
-            # Verify package checksums
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-server-checksums.txt
-            sha256sum -c joblet-server-checksums.txt
-            
-            # Verify package signatures (Debian)
-            dpkg -I joblet_*.deb
-            
-            # Verify package signatures (RPM)
-            rpm -qip joblet-*.rpm
+            # Verify all checksums
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-complete-checksums.txt
+            sha256sum -c joblet-complete-checksums.txt
             ```
+            
+            ---
+            
+            ## 📊 Architecture Support Matrix
+            
+            | Package Type | AMD64/x86_64 | ARM64/aarch64 | i386 |
+            |-------------|--------------|---------------|------|
+            | **Debian (.deb)** | ✅ | ✅ | ❌ |
+            | **RPM (.rpm)** | ✅ | ✅ | ❌ |
+            | **RNX CLI** | ✅ | ✅ | ✅ |
+            
+            Perfect for modern cloud environments including **AWS Graviton**, **Azure ARM**, and traditional **Intel/AMD** servers.
           generate_release_notes: false
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-          tag_name: "${{ github.ref_name }}-server"
+          make_latest: true
