@@ -743,7 +743,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: "Joblet ${{ github.ref_name }}"
+          name: "Joblet ${{ github.ref_name }} - Complete Release"
           files: |
             release/*.deb
             release/*.rpm
