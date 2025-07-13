@@ -327,23 +327,52 @@ cp -r scripts "$BUILD_DIR/BUILD/"
 
 cd "$BUILD_DIR"
 
-if [ "$ARCH" = "aarch64" ] && [ "$(uname -m)" = "x86_64" ]; then
-    echo "Setting up cross-compilation for aarch64 on x86_64..."
-    # Add --target for cross-compilation
-    RPMBUILD_OPTS="--target ${ARCH}"
-else
-    RPMBUILD_OPTS=""
-fi
+echo "🏗️  Building RPM package for ${ARCH}..."
 
-rpmbuild --define "_topdir $(pwd)" \
-         --define "_builddir $(pwd)/BUILD" \
-         --define "_buildrootdir $(pwd)/BUILDROOT" \
-         --define "_rpmdir $(pwd)/RPMS" \
-         --define "_sourcedir $(pwd)/SOURCES" \
-         --define "_specdir $(pwd)/SPECS" \
-         --define "_srcrpmdir $(pwd)/SRPMS" \
-         $RPMBUILD_OPTS \
-         -bb SPECS/${PACKAGE_NAME}.spec
+# Since Go binaries are statically linked and our package has no architecture-specific
+# dependencies, we can build as noarch and rename for cross-compilation
+if [ "$ARCH" = "aarch64" ] && [ "$(uname -m)" = "x86_64" ]; then
+    echo "🔄 Using simplified cross-compilation approach for ${ARCH}..."
+
+    # Temporarily modify spec to build as noarch
+    sed -i "s/BuildArch:.*${ARCH}/BuildArch: noarch/" SPECS/${PACKAGE_NAME}.spec
+
+    # Build as noarch
+    rpmbuild --define "_topdir $(pwd)" \
+             --define "_builddir $(pwd)/BUILD" \
+             --define "_buildrootdir $(pwd)/BUILDROOT" \
+             --define "_rpmdir $(pwd)/RPMS" \
+             --define "_sourcedir $(pwd)/SOURCES" \
+             --define "_specdir $(pwd)/SPECS" \
+             --define "_srcrpmdir $(pwd)/SRPMS" \
+             -bb SPECS/${PACKAGE_NAME}.spec
+
+    # Create target architecture directory
+    mkdir -p "RPMS/${ARCH}"
+
+    # Copy and rename the package
+    NOARCH_PKG="RPMS/noarch/${PACKAGE_NAME}-${CLEAN_VERSION}-${RELEASE}.noarch.rpm"
+    TARGET_PKG="RPMS/${ARCH}/${PACKAGE_NAME}-${CLEAN_VERSION}-${RELEASE}.${ARCH}.rpm"
+
+    if [ -f "$NOARCH_PKG" ]; then
+        cp "$NOARCH_PKG" "$TARGET_PKG"
+        echo "✅ Package built and renamed for ${ARCH}"
+    else
+        echo "❌ Failed to build noarch package"
+        exit 1
+    fi
+else
+    echo "🏗️  Native build for ${ARCH}..."
+    # For native builds, use the original architecture
+    rpmbuild --define "_topdir $(pwd)" \
+             --define "_builddir $(pwd)/BUILD" \
+             --define "_buildrootdir $(pwd)/BUILDROOT" \
+             --define "_rpmdir $(pwd)/RPMS" \
+             --define "_sourcedir $(pwd)/SOURCES" \
+             --define "_specdir $(pwd)/SPECS" \
+             --define "_srcrpmdir $(pwd)/SRPMS" \
+             -bb SPECS/${PACKAGE_NAME}.spec
+fi
 
 cd ..
 

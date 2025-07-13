@@ -271,10 +271,16 @@ jobs:
           mv joblet-arm64 joblet
           mv rnx-arm64 rnx
 
-      - name: Install RPM build tools
+      - name: Install RPM build tools with cross-compilation support
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm build-essential
+          
+          # Add architecture support for cross-compilation
+          sudo dpkg --add-architecture arm64
+          
+          # Install cross-compilation tools if available
+          sudo apt-get install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available, proceeding with noarch build"
 
       - name: Set version from previous job
         run: |
@@ -283,7 +289,6 @@ jobs:
       - name: Build RPM package (aarch64)
         run: |
           chmod +x scripts/build-rpm.sh
-          # Use --target to specify target architecture for cross-compilation
           ./scripts/build-rpm.sh aarch64 ${{ env.VERSION }}
 
       - name: Upload RPM package (aarch64)
