@@ -605,30 +605,40 @@ jobs:
       - name: Generate checksums
         run: |
           cd release/
-          sha256sum *.deb *.rpm > checksums.txt
-          cat checksums.txt
+          sha256sum *.deb *.rpm > joblet-server-checksums.txt
+          cat joblet-server-checksums.txt
 
-      - name: Create release
+      - name: Create Linux Server Package Release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: "Joblet Server ${{ github.ref_name }} - Linux Packages"
           files: |
             release/*.deb
             release/*.rpm
-            release/checksums.txt
+            release/joblet-server-checksums.txt
           body: |
-            ## Joblet ${{ github.ref_name }}
+            # 🖥️ Joblet Server ${{ github.ref_name }} - Linux Server Packages
             
-            ### Quick Installation
+            **Complete Linux server deployment packages** including both the Joblet daemon and RNX CLI with embedded certificates.
             
-            #### Ubuntu/Debian
+            ## 📦 Package Types
+            
+            | Package Type | Distributions | Architectures |
+            |-------------|---------------|---------------|
+            | **Debian (.deb)** | Ubuntu 18.04+, Debian 10+ | AMD64, ARM64 |
+            | **RPM (.rpm)** | Amazon Linux, RHEL, CentOS, Fedora | x86_64, aarch64 |
+            
+            ## 🚀 Quick Server Installation
+            
+            ### 📋 Debian/Ubuntu Server
             ```bash
-            # AMD64 (Intel/AMD processors)
+            # AMD64 (Intel/AMD servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
             
-            # ARM64 (ARM processors, AWS Graviton)
+            # ARM64 (AWS Graviton, ARM servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
             sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
             
@@ -637,21 +647,22 @@ jobs:
             sudo systemctl enable joblet
             ```
             
-            #### Amazon Linux / RHEL / CentOS / Fedora
+            ### 🔴 RHEL/CentOS/Fedora Server  
             ```bash
-            # x86_64 (Intel/AMD processors)
+            # x86_64 (Intel/AMD servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            # aarch64 (ARM processors, AWS Graviton)
+            # aarch64 (AWS Graviton, ARM servers)
             wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
             
-            # Install on Amazon Linux 2
+            # Install based on your distribution:
+            # Amazon Linux 2
             sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            # Install on Amazon Linux 2023 / Fedora
+            # Amazon Linux 2023 / Fedora
             sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
-            # Install on RHEL/CentOS
+            # RHEL/CentOS
             sudo rpm -ivh joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
             
             # Start the service
@@ -659,61 +670,94 @@ jobs:
             sudo systemctl enable joblet
             ```
             
-            ### Architecture Support
-            - **amd64/x86_64**: Intel/AMD processors
-            - **arm64/aarch64**: ARM processors (including AWS Graviton)
-            
-            ### Package Formats
-            - **Debian packages** (.deb): Ubuntu, Debian, and derivatives
-            - **RPM packages** (.rpm): Amazon Linux, RHEL, CentOS, Fedora, SUSE
-            
-            ### Supported Distributions
-            #### Debian-based
-            - Ubuntu 18.04+
-            - Debian 10+
-            - And derivatives
-            
-            #### RPM-based
-            - Amazon Linux 2/2023
-            - RHEL/CentOS 8/9
-            - Fedora 35+
-            - SUSE/openSUSE
-            
-            ### Package Verification
+            ### 🟠 Amazon Web Services (AWS)
             ```bash
-            # Verify checksums
-            sha256sum -c checksums.txt
+            # Amazon Linux 2 (x86_64)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            
+            # Amazon Linux 2 (ARM64/Graviton)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
+            sudo yum localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
+            
+            # Amazon Linux 2023 (x86_64)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
+            
+            # Amazon Linux 2023 (ARM64/Graviton)
+            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
+            sudo dnf localinstall -y joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
             ```
             
-            ### Post-Installation
+            ## 🔧 Post-Installation
+            
             ```bash
             # Verify installation
             sudo systemctl status joblet
             sudo rnx list
             
-            # View logs
+            # View service logs
             sudo journalctl -u joblet -f
+            
+            # Test job execution
+            sudo rnx run echo "Hello from Joblet Server!"
             ```
             
-            ### CLI Usage
+            ## 📋 What's Included
+            
+            Each package contains:
+            - ✅ **Joblet daemon** (`/opt/joblet/joblet`) - The main server process
+            - ✅ **RNX CLI** (`/opt/joblet/rnx`) - Command-line client
+            - ✅ **Systemd service** (`joblet.service`) - Auto-start configuration  
+            - ✅ **Embedded certificates** - Automatic mTLS setup
+            - ✅ **Configuration templates** - Ready-to-use configs
+            - ✅ **Certificate generator** - Easy certificate management
+            
+            ## 🌐 Architecture Support
+            
+            | Architecture | Description | Cloud Examples |
+            |-------------|-------------|----------------|
+            | **AMD64/x86_64** | Intel/AMD 64-bit | EC2 c5, m5, r5 series |
+            | **ARM64/aarch64** | ARM 64-bit | EC2 Graviton (c6g, m6g, r6g) |
+            
+            ## 🔐 Security Features
+            
+            - ✅ **Process isolation** using Linux namespaces
+            - ✅ **Resource limits** (CPU, memory, I/O)
+            - ✅ **mTLS encryption** with embedded certificates
+            - ✅ **Role-based access** (admin/viewer roles)
+            - ✅ **Filesystem isolation** with chroot
+            - ✅ **Cgroup-based resource management**
+            
+            ## 🚀 Production Ready
+            
+            - ✅ **Multi-architecture support** for modern cloud environments
+            - ✅ **Enterprise distributions** (RHEL, Ubuntu LTS, Amazon Linux)
+            - ✅ **Automated certificate management** with embedded configs
+            - ✅ **Systemd integration** for reliable service management
+            - ✅ **Security scanned** packages with vulnerability checks
+            
+            ## 📖 Next Steps
+            
+            1. **Install the server package** on your Linux server
+            2. **Download the RNX CLI** for your desktop from our [cross-platform CLI releases](https://github.com/ehsaniara/joblet/releases)
+            3. **Copy the client configuration** from `/opt/joblet/config/rnx-config.yml`
+            4. **Start managing jobs remotely** with `rnx run <command>`
+            
+            ## 🔐 Package Verification
+            
             ```bash
-            # Basic commands
-            rnx list                              # List all jobs
-            rnx run echo "Hello World"            # Run a simple command
-            rnx run --max-memory=512 python3 script.py  # Run with resource limits
-            rnx status <job-id>                   # Get job status
-            rnx log <job-id>                      # Stream job logs
-            rnx stop <job-id>                     # Stop a job
-            ```
+            # Verify package checksums
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-server-checksums.txt
+            sha256sum -c joblet-server-checksums.txt
             
-            ### Custom Configuration
-            ```bash
-            # Debian with custom IP
-            JOBLET_SERVER_IP="192.168.1.100" sudo -E dpkg -i joblet_*.deb
+            # Verify package signatures (Debian)
+            dpkg -I joblet_*.deb
             
-            # RPM with custom IP  
-            JOBLET_SERVER_IP="192.168.1.100" sudo -E yum localinstall -y joblet-*.rpm
-            JOBLET_SERVER_IP="192.168.1.100" sudo -E dnf localinstall -y joblet-*.rpm
+            # Verify package signatures (RPM)
+            rpm -qip joblet-*.rpm
             ```
+          generate_release_notes: false
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          tag_name: "${{ github.ref_name }}-server"

@@ -1,4 +1,4 @@
-name: Release
+name: Cross-Platform RNX CLI Release
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  build-cross-platform-rnx:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,35 +24,200 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Build release binaries
+      - name: Build RNX CLI for all platforms and architectures
         run: |
-          # Linux binaries (joblet, rnx)
-          GOOS=linux GOARCH=amd64 go build -o joblet-linux-amd64 ./cmd/joblet
-          GOOS=linux GOARCH=amd64 go build -o rnx-linux-amd64 ./cmd/rnx
+          echo "🚀 Building RNX CLI for all platforms and architectures..."
           
-          # macOS RNX only
-          GOOS=darwin GOARCH=amd64 go build -o rnx-darwin-amd64 ./cmd/rnx
-          GOOS=darwin GOARCH=arm64 go build -o rnx-darwin-arm64 ./cmd/rnx
+          # Create build directory
+          mkdir -p dist
           
-          # Windows RNX only
-          GOOS=windows GOARCH=amd64 go build -o rnx-windows-amd64.exe ./cmd/rnx
+          # Linux (Desktop/Client usage)
+          echo "🐧 Building Linux RNX CLI variants..."
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-linux-amd64 ./cmd/rnx
+          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-linux-arm64 ./cmd/rnx
+          GOOS=linux GOARCH=386 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-linux-386 ./cmd/rnx
           
-          # Create archives
-          # Linux (includes all three binaries)
-          tar -czf joblet-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz joblet-linux-amd64 rnx-linux-amd64 
+          # macOS (Intel and Apple Silicon)
+          echo "🍎 Building macOS RNX CLI variants..."
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-darwin-amd64 ./cmd/rnx
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-darwin-arm64 ./cmd/rnx
           
-          # macOS (RNX only)
+          # Windows (Intel and ARM)
+          echo "🪟 Building Windows RNX CLI variants..."
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-windows-amd64.exe ./cmd/rnx
+          GOOS=windows GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-windows-arm64.exe ./cmd/rnx
+          GOOS=windows GOARCH=386 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-windows-386.exe ./cmd/rnx
+          
+          # FreeBSD (for completeness)
+          echo "😈 Building FreeBSD RNX CLI variants..."
+          GOOS=freebsd GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-freebsd-amd64 ./cmd/rnx
+          GOOS=freebsd GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.VERSION }} -w -s" -o dist/rnx-freebsd-arm64 ./cmd/rnx
+
+      - name: Create platform-specific archives
+        run: |
+          echo "📦 Creating platform-specific archives..."
+          cd dist
+          
+          # Linux archives
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz rnx-linux-amd64
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz rnx-linux-arm64
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-linux-386.tar.gz rnx-linux-386
+          
+          # macOS archives (separate for Intel and Apple Silicon)
           tar -czf rnx-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz rnx-darwin-amd64
           tar -czf rnx-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz rnx-darwin-arm64
           
-          # Windows (RNX only)
+          # Universal macOS archive (includes both architectures)
+          mkdir -p universal-macos
+          cp rnx-darwin-amd64 universal-macos/rnx-intel
+          cp rnx-darwin-arm64 universal-macos/rnx-apple-silicon
+          cat > universal-macos/install.sh << 'EOF'
+          #!/bin/bash
+          # Universal macOS installer for RNX CLI
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+              echo "Installing RNX for Apple Silicon (M1/M2/M3)..."
+              cp rnx-apple-silicon /usr/local/bin/rnx
+          else
+              echo "Installing RNX for Intel..."
+              cp rnx-intel /usr/local/bin/rnx
+          fi
+          chmod +x /usr/local/bin/rnx
+          echo "✅ RNX CLI installed successfully!"
+          echo "Usage: rnx --help"
+          EOF
+          chmod +x universal-macos/install.sh
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-darwin-universal.tar.gz -C universal-macos .
+          
+          # Windows archives
           zip rnx-${{ steps.version.outputs.VERSION }}-windows-amd64.zip rnx-windows-amd64.exe
+          zip rnx-${{ steps.version.outputs.VERSION }}-windows-arm64.zip rnx-windows-arm64.exe
+          zip rnx-${{ steps.version.outputs.VERSION }}-windows-386.zip rnx-windows-386.exe
+          
+          # FreeBSD archives
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz rnx-freebsd-amd64
+          tar -czf rnx-${{ steps.version.outputs.VERSION }}-freebsd-arm64.tar.gz rnx-freebsd-arm64
 
-      - name: Create Release
+      - name: Generate checksums
+        run: |
+          cd dist
+          echo "🔐 Generating checksums for all RNX CLI releases..."
+          sha256sum *.tar.gz *.zip > rnx-checksums.txt
+          echo "📋 Checksums generated:"
+          cat rnx-checksums.txt
+
+      - name: Create Cross-Platform RNX CLI Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "RNX CLI ${{ steps.version.outputs.VERSION }} - Cross Platform"
           files: |
-            joblet-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz
-            rnx-${{ steps.version.outputs.VERSION }}-*.tar.gz
-            rnx-${{ steps.version.outputs.VERSION }}-*.zip
-          generate_release_notes: true
+            dist/*.tar.gz
+            dist/*.zip
+            dist/rnx-checksums.txt
+          body: |
+            # 🚀 RNX CLI ${{ steps.version.outputs.VERSION }} - Cross Platform Release
+            
+            **RNX** is the cross-platform command-line client for Joblet. Use it to connect to Joblet servers from any platform.
+            
+            ## 📥 Quick Installation
+            
+            ### 🍎 macOS
+            ```bash
+            # Intel Macs
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz | tar xz
+            sudo mv rnx-darwin-amd64 /usr/local/bin/rnx
+            
+            # Apple Silicon (M1/M2/M3)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz | tar xz
+            sudo mv rnx-darwin-arm64 /usr/local/bin/rnx
+            
+            # Universal installer (auto-detects architecture)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-darwin-universal.tar.gz | tar xz
+            sudo bash install.sh
+            ```
+            
+            ### 🪟 Windows
+            ```powershell
+            # AMD64 (Intel/AMD)
+            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-windows-amd64.zip" -OutFile "rnx.zip"
+            Expand-Archive rnx.zip
+            Move-Item rnx\rnx-windows-amd64.exe "C:\Program Files\rnx.exe"
+            
+            # ARM64 (Surface Pro X, other ARM Windows)
+            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-windows-arm64.zip" -OutFile "rnx.zip"
+            ```
+            
+            ### 🐧 Linux (Desktop/Client)
+            ```bash
+            # AMD64 (Intel/AMD)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz | tar xz
+            sudo mv rnx-linux-amd64 /usr/local/bin/rnx
+            
+            # ARM64 (Raspberry Pi 4, Pine64, etc.)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz | tar xz
+            sudo mv rnx-linux-arm64 /usr/local/bin/rnx
+            
+            # i386 (older 32-bit systems)
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-linux-386.tar.gz | tar xz
+            sudo mv rnx-linux-386 /usr/local/bin/rnx
+            ```
+            
+            ### 😈 FreeBSD
+            ```bash
+            # AMD64
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz | tar xz
+            sudo mv rnx-freebsd-amd64 /usr/local/bin/rnx
+            ```
+            
+            ## 🎯 Platform Support Matrix
+            
+            | Platform | Architecture | Binary | Package |
+            |----------|-------------|---------|---------|
+            | **macOS** | Intel (x64) | ✅ rnx-darwin-amd64 | ✅ Universal installer |
+            | **macOS** | Apple Silicon (ARM64) | ✅ rnx-darwin-arm64 | ✅ Universal installer |
+            | **Windows** | AMD64 (x64) | ✅ rnx-windows-amd64.exe | ✅ ZIP |
+            | **Windows** | ARM64 | ✅ rnx-windows-arm64.exe | ✅ ZIP |
+            | **Windows** | i386 (32-bit) | ✅ rnx-windows-386.exe | ✅ ZIP |
+            | **Linux Desktop** | AMD64 (x64) | ✅ rnx-linux-amd64 | ✅ TAR.GZ |
+            | **Linux Desktop** | ARM64 | ✅ rnx-linux-arm64 | ✅ TAR.GZ |
+            | **Linux Desktop** | i386 (32-bit) | ✅ rnx-linux-386 | ✅ TAR.GZ |
+            | **FreeBSD** | AMD64 (x64) | ✅ rnx-freebsd-amd64 | ✅ TAR.GZ |
+            | **FreeBSD** | ARM64 | ✅ rnx-freebsd-arm64 | ✅ TAR.GZ |
+            
+            ## 🔧 Usage
+            
+            ```bash
+            # Connect to a Joblet server
+            rnx --config rnx-config.yml list
+            
+            # Run a job
+            rnx run echo "Hello from $(hostname)"
+            
+            # Run with resource limits
+            rnx run --max-cpu=50 --max-memory=512 python3 script.py
+            
+            # Stream job logs
+            rnx log <job-id>
+            
+            # Stop a job
+            rnx stop <job-id>
+            ```
+            
+            ## 📋 What's Next?
+            
+            **For Linux Server Deployment:** Check out the comprehensive Linux packages (`.deb` and `.rpm`) that include both the Joblet daemon and RNX CLI in our [server deployment releases](https://github.com/ehsaniara/joblet/releases).
+            
+            **Need Help?** See the [documentation](https://github.com/ehsaniara/joblet#readme) or run `rnx --help`.
+            
+            ## 🔐 Verification
+            
+            ```bash
+            # Verify checksums
+            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.VERSION }}/rnx-checksums.txt
+            sha256sum -c rnx-checksums.txt
+            ```
+          generate_release_notes: false
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          make_latest: true
