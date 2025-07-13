@@ -329,16 +329,61 @@ cd "$BUILD_DIR"
 
 echo "🏗️  Building RPM package for ${ARCH}..."
 
-# Always build for the correct architecture - no cross-compilation workarounds
-# Go binaries are architecture-specific and should be packaged correctly
-rpmbuild --define "_topdir $(pwd)" \
+# Configure RPM to allow cross-architecture building
+# This is needed when building aarch64 packages on x86_64 systems
+echo "🔧 Configuring RPM for cross-architecture build..."
+
+# Create temporary RPM configuration to allow cross-architecture builds
+TEMP_RPMRC="$(pwd)/custom-rpmrc"
+cat > "$TEMP_RPMRC" << 'RPMRC_EOF'
+# Enable cross-architecture building for common architectures
+buildarchtranslate: i386: i386
+buildarchtranslate: i486: i386
+buildarchtranslate: i586: i386
+buildarchtranslate: i686: i386
+buildarchtranslate: athlon: i386
+buildarchtranslate: pentium3: i386
+buildarchtranslate: pentium4: i386
+buildarchtranslate: x86_64: x86_64
+buildarchtranslate: amd64: x86_64
+buildarchtranslate: ia32e: x86_64
+buildarchtranslate: aarch64: aarch64
+buildarchtranslate: arm64: aarch64
+
+# Architecture compatibility for cross-building
+arch_compat: aarch64: noarch
+arch_compat: x86_64: noarch
+arch_compat: i686: noarch
+arch_compat: i586: noarch
+arch_compat: i486: noarch
+arch_compat: i386: noarch
+
+# Build architecture compatibility
+buildarch_compat: aarch64: noarch
+buildarch_compat: x86_64: noarch
+buildarch_compat: i686: noarch
+buildarch_compat: i586: noarch
+buildarch_compat: i486: noarch
+buildarch_compat: i386: noarch
+RPMRC_EOF
+
+# Always build for the correct architecture with cross-build support
+# Use --target to specify the target architecture and custom rpmrc for compatibility
+rpmbuild --rcfile /usr/lib/rpm/rpmrc:"$TEMP_RPMRC" \
+         --target "${ARCH}" \
+         --define "_topdir $(pwd)" \
          --define "_builddir $(pwd)/BUILD" \
          --define "_buildrootdir $(pwd)/BUILDROOT" \
          --define "_rpmdir $(pwd)/RPMS" \
          --define "_sourcedir $(pwd)/SOURCES" \
          --define "_specdir $(pwd)/SPECS" \
          --define "_srcrpmdir $(pwd)/SRPMS" \
+         --define "_binary_payload w9.gzdio" \
+         --define "_target_cpu ${ARCH}" \
+         --define "_target_os linux" \
          -bb SPECS/${PACKAGE_NAME}.spec
+
+rm -f "$TEMP_RPMRC"
 
 cd ..
 
