@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"joblet/internal/joblet/core/filesystem"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/core/process"
 	"joblet/internal/joblet/core/resource"
@@ -34,6 +35,7 @@ type Joblet struct {
 	cgroup         resource.Resource
 	processManager *process.Manager
 	jobIsolation   *unprivileged.JobIsolation
+	filesystem     *filesystem.Isolator
 	platform       platform.Platform
 	config         *config.Config
 	logger         *logger.Logger
@@ -45,12 +47,14 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 	processManager := process.NewProcessManager(platformInterface)
 	cgroupResource := resource.New(cfg.Cgroup)
 	jobIsolation := unprivileged.NewJobIsolation()
+	filesystemIsolator := filesystem.NewIsolator(cfg.Filesystem, platformInterface)
 
 	w := &Joblet{
 		store:          store,
 		cgroup:         cgroupResource,
 		processManager: processManager,
 		jobIsolation:   jobIsolation,
+		filesystem:     filesystemIsolator,
 		platform:       platformInterface,
 		config:         cfg,
 		logger:         logger.New().WithField("component", "linux-joblet"),
@@ -288,8 +292,8 @@ func (w *Joblet) StopJob(ctx context.Context, jobID string) error {
 	// Update job status
 	w.updateJobStatus(job, result)
 
-	// Cleanup cgroup
-	w.cgroup.CleanupCgroup(jobID)
+	// Cleanup all job resources (cgroup + filesystem)
+	w.cleanupJobResources(jobID)
 
 	log.Debug("job stopped successfully", "method", result.Method)
 	return nil
@@ -440,8 +444,8 @@ func (w *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 
 	w.store.UpdateJob(completedJob)
 
-	// Cleanup cgroup
-	w.cgroup.CleanupCgroup(job.Id)
+	// Cleanup all job resources (cgroup + filesystem)
+	w.cleanupJobResources(job.Id)
 
 	log.Debug("job monitoring completed",
 		"finalStatus", finalStatus,
@@ -449,11 +453,36 @@ func (w *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		"duration", duration)
 }
 
+// cleanupJobResources handles both cgroup and filesystem
+func (w *Joblet) cleanupJobResources(jobID string) {
+	log := w.logger.WithField("jobID", jobID)
+	log.Debug("cleaning up job resources")
+
+	w.cgroup.CleanupCgroup(jobID)
+
+	jobRootDir := filepath.Join(w.config.Filesystem.BaseDir, jobID)
+	jobTmpDir := strings.Replace(w.config.Filesystem.TmpDir, "{JOB_ID}", jobID, -1)
+
+	if err := w.platform.RemoveAll(jobRootDir); err != nil {
+		log.Warn("failed to remove job root directory", "path", jobRootDir, "error", err)
+	} else {
+		log.Debug("removed job root directory", "path", jobRootDir)
+	}
+
+	if err := w.platform.RemoveAll(jobTmpDir); err != nil {
+		log.Warn("failed to remove job tmp directory", "path", jobTmpDir, "error", err)
+	} else {
+		log.Debug("removed job tmp directory", "path", jobTmpDir)
+	}
+
+	log.Debug("job resources cleanup completed")
+}
+
 func (w *Joblet) cleanupFailedJob(job *domain.Job) {
 	failedJob := job.DeepCopy()
 	failedJob.Fail(-1)
 	w.store.UpdateJob(failedJob)
-	w.cgroup.CleanupCgroup(job.Id)
+	w.cleanupJobResources(job.Id)
 }
 
 func (w *Joblet) updateJobStatus(job *domain.Job, result *process.CleanupResult) {
