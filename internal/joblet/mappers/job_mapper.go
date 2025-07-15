@@ -85,3 +85,19 @@ func DomainToStopJobResponse(job *domain.Job) *pb.StopJobRes {
 
 	return response
 }
+
+// ProtobufToFileUpload converts protobuf FileUpload to domain FileUpload
+func ProtobufToFileUpload(uploads []*pb.FileUpload) []domain.FileUpload {
+	domainUploads := make([]domain.FileUpload, 0, len(uploads))
+
+	for _, pbUpload := range uploads {
+		domainUploads = append(domainUploads, domain.FileUpload{
+			Path:        pbUpload.Path,
+			Content:     pbUpload.Content,
+			Mode:        pbUpload.Mode,
+			IsDirectory: pbUpload.IsDirectory,
+		})
+	}
+
+	return domainUploads
+}

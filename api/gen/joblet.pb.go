@@ -237,12 +237,13 @@ type RunJobReq struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Command   string   `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
-	Args      []string `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
-	MaxCPU    int32    `protobuf:"varint,3,opt,name=maxCPU,proto3" json:"maxCPU,omitempty"`
-	CpuCores  string   `protobuf:"bytes,4,opt,name=cpuCores,proto3" json:"cpuCores,omitempty"`
-	MaxMemory int32    `protobuf:"varint,5,opt,name=maxMemory,proto3" json:"maxMemory,omitempty"`
-	MaxIOBPS  int32    `protobuf:"varint,6,opt,name=maxIOBPS,proto3" json:"maxIOBPS,omitempty"`
+	Command   string        `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	Args      []string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
+	MaxCPU    int32         `protobuf:"varint,3,opt,name=maxCPU,proto3" json:"maxCPU,omitempty"`
+	CpuCores  string        `protobuf:"bytes,4,opt,name=cpuCores,proto3" json:"cpuCores,omitempty"`
+	MaxMemory int32         `protobuf:"varint,5,opt,name=maxMemory,proto3" json:"maxMemory,omitempty"`
+	MaxIOBPS  int32         `protobuf:"varint,6,opt,name=maxIOBPS,proto3" json:"maxIOBPS,omitempty"`
+	Uploads   []*FileUpload `protobuf:"bytes,7,rep,name=uploads,proto3" json:"uploads,omitempty"`
 }
 
 func (x *RunJobReq) Reset() {
@@ -319,6 +320,84 @@ func (x *RunJobReq) GetMaxIOBPS() int32 {
 	return 0
 }
 
+func (x *RunJobReq) GetUploads() []*FileUpload {
+	if x != nil {
+		return x.Uploads
+	}
+	return nil
+}
+
+type FileUpload struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Path        string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`                // Relative path in job workspace
+	Content     []byte `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`          // File content
+	Mode        uint32 `protobuf:"varint,3,opt,name=mode,proto3" json:"mode,omitempty"`               // Unix file permissions (e.g., 0644)
+	IsDirectory bool   `protobuf:"varint,4,opt,name=isDirectory,proto3" json:"isDirectory,omitempty"` // True if this represents a directory
+}
+
+func (x *FileUpload) Reset() {
+	*x = FileUpload{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_joblet_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FileUpload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileUpload) ProtoMessage() {}
+
+func (x *FileUpload) ProtoReflect() protoreflect.Message {
+	mi := &file_joblet_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileUpload.ProtoReflect.Descriptor instead.
+func (*FileUpload) Descriptor() ([]byte, []int) {
+	return file_joblet_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FileUpload) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FileUpload) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *FileUpload) GetMode() uint32 {
+	if x != nil {
+		return x.Mode
+	}
+	return 0
+}
+
+func (x *FileUpload) GetIsDirectory() bool {
+	if x != nil {
+		return x.IsDirectory
+	}
+	return false
+}
+
 type RunJobRes struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -340,7 +419,7 @@ type RunJobRes struct {
 func (x *RunJobRes) Reset() {
 	*x = RunJobRes{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[4]
+		mi := &file_joblet_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -353,7 +432,7 @@ func (x *RunJobRes) String() string {
 func (*RunJobRes) ProtoMessage() {}
 
 func (x *RunJobRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[4]
+	mi := &file_joblet_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +445,7 @@ func (x *RunJobRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunJobRes.ProtoReflect.Descriptor instead.
 func (*RunJobRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{4}
+	return file_joblet_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RunJobRes) GetId() string {
@@ -458,7 +537,7 @@ type GetJobStatusReq struct {
 func (x *GetJobStatusReq) Reset() {
 	*x = GetJobStatusReq{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[5]
+		mi := &file_joblet_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -471,7 +550,7 @@ func (x *GetJobStatusReq) String() string {
 func (*GetJobStatusReq) ProtoMessage() {}
 
 func (x *GetJobStatusReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[5]
+	mi := &file_joblet_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -484,7 +563,7 @@ func (x *GetJobStatusReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobStatusReq.ProtoReflect.Descriptor instead.
 func (*GetJobStatusReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{5}
+	return file_joblet_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetJobStatusReq) GetId() string {
@@ -515,7 +594,7 @@ type GetJobStatusRes struct {
 func (x *GetJobStatusRes) Reset() {
 	*x = GetJobStatusRes{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[6]
+		mi := &file_joblet_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -528,7 +607,7 @@ func (x *GetJobStatusRes) String() string {
 func (*GetJobStatusRes) ProtoMessage() {}
 
 func (x *GetJobStatusRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[6]
+	mi := &file_joblet_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +620,7 @@ func (x *GetJobStatusRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobStatusRes.ProtoReflect.Descriptor instead.
 func (*GetJobStatusRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{6}
+	return file_joblet_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetJobStatusRes) GetId() string {
@@ -633,7 +712,7 @@ type StopJobReq struct {
 func (x *StopJobReq) Reset() {
 	*x = StopJobReq{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[7]
+		mi := &file_joblet_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -646,7 +725,7 @@ func (x *StopJobReq) String() string {
 func (*StopJobReq) ProtoMessage() {}
 
 func (x *StopJobReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[7]
+	mi := &file_joblet_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -659,7 +738,7 @@ func (x *StopJobReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopJobReq.ProtoReflect.Descriptor instead.
 func (*StopJobReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{7}
+	return file_joblet_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StopJobReq) GetId() string {
@@ -683,7 +762,7 @@ type StopJobRes struct {
 func (x *StopJobRes) Reset() {
 	*x = StopJobRes{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[8]
+		mi := &file_joblet_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -696,7 +775,7 @@ func (x *StopJobRes) String() string {
 func (*StopJobRes) ProtoMessage() {}
 
 func (x *StopJobRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[8]
+	mi := &file_joblet_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -709,7 +788,7 @@ func (x *StopJobRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopJobRes.ProtoReflect.Descriptor instead.
 func (*StopJobRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{8}
+	return file_joblet_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StopJobRes) GetId() string {
@@ -752,7 +831,7 @@ type GetJobLogsReq struct {
 func (x *GetJobLogsReq) Reset() {
 	*x = GetJobLogsReq{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[9]
+		mi := &file_joblet_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -765,7 +844,7 @@ func (x *GetJobLogsReq) String() string {
 func (*GetJobLogsReq) ProtoMessage() {}
 
 func (x *GetJobLogsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[9]
+	mi := &file_joblet_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,7 +857,7 @@ func (x *GetJobLogsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobLogsReq.ProtoReflect.Descriptor instead.
 func (*GetJobLogsReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{9}
+	return file_joblet_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetJobLogsReq) GetId() string {
@@ -799,7 +878,7 @@ type DataChunk struct {
 func (x *DataChunk) Reset() {
 	*x = DataChunk{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_joblet_proto_msgTypes[10]
+		mi := &file_joblet_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -812,7 +891,7 @@ func (x *DataChunk) String() string {
 func (*DataChunk) ProtoMessage() {}
 
 func (x *DataChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[10]
+	mi := &file_joblet_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -825,7 +904,7 @@ func (x *DataChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataChunk.ProtoReflect.Descriptor instead.
 func (*DataChunk) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{10}
+	return file_joblet_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DataChunk) GetPayload() []byte {
@@ -861,7 +940,7 @@ var file_joblet_proto_rawDesc = []byte{
 	0x69, 0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x65, 0x78, 0x69, 0x74, 0x43, 0x6f, 0x64, 0x65, 0x18,
 	0x0b, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x65, 0x78, 0x69, 0x74, 0x43, 0x6f, 0x64, 0x65, 0x22,
 	0x0e, 0x0a, 0x0c, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22,
-	0xa7, 0x01, 0x0a, 0x09, 0x52, 0x75, 0x6e, 0x4a, 0x6f, 0x62, 0x52, 0x65, 0x71, 0x12, 0x18, 0x0a,
+	0xd5, 0x01, 0x0a, 0x09, 0x52, 0x75, 0x6e, 0x4a, 0x6f, 0x62, 0x52, 0x65, 0x71, 0x12, 0x18, 0x0a,
 	0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
 	0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x61, 0x72, 0x67, 0x73, 0x18,
 	0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x04, 0x61, 0x72, 0x67, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x6d,
@@ -871,7 +950,17 @@ var file_joblet_proto_rawDesc = []byte{
 	0x1c, 0x0a, 0x09, 0x6d, 0x61, 0x78, 0x4d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x18, 0x05, 0x20, 0x01,
 	0x28, 0x05, 0x52, 0x09, 0x6d, 0x61, 0x78, 0x4d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x12, 0x1a, 0x0a,
 	0x08, 0x6d, 0x61, 0x78, 0x49, 0x4f, 0x42, 0x50, 0x53, 0x18, 0x06, 0x20, 0x01, 0x28, 0x05, 0x52,
-	0x08, 0x6d, 0x61, 0x78, 0x49, 0x4f, 0x42, 0x50, 0x53, 0x22, 0xa3, 0x02, 0x0a, 0x09, 0x52, 0x75,
+	0x08, 0x6d, 0x61, 0x78, 0x49, 0x4f, 0x42, 0x50, 0x53, 0x12, 0x2c, 0x0a, 0x07, 0x75, 0x70, 0x6c,
+	0x6f, 0x61, 0x64, 0x73, 0x18, 0x07, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x6a, 0x6f, 0x62,
+	0x6c, 0x65, 0x74, 0x2e, 0x46, 0x69, 0x6c, 0x65, 0x55, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x52, 0x07,
+	0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x73, 0x22, 0x70, 0x0a, 0x0a, 0x46, 0x69, 0x6c, 0x65, 0x55,
+	0x70, 0x6c, 0x6f, 0x61, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e,
+	0x74, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74,
+	0x65, 0x6e, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x6d, 0x6f, 0x64, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x0d, 0x52, 0x04, 0x6d, 0x6f, 0x64, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x69, 0x73, 0x44, 0x69, 0x72,
+	0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0b, 0x69, 0x73,
+	0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x22, 0xa3, 0x02, 0x0a, 0x09, 0x52, 0x75,
 	0x6e, 0x4a, 0x6f, 0x62, 0x52, 0x65, 0x73, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61,
 	0x6e, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e,
@@ -958,37 +1047,39 @@ func file_joblet_proto_rawDescGZIP() []byte {
 	return file_joblet_proto_rawDescData
 }
 
-var file_joblet_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_joblet_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_joblet_proto_goTypes = []any{
 	(*Jobs)(nil),            // 0: joblet.Jobs
 	(*Job)(nil),             // 1: joblet.Job
 	(*EmptyRequest)(nil),    // 2: joblet.EmptyRequest
 	(*RunJobReq)(nil),       // 3: joblet.RunJobReq
-	(*RunJobRes)(nil),       // 4: joblet.RunJobRes
-	(*GetJobStatusReq)(nil), // 5: joblet.GetJobStatusReq
-	(*GetJobStatusRes)(nil), // 6: joblet.GetJobStatusRes
-	(*StopJobReq)(nil),      // 7: joblet.StopJobReq
-	(*StopJobRes)(nil),      // 8: joblet.StopJobRes
-	(*GetJobLogsReq)(nil),   // 9: joblet.GetJobLogsReq
-	(*DataChunk)(nil),       // 10: joblet.DataChunk
+	(*FileUpload)(nil),      // 4: joblet.FileUpload
+	(*RunJobRes)(nil),       // 5: joblet.RunJobRes
+	(*GetJobStatusReq)(nil), // 6: joblet.GetJobStatusReq
+	(*GetJobStatusRes)(nil), // 7: joblet.GetJobStatusRes
+	(*StopJobReq)(nil),      // 8: joblet.StopJobReq
+	(*StopJobRes)(nil),      // 9: joblet.StopJobRes
+	(*GetJobLogsReq)(nil),   // 10: joblet.GetJobLogsReq
+	(*DataChunk)(nil),       // 11: joblet.DataChunk
 }
 var file_joblet_proto_depIdxs = []int32{
 	1,  // 0: joblet.Jobs.jobs:type_name -> joblet.Job
-	3,  // 1: joblet.JobletService.RunJob:input_type -> joblet.RunJobReq
-	5,  // 2: joblet.JobletService.GetJobStatus:input_type -> joblet.GetJobStatusReq
-	7,  // 3: joblet.JobletService.StopJob:input_type -> joblet.StopJobReq
-	9,  // 4: joblet.JobletService.GetJobLogs:input_type -> joblet.GetJobLogsReq
-	2,  // 5: joblet.JobletService.ListJobs:input_type -> joblet.EmptyRequest
-	4,  // 6: joblet.JobletService.RunJob:output_type -> joblet.RunJobRes
-	6,  // 7: joblet.JobletService.GetJobStatus:output_type -> joblet.GetJobStatusRes
-	8,  // 8: joblet.JobletService.StopJob:output_type -> joblet.StopJobRes
-	10, // 9: joblet.JobletService.GetJobLogs:output_type -> joblet.DataChunk
-	0,  // 10: joblet.JobletService.ListJobs:output_type -> joblet.Jobs
-	6,  // [6:11] is the sub-list for method output_type
-	1,  // [1:6] is the sub-list for method input_type
-	1,  // [1:1] is the sub-list for extension type_name
-	1,  // [1:1] is the sub-list for extension extendee
-	0,  // [0:1] is the sub-list for field type_name
+	4,  // 1: joblet.RunJobReq.uploads:type_name -> joblet.FileUpload
+	3,  // 2: joblet.JobletService.RunJob:input_type -> joblet.RunJobReq
+	6,  // 3: joblet.JobletService.GetJobStatus:input_type -> joblet.GetJobStatusReq
+	8,  // 4: joblet.JobletService.StopJob:input_type -> joblet.StopJobReq
+	10, // 5: joblet.JobletService.GetJobLogs:input_type -> joblet.GetJobLogsReq
+	2,  // 6: joblet.JobletService.ListJobs:input_type -> joblet.EmptyRequest
+	5,  // 7: joblet.JobletService.RunJob:output_type -> joblet.RunJobRes
+	7,  // 8: joblet.JobletService.GetJobStatus:output_type -> joblet.GetJobStatusRes
+	9,  // 9: joblet.JobletService.StopJob:output_type -> joblet.StopJobRes
+	11, // 10: joblet.JobletService.GetJobLogs:output_type -> joblet.DataChunk
+	0,  // 11: joblet.JobletService.ListJobs:output_type -> joblet.Jobs
+	7,  // [7:12] is the sub-list for method output_type
+	2,  // [2:7] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_joblet_proto_init() }
@@ -1046,7 +1137,7 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[4].Exporter = func(v any, i int) any {
-			switch v := v.(*RunJobRes); i {
+			switch v := v.(*FileUpload); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1058,7 +1149,7 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[5].Exporter = func(v any, i int) any {
-			switch v := v.(*GetJobStatusReq); i {
+			switch v := v.(*RunJobRes); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1070,7 +1161,7 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[6].Exporter = func(v any, i int) any {
-			switch v := v.(*GetJobStatusRes); i {
+			switch v := v.(*GetJobStatusReq); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1082,7 +1173,7 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[7].Exporter = func(v any, i int) any {
-			switch v := v.(*StopJobReq); i {
+			switch v := v.(*GetJobStatusRes); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1094,7 +1185,7 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[8].Exporter = func(v any, i int) any {
-			switch v := v.(*StopJobRes); i {
+			switch v := v.(*StopJobReq); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1106,7 +1197,7 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[9].Exporter = func(v any, i int) any {
-			switch v := v.(*GetJobLogsReq); i {
+			switch v := v.(*StopJobRes); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1118,6 +1209,18 @@ func file_joblet_proto_init() {
 			}
 		}
 		file_joblet_proto_msgTypes[10].Exporter = func(v any, i int) any {
+			switch v := v.(*GetJobLogsReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_joblet_proto_msgTypes[11].Exporter = func(v any, i int) any {
 			switch v := v.(*DataChunk); i {
 			case 0:
 				return &v.state
@@ -1136,7 +1239,7 @@ func file_joblet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_joblet_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -18,7 +18,7 @@ type darwinJoblet struct {
 	config *config.Config
 }
 
-// NewJoblet creates a Darwin joblet for development (SAME FUNCTION NAME as Linux)
+// NewJoblet creates a Darwin joblet for development
 func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
 	return &darwinJoblet{
 		logger: logger.New().WithField("component", "darwin-joblet"),
@@ -27,8 +27,11 @@ func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
 }
 
 // StartJob provides basic job execution on macOS (for development/testing)
-func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error) {
+func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload) (*domain.Job, error) {
 	w.logger.Warn("Darwin joblet has limited functionality - jobs will not be isolated")
+	if len(uploads) > 0 {
+		w.logger.Warn("File uploads are not supported on Darwin", "uploadCount", len(uploads))
+	}
 	return nil, fmt.Errorf("Darwin joblet not fully implemented - use Linux for production")
 }
 

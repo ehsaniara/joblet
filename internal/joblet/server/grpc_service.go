@@ -40,6 +40,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		"maxCPU", req.MaxCPU,
 		"maxMemory", req.MaxMemory,
 		"maxIOBPS", req.MaxIOBPS,
+		"uploadCount", len(req.Uploads),
 	)
 
 	log.Debug("run job request received")
@@ -49,8 +50,25 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		return nil, err
 	}
 
+	// Validate upload size limits
+	totalUploadSize := int64(0)
+	for _, upload := range req.Uploads {
+		totalUploadSize += int64(len(upload.Content))
+	}
+
+	// Set reasonable limits
+	const maxTotalUploadSize = 100 * 1024 * 1024 // 100MB total
+	if totalUploadSize > maxTotalUploadSize {
+		log.Error("upload size exceeds limit", "totalSize", totalUploadSize, "maxSize", maxTotalUploadSize)
+		return nil, status.Errorf(codes.InvalidArgument, "total upload size %.2f MB exceeds limit of %.2f MB",
+			float64(totalUploadSize)/1024/1024, float64(maxTotalUploadSize)/1024/1024)
+	}
+
 	startTime := time.Now()
-	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores)
+
+	domainUploads := mappers.ProtobufToFileUpload(req.Uploads)
+
+	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads)
 
 	if err != nil {
 		duration := time.Since(startTime)
@@ -59,7 +77,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 	}
 
 	duration := time.Since(startTime)
-	log.Debug("job created successfully with host networking", "jobId", newJob.Id, "duration", duration)
+	log.Debug("job created successfully with host networking", "jobId", newJob.Id, "duration", duration, "uploadsProcessed", len(domainUploads))
 
 	return mappers.DomainToRunJobResponse(newJob), nil
 }

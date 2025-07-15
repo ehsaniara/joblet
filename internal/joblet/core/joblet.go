@@ -16,6 +16,7 @@ import (
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -73,15 +74,16 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 	return w
 }
 
-func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error) {
+func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload) (*domain.Job, error) {
 	jobID := w.getNextJobID()
-	log := w.logger.WithFields("jobID", jobID, "command", command)
+	log := w.logger.WithFields("jobID", jobID, "command", command, "uploadCount", len(uploads))
 
 	log.Debug("starting job with configuration",
 		"requestedCPU", maxCPU,
 		"requestedMemory", maxMemory,
 		"requestedIO", maxIOBPS,
-		"validateCommands", w.config.Joblet.ValidateCommands)
+		"validateCommands", w.config.Joblet.ValidateCommands,
+		"uploads", len(uploads))
 
 	// Early context check
 	select {
@@ -108,6 +110,11 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS, cpuCores)
 
+	// Create job workspace directory BEFORE setting up cgroups
+	if e := w.setupJobWorkspace(job, uploads); e != nil {
+		return nil, fmt.Errorf("failed to setup job workspace: %w", e)
+	}
+
 	log.Debug("creating cgroup with strict resource limit enforcement",
 		"limits", fmt.Sprintf("CPU:%d%%, Memory:%dMB, IO:%d BPS, Cores:%s",
 			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS, job.Limits.CPUCores))
@@ -119,6 +126,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
+		w.cleanupJobWorkspace(job.Id)
 		return nil, fmt.Errorf("resource limit enforcement failed: %w", e)
 	}
 
@@ -126,6 +134,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	if job.Limits.CPUCores != "" {
 		if e := w.setupCPUCoreRestrictions(job); e != nil {
 			w.cgroup.CleanupCgroup(job.Id)
+			w.cleanupJobWorkspace(job.Id)
 			return nil, fmt.Errorf("CPU core enforcement failed: %w", e)
 		}
 	}
@@ -137,6 +146,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	cmd, err := w.startProcessSingleBinary(ctx, job)
 	if err != nil {
 		w.cleanupFailedJob(job)
+		w.cleanupJobWorkspace(job.Id)
 		return nil, fmt.Errorf("process start failed: %w", err)
 	}
 
@@ -146,7 +156,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	// Start monitoring
 	go w.monitorJob(ctx, cmd, job)
 
-	log.Debug("job started successfully", "pid", job.Pid)
+	log.Debug("job started successfully", "pid", job.Pid, "workspaceFiles", len(uploads))
 	return job, nil
 }
 
@@ -337,6 +347,65 @@ func (w *Joblet) createJobDomain(jobID, resolvedCommand string, args []string, m
 		Status:     domain.StatusInitializing,
 		CgroupPath: filepath.Join(w.config.Cgroup.BaseDir, "job-"+jobID),
 		StartTime:  time.Now(),
+	}
+}
+
+// setupJobWorkspace creates the job workspace and uploads files
+func (w *Joblet) setupJobWorkspace(job *domain.Job, uploads []domain.FileUpload) error {
+	log := w.logger.WithFields("jobID", job.Id, "uploadCount", len(uploads))
+
+	// Create job workspace directory
+	workspaceDir := filepath.Join(w.config.Filesystem.BaseDir, job.Id, "work")
+
+	log.Info("creating job workspace", "path", workspaceDir)
+
+	if err := w.platform.MkdirAll(workspaceDir, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	// Process uploads
+	for i, upload := range uploads {
+		log.Info("uploads loop", "num", i)
+		fullPath := filepath.Join(workspaceDir, upload.Path)
+
+		if upload.IsDirectory {
+			// Create directory
+			if err := w.platform.MkdirAll(fullPath, os.FileMode(upload.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
+			}
+			log.Info("created directory", "path", upload.Path, "mode", fmt.Sprintf("%o", upload.Mode))
+		} else {
+			// Ensure parent directory exists
+			parentDir := filepath.Dir(fullPath)
+			if err := w.platform.MkdirAll(parentDir, 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+			}
+
+			// Write file
+			mode := os.FileMode(upload.Mode)
+			if mode == 0 {
+				mode = 0644 // Default file permissions
+			}
+
+			if err := w.platform.WriteFile(fullPath, upload.Content, mode); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
+			}
+			log.Info("wrote file", "path", upload.Path, "size", len(upload.Content), "mode", fmt.Sprintf("%o", mode))
+		}
+	}
+
+	log.Info("job workspace setup completed", "filesUploaded", len(uploads))
+	return nil
+}
+
+// cleanupJobWorkspace removes the job workspace directory
+func (w *Joblet) cleanupJobWorkspace(jobID string) {
+	workspaceDir := filepath.Join(w.config.Filesystem.BaseDir, jobID)
+
+	if err := w.platform.RemoveAll(workspaceDir); err != nil {
+		w.logger.Warn("failed to cleanup job workspace", "jobID", jobID, "error", err)
+	} else {
+		w.logger.Debug("job workspace cleaned up", "jobID", jobID)
 	}
 }
 
