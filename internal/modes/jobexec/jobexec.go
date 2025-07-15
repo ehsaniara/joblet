@@ -1,7 +1,10 @@
 package jobexec
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -10,12 +13,21 @@ import (
 	"joblet/pkg/platform"
 )
 
-// JobConfig represents job configuration
+// JobConfig represents job configuration with upload support
 type JobConfig struct {
 	JobID      string
 	Command    string
 	Args       []string
 	CgroupPath string
+	Uploads    []UploadInfo
+}
+
+// UploadInfo represents file upload information
+type UploadInfo struct {
+	Path        string
+	Content     []byte
+	Mode        uint32
+	IsDirectory bool
 }
 
 // JobExecutor handles job execution using platform abstraction
@@ -32,14 +44,14 @@ func NewJobExecutor(p platform.Platform, logger *logger.Logger) *JobExecutor {
 	}
 }
 
-// LoadConfigFromEnv loads job configuration from environment variables using platform abstraction
+// LoadConfigFromEnv loads job configuration including uploads from environment variables
 func LoadConfigFromEnv(logger *logger.Logger) (*JobConfig, error) {
 	p := platform.NewPlatform()
 	executor := NewJobExecutor(p, logger)
 	return executor.LoadConfigFromEnv()
 }
 
-// LoadConfigFromEnv loads job configuration from environment variables
+// LoadConfigFromEnv loads job configuration including embedded uploads
 func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 	jobID := je.platform.Getenv("JOB_ID")
 	command := je.platform.Getenv("JOB_COMMAND")
@@ -65,10 +77,17 @@ func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 		}
 	}
 
-	je.logger.Debug("loaded job configuration",
+	// Load embedded uploads if present
+	uploads, err := je.loadUploadsFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load uploads: %w", err)
+	}
+
+	je.logger.Debug("loaded job configuration with uploads",
 		"jobId", jobID,
 		"command", command,
 		"argsCount", len(args),
+		"uploadsCount", len(uploads),
 		"cgroupPath", cgroupPath)
 
 	return &JobConfig{
@@ -76,14 +95,146 @@ func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 		Command:    command,
 		Args:       args,
 		CgroupPath: cgroupPath,
+		Uploads:    uploads,
 	}, nil
 }
 
-// Execute executes the job based on platform
+// loadUploadsFromEnv deserializes uploads from environment variables
+func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
+	uploadsData := je.platform.Getenv("JOB_UPLOADS")
+	if uploadsData == "" {
+		return nil, nil // No uploads
+	}
+
+	// Decode base64 encoded JSON
+	jsonData, err := base64.StdEncoding.DecodeString(uploadsData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode uploads data: %w", err)
+	}
+
+	// Parse JSON upload data
+	var uploadData []struct {
+		Path        string `json:"path"`
+		Content     string `json:"content"` // Base64 encoded
+		Mode        uint32 `json:"mode"`
+		IsDirectory bool   `json:"isDirectory"`
+	}
+
+	if err := json.Unmarshal(jsonData, &uploadData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal upload data: %w", err)
+	}
+
+	// Convert to UploadInfo with decoded content
+	var uploads []UploadInfo
+	for _, data := range uploadData {
+		content, err := base64.StdEncoding.DecodeString(data.Content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode file content for %s: %w", data.Path, err)
+		}
+
+		uploads = append(uploads, UploadInfo{
+			Path:        data.Path,
+			Content:     content,
+			Mode:        data.Mode,
+			IsDirectory: data.IsDirectory,
+		})
+	}
+
+	je.logger.Debug("deserialized uploads from environment",
+		"uploadCount", len(uploads))
+
+	return uploads, nil
+}
+
+// Execute executes the job with upload processing
 func Execute(config *JobConfig, logger *logger.Logger) error {
 	p := platform.NewPlatform()
 	executor := NewJobExecutor(p, logger)
-	return executor.Execute(config)
+	return executor.ExecuteWithUploads(config)
+}
+
+// ExecuteWithUploads executes the job with file upload processing
+func (je *JobExecutor) ExecuteWithUploads(config *JobConfig) error {
+	log := je.logger.WithField("jobID", config.JobID)
+
+	// Process uploads FIRST (inside cgroups and isolation)
+	if len(config.Uploads) > 0 {
+		log.Debug("processing file uploads", "fileCount", len(config.Uploads))
+
+		if err := je.processUploads(config.Uploads); err != nil {
+			return fmt.Errorf("file upload processing failed: %w", err)
+		}
+
+		log.Debug("file upload completed", "filesUploaded", len(config.Uploads))
+	}
+
+	// Now execute the actual job command
+	log.Debug("executing job command", "command", config.Command, "args", config.Args)
+
+	// Use the existing execution logic but convert back to original JobConfig
+	originalConfig := &JobConfig{
+		JobID:      config.JobID,
+		Command:    config.Command,
+		Args:       config.Args,
+		CgroupPath: config.CgroupPath,
+		Uploads:    nil, // Already processed
+	}
+
+	return je.Execute(originalConfig)
+}
+
+// processUploads handles file upload processing inside the isolated environment
+func (je *JobExecutor) processUploads(uploads []UploadInfo) error {
+	log := je.logger.WithField("operation", "upload-processing")
+
+	// Determine workspace directory (we're inside chroot, so paths are relative to /)
+	workspaceDir := "/work"
+
+	// Ensure workspace exists
+	if err := je.platform.MkdirAll(workspaceDir, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	// Process each upload
+	for i, upload := range uploads {
+		log.Debug("processing upload", "file", i+1, "path", upload.Path, "size", len(upload.Content))
+
+		fullPath := filepath.Join(workspaceDir, upload.Path)
+
+		if upload.IsDirectory {
+			// Create directory
+			mode := os.FileMode(upload.Mode)
+			if mode == 0 {
+				mode = 0755 // Default directory permissions
+			}
+
+			if err := je.platform.MkdirAll(fullPath, mode); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
+			}
+
+			log.Debug("created directory", "path", upload.Path, "mode", fmt.Sprintf("%o", mode))
+		} else {
+			// Ensure parent directory exists
+			parentDir := filepath.Dir(fullPath)
+			if err := je.platform.MkdirAll(parentDir, 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+			}
+
+			// Write file
+			mode := os.FileMode(upload.Mode)
+			if mode == 0 {
+				mode = 0644 // Default file permissions
+			}
+
+			if err := je.platform.WriteFile(fullPath, upload.Content, mode); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
+			}
+
+			log.Debug("wrote file", "path", upload.Path, "size", len(upload.Content), "mode", fmt.Sprintf("%o", mode))
+		}
+	}
+
+	return nil
 }
 
 // Execute executes the job based on platform using platform abstraction

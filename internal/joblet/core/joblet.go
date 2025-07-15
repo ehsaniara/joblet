@@ -73,15 +73,16 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 	return w
 }
 
-func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error) {
+// StartJob now immediately starts the isolated job with uploads happening inside cgroups
+func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload) (*domain.Job, error) {
 	jobID := w.getNextJobID()
-	log := w.logger.WithFields("jobID", jobID, "command", command)
+	log := w.logger.WithFields("jobID", jobID, "command", command, "uploadCount", len(uploads))
 
-	log.Debug("starting job with configuration",
+	log.Debug("starting job with isolated file upload",
 		"requestedCPU", maxCPU,
 		"requestedMemory", maxMemory,
 		"requestedIO", maxIOBPS,
-		"validateCommands", w.config.Joblet.ValidateCommands)
+		"uploads", len(uploads))
 
 	// Early context check
 	select {
@@ -108,17 +109,19 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS, cpuCores)
 
-	log.Debug("creating cgroup with strict resource limit enforcement",
-		"limits", fmt.Sprintf("CPU:%d%%, Memory:%dMB, IO:%d BPS, Cores:%s",
-			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS, job.Limits.CPUCores))
+	// Create minimal base workspace directory (for cgroup setup only)
+	baseWorkspaceDir := filepath.Join(w.config.Filesystem.BaseDir, job.Id)
+	if err := w.platform.MkdirAll(baseWorkspaceDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create base workspace: %w", err)
+	}
 
-	// Setup cgroup resources
 	if e := w.cgroup.Create(
 		job.CgroupPath,
 		job.Limits.MaxCPU,
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
+		_ = w.platform.RemoveAll(baseWorkspaceDir)
 		return nil, fmt.Errorf("resource limit enforcement failed: %w", e)
 	}
 
@@ -126,6 +129,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	if job.Limits.CPUCores != "" {
 		if e := w.setupCPUCoreRestrictions(job); e != nil {
 			w.cgroup.CleanupCgroup(job.Id)
+			_ = w.platform.RemoveAll(baseWorkspaceDir)
 			return nil, fmt.Errorf("CPU core enforcement failed: %w", e)
 		}
 	}
@@ -133,10 +137,11 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	// Register job in store
 	w.store.CreateNewJob(job)
 
-	// Start the process using single binary approach
-	cmd, err := w.startProcessSingleBinary(ctx, job)
+	// Start the isolated process with uploads embedded in environment
+	cmd, err := w.startProcessWithEmbeddedUploads(ctx, job, uploads)
 	if err != nil {
 		w.cleanupFailedJob(job)
+		_ = w.platform.RemoveAll(baseWorkspaceDir)
 		return nil, fmt.Errorf("process start failed: %w", err)
 	}
 
@@ -146,8 +151,46 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	// Start monitoring
 	go w.monitorJob(ctx, cmd, job)
 
-	log.Debug("job started successfully", "pid", job.Pid)
+	log.Debug("job started successfully with isolated file upload", "pid", job.Pid, "uploadFiles", len(uploads))
 	return job, nil
+}
+
+// startProcessWithEmbeddedUploads starts the job process with file uploads serialized in environment
+func (w *Joblet) startProcessWithEmbeddedUploads(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) (platform.Command, error) {
+	// Get the current executable path
+	execPath, err := w.platform.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current executable path: %w", err)
+	}
+
+	// Build environment with job information AND embedded uploads
+	env := w.processManager.BuildJobEnvironmentWithUploads(job, execPath, uploads)
+
+	// Create isolation attributes
+	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
+
+	// Create launch configuration
+	launchConfig := &process.LaunchConfig{
+		InitPath:    execPath,
+		Environment: env,
+		SysProcAttr: sysProcAttr,
+		Stdout:      NewWrite(w.store, job.Id),
+		Stderr:      NewWrite(w.store, job.Id),
+		JobID:       job.Id,
+		Command:     job.Command,
+		Args:        job.Args,
+	}
+
+	// Launch the process
+	result, err := w.processManager.LaunchProcess(ctx, launchConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.logger.Debug("process launched with embedded uploads",
+		"jobID", job.Id, "pid", result.PID, "uploadCount", len(uploads))
+
+	return result.Command, nil
 }
 
 func (w *Joblet) setupCPUCoreRestrictions(job *domain.Job) error {
@@ -349,44 +392,6 @@ func (w *Joblet) setupCgroupControllers() error {
 
 	w.logger.Debug("cgroup controllers setup completed successfully")
 	return nil
-}
-
-// startProcessSingleBinary starts a job using the same binary in init mode
-func (w *Joblet) startProcessSingleBinary(ctx context.Context, job *domain.Job) (platform.Command, error) {
-	// Get the current executable path
-	execPath, err := w.platform.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current executable path: %w", err)
-	}
-
-	// environment with job information and mode indicator
-	env := w.processManager.BuildJobEnvironment(job, execPath)
-
-	// Create isolation attributes
-	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
-
-	// Create launch configuration
-	launchConfig := &process.LaunchConfig{
-		InitPath:    execPath,
-		Environment: env,
-		SysProcAttr: sysProcAttr,
-		Stdout:      NewWrite(w.store, job.Id),
-		Stderr:      NewWrite(w.store, job.Id),
-		JobID:       job.Id,
-		Command:     job.Command,
-		Args:        job.Args,
-	}
-
-	// Launch the process
-	result, err := w.processManager.LaunchProcess(ctx, launchConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	w.logger.Debug("process launched using two-stage init with self-cgroup-assignment",
-		"jobID", job.Id, "pid", result.PID)
-
-	return result.Command, nil
 }
 
 func (w *Joblet) updateJobAsRunning(job *domain.Job, processCmd platform.Command) {

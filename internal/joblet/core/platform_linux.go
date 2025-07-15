@@ -23,8 +23,8 @@ func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
 }
 
 // StartJob delegates to the platform joblet
-func (w *linuxJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string) (*domain.Job, error) {
-	return w.platformJoblet.StartJob(ctx, command, args, maxCPU, maxMemory, maxIOBPS, cpuCores)
+func (w *linuxJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload) (*domain.Job, error) {
+	return w.platformJoblet.StartJob(ctx, command, args, maxCPU, maxMemory, maxIOBPS, cpuCores, uploads)
 }
 
 // StopJob delegates to the platform joblet

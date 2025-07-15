@@ -39,6 +39,14 @@ message RunJobReq{
   string cpuCores = 4;
   int32 maxMemory = 5;
   int32 maxIOBPS = 6;
+  repeated FileUpload uploads = 7;
+}
+
+message FileUpload {
+  string path = 1;           // Relative path in job workspace
+  bytes content = 2;         // File content
+  uint32 mode = 3;           // Unix file permissions (e.g., 0644)
+  bool isDirectory = 4;      // True if this represents a directory
 }
 
 message RunJobRes{
