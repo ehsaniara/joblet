@@ -38,12 +38,14 @@ type Logger struct {
 	level  LogLevel
 	logger *log.Logger
 	fields map[string]interface{}
+	mode   string // New field to track the mode
 }
 
 type Config struct {
 	Level  LogLevel
 	Output io.Writer
 	Format string // "json" or "text" (default)
+	Mode   string // "server", "init", or empty
 }
 
 func New() *Logger {
@@ -51,6 +53,7 @@ func New() *Logger {
 		Level:  INFO,
 		Output: os.Stdout,
 		Format: "text",
+		Mode:   "", // Default to no mode
 	})
 }
 
@@ -60,11 +63,21 @@ func NewWithConfig(config Config) *Logger {
 	}
 
 	return &Logger{
-		level: config.Level,
-		// no default prefix/flags, we'll format ourselves
+		level:  config.Level,
 		logger: log.New(config.Output, "", 0),
 		fields: make(map[string]interface{}),
+		mode:   config.Mode,
 	}
+}
+
+// SetMode sets the mode for the logger (e.g., "server", "init")
+func (l *Logger) SetMode(mode string) {
+	l.mode = mode
+}
+
+// GetMode returns the current mode
+func (l *Logger) GetMode() string {
+	return l.mode
 }
 
 func (l *Logger) WithFields(keyVals ...interface{}) *Logger {
@@ -72,6 +85,7 @@ func (l *Logger) WithFields(keyVals ...interface{}) *Logger {
 		level:  l.level,
 		logger: l.logger,
 		fields: make(map[string]interface{}),
+		mode:   l.mode, // Preserve mode in new logger
 	}
 
 	// copy existing fields
@@ -93,6 +107,23 @@ func (l *Logger) WithFields(keyVals ...interface{}) *Logger {
 // WithField returns a new logger with a single additional context field
 func (l *Logger) WithField(key string, value interface{}) *Logger {
 	return l.WithFields(key, value)
+}
+
+// WithMode returns a new logger with the specified mode
+func (l *Logger) WithMode(mode string) *Logger {
+	newLogger := &Logger{
+		level:  l.level,
+		logger: l.logger,
+		fields: make(map[string]interface{}),
+		mode:   mode,
+	}
+
+	// copy existing fields
+	for k, v := range l.fields {
+		newLogger.fields[k] = v
+	}
+
+	return newLogger
 }
 
 func (l *Logger) Debug(msg string, keyVals ...interface{}) {
@@ -152,6 +183,12 @@ func (l *Logger) formatLogLine(timestamp string, level LogLevel, msg string, fie
 
 	parts = append(parts, fmt.Sprintf("[%s]", timestamp))
 	parts = append(parts, fmt.Sprintf("[%s]", level.String()))
+
+	// Add mode if it's set
+	if l.mode != "" {
+		parts = append(parts, fmt.Sprintf("[%s]", l.mode))
+	}
+
 	parts = append(parts, msg)
 
 	// Add fields
@@ -206,6 +243,11 @@ func (l *Logger) IsInfoEnabled() bool {
 // global logger instance for the convenience
 var globalLogger = New()
 
+// SetGlobalMode sets the mode for the global logger
+func SetGlobalMode(mode string) {
+	globalLogger.SetMode(mode)
+}
+
 func Debug(msg string, keyvals ...interface{}) {
 	globalLogger.Debug(msg, keyvals...)
 }
@@ -236,6 +278,10 @@ func WithFields(keyvals ...interface{}) *Logger {
 
 func WithField(key string, value interface{}) *Logger {
 	return globalLogger.WithField(key, value)
+}
+
+func WithMode(mode string) *Logger {
+	return globalLogger.WithMode(mode)
 }
 
 func SetLevel(level LogLevel) {

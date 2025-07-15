@@ -159,13 +159,13 @@ func (je *JobExecutor) ExecuteWithUploads(config *JobConfig) error {
 
 	// Process uploads FIRST (inside cgroups and isolation)
 	if len(config.Uploads) > 0 {
-		log.Info("processing file uploads", "fileCount", len(config.Uploads))
+		log.Debug("processing file uploads", "fileCount", len(config.Uploads))
 
 		if err := je.processUploads(config.Uploads); err != nil {
 			return fmt.Errorf("file upload processing failed: %w", err)
 		}
 
-		log.Info("file upload completed", "filesUploaded", len(config.Uploads))
+		log.Debug("file upload completed", "filesUploaded", len(config.Uploads))
 	}
 
 	// Now execute the actual job command

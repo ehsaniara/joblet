@@ -20,7 +20,10 @@ func main() {
 	// Initialize logging with configuration
 	initializeLogging(cfg)
 
-	// Create context logger
+	// Set the global logger mode based on the configuration
+	logger.SetGlobalMode(cfg.Server.Mode)
+
+	// Create context logger with mode
 	mainLogger := logger.WithField("component", "main")
 
 	mainLogger.Debug("Configuration loaded", "path", path)

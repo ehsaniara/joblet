@@ -61,7 +61,7 @@ func RunServer(cfg *config.Config) error {
 	return nil
 }
 
-// RunJobInit runs the joblet in job initialization mode with upload support
+// RunJobInit runs the joblet in job initialization mode
 func RunJobInit(cfg *config.Config) error {
 	initLogger := logger.WithField("mode", "init")
 
@@ -70,7 +70,7 @@ func RunJobInit(cfg *config.Config) error {
 		initLogger = initLogger.WithField("jobId", jobID)
 	}
 
-	initLogger.Debug("joblet starting in INIT mode with upload support",
+	initLogger.Debug("joblet starting in INIT mode",
 		"platform", runtime.GOOS,
 		"mode", "init",
 		"jobId", jobID)
@@ -94,21 +94,10 @@ func RunJobInit(cfg *config.Config) error {
 	// Log resource limits for transparency
 	logResourceLimits(initLogger)
 
-	// Load job configuration with uploads
+	// Load job configuration
 	jobConfig, err := jobexec.LoadConfigFromEnv(initLogger)
 	if err != nil {
 		return fmt.Errorf("failed to load job config: %w", err)
-	}
-
-	// Log upload information
-	if len(jobConfig.Uploads) > 0 {
-		totalSize := int64(0)
-		for _, upload := range jobConfig.Uploads {
-			totalSize += int64(len(upload.Content))
-		}
-		initLogger.Info("job has file uploads to process",
-			"uploadCount", len(jobConfig.Uploads),
-			"totalSize", fmt.Sprintf("%.2f MB", float64(totalSize)/1024/1024))
 	}
 
 	// Set up isolation
@@ -116,7 +105,7 @@ func RunJobInit(cfg *config.Config) error {
 		return fmt.Errorf("job isolation setup failed: %w", err)
 	}
 
-	// Execute the job with upload processing
+	// Execute the job
 	if err := jobexec.Execute(jobConfig, initLogger); err != nil {
 		return fmt.Errorf("job execution failed: %w", err)
 	}
