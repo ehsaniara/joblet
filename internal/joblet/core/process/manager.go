@@ -4,6 +4,8 @@ package process
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -714,4 +716,74 @@ func (m *Manager) validateEnvironment(env []string) error {
 		}
 	}
 	return nil
+}
+
+// BuildJobEnvironmentWithUploads builds environment variables with embedded file uploads
+func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath string, uploads []domain.FileUpload) []string {
+	baseEnv := m.platform.Environ()
+
+	// Job-specific environment with mode indicator
+	jobEnv := []string{
+		"JOBLET_MODE=init", // This tells the binary to run in init mode
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace view
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host view - CRITICAL
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+	}
+
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+
+	// Embed file uploads in environment (if any)
+	if len(uploads) > 0 {
+		if uploadsData, err := m.serializeUploads(uploads); err == nil {
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS=%s", uploadsData))
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(uploads)))
+			m.logger.Debug("embedded uploads in environment",
+				"uploadCount", len(uploads),
+				"serializedSize", len(uploadsData))
+		} else {
+			m.logger.Error("failed to serialize uploads", "error", err)
+		}
+	}
+
+	return append(baseEnv, jobEnv...)
+}
+
+// UploadData represents serializable upload information
+type UploadData struct {
+	Path        string `json:"path"`
+	Content     string `json:"content"` // Base64 encoded
+	Mode        uint32 `json:"mode"`
+	IsDirectory bool   `json:"isDirectory"`
+}
+
+// serializeUploads converts uploads to base64-encoded JSON for environment transport
+func (m *Manager) serializeUploads(uploads []domain.FileUpload) (string, error) {
+	var uploadData []UploadData
+
+	for _, upload := range uploads {
+		data := UploadData{
+			Path:        upload.Path,
+			Content:     base64.StdEncoding.EncodeToString(upload.Content),
+			Mode:        upload.Mode,
+			IsDirectory: upload.IsDirectory,
+		}
+		uploadData = append(uploadData, data)
+	}
+
+	jsonData, err := json.Marshal(uploadData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal upload data: %w", err)
+	}
+
+	// Base64 encode the entire JSON to make it environment-safe
+	return base64.StdEncoding.EncodeToString(jsonData), nil
 }
