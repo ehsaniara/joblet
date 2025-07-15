@@ -115,11 +115,6 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		return nil, fmt.Errorf("failed to create base workspace: %w", err)
 	}
 
-	log.Debug("creating cgroup with strict resource limit enforcement",
-		"limits", fmt.Sprintf("CPU:%d%%, Memory:%dMB, IO:%d BPS, Cores:%s",
-			job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS, job.Limits.CPUCores))
-
-	// Setup cgroup resources FIRST
 	if e := w.cgroup.Create(
 		job.CgroupPath,
 		job.Limits.MaxCPU,
@@ -385,17 +380,6 @@ func (w *Joblet) createJobDomain(jobID, resolvedCommand string, args []string, m
 		Status:     domain.StatusInitializing,
 		CgroupPath: filepath.Join(w.config.Cgroup.BaseDir, "job-"+jobID),
 		StartTime:  time.Now(),
-	}
-}
-
-// cleanupJobWorkspace removes the job workspace directory
-func (w *Joblet) cleanupJobWorkspace(jobID string) {
-	workspaceDir := filepath.Join(w.config.Filesystem.BaseDir, jobID)
-
-	if err := w.platform.RemoveAll(workspaceDir); err != nil {
-		w.logger.Warn("failed to cleanup job workspace", "jobID", jobID, "error", err)
-	} else {
-		w.logger.Debug("job workspace cleaned up", "jobID", jobID)
 	}
 }
 
