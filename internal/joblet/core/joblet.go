@@ -121,7 +121,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		job.Limits.MaxMemory,
 		job.Limits.MaxIOBPS,
 	); e != nil {
-		w.platform.RemoveAll(baseWorkspaceDir)
+		_ = w.platform.RemoveAll(baseWorkspaceDir)
 		return nil, fmt.Errorf("resource limit enforcement failed: %w", e)
 	}
 
@@ -129,7 +129,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	if job.Limits.CPUCores != "" {
 		if e := w.setupCPUCoreRestrictions(job); e != nil {
 			w.cgroup.CleanupCgroup(job.Id)
-			w.platform.RemoveAll(baseWorkspaceDir)
+			_ = w.platform.RemoveAll(baseWorkspaceDir)
 			return nil, fmt.Errorf("CPU core enforcement failed: %w", e)
 		}
 	}
@@ -141,7 +141,7 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	cmd, err := w.startProcessWithEmbeddedUploads(ctx, job, uploads)
 	if err != nil {
 		w.cleanupFailedJob(job)
-		w.platform.RemoveAll(baseWorkspaceDir)
+		_ = w.platform.RemoveAll(baseWorkspaceDir)
 		return nil, fmt.Errorf("process start failed: %w", err)
 	}
 
@@ -392,44 +392,6 @@ func (w *Joblet) setupCgroupControllers() error {
 
 	w.logger.Debug("cgroup controllers setup completed successfully")
 	return nil
-}
-
-// startProcessSingleBinary starts a job using the same binary in init mode
-func (w *Joblet) startProcessSingleBinary(ctx context.Context, job *domain.Job) (platform.Command, error) {
-	// Get the current executable path
-	execPath, err := w.platform.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current executable path: %w", err)
-	}
-
-	// environment with job information and mode indicator
-	env := w.processManager.BuildJobEnvironment(job, execPath)
-
-	// Create isolation attributes
-	sysProcAttr := w.jobIsolation.CreateIsolatedSysProcAttr()
-
-	// Create launch configuration
-	launchConfig := &process.LaunchConfig{
-		InitPath:    execPath,
-		Environment: env,
-		SysProcAttr: sysProcAttr,
-		Stdout:      NewWrite(w.store, job.Id),
-		Stderr:      NewWrite(w.store, job.Id),
-		JobID:       job.Id,
-		Command:     job.Command,
-		Args:        job.Args,
-	}
-
-	// Launch the process
-	result, err := w.processManager.LaunchProcess(ctx, launchConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	w.logger.Debug("process launched using two-stage init with self-cgroup-assignment",
-		"jobID", job.Id, "pid", result.PID)
-
-	return result.Command, nil
 }
 
 func (w *Joblet) updateJobAsRunning(job *domain.Job, processCmd platform.Command) {
