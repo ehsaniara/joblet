@@ -187,6 +187,53 @@ rnx run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
 rnx run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
 ```
 
+### File & Directory Upload
+
+Joblet supports uploading files and directories to the job workspace for processing. Files are automatically available
+in the `/work` directory inside the job:
+
+```bash
+# Upload a single file
+rnx run --upload=script.py python3 script.py
+
+# Upload multiple files
+rnx run --upload=data.csv --upload=process.py python3 process.py
+
+# Upload entire directory with preserved structure
+rnx run --upload-dir=dataset python3 analyze.py
+
+# Upload current directory
+rnx run --upload-dir=. python3 main.py
+
+# Complex data processing example
+rnx run --upload-dir=ml-project bash -c "cd ml-project && python3 train.py"
+```
+
+#### Upload Features
+
+- **Memory-Optimized**: Small files (<1MB) are embedded, large files (≥1MB) are streamed
+- **OOM Protection**: Dynamic chunking based on job memory limits prevents out-of-memory kills
+- **Progress Feedback**: Real-time upload progress and optimization information
+- **Size Limits**: 50MB per file, 100MB total upload size
+- **Directory Structure**: Preserves full directory hierarchy in job workspace
+- **Security**: Path traversal protection and system directory access prevention
+
+```bash
+# Example output with upload optimization
+$ rnx run --upload-dir=dataset python3 process_data.py
+
+📤 Upload optimized for memory efficiency:
+   Total: 15 files (25.3 MB)
+   Small files: 12 (embedded in job)
+   Large files: 3 (streamed to job)
+   Memory-safe chunking: Enabled
+
+Job started:
+ID: 2
+Command: python3 process_data.py
+Status: RUNNING
+```
+
 ### CPU Core Management
 
 ```bash
@@ -285,39 +332,39 @@ rnx run --cpu-cores="4-7" --max-memory=2048 scientific_computation
 rnx run --cpu-cores="8-11" realtime_data_processor
 ```
 
+#### Data Processing with Uploads
+
+```bash
+# Process large datasets with file upload
+rnx run --upload-dir=datasets --cpu-cores="0-7" --max-memory=8192 python3 process_data.py
+
+# Machine learning training with code and data upload
+rnx run --upload=train.py --upload-dir=data --cpu-cores="0-3" --max-memory=4096 python3 train.py
+
+# Bioinformatics pipeline with multiple input files
+rnx run --upload-dir=genomes --upload=pipeline.sh --max-memory=16384 bash pipeline.sh
+```
+
 #### Development Workflow
 
 ```bash
 # Test on remote development server with limited resources
-rnx --server=dev-server:50051 run --cpu-cores="0-1" --max-memory=1024 pytest tests/
+rnx --server=dev-server:50051 run --upload-dir=. --cpu-cores="0-1" --max-memory=1024 pytest tests/
 
-# Build project with dedicated cores
-rnx run --cpu-cores="2-5" --max-memory=2048 make build
+# Build project with uploaded source code
+rnx run --upload-dir=src --cpu-cores="2-5" --max-memory=2048 make build
 
-# Run security scans safely on specific cores
-rnx run --cpu-cores="6" --max-memory=512 trivy scan .
+# Run security scans on uploaded codebase
+rnx run --upload-dir=. --cpu-cores="6" --max-memory=512 trivy scan .
 ```
 
 #### CI/CD Integration
 
 ```bash
-# In CI pipeline with core allocation
+# In CI pipeline with core allocation and artifact upload
 export JOBLET_SERVER=build-server:50051
-rnx run --cpu-cores="0-3" --max-memory=2048 docker build -t myapp .
-rnx run --cpu-cores="4-5" --max-cpu=50 npm test
-```
-
-#### Data Processing
-
-```bash
-# Process large datasets with dedicated cores
-rnx --server=data-server:50051 run --cpu-cores="0-7" --max-memory=8192 python process_data.py
-
-# ETL with I/O throttling and core limiting
-rnx run --cpu-cores="8-15" --max-iobps=52428800 spark-submit etl_job.py
-
-# Parallel data processing with core isolation
-rnx run --cpu-cores="0,2,4,6" --max-memory=4096 parallel_processor
+rnx run --upload-dir=. --cpu-cores="0-3" --max-memory=2048 docker build -t myapp .
+rnx run --upload=test-config.yml --cpu-cores="4-5" --max-cpu=50 npm test
 ```
 
 ## ⚙️ Configuration
@@ -396,6 +443,7 @@ nodes:
 - **Resource Isolation**: CPU, memory, and I/O limits prevent resource exhaustion
 - **CPU Core Isolation**: Jobs are bound to specific CPU cores for performance isolation
 - **Network Isolation**: Optional network namespace isolation
+- **Upload Security**: Path traversal protection and system directory access prevention
 
 ## 🛠️ Advanced Configuration
 
@@ -592,6 +640,14 @@ cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/memory.current
 | `--max-memory=N`   | Memory limit in MB         | `--max-memory=1024` (1GB)                    |
 | `--max-iobps=N`    | I/O bandwidth in bytes/sec | `--max-iobps=10485760` (10MB/s)              |
 | `--cpu-cores=SPEC` | CPU cores specification    | `--cpu-cores="0-3"` or `--cpu-cores="1,3,5"` |
+
+### File Upload Flags
+
+| Flag               | Description              | Example                |
+|--------------------|--------------------------|------------------------|
+| `--upload=FILE`    | Upload single file       | `--upload=script.py`   |
+| `--upload-dir=DIR` | Upload entire directory  | `--upload-dir=dataset` |
+| `--upload-dir=.`   | Upload current directory | `--upload-dir=.`       |
 
 ### CPU Core Specification Examples
 
