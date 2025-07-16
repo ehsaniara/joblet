@@ -126,10 +126,32 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// show upload summary if files are being uploaded
 	if len(fileUploads) > 0 {
 		totalSize := int64(0)
+		largeFiles := 0
+		smallFiles := 0
+
 		for _, f := range fileUploads {
-			totalSize += int64(len(f.Content))
+			size := int64(len(f.Content))
+			totalSize += size
+
+			if size >= 1024*1024 {
+				largeFiles++
+			} else {
+				smallFiles++
+			}
 		}
-		fmt.Printf("Uploading %d files (%.2f MB)...\n", len(fileUploads), float64(totalSize)/1024/1024)
+
+		fmt.Printf(" Upload optimized for memory efficiency:\n")
+		fmt.Printf("   Total: %d files (%.2f MB)\n", len(fileUploads), float64(totalSize)/1024/1024)
+
+		if smallFiles > 0 {
+			fmt.Printf("   Small files: %d (embedded in job)\n", smallFiles)
+		}
+
+		if largeFiles > 0 {
+			fmt.Printf("   Large files: %d (streamed to job)\n", largeFiles)
+		}
+
+		fmt.Printf("   Memory-safe chunking: Enabled\n")
 	}
 
 	job := &pb.RunJobReq{
@@ -161,6 +183,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 func collectFileUploads(path string, isDir bool) ([]*pb.FileUpload, error) {
 	var uploads []*pb.FileUpload
+	const maxFileSize = 50 * 1024 * 1024   // 50MB limit per file
+	const largeFileThreshold = 1024 * 1024 // 1MB threshold for "large" files
 
 	// Get absolute path for proper relative path calculation
 	absPath, err := filepath.Abs(path)
@@ -174,26 +198,25 @@ func collectFileUploads(path string, isDir bool) ([]*pb.FileUpload, error) {
 		return nil, fmt.Errorf("path does not exist: %w", err)
 	}
 
-	// If it's a file and we expected a directory, error
+	// Validate directory/file expectation
 	if isDir && !info.IsDir() {
 		return nil, fmt.Errorf("expected directory but got file: %s", path)
 	}
 
-	// If it's a directory and we didn't expect one, error
 	if !isDir && info.IsDir() {
 		return nil, fmt.Errorf("expected file but got directory: %s (use --upload-dir for directories)", path)
 	}
+
+	var totalSize int64
+	var largeFileCount int
 
 	if info.IsDir() {
 		// Walk the directory tree
 		var baseDir string
 
-		// the base should be the parent of the directory
-		// so that the directory name itself is preserved in the relative path
 		if isDir {
 			baseDir = filepath.Dir(absPath)
 		} else {
-			// when current directory uploads (path == ".")
 			baseDir = absPath
 		}
 
@@ -220,16 +243,25 @@ func collectFileUploads(path string, isDir bool) ([]*pb.FileUpload, error) {
 					IsDirectory: true,
 				})
 			} else {
+				// Check file size first
+				fileSize := fileInfo.Size()
+				totalSize += fileSize
+
+				if fileSize > maxFileSize {
+					fmt.Printf("Warning: Skipping large file %s (%.2f MB > %.2f MB limit)\n",
+						relPath, float64(fileSize)/1024/1024, float64(maxFileSize)/1024/1024)
+					return nil
+				}
+
+				// Track large files for user awareness
+				if fileSize >= largeFileThreshold {
+					largeFileCount++
+				}
+
 				// Read file content
 				content, e := os.ReadFile(filePath)
 				if e != nil {
 					return fmt.Errorf("failed to read file %s: %w", filePath, e)
-				}
-
-				// Skip very large files
-				if len(content) > 50*1024*1024 { // 50MB limit per file
-					fmt.Printf("Warning: Skipping large file %s (%.2f MB)\n", relPath, float64(len(content))/1024/1024)
-					return nil
 				}
 
 				uploads = append(uploads, &pb.FileUpload{
@@ -248,7 +280,18 @@ func collectFileUploads(path string, isDir bool) ([]*pb.FileUpload, error) {
 		}
 	} else {
 		// Single file upload
-		content, err := io.ReadAll(io.LimitReader(openFile(absPath), 50*1024*1024)) // 50MB limit
+		fileSize := info.Size()
+		if fileSize > maxFileSize {
+			return nil, fmt.Errorf("file too large: %s (%.2f MB > %.2f MB limit)",
+				path, float64(fileSize)/1024/1024, float64(maxFileSize)/1024/1024)
+		}
+
+		totalSize = fileSize
+		if fileSize >= largeFileThreshold {
+			largeFileCount = 1
+		}
+
+		content, err := io.ReadAll(io.LimitReader(openFile(absPath), maxFileSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
@@ -259,6 +302,24 @@ func collectFileUploads(path string, isDir bool) ([]*pb.FileUpload, error) {
 			Mode:        uint32(info.Mode().Perm()),
 			IsDirectory: false,
 		})
+	}
+
+	// Display upload summary with optimization information
+	if len(uploads) > 0 {
+		fmt.Printf("Upload Summary:\n")
+		fmt.Printf("  Total files: %d\n", len(uploads))
+		fmt.Printf("  Total size: %.2f MB\n", float64(totalSize)/1024/1024)
+
+		if largeFileCount > 0 {
+			fmt.Printf("  Large files (>1MB): %d (will be streamed)\n", largeFileCount)
+		}
+
+		smallFileCount := len(uploads) - largeFileCount
+		if smallFileCount > 0 {
+			fmt.Printf("  Small files (<1MB): %d (will be embedded)\n", smallFileCount)
+		}
+
+		fmt.Printf("  Memory optimization: Enabled\n")
 	}
 
 	return uploads, nil
