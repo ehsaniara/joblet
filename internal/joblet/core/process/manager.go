@@ -866,26 +866,3 @@ type UploadData struct {
 	Mode        uint32 `json:"mode"`
 	IsDirectory bool   `json:"isDirectory"`
 }
-
-// serializeUploads converts uploads to base64-encoded JSON for environment transport
-func (m *Manager) serializeUploads(uploads []domain.FileUpload) (string, error) {
-	var uploadData []UploadData
-
-	for _, upload := range uploads {
-		data := UploadData{
-			Path:        upload.Path,
-			Content:     base64.StdEncoding.EncodeToString(upload.Content),
-			Mode:        upload.Mode,
-			IsDirectory: upload.IsDirectory,
-		}
-		uploadData = append(uploadData, data)
-	}
-
-	jsonData, err := json.Marshal(uploadData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal upload data: %w", err)
-	}
-
-	// Base64 encode the entire JSON to make it environment-safe
-	return base64.StdEncoding.EncodeToString(jsonData), nil
-}
