@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
 	"joblet/pkg/platform"
 	"os/exec"
@@ -24,19 +25,23 @@ import (
 const (
 	GracefulShutdownTimeout = 100 * time.Millisecond
 	StartTimeout            = 10 * time.Second
+	SmallFileThreshold      = 1024 * 1024 // 1MB
 )
 
 // Manager handles all process-related operations including launching, cleanup, and validation
 type Manager struct {
-	platform platform.Platform
-	logger   *logger.Logger
+	platform      platform.Platform
+	logger        *logger.Logger
+	uploadManager *upload.Manager
 }
 
 // NewProcessManager creates a new unified process manager
 func NewProcessManager(platform platform.Platform) *Manager {
+	log := logger.New().WithField("component", "process-manager")
 	return &Manager{
-		platform: platform,
-		logger:   logger.New().WithField("component", "process-manager"),
+		platform:      platform,
+		logger:        log,
+		uploadManager: upload.NewManager(platform, log),
 	}
 }
 
@@ -722,18 +727,31 @@ func (m *Manager) validateEnvironment(env []string) error {
 func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath string, uploads []domain.FileUpload) []string {
 	baseEnv := m.platform.Environ()
 
-	// Job-specific environment with mode indicator
+	// Prepare upload session for streaming
+	session, err := m.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
+	if err != nil {
+		m.logger.Error("failed to prepare upload session", "error", err)
+		// Fallback to old method for small files only
+		return m.buildJobEnvironmentWithSmallFiles(job, execPath, uploads)
+	}
+
+	// Job-specific environment with streaming support
 	jobEnv := []string{
-		"JOBLET_MODE=init", // This tells the binary to run in init mode
+		"JOBLET_MODE=init",
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace view
-		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host view - CRITICAL
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
 		fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
 		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
 		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+
+		// Upload session information
+		fmt.Sprintf("JOB_UPLOAD_SESSION=%t", len(uploads) > 0),
+		fmt.Sprintf("JOB_UPLOAD_TOTAL_FILES=%d", session.TotalFiles),
+		fmt.Sprintf("JOB_UPLOAD_LARGE_FILES=%d", len(session.LargeFiles)),
 	}
 
 	// Add job arguments
@@ -741,20 +759,104 @@ func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath strin
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
 
-	// Embed file uploads in environment (if any)
-	if len(uploads) > 0 {
-		if uploadsData, err := m.serializeUploads(uploads); err == nil {
+	// Add small files using the legacy method (for files < 1MB)
+	if len(session.SmallFiles) > 0 {
+		if uploadsData, err := m.serializeSmallFiles(session.SmallFiles); err == nil {
 			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS=%s", uploadsData))
-			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(uploads)))
-			m.logger.Debug("embedded uploads in environment",
-				"uploadCount", len(uploads),
-				"serializedSize", len(uploadsData))
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(session.SmallFiles)))
+		}
+	}
+
+	// Add pipe path for large files
+	if len(session.LargeFiles) > 0 {
+		pipePath, err := m.uploadManager.CreateUploadPipe(job.Id)
+		if err != nil {
+			m.logger.Error("failed to create upload pipe", "error", err)
 		} else {
-			m.logger.Error("failed to serialize uploads", "error", err)
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOAD_PIPE=%s", pipePath))
+
+			// Start streaming large files in background
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), upload.UploadTimeout)
+				defer cancel()
+
+				if err := m.uploadManager.StreamLargeFiles(ctx, session, pipePath); err != nil {
+					m.logger.Error("failed to stream large files", "error", err)
+				}
+
+				_ = m.uploadManager.CleanupPipe(pipePath)
+			}()
 		}
 	}
 
 	return append(baseEnv, jobEnv...)
+}
+
+func (m *Manager) buildJobEnvironmentWithSmallFiles(job *domain.Job, execPath string, uploads []domain.FileUpload) []string {
+	// Filter only small files
+	smallFiles := make([]domain.FileUpload, 0)
+	for _, ul := range uploads {
+		if len(ul.Content) < SmallFileThreshold {
+			smallFiles = append(smallFiles, ul)
+		}
+	}
+
+	// Create a job with just small files
+	if len(smallFiles) > 0 {
+		baseEnv := m.platform.Environ()
+
+		// Build basic job environment
+		jobEnv := []string{
+			"JOBLET_MODE=init",
+			fmt.Sprintf("JOB_ID=%s", job.Id),
+			fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+			fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
+			fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
+			fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+			fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
+			fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+			fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+			fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+		}
+
+		// Add job arguments
+		for i, arg := range job.Args {
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+		}
+
+		// Add small files using legacy serialization
+		if uploadsData, err := m.serializeSmallFiles(smallFiles); err == nil {
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS=%s", uploadsData))
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(smallFiles)))
+		}
+
+		return append(baseEnv, jobEnv...)
+	}
+
+	// No uploads, use basic environment
+	return m.BuildJobEnvironment(job, execPath)
+}
+
+// Helper method to serialize small files using existing logic
+func (m *Manager) serializeSmallFiles(smallFiles []domain.FileUpload) (string, error) {
+	var uploadData []UploadData
+
+	for _, upload := range smallFiles {
+		data := UploadData{
+			Path:        upload.Path,
+			Content:     base64.StdEncoding.EncodeToString(upload.Content),
+			Mode:        upload.Mode,
+			IsDirectory: upload.IsDirectory,
+		}
+		uploadData = append(uploadData, data)
+	}
+
+	jsonData, err := json.Marshal(uploadData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal upload data: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(jsonData), nil
 }
 
 // UploadData represents serializable upload information

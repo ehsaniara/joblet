@@ -11,6 +11,7 @@ import (
 	"joblet/internal/joblet/core/process"
 	"joblet/internal/joblet/core/resource"
 	"joblet/internal/joblet/core/unprivileged"
+	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
@@ -39,6 +40,7 @@ type Joblet struct {
 	platform       platform.Platform
 	config         *config.Config
 	logger         *logger.Logger
+	uploadManager  *upload.Manager
 }
 
 // NewPlatformJoblet creates a new Linux platform joblet
@@ -49,6 +51,9 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 	jobIsolation := unprivileged.NewJobIsolation()
 	filesystemIsolator := filesystem.NewIsolator(cfg.Filesystem, platformInterface)
 
+	jobletLogger := logger.New().WithField("component", "linux-joblet")
+	uploadManager := upload.NewManager(platformInterface, jobletLogger)
+
 	w := &Joblet{
 		store:          store,
 		cgroup:         cgroupResource,
@@ -57,14 +62,15 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 		filesystem:     filesystemIsolator,
 		platform:       platformInterface,
 		config:         cfg,
-		logger:         logger.New().WithField("component", "linux-joblet"),
+		logger:         jobletLogger,
+		uploadManager:  uploadManager,
 	}
 
 	if err := w.setupCgroupControllers(); err != nil {
 		w.logger.Fatal("cgroup controller setup failed", "error", err)
 	}
 
-	w.logger.Debug("Linux joblet initialized",
+	w.logger.Debug("Linux joblet initialized with streaming upload support",
 		"maxConcurrentJobs", cfg.Joblet.MaxConcurrentJobs,
 		"defaultCPU", cfg.Joblet.DefaultCPULimit,
 		"defaultMemory", cfg.Joblet.DefaultMemoryLimit,
@@ -163,7 +169,20 @@ func (w *Joblet) startProcessWithEmbeddedUploads(ctx context.Context, job *domai
 		return nil, fmt.Errorf("failed to get current executable path: %w", err)
 	}
 
-	// Build environment with job information AND embedded uploads
+	// Prepare workspace directory first
+	workspaceDir := filepath.Join(w.config.Filesystem.BaseDir, job.Id, "work")
+	if err := w.platform.MkdirAll(workspaceDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	// Process uploads using the new streaming approach
+	if len(uploads) > 0 {
+		if err := w.processUploadsWithStreaming(ctx, job, uploads, workspaceDir); err != nil {
+			return nil, fmt.Errorf("failed to process uploads: %w", err)
+		}
+	}
+
+	// Build environment with streaming support
 	env := w.processManager.BuildJobEnvironmentWithUploads(job, execPath, uploads)
 
 	// Create isolation attributes
@@ -187,10 +206,43 @@ func (w *Joblet) startProcessWithEmbeddedUploads(ctx context.Context, job *domai
 		return nil, err
 	}
 
-	w.logger.Debug("process launched with embedded uploads",
+	w.logger.Debug("process launched with streaming upload support",
 		"jobID", job.Id, "pid", result.PID, "uploadCount", len(uploads))
 
 	return result.Command, nil
+}
+
+func (w *Joblet) processUploadsWithStreaming(ctx context.Context, job *domain.Job, uploads []domain.FileUpload, workspaceDir string) error {
+	log := w.logger.WithField("operation", "process-uploads-streaming")
+
+	// Prepare upload session
+	session, err := w.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to prepare upload session: %w", err)
+	}
+
+	log.Debug("processing uploads with streaming",
+		"totalFiles", session.TotalFiles,
+		"smallFiles", len(session.SmallFiles),
+		"largeFiles", len(session.LargeFiles),
+		"totalSize", session.TotalSize)
+
+	// Process small files directly
+	if len(session.SmallFiles) > 0 {
+		if err := w.uploadManager.ProcessSmallFiles(session, workspaceDir); err != nil {
+			return fmt.Errorf("failed to process small files: %w", err)
+		}
+	}
+
+	// For large files, the streaming will be handled by the process manager
+	// during environment setup - they will be streamed to the job process
+	// through named pipes
+
+	log.Debug("upload processing completed",
+		"smallFilesProcessed", len(session.SmallFiles),
+		"largeFilesQueued", len(session.LargeFiles))
+
+	return nil
 }
 
 func (w *Joblet) setupCPUCoreRestrictions(job *domain.Job) error {
@@ -461,10 +513,12 @@ func (w *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 // cleanupJobResources handles both cgroup and filesystem
 func (w *Joblet) cleanupJobResources(jobID string) {
 	log := w.logger.WithField("jobID", jobID)
-	log.Debug("cleaning up job resources")
+	log.Debug("cleaning up job resources including upload pipes")
 
+	// Cleanup cgroup
 	w.cgroup.CleanupCgroup(jobID)
 
+	// Cleanup filesystem
 	jobRootDir := filepath.Join(w.config.Filesystem.BaseDir, jobID)
 	jobTmpDir := strings.Replace(w.config.Filesystem.TmpDir, "{JOB_ID}", jobID, -1)
 
@@ -478,6 +532,14 @@ func (w *Joblet) cleanupJobResources(jobID string) {
 		log.Warn("failed to remove job tmp directory", "path", jobTmpDir, "error", err)
 	} else {
 		log.Debug("removed job tmp directory", "path", jobTmpDir)
+	}
+
+	// Cleanup upload pipes directory
+	pipesDir := filepath.Join(w.config.Filesystem.BaseDir, jobID, "pipes")
+	if err := w.platform.RemoveAll(pipesDir); err != nil {
+		log.Warn("failed to remove pipes directory", "path", pipesDir, "error", err)
+	} else {
+		log.Debug("removed pipes directory", "path", pipesDir)
 	}
 
 	log.Debug("job resources cleanup completed")

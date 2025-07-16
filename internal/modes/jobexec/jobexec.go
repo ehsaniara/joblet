@@ -1,9 +1,11 @@
 package jobexec
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"joblet/internal/joblet/core/upload"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,11 +17,14 @@ import (
 
 // JobConfig represents job configuration with upload support
 type JobConfig struct {
-	JobID      string
-	Command    string
-	Args       []string
-	CgroupPath string
-	Uploads    []UploadInfo
+	JobID            string
+	Command          string
+	Args             []string
+	CgroupPath       string
+	Uploads          []UploadInfo
+	HasUploadSession bool   // indicates streaming upload session
+	UploadPipePath   string // path to upload pipe
+	LargeFileCount   int    // number of large files to receive
 }
 
 // UploadInfo represents file upload information
@@ -77,25 +82,40 @@ func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 		}
 	}
 
-	// Load embedded uploads if present
+	// Load uploads (small files)
 	uploads, err := je.loadUploadsFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load uploads: %w", err)
 	}
 
-	je.logger.Debug("loaded job configuration with uploads",
+	hasUploadSession := je.platform.Getenv("JOB_UPLOAD_SESSION") == "true"
+	uploadPipePath := je.platform.Getenv("JOB_UPLOAD_PIPE")
+	largeFileCountStr := je.platform.Getenv("JOB_UPLOAD_LARGE_FILES")
+
+	var largeFileCount int
+	if largeFileCountStr != "" {
+		largeFileCount, _ = strconv.Atoi(largeFileCountStr)
+	}
+
+	je.logger.Debug("loaded job configuration with streaming support",
 		"jobId", jobID,
 		"command", command,
 		"argsCount", len(args),
 		"uploadsCount", len(uploads),
+		"hasUploadSession", hasUploadSession,
+		"uploadPipePath", uploadPipePath,
+		"largeFileCount", largeFileCount,
 		"cgroupPath", cgroupPath)
 
 	return &JobConfig{
-		JobID:      jobID,
-		Command:    command,
-		Args:       args,
-		CgroupPath: cgroupPath,
-		Uploads:    uploads,
+		JobID:            jobID,
+		Command:          command,
+		Args:             args,
+		CgroupPath:       cgroupPath,
+		Uploads:          uploads,
+		HasUploadSession: hasUploadSession,
+		UploadPipePath:   uploadPipePath,
+		LargeFileCount:   largeFileCount,
 	}, nil
 }
 
@@ -150,37 +170,68 @@ func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
 func Execute(config *JobConfig, logger *logger.Logger) error {
 	p := platform.NewPlatform()
 	executor := NewJobExecutor(p, logger)
-	return executor.ExecuteWithUploads(config)
+	return executor.ExecuteWithStreamingUploads(config)
 }
 
-// ExecuteWithUploads executes the job with file upload processing
-func (je *JobExecutor) ExecuteWithUploads(config *JobConfig) error {
+func (je *JobExecutor) ExecuteWithStreamingUploads(config *JobConfig) error {
 	log := je.logger.WithField("jobID", config.JobID)
 
-	// Process uploads FIRST (inside cgroups and isolation)
-	if len(config.Uploads) > 0 {
-		log.Debug("processing file uploads", "fileCount", len(config.Uploads))
+	// Process uploads if present
+	if config.HasUploadSession {
+		log.Debug("processing streaming upload session",
+			"legacyUploads", len(config.Uploads),
+			"largeFileCount", config.LargeFileCount,
+			"pipePath", config.UploadPipePath)
 
-		if err := je.processUploads(config.Uploads); err != nil {
-			return fmt.Errorf("file upload processing failed: %w", err)
+		if err := je.processStreamingUploads(config); err != nil {
+			return fmt.Errorf("streaming upload processing failed: %w", err)
 		}
-
-		log.Debug("file upload completed", "filesUploaded", len(config.Uploads))
+	} else if len(config.Uploads) > 0 {
+		// Fallback to legacy upload processing
+		log.Debug("processing legacy uploads", "fileCount", len(config.Uploads))
+		if err := je.processUploads(config.Uploads); err != nil {
+			return fmt.Errorf("legacy upload processing failed: %w", err)
+		}
 	}
 
-	// Now execute the actual job command
+	// Execute the actual job command
 	log.Debug("executing job command", "command", config.Command, "args", config.Args)
-
-	// Use the existing execution logic but convert back to original JobConfig
-	originalConfig := &JobConfig{
+	return je.Execute(&JobConfig{
 		JobID:      config.JobID,
 		Command:    config.Command,
 		Args:       config.Args,
 		CgroupPath: config.CgroupPath,
-		Uploads:    nil, // Already processed
+	})
+}
+
+func (je *JobExecutor) processStreamingUploads(config *JobConfig) error {
+	ctx, cancel := context.WithTimeout(context.Background(), upload.UploadTimeout)
+	defer cancel()
+
+	// Create upload receiver
+	receiver := upload.NewReceiver(je.platform, je.logger)
+
+	// Process small files first (from environment - legacy method)
+	if len(config.Uploads) > 0 {
+		je.logger.Debug("processing small files from environment", "count", len(config.Uploads))
+		if err := je.processUploads(config.Uploads); err != nil {
+			return fmt.Errorf("failed to process small files: %w", err)
+		}
 	}
 
-	return je.Execute(originalConfig)
+	// Process large files from pipe
+	if config.LargeFileCount > 0 && config.UploadPipePath != "" {
+		je.logger.Debug("receiving large files from pipe",
+			"count", config.LargeFileCount,
+			"pipePath", config.UploadPipePath)
+
+		if err := receiver.ReceiveLargeFiles(ctx, config.UploadPipePath); err != nil {
+			return fmt.Errorf("failed to receive large files: %w", err)
+		}
+	}
+
+	je.logger.Debug("streaming upload processing completed successfully")
+	return nil
 }
 
 // processUploads handles file upload processing inside the isolated environment
