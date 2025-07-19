@@ -11,6 +11,7 @@ import (
 type JobStatus string
 
 const (
+	StatusScheduled    JobStatus = "SCHEDULED"
 	StatusInitializing JobStatus = "INITIALIZING"
 	StatusRunning      JobStatus = "RUNNING"
 	StatusCompleted    JobStatus = "COMPLETED"
@@ -26,16 +27,17 @@ type ResourceLimits struct {
 }
 
 type Job struct {
-	Id         string         // Unique identifier for job tracking
-	Command    string         // Executable command path
-	Args       []string       // Command line arguments
-	Limits     ResourceLimits // CPU/memory/IO constraints
-	Status     JobStatus      // Current execution state
-	Pid        int32          // Process ID when running
-	CgroupPath string         // Filesystem path for resource limits
-	StartTime  time.Time      // Job creation timestamp
-	EndTime    *time.Time     // Completion timestamp (nil if running)
-	ExitCode   int32          // Process exit status
+	Id            string         // Unique identifier for job tracking
+	Command       string         // Executable command path
+	Args          []string       // Command line arguments
+	Limits        ResourceLimits // CPU/memory/IO constraints
+	Status        JobStatus      // Current execution state
+	Pid           int32          // Process ID when running
+	CgroupPath    string         // Filesystem path for resource limits
+	StartTime     time.Time      // Job creation timestamp
+	EndTime       *time.Time     // Completion timestamp (nil if running)
+	ExitCode      int32          // Process exit status
+	ScheduledTime *time.Time     // When the job should start (nil for immediate execution)
 }
 
 func (r *ResourceLimits) HasCoreRestriction() bool {
@@ -71,9 +73,30 @@ func (j *Job) IsCompleted() bool {
 	return j.Status == StatusCompleted || j.Status == StatusFailed || j.Status == StatusStopped
 }
 
+// IsScheduled returns true if the job is scheduled for future execution
+func (j *Job) IsScheduled() bool {
+	return j.Status == StatusScheduled
+}
+
+// IsDue returns true if a scheduled job is ready to execute
+func (j *Job) IsDue() bool {
+	if !j.IsScheduled() || j.ScheduledTime == nil {
+		return false
+	}
+	return time.Now().After(*j.ScheduledTime) || time.Now().Equal(*j.ScheduledTime)
+}
+
+// GetExecutionTime returns the time when this job should execute
+// For immediate jobs, returns StartTime. For scheduled jobs, returns ScheduledTime.
+func (j *Job) GetExecutionTime() time.Time {
+	if j.ScheduledTime != nil {
+		return *j.ScheduledTime
+	}
+	return j.StartTime
+}
+
 // MarkAsRunning transitions job from INITIALIZING to RUNNING state with given PID
 func (j *Job) MarkAsRunning(pid int32) error {
-
 	if j.Status != StatusInitializing {
 		return fmt.Errorf("cannot mark job as running: current status is %s, expected %s", j.Status, StatusInitializing)
 	}
@@ -84,6 +107,16 @@ func (j *Job) MarkAsRunning(pid int32) error {
 
 	j.Status = StatusRunning
 	j.Pid = pid
+	return nil
+}
+
+// MarkAsInitializing transitions job from SCHEDULED to INITIALIZING state
+func (j *Job) MarkAsInitializing() error {
+	if j.Status != StatusScheduled {
+		return fmt.Errorf("cannot mark job as initializing: current status is %s, expected %s", j.Status, StatusScheduled)
+	}
+
+	j.Status = StatusInitializing
 	return nil
 }
 
@@ -103,58 +136,49 @@ func (j *Job) Fail(exitCode int32) {
 	j.EndTime = &now
 }
 
-// Stop forcefully terminates a running job
+// Stop marks job as stopped (terminated by user)
 func (j *Job) Stop() {
 	j.Status = StatusStopped
-	j.ExitCode = -1
+	j.ExitCode = -1 // Conventional exit code for terminated processes
 	now := time.Now()
 	j.EndTime = &now
 }
 
-// DeepCopy creates independent copy to prevent concurrent modification issues
-func (j *Job) DeepCopy() *Job {
-	var endTimeCopy *time.Time
+// Duration returns how long the job has been running or took to complete
+func (j *Job) Duration() time.Duration {
 	if j.EndTime != nil {
-		cp := *j.EndTime
-		endTimeCopy = &cp
+		return j.EndTime.Sub(j.StartTime)
+	}
+	return time.Since(j.StartTime)
+}
+
+// DeepCopy creates a deep copy of the job
+func (j *Job) DeepCopy() *Job {
+	if j == nil {
+		return nil
 	}
 
-	return &Job{
+	cp := &Job{
 		Id:         j.Id,
 		Command:    j.Command,
-		Args:       copyStringSlice(j.Args),
+		Args:       append([]string(nil), j.Args...),
 		Limits:     j.Limits,
 		Status:     j.Status,
 		Pid:        j.Pid,
 		CgroupPath: j.CgroupPath,
 		StartTime:  j.StartTime,
-		EndTime:    endTimeCopy,
 		ExitCode:   j.ExitCode,
 	}
-}
 
-// Duration calculates job runtime (current time if still running)
-func (j *Job) Duration() time.Duration {
 	if j.EndTime != nil {
-		return j.EndTime.Sub(j.StartTime)
-	}
-	if j.Status == StatusRunning {
-		return time.Since(j.StartTime)
-	}
-	return 0
-}
-
-func copyStringSlice(src []string) []string {
-	if src == nil {
-		return nil
+		endTimeCopy := *j.EndTime
+		cp.EndTime = &endTimeCopy
 	}
 
-	if len(src) == 0 {
-		return []string{}
+	if j.ScheduledTime != nil {
+		scheduledTimeCopy := *j.ScheduledTime
+		cp.ScheduledTime = &scheduledTimeCopy
 	}
 
-	dst := make([]string, len(src))
-	copy(dst, src)
-
-	return dst
+	return cp
 }

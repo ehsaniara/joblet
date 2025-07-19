@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	pb "joblet/api/gen"
@@ -41,6 +42,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		"maxMemory", req.MaxMemory,
 		"maxIOBPS", req.MaxIOBPS,
 		"uploadCount", len(req.Uploads),
+		"schedule", req.Schedule, // New: log schedule specification
 	)
 
 	log.Debug("run job request received")
@@ -68,7 +70,8 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 
 	domainUploads := mappers.ProtobufToFileUpload(req.Uploads)
 
-	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads)
+	// StartJob now expects RFC3339 formatted schedule string (already parsed by client)
+	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads, req.Schedule)
 
 	if err != nil {
 		duration := time.Since(startTime)
@@ -77,7 +80,20 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 	}
 
 	duration := time.Since(startTime)
-	log.Debug("job created successfully with host networking", "jobId", newJob.Id, "duration", duration, "uploadsProcessed", len(domainUploads))
+
+	// Log differently based on whether job was scheduled or executed immediately
+	if req.Schedule != "" {
+		log.Info("job scheduled successfully",
+			"jobId", newJob.Id,
+			"duration", duration,
+			"uploadsProcessed", len(domainUploads),
+			"scheduledTimeRFC3339", req.Schedule)
+	} else {
+		log.Debug("job created successfully",
+			"jobId", newJob.Id,
+			"duration", duration,
+			"uploadsProcessed", len(domainUploads))
+	}
 
 	return mappers.DomainToRunJobResponse(newJob), nil
 }
@@ -98,7 +114,14 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		return nil, status.Errorf(codes.NotFound, "job not found %v", req.GetId())
 	}
 
-	log.Debug("job retrieved successfully", "status", string(job.Status), "duration", job.Duration())
+	// Enhanced logging for scheduled jobs
+	if job.IsScheduled() {
+		log.Debug("scheduled job retrieved",
+			"status", string(job.Status),
+			"scheduledTime", job.ScheduledTime.Format(time.RFC3339))
+	} else {
+		log.Debug("job retrieved successfully", "status", string(job.Status), "duration", job.Duration())
+	}
 
 	return mappers.DomainToGetJobStatusResponse(job), nil
 }
@@ -113,6 +136,12 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 		return nil, err
 	}
 
+	// Check job status before stopping to provide better logging
+	job, exists := s.jobStore.GetJob(req.GetId())
+	if exists && job.IsScheduled() {
+		log.Info("stopping scheduled job", "scheduledTime", job.ScheduledTime.Format(time.RFC3339))
+	}
+
 	startTime := time.Now()
 	if err := s.joblet.StopJob(ctx, req.GetId()); err != nil {
 		duration := time.Since(startTime)
@@ -120,7 +149,7 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 		return nil, status.Errorf(codes.Internal, "StopJob error %v", err)
 	}
 
-	job, exists := s.jobStore.GetJob(req.GetId())
+	job, exists = s.jobStore.GetJob(req.GetId())
 	if !exists {
 		log.Warn("job not found after stop operation")
 		return nil, status.Errorf(codes.NotFound, "job not found %v", req.GetId())
@@ -165,53 +194,43 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, _ *pb.EmptyRequest) (*p
 func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobletService_GetJobLogsServer) error {
 	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetId())
 
-	log.Debug("job logs stream request received")
-
 	if err := s.auth.Authorized(stream.Context(), auth2.StreamJobsOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return err
 	}
 
-	existingLogs, isRunning, err := s.jobStore.GetOutput(req.GetId())
-	if err != nil {
-		log.Warn("job not found for log streaming")
-		return status.Errorf(codes.NotFound, "job not found")
+	job, exists := s.jobStore.GetJob(req.GetId())
+	if !exists {
+		log.Warn("logs requested for non-existent job")
+		return status.Errorf(codes.NotFound, "job not found: %v", req.GetId())
 	}
 
-	log.Debug("streaming job logs", "jobId", req.GetId(), "existingLogSize", len(existingLogs), "isRunning", isRunning)
+	if job.IsScheduled() {
+		scheduledMsg := fmt.Sprintf("Job is scheduled for: %s\n", job.ScheduledTime.Format("2006-01-02 15:04:05 MST"))
 
-	// streaming the existing logs from the existingLogs
-	if e := stream.Send(&pb.DataChunk{Payload: existingLogs}); e != nil {
-		log.Error("failed to send existing logs", "error", e, "logSize", len(existingLogs))
-		return e
+		if err := stream.Send(&pb.DataChunk{Payload: []byte(scheduledMsg)}); err != nil {
+			log.Error("failed to send scheduled job message", "error", err)
+			return err
+		}
 	}
 
-	log.Debug("existing logs sent", "logSize", len(existingLogs))
+	// start streaming (handles ALL job states: SCHEDULED, RUNNING, COMPLETED)
+	startTime := time.Now()
+	adapter := adapters.NewGrpcStreamAdapter(stream)
 
-	// already completed, we're done
-	if !isRunning {
-		log.Debug("job already completed, log stream ended", "jobId", req.GetId())
-		return nil
+	if err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetId(), adapter); err != nil {
+		duration := time.Since(startTime)
+
+		if errors.Is(err, context.Canceled) {
+			log.Debug("log stream cancelled by client", "duration", duration)
+			return nil
+		}
+
+		log.Error("log stream failed", "error", err, "duration", duration)
+		return status.Errorf(codes.Internal, "GetJobLogs error: %v", err)
 	}
 
-	// subscribe to new updates not the existing ones
-	domainStream := adapters.NewGrpcStreamAdapter(stream)
-	streamStartTime := time.Now()
-
-	e := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetId(), domainStream)
-
-	streamDuration := time.Since(streamStartTime)
-
-	if e != nil && errors.Is(e, errors.New("stream cancelled by client")) {
-		log.Debug("log stream cancelled by client", "duration", streamDuration)
-		return status.Error(codes.Canceled, "log stream cancelled by client")
-	}
-
-	if e != nil {
-		log.Error("log stream ended with error", "error", e, "duration", streamDuration)
-	} else {
-		log.Debug("log stream completed successfully", "duration", streamDuration)
-	}
-
-	return e
+	duration := time.Since(startTime)
+	log.Debug("log stream completed successfully", "duration", duration)
+	return nil
 }

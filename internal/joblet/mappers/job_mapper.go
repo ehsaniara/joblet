@@ -12,16 +12,20 @@ func DomainToProtobuf(job *domain.Job) *pb.Job {
 		Command:   job.Command,
 		Args:      job.Args,
 		MaxCPU:    job.Limits.MaxCPU,
+		CpuCores:  job.Limits.CPUCores,
 		MaxMemory: job.Limits.MaxMemory,
 		MaxIOBPS:  job.Limits.MaxIOBPS,
 		Status:    string(job.Status),
 		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
 		ExitCode:  job.ExitCode,
-		// Removed network fields
 	}
 
 	if job.EndTime != nil {
 		pbJob.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	if job.ScheduledTime != nil {
+		pbJob.ScheduledTime = job.ScheduledTime.Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	return pbJob
@@ -34,16 +38,20 @@ func DomainToRunJobResponse(job *domain.Job) *pb.RunJobRes {
 		Command:   job.Command,
 		Args:      job.Args,
 		MaxCPU:    job.Limits.MaxCPU,
+		CpuCores:  job.Limits.CPUCores,
 		MaxMemory: job.Limits.MaxMemory,
 		MaxIOBPS:  job.Limits.MaxIOBPS,
 		Status:    string(job.Status),
 		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
 		ExitCode:  job.ExitCode,
-		// Removed network fields
 	}
 
 	if job.EndTime != nil {
 		response.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	if job.ScheduledTime != nil {
+		response.ScheduledTime = job.ScheduledTime.Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	return response
@@ -56,16 +64,20 @@ func DomainToGetJobStatusResponse(job *domain.Job) *pb.GetJobStatusRes {
 		Command:   job.Command,
 		Args:      job.Args,
 		MaxCPU:    job.Limits.MaxCPU,
+		CpuCores:  job.Limits.CPUCores,
 		MaxMemory: job.Limits.MaxMemory,
 		MaxIOBPS:  job.Limits.MaxIOBPS,
 		Status:    string(job.Status),
 		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
 		ExitCode:  job.ExitCode,
-		// Removed network fields
 	}
 
 	if job.EndTime != nil {
 		response.EndTime = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	if job.ScheduledTime != nil {
+		response.ScheduledTime = job.ScheduledTime.Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	return response

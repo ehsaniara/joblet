@@ -11,7 +11,8 @@
 📝 **Note:** Project recently renamed from _Worker_ to **Joblet** and **RNX** (CLI)
 
 **Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process
-isolation, resource limits, and real-time monitoring - protecting your host system from malicious or resource-hungry
+isolation, resource limits, real-time monitoring, and **scheduled execution** - protecting your host system from
+malicious or resource-hungry
 processes.
 
 ## 🎯 Why Use Joblet?
@@ -53,6 +54,7 @@ root         1  0.0  0.0   2304   768 ?        S    10:45   0:00 ps aux
 # ✅ Filesystem isolation - limited access to host files  
 # ✅ Resource limits - memory, CPU, I/O controls
 # ✅ Real-time monitoring and logs
+# ✅ Scheduled execution for automation
 ```
 
 ## 🔧 How It Works
@@ -72,6 +74,7 @@ Joblet consists of two components:
 - **CPU Core Binding**: Limit jobs to specific CPU cores for performance isolation
 - **Network Security**: mTLS encryption with certificate-based authentication
 - **Role-Based Access**: Admin (full control) and Viewer (read-only) roles
+- **Job Scheduling**: Future execution with priority queue management
 
 ## 📦 Installation
 
@@ -187,6 +190,44 @@ rnx run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
 rnx run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
 ```
 
+### Job Scheduling
+
+Joblet supports scheduling jobs for future execution with flexible time specifications:
+
+```bash
+# Schedule using relative time
+rnx run --schedule="1hour" python3 backup_script.py
+rnx run --schedule="30min" echo "Scheduled task"
+rnx run --schedule="2h30m" data_processing.py
+rnx run --schedule="45s" quick_task.sh
+
+# Schedule using absolute time (RFC3339 format)
+rnx run --schedule="2025-07-18T20:02:48" backup_script.sh
+rnx run --schedule="2025-07-18T20:02:48Z" maintenance.sh
+rnx run --schedule="2025-07-18T20:02:48-07:00" deploy.sh
+
+# Combine scheduling with resource limits
+rnx run --schedule="1hour" --max-cpu=50 --max-memory=512 heavy_computation.py
+
+# Schedule with file uploads
+rnx run --schedule="30min" --upload-dir=dataset python3 process_data.py
+```
+
+#### Scheduling Formats
+
+**Relative Time:**
+
+- `"1hour"` - 1 hour from now
+- `"30min"` - 30 minutes from now
+- `"2h30m"` - 2 hours 30 minutes from now
+- `"45s"` - 45 seconds from now
+
+**Absolute Time (RFC3339):**
+
+- `"2025-07-18T20:02:48"` - Local time
+- `"2025-07-18T20:02:48Z"` - UTC time
+- `"2025-07-18T20:02:48-07:00"` - With timezone
+
 ### File & Directory Upload
 
 Joblet supports uploading files and directories to the job workspace for processing. Files are automatically available
@@ -207,6 +248,10 @@ rnx run --upload-dir=. python3 main.py
 
 # Complex data processing example
 rnx run --upload-dir=ml-project bash -c "cd ml-project && python3 train.py"
+
+# Scheduled jobs with uploads
+rnx run --schedule="1hour" --upload-dir=. python3 main.py
+rnx run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
 ```
 
 #### Upload Features
@@ -217,10 +262,11 @@ rnx run --upload-dir=ml-project bash -c "cd ml-project && python3 train.py"
 - **Size Limits**: 50MB per file, 100MB total upload size
 - **Directory Structure**: Preserves full directory hierarchy in job workspace
 - **Security**: Path traversal protection and system directory access prevention
+- **Scheduling Support**: File uploads work seamlessly with scheduled jobs
 
 ```bash
 # Example output with upload optimization
-$ rnx run --upload-dir=dataset python3 process_data.py
+$ rnx run --schedule="1hour" --upload-dir=dataset python3 process_data.py
 
 📤 Upload optimized for memory efficiency:
    Total: 15 files (25.3 MB)
@@ -231,7 +277,9 @@ $ rnx run --upload-dir=dataset python3 process_data.py
 Job started:
 ID: 2
 Command: python3 process_data.py
-Status: RUNNING
+Status: SCHEDULED
+Schedule Input: 1hour
+Scheduled Time: 2025-07-19T15:45:30Z
 ```
 
 ### CPU Core Management
@@ -251,6 +299,9 @@ rnx run --cpu-cores="0-1" --max-cpu=150 --max-memory=512 heavy_computation
 
 # Reserve cores for system (use all except core 0)
 rnx run --cpu-cores="1-7" user_workload                # Leave core 0 for system
+
+# Schedule with core allocation
+rnx run --schedule="30min" --cpu-cores="2-5" --max-memory=1024 batch_job.py
 ```
 
 ### Resource Limiting Examples
@@ -267,6 +318,9 @@ rnx run --cpu-cores="2-3" --max-cpu=150 workload       # 150% across cores 2-3 o
 
 # Memory and I/O limits
 rnx run --max-memory=1024 --max-iobps=10485760 data_processor
+
+# Schedule with resource limits
+rnx run --schedule="2h" --max-cpu=25 --max-memory=512 overnight_batch.py
 ```
 
 #### Example
@@ -289,10 +343,10 @@ StartTime: 2025-07-11T06:18:54Z
 ### Job Monitoring
 
 ```bash
-# List all jobs
+# List all jobs (including scheduled ones)
 rnx list
 
-# Get job details (including CPU core assignment)
+# Get job details (including scheduled time)
 rnx status <job-id>
 
 # Stream live logs
@@ -319,6 +373,22 @@ rnx list  # Uses production server
 
 ### Real-World Examples
 
+#### Automation & Scheduling
+
+```bash
+# Daily backup at 2 AM
+rnx run --schedule="2025-07-20T02:00:00" --upload=backup.sh bash backup.sh
+
+# Data processing every 30 minutes
+rnx run --schedule="30min" --upload-dir=data --max-memory=2048 python3 process.py
+
+# Weekly maintenance
+rnx run --schedule="2025-07-27T03:00:00" --max-cpu=25 maintenance_script.sh
+
+# Resource-limited batch processing
+rnx run --schedule="1hour" --cpu-cores="0-3" --max-memory=4096 batch_analysis.py
+```
+
 #### High-Performance Computing
 
 ```bash
@@ -330,6 +400,9 @@ rnx run --cpu-cores="4-7" --max-memory=2048 scientific_computation
 
 # Reserve cores for real-time applications
 rnx run --cpu-cores="8-11" realtime_data_processor
+
+# Scheduled HPC jobs
+rnx run --schedule="2025-07-20T00:00:00" --cpu-cores="0-15" --max-memory=16384 overnight_simulation.py
 ```
 
 #### Data Processing with Uploads
@@ -343,6 +416,9 @@ rnx run --upload=train.py --upload-dir=data --cpu-cores="0-3" --max-memory=4096 
 
 # Bioinformatics pipeline with multiple input files
 rnx run --upload-dir=genomes --upload=pipeline.sh --max-memory=16384 bash pipeline.sh
+
+# Scheduled data processing
+rnx run --schedule="6h" --upload-dir=daily-data --max-memory=8192 python3 daily_analysis.py
 ```
 
 #### Development Workflow
@@ -356,6 +432,9 @@ rnx run --upload-dir=src --cpu-cores="2-5" --max-memory=2048 make build
 
 # Run security scans on uploaded codebase
 rnx run --upload-dir=. --cpu-cores="6" --max-memory=512 trivy scan .
+
+# Schedule nightly builds
+rnx run --schedule="2025-07-20T01:00:00" --upload-dir=. --max-memory=4096 make build test
 ```
 
 #### CI/CD Integration
@@ -365,6 +444,9 @@ rnx run --upload-dir=. --cpu-cores="6" --max-memory=512 trivy scan .
 export JOBLET_SERVER=build-server:50051
 rnx run --upload-dir=. --cpu-cores="0-3" --max-memory=2048 docker build -t myapp .
 rnx run --upload=test-config.yml --cpu-cores="4-5" --max-cpu=50 npm test
+
+# Schedule deployment
+rnx run --schedule="2025-07-20T18:00:00" --upload-dir=dist deploy.sh
 ```
 
 ## ⚙️ Configuration
@@ -444,6 +526,7 @@ nodes:
 - **CPU Core Isolation**: Jobs are bound to specific CPU cores for performance isolation
 - **Network Isolation**: Optional network namespace isolation
 - **Upload Security**: Path traversal protection and system directory access prevention
+- **Scheduler Security**: Scheduled jobs maintain same isolation as immediate jobs
 
 ## 🛠️ Advanced Configuration
 
@@ -478,6 +561,10 @@ rnx run --cpu-cores="8-11" prod_service
 
 # System: Reserve cores 12-15 for OS and services
 # (no job allocation on these cores)
+
+# Schedule different workloads on different cores
+rnx run --schedule="2h" --cpu-cores="0-3" batch_dev.py
+rnx run --schedule="4h" --cpu-cores="4-7" test_automation.py
 ```
 
 #### NUMA-Aware Core Allocation
@@ -489,6 +576,9 @@ numactl --hardware
 # Allocate cores from specific NUMA nodes
 rnx run --cpu-cores="0-7" numa_node_0_workload     # NUMA node 0
 rnx run --cpu-cores="8-15" numa_node_1_workload    # NUMA node 1
+
+# Schedule NUMA-aware jobs
+rnx run --schedule="1hour" --cpu-cores="0-7" --max-memory=4096 numa_optimized.py
 ```
 
 ### Regenerate Certificates
@@ -527,6 +617,10 @@ nodes:
 # Use specific environment
 rnx --node=development run pytest
 rnx --node=production run deploy.sh
+
+# Schedule jobs on different environments
+rnx --node=staging run --schedule="30min" integration_tests.py
+rnx --node=production run --schedule="2025-07-20T02:00:00" backup.sh
 ```
 
 ### Service Management
@@ -580,6 +674,19 @@ sudo cat /sys/fs/cgroup/joblet.slice/joblet.service/cgroup.subtree_control
 sudo find /sys/fs/cgroup -name "job-*" -exec sh -c 'echo "Job: {}"; cat {}/cpuset.cpus 2>/dev/null || echo "no cpuset"' \;
 ```
 
+**Scheduled jobs not executing**
+
+```bash
+# Check scheduler status
+sudo journalctl -u joblet | grep scheduler
+
+# View scheduled jobs queue
+rnx list | grep SCHEDULED
+
+# Check system time synchronization
+timedatectl status
+```
+
 **CLI not found**
 
 ```bash
@@ -603,6 +710,9 @@ ps -eo pid,comm,psr,pcpu | grep your_process  # PSR column shows current core
 # Monitor cgroup resource usage
 cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/cpuset.cpus
 cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/memory.current
+
+# Monitor scheduler performance
+sudo journalctl -u joblet | grep "scheduled job"
 ```
 
 ### Getting Help
@@ -649,6 +759,12 @@ cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/memory.current
 | `--upload-dir=DIR` | Upload entire directory  | `--upload-dir=dataset` |
 | `--upload-dir=.`   | Upload current directory | `--upload-dir=.`       |
 
+### Scheduling Flag
+
+| Flag              | Description                       | Example                                                    |
+|-------------------|-----------------------------------|------------------------------------------------------------|
+| `--schedule=SPEC` | Schedule job for future execution | `--schedule="1hour"` or `--schedule="2025-07-20T15:30:00"` |
+
 ### CPU Core Specification Examples
 
 | Format          | Description     | Cores Used          |
@@ -658,6 +774,18 @@ cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/memory.current
 | `"1,3,5"`       | Specific cores  | Cores 1, 3, 5 only  |
 | `"0-1,4-5"`     | Multiple ranges | Cores 0, 1, 4, 5    |
 | `""` or omitted | No restriction  | All available cores |
+
+### Schedule Specification Examples
+
+| Format                        | Description            | Execution Time             |
+|-------------------------------|------------------------|----------------------------|
+| `"30s"`                       | 30 seconds from now    | Relative time              |
+| `"5min"`                      | 5 minutes from now     | Relative time              |
+| `"1hour"`                     | 1 hour from now        | Relative time              |
+| `"2h30m"`                     | 2.5 hours from now     | Relative time              |
+| `"2025-07-20T15:30:00"`       | Absolute local time    | Specific date/time         |
+| `"2025-07-20T15:30:00Z"`      | Absolute UTC time      | Specific date/time (UTC)   |
+| `"2025-07-20T15:30:00-07:00"` | Absolute with timezone | Specific date/time with TZ |
 
 ## 🤝 Contributing
 
