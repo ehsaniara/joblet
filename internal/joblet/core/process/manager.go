@@ -110,14 +110,11 @@ func (m *Manager) launchInGoroutine(config *LaunchConfig, resultChan chan<- *Lau
 		}
 	}()
 
-	log := m.logger.WithField("jobID", config.JobID)
-
 	// Lock this goroutine to the OS thread for namespace operations
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	// Start the process (which will inherit the current namespace)
-	startTime := time.Now()
 	cmd, err := m.createAndStartCommand(config)
 	if err != nil {
 		resultChan <- &LaunchResult{
@@ -133,9 +130,6 @@ func (m *Manager) launchInGoroutine(config *LaunchConfig, resultChan chan<- *Lau
 		}
 		return
 	}
-
-	duration := time.Since(startTime)
-	log.Debug("process started in goroutine", "pid", process.Pid(), "duration", duration)
 
 	resultChan <- &LaunchResult{
 		PID:     int32(process.Pid()),
@@ -210,7 +204,6 @@ func (m *Manager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cle
 	log := m.logger.WithFields("jobID", req.JobID, "pid", req.PID)
 	log.Debug("starting process cleanup", "forceKill", req.ForceKill, "gracefulTimeout", req.GracefulTimeout)
 
-	startTime := time.Now()
 	result := &CleanupResult{
 		JobID:  req.JobID,
 		Errors: make([]error, 0),
@@ -235,8 +228,6 @@ func (m *Manager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cle
 			result.NamespaceRemoved = true
 		}
 	}
-
-	result.Duration = time.Since(startTime)
 
 	if len(result.Errors) > 0 {
 		log.Warn("cleanup completed with errors", "duration", result.Duration, "errorCount", len(result.Errors))

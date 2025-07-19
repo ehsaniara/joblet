@@ -66,32 +66,25 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 			float64(totalUploadSize)/1024/1024, float64(maxTotalUploadSize)/1024/1024)
 	}
 
-	startTime := time.Now()
-
 	domainUploads := mappers.ProtobufToFileUpload(req.Uploads)
 
 	// StartJob now expects RFC3339 formatted schedule string (already parsed by client)
 	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads, req.Schedule)
 
 	if err != nil {
-		duration := time.Since(startTime)
-		log.Error("job creation failed", "error", err, "duration", duration)
+		log.Error("job creation failed", "error", err)
 		return nil, status.Errorf(codes.Internal, "job run failed: %v", err)
 	}
-
-	duration := time.Since(startTime)
 
 	// Log differently based on whether job was scheduled or executed immediately
 	if req.Schedule != "" {
 		log.Info("job scheduled successfully",
 			"jobId", newJob.Id,
-			"duration", duration,
 			"uploadsProcessed", len(domainUploads),
 			"scheduledTimeRFC3339", req.Schedule)
 	} else {
 		log.Debug("job created successfully",
 			"jobId", newJob.Id,
-			"duration", duration,
 			"uploadsProcessed", len(domainUploads))
 	}
 
@@ -129,8 +122,6 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb.StopJobRes, error) {
 	log := s.logger.WithFields("operation", "StopJob", "jobId", req.GetId())
 
-	log.Debug("stop job request received")
-
 	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
@@ -142,10 +133,8 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 		log.Info("stopping scheduled job", "scheduledTime", job.ScheduledTime.Format(time.RFC3339))
 	}
 
-	startTime := time.Now()
 	if err := s.joblet.StopJob(ctx, req.GetId()); err != nil {
-		duration := time.Since(startTime)
-		log.Error("job stop failed", "error", err, "duration", duration)
+		log.Error("job stop failed", "error", err)
 		return nil, status.Errorf(codes.Internal, "StopJob error %v", err)
 	}
 
@@ -155,23 +144,17 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 		return nil, status.Errorf(codes.NotFound, "job not found %v", req.GetId())
 	}
 
-	duration := time.Since(startTime)
-	log.Debug("job stopped successfully", "finalStatus", string(job.Status), "duration", duration)
-
 	return mappers.DomainToStopJobResponse(job), nil
 }
 
 func (s *JobServiceServer) ListJobs(ctx context.Context, _ *pb.EmptyRequest) (*pb.Jobs, error) {
 	log := s.logger.WithField("operation", "ListJobs")
 
-	log.Debug("list jobs request received")
-
 	if err := s.auth.Authorized(ctx, auth2.ListJobsOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
 
-	startTime := time.Now()
 	jobs := s.jobStore.ListJobs()
 
 	rawJobs := &pb.Jobs{}
@@ -181,12 +164,6 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, _ *pb.EmptyRequest) (*p
 		rawJobs.Jobs = append(rawJobs.Jobs, mappers.DomainToProtobuf(job))
 		statusCounts[string(job.Status)]++
 	}
-
-	duration := time.Since(startTime)
-	log.Debug("jobs listed successfully",
-		"totalJobs", len(jobs),
-		"statusBreakdown", statusCounts,
-		"duration", duration)
 
 	return rawJobs, nil
 }
@@ -215,22 +192,19 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobletSer
 	}
 
 	// start streaming (handles ALL job states: SCHEDULED, RUNNING, COMPLETED)
-	startTime := time.Now()
 	adapter := adapters.NewGrpcStreamAdapter(stream)
 
 	if err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetId(), adapter); err != nil {
-		duration := time.Since(startTime)
 
 		if errors.Is(err, context.Canceled) {
-			log.Debug("log stream cancelled by client", "duration", duration)
+			log.Debug("log stream cancelled by client")
 			return nil
 		}
 
-		log.Error("log stream failed", "error", err, "duration", duration)
+		log.Error("log stream failed", "error", err)
 		return status.Errorf(codes.Internal, "GetJobLogs error: %v", err)
 	}
 
-	duration := time.Since(startTime)
-	log.Debug("log stream completed successfully", "duration", duration)
+	log.Debug("log stream completed successfully")
 	return nil
 }

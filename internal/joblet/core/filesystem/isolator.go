@@ -200,7 +200,6 @@ func (f *JobFilesystem) setupTmpDir() error {
 // performChroot performs the actual chroot operation
 func (f *JobFilesystem) performChroot() error {
 	log := f.logger.WithField("operation", "chroot")
-	log.Debug("performing chroot", "newRoot", f.RootDir)
 
 	// Change to the new root directory
 	if err := syscall.Chdir(f.RootDir); err != nil {

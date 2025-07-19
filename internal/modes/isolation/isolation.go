@@ -105,9 +105,9 @@ func (i *Isolator) setupFilesystemIsolation() error {
 	}
 
 	// Create isolated filesystem for this job
-	jobFS, err := i.filesystem.CreateJobFilesystem(jobID)
-	if err != nil {
-		return fmt.Errorf("failed to create job filesystem: %w", err)
+	jobFS, e := i.filesystem.CreateJobFilesystem(jobID)
+	if e != nil {
+		return fmt.Errorf("failed to create job filesystem: %w", e)
 	}
 
 	// Set up the filesystem isolation (chroot, mounts, etc.)
@@ -183,9 +183,7 @@ func (i *Isolator) verifyIsolation() error {
 		}
 	}
 
-	i.logger.Debug("isolation verification",
-		"visibleProcesses", pidCount,
-		"isolationQuality", assessIsolationQuality(pidCount))
+	i.logger.Debug("isolation verification", "visibleProcesses", pidCount)
 
 	return nil
 }
@@ -204,18 +202,4 @@ func (i *Isolator) readProcDir() ([]string, error) {
 	}
 
 	return entries, nil
-}
-
-// assessIsolationQuality provides feedback on isolation effectiveness
-func assessIsolationQuality(pidCount int) string {
-	switch {
-	case pidCount <= 5:
-		return "excellent"
-	case pidCount <= 20:
-		return "good"
-	case pidCount <= 50:
-		return "partial"
-	default:
-		return "poor"
-	}
 }

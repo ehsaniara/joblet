@@ -127,9 +127,9 @@ func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
 	}
 
 	// Decode base64 encoded JSON
-	jsonData, err := base64.StdEncoding.DecodeString(uploadsData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode uploads data: %w", err)
+	jsonData, e := base64.StdEncoding.DecodeString(uploadsData)
+	if e != nil {
+		return nil, fmt.Errorf("failed to decode uploads data: %w", e)
 	}
 
 	// Parse JSON upload data
@@ -160,8 +160,7 @@ func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
 		})
 	}
 
-	je.logger.Debug("deserialized uploads from environment",
-		"uploadCount", len(uploads))
+	je.logger.Debug("deserialized uploads from environment", "uploadCount", len(uploads))
 
 	return uploads, nil
 }
@@ -247,41 +246,41 @@ func (je *JobExecutor) processUploads(uploads []UploadInfo) error {
 	}
 
 	// Process each upload
-	for i, upload := range uploads {
-		log.Debug("processing upload", "file", i+1, "path", upload.Path, "size", len(upload.Content))
+	for i, u := range uploads {
+		log.Debug("processing upload", "file", i+1, "path", u.Path, "size", len(u.Content))
 
-		fullPath := filepath.Join(workspaceDir, upload.Path)
+		fullPath := filepath.Join(workspaceDir, u.Path)
 
-		if upload.IsDirectory {
+		if u.IsDirectory {
 			// Create directory
-			mode := os.FileMode(upload.Mode)
+			mode := os.FileMode(u.Mode)
 			if mode == 0 {
 				mode = 0755 // Default directory permissions
 			}
 
 			if err := je.platform.MkdirAll(fullPath, mode); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
+				return fmt.Errorf("failed to create directory %s: %w", u.Path, err)
 			}
 
-			log.Debug("created directory", "path", upload.Path, "mode", fmt.Sprintf("%o", mode))
+			log.Debug("created directory", "path", u.Path, "mode", fmt.Sprintf("%o", mode))
 		} else {
 			// Ensure parent directory exists
 			parentDir := filepath.Dir(fullPath)
 			if err := je.platform.MkdirAll(parentDir, 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+				return fmt.Errorf("failed to create parent directory for %s: %w", u.Path, err)
 			}
 
 			// Write file
-			mode := os.FileMode(upload.Mode)
+			mode := os.FileMode(u.Mode)
 			if mode == 0 {
 				mode = 0644 // Default file permissions
 			}
 
-			if err := je.platform.WriteFile(fullPath, upload.Content, mode); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
+			if err := je.platform.WriteFile(fullPath, u.Content, mode); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", u.Path, err)
 			}
 
-			log.Debug("wrote file", "path", upload.Path, "size", len(upload.Content), "mode", fmt.Sprintf("%o", mode))
+			log.Debug("wrote file", "path", u.Path, "size", len(u.Content), "mode", fmt.Sprintf("%o", mode))
 		}
 	}
 
@@ -305,9 +304,9 @@ func (je *JobExecutor) executeLinux(config *JobConfig) error {
 	je.logger.Debug("executing job on Linux", "command", config.Command, "args", config.Args)
 
 	// Resolve command path using platform abstraction
-	commandPath, err := je.resolveCommandPath(config.Command)
-	if err != nil {
-		return fmt.Errorf("command resolution failed: %w", err)
+	commandPath, e := je.resolveCommandPath(config.Command)
+	if e != nil {
+		return fmt.Errorf("command resolution failed: %w", e)
 	}
 
 	// Prepare arguments and environment using platform abstraction

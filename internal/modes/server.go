@@ -91,8 +91,13 @@ func RunJobInit(cfg *config.Config) error {
 		return fmt.Errorf("cgroup assignment verification failed: %w", err)
 	}
 
-	// Log resource limits for transparency
-	logResourceLimits(initLogger)
+	limits := map[string]string{
+		"maxCPU":    os.Getenv("JOB_MAX_CPU"),
+		"maxMemory": os.Getenv("JOB_MAX_MEMORY"),
+		"maxIOBPS":  os.Getenv("JOB_MAX_IOBPS"),
+	}
+
+	logger.Debug("resource limits applied", "limits", limits)
 
 	// Load job configuration
 	jobConfig, err := jobexec.LoadConfigFromEnv(initLogger)
@@ -138,12 +143,6 @@ func assignToCgroup(cgroupPath string, logger *logger.Logger) error {
 	procsFile := filepath.Join(hostCgroupPath, "cgroup.procs")
 	pidBytes := []byte(fmt.Sprintf("%d", pid))
 
-	logger.Debug("assigning process to cgroup",
-		"pid", pid,
-		"namespaceCgroupPath", cgroupPath,
-		"hostCgroupPath", hostCgroupPath,
-		"procsFile", procsFile)
-
 	// Verify the host cgroup directory exists
 	if _, err := os.Stat(hostCgroupPath); err != nil {
 		return fmt.Errorf("host cgroup directory does not exist: %s: %w", hostCgroupPath, err)
@@ -176,11 +175,6 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger) er
 	cgroupContent := strings.TrimSpace(string(cgroupData))
 	pid := os.Getpid()
 
-	logger.Debug("cgroup assignment verification",
-		"pid", pid,
-		"cgroupView", cgroupContent,
-		"expectedPath", expectedCgroupPath)
-
 	// In cgroup namespace, we expect something like "0::/job-1" or similar
 	// The key is that it should NOT be "0::/" (root cgroup)
 	if cgroupContent == "0::/" {
@@ -196,15 +190,4 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger) er
 
 	logger.Debug("cgroup assignment verified successfully", "pid", pid)
 	return nil
-}
-
-// logResourceLimits logs the applied resource limits for transparency
-func logResourceLimits(logger *logger.Logger) {
-	limits := map[string]string{
-		"maxCPU":    os.Getenv("JOB_MAX_CPU"),
-		"maxMemory": os.Getenv("JOB_MAX_MEMORY"),
-		"maxIOBPS":  os.Getenv("JOB_MAX_IOBPS"),
-	}
-
-	logger.Debug("resource limits applied", "limits", limits)
 }

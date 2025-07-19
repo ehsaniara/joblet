@@ -81,7 +81,6 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 		w.logger.Fatal("scheduler start failed", "error", err)
 	}
 
-	w.logger.Debug("Linux joblet initialized with scheduler support")
 	return w
 }
 
@@ -123,9 +122,9 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 
 	// Handle scheduling if specified
 	if schedule != "" {
-		scheduledTime, e := time.Parse("2006-01-02T15:04:05Z07:00", schedule)
-		if e != nil {
-			return nil, fmt.Errorf("invalid schedule format from client: %w", e)
+		scheduledTime, er := time.Parse("2006-01-02T15:04:05Z07:00", schedule)
+		if er != nil {
+			return nil, fmt.Errorf("invalid schedule format from client: %w", er)
 		}
 
 		// Validate the scheduled time is reasonable
@@ -147,8 +146,8 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 
 		// Process file uploads immediately (even for scheduled jobs)
 		if len(uploads) > 0 {
-			if err := w.processUploadsForScheduledJob(ctx, job, uploads); err != nil {
-				return nil, fmt.Errorf("upload processing failed for scheduled job: %w", err)
+			if e := w.processUploadsForScheduledJob(ctx, job, uploads); e != nil {
+				return nil, fmt.Errorf("upload processing failed for scheduled job: %w", e)
 			}
 		}
 
@@ -156,14 +155,14 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		w.store.CreateNewJob(job)
 
 		// Add to scheduler queue
-		if err := w.scheduler.AddJob(job); err != nil {
-			return nil, fmt.Errorf("failed to schedule job: %w", err)
+		if e := w.scheduler.AddJob(job); e != nil {
+			return nil, fmt.Errorf("failed to schedule job: %w", e)
 		}
 
 		return job, nil
 	}
 
-	// Immediate execution (existing logic)
+	// Immediate execution
 	job.Status = domain.StatusInitializing
 	return w.executeJobImmediately(ctx, job, uploads)
 }
@@ -240,22 +239,22 @@ func (w *Joblet) processUploadsForScheduledJob(ctx context.Context, job *domain.
 	}
 
 	// Process uploads with proper isolation
-	for _, upload := range uploads {
-		targetPath := filepath.Join(workspaceDir, upload.Path)
+	for _, ul := range uploads {
+		targetPath := filepath.Join(workspaceDir, ul.Path)
 
-		if upload.IsDirectory {
-			if err := w.platform.MkdirAll(targetPath, os.FileMode(upload.Mode)); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
+		if ul.IsDirectory {
+			if err := w.platform.MkdirAll(targetPath, os.FileMode(ul.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", ul.Path, err)
 			}
 		} else {
 			// Ensure parent directory exists
 			if err := w.platform.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+				return fmt.Errorf("failed to create parent directory for %s: %w", ul.Path, err)
 			}
 
 			// Write file content
-			if err := w.platform.WriteFile(targetPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
+			if err := w.platform.WriteFile(targetPath, ul.Content, os.FileMode(ul.Mode)); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", ul.Path, err)
 			}
 		}
 	}
@@ -381,7 +380,7 @@ func (w *Joblet) setupCPUCoreRestrictions(job *domain.Job) error {
 		return fmt.Errorf("requested CPU cores not available: %w", err)
 	}
 
-	// STRICT: CPU cores MUST be set successfully
+	// CPU cores MUST be set successfully
 	if err := w.cgroup.SetCPUCores(job.CgroupPath, job.Limits.CPUCores); err != nil {
 		return fmt.Errorf("failed to enforce CPU core restriction '%s': %w",
 			job.Limits.CPUCores, err)
@@ -501,7 +500,6 @@ func (w *Joblet) StopJob(ctx context.Context, jobID string) error {
 		return fmt.Errorf("job is not running: %s (status: %s)", jobID, job.Status)
 	}
 
-	// Create cleanup request
 	cleanupReq := &process.CleanupRequest{
 		JobID:           jobID,
 		PID:             job.Pid,
@@ -601,11 +599,9 @@ func (w *Joblet) updateJobAsRunning(job *domain.Job, processCmd platform.Command
 
 func (w *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
 	log := w.logger.WithField("jobID", job.Id)
-	startTime := time.Now()
 
 	// Wait for process completion
 	err := cmd.Wait()
-	duration := time.Since(startTime)
 
 	// Determine final status and exit code
 	var finalStatus domain.JobStatus
@@ -636,10 +632,7 @@ func (w *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 	// Cleanup all job resources (cgroup + filesystem)
 	w.cleanupJobResources(job.Id)
 
-	log.Debug("job monitoring completed",
-		"finalStatus", finalStatus,
-		"exitCode", exitCode,
-		"duration", duration)
+	log.Debug("job monitoring completed", "finalStatus", finalStatus, "exitCode", exitCode)
 }
 
 // cleanupJobResources handles both cgroup and filesystem
