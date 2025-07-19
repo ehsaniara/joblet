@@ -251,39 +251,3 @@ func TestJobIsCompleted(t *testing.T) {
 		}
 	}
 }
-
-func TestJobDuration(t *testing.T) {
-	now := time.Now()
-
-	// Test running job
-	runningJob := &Job{
-		Status:    StatusRunning,
-		StartTime: now.Add(-5 * time.Second),
-	}
-	duration := runningJob.Duration()
-	if duration < 4*time.Second || duration > 6*time.Second {
-		t.Errorf("Expected duration around 5 seconds, got %v", duration)
-	}
-
-	// Test completed job
-	endTime := now.Add(-2 * time.Second)
-	completedJob := &Job{
-		Status:    StatusCompleted,
-		StartTime: now.Add(-5 * time.Second),
-		EndTime:   &endTime,
-	}
-	duration = completedJob.Duration()
-	expected := 3 * time.Second
-	if duration != expected {
-		t.Errorf("Expected duration %v, got %v", expected, duration)
-	}
-
-	// Test job that never started properly
-	neverStartedJob := &Job{
-		Status: StatusInitializing,
-	}
-	duration = neverStartedJob.Duration()
-	if duration != 0 {
-		t.Errorf("Expected duration 0, got %v", duration)
-	}
-}

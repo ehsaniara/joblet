@@ -6,7 +6,6 @@ import (
 	"joblet/internal/joblet/domain"
 	"joblet/pkg/logger"
 	"sync"
-	"time"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -147,10 +146,10 @@ func (st *store) GetOutput(id string) ([]byte, bool, error) {
 	return buffer, isRunning, nil
 }
 
-// SendUpdatesToClient sends the job log updates only
+// SendUpdatesToClient sends the job log updates for scheduled, running, and completed jobs
 func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error {
 	st.mutex.RLock()
-	job, exists := st.tasks[id]
+	task, exists := st.tasks[id]
 	st.mutex.RUnlock()
 
 	if !exists {
@@ -165,61 +164,58 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 	default:
 	}
 
-	if !job.IsRunning() {
-		jobCopy := job.GetJob()
-		st.logger.Warn("stream requested for non-running job", "jobId", id, "status", string(jobCopy.Status))
+	jobCopy := task.GetJob()
+	st.logger.Debug("starting log stream", "jobId", id, "status", string(jobCopy.Status))
+
+	// Handle different job states
+	if jobCopy.IsCompleted() {
+		// Job is already completed - send existing logs and return
+		buffer := task.GetBuffer()
+		if len(buffer) > 0 {
+			if err := stream.SendData(buffer); err != nil {
+				st.logger.Warn("failed to send completed job logs", "jobId", id, "error", err)
+				return err
+			}
+			st.logger.Debug("sent logs for completed job", "jobId", id, "logSize", len(buffer))
+		}
 		return nil
 	}
 
-	updates, unsubscribe := job.Subscribe()
+	// For scheduled and running jobs, subscribe to updates
+	updates, unsubscribe := task.Subscribe()
 	defer unsubscribe()
 
-	st.logger.Debug("streaming updates started", "jobId", id)
+	st.logger.Debug("streaming updates started", "jobId", id, "initialStatus", string(jobCopy.Status))
 
-	updateCount := 0
-	logBytesSent := 0
-	startTime := time.Now()
-
+	// If job is scheduled, we'll get status updates when it starts
+	// If job is running, we'll get log chunks and status updates
 	for {
 		select {
 		case <-ctx.Done():
-			duration := time.Since(startTime)
-			st.logger.Debug("stream cancelled by context", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent, "reason", ctx.Err())
 			return ctx.Err()
 
 		case <-stream.Context().Done():
-			duration := time.Since(startTime)
-			st.logger.Debug("stream cancelled by client", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
 			return errors.New("stream cancelled by client")
 
 		case update, ok := <-updates:
 			if !ok {
 				// channel closed, job completed or task cleaned up
-				duration := time.Since(startTime)
-				st.logger.Debug("update channel closed", "jobId", id, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
 				return nil
 			}
 
-			if update.LogChunk != nil {
+			// Handle status updates (including SCHEDULED -> RUNNING transitions)
+			// If job completed, we're done
+			if update.Status == "COMPLETED" || update.Status == "FAILED" || update.Status == "STOPPED" {
+				return nil
+			}
 
+			// Handle log chunks
+			if len(update.LogChunk) > 0 {
 				if streamErr := stream.SendData(update.LogChunk); streamErr != nil {
 					st.logger.Warn("failed to send log chunk", "jobId", id, "chunkSize", len(update.LogChunk), "error", streamErr)
 					return streamErr
 				}
-
-				updateCount++
-				logBytesSent += len(update.LogChunk)
-
-				st.logger.Debug("log chunk sent", "jobId", id, "chunkSize", len(update.LogChunk), "totalBytesSent", logBytesSent)
 			}
-
-			// exit if job is not running
-			if update.Status != "" && update.Status != "RUNNING" {
-				duration := time.Since(startTime)
-				st.logger.Debug("job status changed, ending stream", "jobId", id, "newStatus", update.Status, "duration", duration, "updatesSent", updateCount, "bytesSent", logBytesSent)
-				return nil
-			}
-
 		}
 	}
 }

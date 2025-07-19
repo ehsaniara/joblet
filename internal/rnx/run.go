@@ -3,9 +3,9 @@ package rnx
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,24 +17,46 @@ import (
 func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run <command> [args...]",
-		Short: "Run a new job",
-		Long: `Run a new job with the specified command and arguments.
+		Short: "Run a new job immediately or schedule it for later",
+		Long: `Run a new job with the specified command and arguments, either immediately or scheduled for future execution.
 
 Examples:
+  # Immediate execution
   rnx run nginx
   rnx run python3 script.py
   rnx run bash -c "curl https://example.com"
   rnx --node=srv1 run ps aux
 
+  # Scheduled execution
+  rnx run --schedule="1hour" python3 script.py
+  rnx run --schedule="30min" echo "Hello World"
+  rnx run --schedule="2025-07-18T20:02:48" backup_script.sh
+  rnx run --schedule="2h30m" --max-memory=512 data_processing.py
+
 File Upload Examples:
+  # Uploads work with both immediate and scheduled jobs
   rnx run --upload=script.py python3 script.py
-  rnx run --upload-dir=. python3 main.py
-  rnx run --upload=data.csv --upload=process.py python3 process.py data.csv
+  rnx run --schedule="1hour" --upload-dir=. python3 main.py
+  rnx run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
+
+Scheduling Formats:
+  # Relative time
+  --schedule="1hour"      # 1 hour from now
+  --schedule="30min"      # 30 minutes from now
+  --schedule="2h30m"      # 2 hours 30 minutes from now
+  --schedule="45s"        # 45 seconds from now
+
+  # Absolute time (RFC3339 format)
+  --schedule="2025-07-18T20:02:48"           # Local time
+  --schedule="2025-07-18T20:02:48Z"          # UTC time
+  --schedule="2025-07-18T20:02:48-07:00"     # With timezone
 
 Flags:
+  --schedule=SPEC     Schedule job for future execution
   --max-cpu=N         Max CPU percentage
   --max-memory=N      Max Memory in MB  
   --max-iobps=N       Max IO BPS
+  --cpu-cores=SPEC    CPU cores specification
   --upload=FILE       Upload a file to the job workspace
   --upload-dir=DIR    Upload entire directory to the job workspace`,
 		Args:               cobra.MinimumNArgs(1),
@@ -53,11 +75,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 		maxIOBPS   int32
 		uploads    []string
 		uploadDirs []string
+		schedule   string // New: schedule specification
 	)
 
 	commandStartIndex := 0
 	for i, arg := range args {
-		if strings.HasPrefix(arg, "--cpu-cores=") {
+		if strings.HasPrefix(arg, "--schedule=") {
+			schedule = strings.TrimPrefix(arg, "--schedule=")
+		} else if strings.HasPrefix(arg, "--cpu-cores=") {
 			cpuCores = strings.TrimPrefix(arg, "--cpu-cores=")
 		} else if strings.HasPrefix(arg, "--max-cpu=") {
 			if val, err := parseIntFlag(arg, "--max-cpu="); err == nil {
@@ -93,7 +118,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	command := commandArgs[0]
 	cmdArgs := commandArgs[1:]
 
-	// client creation using unified config
+	// Client creation using unified config
 	jobClient, err := newJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
@@ -103,58 +128,37 @@ func runRun(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var fileUploads []*pb.FileUpload
-
-	// individual file uploads
-	for _, uploadPath := range uploads {
-		files, err := collectFileUploads(uploadPath, false)
-		if err != nil {
-			return fmt.Errorf("failed to prepare upload %s: %w", uploadPath, err)
-		}
-		fileUploads = append(fileUploads, files...)
+	// Process file uploads
+	fileUploads, err := processFileUploads(uploads, uploadDirs)
+	if err != nil {
+		return fmt.Errorf("file upload processing failed: %w", err)
 	}
 
-	// directory uploads
-	for _, uploadDir := range uploadDirs {
-		files, err := collectFileUploads(uploadDir, true)
-		if err != nil {
-			return fmt.Errorf("failed to prepare upload directory %s: %w", uploadDir, err)
-		}
-		fileUploads = append(fileUploads, files...)
-	}
-
-	// show upload summary if files are being uploaded
+	// Display upload summary if files are being uploaded
 	if len(fileUploads) > 0 {
 		totalSize := int64(0)
-		largeFiles := 0
-		smallFiles := 0
-
-		for _, f := range fileUploads {
-			size := int64(len(f.Content))
-			totalSize += size
-
-			if size >= 1024*1024 {
-				largeFiles++
-			} else {
-				smallFiles++
-			}
+		for _, upload := range fileUploads {
+			totalSize += int64(len(upload.Content))
 		}
 
-		fmt.Printf(" Upload optimized for memory efficiency:\n")
-		fmt.Printf("   Total: %d files (%.2f MB)\n", len(fileUploads), float64(totalSize)/1024/1024)
-
-		if smallFiles > 0 {
-			fmt.Printf("   Small files: %d (embedded in job)\n", smallFiles)
-		}
-
-		if largeFiles > 0 {
-			fmt.Printf("   Large files: %d (streamed to job)\n", largeFiles)
-		}
-
-		fmt.Printf("   Memory-safe chunking: Enabled\n")
+		fmt.Printf("📤 Uploading %d files (%.2f MB)...\n",
+			len(fileUploads), float64(totalSize)/1024/1024)
 	}
 
-	job := &pb.RunJobReq{
+	// Process schedule on client side
+	var scheduledTimeRFC3339 string
+	if schedule != "" {
+		scheduledTime, err := parseScheduleOnClient(schedule)
+		if err != nil {
+			return fmt.Errorf("invalid schedule '%s': %w", schedule, err)
+		}
+
+		// Convert to RFC3339 format for server
+		scheduledTimeRFC3339 = scheduledTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	// Create job request with RFC3339 formatted schedule
+	request := &pb.RunJobReq{
 		Command:   command,
 		Args:      cmdArgs,
 		MaxCPU:    maxCPU,
@@ -162,178 +166,239 @@ func runRun(cmd *cobra.Command, args []string) error {
 		MaxMemory: maxMemory,
 		MaxIOBPS:  maxIOBPS,
 		Uploads:   fileUploads,
+		Schedule:  scheduledTimeRFC3339, // Send RFC3339 string to server
 	}
 
-	response, err := jobClient.RunJob(ctx, job)
+	// Submit job
+	response, err := jobClient.RunJob(ctx, request)
 	if err != nil {
 		return fmt.Errorf("failed to run job: %v", err)
 	}
 
 	fmt.Printf("Job started:\n")
 	fmt.Printf("ID: %s\n", response.Id)
-	fmt.Printf("Command: %s\n", strings.Join(commandArgs, " "))
+	fmt.Printf("Command: %s %s\n", response.Command, strings.Join(response.Args, " "))
 	fmt.Printf("Status: %s\n", response.Status)
-	fmt.Printf("StartTime: %s\n", response.StartTime)
+	if schedule != "" {
+		fmt.Printf("Schedule Input: %s\n", schedule) // Show user's original input
+		fmt.Printf("Scheduled Time: %s\n", response.ScheduledTime)
+	} else {
+		fmt.Printf("StartTime: %s\n", response.StartTime)
+	}
+
 	if len(fileUploads) > 0 {
-		fmt.Printf("Uploaded: %d files\n", len(fileUploads))
+		fmt.Printf("Files: %d uploaded successfully\n", len(fileUploads))
 	}
 
 	return nil
 }
 
-func collectFileUploads(path string, isDir bool) ([]*pb.FileUpload, error) {
-	var uploads []*pb.FileUpload
-	const maxFileSize = 50 * 1024 * 1024   // 50MB limit per file
-	const largeFileThreshold = 1024 * 1024 // 1MB threshold for "large" files
+func parseIntFlag(arg, prefix string) (int, error) {
+	valueStr := strings.TrimPrefix(arg, prefix)
+	return strconv.Atoi(valueStr)
+}
 
-	// Get absolute path for proper relative path calculation
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path: %w", err)
-	}
+func processFileUploads(uploads []string, uploadDirs []string) ([]*pb.FileUpload, error) {
+	var result []*pb.FileUpload
 
-	// Check if path exists
-	info, err := os.Stat(absPath)
-	if err != nil {
-		return nil, fmt.Errorf("path does not exist: %w", err)
-	}
-
-	// Validate directory/file expectation
-	if isDir && !info.IsDir() {
-		return nil, fmt.Errorf("expected directory but got file: %s", path)
-	}
-
-	if !isDir && info.IsDir() {
-		return nil, fmt.Errorf("expected file but got directory: %s (use --upload-dir for directories)", path)
-	}
-
-	var totalSize int64
-	var largeFileCount int
-
-	if info.IsDir() {
-		// Walk the directory tree
-		var baseDir string
-
-		if isDir {
-			baseDir = filepath.Dir(absPath)
-		} else {
-			baseDir = absPath
-		}
-
-		err = filepath.Walk(absPath, func(filePath string, fileInfo os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			// Calculate relative path
-			relPath, err := filepath.Rel(baseDir, filePath)
-			if err != nil {
-				return fmt.Errorf("failed to calculate relative path: %w", err)
-			}
-
-			// Convert to forward slashes for consistency
-			relPath = filepath.ToSlash(relPath)
-
-			if fileInfo.IsDir() {
-				// Add directory entry
-				uploads = append(uploads, &pb.FileUpload{
-					Path:        relPath,
-					Content:     nil,
-					Mode:        uint32(fileInfo.Mode().Perm()),
-					IsDirectory: true,
-				})
-			} else {
-				// Check file size first
-				fileSize := fileInfo.Size()
-				totalSize += fileSize
-
-				if fileSize > maxFileSize {
-					fmt.Printf("Warning: Skipping large file %s (%.2f MB > %.2f MB limit)\n",
-						relPath, float64(fileSize)/1024/1024, float64(maxFileSize)/1024/1024)
-					return nil
-				}
-
-				// Track large files for user awareness
-				if fileSize >= largeFileThreshold {
-					largeFileCount++
-				}
-
-				// Read file content
-				content, e := os.ReadFile(filePath)
-				if e != nil {
-					return fmt.Errorf("failed to read file %s: %w", filePath, e)
-				}
-
-				uploads = append(uploads, &pb.FileUpload{
-					Path:        relPath,
-					Content:     content,
-					Mode:        uint32(fileInfo.Mode().Perm()),
-					IsDirectory: false,
-				})
-			}
-
-			return nil
-		})
-
+	// Process individual file uploads
+	for _, uploadPath := range uploads {
+		fileInfo, err := os.Stat(uploadPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to walk directory: %w", err)
-		}
-	} else {
-		// Single file upload
-		fileSize := info.Size()
-		if fileSize > maxFileSize {
-			return nil, fmt.Errorf("file too large: %s (%.2f MB > %.2f MB limit)",
-				path, float64(fileSize)/1024/1024, float64(maxFileSize)/1024/1024)
+			return nil, fmt.Errorf("cannot access upload file %s: %w", uploadPath, err)
 		}
 
-		totalSize = fileSize
-		if fileSize >= largeFileThreshold {
-			largeFileCount = 1
+		if fileInfo.IsDir() {
+			return nil, fmt.Errorf("use --upload-dir for directories: %s", uploadPath)
 		}
 
-		content, err := io.ReadAll(io.LimitReader(openFile(absPath), maxFileSize))
+		content, err := os.ReadFile(uploadPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read file: %w", err)
+			return nil, fmt.Errorf("cannot read upload file %s: %w", uploadPath, err)
 		}
 
-		uploads = append(uploads, &pb.FileUpload{
-			Path:        filepath.Base(absPath),
+		result = append(result, &pb.FileUpload{
+			Path:        filepath.Base(uploadPath),
 			Content:     content,
-			Mode:        uint32(info.Mode().Perm()),
+			Mode:        uint32(fileInfo.Mode()),
 			IsDirectory: false,
 		})
 	}
 
-	// Display upload summary with optimization information
-	if len(uploads) > 0 {
-		fmt.Printf("Upload Summary:\n")
-		fmt.Printf("  Total files: %d\n", len(uploads))
-		fmt.Printf("  Total size: %.2f MB\n", float64(totalSize)/1024/1024)
-
-		if largeFileCount > 0 {
-			fmt.Printf("  Large files (>1MB): %d (will be streamed)\n", largeFileCount)
+	// Process directory uploads
+	for _, uploadDir := range uploadDirs {
+		dirUploads, err := processDirectoryUpload(uploadDir)
+		if err != nil {
+			return nil, fmt.Errorf("directory upload failed for %s: %w", uploadDir, err)
 		}
-
-		smallFileCount := len(uploads) - largeFileCount
-		if smallFileCount > 0 {
-			fmt.Printf("  Small files (<1MB): %d (will be embedded)\n", smallFileCount)
-		}
-
-		fmt.Printf("  Memory optimization: Enabled\n")
+		result = append(result, dirUploads...)
 	}
 
-	return uploads, nil
+	return result, nil
 }
 
-func openFile(path string) io.ReadCloser {
-	file, err := os.Open(path)
-	if err != nil {
-		return io.NopCloser(strings.NewReader(""))
+func processDirectoryUpload(dir string) ([]*pb.FileUpload, error) {
+	var uploads []*pb.FileUpload
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Calculate relative path
+		relPath, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip the root directory itself
+		if relPath == "." {
+			return nil
+		}
+
+		if info.IsDir() {
+			// Create directory entry
+			uploads = append(uploads, &pb.FileUpload{
+				Path:        relPath,
+				Content:     nil,
+				Mode:        uint32(info.Mode()),
+				IsDirectory: true,
+			})
+		} else {
+			// Read file content
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("cannot read file %s: %w", path, err)
+			}
+
+			uploads = append(uploads, &pb.FileUpload{
+				Path:        relPath,
+				Content:     content,
+				Mode:        uint32(info.Mode()),
+				IsDirectory: false,
+			})
+		}
+
+		return nil
+	})
+
+	return uploads, err
+}
+
+// parseScheduleOnClient parses schedule specifications on the client side
+func parseScheduleOnClient(scheduleSpec string) (time.Time, error) {
+	if scheduleSpec == "" {
+		return time.Time{}, fmt.Errorf("schedule specification cannot be empty")
 	}
-	return file
+
+	// Try parsing as absolute time first (RFC3339 format)
+	if absoluteTime, err := parseAbsoluteTime(scheduleSpec); err == nil {
+		return absoluteTime, nil
+	}
+
+	// Try parsing as relative time
+	if relativeTime, err := parseRelativeTime(scheduleSpec); err == nil {
+		return relativeTime, nil
+	}
+
+	return time.Time{}, fmt.Errorf("invalid format. Examples: '1min', '30min', '1hour', '2h30m', '45s' or '2025-07-18T20:02:48'")
 }
 
-func parseIntFlag(arg, prefix string) (int64, error) {
-	valueStr := strings.TrimPrefix(arg, prefix)
-	return strconv.ParseInt(valueStr, 10, 32)
+// parseAbsoluteTime parses absolute time specifications
+func parseAbsoluteTime(spec string) (time.Time, error) {
+	// Common time formats to try
+	formats := []string{
+		time.RFC3339,          // "2006-01-02T15:04:05Z07:00"
+		time.RFC3339Nano,      // "2006-01-02T15:04:05.999999999Z07:00"
+		"2006-01-02T15:04:05", // Without timezone
+		"2006-01-02 15:04:05", // Space instead of T
+		"2006-01-02T15:04",    // Without seconds
+		"2006-01-02 15:04",    // Space, no seconds
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, spec); err == nil {
+			// If no timezone specified, assume local time
+			if t.Location() == time.UTC && !strings.Contains(spec, "Z") && !strings.Contains(spec, "+") && !strings.Contains(spec, "-") {
+				t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.Local)
+			}
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid absolute time format: %s", spec)
+}
+
+// parseRelativeTime parses relative time specifications
+func parseRelativeTime(spec string) (time.Time, error) {
+	// Normalize the input - remove spaces and convert to lowercase
+	spec = strings.ToLower(strings.ReplaceAll(spec, " ", ""))
+
+	// Handle common shorthand cases first
+	switch spec {
+	case "1min", "1m":
+		return time.Now().Add(1 * time.Minute), nil
+	case "5min", "5m":
+		return time.Now().Add(5 * time.Minute), nil
+	case "10min", "10m":
+		return time.Now().Add(10 * time.Minute), nil
+	case "30min", "30m":
+		return time.Now().Add(30 * time.Minute), nil
+	case "1hour", "1h":
+		return time.Now().Add(1 * time.Hour), nil
+	case "2hour", "2h":
+		return time.Now().Add(2 * time.Hour), nil
+	}
+
+	// Regular expression to match time components
+	re := regexp.MustCompile(`(\d+)\s*(h|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds)\b`)
+	matches := re.FindAllStringSubmatch(spec, -1)
+
+	if len(matches) == 0 {
+		return time.Time{}, fmt.Errorf("no valid time components found")
+	}
+
+	var totalDuration time.Duration
+
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+
+		value, err := strconv.Atoi(match[1])
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid number: %s", match[1])
+		}
+
+		unit := strings.TrimSpace(match[2])
+		var duration time.Duration
+
+		switch unit {
+		case "h", "hour", "hours":
+			duration = time.Duration(value) * time.Hour
+		case "m", "min", "mins", "minute", "minutes":
+			duration = time.Duration(value) * time.Minute
+		case "s", "sec", "secs", "second", "seconds":
+			duration = time.Duration(value) * time.Second
+		default:
+			return time.Time{}, fmt.Errorf("unknown time unit: %s", unit)
+		}
+
+		totalDuration += duration
+	}
+
+	if totalDuration == 0 {
+		return time.Time{}, fmt.Errorf("total duration cannot be zero")
+	}
+
+	// Validate duration bounds
+	if totalDuration < time.Second {
+		return time.Time{}, fmt.Errorf("duration too short (minimum 1 second)")
+	}
+
+	if totalDuration > 365*24*time.Hour {
+		return time.Time{}, fmt.Errorf("duration too long (maximum 1 year)")
+	}
+
+	return time.Now().Add(totalDuration), nil
 }

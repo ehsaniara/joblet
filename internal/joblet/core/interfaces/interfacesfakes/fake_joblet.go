@@ -9,7 +9,19 @@ import (
 )
 
 type FakeJoblet struct {
-	StartJobStub        func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload) (*domain.Job, error)
+	ExecuteScheduledJobStub        func(context.Context, *domain.Job) error
+	executeScheduledJobMutex       sync.RWMutex
+	executeScheduledJobArgsForCall []struct {
+		arg1 context.Context
+		arg2 *domain.Job
+	}
+	executeScheduledJobReturns struct {
+		result1 error
+	}
+	executeScheduledJobReturnsOnCall map[int]struct {
+		result1 error
+	}
+	StartJobStub        func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
 	startJobArgsForCall []struct {
 		arg1 context.Context
@@ -20,6 +32,7 @@ type FakeJoblet struct {
 		arg6 int32
 		arg7 string
 		arg8 []domain.FileUpload
+		arg9 string
 	}
 	startJobReturns struct {
 		result1 *domain.Job
@@ -45,7 +58,69 @@ type FakeJoblet struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32, arg7 string, arg8 []domain.FileUpload) (*domain.Job, error) {
+func (fake *FakeJoblet) ExecuteScheduledJob(arg1 context.Context, arg2 *domain.Job) error {
+	fake.executeScheduledJobMutex.Lock()
+	ret, specificReturn := fake.executeScheduledJobReturnsOnCall[len(fake.executeScheduledJobArgsForCall)]
+	fake.executeScheduledJobArgsForCall = append(fake.executeScheduledJobArgsForCall, struct {
+		arg1 context.Context
+		arg2 *domain.Job
+	}{arg1, arg2})
+	stub := fake.ExecuteScheduledJobStub
+	fakeReturns := fake.executeScheduledJobReturns
+	fake.recordInvocation("ExecuteScheduledJob", []interface{}{arg1, arg2})
+	fake.executeScheduledJobMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJoblet) ExecuteScheduledJobCallCount() int {
+	fake.executeScheduledJobMutex.RLock()
+	defer fake.executeScheduledJobMutex.RUnlock()
+	return len(fake.executeScheduledJobArgsForCall)
+}
+
+func (fake *FakeJoblet) ExecuteScheduledJobCalls(stub func(context.Context, *domain.Job) error) {
+	fake.executeScheduledJobMutex.Lock()
+	defer fake.executeScheduledJobMutex.Unlock()
+	fake.ExecuteScheduledJobStub = stub
+}
+
+func (fake *FakeJoblet) ExecuteScheduledJobArgsForCall(i int) (context.Context, *domain.Job) {
+	fake.executeScheduledJobMutex.RLock()
+	defer fake.executeScheduledJobMutex.RUnlock()
+	argsForCall := fake.executeScheduledJobArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeJoblet) ExecuteScheduledJobReturns(result1 error) {
+	fake.executeScheduledJobMutex.Lock()
+	defer fake.executeScheduledJobMutex.Unlock()
+	fake.ExecuteScheduledJobStub = nil
+	fake.executeScheduledJobReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJoblet) ExecuteScheduledJobReturnsOnCall(i int, result1 error) {
+	fake.executeScheduledJobMutex.Lock()
+	defer fake.executeScheduledJobMutex.Unlock()
+	fake.ExecuteScheduledJobStub = nil
+	if fake.executeScheduledJobReturnsOnCall == nil {
+		fake.executeScheduledJobReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.executeScheduledJobReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32, arg7 string, arg8 []domain.FileUpload, arg9 string) (*domain.Job, error) {
 	var arg3Copy []string
 	if arg3 != nil {
 		arg3Copy = make([]string, len(arg3))
@@ -67,13 +142,14 @@ func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []strin
 		arg6 int32
 		arg7 string
 		arg8 []domain.FileUpload
-	}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy})
+		arg9 string
+	}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9})
 	stub := fake.StartJobStub
 	fakeReturns := fake.startJobReturns
-	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy})
+	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9})
 	fake.startJobMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -87,17 +163,17 @@ func (fake *FakeJoblet) StartJobCallCount() int {
 	return len(fake.startJobArgsForCall)
 }
 
-func (fake *FakeJoblet) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload) (*domain.Job, error)) {
+func (fake *FakeJoblet) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string) (*domain.Job, error)) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = stub
 }
 
-func (fake *FakeJoblet) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload) {
+func (fake *FakeJoblet) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string) {
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	argsForCall := fake.startJobArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7, argsForCall.arg8
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7, argsForCall.arg8, argsForCall.arg9
 }
 
 func (fake *FakeJoblet) StartJobReturns(result1 *domain.Job, result2 error) {
@@ -191,6 +267,8 @@ func (fake *FakeJoblet) StopJobReturnsOnCall(i int, result1 error) {
 func (fake *FakeJoblet) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.executeScheduledJobMutex.RLock()
+	defer fake.executeScheduledJobMutex.RUnlock()
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	fake.stopJobMutex.RLock()

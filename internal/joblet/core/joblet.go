@@ -13,10 +13,12 @@ import (
 	"joblet/internal/joblet/core/unprivileged"
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/scheduler"
 	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -41,6 +43,7 @@ type Joblet struct {
 	config         *config.Config
 	logger         *logger.Logger
 	uploadManager  *upload.Manager
+	scheduler      *scheduler.Scheduler
 }
 
 // NewPlatformJoblet creates a new Linux platform joblet
@@ -64,25 +67,28 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 		config:         cfg,
 		logger:         jobletLogger,
 		uploadManager:  uploadManager,
+		scheduler:      nil, // Will be set below
 	}
 
 	if err := w.setupCgroupControllers(); err != nil {
 		w.logger.Fatal("cgroup controller setup failed", "error", err)
 	}
 
-	w.logger.Debug("Linux joblet initialized with streaming upload support",
-		"maxConcurrentJobs", cfg.Joblet.MaxConcurrentJobs,
-		"defaultCPU", cfg.Joblet.DefaultCPULimit,
-		"defaultMemory", cfg.Joblet.DefaultMemoryLimit,
-		"cgroupPath", cfg.Cgroup.BaseDir)
+	w.scheduler = scheduler.New(w)
 
+	// Start the scheduler
+	if err := w.scheduler.Start(); err != nil {
+		w.logger.Fatal("scheduler start failed", "error", err)
+	}
+
+	w.logger.Debug("Linux joblet initialized with scheduler support")
 	return w
 }
 
 // StartJob now immediately starts the isolated job with uploads happening inside cgroups
-func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload) (*domain.Job, error) {
+func (w *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string) (*domain.Job, error) {
 	jobID := w.getNextJobID()
-	log := w.logger.WithFields("jobID", jobID, "command", command, "uploadCount", len(uploads))
+	log := w.logger.WithFields("jobID", jobID, "command", command, "uploadCount", len(uploads), "schedule", schedule)
 
 	log.Debug("starting job with isolated file upload",
 		"requestedCPU", maxCPU,
@@ -114,6 +120,57 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 
 	// Create job domain object
 	job := w.createJobDomain(jobID, resolvedCommand, args, maxCPU, maxMemory, maxIOBPS, cpuCores)
+
+	// Handle scheduling if specified
+	if schedule != "" {
+		scheduledTime, e := time.Parse("2006-01-02T15:04:05Z07:00", schedule)
+		if e != nil {
+			return nil, fmt.Errorf("invalid schedule format from client: %w", e)
+		}
+
+		// Validate the scheduled time is reasonable
+		now := time.Now()
+		if scheduledTime.Before(now.Add(-1 * time.Minute)) {
+			return nil, fmt.Errorf("scheduled time is in the past: %s", scheduledTime.Format(time.RFC3339))
+		}
+
+		maxFuture := now.Add(365 * 24 * time.Hour)
+		if scheduledTime.After(maxFuture) {
+			return nil, fmt.Errorf("scheduled time is too far in the future (max 1 year): %s", scheduledTime.Format(time.RFC3339))
+		}
+
+		// Set scheduling fields
+		job.ScheduledTime = &scheduledTime
+		job.Status = domain.StatusScheduled
+
+		log.Info("job scheduled for future execution", "scheduledTime", scheduledTime.Format(time.RFC3339))
+
+		// Process file uploads immediately (even for scheduled jobs)
+		if len(uploads) > 0 {
+			if err := w.processUploadsForScheduledJob(ctx, job, uploads); err != nil {
+				return nil, fmt.Errorf("upload processing failed for scheduled job: %w", err)
+			}
+		}
+
+		// Register job in store
+		w.store.CreateNewJob(job)
+
+		// Add to scheduler queue
+		if err := w.scheduler.AddJob(job); err != nil {
+			return nil, fmt.Errorf("failed to schedule job: %w", err)
+		}
+
+		return job, nil
+	}
+
+	// Immediate execution (existing logic)
+	job.Status = domain.StatusInitializing
+	return w.executeJobImmediately(ctx, job, uploads)
+}
+
+// executeJobImmediately extract existing logic
+func (w *Joblet) executeJobImmediately(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) (*domain.Job, error) {
+	log := w.logger.WithFields("job", job)
 
 	// Create minimal base workspace directory (for cgroup setup only)
 	baseWorkspaceDir := filepath.Join(w.config.Filesystem.BaseDir, job.Id)
@@ -159,6 +216,71 @@ func (w *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 
 	log.Debug("job started successfully with isolated file upload", "pid", job.Pid, "uploadFiles", len(uploads))
 	return job, nil
+}
+
+// processUploadsForScheduledJob
+func (w *Joblet) processUploadsForScheduledJob(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) error {
+	if len(uploads) == 0 {
+		return nil
+	}
+
+	log := w.logger.WithField("jobID", job.Id)
+	log.Debug("processing uploads for scheduled job", "uploadCount", len(uploads))
+
+	// Create workspace directory for the scheduled job
+	workspaceDir := filepath.Join(w.config.Filesystem.BaseDir, job.Id, "work")
+	if err := w.platform.MkdirAll(workspaceDir, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace for scheduled job: %w", err)
+	}
+
+	// Create and setup cgroups early (for resource limits during upload processing)
+	if err := w.cgroup.Create(job.CgroupPath, job.Limits.MaxCPU, job.Limits.MaxMemory, job.Limits.MaxIOBPS); err != nil {
+		_ = w.platform.RemoveAll(filepath.Dir(workspaceDir))
+		return fmt.Errorf("resource limit setup failed for scheduled job: %w", err)
+	}
+
+	// Process uploads with proper isolation
+	for _, upload := range uploads {
+		targetPath := filepath.Join(workspaceDir, upload.Path)
+
+		if upload.IsDirectory {
+			if err := w.platform.MkdirAll(targetPath, os.FileMode(upload.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
+			}
+		} else {
+			// Ensure parent directory exists
+			if err := w.platform.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+			}
+
+			// Write file content
+			if err := w.platform.WriteFile(targetPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
+			}
+		}
+	}
+
+	log.Debug("uploads processed successfully for scheduled job")
+	return nil
+}
+
+// ExecuteScheduledJob (implements scheduler.JobExecutor interface)
+func (w *Joblet) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
+	log := w.logger.WithField("jobID", job.Id)
+	log.Info("executing scheduled job", "originalScheduledTime", job.ScheduledTime.Format(time.RFC3339))
+
+	// Transition from SCHEDULED to INITIALIZING
+	if err := job.MarkAsInitializing(); err != nil {
+		log.Error("failed to transition job to initializing", "error", err)
+		return fmt.Errorf("invalid job state transition: %w", err)
+	}
+
+	// Update job status in store
+	w.store.UpdateJob(job)
+
+	// Execute the job (uploads were already processed during scheduling)
+	_, err := w.executeJobImmediately(ctx, job, nil) // No uploads - already processed
+	return err
 }
 
 // startProcessWithEmbeddedUploads starts the job process with file uploads serialized in environment
@@ -363,6 +485,16 @@ func (w *Joblet) StopJob(ctx context.Context, jobID string) error {
 	job, exists := w.store.GetJob(jobID)
 	if !exists {
 		return fmt.Errorf("job not found: %s", jobID)
+	}
+
+	if job.IsScheduled() {
+		if w.scheduler.RemoveJob(jobID) {
+			job.Stop()
+			w.store.UpdateJob(job)
+			log.Info("scheduled job removed from queue")
+			return nil
+		}
+		return fmt.Errorf("failed to remove scheduled job from queue")
 	}
 
 	if !job.IsRunning() {

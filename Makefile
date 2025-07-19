@@ -1,6 +1,7 @@
-REMOTE_HOST ?= 192.168.1.161
+REMOTE_HOST ?= 192.168.100.94
 REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/joblet
+REMOTE_ARCH ?= arm64
 
 .PHONY: all clean rnx joblet deploy-passwordless deploy-safe config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
 
@@ -54,11 +55,11 @@ help:
 
 rnx:
 	@echo "Building RNX CLI..."
-	GOOS=darwin GOARCH=amd64 go build -o bin/rnx ./cmd/rnx
+	GOOS=darwin GOARCH=$(REMOTE_ARCH) go build -o bin/rnx ./cmd/rnx
 
 joblet:
 	@echo "Building Joblet..."
-	GOOS=linux GOARCH=amd64 go build -o bin/joblet ./cmd/joblet
+	GOOS=linux GOARCH=$(REMOTE_ARCH) go build -o bin/joblet ./cmd/joblet
 
 deploy-passwordless: joblet
 	@echo "🚀 Passwordless deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."

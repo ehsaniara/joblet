@@ -28,6 +28,7 @@ message Job{
   string startTime = 9;
   string endTime = 10;
   int32 exitCode = 11;
+  string scheduledTime = 12;    // When the job should execute (RFC3339 format, empty if immediate)
 }
 
 message EmptyRequest {}
@@ -40,6 +41,7 @@ message RunJobReq{
   int32 maxMemory = 5;
   int32 maxIOBPS = 6;
   repeated FileUpload uploads = 7;
+  string schedule = 8;          // RFC3339 formatted time string
 }
 
 message FileUpload {
@@ -61,6 +63,7 @@ message RunJobRes{
   string startTime = 9;
   string endTime = 10;
   int32 exitCode = 11;
+  string scheduledTime = 12;    // When the job should execute (empty if immediate)
 }
 
 // GetJobStatus
@@ -80,6 +83,7 @@ message GetJobStatusRes{
   string startTime = 9;
   string endTime = 10;
   int32 exitCode = 11;
+  string scheduledTime = 12;    // When the job should execute (empty if immediate)
 }
 
 // StopJob
