@@ -103,12 +103,14 @@ func ProtobufToFileUpload(uploads []*pb.FileUpload) []domain.FileUpload {
 	domainUploads := make([]domain.FileUpload, 0, len(uploads))
 
 	for _, pbUpload := range uploads {
-		domainUploads = append(domainUploads, domain.FileUpload{
+		domainUpload := domain.FileUpload{
 			Path:        pbUpload.Path,
 			Content:     pbUpload.Content,
 			Mode:        pbUpload.Mode,
 			IsDirectory: pbUpload.IsDirectory,
-		})
+			Size:        int64(len(pbUpload.Content)), // Calculate size from content
+		}
+		domainUploads = append(domainUploads, domainUpload)
 	}
 
 	return domainUploads

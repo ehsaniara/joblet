@@ -1,7 +1,7 @@
-REMOTE_HOST ?= 192.168.100.94
+REMOTE_HOST ?= 192.168.1.161
 REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/joblet
-REMOTE_ARCH ?= arm64
+REMOTE_ARCH ?= amd64
 
 .PHONY: all clean rnx joblet deploy-passwordless deploy-safe config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
 
