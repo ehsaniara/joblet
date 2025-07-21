@@ -743,7 +743,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: "Joblet ${{ github.ref_name }} - Complete Release"
+          name: "Joblet ${{ github.ref_name }}"
           files: |
             release/*.deb
             release/*.rpm
@@ -751,9 +751,7 @@ jobs:
             release/*.zip
             release/*-checksums.txt
           body: |
-            # 🚀 Joblet ${{ github.ref_name }} - Complete Release
-            
-            **Complete Joblet release** with both Linux server packages and cross-platform RNX CLI.
+            ** 🚀 Complete Joblet release** ${{ github.ref_name }} with both Linux server packages and cross-platform RNX CLI.
             
             ---
             
