@@ -4,8 +4,6 @@ package process
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -772,73 +770,6 @@ func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath strin
 	}
 
 	return append(baseEnv, jobEnv...)
-}
-
-func (m *Manager) buildJobEnvironmentWithSmallFiles(job *domain.Job, execPath string, uploads []domain.FileUpload) []string {
-	// Filter only small files
-	smallFiles := make([]domain.FileUpload, 0)
-	for _, ul := range uploads {
-		if len(ul.Content) < SmallFileThreshold {
-			smallFiles = append(smallFiles, ul)
-		}
-	}
-
-	// Create a job with just small files
-	if len(smallFiles) > 0 {
-		baseEnv := m.platform.Environ()
-
-		// Build basic job environment
-		jobEnv := []string{
-			"JOBLET_MODE=init",
-			fmt.Sprintf("JOB_ID=%s", job.Id),
-			fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-			fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
-			fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
-			fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-			fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
-			fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
-			fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
-			fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
-		}
-
-		// Add job arguments
-		for i, arg := range job.Args {
-			jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-		}
-
-		// Add small files using legacy serialization
-		if uploadsData, err := m.serializeSmallFiles(smallFiles); err == nil {
-			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS=%s", uploadsData))
-			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(smallFiles)))
-		}
-
-		return append(baseEnv, jobEnv...)
-	}
-
-	// No uploads, use basic environment
-	return m.BuildJobEnvironment(job, execPath)
-}
-
-// Helper method to serialize small files using existing logic
-func (m *Manager) serializeSmallFiles(smallFiles []domain.FileUpload) (string, error) {
-	var uploadData []UploadData
-
-	for _, upload := range smallFiles {
-		data := UploadData{
-			Path:        upload.Path,
-			Content:     base64.StdEncoding.EncodeToString(upload.Content),
-			Mode:        upload.Mode,
-			IsDirectory: upload.IsDirectory,
-		}
-		uploadData = append(uploadData, data)
-	}
-
-	jsonData, err := json.Marshal(uploadData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal upload data: %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(jsonData), nil
 }
 
 // UploadData represents serializable upload information
