@@ -6,19 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"joblet/internal/joblet/core/filesystem"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/core/process"
-	"joblet/internal/joblet/core/resource"
-	"joblet/internal/joblet/core/unprivileged"
-	"joblet/internal/joblet/core/upload"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/scheduler"
-	"joblet/internal/joblet/state"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -27,6 +14,20 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"joblet/internal/joblet/core/filesystem"
+	"joblet/internal/joblet/core/interfaces"
+	"joblet/internal/joblet/core/process"
+	"joblet/internal/joblet/core/resource"
+	"joblet/internal/joblet/core/unprivileged"
+	"joblet/internal/joblet/core/upload"
+
+	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/scheduler"
+	"joblet/internal/joblet/state"
+	"joblet/pkg/config"
+	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -72,13 +73,15 @@ type ExecutionEngine struct {
 // NewPlatformJoblet creates a new Linux platform joblet with better organization
 func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
-	processManager := process.NewProcessManager(platformInterface)
 	cgroupResource := resource.New(cfg.Cgroup)
 	jobIsolation := unprivileged.NewJobIsolation()
 	filesystemIsolator := filesystem.NewIsolator(cfg.Filesystem, platformInterface)
 
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
 	uploadManager := upload.NewManager(platformInterface, jobletLogger)
+
+	// Create process manager with upload manager
+	processManager := process.NewProcessManager(platformInterface)
 
 	// Create resource manager
 	resourceManager := &ResourceManager{
@@ -193,8 +196,8 @@ func (w *Joblet) handleScheduledJob(ctx context.Context, job *domain.Job, upload
 	}
 
 	// Validate the scheduled time
-	if err := w.validateScheduledTime(scheduledTime); err != nil {
-		return nil, err
+	if e := w.validateScheduledTime(scheduledTime); e != nil {
+		return nil, e
 	}
 
 	// Set scheduling fields
@@ -205,8 +208,8 @@ func (w *Joblet) handleScheduledJob(ctx context.Context, job *domain.Job, upload
 
 	// Process file uploads immediately (even for scheduled jobs)
 	if len(uploads) > 0 {
-		if err := w.processUploadsForScheduledJob(ctx, job, uploads); err != nil {
-			return nil, fmt.Errorf("upload processing failed for scheduled job: %w", err)
+		if e := w.processUploadsForScheduledJob(ctx, job, uploads); e != nil {
+			return nil, fmt.Errorf("upload processing failed for scheduled job: %w", e)
 		}
 	}
 
@@ -214,8 +217,8 @@ func (w *Joblet) handleScheduledJob(ctx context.Context, job *domain.Job, upload
 	w.store.CreateNewJob(job)
 
 	// Add to scheduler queue
-	if err := w.scheduler.AddJob(job); err != nil {
-		return nil, fmt.Errorf("failed to schedule job: %w", err)
+	if e := w.scheduler.AddJob(job); e != nil {
+		return nil, fmt.Errorf("failed to schedule job: %w", e)
 	}
 
 	return job, nil
@@ -263,7 +266,7 @@ func (w *Joblet) executeJobImmediately(ctx context.Context, job *domain.Job, upl
 	return job, nil
 }
 
-// processUploadsForScheduledJob - extracted upload processing for scheduled jobs
+// processUploadsForScheduledJob - unified approach for scheduled jobs
 func (w *Joblet) processUploadsForScheduledJob(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) error {
 	if len(uploads) == 0 {
 		return nil
@@ -284,28 +287,18 @@ func (w *Joblet) processUploadsForScheduledJob(ctx context.Context, job *domain.
 		return fmt.Errorf("resource limit setup failed for scheduled job: %w", err)
 	}
 
-	// Process uploads with proper isolation
-	for _, ul := range uploads {
-		targetPath := filepath.Join(workspaceDir, ul.Path)
-
-		if ul.IsDirectory {
-			if err := w.platform.MkdirAll(targetPath, os.FileMode(ul.Mode)); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", ul.Path, err)
-			}
-		} else {
-			// Ensure parent directory exists
-			if err := w.platform.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", ul.Path, err)
-			}
-
-			// Write file content
-			if err := w.platform.WriteFile(targetPath, ul.Content, os.FileMode(ul.Mode)); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", ul.Path, err)
-			}
-		}
+	// Prepare upload session and process files under cgroup limits
+	session, err := w.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to prepare upload session: %w", err)
 	}
 
-	log.Debug("uploads processed successfully for scheduled job")
+	// Process all files using unified approach
+	if err := w.uploadManager.ProcessAllFiles(session, workspaceDir); err != nil {
+		return fmt.Errorf("failed to process uploads: %w", err)
+	}
+
+	log.Debug("scheduled job uploads processed", "filesProcessed", len(session.Files))
 	return nil
 }
 
@@ -376,7 +369,7 @@ func (w *Joblet) StopJob(ctx context.Context, jobID string) error {
 	return nil
 }
 
-// ResourceManager methods
+// SetupJobResources Setup Job Resources method
 func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
 	log := rm.logger.WithField("jobID", job.Id)
 	log.Debug("setting up job resources")
@@ -437,7 +430,7 @@ func (rm *ResourceManager) setupCPUCoreRestrictions(job *domain.Job) error {
 	return nil
 }
 
-// ExecutionEngine methods
+// StartProcessWithUploads Start Process With Uploads method
 func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) (platform.Command, error) {
 	// Get the current executable path
 	execPath, err := ee.platform.Executable()
@@ -446,20 +439,21 @@ func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *dom
 	}
 
 	// Prepare workspace directory first
+	// Prepare workspace directory first
 	workspaceDir := filepath.Join(ee.config.Filesystem.BaseDir, job.Id, "work")
-	if err := ee.platform.MkdirAll(workspaceDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create workspace directory: %w", err)
+	if e := ee.platform.MkdirAll(workspaceDir, 0755); e != nil {
+		return nil, fmt.Errorf("failed to create workspace directory: %w", e)
 	}
 
-	// Process uploads using the new streaming approach
+	// Process uploads using the unified streaming approach
 	if len(uploads) > 0 {
-		if err := ee.processUploadsWithStreaming(ctx, job, uploads, workspaceDir); err != nil {
-			return nil, fmt.Errorf("failed to process uploads: %w", err)
+		if e := ee.processUploadsWithUnifiedStreaming(ctx, job, uploads, workspaceDir); e != nil {
+			return nil, fmt.Errorf("failed to process uploads: %w", e)
 		}
 	}
 
-	// Build environment with streaming support
-	env := ee.processManager.BuildJobEnvironmentWithUploads(job, execPath, uploads)
+	// Build environment with unified streaming support
+	env := ee.buildJobEnvironmentWithUploads(job, execPath, uploads)
 
 	// Create isolation attributes
 	sysProcAttr := ee.createIsolatedSysProcAttr()
@@ -482,14 +476,15 @@ func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *dom
 		return nil, err
 	}
 
-	ee.logger.Debug("process launched with streaming upload support",
+	ee.logger.Debug("process launched with unified upload streaming",
 		"jobID", job.Id, "pid", result.PID, "uploadCount", len(uploads))
 
 	return result.Command, nil
 }
 
-func (ee *ExecutionEngine) processUploadsWithStreaming(ctx context.Context, job *domain.Job, uploads []domain.FileUpload, workspaceDir string) error {
-	log := ee.logger.WithField("operation", "process-uploads-streaming")
+// processUploadsWithUnifiedStreaming processes uploads using the unified streaming approach
+func (ee *ExecutionEngine) processUploadsWithUnifiedStreaming(ctx context.Context, job *domain.Job, uploads []domain.FileUpload, workspaceDir string) error {
+	log := ee.logger.WithField("operation", "process-uploads-unified")
 
 	// Prepare upload session
 	session, err := ee.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
@@ -497,24 +492,104 @@ func (ee *ExecutionEngine) processUploadsWithStreaming(ctx context.Context, job 
 		return fmt.Errorf("failed to prepare upload session: %w", err)
 	}
 
-	log.Debug("processing uploads with streaming",
+	log.Debug("processing uploads with unified streaming",
 		"totalFiles", session.TotalFiles,
-		"smallFiles", len(session.SmallFiles),
-		"largeFiles", len(session.LargeFiles),
 		"totalSize", session.TotalSize)
 
-	// Process small files directly
-	if len(session.SmallFiles) > 0 {
-		if err := ee.uploadManager.ProcessSmallFiles(session, workspaceDir); err != nil {
-			return fmt.Errorf("failed to process small files: %w", err)
+	// For immediate execution, process files directly
+	// (For streaming during job execution, files will be streamed via pipe)
+	if e := ee.uploadManager.ProcessAllFiles(session, workspaceDir); e != nil {
+		return fmt.Errorf("failed to process files: %w", e)
+	}
+
+	log.Debug("upload processing completed", "filesProcessed", len(session.Files))
+	return nil
+}
+
+// buildJobEnvironmentWithUploads creates job environment with unified streaming upload support
+func (ee *ExecutionEngine) buildJobEnvironmentWithUploads(job *domain.Job, execPath string, uploads []domain.FileUpload) []string {
+	baseEnv := ee.platform.Environ()
+
+	// Prepare upload session for streaming
+	session, err := ee.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
+	if err != nil {
+		ee.logger.Error("failed to prepare upload session", "error", err)
+		// Fallback to basic environment without uploads
+		return ee.buildBasicJobEnvironment(job, execPath)
+	}
+
+	// Job-specific environment with streaming support
+	jobEnv := []string{
+		"JOBLET_MODE=init",
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+
+		// Upload session information
+		fmt.Sprintf("JOB_UPLOAD_SESSION=%t", len(uploads) > 0),
+		fmt.Sprintf("JOB_UPLOAD_TOTAL_FILES=%d", session.TotalFiles),
+	}
+
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+
+	// Single streaming path for all files
+	if len(session.Files) > 0 {
+		pipePath, er := ee.uploadManager.CreateUploadPipe(job.Id)
+		if er != nil {
+			ee.logger.Error("failed to create upload pipe", "error", er)
+		} else {
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOAD_PIPE=%s", pipePath))
+
+			// Stream all files in background
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), upload.UploadTimeout)
+				defer cancel()
+
+				if e := ee.uploadManager.StreamAllFiles(ctx, session, pipePath); e != nil {
+					ee.logger.Error("failed to stream files", "error", e)
+				}
+
+				_ = ee.uploadManager.CleanupPipe(pipePath)
+			}()
 		}
 	}
 
-	log.Debug("upload processing completed",
-		"smallFilesProcessed", len(session.SmallFiles),
-		"largeFilesQueued", len(session.LargeFiles))
+	return append(baseEnv, jobEnv...)
+}
 
-	return nil
+// buildBasicJobEnvironment creates basic job environment without uploads
+func (ee *ExecutionEngine) buildBasicJobEnvironment(job *domain.Job, execPath string) []string {
+	baseEnv := ee.platform.Environ()
+
+	// Job-specific environment
+	jobEnv := []string{
+		"JOBLET_MODE=init",
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
+		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+		fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+	}
+
+	// Add job arguments
+	for i, arg := range job.Args {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+
+	return append(baseEnv, jobEnv...)
 }
 
 func (ee *ExecutionEngine) createIsolatedSysProcAttr() *syscall.SysProcAttr {

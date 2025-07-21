@@ -90,6 +90,21 @@ type FakeOSOperations struct {
 	mkdirAllReturnsOnCall map[int]struct {
 		result1 error
 	}
+	OpenFileStub        func(string, int, os.FileMode) (*os.File, error)
+	openFileMutex       sync.RWMutex
+	openFileArgsForCall []struct {
+		arg1 string
+		arg2 int
+		arg3 os.FileMode
+	}
+	openFileReturns struct {
+		result1 *os.File
+		result2 error
+	}
+	openFileReturnsOnCall map[int]struct {
+		result1 *os.File
+		result2 error
+	}
 	ReadDirStub        func(string) ([]os.DirEntry, error)
 	readDirMutex       sync.RWMutex
 	readDirArgsForCall []struct {
@@ -619,6 +634,72 @@ func (fake *FakeOSOperations) MkdirAllReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeOSOperations) OpenFile(arg1 string, arg2 int, arg3 os.FileMode) (*os.File, error) {
+	fake.openFileMutex.Lock()
+	ret, specificReturn := fake.openFileReturnsOnCall[len(fake.openFileArgsForCall)]
+	fake.openFileArgsForCall = append(fake.openFileArgsForCall, struct {
+		arg1 string
+		arg2 int
+		arg3 os.FileMode
+	}{arg1, arg2, arg3})
+	stub := fake.OpenFileStub
+	fakeReturns := fake.openFileReturns
+	fake.recordInvocation("OpenFile", []interface{}{arg1, arg2, arg3})
+	fake.openFileMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeOSOperations) OpenFileCallCount() int {
+	fake.openFileMutex.RLock()
+	defer fake.openFileMutex.RUnlock()
+	return len(fake.openFileArgsForCall)
+}
+
+func (fake *FakeOSOperations) OpenFileCalls(stub func(string, int, os.FileMode) (*os.File, error)) {
+	fake.openFileMutex.Lock()
+	defer fake.openFileMutex.Unlock()
+	fake.OpenFileStub = stub
+}
+
+func (fake *FakeOSOperations) OpenFileArgsForCall(i int) (string, int, os.FileMode) {
+	fake.openFileMutex.RLock()
+	defer fake.openFileMutex.RUnlock()
+	argsForCall := fake.openFileArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeOSOperations) OpenFileReturns(result1 *os.File, result2 error) {
+	fake.openFileMutex.Lock()
+	defer fake.openFileMutex.Unlock()
+	fake.OpenFileStub = nil
+	fake.openFileReturns = struct {
+		result1 *os.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeOSOperations) OpenFileReturnsOnCall(i int, result1 *os.File, result2 error) {
+	fake.openFileMutex.Lock()
+	defer fake.openFileMutex.Unlock()
+	fake.OpenFileStub = nil
+	if fake.openFileReturnsOnCall == nil {
+		fake.openFileReturnsOnCall = make(map[int]struct {
+			result1 *os.File
+			result2 error
+		})
+	}
+	fake.openFileReturnsOnCall[i] = struct {
+		result1 *os.File
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeOSOperations) ReadDir(arg1 string) ([]os.DirEntry, error) {
 	fake.readDirMutex.Lock()
 	ret, specificReturn := fake.readDirReturnsOnCall[len(fake.readDirArgsForCall)]
@@ -1082,6 +1163,8 @@ func (fake *FakeOSOperations) Invocations() map[string][][]interface{} {
 	defer fake.isNotExistMutex.RUnlock()
 	fake.mkdirAllMutex.RLock()
 	defer fake.mkdirAllMutex.RUnlock()
+	fake.openFileMutex.RLock()
+	defer fake.openFileMutex.RUnlock()
 	fake.readDirMutex.RLock()
 	defer fake.readDirMutex.RUnlock()
 	fake.readFileMutex.RLock()

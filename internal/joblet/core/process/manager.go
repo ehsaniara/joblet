@@ -714,16 +714,16 @@ func (m *Manager) validateEnvironment(env []string) error {
 	return nil
 }
 
-// BuildJobEnvironmentWithUploads builds environment variables with embedded file uploads
-func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath string, uploads []domain.FileUpload) []string {
+// BuildJobEnvironmentWithUploads creates job environment with unified streaming upload support
+func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath string, uploads []domain.FileUpload, uploadManager *upload.Manager) []string {
 	baseEnv := m.platform.Environ()
 
 	// Prepare upload session for streaming
-	session, err := m.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
+	session, err := uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
 	if err != nil {
 		m.logger.Error("failed to prepare upload session", "error", err)
-		// Fallback to old method for small files only
-		return m.buildJobEnvironmentWithSmallFiles(job, execPath, uploads)
+		// Fallback to basic environment without uploads
+		return m.BuildJobEnvironment(job, execPath)
 	}
 
 	// Job-specific environment with streaming support
@@ -742,7 +742,6 @@ func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath strin
 		// Upload session information
 		fmt.Sprintf("JOB_UPLOAD_SESSION=%t", len(uploads) > 0),
 		fmt.Sprintf("JOB_UPLOAD_TOTAL_FILES=%d", session.TotalFiles),
-		fmt.Sprintf("JOB_UPLOAD_LARGE_FILES=%d", len(session.LargeFiles)),
 	}
 
 	// Add job arguments
@@ -750,32 +749,24 @@ func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath strin
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
 
-	// Add small files using the legacy method (for files < 1MB)
-	if len(session.SmallFiles) > 0 {
-		if uploadsData, err := m.serializeSmallFiles(session.SmallFiles); err == nil {
-			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS=%s", uploadsData))
-			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(session.SmallFiles)))
-		}
-	}
-
-	// Add pipe path for large files
-	if len(session.LargeFiles) > 0 {
-		pipePath, err := m.uploadManager.CreateUploadPipe(job.Id)
+	// Single streaming path for all files
+	if len(session.Files) > 0 {
+		pipePath, err := uploadManager.CreateUploadPipe(job.Id)
 		if err != nil {
 			m.logger.Error("failed to create upload pipe", "error", err)
 		} else {
 			jobEnv = append(jobEnv, fmt.Sprintf("JOB_UPLOAD_PIPE=%s", pipePath))
 
-			// Start streaming large files in background
+			// Stream all files in background
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), upload.UploadTimeout)
 				defer cancel()
 
-				if err := m.uploadManager.StreamLargeFiles(ctx, session, pipePath); err != nil {
-					m.logger.Error("failed to stream large files", "error", err)
+				if err := uploadManager.StreamAllFiles(ctx, session, pipePath); err != nil {
+					m.logger.Error("failed to stream files", "error", err)
 				}
 
-				_ = m.uploadManager.CleanupPipe(pipePath)
+				_ = uploadManager.CleanupPipe(pipePath)
 			}()
 		}
 	}

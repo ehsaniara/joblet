@@ -1,16 +1,15 @@
 package jobexec
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"joblet/internal/joblet/core/upload"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 
+	"joblet/internal/joblet/core/upload"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 )
@@ -21,10 +20,10 @@ type JobConfig struct {
 	Command          string
 	Args             []string
 	CgroupPath       string
-	Uploads          []UploadInfo
-	HasUploadSession bool   // indicates streaming upload session
-	UploadPipePath   string // path to upload pipe
-	LargeFileCount   int    // number of large files to receive
+	Uploads          []UploadInfo // Legacy uploads (for compatibility)
+	HasUploadSession bool         // Indicates unified upload session
+	UploadPipePath   string       // Path to upload pipe
+	TotalFiles       int          // Total number of files (unified approach)
 }
 
 // UploadInfo represents file upload information
@@ -56,7 +55,7 @@ func LoadConfigFromEnv(logger *logger.Logger) (*JobConfig, error) {
 	return executor.LoadConfigFromEnv()
 }
 
-// LoadConfigFromEnv loads job configuration including embedded uploads
+// LoadConfigFromEnv loads job configuration with unified upload support
 func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 	jobID := je.platform.Getenv("JOB_ID")
 	command := je.platform.Getenv("JOB_COMMAND")
@@ -82,29 +81,30 @@ func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 		}
 	}
 
-	// Load uploads (small files)
+	// Load legacy uploads (for compatibility)
 	uploads, err := je.loadUploadsFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load uploads: %w", err)
 	}
 
+	// Check for unified upload session
 	hasUploadSession := je.platform.Getenv("JOB_UPLOAD_SESSION") == "true"
 	uploadPipePath := je.platform.Getenv("JOB_UPLOAD_PIPE")
-	largeFileCountStr := je.platform.Getenv("JOB_UPLOAD_LARGE_FILES")
+	totalFilesStr := je.platform.Getenv("JOB_UPLOAD_TOTAL_FILES")
 
-	var largeFileCount int
-	if largeFileCountStr != "" {
-		largeFileCount, _ = strconv.Atoi(largeFileCountStr)
+	var totalFiles int
+	if totalFilesStr != "" {
+		totalFiles, _ = strconv.Atoi(totalFilesStr)
 	}
 
-	je.logger.Debug("loaded job configuration with streaming support",
+	je.logger.Debug("loaded job configuration with unified upload support",
 		"jobId", jobID,
 		"command", command,
 		"argsCount", len(args),
-		"uploadsCount", len(uploads),
+		"legacyUploadsCount", len(uploads),
 		"hasUploadSession", hasUploadSession,
 		"uploadPipePath", uploadPipePath,
-		"largeFileCount", largeFileCount,
+		"totalFiles", totalFiles,
 		"cgroupPath", cgroupPath)
 
 	return &JobConfig{
@@ -115,11 +115,11 @@ func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
 		Uploads:          uploads,
 		HasUploadSession: hasUploadSession,
 		UploadPipePath:   uploadPipePath,
-		LargeFileCount:   largeFileCount,
+		TotalFiles:       totalFiles,
 	}, nil
 }
 
-// loadUploadsFromEnv deserializes uploads from environment variables
+// loadUploadsFromEnv deserializes legacy uploads from environment variables
 func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
 	uploadsData := je.platform.Getenv("JOB_UPLOADS")
 	if uploadsData == "" {
@@ -160,82 +160,96 @@ func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
 		})
 	}
 
-	je.logger.Debug("deserialized uploads from environment", "uploadCount", len(uploads))
-
+	je.logger.Debug("deserialized legacy uploads from environment", "uploadCount", len(uploads))
 	return uploads, nil
 }
 
-// Execute executes the job with upload processing
+// Execute executes the job with unified upload processing
 func Execute(config *JobConfig, logger *logger.Logger) error {
 	p := platform.NewPlatform()
 	executor := NewJobExecutor(p, logger)
-	return executor.ExecuteWithStreamingUploads(config)
+	return executor.ExecuteWithUnifiedUploads(config)
 }
 
-func (je *JobExecutor) ExecuteWithStreamingUploads(config *JobConfig) error {
+// ExecuteWithUnifiedUploads executes job with unified upload processing
+func (je *JobExecutor) ExecuteWithUnifiedUploads(config *JobConfig) error {
 	log := je.logger.WithField("jobID", config.JobID)
 
-	// Process uploads if present
+	// Process uploads using unified approach
 	if config.HasUploadSession {
-		log.Debug("processing streaming upload session",
+		log.Debug("processing unified upload session",
 			"legacyUploads", len(config.Uploads),
-			"largeFileCount", config.LargeFileCount,
+			"totalFiles", config.TotalFiles,
 			"pipePath", config.UploadPipePath)
 
-		if err := je.processStreamingUploads(config); err != nil {
-			return fmt.Errorf("streaming upload processing failed: %w", err)
+		workspaceDir := "/work" // Inside the isolated environment
+		if err := je.ProcessUploadsUnified(workspaceDir); err != nil {
+			return fmt.Errorf("unified upload processing failed: %w", err)
 		}
 	} else if len(config.Uploads) > 0 {
-		// Fallback to legacy upload processing
+		// Fallback to legacy upload processing for compatibility
 		log.Debug("processing legacy uploads", "fileCount", len(config.Uploads))
-		if err := je.processUploads(config.Uploads); err != nil {
+		if err := je.processLegacyUploads(config.Uploads); err != nil {
 			return fmt.Errorf("legacy upload processing failed: %w", err)
 		}
 	}
 
 	// Execute the actual job command
 	log.Debug("executing job command", "command", config.Command, "args", config.Args)
-	return je.Execute(&JobConfig{
-		JobID:      config.JobID,
-		Command:    config.Command,
-		Args:       config.Args,
-		CgroupPath: config.CgroupPath,
-	})
+	return je.Execute(config)
 }
 
-func (je *JobExecutor) processStreamingUploads(config *JobConfig) error {
-	ctx, cancel := context.WithTimeout(context.Background(), upload.UploadTimeout)
-	defer cancel()
+// ProcessUploadsUnified handles file uploads using the unified streaming approach
+func (je *JobExecutor) ProcessUploadsUnified(workspacePath string) error {
+	log := je.logger.WithField("operation", "process-uploads-unified")
 
-	// Create upload receiver
+	// Check if upload pipe is specified
+	uploadPipe := os.Getenv("JOB_UPLOAD_PIPE")
+	if uploadPipe == "" {
+		log.Debug("no upload pipe specified, skipping file processing")
+		return nil
+	}
+
+	log.Debug("processing uploads from pipe", "pipePath", uploadPipe, "workspace", workspacePath)
+
+	// Ensure workspace directory exists
+	if err := je.platform.MkdirAll(workspacePath, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	// Create receiver and process all files from the pipe
 	receiver := upload.NewReceiver(je.platform, je.logger)
-
-	// Process small files first (from environment - legacy method)
-	if len(config.Uploads) > 0 {
-		je.logger.Debug("processing small files from environment", "count", len(config.Uploads))
-		if err := je.processUploads(config.Uploads); err != nil {
-			return fmt.Errorf("failed to process small files: %w", err)
-		}
+	if err := receiver.ProcessAllFiles(uploadPipe, workspacePath); err != nil {
+		return fmt.Errorf("failed to process files from pipe: %w", err)
 	}
 
-	// Process large files from pipe
-	if config.LargeFileCount > 0 && config.UploadPipePath != "" {
-		je.logger.Debug("receiving large files from pipe",
-			"count", config.LargeFileCount,
-			"pipePath", config.UploadPipePath)
-
-		if err := receiver.ReceiveLargeFiles(ctx, config.UploadPipePath); err != nil {
-			return fmt.Errorf("failed to receive large files: %w", err)
-		}
-	}
-
-	je.logger.Debug("streaming upload processing completed successfully")
+	log.Debug("unified upload processing completed")
 	return nil
 }
 
-// processUploads handles file upload processing inside the isolated environment
-func (je *JobExecutor) processUploads(uploads []UploadInfo) error {
-	log := je.logger.WithField("operation", "upload-processing")
+// GetUnifiedUploadInfo returns information about the unified upload session
+func (je *JobExecutor) GetUnifiedUploadInfo() (bool, int, error) {
+	hasUploads := os.Getenv("JOB_UPLOAD_SESSION") == "true"
+	if !hasUploads {
+		return false, 0, nil
+	}
+
+	totalFilesStr := os.Getenv("JOB_UPLOAD_TOTAL_FILES")
+	if totalFilesStr == "" {
+		return true, 0, nil
+	}
+
+	var totalFiles int
+	if _, err := fmt.Sscanf(totalFilesStr, "%d", &totalFiles); err != nil {
+		return true, 0, fmt.Errorf("invalid total files count: %s", totalFilesStr)
+	}
+
+	return true, totalFiles, nil
+}
+
+// processLegacyUploads handles legacy file upload processing (for compatibility)
+func (je *JobExecutor) processLegacyUploads(uploads []UploadInfo) error {
+	log := je.logger.WithField("operation", "legacy-upload-processing")
 
 	// Determine workspace directory (we're inside chroot, so paths are relative to /)
 	workspaceDir := "/work"
@@ -246,41 +260,41 @@ func (je *JobExecutor) processUploads(uploads []UploadInfo) error {
 	}
 
 	// Process each upload
-	for i, u := range uploads {
-		log.Debug("processing upload", "file", i+1, "path", u.Path, "size", len(u.Content))
+	for i, upload := range uploads {
+		log.Debug("processing legacy upload", "file", i+1, "path", upload.Path, "size", len(upload.Content))
 
-		fullPath := filepath.Join(workspaceDir, u.Path)
+		fullPath := filepath.Join(workspaceDir, upload.Path)
 
-		if u.IsDirectory {
+		if upload.IsDirectory {
 			// Create directory
-			mode := os.FileMode(u.Mode)
+			mode := os.FileMode(upload.Mode)
 			if mode == 0 {
 				mode = 0755 // Default directory permissions
 			}
 
 			if err := je.platform.MkdirAll(fullPath, mode); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", u.Path, err)
+				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
 			}
 
-			log.Debug("created directory", "path", u.Path, "mode", fmt.Sprintf("%o", mode))
+			log.Debug("created directory", "path", upload.Path, "mode", fmt.Sprintf("%o", mode))
 		} else {
 			// Ensure parent directory exists
 			parentDir := filepath.Dir(fullPath)
 			if err := je.platform.MkdirAll(parentDir, 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", u.Path, err)
+				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
 			}
 
 			// Write file
-			mode := os.FileMode(u.Mode)
+			mode := os.FileMode(upload.Mode)
 			if mode == 0 {
 				mode = 0644 // Default file permissions
 			}
 
-			if err := je.platform.WriteFile(fullPath, u.Content, mode); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", u.Path, err)
+			if err := je.platform.WriteFile(fullPath, upload.Content, mode); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
 			}
 
-			log.Debug("wrote file", "path", u.Path, "size", len(u.Content), "mode", fmt.Sprintf("%o", mode))
+			log.Debug("wrote file", "path", upload.Path, "size", len(upload.Content), "mode", fmt.Sprintf("%o", mode))
 		}
 	}
 

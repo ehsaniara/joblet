@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	SmallFileThreshold = 1024 * 1024 // 1MB
-	PipeBufferSize     = 64 * 1024   // 64KB pipe buffer
-	UploadTimeout      = 5 * time.Minute
+	PipeBufferSize   = 64 * 1024 // 64KB pipe buffer
+	UploadTimeout    = 5 * time.Minute
+	DefaultChunkSize = 64 * 1024 // Default chunk size
 )
 
 // Manager handles streaming file uploads with memory-aware chunking
@@ -37,27 +37,20 @@ func NewManager(platform platform.Platform, logger *logger.Logger) *Manager {
 // PrepareUploadSession creates an upload session optimized for the given memory limit
 func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload, memoryLimitMB int32) (*domain.UploadSession, error) {
 	session := &domain.UploadSession{
-		JobID:      jobID,
-		SmallFiles: make([]domain.FileUpload, 0),
-		LargeFiles: make([]domain.FileUpload, 0),
+		JobID: jobID,
+		Files: make([]domain.FileUpload, 0, len(uploads)),
 	}
 
 	// Optimize for memory constraints
 	session.OptimizeForMemory(memoryLimitMB)
 
-	// Categorize files by size
+	// Process all files uniformly
 	var totalSize int64
 	for _, upload := range uploads {
-		totalSize += int64(len(upload.Content))
+		upload.Size = int64(len(upload.Content))
+		totalSize += upload.Size
 		session.TotalFiles++
-
-		if len(upload.Content) >= SmallFileThreshold {
-			upload.IsLarge = true
-			upload.Size = int64(len(upload.Content))
-			session.LargeFiles = append(session.LargeFiles, upload)
-		} else {
-			session.SmallFiles = append(session.SmallFiles, upload)
-		}
+		session.Files = append(session.Files, upload)
 	}
 
 	session.TotalSize = totalSize
@@ -70,15 +63,13 @@ func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload
 	m.logger.Debug("upload session prepared",
 		"jobID", jobID,
 		"totalFiles", session.TotalFiles,
-		"smallFiles", len(session.SmallFiles),
-		"largeFiles", len(session.LargeFiles),
 		"totalSize", totalSize,
 		"chunkSize", session.ChunkSize)
 
 	return session, nil
 }
 
-// CreateUploadPipe creates a named pipe for streaming large files
+// CreateUploadPipe creates a named pipe for streaming files
 func (m *Manager) CreateUploadPipe(jobID string) (string, error) {
 	pipeDir := fmt.Sprintf("/opt/joblet/jobs/%s/pipes", jobID)
 	if err := m.platform.MkdirAll(pipeDir, 0700); err != nil {
@@ -96,14 +87,14 @@ func (m *Manager) CreateUploadPipe(jobID string) (string, error) {
 	return pipePath, nil
 }
 
-// StreamLargeFiles streams large files through the named pipe with memory monitoring
-func (m *Manager) StreamLargeFiles(ctx context.Context, session *domain.UploadSession, pipePath string) error {
-	if len(session.LargeFiles) == 0 {
+// StreamAllFiles streams all files through the named pipe with memory monitoring
+func (m *Manager) StreamAllFiles(ctx context.Context, session *domain.UploadSession, pipePath string) error {
+	if len(session.Files) == 0 {
 		return nil
 	}
 
-	log := m.logger.WithField("operation", "stream-large-files")
-	log.Debug("starting large file streaming", "fileCount", len(session.LargeFiles))
+	log := m.logger.WithField("operation", "stream-all-files")
+	log.Debug("starting file streaming", "fileCount", len(session.Files))
 
 	// Open pipe for writing (this will block until reader opens it)
 	pipe, err := os.OpenFile(pipePath, os.O_WRONLY, 0)
@@ -112,22 +103,22 @@ func (m *Manager) StreamLargeFiles(ctx context.Context, session *domain.UploadSe
 	}
 	defer pipe.Close()
 
-	// Stream each large file
-	for i, file := range session.LargeFiles {
+	// Stream each file using the same mechanism
+	for i, file := range session.Files {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		log.Debug("streaming large file", "file", file.Path, "size", file.Size, "index", i+1)
+		log.Debug("streaming file", "file", file.Path, "size", file.Size, "index", i+1)
 
 		if err := m.streamSingleFile(ctx, pipe, file, session.ChunkSize); err != nil {
 			return fmt.Errorf("failed to stream file %s: %w", file.Path, err)
 		}
 	}
 
-	log.Debug("large file streaming completed")
+	log.Debug("file streaming completed")
 	return nil
 }
 
@@ -213,16 +204,16 @@ func (m *Manager) checkMemoryPressure() error {
 	return nil
 }
 
-// ProcessSmallFiles processes small files directly in memory
-func (m *Manager) ProcessSmallFiles(session *domain.UploadSession, workspacePath string) error {
-	if len(session.SmallFiles) == 0 {
+// ProcessAllFiles processes all files directly in the workspace
+func (m *Manager) ProcessAllFiles(session *domain.UploadSession, workspacePath string) error {
+	if len(session.Files) == 0 {
 		return nil
 	}
 
-	log := m.logger.WithField("operation", "process-small-files")
-	log.Debug("processing small files", "fileCount", len(session.SmallFiles))
+	log := m.logger.WithField("operation", "process-all-files")
+	log.Debug("processing files", "fileCount", len(session.Files))
 
-	for _, file := range session.SmallFiles {
+	for _, file := range session.Files {
 		fullPath := filepath.Join(workspacePath, file.Path)
 
 		if file.IsDirectory {
@@ -250,11 +241,11 @@ func (m *Manager) ProcessSmallFiles(session *domain.UploadSession, workspacePath
 			if err := m.platform.WriteFile(fullPath, file.Content, mode); err != nil {
 				return fmt.Errorf("failed to write file %s: %w", file.Path, err)
 			}
-			log.Debug("wrote small file", "path", file.Path, "size", len(file.Content))
+			log.Debug("wrote file", "path", file.Path, "size", len(file.Content))
 		}
 	}
 
-	log.Debug("small files processing completed")
+	log.Debug("file processing completed")
 	return nil
 }
 

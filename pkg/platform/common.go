@@ -41,6 +41,10 @@ func (bp *BasePlatform) MkdirAll(dir string, perm os.FileMode) error {
 	return os.MkdirAll(dir, perm)
 }
 
+func (bp *BasePlatform) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
 func (bp *BasePlatform) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }

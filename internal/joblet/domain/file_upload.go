@@ -9,11 +9,10 @@ import (
 // FileUpload represents a file to be uploaded to the job workspace with streaming support
 type FileUpload struct {
 	Path        string // Relative path in job workspace
-	Content     []byte // File content (for small files < 1MB)
+	Content     []byte // File content
 	Mode        uint32 // Unix file permissions
 	IsDirectory bool   // True if this represents a directory
-	Size        int64  // Total file size (for large files)
-	IsLarge     bool   // True if file should be streamed (> 1MB)
+	Size        int64  // Total file size
 }
 
 // UploadSession represents a file upload session with streaming capabilities
@@ -21,9 +20,8 @@ type UploadSession struct {
 	JobID       string
 	TotalFiles  int
 	TotalSize   int64
-	PipePath    string       // Named pipe for streaming large files
-	SmallFiles  []FileUpload // Files < 1MB (embedded)
-	LargeFiles  []FileUpload // Files >= 1MB (streamed)
+	PipePath    string       // Named pipe for streaming files
+	Files       []FileUpload // All files
 	MemoryLimit int64        // Cgroup memory limit for chunking
 	ChunkSize   int          // Optimal chunk size based on memory
 }
@@ -31,7 +29,7 @@ type UploadSession struct {
 // ValidateUpload ensures upload is safe and within limits
 func (us *UploadSession) ValidateUpload() error {
 	// Security validations
-	for _, file := range append(us.SmallFiles, us.LargeFiles...) {
+	for _, file := range us.Files {
 		if err := validateFilePath(file.Path); err != nil {
 			return fmt.Errorf("invalid file path %s: %w", file.Path, err)
 		}
