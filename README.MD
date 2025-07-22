@@ -187,7 +187,8 @@ rnx run --max-cpu=50 --max-memory=256 python3 script.py
 rnx run --max-iobps=5242880 dd if=/dev/zero of=/tmp/test bs=1M count=100
 
 # Complex commands
-rnx run bash -c "curl -s https://api.github.com/users/octocat | jq '.name'"
+rnx run bash -c "curl -s https://api.github.com/users/octocat"
+rnx run python3 -c "import json; print('Python available')"
 ```
 
 ### Job Scheduling
