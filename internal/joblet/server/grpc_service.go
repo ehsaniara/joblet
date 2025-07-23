@@ -42,7 +42,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		"maxMemory", req.MaxMemory,
 		"maxIOBPS", req.MaxIOBPS,
 		"uploadCount", len(req.Uploads),
-		"schedule", req.Schedule, // New: log schedule specification
+		"schedule", req.Schedule,
 	)
 
 	log.Debug("run job request received")

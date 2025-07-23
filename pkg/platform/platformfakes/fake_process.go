@@ -140,10 +140,6 @@ func (fake *FakeProcess) PidReturnsOnCall(i int, result1 int) {
 func (fake *FakeProcess) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.killMutex.RLock()
-	defer fake.killMutex.RUnlock()
-	fake.pidMutex.RLock()
-	defer fake.pidMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

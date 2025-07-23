@@ -75,7 +75,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		maxIOBPS   int32
 		uploads    []string
 		uploadDirs []string
-		schedule   string // New: schedule specification
+		schedule   string
 	)
 
 	commandStartIndex := 0

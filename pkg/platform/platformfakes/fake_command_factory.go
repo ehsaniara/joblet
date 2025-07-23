@@ -7,23 +7,23 @@ import (
 )
 
 type FakeCommandFactory struct {
-	CreateCommandStub        func(string, ...string) platform.Command
+	CreateCommandStub        func(string, ...string) *platform.ExecCommand
 	createCommandMutex       sync.RWMutex
 	createCommandArgsForCall []struct {
 		arg1 string
 		arg2 []string
 	}
 	createCommandReturns struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}
 	createCommandReturnsOnCall map[int]struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeCommandFactory) CreateCommand(arg1 string, arg2 ...string) platform.Command {
+func (fake *FakeCommandFactory) CreateCommand(arg1 string, arg2 ...string) *platform.ExecCommand {
 	fake.createCommandMutex.Lock()
 	ret, specificReturn := fake.createCommandReturnsOnCall[len(fake.createCommandArgsForCall)]
 	fake.createCommandArgsForCall = append(fake.createCommandArgsForCall, struct {
@@ -49,7 +49,7 @@ func (fake *FakeCommandFactory) CreateCommandCallCount() int {
 	return len(fake.createCommandArgsForCall)
 }
 
-func (fake *FakeCommandFactory) CreateCommandCalls(stub func(string, ...string) platform.Command) {
+func (fake *FakeCommandFactory) CreateCommandCalls(stub func(string, ...string) *platform.ExecCommand) {
 	fake.createCommandMutex.Lock()
 	defer fake.createCommandMutex.Unlock()
 	fake.CreateCommandStub = stub
@@ -62,34 +62,32 @@ func (fake *FakeCommandFactory) CreateCommandArgsForCall(i int) (string, []strin
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeCommandFactory) CreateCommandReturns(result1 platform.Command) {
+func (fake *FakeCommandFactory) CreateCommandReturns(result1 *platform.ExecCommand) {
 	fake.createCommandMutex.Lock()
 	defer fake.createCommandMutex.Unlock()
 	fake.CreateCommandStub = nil
 	fake.createCommandReturns = struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}{result1}
 }
 
-func (fake *FakeCommandFactory) CreateCommandReturnsOnCall(i int, result1 platform.Command) {
+func (fake *FakeCommandFactory) CreateCommandReturnsOnCall(i int, result1 *platform.ExecCommand) {
 	fake.createCommandMutex.Lock()
 	defer fake.createCommandMutex.Unlock()
 	fake.CreateCommandStub = nil
 	if fake.createCommandReturnsOnCall == nil {
 		fake.createCommandReturnsOnCall = make(map[int]struct {
-			result1 platform.Command
+			result1 *platform.ExecCommand
 		})
 	}
 	fake.createCommandReturnsOnCall[i] = struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}{result1}
 }
 
 func (fake *FakeCommandFactory) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.createCommandMutex.RLock()
-	defer fake.createCommandMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

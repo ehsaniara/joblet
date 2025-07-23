@@ -89,8 +89,6 @@ func (fake *FakeGrpcAuthorization) AuthorizedReturnsOnCall(i int, result1 error)
 func (fake *FakeGrpcAuthorization) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.authorizedMutex.RLock()
-	defer fake.authorizedMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

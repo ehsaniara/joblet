@@ -97,26 +97,18 @@ func RunJobInit(cfg *config.Config) error {
 		"maxIOBPS":  os.Getenv("JOB_MAX_IOBPS"),
 	}
 
-	logger.Debug("resource limits applied", "limits", limits)
-
-	// Load job configuration
-	jobConfig, err := jobexec.LoadConfigFromEnv(initLogger)
-	if err != nil {
-		return fmt.Errorf("failed to load job config: %w", err)
-	}
+	initLogger.Debug("resource limits applied", "limits", limits)
 
 	// Set up isolation
 	if err := isolation.Setup(initLogger); err != nil {
 		return fmt.Errorf("job isolation setup failed: %w", err)
 	}
 
-	// Execute the job
-	if err := jobexec.Execute(jobConfig, initLogger); err != nil {
+	// Execute the job using the new consolidated approach
+	if err := jobexec.Execute(initLogger); err != nil {
 		return fmt.Errorf("job execution failed: %w", err)
 	}
 
-	// Handle completion
-	jobexec.HandleCompletion(initLogger)
 	return nil
 }
 

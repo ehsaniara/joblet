@@ -432,20 +432,6 @@ func (fake *FakeStore) WriteToBufferArgsForCall(i int) (string, []byte) {
 func (fake *FakeStore) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.createNewJobMutex.RLock()
-	defer fake.createNewJobMutex.RUnlock()
-	fake.getJobMutex.RLock()
-	defer fake.getJobMutex.RUnlock()
-	fake.getOutputMutex.RLock()
-	defer fake.getOutputMutex.RUnlock()
-	fake.listJobsMutex.RLock()
-	defer fake.listJobsMutex.RUnlock()
-	fake.sendUpdatesToClientMutex.RLock()
-	defer fake.sendUpdatesToClientMutex.RUnlock()
-	fake.updateJobMutex.RLock()
-	defer fake.updateJobMutex.RUnlock()
-	fake.writeToBufferMutex.RLock()
-	defer fake.writeToBufferMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

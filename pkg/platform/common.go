@@ -94,7 +94,7 @@ func (bp *BasePlatform) CreateProcessGroup() *syscall.SysProcAttr {
 }
 
 // Common command operations
-func (bp *BasePlatform) CreateCommand(name string, args ...string) Command {
+func (bp *BasePlatform) CreateCommand(name string, args ...string) *ExecCommand {
 	return &ExecCommand{cmd: exec.Command(name, args...)}
 }
 
@@ -113,6 +113,18 @@ func (lp *LinuxPlatform) ReadDir(s string) ([]os.DirEntry, error) {
 // ExecCommand wraps exec.Cmd to implement Command interface
 type ExecCommand struct {
 	cmd *exec.Cmd
+}
+
+func (e *ExecCommand) SetStdin(w interface{}) {
+	e.cmd.Stdin = w.(io.Reader)
+}
+
+func (e *ExecCommand) SetDir(s string) {
+	e.cmd.Dir = s
+}
+
+func (e *ExecCommand) Run() error {
+	return e.cmd.Run()
 }
 
 func (e *ExecCommand) Start() error {

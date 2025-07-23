@@ -1,405 +1,188 @@
 package jobexec
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strconv"
-
+	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/core/upload"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
-// JobConfig represents job configuration with upload support
-type JobConfig struct {
-	JobID            string
-	Command          string
-	Args             []string
-	CgroupPath       string
-	Uploads          []UploadInfo // Legacy uploads (for compatibility)
-	HasUploadSession bool         // Indicates unified upload session
-	UploadPipePath   string       // Path to upload pipe
-	TotalFiles       int          // Total number of files (unified approach)
-}
-
-// UploadInfo represents file upload information
-type UploadInfo struct {
-	Path        string
-	Content     []byte
-	Mode        uint32
-	IsDirectory bool
-}
-
-// JobExecutor handles job execution using platform abstraction
+// JobExecutor handles job execution in init mode with consolidated environment handling
 type JobExecutor struct {
-	platform platform.Platform
-	logger   *logger.Logger
+	platform   platform.Platform
+	logger     *logger.Logger
+	envBuilder *environment.Builder
 }
 
-// NewJobExecutor creates a new job executor with the given platform
-func NewJobExecutor(p platform.Platform, logger *logger.Logger) *JobExecutor {
+// NewJobExecutor creates a new job executor
+func NewJobExecutor(platform platform.Platform, logger *logger.Logger) *JobExecutor {
+	uploadManager := upload.NewManager(platform, logger)
+	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
+
 	return &JobExecutor{
-		platform: p,
-		logger:   logger.WithField("component", "jobexec"),
+		platform:   platform,
+		logger:     logger.WithField("component", "job-executor"),
+		envBuilder: envBuilder,
 	}
 }
 
-// LoadConfigFromEnv loads job configuration including uploads from environment variables
-func LoadConfigFromEnv(logger *logger.Logger) (*JobConfig, error) {
+// Execute executes the job using consolidated environment handling
+func Execute(logger *logger.Logger) error {
 	p := platform.NewPlatform()
 	executor := NewJobExecutor(p, logger)
-	return executor.LoadConfigFromEnv()
+	return executor.ExecuteJob()
 }
 
-// LoadConfigFromEnv loads job configuration with unified upload support
-func (je *JobExecutor) LoadConfigFromEnv() (*JobConfig, error) {
-	jobID := je.platform.Getenv("JOB_ID")
-	command := je.platform.Getenv("JOB_COMMAND")
-	cgroupPath := je.platform.Getenv("JOB_CGROUP_PATH")
-	argsCountStr := je.platform.Getenv("JOB_ARGS_COUNT")
-
-	if jobID == "" || command == "" {
-		return nil, fmt.Errorf("missing required environment variables (JOB_ID=%s, JOB_COMMAND=%s)",
-			jobID, command)
-	}
-
-	var args []string
-	if argsCountStr != "" {
-		argsCount, err := strconv.Atoi(argsCountStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid JOB_ARGS_COUNT: %v", err)
-		}
-
-		args = make([]string, argsCount)
-		for i := 0; i < argsCount; i++ {
-			argKey := fmt.Sprintf("JOB_ARG_%d", i)
-			args[i] = je.platform.Getenv(argKey)
-		}
-	}
-
-	// Load legacy uploads (for compatibility)
-	uploads, err := je.loadUploadsFromEnv()
+// ExecuteJob executes the job with consolidated upload and environment handling
+func (je *JobExecutor) ExecuteJob() error {
+	// Load configuration from environment
+	config, err := je.envBuilder.LoadJobConfigFromEnvironment()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load uploads: %w", err)
+		return fmt.Errorf("failed to load job configuration: %w", err)
 	}
 
-	// Check for unified upload session
-	hasUploadSession := je.platform.Getenv("JOB_UPLOAD_SESSION") == "true"
-	uploadPipePath := je.platform.Getenv("JOB_UPLOAD_PIPE")
-	totalFilesStr := je.platform.Getenv("JOB_UPLOAD_TOTAL_FILES")
-
-	var totalFiles int
-	if totalFilesStr != "" {
-		totalFiles, _ = strconv.Atoi(totalFilesStr)
-	}
-
-	je.logger.Debug("loaded job configuration with unified upload support",
-		"jobId", jobID,
-		"command", command,
-		"argsCount", len(args),
-		"legacyUploadsCount", len(uploads),
-		"hasUploadSession", hasUploadSession,
-		"uploadPipePath", uploadPipePath,
-		"totalFiles", totalFiles,
-		"cgroupPath", cgroupPath)
-
-	return &JobConfig{
-		JobID:            jobID,
-		Command:          command,
-		Args:             args,
-		CgroupPath:       cgroupPath,
-		Uploads:          uploads,
-		HasUploadSession: hasUploadSession,
-		UploadPipePath:   uploadPipePath,
-		TotalFiles:       totalFiles,
-	}, nil
-}
-
-// loadUploadsFromEnv deserializes legacy uploads from environment variables
-func (je *JobExecutor) loadUploadsFromEnv() ([]UploadInfo, error) {
-	uploadsData := je.platform.Getenv("JOB_UPLOADS")
-	if uploadsData == "" {
-		return nil, nil // No uploads
-	}
-
-	// Decode base64 encoded JSON
-	jsonData, e := base64.StdEncoding.DecodeString(uploadsData)
-	if e != nil {
-		return nil, fmt.Errorf("failed to decode uploads data: %w", e)
-	}
-
-	// Parse JSON upload data
-	var uploadData []struct {
-		Path        string `json:"path"`
-		Content     string `json:"content"` // Base64 encoded
-		Mode        uint32 `json:"mode"`
-		IsDirectory bool   `json:"isDirectory"`
-	}
-
-	if err := json.Unmarshal(jsonData, &uploadData); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal upload data: %w", err)
-	}
-
-	// Convert to UploadInfo with decoded content
-	var uploads []UploadInfo
-	for _, data := range uploadData {
-		content, err := base64.StdEncoding.DecodeString(data.Content)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode file content for %s: %w", data.Path, err)
-		}
-
-		uploads = append(uploads, UploadInfo{
-			Path:        data.Path,
-			Content:     content,
-			Mode:        data.Mode,
-			IsDirectory: data.IsDirectory,
-		})
-	}
-
-	je.logger.Debug("deserialized legacy uploads from environment", "uploadCount", len(uploads))
-	return uploads, nil
-}
-
-// Execute executes the job with unified upload processing
-func Execute(config *JobConfig, logger *logger.Logger) error {
-	p := platform.NewPlatform()
-	executor := NewJobExecutor(p, logger)
-	return executor.ExecuteWithUnifiedUploads(config)
-}
-
-// ExecuteWithUnifiedUploads executes job with unified upload processing
-func (je *JobExecutor) ExecuteWithUnifiedUploads(config *JobConfig) error {
 	log := je.logger.WithField("jobID", config.JobID)
+	log.Debug("executing job in init mode",
+		"command", config.Command,
+		"args", config.Args,
+		"hasUploads", config.HasUploadSession)
 
-	// Process uploads using unified approach
-	if config.HasUploadSession {
-		log.Debug("processing unified upload session",
-			"legacyUploads", len(config.Uploads),
-			"totalFiles", config.TotalFiles,
-			"pipePath", config.UploadPipePath)
-
-		workspaceDir := "/work" // Inside the isolated environment
-		if err := je.ProcessUploadsUnified(workspaceDir); err != nil {
-			return fmt.Errorf("unified upload processing failed: %w", err)
-		}
-	} else if len(config.Uploads) > 0 {
-		// Fallback to legacy upload processing for compatibility
-		log.Debug("processing legacy uploads", "fileCount", len(config.Uploads))
-		if err := je.processLegacyUploads(config.Uploads); err != nil {
-			return fmt.Errorf("legacy upload processing failed: %w", err)
+	// Process uploads if present
+	if config.HasUploadSession && config.UploadPipePath != "" {
+		if err := je.processUploads(config); err != nil {
+			log.Error("failed to process uploads", "error", err)
+			// Continue execution even if upload fails
 		}
 	}
 
-	// Execute the actual job command
-	log.Debug("executing job command", "command", config.Command, "args", config.Args)
-	return je.Execute(config)
+	// Execute the command
+	return je.executeCommand(config)
 }
 
-// ProcessUploadsUnified handles file uploads using the unified streaming approach
-func (je *JobExecutor) ProcessUploadsUnified(workspacePath string) error {
-	log := je.logger.WithField("operation", "process-uploads-unified")
+// processUploads handles upload processing from the pipe
+func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
+	log := je.logger.WithField("operation", "process-uploads")
 
-	// Check if upload pipe is specified
-	uploadPipe := os.Getenv("JOB_UPLOAD_PIPE")
-	if uploadPipe == "" {
-		log.Debug("no upload pipe specified, skipping file processing")
-		return nil
+	workspaceDir := "/work"
+	log.Debug("processing uploads from pipe",
+		"pipePath", config.UploadPipePath,
+		"workspace", workspaceDir)
+
+	// Create workspace
+	if err := je.platform.MkdirAll(workspaceDir, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace: %w", err)
 	}
 
-	log.Debug("processing uploads from pipe", "pipePath", uploadPipe, "workspace", workspacePath)
-
-	// Ensure workspace directory exists
-	if err := je.platform.MkdirAll(workspacePath, 0755); err != nil {
-		return fmt.Errorf("failed to create workspace directory: %w", err)
-	}
-
-	// Create receiver and process all files from the pipe
+	// Create receiver and process files
 	receiver := upload.NewReceiver(je.platform, je.logger)
-	if err := receiver.ProcessAllFiles(uploadPipe, workspacePath); err != nil {
+	if err := receiver.ProcessAllFiles(config.UploadPipePath, workspaceDir); err != nil {
 		return fmt.Errorf("failed to process files from pipe: %w", err)
 	}
 
-	log.Debug("unified upload processing completed")
+	log.Debug("upload processing completed")
 	return nil
 }
 
-// GetUnifiedUploadInfo returns information about the unified upload session
-func (je *JobExecutor) GetUnifiedUploadInfo() (bool, int, error) {
-	hasUploads := os.Getenv("JOB_UPLOAD_SESSION") == "true"
-	if !hasUploads {
-		return false, 0, nil
-	}
+// executeCommand executes the actual command
+func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
+	// Check if we should exec (replace process)
+	shouldExec := je.platform.Getenv("JOBLET_EXEC_AFTER_ISOLATION") == "true"
 
-	totalFilesStr := os.Getenv("JOB_UPLOAD_TOTAL_FILES")
-	if totalFilesStr == "" {
-		return true, 0, nil
-	}
-
-	var totalFiles int
-	if _, err := fmt.Sscanf(totalFilesStr, "%d", &totalFiles); err != nil {
-		return true, 0, fmt.Errorf("invalid total files count: %s", totalFilesStr)
-	}
-
-	return true, totalFiles, nil
-}
-
-// processLegacyUploads handles legacy file upload processing (for compatibility)
-func (je *JobExecutor) processLegacyUploads(uploads []UploadInfo) error {
-	log := je.logger.WithField("operation", "legacy-upload-processing")
-
-	// Determine workspace directory (we're inside chroot, so paths are relative to /)
-	workspaceDir := "/work"
-
-	// Ensure workspace exists
-	if err := je.platform.MkdirAll(workspaceDir, 0755); err != nil {
-		return fmt.Errorf("failed to create workspace directory: %w", err)
-	}
-
-	// Process each upload
-	for i, upload := range uploads {
-		log.Debug("processing legacy upload", "file", i+1, "path", upload.Path, "size", len(upload.Content))
-
-		fullPath := filepath.Join(workspaceDir, upload.Path)
-
-		if upload.IsDirectory {
-			// Create directory
-			mode := os.FileMode(upload.Mode)
-			if mode == 0 {
-				mode = 0755 // Default directory permissions
-			}
-
-			if err := je.platform.MkdirAll(fullPath, mode); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
-			}
-
-			log.Debug("created directory", "path", upload.Path, "mode", fmt.Sprintf("%o", mode))
-		} else {
-			// Ensure parent directory exists
-			parentDir := filepath.Dir(fullPath)
-			if err := je.platform.MkdirAll(parentDir, 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
-			}
-
-			// Write file
-			mode := os.FileMode(upload.Mode)
-			if mode == 0 {
-				mode = 0644 // Default file permissions
-			}
-
-			if err := je.platform.WriteFile(fullPath, upload.Content, mode); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
-			}
-
-			log.Debug("wrote file", "path", upload.Path, "size", len(upload.Content), "mode", fmt.Sprintf("%o", mode))
-		}
-	}
-
-	return nil
-}
-
-// Execute executes the job based on platform using platform abstraction
-func (je *JobExecutor) Execute(config *JobConfig) error {
-	switch runtime.GOOS {
-	case "linux":
-		return je.executeLinux(config)
-	case "darwin":
-		return je.executeDarwin(config)
-	default:
-		return fmt.Errorf("unsupported platform for job execution: %s", runtime.GOOS)
-	}
-}
-
-// executeLinux executes job on Linux using platform abstraction
-func (je *JobExecutor) executeLinux(config *JobConfig) error {
-	je.logger.Debug("executing job on Linux", "command", config.Command, "args", config.Args)
-
-	// Resolve command path using platform abstraction
-	commandPath, e := je.resolveCommandPath(config.Command)
-	if e != nil {
-		return fmt.Errorf("command resolution failed: %w", e)
-	}
-
-	// Prepare arguments and environment using platform abstraction
-	execArgs := append([]string{config.Command}, config.Args...)
-	envVars := je.platform.Environ()
-
-	je.logger.Debug("executing command with platform exec",
-		"commandPath", commandPath, "args", execArgs)
-
-	// Use platform abstraction for exec
-	if err := je.platform.Exec(commandPath, execArgs, envVars); err != nil {
-		return fmt.Errorf("platform exec failed: %w", err)
-	}
-
-	// This line should never be reached on successful exec
-	return nil
-}
-
-// executeDarwin executes job on macOS using platform abstraction
-func (je *JobExecutor) executeDarwin(config *JobConfig) error {
-	je.logger.Info("executing job on macOS", "command", config.Command, "args", config.Args)
-
-	// Resolve command path using platform abstraction
+	// Resolve command path
 	commandPath, err := je.resolveCommandPath(config.Command)
 	if err != nil {
-		return fmt.Errorf("command resolution failed: %w", err)
+		return fmt.Errorf("failed to resolve command: %w", err)
 	}
 
-	// Use platform abstraction to create and run command
+	if shouldExec {
+		// Use exec to completely replace the joblet process
+		// This makes the user command become PID 1 with no trace of joblet
+		je.logger.Debug("executing command with exec (process replacement)",
+			"command", commandPath,
+			"args", config.Args)
+
+		// Build argv array (command is argv[0])
+		argv := append([]string{commandPath}, config.Args...)
+
+		// Get clean environment (remove joblet-specific vars)
+		envv := je.cleanEnvironment()
+
+		// This replaces the current process entirely
+		// After this, the user command IS PID 1
+		return je.platform.Exec(commandPath, argv, envv)
+	}
+
+	// Fallback: run as child process (original behavior)
 	cmd := je.platform.CreateCommand(commandPath, config.Args...)
-	cmd.SetEnv(je.platform.Environ())
+	cmd.SetStdout(os.Stdout)
+	cmd.SetStderr(os.Stderr)
+	cmd.SetStdin(os.Stdin)
 
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("command start failed: %w", err)
+	if config.HasUploadSession {
+		cmd.SetDir("/work")
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("command execution failed: %w", err)
-	}
-
-	je.logger.Info("command completed successfully on macOS")
-	return nil
+	return cmd.Run()
 }
 
-// resolveCommandPath resolves a command to its full path using platform abstraction
-func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
-	if command == "" {
-		return "", fmt.Errorf("command cannot be empty")
+// cleanEnvironment removes joblet-specific environment variables
+func (je *JobExecutor) cleanEnvironment() []string {
+	current := je.platform.Environ()
+	cleaned := make([]string, 0, len(current))
+
+	// List of prefixes to remove
+	removePrefix := []string{
+		"JOBLET_",
+		"JOB_ID=",
+		"JOB_COMMAND=",
+		"JOB_CGROUP_",
+		"JOB_ARG_",
+		"JOB_MAX_",
+		"JOB_UPLOAD_",
 	}
 
-	// If already absolute path, verify it exists using platform abstraction
-	if filepath.IsAbs(command) {
-		if _, err := je.platform.Stat(command); err != nil {
-			return "", fmt.Errorf("command %s not found: %w", command, err)
+	for _, env := range current {
+		keep := true
+		for _, prefix := range removePrefix {
+			if strings.HasPrefix(env, prefix) {
+				keep = false
+				break
+			}
 		}
+		if keep {
+			cleaned = append(cleaned, env)
+		}
+	}
+
+	// Add minimal required environment
+	cleaned = append(cleaned,
+		"PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
+		"HOME=/tmp",
+		"USER=nobody",
+		"TERM=xterm",
+	)
+
+	return cleaned
+}
+
+// resolveCommandPath resolves the full path for a command
+func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
+	// Check if absolute path
+	if filepath.IsAbs(command) {
 		return command, nil
 	}
 
-	// Try to find in PATH using platform abstraction
-	if resolvedPath, err := je.platform.LookPath(command); err == nil {
-		je.logger.Debug("resolved command via PATH", "command", command, "resolved", resolvedPath)
-		return resolvedPath, nil
+	// Try PATH lookup
+	if path, err := je.platform.LookPath(command); err == nil {
+		return path, nil
 	}
 
-	// Check common paths using platform abstraction
-	commonPaths := je.getCommonPaths(command)
-
-	for _, path := range commonPaths {
-		if _, err := je.platform.Stat(path); err == nil {
-			je.logger.Debug("found command in common location", "command", command, "path", path)
-			return path, nil
-		}
-	}
-
-	return "", fmt.Errorf("command %s not found in PATH or common locations", command)
-}
-
-// getCommonPaths returns platform-specific common command paths
-func (je *JobExecutor) getCommonPaths(command string) []string {
+	// Try common locations
 	commonPaths := []string{
 		filepath.Join("/bin", command),
 		filepath.Join("/usr/bin", command),
@@ -408,38 +191,25 @@ func (je *JobExecutor) getCommonPaths(command string) []string {
 		filepath.Join("/usr/sbin", command),
 	}
 
-	// Add platform-specific paths
-	switch runtime.GOOS {
-	case "darwin":
-		commonPaths = append(commonPaths,
-			filepath.Join("/opt/homebrew/bin", command),
-			filepath.Join("/usr/local/Cellar", command))
-	case "linux":
-		commonPaths = append(commonPaths,
-			filepath.Join("/usr/local/sbin", command))
+	for _, path := range commonPaths {
+		if _, err := je.platform.Stat(path); err == nil {
+			return path, nil
+		}
 	}
 
-	return commonPaths
+	return "", fmt.Errorf("command %s not found", command)
 }
 
-// HandleCompletion handles platform-specific completion logic
-func HandleCompletion(logger *logger.Logger) {
-	p := platform.NewPlatform()
-	executor := NewJobExecutor(p, logger)
-	executor.HandleCompletion()
+// SetupCgroup sets up cgroup constraints (called before executing)
+func (je *JobExecutor) SetupCgroup(cgroupPath string) error {
+	// This is typically called from the joblet before switching to init mode
+	// The init process will already be in the correct cgroup
+	je.logger.Debug("cgroup setup requested", "path", cgroupPath)
+	return nil
 }
 
-// HandleCompletion handles platform-specific completion logic using platform abstraction
-func (je *JobExecutor) HandleCompletion() {
-	switch runtime.GOOS {
-	case "linux":
-		// On Linux: This should never be reached since Execute calls platform.Exec
-		je.logger.Error("unexpected return from Execute - exec should have replaced process")
-		je.platform.Exit(1)
-	case "darwin":
-		// On macOS: This is expected since we use command execution instead of exec
-		je.logger.Info("job execution completed successfully on macOS")
-	default:
-		je.logger.Info("job execution completed", "platform", runtime.GOOS)
-	}
+// HandleSignals sets up signal handling for graceful shutdown
+func (je *JobExecutor) HandleSignals(ctx context.Context) {
+	// Signal handling can be added here if needed
+	je.logger.Debug("signal handling setup")
 }

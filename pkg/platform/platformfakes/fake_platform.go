@@ -9,17 +9,17 @@ import (
 )
 
 type FakePlatform struct {
-	CreateCommandStub        func(string, ...string) platform.Command
+	CreateCommandStub        func(string, ...string) *platform.ExecCommand
 	createCommandMutex       sync.RWMutex
 	createCommandArgsForCall []struct {
 		arg1 string
 		arg2 []string
 	}
 	createCommandReturns struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}
 	createCommandReturnsOnCall map[int]struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}
 	CreateProcessGroupStub        func() *syscall.SysProcAttr
 	createProcessGroupMutex       sync.RWMutex
@@ -283,7 +283,7 @@ type FakePlatform struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakePlatform) CreateCommand(arg1 string, arg2 ...string) platform.Command {
+func (fake *FakePlatform) CreateCommand(arg1 string, arg2 ...string) *platform.ExecCommand {
 	fake.createCommandMutex.Lock()
 	ret, specificReturn := fake.createCommandReturnsOnCall[len(fake.createCommandArgsForCall)]
 	fake.createCommandArgsForCall = append(fake.createCommandArgsForCall, struct {
@@ -309,7 +309,7 @@ func (fake *FakePlatform) CreateCommandCallCount() int {
 	return len(fake.createCommandArgsForCall)
 }
 
-func (fake *FakePlatform) CreateCommandCalls(stub func(string, ...string) platform.Command) {
+func (fake *FakePlatform) CreateCommandCalls(stub func(string, ...string) *platform.ExecCommand) {
 	fake.createCommandMutex.Lock()
 	defer fake.createCommandMutex.Unlock()
 	fake.CreateCommandStub = stub
@@ -322,26 +322,26 @@ func (fake *FakePlatform) CreateCommandArgsForCall(i int) (string, []string) {
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakePlatform) CreateCommandReturns(result1 platform.Command) {
+func (fake *FakePlatform) CreateCommandReturns(result1 *platform.ExecCommand) {
 	fake.createCommandMutex.Lock()
 	defer fake.createCommandMutex.Unlock()
 	fake.CreateCommandStub = nil
 	fake.createCommandReturns = struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}{result1}
 }
 
-func (fake *FakePlatform) CreateCommandReturnsOnCall(i int, result1 platform.Command) {
+func (fake *FakePlatform) CreateCommandReturnsOnCall(i int, result1 *platform.ExecCommand) {
 	fake.createCommandMutex.Lock()
 	defer fake.createCommandMutex.Unlock()
 	fake.CreateCommandStub = nil
 	if fake.createCommandReturnsOnCall == nil {
 		fake.createCommandReturnsOnCall = make(map[int]struct {
-			result1 platform.Command
+			result1 *platform.ExecCommand
 		})
 	}
 	fake.createCommandReturnsOnCall[i] = struct {
-		result1 platform.Command
+		result1 *platform.ExecCommand
 	}{result1}
 }
 
@@ -1676,52 +1676,6 @@ func (fake *FakePlatform) WriteFileReturnsOnCall(i int, result1 error) {
 func (fake *FakePlatform) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.createCommandMutex.RLock()
-	defer fake.createCommandMutex.RUnlock()
-	fake.createProcessGroupMutex.RLock()
-	defer fake.createProcessGroupMutex.RUnlock()
-	fake.environMutex.RLock()
-	defer fake.environMutex.RUnlock()
-	fake.execMutex.RLock()
-	defer fake.execMutex.RUnlock()
-	fake.executableMutex.RLock()
-	defer fake.executableMutex.RUnlock()
-	fake.exitMutex.RLock()
-	defer fake.exitMutex.RUnlock()
-	fake.getenvMutex.RLock()
-	defer fake.getenvMutex.RUnlock()
-	fake.getpidMutex.RLock()
-	defer fake.getpidMutex.RUnlock()
-	fake.isExistMutex.RLock()
-	defer fake.isExistMutex.RUnlock()
-	fake.isNotExistMutex.RLock()
-	defer fake.isNotExistMutex.RUnlock()
-	fake.killMutex.RLock()
-	defer fake.killMutex.RUnlock()
-	fake.lookPathMutex.RLock()
-	defer fake.lookPathMutex.RUnlock()
-	fake.mkdirAllMutex.RLock()
-	defer fake.mkdirAllMutex.RUnlock()
-	fake.mountMutex.RLock()
-	defer fake.mountMutex.RUnlock()
-	fake.openFileMutex.RLock()
-	defer fake.openFileMutex.RUnlock()
-	fake.readDirMutex.RLock()
-	defer fake.readDirMutex.RUnlock()
-	fake.readFileMutex.RLock()
-	defer fake.readFileMutex.RUnlock()
-	fake.removeMutex.RLock()
-	defer fake.removeMutex.RUnlock()
-	fake.removeAllMutex.RLock()
-	defer fake.removeAllMutex.RUnlock()
-	fake.statMutex.RLock()
-	defer fake.statMutex.RUnlock()
-	fake.symlinkMutex.RLock()
-	defer fake.symlinkMutex.RUnlock()
-	fake.unmountMutex.RLock()
-	defer fake.unmountMutex.RUnlock()
-	fake.writeFileMutex.RLock()
-	defer fake.writeFileMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

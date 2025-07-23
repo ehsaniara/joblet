@@ -218,12 +218,6 @@ func (fake *FakeDomainStreamer) SendKeepaliveReturnsOnCall(i int, result1 error)
 func (fake *FakeDomainStreamer) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.contextMutex.RLock()
-	defer fake.contextMutex.RUnlock()
-	fake.sendDataMutex.RLock()
-	defer fake.sendDataMutex.RUnlock()
-	fake.sendKeepaliveMutex.RLock()
-	defer fake.sendKeepaliveMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

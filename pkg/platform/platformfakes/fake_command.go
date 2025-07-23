@@ -18,6 +18,21 @@ type FakeCommand struct {
 	processReturnsOnCall map[int]struct {
 		result1 platform.Process
 	}
+	RunStub        func() error
+	runMutex       sync.RWMutex
+	runArgsForCall []struct {
+	}
+	runReturns struct {
+		result1 error
+	}
+	runReturnsOnCall map[int]struct {
+		result1 error
+	}
+	SetDirStub        func(string)
+	setDirMutex       sync.RWMutex
+	setDirArgsForCall []struct {
+		arg1 string
+	}
 	SetEnvStub        func([]string)
 	setEnvMutex       sync.RWMutex
 	setEnvArgsForCall []struct {
@@ -26,6 +41,11 @@ type FakeCommand struct {
 	SetStderrStub        func(interface{})
 	setStderrMutex       sync.RWMutex
 	setStderrArgsForCall []struct {
+		arg1 interface{}
+	}
+	SetStdinStub        func(interface{})
+	setStdinMutex       sync.RWMutex
+	setStdinArgsForCall []struct {
 		arg1 interface{}
 	}
 	SetStdoutStub        func(interface{})
@@ -115,6 +135,91 @@ func (fake *FakeCommand) ProcessReturnsOnCall(i int, result1 platform.Process) {
 	}{result1}
 }
 
+func (fake *FakeCommand) Run() error {
+	fake.runMutex.Lock()
+	ret, specificReturn := fake.runReturnsOnCall[len(fake.runArgsForCall)]
+	fake.runArgsForCall = append(fake.runArgsForCall, struct {
+	}{})
+	stub := fake.RunStub
+	fakeReturns := fake.runReturns
+	fake.recordInvocation("Run", []interface{}{})
+	fake.runMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeCommand) RunCallCount() int {
+	fake.runMutex.RLock()
+	defer fake.runMutex.RUnlock()
+	return len(fake.runArgsForCall)
+}
+
+func (fake *FakeCommand) RunCalls(stub func() error) {
+	fake.runMutex.Lock()
+	defer fake.runMutex.Unlock()
+	fake.RunStub = stub
+}
+
+func (fake *FakeCommand) RunReturns(result1 error) {
+	fake.runMutex.Lock()
+	defer fake.runMutex.Unlock()
+	fake.RunStub = nil
+	fake.runReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeCommand) RunReturnsOnCall(i int, result1 error) {
+	fake.runMutex.Lock()
+	defer fake.runMutex.Unlock()
+	fake.RunStub = nil
+	if fake.runReturnsOnCall == nil {
+		fake.runReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.runReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeCommand) SetDir(arg1 string) {
+	fake.setDirMutex.Lock()
+	fake.setDirArgsForCall = append(fake.setDirArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.SetDirStub
+	fake.recordInvocation("SetDir", []interface{}{arg1})
+	fake.setDirMutex.Unlock()
+	if stub != nil {
+		fake.SetDirStub(arg1)
+	}
+}
+
+func (fake *FakeCommand) SetDirCallCount() int {
+	fake.setDirMutex.RLock()
+	defer fake.setDirMutex.RUnlock()
+	return len(fake.setDirArgsForCall)
+}
+
+func (fake *FakeCommand) SetDirCalls(stub func(string)) {
+	fake.setDirMutex.Lock()
+	defer fake.setDirMutex.Unlock()
+	fake.SetDirStub = stub
+}
+
+func (fake *FakeCommand) SetDirArgsForCall(i int) string {
+	fake.setDirMutex.RLock()
+	defer fake.setDirMutex.RUnlock()
+	argsForCall := fake.setDirArgsForCall[i]
+	return argsForCall.arg1
+}
+
 func (fake *FakeCommand) SetEnv(arg1 []string) {
 	var arg1Copy []string
 	if arg1 != nil {
@@ -181,6 +286,38 @@ func (fake *FakeCommand) SetStderrArgsForCall(i int) interface{} {
 	fake.setStderrMutex.RLock()
 	defer fake.setStderrMutex.RUnlock()
 	argsForCall := fake.setStderrArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeCommand) SetStdin(arg1 interface{}) {
+	fake.setStdinMutex.Lock()
+	fake.setStdinArgsForCall = append(fake.setStdinArgsForCall, struct {
+		arg1 interface{}
+	}{arg1})
+	stub := fake.SetStdinStub
+	fake.recordInvocation("SetStdin", []interface{}{arg1})
+	fake.setStdinMutex.Unlock()
+	if stub != nil {
+		fake.SetStdinStub(arg1)
+	}
+}
+
+func (fake *FakeCommand) SetStdinCallCount() int {
+	fake.setStdinMutex.RLock()
+	defer fake.setStdinMutex.RUnlock()
+	return len(fake.setStdinArgsForCall)
+}
+
+func (fake *FakeCommand) SetStdinCalls(stub func(interface{})) {
+	fake.setStdinMutex.Lock()
+	defer fake.setStdinMutex.Unlock()
+	fake.SetStdinStub = stub
+}
+
+func (fake *FakeCommand) SetStdinArgsForCall(i int) interface{} {
+	fake.setStdinMutex.RLock()
+	defer fake.setStdinMutex.RUnlock()
+	argsForCall := fake.setStdinArgsForCall[i]
 	return argsForCall.arg1
 }
 
@@ -357,20 +494,6 @@ func (fake *FakeCommand) WaitReturnsOnCall(i int, result1 error) {
 func (fake *FakeCommand) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.processMutex.RLock()
-	defer fake.processMutex.RUnlock()
-	fake.setEnvMutex.RLock()
-	defer fake.setEnvMutex.RUnlock()
-	fake.setStderrMutex.RLock()
-	defer fake.setStderrMutex.RUnlock()
-	fake.setStdoutMutex.RLock()
-	defer fake.setStdoutMutex.RUnlock()
-	fake.setSysProcAttrMutex.RLock()
-	defer fake.setSysProcAttrMutex.RUnlock()
-	fake.startMutex.RLock()
-	defer fake.startMutex.RUnlock()
-	fake.waitMutex.RLock()
-	defer fake.waitMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
