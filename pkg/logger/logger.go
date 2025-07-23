@@ -38,7 +38,7 @@ type Logger struct {
 	level  LogLevel
 	logger *log.Logger
 	fields map[string]interface{}
-	mode   string // New field to track the mode
+	mode   string // to track the mode
 }
 
 type Config struct {

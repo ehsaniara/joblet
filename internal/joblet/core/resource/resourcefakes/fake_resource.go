@@ -488,20 +488,6 @@ func (fake *FakeResource) SetMemoryLimitReturnsOnCall(i int, result1 error) {
 func (fake *FakeResource) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.cleanupCgroupMutex.RLock()
-	defer fake.cleanupCgroupMutex.RUnlock()
-	fake.createMutex.RLock()
-	defer fake.createMutex.RUnlock()
-	fake.ensureControllersMutex.RLock()
-	defer fake.ensureControllersMutex.RUnlock()
-	fake.setCPUCoresMutex.RLock()
-	defer fake.setCPUCoresMutex.RUnlock()
-	fake.setCPULimitMutex.RLock()
-	defer fake.setCPULimitMutex.RUnlock()
-	fake.setIOLimitMutex.RLock()
-	defer fake.setIOLimitMutex.RUnlock()
-	fake.setMemoryLimitMutex.RLock()
-	defer fake.setMemoryLimitMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

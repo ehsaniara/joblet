@@ -32,9 +32,45 @@ type JobFilesystem struct {
 	RootDir  string
 	TmpDir   string
 	WorkDir  string
+	InitPath string // Path to the init binary inside the isolated environment
 	platform platform.Platform
 	config   config.FilesystemConfig
 	logger   *logger.Logger
+}
+
+// PrepareInitBinary prepare the init binary
+func (f *JobFilesystem) PrepareInitBinary(hostBinaryPath string) error {
+	log := f.logger.WithField("operation", "prepare-init-binary")
+
+	// Create /sbin directory in the isolated root
+	sbinDir := filepath.Join(f.RootDir, "sbin")
+	if err := f.platform.MkdirAll(sbinDir, 0755); err != nil {
+		return fmt.Errorf("failed to create sbin directory: %w", err)
+	}
+
+	// Set the init path that will be used inside the chroot
+	f.InitPath = "/sbin/init"
+
+	// Copy the binary to the isolated filesystem
+	destPath := filepath.Join(f.RootDir, "sbin", "init")
+
+	// Read the host binary
+	data, err := f.platform.ReadFile(hostBinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to read host binary: %w", err)
+	}
+
+	// Write to the isolated location
+	if err := f.platform.WriteFile(destPath, data, 0755); err != nil {
+		return fmt.Errorf("failed to write init binary: %w", err)
+	}
+
+	log.Debug("init binary prepared in isolated filesystem",
+		"hostPath", hostBinaryPath,
+		"isolatedPath", destPath,
+		"chrootPath", f.InitPath)
+
+	return nil
 }
 
 // CreateJobFilesystem creates an isolated filesystem for a job

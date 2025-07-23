@@ -459,10 +459,11 @@ func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string
 		"JOBLET_MODE=init", // This tells the binary to run in init mode
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),    // Namespace view
-		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath), // Host view - CRITICAL ADDITION
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
+		// Use generic path instead of revealing host structure
+		fmt.Sprintf("JOBLET_BINARY_PATH=%s", "/sbin/init"),
 		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
 		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),

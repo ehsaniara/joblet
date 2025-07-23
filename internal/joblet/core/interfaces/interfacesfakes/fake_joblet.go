@@ -267,12 +267,6 @@ func (fake *FakeJoblet) StopJobReturnsOnCall(i int, result1 error) {
 func (fake *FakeJoblet) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.executeScheduledJobMutex.RLock()
-	defer fake.executeScheduledJobMutex.RUnlock()
-	fake.startJobMutex.RLock()
-	defer fake.startJobMutex.RUnlock()
-	fake.stopJobMutex.RLock()
-	defer fake.stopJobMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

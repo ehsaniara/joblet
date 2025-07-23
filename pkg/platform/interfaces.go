@@ -65,7 +65,7 @@ type SyscallOperations interface {
 //
 //counterfeiter:generate . CommandFactory
 type CommandFactory interface {
-	CreateCommand(name string, args ...string) Command
+	CreateCommand(name string, args ...string) *ExecCommand
 }
 
 // Command represents an executing command
@@ -79,6 +79,9 @@ type Command interface {
 	SetStderr(w interface{})
 	SetSysProcAttr(attr *syscall.SysProcAttr)
 	SetEnv(env []string)
+	SetStdin(w interface{})
+	SetDir(s string)
+	Run() error
 }
 
 // Process represents a running process

@@ -91,8 +91,6 @@ func (fake *FakeExecOperations) LookPathReturnsOnCall(i int, result1 string, res
 func (fake *FakeExecOperations) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.lookPathMutex.RLock()
-	defer fake.lookPathMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
