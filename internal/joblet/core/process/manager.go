@@ -10,6 +10,7 @@ import (
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
 	"joblet/pkg/platform"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -53,6 +54,7 @@ type LaunchConfig struct {
 	JobID       string
 	Command     string
 	Args        []string
+	ExtraFiles  []*os.File
 }
 
 // LaunchResult contains the result of a process launch
@@ -159,9 +161,14 @@ func (m *Manager) createAndStartCommand(config *LaunchConfig) (platform.Command,
 		cmd.SetSysProcAttr(config.SysProcAttr)
 	}
 
-	// Start the command
+	// Add extra files for file descriptor passing
+	if config.ExtraFiles != nil && len(config.ExtraFiles) > 0 {
+		cmd.SetExtraFiles(config.ExtraFiles)
+	}
+
+	// start the process
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start process: %w", err)
 	}
 
 	return cmd, nil
@@ -469,7 +476,6 @@ func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
 	}
 
-	// Add job arguments
 	for i, arg := range job.Args {
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
@@ -743,7 +749,6 @@ func (m *Manager) BuildJobEnvironmentWithUploads(job *domain.Job, execPath strin
 		fmt.Sprintf("JOB_UPLOAD_TOTAL_FILES=%d", session.TotalFiles),
 	}
 
-	// Add job arguments
 	for i, arg := range job.Args {
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}

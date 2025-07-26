@@ -30,12 +30,14 @@ func (ji *JobIsolation) CreateIsolatedSysProcAttr() *syscall.SysProcAttr {
 	sysProcAttr.Cloneflags = syscall.CLONE_NEWPID | // Process isolation (native)
 		syscall.CLONE_NEWNS | // Mount isolation (native)
 		syscall.CLONE_NEWIPC | // IPC isolation (native)
-		syscall.CLONE_NEWUTS // UTS isolation (native)
+		syscall.CLONE_NEWUTS | // UTS isolation (native)
+		syscall.CLONE_NEWNET // Network isolation - ADD THIS!
 
 	ji.logger.Debug("created native Go isolation attributes",
 		"approach", "native-go-syscalls",
 		"pidNamespace", true,
 		"mountNamespace", true,
+		"networkNamespace", true,
 		"userComplexity", false,
 		"reliability", "high")
 

@@ -82,6 +82,7 @@ type Command interface {
 	SetStdin(w interface{})
 	SetDir(s string)
 	Run() error
+	Kill()
 }
 
 // Process represents a running process

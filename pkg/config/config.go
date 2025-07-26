@@ -21,6 +21,26 @@ type Config struct {
 	Filesystem FilesystemConfig `yaml:"filesystem" json:"filesystem"`
 	GRPC       GRPCConfig       `yaml:"grpc" json:"grpc"`
 	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
+	Network    NetworkConfig    `yaml:"network"`
+}
+
+type NetworkConfig struct {
+	StateDir            string                       `yaml:"state_dir"`
+	Enabled             bool                         `yaml:"enabled"`
+	DefaultNetwork      string                       `yaml:"default_network"`
+	Networks            map[string]NetworkDefinition `yaml:"networks"`
+	AllowCustomNetworks bool                         `yaml:"allow_custom_networks"`
+	MaxCustomNetworks   int                          `yaml:"max_custom_networks"`
+}
+
+type NetworkDefinition struct {
+	CIDR       string `yaml:"cidr"`
+	BridgeName string `yaml:"bridge_name"`
+}
+
+type IPAllocationConfig struct {
+	StartOffset int `yaml:"start_offset"`
+	EndReserve  int `yaml:"end_reserve"`
 }
 
 // ServerConfig holds server-specific configuration

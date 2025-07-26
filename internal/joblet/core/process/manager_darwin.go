@@ -8,6 +8,7 @@ import (
 	"io"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
+	"os"
 	"syscall"
 	"time"
 )
@@ -28,6 +29,7 @@ type LaunchConfig struct {
 	JobID       string
 	Command     string
 	Args        []string
+	ExtraFiles  []*os.File // this field to match Linux version
 }
 
 // LaunchResult contains the result of a process launch
@@ -68,7 +70,7 @@ func NewProcessManager(platform platform.Platform) *Manager {
 	}
 }
 
-// Stub implementations for Darwin
+// LaunchProcess Stub implementations for Darwin
 func (m *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*LaunchResult, error) {
 	return nil, fmt.Errorf("process management not supported on Darwin")
 }

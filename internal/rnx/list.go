@@ -60,7 +60,7 @@ func formatJobList(jobs []*pb.Job) {
 		}
 	}
 
-	// add some padding
+	// some padding
 	maxIDWidth += 2
 	maxStatusWidth += 2
 

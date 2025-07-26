@@ -35,6 +35,67 @@ detect_internal_ip() {
     echo "${ip:-127.0.0.1}"
 }
 
+setup_network_requirements() {
+    print_info "Setting up network requirements for joblet..."
+
+    # Enable IP forwarding
+    sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
+
+    # Make IP forwarding permanent
+    if ! grep -q "^net.ipv4.ip_forward = 1" /etc/sysctl.conf 2>/dev/null; then
+        echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+    fi
+
+    # Load required kernel modules
+    for module in br_netfilter nf_conntrack nf_nat; do
+        modprobe $module 2>/dev/null || true
+    done
+
+    # Ensure modules load on boot
+    for module in br_netfilter nf_conntrack nf_nat; do
+        if ! grep -q "^$module$" /etc/modules 2>/dev/null; then
+            echo "$module" >> /etc/modules
+        fi
+    done
+
+    # Create state directory for network configs
+    mkdir -p /var/lib/joblet
+    chown root:root /var/lib/joblet
+    chmod 755 /var/lib/joblet
+
+    # Setup default bridge if it doesn't exist
+    if ! ip link show joblet0 >/dev/null 2>&1; then
+        ip link add joblet0 type bridge 2>/dev/null || true
+        ip addr add 172.20.0.1/16 dev joblet0 2>/dev/null || true
+        ip link set joblet0 up 2>/dev/null || true
+        print_success "Created default bridge network"
+    fi
+
+    # Configure iptables for NAT (idempotent)
+    if ! iptables -t nat -C POSTROUTING -s 172.20.0.0/16 -j MASQUERADE 2>/dev/null; then
+        iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -j MASQUERADE
+        print_success "Configured NAT for bridge network"
+    fi
+
+    # Check and configure FORWARD chain
+    if iptables -L FORWARD -n | head -1 | grep -q "policy DROP"; then
+        print_warning "iptables FORWARD policy is DROP. Adding ACCEPT rules for joblet..."
+        iptables -I FORWARD -i joblet0 -j ACCEPT
+        iptables -I FORWARD -o joblet0 -j ACCEPT
+        iptables -I FORWARD -i viso+ -j ACCEPT
+        iptables -I FORWARD -o viso+ -j ACCEPT
+    fi
+
+    # Save iptables rules if iptables-persistent is installed
+    if command -v netfilter-persistent >/dev/null 2>&1; then
+        netfilter-persistent save >/dev/null 2>&1 || true
+    elif [ -d /etc/iptables ]; then
+        iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+    fi
+
+    print_success "Network requirements configured"
+}
+
 get_configuration() {
     # Load saved config from debian/config if it exists
     if [ -f /tmp/joblet-install-config ]; then
@@ -224,6 +285,9 @@ case "$1" in
             print_error "Failed to generate certificates"
             exit 1
         fi
+
+        # Network requirements configured
+        setup_network_requirements
 
         # Create log directory
         mkdir -p /var/log/joblet

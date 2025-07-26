@@ -44,7 +44,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Display scheduling information if available
 	if response.ScheduledTime != "" {
-		fmt.Printf("\n📅 Scheduling Information:\n")
+		fmt.Printf("\nScheduling Information:\n")
 
 		scheduledTime, err := time.Parse("2006-01-02T15:04:05Z07:00", response.ScheduledTime)
 		if err == nil {
@@ -66,7 +66,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display timing information
-	fmt.Printf("\n⏱️  Timing:\n")
+	fmt.Printf("\nTiming:\n")
 	fmt.Printf("  Created: %s\n", formatTimestamp(response.StartTime))
 
 	if response.EndTime != "" {
@@ -88,7 +88,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display resource limits
-	fmt.Printf("\n🔧 Resource Limits:\n")
+	fmt.Printf("\nResource Limits:\n")
 	fmt.Printf("  Max CPU: %d%%\n", response.MaxCPU)
 	fmt.Printf("  Max Memory: %d MB\n", response.MaxMemory)
 	fmt.Printf("  Max IO BPS: %d\n", response.MaxIOBPS)
@@ -98,12 +98,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Display exit code for completed jobs
 	if response.Status != "RUNNING" && response.Status != "SCHEDULED" && response.Status != "INITIALIZING" {
-		fmt.Printf("\n📋 Result:\n")
+		fmt.Printf("\nResult:\n")
 		fmt.Printf("  Exit Code: %d\n", response.ExitCode)
 	}
 
 	// Provide helpful next steps based on job status
-	fmt.Printf("\n💡 Available Actions:\n")
+	fmt.Printf("\nAvailable Actions:\n")
 	switch response.Status {
 	case "SCHEDULED":
 		fmt.Printf("  • rnx stop %s     # Cancel scheduled job\n", response.Id)

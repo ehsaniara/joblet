@@ -19,11 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	JobletService_RunJob_FullMethodName       = "/joblet.JobletService/RunJob"
-	JobletService_GetJobStatus_FullMethodName = "/joblet.JobletService/GetJobStatus"
-	JobletService_StopJob_FullMethodName      = "/joblet.JobletService/StopJob"
-	JobletService_GetJobLogs_FullMethodName   = "/joblet.JobletService/GetJobLogs"
-	JobletService_ListJobs_FullMethodName     = "/joblet.JobletService/ListJobs"
+	JobletService_RunJob_FullMethodName        = "/joblet.JobletService/RunJob"
+	JobletService_GetJobStatus_FullMethodName  = "/joblet.JobletService/GetJobStatus"
+	JobletService_StopJob_FullMethodName       = "/joblet.JobletService/StopJob"
+	JobletService_GetJobLogs_FullMethodName    = "/joblet.JobletService/GetJobLogs"
+	JobletService_ListJobs_FullMethodName      = "/joblet.JobletService/ListJobs"
+	JobletService_CreateNetwork_FullMethodName = "/joblet.JobletService/CreateNetwork"
+	JobletService_ListNetworks_FullMethodName  = "/joblet.JobletService/ListNetworks"
+	JobletService_RemoveNetwork_FullMethodName = "/joblet.JobletService/RemoveNetwork"
 )
 
 // JobletServiceClient is the client API for JobletService service.
@@ -35,6 +38,10 @@ type JobletServiceClient interface {
 	StopJob(ctx context.Context, in *StopJobReq, opts ...grpc.CallOption) (*StopJobRes, error)
 	GetJobLogs(ctx context.Context, in *GetJobLogsReq, opts ...grpc.CallOption) (JobletService_GetJobLogsClient, error)
 	ListJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Jobs, error)
+	// Network management
+	CreateNetwork(ctx context.Context, in *CreateNetworkReq, opts ...grpc.CallOption) (*CreateNetworkRes, error)
+	ListNetworks(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Networks, error)
+	RemoveNetwork(ctx context.Context, in *RemoveNetworkReq, opts ...grpc.CallOption) (*RemoveNetworkRes, error)
 }
 
 type jobletServiceClient struct {
@@ -113,6 +120,33 @@ func (c *jobletServiceClient) ListJobs(ctx context.Context, in *EmptyRequest, op
 	return out, nil
 }
 
+func (c *jobletServiceClient) CreateNetwork(ctx context.Context, in *CreateNetworkReq, opts ...grpc.CallOption) (*CreateNetworkRes, error) {
+	out := new(CreateNetworkRes)
+	err := c.cc.Invoke(ctx, JobletService_CreateNetwork_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobletServiceClient) ListNetworks(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Networks, error) {
+	out := new(Networks)
+	err := c.cc.Invoke(ctx, JobletService_ListNetworks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobletServiceClient) RemoveNetwork(ctx context.Context, in *RemoveNetworkReq, opts ...grpc.CallOption) (*RemoveNetworkRes, error) {
+	out := new(RemoveNetworkRes)
+	err := c.cc.Invoke(ctx, JobletService_RemoveNetwork_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // JobletServiceServer is the server API for JobletService service.
 // All implementations must embed UnimplementedJobletServiceServer
 // for forward compatibility
@@ -122,6 +156,10 @@ type JobletServiceServer interface {
 	StopJob(context.Context, *StopJobReq) (*StopJobRes, error)
 	GetJobLogs(*GetJobLogsReq, JobletService_GetJobLogsServer) error
 	ListJobs(context.Context, *EmptyRequest) (*Jobs, error)
+	// Network management
+	CreateNetwork(context.Context, *CreateNetworkReq) (*CreateNetworkRes, error)
+	ListNetworks(context.Context, *EmptyRequest) (*Networks, error)
+	RemoveNetwork(context.Context, *RemoveNetworkReq) (*RemoveNetworkRes, error)
 	mustEmbedUnimplementedJobletServiceServer()
 }
 
@@ -143,6 +181,15 @@ func (UnimplementedJobletServiceServer) GetJobLogs(*GetJobLogsReq, JobletService
 }
 func (UnimplementedJobletServiceServer) ListJobs(context.Context, *EmptyRequest) (*Jobs, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListJobs not implemented")
+}
+func (UnimplementedJobletServiceServer) CreateNetwork(context.Context, *CreateNetworkReq) (*CreateNetworkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateNetwork not implemented")
+}
+func (UnimplementedJobletServiceServer) ListNetworks(context.Context, *EmptyRequest) (*Networks, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListNetworks not implemented")
+}
+func (UnimplementedJobletServiceServer) RemoveNetwork(context.Context, *RemoveNetworkReq) (*RemoveNetworkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveNetwork not implemented")
 }
 func (UnimplementedJobletServiceServer) mustEmbedUnimplementedJobletServiceServer() {}
 
@@ -250,6 +297,60 @@ func _JobletService_ListJobs_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _JobletService_CreateNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateNetworkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobletServiceServer).CreateNetwork(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobletService_CreateNetwork_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobletServiceServer).CreateNetwork(ctx, req.(*CreateNetworkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobletService_ListNetworks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobletServiceServer).ListNetworks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobletService_ListNetworks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobletServiceServer).ListNetworks(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobletService_RemoveNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveNetworkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobletServiceServer).RemoveNetwork(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobletService_RemoveNetwork_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobletServiceServer).RemoveNetwork(ctx, req.(*RemoveNetworkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // JobletService_ServiceDesc is the grpc.ServiceDesc for JobletService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -272,6 +373,18 @@ var JobletService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListJobs",
 			Handler:    _JobletService_ListJobs_Handler,
+		},
+		{
+			MethodName: "CreateNetwork",
+			Handler:    _JobletService_CreateNetwork_Handler,
+		},
+		{
+			MethodName: "ListNetworks",
+			Handler:    _JobletService_ListNetworks_Handler,
+		},
+		{
+			MethodName: "RemoveNetwork",
+			Handler:    _JobletService_RemoveNetwork_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

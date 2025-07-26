@@ -89,3 +89,15 @@ func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobletService
 	}
 	return stream, nil
 }
+
+func (c *JobClient) CreateNetwork(ctx context.Context, req *pb.CreateNetworkReq) (*pb.CreateNetworkRes, error) {
+	return c.client.CreateNetwork(ctx, req)
+}
+
+func (c *JobClient) ListNetworks(ctx context.Context) (*pb.Networks, error) {
+	return c.client.ListNetworks(ctx, &pb.EmptyRequest{})
+}
+
+func (c *JobClient) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkReq) (*pb.RemoveNetworkRes, error) {
+	return c.client.RemoveNetwork(ctx, req)
+}

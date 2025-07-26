@@ -3,6 +3,8 @@ package cleanup
 import (
 	"context"
 	"fmt"
+	"joblet/internal/joblet/network"
+	"joblet/internal/joblet/state"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -25,6 +27,9 @@ type Coordinator struct {
 
 	// Cleanup tracking
 	activeCleanups sync.Map // jobID -> cleanup status
+
+	networkSetup *network.NetworkSetup
+	networkStore *state.NetworkStore
 }
 
 // CleanupStatus tracks the status of a cleanup operation
@@ -45,6 +50,7 @@ func NewCoordinator(
 	platform platform.Platform,
 	config *config.Config,
 	logger *logger.Logger,
+	networkStore *state.NetworkStore,
 ) *Coordinator {
 	return &Coordinator{
 		processManager: processManager,
@@ -52,6 +58,8 @@ func NewCoordinator(
 		platform:       platform,
 		config:         config,
 		logger:         logger.WithField("component", "cleanup-coordinator"),
+		networkStore:   networkStore,
+		networkSetup:   network.NewNetworkSetup(platform, networkStore),
 	}
 }
 
@@ -95,6 +103,16 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 		log.Error("additional resource cleanup failed", "error", err)
 		status.Errors = append(status.Errors, fmt.Errorf("additional: %w", err))
 	}
+
+	// Clean up network resources
+	if alloc, err := c.networkStore.GetJobAllocation(jobID); err == nil {
+		if err := c.networkSetup.CleanupJobNetwork(alloc); err != nil {
+			c.logger.Warn("failed to cleanup network", "jobID", jobID, "error", err)
+		}
+	}
+
+	// Release network allocation
+	c.networkStore.ReleaseJob(jobID)
 
 	status.Completed = true
 

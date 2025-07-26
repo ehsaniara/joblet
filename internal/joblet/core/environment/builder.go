@@ -76,17 +76,14 @@ func (b *Builder) buildCoreEnvironment(job *domain.Job, execPath string) []strin
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
 	}
 
-	// Add CPU cores if specified
 	if job.Limits.CPUCores != "" {
 		env = append(env, fmt.Sprintf("JOB_CPU_CORES=%s", job.Limits.CPUCores))
 	}
 
-	// Add job arguments
 	for i, arg := range job.Args {
 		env = append(env, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
 
-	// Add schedule information if present
 	if job.ScheduledTime != nil && !job.ScheduledTime.IsZero() {
 		env = append(env, fmt.Sprintf("JOB_SCHEDULED_TIME=%s", job.ScheduledTime.Format(time.RFC3339)))
 	}
@@ -139,12 +136,10 @@ func (b *Builder) BuildInitModeEnvironment(config *JobConfig) []string {
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(config.Args)),
 	}
 
-	// Add arguments
 	for i, arg := range config.Args {
 		env = append(env, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
 
-	// Add upload information if present
 	if config.HasUploadSession {
 		env = append(env,
 			fmt.Sprintf("JOB_UPLOAD_SESSION=%t", true),

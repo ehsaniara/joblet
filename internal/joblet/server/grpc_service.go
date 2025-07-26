@@ -18,18 +18,20 @@ import (
 
 type JobServiceServer struct {
 	pb.UnimplementedJobletServiceServer
-	auth     auth2.GrpcAuthorization
-	jobStore state.Store
-	joblet   interfaces.Joblet
-	logger   *logger.Logger
+	auth         auth2.GrpcAuthorization
+	jobStore     state.Store
+	joblet       interfaces.Joblet
+	logger       *logger.Logger
+	networkStore *state.NetworkStore
 }
 
-func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore state.Store, joblet interfaces.Joblet) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore state.Store, joblet interfaces.Joblet, networkStore *state.NetworkStore) *JobServiceServer {
 	return &JobServiceServer{
-		auth:     auth,
-		jobStore: jobStore,
-		joblet:   joblet,
-		logger:   logger.WithField("component", "grpc-service"),
+		auth:         auth,
+		jobStore:     jobStore,
+		joblet:       joblet,
+		networkStore: networkStore,
+		logger:       logger.WithField("component", "grpc-service"),
 	}
 }
 
@@ -52,6 +54,11 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		return nil, err
 	}
 
+	// Set default network if not specified
+	if req.Network == "" {
+		req.Network = "bridge"
+	}
+
 	// Validate upload size limits
 	totalUploadSize := int64(0)
 	for _, upload := range req.Uploads {
@@ -69,7 +76,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 	domainUploads := mappers.ProtobufToFileUpload(req.Uploads)
 
 	// StartJob now expects RFC3339 formatted schedule string (already parsed by client)
-	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads, req.Schedule)
+	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads, req.Schedule, req.Network)
 
 	if err != nil {
 		log.Error("job creation failed", "error", err)
@@ -207,4 +214,93 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobletSer
 
 	log.Debug("log stream completed successfully")
 	return nil
+}
+
+func (s *JobServiceServer) CreateNetwork(ctx context.Context, req *pb.CreateNetworkReq) (*pb.CreateNetworkRes, error) {
+	log := s.logger.WithFields(
+		"operation", "CreateNetwork",
+		"name", req.Name,
+		"cidr", req.Cidr)
+
+	log.Debug("create network request received")
+
+	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	// Create the network
+	if err := s.networkStore.CreateNetwork(req.Name, req.Cidr); err != nil {
+		log.Error("failed to create network", "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to create network: %v", err)
+	}
+
+	// Get network info for response
+	networks := s.networkStore.ListNetworks()
+	netInfo, exists := networks[req.Name]
+	if !exists {
+		return nil, status.Errorf(codes.Internal, "network created but not found")
+	}
+
+	log.Info("network created successfully")
+
+	return &pb.CreateNetworkRes{
+		Name:   netInfo.Name,
+		Cidr:   netInfo.CIDR,
+		Bridge: netInfo.Bridge,
+	}, nil
+}
+
+func (s *JobServiceServer) ListNetworks(ctx context.Context, req *pb.EmptyRequest) (*pb.Networks, error) {
+	log := s.logger.WithField("operation", "ListNetworks")
+
+	if err := s.auth.Authorized(ctx, auth2.StreamJobsOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	networks := s.networkStore.ListNetworks()
+
+	resp := &pb.Networks{
+		Networks: make([]*pb.Network, 0, len(networks)),
+	}
+
+	for _, net := range networks {
+		resp.Networks = append(resp.Networks, &pb.Network{
+			Name:     net.Name,
+			Cidr:     net.CIDR,
+			Bridge:   net.Bridge,
+			JobCount: int32(net.JobCount),
+		})
+	}
+
+	return resp, nil
+}
+
+func (s *JobServiceServer) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkReq) (*pb.RemoveNetworkRes, error) {
+	log := s.logger.WithFields(
+		"operation", "RemoveNetwork",
+		"name", req.Name)
+
+	log.Debug("remove network request received")
+
+	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	if err := s.networkStore.RemoveNetwork(req.Name); err != nil {
+		log.Error("failed to remove network", "error", err)
+		return &pb.RemoveNetworkRes{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	log.Info("network removed successfully")
+
+	return &pb.RemoveNetworkRes{
+		Success: true,
+		Message: "Network removed successfully",
+	}, nil
 }

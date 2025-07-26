@@ -529,6 +529,28 @@ nodes:
 - **Upload Security**: Path traversal protection and system directory access prevention
 - **Scheduler Security**: Scheduled jobs maintain same isolation as immediate jobs
 
+## Network Requirements
+
+Joblet v2.9.3+ includes network isolation features that require:
+
+- Linux kernel with namespace support (CONFIG_NET_NS=y)
+- IP forwarding enabled
+- iptables with NAT support
+- Bridge utilities
+
+The installation package automatically configures these requirements.
+
+### Manual Network Setup (if needed)
+
+```bash
+# Enable IP forwarding
+sudo sysctl -w net.ipv4.ip_forward=1
+echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
+
+# Check network setup
+sudo /opt/joblet/scripts/check-network.sh
+
+
 ## 🛠️ Advanced Configuration
 
 ### CPU Core Management

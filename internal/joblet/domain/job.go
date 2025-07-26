@@ -38,6 +38,7 @@ type Job struct {
 	EndTime       *time.Time     // Completion timestamp (nil if running)
 	ExitCode      int32          // Process exit status
 	ScheduledTime *time.Time     // When the job should start (nil for immediate execution)
+	Network       string         // Network name
 }
 
 func (r *ResourceLimits) HasCoreRestriction() bool {

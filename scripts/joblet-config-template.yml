@@ -25,6 +25,17 @@ cgroup:
   enableControllers: [ "memory", "cpu", "io", "pids", "cpuset" ]
   cleanupTimeout: "1s"
 
+network:
+  state_dir: "/var/lib/joblet"
+  enabled: true
+  default_network: "bridge"
+  allow_custom_networks: true
+  max_custom_networks: 50
+  networks:
+    bridge:
+      cidr: "172.20.0.0/16"
+      bridge_name: "joblet0"
+
 filesystem:
   baseDir: "/opt/joblet/jobs"
   tmpDir: "/tmp/job-{JOB_ID}"
@@ -35,6 +46,11 @@ filesystem:
     - "/lib64"
     - "/usr/lib"
     - "/usr/lib64"
+    # Add SSL certificate directories
+    - "/etc/ssl"
+    - "/etc/pki"
+    - "/etc/ca-certificates"
+    - "/usr/share/ca-certificates"
   blockDevices: false
 
 grpc:

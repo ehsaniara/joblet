@@ -1,6 +1,40 @@
 #!/bin/bash
 set -e
 
+cleanup_network() {
+    echo "Cleaning up joblet network resources..."
+
+    # Remove iptables rules
+    iptables -t nat -D POSTROUTING -s 172.20.0.0/16 -j MASQUERADE 2>/dev/null || true
+
+    # Remove any isolated network NAT rules
+    iptables-save | grep "POSTROUTING.*10\.255\.255\.2.*MASQUERADE" | \
+        sed 's/-A/-D/' | while read rule; do
+        iptables -t nat $rule 2>/dev/null || true
+    done
+
+    # Remove FORWARD rules
+    for rule in $(iptables -S FORWARD | grep -E "joblet|viso" | sed 's/^-A/-D/'); do
+        iptables $rule 2>/dev/null || true
+    done
+
+    # Clean up veth interfaces
+    for veth in $(ip link show | grep -o 'viso[0-9]*' | grep -v '@'); do
+        ip link delete $veth 2>/dev/null || true
+    done
+
+    # On purge, remove bridges and state
+    if [ "$1" = "remove" ] && [ "$2" = "purge" ]; then
+        # Remove bridges
+        for bridge in $(ip link show type bridge | grep -o 'joblet[^ :]*'); do
+            ip link delete $bridge 2>/dev/null || true
+        done
+
+        # Remove state directory
+        rm -rf /var/lib/joblet
+    fi
+}
+
 case "$1" in
     remove|upgrade|deconfigure)
         # Stop the service
@@ -12,6 +46,9 @@ case "$1" in
         if systemctl is-enabled --quiet joblet; then
             systemctl disable joblet
         fi
+
+        # Clean up network
+        cleanup_network
         ;;
 esac
 
