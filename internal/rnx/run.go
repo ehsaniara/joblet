@@ -157,7 +157,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 			totalSize += int64(len(upload.Content))
 		}
 
-		fmt.Printf("📤 Uploading %d files (%.2f MB)...\n",
+		fmt.Printf("Uploading %d files (%.2f MB)...\n",
 			len(fileUploads), float64(totalSize)/1024/1024)
 	}
 
@@ -182,7 +182,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		MaxMemory: maxMemory,
 		MaxIOBPS:  maxIOBPS,
 		Uploads:   fileUploads,
-		Schedule:  scheduledTimeRFC3339, // Send RFC3339 string to server
+		Schedule:  scheduledTimeRFC3339,
 		Network:   network,
 	}
 

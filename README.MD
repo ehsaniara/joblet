@@ -8,12 +8,10 @@
 
 <img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
-📝 **Note:** Project recently renamed from _Worker_ to **Joblet** and **RNX** (CLI)
-
 **Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process
-isolation, resource limits, real-time monitoring, and **scheduled execution** - protecting your host system from
-malicious or resource-hungry
-processes.
+isolation, resource limits, real-time monitoring, **network isolation**, and **scheduled execution** - protecting your
+host system from
+malicious or resource-hungry processes.
 
 ## 🎯 Why Use Joblet?
 
@@ -39,6 +37,7 @@ user      2567  5.2  0.1  21532  2134 pts/0    Rs+  10:42   0:00 ps aux
 # ❌ Can see all processes, access sensitive files, consume unlimited resources
 # ❌ Can interfere with other applications
 # ❌ No resource controls or monitoring
+# ❌ No network isolation between workloads
 ```
 
 ### The Solution: Isolated Job Execution
@@ -53,6 +52,7 @@ root         1  0.0  0.0   2304   768 ?        S    10:45   0:00 ps aux
 # ✅ Process isolation - can only see its own processes
 # ✅ Filesystem isolation - limited access to host files  
 # ✅ Resource limits - memory, CPU, I/O controls
+# ✅ Network isolation - control inter-job communication
 # ✅ Real-time monitoring and logs
 # ✅ Scheduled execution for automation
 ```
@@ -70,11 +70,28 @@ Joblet consists of two components:
 
 - **Process Isolation**: Jobs run in separate PID namespaces
 - **Filesystem Isolation**: Chroot environments with limited host access
+- **Network Isolation**: Four network modes with custom network support
 - **Resource Limits**: CPU, memory, I/O bandwidth, and CPU core controls
 - **CPU Core Binding**: Limit jobs to specific CPU cores for performance isolation
 - **Network Security**: mTLS encryption with certificate-based authentication
 - **Role-Based Access**: Admin (full control) and Viewer (read-only) roles
 - **Job Scheduling**: Future execution with priority queue management
+
+## 🧭 Comparison Table: Joblet vs Competitors
+| Feature / Tool            | **Joblet** (v2.10.0)                          | **Apache DolphinScheduler**                 | **Dkron**                              | **JobRunr**                     | **gVisor** / **Kata**                     |
+|---------------------------|-----------------------------------------------|---------------------------------------------|----------------------------------------|---------------------------------|-------------------------------------------|
+| **Type**                  | Linux-native job execution platform           | Distributed job orchestration engine        | Distributed cron job scheduler         | In-memory job scheduler for JVM | OCI container runtime sandboxing          |
+| **Isolation Mechanism**   | Linux **namespaces** + **cgroups v2**         | None (relies on system agents)              | None (delegates to OS processes)       | JVM sandboxing                  | Full syscall interception / VM isolation  |
+| **Execution Mode**        | Binary CLI + gRPC API                         | Web UI + REST API                           | Agent-based CLI + API                  | Java code only (embedded)       | Containerized / OCI only                  |
+| **Filesystem Isolation**  | ✅ via chroot + mount namespace                | ❌                                           | ❌                                      | ❌                               | ✅ full container FS isolation             |
+| **Network Isolation**     | Optional (separate netns)                     | ❌                                           | ❌                                      | ❌                               | ✅ (via container)                         |
+| **Resource Limits**       | ✅ CPU, memory, I/O, pids via cgroups          | ❌                                           | ❌                                      | ❌                               | ✅ via kernel interface                    |
+| **Programming Interface** | gRPC + binary CLI                             | REST API                                    | HTTP API + CLI                         | Java annotations / Spring       | OCI runtime interface only                |
+| **Real-time Logging**     | ✅ Built-in SSE log stream + file              | Partial (log files in worker nodes)         | No streaming, logs stored in etcd/disk | Logs via application only       | No – depends on container logging driver  |
+| **Job Types Supported**   | Bash, Python, binary, arbitrary Linux process | Shell scripts, SQL, Spark, Flink, Python    | Shell scripts, HTTP/Webhooks, Docker   | Java method jobs (Lambdas)      | Any Linux process                         |
+| **Security Model**        | Local users or mTLS + RBAC                    | LDAP/SSO + role permissions                 | Basic Auth + token-based               | In-app only                     | Depends on container runtime              |
+| **Deployment Complexity** | ✅ One binary                                  | ❌ Complex (ZooKeeper, DB, multiple workers) | ✅ Medium (agents per node)             | ✅ Simple (library import)       | ❌ Requires container runtime setup        |
+| **Use Case Fit**          | Secure workload exec (CI/CD, scripts, etc.)   | Large ETL / batch orchestration             | Distributed cron with clustering       | Background tasks in Java apps   | Secure container workloads (e.g. sandbox) |
 
 ## 📦 Installation
 
@@ -191,6 +208,80 @@ rnx run bash -c "curl -s https://api.github.com/users/octocat"
 rnx run python3 -c "import json; print('Python available')"
 ```
 
+### Network Isolation
+
+Joblet supports four network modes for job isolation:
+
+#### 1. `none` - No Network (Most Secure)
+
+```bash
+# Complete network isolation - no network access
+rnx run --network=none python3 process_local_data.py
+rnx run --network=none bash data_analysis.sh
+```
+
+#### 2. `isolated` - External Access Only
+
+```bash
+# Can access external internet but isolated from other jobs
+rnx run --network=isolated wget "https://api.example.com/data"
+rnx run --network=isolated pip install requests
+rnx run --network=isolated curl "https://github.com/api/v3/repos"
+```
+
+#### 3. `bridge` - Default Internal Network (Default)
+
+```bash
+# Jobs can communicate within the same network (172.20.0.0/16)
+rnx run --network=bridge python3 api_server.py
+rnx run --network=bridge python3 worker.py
+rnx run --network=bridge curl "http://api:8080/status"
+
+# Bridge is the default if --network is not specified
+rnx run postgres  # Automatically uses bridge network
+```
+
+#### 4. Custom Networks - User Defined
+
+```bash
+# Create isolated custom networks with specific CIDR ranges
+rnx network create backend --cidr=10.1.0.0/24
+rnx network create frontend --cidr=10.2.0.0/24
+rnx network create analytics --cidr=192.168.100.0/24
+
+# Run jobs in custom networks - jobs in same network can communicate
+rnx run --network=backend postgres
+rnx run --network=backend python3 app.py
+rnx run --network=backend redis-server
+
+# Jobs in different custom networks are isolated from each other
+rnx run --network=frontend nginx  # Cannot access backend network
+
+# List all networks
+rnx network list
+# Output:
+# NAME           CIDR               BRIDGE          JOBS
+# -----------    --------------     -----------     ----
+# none           N/A                N/A             0 (built-in)
+# isolated       N/A                N/A             0 (built-in)
+# bridge         172.20.0.0/16      joblet0         3 (built-in)
+# backend        10.1.0.0/24        joblet-backend  3
+# frontend       10.2.0.0/24        joblet-frontend 1
+# analytics      192.168.100.0/24   joblet-analytics 0
+
+# Remove unused custom networks
+rnx network remove analytics
+```
+
+### Network Features
+
+- **Automatic IP Assignment**: Sequential IP allocation within each network
+- **DNS Resolution**: Jobs can resolve each other by name within the same network
+- **Network Isolation**: Custom networks are isolated from each other
+- **External Access Control**: `isolated` network allows internet access but no inter-job communication
+- **Resource Efficiency**: Minimal overhead with simple state management
+- **Clean Removal**: Networks can only be removed when no jobs are using them
+
 ### Job Scheduling
 
 Joblet supports scheduling jobs for future execution with flexible time specifications:
@@ -207,8 +298,8 @@ rnx run --schedule="2025-07-18T20:02:48" backup_script.sh
 rnx run --schedule="2025-07-18T20:02:48Z" maintenance.sh
 rnx run --schedule="2025-07-18T20:02:48-07:00" deploy.sh
 
-# Combine scheduling with resource limits
-rnx run --schedule="1hour" --max-cpu=50 --max-memory=512 heavy_computation.py
+# Combine scheduling with resource limits and network isolation
+rnx run --schedule="1hour" --max-cpu=50 --max-memory=512 --network=backend heavy_computation.py
 
 # Schedule with file uploads
 rnx run --schedule="30min" --upload-dir=dataset python3 process_data.py
@@ -250,9 +341,9 @@ rnx run --upload-dir=. python3 main.py
 # Complex data processing example
 rnx run --upload-dir=ml-project bash -c "cd ml-project && python3 train.py"
 
-# Scheduled jobs with uploads
-rnx run --schedule="1hour" --upload-dir=. python3 main.py
-rnx run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
+# Scheduled jobs with uploads and network isolation
+rnx run --schedule="1hour" --upload-dir=. --network=isolated python3 main.py
+rnx run --schedule="30min" --upload=data.csv --upload=process.py --network=backend python3 process.py
 ```
 
 #### Upload Features
@@ -267,13 +358,7 @@ rnx run --schedule="30min" --upload=data.csv --upload=process.py python3 process
 
 ```bash
 # Example output with upload optimization
-$ rnx run --schedule="1hour" --upload-dir=dataset python3 process_data.py
-
-📤 Upload optimized for memory efficiency:
-   Total: 15 files (25.3 MB)
-   Small files: 12 (embedded in job)
-   Large files: 3 (streamed to job)
-   Memory-safe chunking: Enabled
+$ rnx run --schedule="1hour" --upload-dir=dataset --network=analytics python3 process_data.py
 
 Job started:
 ID: 2
@@ -281,6 +366,8 @@ Command: python3 process_data.py
 Status: SCHEDULED
 Schedule Input: 1hour
 Scheduled Time: 2025-07-19T15:45:30Z
+Network: analytics
+Files: 15 uploaded successfully
 ```
 
 ### CPU Core Management
@@ -295,14 +382,14 @@ rnx run --cpu-cores="1,3,5,7" simulation_app           # Use cores 1,3,5,7
 # Single core allocation
 rnx run --cpu-cores="2" lightweight_task               # Use only core 2
 
-# Combine core limiting with other resource limits
-rnx run --cpu-cores="0-1" --max-cpu=150 --max-memory=512 heavy_computation
+# Combine core limiting with other resource limits and network
+rnx run --cpu-cores="0-1" --max-cpu=150 --max-memory=512 --network=backend heavy_computation
 
 # Reserve cores for system (use all except core 0)
 rnx run --cpu-cores="1-7" user_workload                # Leave core 0 for system
 
-# Schedule with core allocation
-rnx run --schedule="30min" --cpu-cores="2-5" --max-memory=1024 batch_job.py
+# Schedule with core allocation and network
+rnx run --schedule="30min" --cpu-cores="2-5" --max-memory=1024 --network=analytics batch_job.py
 ```
 
 ### Resource Limiting Examples
@@ -317,11 +404,11 @@ rnx run --cpu-cores="0-1" stress --cpu 2               # Full speed on cores 0-1
 # Combine both for precise control
 rnx run --cpu-cores="2-3" --max-cpu=150 workload       # 150% across cores 2-3 only
 
-# Memory and I/O limits
-rnx run --max-memory=1024 --max-iobps=10485760 data_processor
+# Memory and I/O limits with network isolation
+rnx run --max-memory=1024 --max-iobps=10485760 --network=isolated data_processor
 
-# Schedule with resource limits
-rnx run --schedule="2h" --max-cpu=25 --max-memory=512 overnight_batch.py
+# Schedule with resource limits and custom network
+rnx run --schedule="2h" --max-cpu=25 --max-memory=512 --network=backend overnight_batch.py
 ```
 
 #### Example
@@ -347,7 +434,7 @@ StartTime: 2025-07-11T06:18:54Z
 # List all jobs (including scheduled ones)
 rnx list
 
-# Get job details (including scheduled time)
+# Get job details (including scheduled time and network)
 rnx status <job-id>
 
 # Stream live logs
@@ -360,94 +447,156 @@ rnx stop <job-id>
 ### Remote Server Connection
 
 ```bash
-# Connect to remote daemon
-rnx --server=production:50051 run python3 script.py
+# List all configured nodes
+rnx nodes
+# Output:
+# Available nodes in configuration:
+#   - default (192.168.1.100:50051)
+#   - production (prod.example.com:50051)
+#   - staging (staging.example.com:50051)
+
+# Connect to specific node
+rnx --node=production run python3 script.py
 
 # Use different configurations
 rnx --config=prod-rnx-config.yml list
-rnx --node=production run deploy.sh
 
-# Set default server
-export JOBLET_SERVER=production:50051
-rnx list  # Uses production server
+# Set default node via environment
+export JOBLET_NODE=production
+rnx list  # Uses production node
 ```
 
 ### Real-World Examples
 
+#### Microservices Development with Network Isolation
+
+```bash
+# Create separate networks for different environments
+rnx network create dev --cidr=10.10.0.0/24
+rnx network create staging --cidr=10.20.0.0/24
+rnx network create prod --cidr=10.30.0.0/24
+
+# Development environment with inter-service communication
+rnx run --network=dev postgres:14
+rnx run --network=dev redis:latest
+rnx run --network=dev --upload-dir=. python3 api.py
+rnx run --network=dev --upload-dir=. python3 worker.py
+
+# Staging environment - isolated from dev
+rnx run --network=staging --schedule="30min" python3 api.py
+rnx run --network=staging postgres:14
+
+# Production - completely isolated
+rnx run --network=prod --cpu-cores="4-7" --max-memory=4096 python3 api.py
+```
+
+#### Data Pipeline with Network Segmentation
+
+```bash
+# Create networks for different pipeline stages
+rnx network create ingestion --cidr=10.100.0.0/24
+rnx network create processing --cidr=10.101.0.0/24
+rnx network create storage --cidr=10.102.0.0/24
+
+# Ingestion stage - external access only
+rnx run --network=isolated --schedule="1hour" python3 web_scraper.py
+rnx run --network=isolated python3 fetch_apis.py
+
+# Processing stage - internal only
+rnx run --network=processing --cpu-cores="0-3" --max-memory=8192 python3 etl.py
+rnx run --network=processing --upload-dir=models python3 process.py
+
+# Storage stage - isolated for security
+rnx run --network=storage postgres
+rnx run --network=storage --upload-dir=output python3 upload_s3.py
+```
+
 #### Automation & Scheduling
 
 ```bash
-# Daily backup at 2 AM
-rnx run --schedule="2025-07-20T02:00:00" --upload=backup.sh bash backup.sh
+# Daily backup at 2 AM with network isolation
+rnx run --schedule="2025-07-20T02:00:00" --upload=backup.sh --network=isolated bash backup.sh
 
-# Data processing every 30 minutes
-rnx run --schedule="30min" --upload-dir=data --max-memory=2048 python3 process.py
+# Data processing every 30 minutes in dedicated network
+rnx run --schedule="30min" --upload-dir=data --max-memory=2048 --network=analytics python3 process.py
 
-# Weekly maintenance
-rnx run --schedule="2025-07-27T03:00:00" --max-cpu=25 maintenance_script.sh
+# Weekly maintenance with no network access
+rnx run --schedule="2025-07-27T03:00:00" --max-cpu=25 --network=none maintenance_script.sh
 
-# Resource-limited batch processing
-rnx run --schedule="1hour" --cpu-cores="0-3" --max-memory=4096 batch_analysis.py
+# Resource-limited batch processing in custom network
+rnx run --schedule="1hour" --cpu-cores="0-3" --max-memory=4096 --network=batch batch_analysis.py
 ```
 
 #### High-Performance Computing
 
 ```bash
-# Parallel processing with dedicated cores
-rnx run --cpu-cores="0-3" --max-memory=4096 mpi_simulation
+# Create HPC network for compute cluster
+rnx network create hpc --cidr=192.168.200.0/24
+
+# Parallel processing with dedicated cores and network
+rnx run --network=hpc --cpu-cores="0-3" --max-memory=4096 mpi_simulation
+rnx run --network=hpc --cpu-cores="4-7" --max-memory=4096 mpi_worker
+rnx run --network=hpc --cpu-cores="8-11" --max-memory=4096 mpi_worker
 
 # CPU-intensive tasks with core isolation
-rnx run --cpu-cores="4-7" --max-memory=2048 scientific_computation
+rnx run --cpu-cores="4-7" --max-memory=2048 --network=none scientific_computation
 
 # Reserve cores for real-time applications
-rnx run --cpu-cores="8-11" realtime_data_processor
+rnx run --cpu-cores="8-11" --network=isolated realtime_data_processor
 
-# Scheduled HPC jobs
-rnx run --schedule="2025-07-20T00:00:00" --cpu-cores="0-15" --max-memory=16384 overnight_simulation.py
+# Scheduled HPC jobs in dedicated network
+rnx run --schedule="2025-07-20T00:00:00" --cpu-cores="0-15" --max-memory=16384 --network=hpc overnight_simulation.py
 ```
 
 #### Data Processing with Uploads
 
 ```bash
-# Process large datasets with file upload
-rnx run --upload-dir=datasets --cpu-cores="0-7" --max-memory=8192 python3 process_data.py
+# Process large datasets with file upload and network isolation
+rnx run --upload-dir=datasets --cpu-cores="0-7" --max-memory=8192 --network=analytics python3 process_data.py
 
 # Machine learning training with code and data upload
-rnx run --upload=train.py --upload-dir=data --cpu-cores="0-3" --max-memory=4096 python3 train.py
+rnx run --upload=train.py --upload-dir=data --cpu-cores="0-3" --max-memory=4096 --network=ml python3 train.py
 
 # Bioinformatics pipeline with multiple input files
-rnx run --upload-dir=genomes --upload=pipeline.sh --max-memory=16384 bash pipeline.sh
+rnx run --upload-dir=genomes --upload=pipeline.sh --max-memory=16384 --network=none bash pipeline.sh
 
-# Scheduled data processing
-rnx run --schedule="6h" --upload-dir=daily-data --max-memory=8192 python3 daily_analysis.py
+# Scheduled data processing in isolated network
+rnx run --schedule="6h" --upload-dir=daily-data --max-memory=8192 --network=isolated python3 daily_analysis.py
 ```
 
 #### Development Workflow
 
 ```bash
+# Create development network
+rnx network create devnet --cidr=10.50.0.0/24
+
 # Test on remote development server with limited resources
-rnx --server=dev-server:50051 run --upload-dir=. --cpu-cores="0-1" --max-memory=1024 pytest tests/
+rnx --server=dev-server:50051 run --upload-dir=. --cpu-cores="0-1" --max-memory=1024 --network=devnet pytest tests/
 
 # Build project with uploaded source code
-rnx run --upload-dir=src --cpu-cores="2-5" --max-memory=2048 make build
+rnx run --upload-dir=src --cpu-cores="2-5" --max-memory=2048 --network=none make build
 
 # Run security scans on uploaded codebase
-rnx run --upload-dir=. --cpu-cores="6" --max-memory=512 trivy scan .
+rnx run --upload-dir=. --cpu-cores="6" --max-memory=512 --network=isolated trivy scan .
 
-# Schedule nightly builds
-rnx run --schedule="2025-07-20T01:00:00" --upload-dir=. --max-memory=4096 make build test
+# Schedule nightly builds in dedicated network
+rnx run --schedule="2025-07-20T01:00:00" --upload-dir=. --max-memory=4096 --network=build make build test
 ```
 
 #### CI/CD Integration
 
 ```bash
+# Create CI/CD networks
+rnx network create ci --cidr=10.200.0.0/24
+rnx network create cd --cidr=10.201.0.0/24
+
 # In CI pipeline with core allocation and artifact upload
 export JOBLET_SERVER=build-server:50051
-rnx run --upload-dir=. --cpu-cores="0-3" --max-memory=2048 docker build -t myapp .
-rnx run --upload=test-config.yml --cpu-cores="4-5" --max-cpu=50 npm test
+rnx run --upload-dir=. --cpu-cores="0-3" --max-memory=2048 --network=ci docker build -t myapp .
+rnx run --upload=test-config.yml --cpu-cores="4-5" --max-cpu=50 --network=ci npm test
 
-# Schedule deployment
-rnx run --schedule="2025-07-20T18:00:00" --upload-dir=dist deploy.sh
+# Schedule deployment in CD network
+rnx run --schedule="2025-07-20T18:00:00" --upload-dir=dist --network=cd deploy.sh
 ```
 
 ## ⚙️ Configuration
@@ -472,6 +621,14 @@ joblet:
 cgroup:
   baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service"
   enableControllers: [ "memory", "cpu", "io", "pids", "cpuset" ]  # cpuset for core limiting
+
+# Network configuration
+network:
+  stateDir: "/var/lib/joblet"
+  networks:
+    bridge:
+      cidr: "172.20.0.0/16"
+      bridgeName: "joblet0"
 
 security:
   # Certificates embedded here automatically
@@ -523,15 +680,15 @@ nodes:
 
 - **Process Isolation**: Each job runs in separate PID namespace (can only see its own processes)
 - **Filesystem Isolation**: Jobs run in chroot with limited host access
+- **Network Isolation**: Four network modes with custom network support for traffic segmentation
 - **Resource Isolation**: CPU, memory, and I/O limits prevent resource exhaustion
 - **CPU Core Isolation**: Jobs are bound to specific CPU cores for performance isolation
-- **Network Isolation**: Optional network namespace isolation
 - **Upload Security**: Path traversal protection and system directory access prevention
 - **Scheduler Security**: Scheduled jobs maintain same isolation as immediate jobs
 
 ## Network Requirements
 
-Joblet v2.9.3+ includes network isolation features that require:
+Joblet includes network isolation features that require:
 
 - Linux kernel with namespace support (CONFIG_NET_NS=y)
 - IP forwarding enabled
@@ -549,9 +706,26 @@ echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
 
 # Check network setup
 sudo /opt/joblet/scripts/check-network.sh
-
+```
 
 ## 🛠️ Advanced Configuration
+
+### Network Management
+
+#### Creating Custom Networks
+
+```bash
+# Create networks with specific CIDR ranges
+rnx network create dev --cidr=10.10.0.0/24
+rnx network create prod --cidr=10.20.0.0/24
+rnx network create dmz --cidr=172.16.0.0/24
+
+# List all networks with job counts
+rnx network list
+
+# Remove unused networks
+rnx network remove dev
+```
 
 ### CPU Core Management
 
@@ -573,21 +747,21 @@ taskset -cp $(pgrep your_process)  # View process CPU affinity
 #### Multi-Tenant Core Allocation
 
 ```bash
-# User 1: Cores 0-3 for development
-rnx run --cpu-cores="0-3" dev_workload
+# User 1: Cores 0-3 for development in dev network
+rnx run --cpu-cores="0-3" --network=dev dev_workload
 
-# User 2: Cores 4-7 for testing  
-rnx run --cpu-cores="4-7" test_suite
+# User 2: Cores 4-7 for testing in test network
+rnx run --cpu-cores="4-7" --network=test test_suite
 
-# User 3: Cores 8-11 for production tasks
-rnx run --cpu-cores="8-11" prod_service
+# User 3: Cores 8-11 for production tasks in prod network
+rnx run --cpu-cores="8-11" --network=prod prod_service
 
 # System: Reserve cores 12-15 for OS and services
 # (no job allocation on these cores)
 
-# Schedule different workloads on different cores
-rnx run --schedule="2h" --cpu-cores="0-3" batch_dev.py
-rnx run --schedule="4h" --cpu-cores="4-7" test_automation.py
+# Schedule different workloads on different cores and networks
+rnx run --schedule="2h" --cpu-cores="0-3" --network=dev batch_dev.py
+rnx run --schedule="4h" --cpu-cores="4-7" --network=test test_automation.py
 ```
 
 #### NUMA-Aware Core Allocation
@@ -597,11 +771,11 @@ rnx run --schedule="4h" --cpu-cores="4-7" test_automation.py
 numactl --hardware
 
 # Allocate cores from specific NUMA nodes
-rnx run --cpu-cores="0-7" numa_node_0_workload     # NUMA node 0
-rnx run --cpu-cores="8-15" numa_node_1_workload    # NUMA node 1
+rnx run --cpu-cores="0-7" --network=numa0 numa_node_0_workload     # NUMA node 0
+rnx run --cpu-cores="8-15" --network=numa1 numa_node_1_workload    # NUMA node 1
 
 # Schedule NUMA-aware jobs
-rnx run --schedule="1hour" --cpu-cores="0-7" --max-memory=4096 numa_optimized.py
+rnx run --schedule="1hour" --cpu-cores="0-7" --max-memory=4096 --network=hpc numa_optimized.py
 ```
 
 ### Regenerate Certificates
@@ -641,9 +815,9 @@ nodes:
 rnx --node=development run pytest
 rnx --node=production run deploy.sh
 
-# Schedule jobs on different environments
-rnx --node=staging run --schedule="30min" integration_tests.py
-rnx --node=production run --schedule="2025-07-20T02:00:00" backup.sh
+# Schedule jobs on different environments with different networks
+rnx --node=staging run --schedule="30min" --network=test integration_tests.py
+rnx --node=production run --schedule="2025-07-20T02:00:00" --network=prod backup.sh
 ```
 
 ### Service Management
@@ -682,6 +856,24 @@ openssl x509 -in ~/.rnx/rnx-config.yml -noout -text
 
 # Regenerate if needed
 sudo /usr/local/bin/certs_gen_embedded.sh
+```
+
+**Network issues**
+
+```bash
+# Check network configuration
+rnx network list
+
+# Verify bridge interfaces
+ip link show type bridge
+
+# Check iptables rules
+sudo iptables -L -n -v
+sudo iptables -t nat -L -n -v
+
+# Test network isolation
+rnx run --network=backend ping test2
+rnx run --network=frontend ping test1  # Should fail
 ```
 
 **CPU core limiting not working**
@@ -736,12 +928,16 @@ cat /sys/fs/cgroup/joblet.slice/joblet.service/job-*/memory.current
 
 # Monitor scheduler performance
 sudo journalctl -u joblet | grep "scheduled job"
+
+# Monitor network usage per job
+ip -s link show | grep veth
 ```
 
 ### Getting Help
 
 - **Configuration Examples**: `rnx config-help`
 - **Node Information**: `rnx nodes`
+- **Network Information**: `rnx network list`
 - **GitHub Issues**: [Report bugs](https://github.com/ehsaniara/joblet/issues)
 - **Documentation**: Full docs in `/docs` directory
 
@@ -753,9 +949,10 @@ sudo journalctl -u joblet | grep "scheduled job"
 - **CPU**: Multi-core CPU recommended for core limiting features
 - **Memory**: 1GB+ RAM
 - **Disk**: 5GB+ available space
-- **Network**: Port 50051 (configurable)
+- **Network**: Port 50051 (configurable), kernel namespace support
 - **Privileges**: Root access for namespace operations
 - **Cgroups**: cgroups v2 with cpuset controller support
+- **Network Tools**: iptables, iproute2, bridge-utils
 
 ### RNX CLI (Client)
 
@@ -765,6 +962,18 @@ sudo journalctl -u joblet | grep "scheduled job"
 
 ## 🚀 Command Reference
 
+### Core Commands
+
+| Command         | Description                                | Example                            |
+|-----------------|--------------------------------------------|------------------------------------|
+| `rnx run`       | Run a job with specified command and args  | `rnx run python3 script.py`        |
+| `rnx list`      | List all jobs (running and scheduled)      | `rnx list`                         |
+| `rnx status`    | Get detailed status of a specific job      | `rnx status 123`                   |
+| `rnx log`       | Stream live logs from a running job        | `rnx log 123`                      |
+| `rnx stop`      | Stop a running or scheduled job            | `rnx stop 123`                     |
+| `rnx nodes`     | List all configured server nodes           | `rnx nodes`                        |
+| `rnx config-help` | Show configuration file examples         | `rnx config-help`                  |
+
 ### Resource Limiting Flags
 
 | Flag               | Description                | Example                                      |
@@ -773,6 +982,20 @@ sudo journalctl -u joblet | grep "scheduled job"
 | `--max-memory=N`   | Memory limit in MB         | `--max-memory=1024` (1GB)                    |
 | `--max-iobps=N`    | I/O bandwidth in bytes/sec | `--max-iobps=10485760` (10MB/s)              |
 | `--cpu-cores=SPEC` | CPU cores specification    | `--cpu-cores="0-3"` or `--cpu-cores="1,3,5"` |
+
+### Network Flags
+
+| Flag             | Description             | Example             |
+|------------------|-------------------------|---------------------|
+| `--network=NAME` | Specify network for job | `--network=backend` |
+
+### Network Commands
+
+| Command              | Description           | Example                                     |
+|----------------------|-----------------------|---------------------------------------------|
+| `rnx network create` | Create custom network | `rnx network create dev --cidr=10.1.0.0/24` |
+| `rnx network list`   | List all networks     | `rnx network list`                          |
+| `rnx network remove` | Remove custom network | `rnx network remove dev`                    |
 
 ### File Upload Flags
 
@@ -809,6 +1032,15 @@ sudo journalctl -u joblet | grep "scheduled job"
 | `"2025-07-20T15:30:00"`       | Absolute local time    | Specific date/time         |
 | `"2025-07-20T15:30:00Z"`      | Absolute UTC time      | Specific date/time (UTC)   |
 | `"2025-07-20T15:30:00-07:00"` | Absolute with timezone | Specific date/time with TZ |
+
+### Network Type Examples
+
+| Network Type | Description                    | Example Usage                             |
+|--------------|--------------------------------|-------------------------------------------|
+| `none`       | No network access              | `--network=none` (most secure)            |
+| `isolated`   | External internet only         | `--network=isolated` (no inter-job comms) |
+| `bridge`     | Default internal network       | `--network=bridge` or omit flag           |
+| Custom       | User-created isolated networks | `--network=backend` (after creating it)   |
 
 ## 🤝 Contributing
 

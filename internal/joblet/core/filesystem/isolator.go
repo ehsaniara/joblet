@@ -186,6 +186,13 @@ func (f *JobFilesystem) Setup() error {
 		return fmt.Errorf("failed to mount allowed directories: %w", err)
 	}
 
+	// Mount pipes directory for uploads
+	if err := f.mountPipesDirectory(); err != nil {
+		// Log warning but don't fail - jobs without uploads should still work
+		log.Warn("failed to mount pipes directory", "error", err)
+		// Don't return error - continue without upload support
+	}
+
 	// Setup /tmp as isolated writable space
 	if err := f.setupTmpDir(); err != nil {
 		return fmt.Errorf("failed to setup tmp directory: %w", err)
@@ -409,6 +416,59 @@ func (f *JobFilesystem) validateInJobContext() error {
 			f.logger.Debug("safety check: many root entries visible, may be on host", "entries", len(entries))
 		}
 	}
+
+	return nil
+}
+
+// mountPipesDirectory mounts the host pipes directory into the chroot
+// This allows the init process to access upload pipes created by the server
+func (f *JobFilesystem) mountPipesDirectory() error {
+	// Get job ID from environment
+	jobID := f.platform.Getenv("JOB_ID")
+	if jobID == "" {
+		f.logger.Debug("no JOB_ID set, skipping pipes mount")
+		return nil
+	}
+
+	// Host pipes directory (where server creates the pipe)
+	hostPipesPath := fmt.Sprintf("/opt/joblet/jobs/%s/pipes", jobID)
+
+	// Check if host pipes directory exists
+	if _, err := f.platform.Stat(hostPipesPath); err != nil {
+		if f.platform.IsNotExist(err) {
+			f.logger.Debug("pipes directory doesn't exist yet", "path", hostPipesPath)
+			// Create it so mount doesn't fail
+			if err := f.platform.MkdirAll(hostPipesPath, 0700); err != nil {
+				return fmt.Errorf("failed to create host pipes directory: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to stat pipes directory: %w", err)
+		}
+	}
+
+	// Target path inside chroot (maintaining the same path structure)
+	targetPipesPath := filepath.Join(f.RootDir, "opt/joblet/jobs", jobID, "pipes")
+
+	// Create the directory structure in chroot
+	targetParentDir := filepath.Dir(targetPipesPath)
+	if err := f.platform.MkdirAll(targetParentDir, 0755); err != nil {
+		return fmt.Errorf("failed to create pipes parent directory in chroot: %w", err)
+	}
+
+	// Create the pipes directory itself
+	if err := f.platform.MkdirAll(targetPipesPath, 0700); err != nil {
+		return fmt.Errorf("failed to create pipes directory in chroot: %w", err)
+	}
+
+	// Bind mount the pipes directory
+	flags := uintptr(syscall.MS_BIND)
+	if err := f.platform.Mount(hostPipesPath, targetPipesPath, "", flags, ""); err != nil {
+		return fmt.Errorf("failed to bind mount pipes directory: %w", err)
+	}
+
+	f.logger.Debug("mounted pipes directory",
+		"hostPath", hostPipesPath,
+		"targetPath", targetPipesPath)
 
 	return nil
 }

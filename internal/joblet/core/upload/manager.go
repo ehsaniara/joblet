@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	PipeBufferSize   = 64 * 1024 // 64KB pipe buffer
 	UploadTimeout    = 5 * time.Minute
 	DefaultChunkSize = 64 * 1024 // Default chunk size
 )
+
+// Ensure Manager implements domain.UploadManager
+var _ domain.UploadManager = (*Manager)(nil)
 
 // Manager handles streaming file uploads with memory-aware chunking
 type Manager struct {
@@ -72,7 +74,9 @@ func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload
 // CreateUploadPipe creates a named pipe for streaming files
 func (m *Manager) CreateUploadPipe(jobID string) (string, error) {
 	pipeDir := fmt.Sprintf("/opt/joblet/jobs/%s/pipes", jobID)
-	if err := m.platform.MkdirAll(pipeDir, 0700); err != nil {
+
+	// Create directory with proper permissions
+	if err := m.platform.MkdirAll(pipeDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create pipe directory: %w", err)
 	}
 
@@ -104,21 +108,18 @@ func (m *Manager) StreamAllFiles(ctx context.Context, session *domain.UploadSess
 	defer pipe.Close()
 
 	// Stream each file using the same mechanism
-	for i, file := range session.Files {
+	for _, file := range session.Files {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		log.Debug("streaming file", "file", file.Path, "size", file.Size, "index", i+1)
-
 		if err := m.streamSingleFile(ctx, pipe, file, session.ChunkSize); err != nil {
 			return fmt.Errorf("failed to stream file %s: %w", file.Path, err)
 		}
 	}
 
-	log.Debug("file streaming completed")
 	return nil
 }
 
@@ -196,7 +197,6 @@ func (m *Manager) checkMemoryPressure() error {
 		pressureStr := string(data)
 		if len(pressureStr) > 0 {
 			// Simple heuristic: if file is not empty, there's some pressure
-			m.logger.Debug("memory pressure detected", "pressure", pressureStr)
 			return fmt.Errorf("memory pressure")
 		}
 	}
@@ -206,12 +206,7 @@ func (m *Manager) checkMemoryPressure() error {
 
 // ProcessAllFiles processes all files directly in the workspace
 func (m *Manager) ProcessAllFiles(session *domain.UploadSession, workspacePath string) error {
-	if len(session.Files) == 0 {
-		return nil
-	}
-
 	log := m.logger.WithField("operation", "process-all-files")
-	log.Debug("processing files", "fileCount", len(session.Files))
 
 	for _, file := range session.Files {
 		fullPath := filepath.Join(workspacePath, file.Path)
@@ -230,7 +225,7 @@ func (m *Manager) ProcessAllFiles(session *domain.UploadSession, workspacePath s
 			// Create parent directory
 			parentDir := filepath.Dir(fullPath)
 			if err := m.platform.MkdirAll(parentDir, 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", file.Path, err)
+				return fmt.Errorf("failed to create parent directory: %w", err)
 			}
 
 			// Write file
@@ -245,7 +240,7 @@ func (m *Manager) ProcessAllFiles(session *domain.UploadSession, workspacePath s
 		}
 	}
 
-	log.Debug("file processing completed")
+	log.Info("processed all files", "count", len(session.Files), "workspacePath", workspacePath)
 	return nil
 }
 

@@ -9,26 +9,61 @@ import (
 	"joblet/pkg/platform"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // JobExecutor handles job execution in init mode with consolidated environment handling
 type JobExecutor struct {
-	platform   platform.Platform
-	logger     *logger.Logger
-	envBuilder *environment.Builder
+	platform      platform.Platform
+	logger        *logger.Logger
+	envBuilder    *environment.Builder
+	uploadManager *upload.Manager
 }
 
 // NewJobExecutor creates a new job executor
 func NewJobExecutor(platform platform.Platform, logger *logger.Logger) *JobExecutor {
+	// Create upload manager
 	uploadManager := upload.NewManager(platform, logger)
-	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
+
+	// Create upload factory for creating stream contexts
+	uploadFactory := upload.NewFactory(logger)
+
+	// Create environment builder with all dependencies
+	envBuilder := environment.NewBuilder(platform, uploadManager, uploadFactory, logger)
 
 	return &JobExecutor{
-		platform:   platform,
-		logger:     logger.WithField("component", "job-executor"),
-		envBuilder: envBuilder,
+		platform:      platform,
+		logger:        logger.WithField("component", "job-executor"),
+		envBuilder:    envBuilder,
+		uploadManager: uploadManager, // Store for direct access if needed
 	}
+}
+
+// ExecuteInInitMode executes a job in init mode
+func (je *JobExecutor) ExecuteInInitMode() error {
+	// Load job configuration from environment
+	config, err := je.envBuilder.LoadJobConfigFromEnvironment()
+	if err != nil {
+		return fmt.Errorf("failed to load job config: %w", err)
+	}
+
+	log := je.logger.WithField("jobID", config.JobID).
+		WithField("totalFiles", config.TotalFiles)
+
+	log.Debug("executing job in init mode",
+		"command", config.Command,
+		"args", config.Args,
+		"hasUploads", config.HasUploadSession)
+
+	// Process uploads if present
+	if config.HasUploadSession && config.UploadPipePath != "" {
+		if e := je.processUploads(config); e != nil {
+			log.Error("failed to process uploads", "error", e)
+			// Continue execution even if upload fails
+		}
+	}
+
+	// Execute the command
+	return je.executeCommand(config)
 }
 
 // Execute executes the job using consolidated environment handling
@@ -38,7 +73,6 @@ func Execute(logger *logger.Logger) error {
 	return executor.ExecuteJob()
 }
 
-// ExecuteJob executes the job with consolidated upload and environment handling
 func (je *JobExecutor) ExecuteJob() error {
 	// Load configuration from environment
 	config, err := je.envBuilder.LoadJobConfigFromEnvironment()
@@ -47,21 +81,25 @@ func (je *JobExecutor) ExecuteJob() error {
 	}
 
 	log := je.logger.WithField("jobID", config.JobID)
-	log.Debug("executing job in init mode",
-		"command", config.Command,
-		"args", config.Args,
-		"hasUploads", config.HasUploadSession)
 
-	// Process uploads if present
-	if config.HasUploadSession && config.UploadPipePath != "" {
-		if err := je.processUploads(config); err != nil {
-			log.Error("failed to process uploads", "error", err)
-			// Continue execution even if upload fails
-		}
+	// Check which phase we're in
+	phase := je.platform.Getenv("JOB_PHASE")
+
+	switch phase {
+	case "upload":
+		// Upload phase is handled in server.go
+		return fmt.Errorf("upload phase should be handled by server.go")
+
+	case "execute", "":
+		// Execute phase - just run the command
+		log.Debug("executing job in init mode", "command", config.Command, "args", config.Args,
+			"hasUploads", je.platform.Getenv("JOB_HAS_UPLOADS") == "true")
+
+		return je.executeCommand(config)
+
+	default:
+		return fmt.Errorf("unknown job phase: %s", phase)
 	}
-
-	// Execute the command
-	return je.executeCommand(config)
 }
 
 // processUploads handles upload processing from the pipe
@@ -88,86 +126,33 @@ func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
 	return nil
 }
 
-// executeCommand executes the actual command
+// executeCommand remains mostly the same but simpler
 func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
-	// Check if we should exec (replace process)
-	shouldExec := je.platform.Getenv("JOBLET_EXEC_AFTER_ISOLATION") == "true"
-
 	// Resolve command path
 	commandPath, err := je.resolveCommandPath(config.Command)
 	if err != nil {
 		return fmt.Errorf("failed to resolve command: %w", err)
 	}
 
-	if shouldExec {
-		// Use exec to completely replace the joblet process
-		// This makes the user command become PID 1 with no trace of joblet
-		je.logger.Debug("executing command with exec (process replacement)",
-			"command", commandPath,
-			"args", config.Args)
-
-		// Build argv array (command is argv[0])
-		argv := append([]string{commandPath}, config.Args...)
-
-		// Get clean environment (remove joblet-specific vars)
-		envv := je.cleanEnvironment()
-
-		// This replaces the current process entirely
-		// After this, the user command IS PID 1
-		return je.platform.Exec(commandPath, argv, envv)
-	}
-
-	// Fallback: run as child process (original behavior)
+	// Create command
 	cmd := je.platform.CreateCommand(commandPath, config.Args...)
+
+	// Set stdout and stderr to inherit from parent (which are connected to OutputWriter)
 	cmd.SetStdout(os.Stdout)
 	cmd.SetStderr(os.Stderr)
-	cmd.SetStdin(os.Stdin)
 
-	if config.HasUploadSession {
-		cmd.SetDir("/work")
+	// Change to workspace if uploads were processed
+	if je.platform.Getenv("JOB_HAS_UPLOADS") == "true" {
+		workDir := "/work"
+		if _, err := je.platform.Stat(workDir); err == nil {
+			cmd.SetDir(workDir)
+			je.logger.Debug("changed working directory to /work")
+		}
 	}
 
+	je.logger.Info("executing job command", "command", commandPath, "args", config.Args)
+	// Execute
 	return cmd.Run()
-}
-
-// cleanEnvironment removes joblet-specific environment variables
-func (je *JobExecutor) cleanEnvironment() []string {
-	current := je.platform.Environ()
-	cleaned := make([]string, 0, len(current))
-
-	// List of prefixes to remove
-	removePrefix := []string{
-		"JOBLET_",
-		"JOB_ID=",
-		"JOB_COMMAND=",
-		"JOB_CGROUP_",
-		"JOB_ARG_",
-		"JOB_MAX_",
-		"JOB_UPLOAD_",
-	}
-
-	for _, env := range current {
-		keep := true
-		for _, prefix := range removePrefix {
-			if strings.HasPrefix(env, prefix) {
-				keep = false
-				break
-			}
-		}
-		if keep {
-			cleaned = append(cleaned, env)
-		}
-	}
-
-	// minimal required environment
-	cleaned = append(cleaned,
-		"PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
-		"HOME=/tmp",
-		"USER=nobody",
-		"TERM=xterm",
-	)
-
-	return cleaned
 }
 
 // resolveCommandPath resolves the full path for a command

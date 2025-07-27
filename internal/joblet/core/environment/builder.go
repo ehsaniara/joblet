@@ -2,7 +2,6 @@ package environment
 
 import (
 	"fmt"
-	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -13,15 +12,22 @@ import (
 // Builder handles environment variable construction for job execution
 type Builder struct {
 	platform      platform.Platform
-	uploadManager *upload.Manager
+	uploadManager domain.UploadManager
+	streamFactory domain.UploadSessionFactory
 	logger        *logger.Logger
 }
 
 // NewBuilder creates a new environment builder
-func NewBuilder(platform platform.Platform, uploadManager *upload.Manager, logger *logger.Logger) *Builder {
+func NewBuilder(
+	platform platform.Platform,
+	uploadManager domain.UploadManager,
+	streamFactory domain.UploadSessionFactory,
+	logger *logger.Logger,
+) *Builder {
 	return &Builder{
 		platform:      platform,
 		uploadManager: uploadManager,
+		streamFactory: streamFactory,
 		logger:        logger.WithField("component", "env-builder"),
 	}
 }
@@ -34,15 +40,8 @@ type JobEnvironmentConfig struct {
 	BaseEnv     []string // Optional base environment, defaults to platform.Environ()
 }
 
-// StreamContext holds information for upload streaming (temporary definition if not in upload package)
-type StreamContext struct {
-	Session  *domain.UploadSession
-	PipePath string
-	JobID    string
-}
-
 // BuildJobEnvironment builds the complete environment for job execution
-func (b *Builder) BuildJobEnvironment(config *JobEnvironmentConfig) ([]string, *StreamContext) {
+func (b *Builder) BuildJobEnvironment(config *JobEnvironmentConfig) ([]string, domain.UploadStreamer) {
 	if config.BaseEnv == nil {
 		config.BaseEnv = b.platform.Environ()
 	}
@@ -51,14 +50,14 @@ func (b *Builder) BuildJobEnvironment(config *JobEnvironmentConfig) ([]string, *
 	jobEnv := b.buildCoreEnvironment(config.Job, config.ExecutePath)
 
 	// Handle uploads if present
-	var streamCtx *StreamContext
+	var streamer domain.UploadStreamer
 	if len(config.Uploads) > 0 {
-		uploadEnv, ctx := b.buildUploadEnvironment(config.Job, config.Uploads)
+		uploadEnv, str := b.buildUploadEnvironment(config.Job, config.Uploads)
 		jobEnv = append(jobEnv, uploadEnv...)
-		streamCtx = ctx
+		streamer = str
 	}
 
-	return append(config.BaseEnv, jobEnv...), streamCtx
+	return append(config.BaseEnv, jobEnv...), streamer
 }
 
 // buildCoreEnvironment builds the core job-specific environment variables
@@ -92,18 +91,22 @@ func (b *Builder) buildCoreEnvironment(job *domain.Job, execPath string) []strin
 }
 
 // buildUploadEnvironment builds upload-specific environment and returns stream context
-func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileUpload) ([]string, *StreamContext) {
+func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileUpload) ([]string, domain.UploadStreamer) {
+	var env []string
+
+	// Prepare upload session
 	session, err := b.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.MaxMemory)
 	if err != nil {
 		b.logger.Error("failed to prepare upload session", "error", err)
-		return nil, nil
+		return env, nil
 	}
 
-	env := []string{
+	// Set basic upload info
+	env = append(env,
 		fmt.Sprintf("JOB_UPLOAD_SESSION=%t", true),
 		fmt.Sprintf("JOB_UPLOAD_TOTAL_FILES=%d", session.TotalFiles),
 		fmt.Sprintf("JOB_UPLOAD_TOTAL_SIZE=%d", session.TotalSize),
-	}
+	)
 
 	// Create streaming context if files are present
 	if len(session.Files) > 0 {
@@ -115,12 +118,9 @@ func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileU
 
 		env = append(env, fmt.Sprintf("JOB_UPLOAD_PIPE=%s", pipePath))
 
-		// Return context for streaming
-		return env, &StreamContext{
-			Session:  session,
-			PipePath: pipePath,
-			JobID:    job.Id,
-		}
+		// Use factory to create stream context
+		streamer := b.streamFactory.CreateStreamContext(session, pipePath, job.Id)
+		return env, streamer
 	}
 
 	return env, nil
@@ -212,17 +212,4 @@ func (b *Builder) LoadJobConfigFromEnvironment() (*JobConfig, error) {
 		UploadPipePath:   uploadPipePath,
 		TotalFiles:       totalFiles,
 	}, nil
-}
-
-// SetManager sets the upload manager for the stream context
-func (sc *StreamContext) SetManager(m *upload.Manager) {
-	// This is a simplified version - in production you might want to store the manager
-	// or use it to perform operations
-}
-
-// StartStreaming starts the background streaming of files
-func (sc *StreamContext) StartStreaming() error {
-	// This should be implemented based on your upload manager's capabilities
-	// For now, return nil to indicate success
-	return nil
 }

@@ -2,13 +2,18 @@ package core
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/network"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
-	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/core/process"
 	"joblet/internal/joblet/core/unprivileged"
 	"joblet/internal/joblet/core/upload"
@@ -44,7 +49,8 @@ func NewExecutionEngine(
 	jobIsolation *unprivileged.JobIsolation,
 	networkStore *state.NetworkStore,
 ) *ExecutionEngine {
-	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
+	uploadFactory := upload.NewFactory(logger)
+	envBuilder := environment.NewBuilder(platform, uploadManager, uploadFactory, logger)
 
 	return &ExecutionEngine{
 		processManager: processManager,
@@ -69,9 +75,10 @@ type StartProcessOptions struct {
 	PreProcessUploads bool // For scheduled jobs that need uploads processed beforehand
 }
 
-// StartProcess starts a job process with the given options
+// StartProcess starts a job process with proper isolation and phased execution
 func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
 	log := ee.logger.WithField("jobID", opts.Job.Id)
+	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
 
 	// Get executable path
 	execPath, err := ee.platform.Executable()
@@ -81,34 +88,123 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 
 	// Create job base directory
 	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id)
-	if err := ee.platform.MkdirAll(filepath.Join(jobDir, "sbin"), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create job directory: %w", err)
+	if e := ee.platform.MkdirAll(filepath.Join(jobDir, "sbin"), 0755); e != nil {
+		return nil, fmt.Errorf("failed to create job directory: %w", e)
 	}
 
 	// Copy joblet binary to job directory
 	isolatedInitPath := filepath.Join(jobDir, "sbin", "init")
-	if err := ee.copyInitBinary(execPath, isolatedInitPath); err != nil {
-		return nil, fmt.Errorf("failed to prepare init binary: %w", err)
+	if e := ee.copyInitBinary(execPath, isolatedInitPath); e != nil {
+		return nil, fmt.Errorf("failed to prepare init binary: %w", e)
 	}
 
-	// Handle pre-processing of uploads if needed
-	if opts.PreProcessUploads && len(opts.Uploads) > 0 {
-		if err := ee.preProcessUploads(ctx, opts); err != nil {
-			return nil, fmt.Errorf("failed to pre-process uploads: %w", err)
+	// CHANGED: Use two-phase execution for uploads
+	if len(opts.Uploads) > 0 {
+		log.Info("executing two-phase job with uploads")
+
+		// Phase 1: Upload processing within isolation
+		if err := ee.executeUploadPhase(ctx, opts, isolatedInitPath); err != nil {
+			// we Don't cleanup here - let the caller handle it
+			return nil, fmt.Errorf("upload phase failed: %w", err)
 		}
+
+		log.Info("upload phase completed successfully")
 	}
 
-	// Build environment
-	envConfig := &environment.JobEnvironmentConfig{
-		Job:         opts.Job,
-		ExecutePath: "/sbin/init",
-		Uploads:     opts.Uploads,
+	// Phase 2: Job execution (with or without uploads)
+	return ee.executeJobPhase(ctx, opts, isolatedInitPath)
+}
+
+// executeUploadPhase runs the upload phase in full isolation
+func (ee *ExecutionEngine) executeUploadPhase(ctx context.Context, opts *StartProcessOptions, initPath string) error {
+	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("phase", "upload")
+
+	// Serialize uploads to pass via environment
+	uploadsJSON, err := json.Marshal(opts.Uploads)
+	if err != nil {
+		return fmt.Errorf("failed to serialize uploads: %w", err)
 	}
 
-	env, streamCtx := ee.envBuilder.BuildJobEnvironment(envConfig)
-	env = append(env, "JOBLET_EXEC_AFTER_ISOLATION=true")
+	// Encode to base64 to avoid issues with special characters
+	uploadsB64 := base64.StdEncoding.EncodeToString(uploadsJSON)
 
-	// Setup network synchronization pipe if network is configured
+	// Build environment for upload phase
+	env := ee.buildPhaseEnvironment(opts.Job, "upload")
+	env = append(env, fmt.Sprintf("JOB_UPLOADS_DATA=%s", uploadsB64))
+	env = append(env, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(opts.Uploads)))
+
+	// Create output writer for upload phase logs
+	uploadOutput := NewWrite(ee.store, opts.Job.Id)
+
+	// Launch upload phase process with full isolation
+	launchConfig := &process.LaunchConfig{
+		InitPath:    initPath,
+		Environment: env,
+		SysProcAttr: ee.createIsolatedSysProcAttr(), // Full isolation!
+		Stdout:      uploadOutput,
+		Stderr:      uploadOutput,
+		JobID:       opts.Job.Id,
+		Command:     "upload-phase", // Internal marker
+		Args:        []string{},
+	}
+
+	result, err := ee.processManager.LaunchProcess(ctx, launchConfig)
+	if err != nil {
+		return fmt.Errorf("failed to launch upload phase: %w", err)
+	}
+
+	// Wait for upload phase to complete
+	cmd := result.Command
+
+	// Create a channel to wait for process completion
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	// Wait with timeout
+	select {
+	case e := <-done:
+		if e != nil {
+			var exitError *exec.ExitError
+			if errors.As(e, &exitError) {
+				log.Error("upload phase failed",
+					"exitCode", exitError.ExitCode(),
+					"error", e)
+				return fmt.Errorf("upload phase exited with code %d", exitError.ExitCode())
+			}
+			return fmt.Errorf("upload phase failed: %w", e)
+		}
+		return nil // Success
+
+	case <-ctx.Done():
+		cmd.Kill()
+		return ctx.Err()
+
+	case <-time.After(5 * time.Minute): // Upload timeout
+		cmd.Kill()
+		return fmt.Errorf("upload phase timeout")
+	}
+}
+
+// executeJobPhase runs the main job execution phase
+func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProcessOptions, initPath string) (platform.Command, error) {
+	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("phase", "execute")
+
+	// Build environment for execution phase
+	env := ee.buildPhaseEnvironment(opts.Job, "execute")
+
+	// Add command and args to environment
+	env = append(env, fmt.Sprintf("JOB_COMMAND=%s", opts.Job.Command))
+	env = append(env, fmt.Sprintf("JOB_ARGS_COUNT=%d", len(opts.Job.Args)))
+	for i, arg := range opts.Job.Args {
+		env = append(env, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
+	}
+
+	// Indicate if uploads were processed
+	env = append(env, fmt.Sprintf("JOB_HAS_UPLOADS=%t", len(opts.Uploads) > 0))
+
+	// Setup network synchronization if needed
 	var networkReadyR, networkReadyW *os.File
 	var extraFiles []*os.File
 
@@ -118,64 +214,44 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 			return nil, fmt.Errorf("failed to create network sync pipe: %w", err)
 		}
 		networkReadyR, networkReadyW = r, w
-
-		// Pass the read end FD to child
 		env = append(env, "NETWORK_READY_FD=3")
 		extraFiles = []*os.File{networkReadyR}
 	}
 
-	// Start streaming if needed
-	if streamCtx != nil && opts.EnableStreaming {
-		streamCtx.SetManager(ee.uploadManager)
-		if err := streamCtx.StartStreaming(); err != nil {
-			log.Error("failed to start upload streaming", "error", err)
-		}
-	}
+	// Create output writer
+	outputWriter := NewWrite(ee.store, opts.Job.Id)
 
-	// Create launch configuration
+	// Launch execution phase process
 	launchConfig := &process.LaunchConfig{
-		InitPath:    isolatedInitPath,
+		InitPath:    initPath,
 		Environment: env,
 		SysProcAttr: ee.createIsolatedSysProcAttr(),
-		Stdout:      NewWrite(ee.store, opts.Job.Id),
-		Stderr:      NewWrite(ee.store, opts.Job.Id),
+		Stdout:      outputWriter,
+		Stderr:      outputWriter,
 		JobID:       opts.Job.Id,
 		Command:     opts.Job.Command,
 		Args:        opts.Job.Args,
 		ExtraFiles:  extraFiles,
 	}
 
-	// Launch the process
 	result, err := ee.processManager.LaunchProcess(ctx, launchConfig)
 	if err != nil {
-		if networkReadyW != nil {
-			networkReadyW.Close()
-		}
-		if networkReadyR != nil {
-			networkReadyR.Close()
-		}
-		return nil, fmt.Errorf("failed to launch process: %w", err)
+		return nil, fmt.Errorf("failed to launch execution phase: %w", err)
 	}
 
-	// Close the read end in parent
-	if networkReadyR != nil {
-		networkReadyR.Close()
-	}
-
-	// Setup network after process is launched
-	if ee.networkStore != nil && opts.Job.Network != "" && networkReadyW != nil {
+	// Handle network setup after process launch
+	if networkReadyW != nil {
 		defer networkReadyW.Close()
 
-		// For isolated network, we need simpler allocation
+		// Handle network allocation and setup
 		var alloc *network.JobAllocation
 		var allocErr error
 
 		if opts.Job.Network == "isolated" {
-			// Create a minimal allocation for isolated network
+			// Create minimal allocation for isolated network
 			alloc = &network.JobAllocation{
 				JobID:   opts.Job.Id,
 				Network: "isolated",
-				// No IP allocation needed for isolated network
 			}
 		} else {
 			// Regular network allocation
@@ -192,27 +268,46 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 			if opts.Job.Network != "isolated" {
 				ee.networkStore.ReleaseJob(opts.Job.Id)
 			}
-			// Check if process is still alive
-			if proc := result.Command.Process(); proc != nil {
-				if _, err := os.FindProcess(int(result.PID)); err == nil {
-					result.Command.Kill()
-				}
-			}
+			result.Command.Kill()
 			return nil, fmt.Errorf("failed to setup network: %w", setupErr)
 		}
 
-		// Signal that network is ready
-		_, writeErr := networkReadyW.Write([]byte{1})
-		if writeErr != nil {
+		// Signal that network is ready - INLINE instead of calling setupJobNetwork
+		if _, writeErr := networkReadyW.Write([]byte{1}); writeErr != nil {
 			log.Warn("failed to signal network ready", "error", writeErr)
+			// Don't fail the job for this - the process might still work
 		}
 	}
 
-	log.Debug("process launched successfully",
-		"pid", result.PID,
-		"network", opts.Job.Network)
+	// Close read end in parent
+	if networkReadyR != nil {
+		networkReadyR.Close()
+	}
 
+	log.Debug("execution phase launched successfully", "pid", result.PID)
 	return result.Command, nil
+}
+
+// buildPhaseEnvironment builds common environment for both phases
+func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) []string {
+	baseEnv := ee.platform.Environ()
+
+	jobEnv := []string{
+		"JOBLET_MODE=init",
+		fmt.Sprintf("JOB_PHASE=%s", phase),
+		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
+		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+	}
+
+	if job.Limits.CPUCores != "" {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_CPU_CORES=%s", job.Limits.CPUCores))
+	}
+
+	return append(baseEnv, jobEnv...)
 }
 
 func (ee *ExecutionEngine) copyInitBinary(source, dest string) error {
@@ -241,28 +336,6 @@ func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *dom
 		WorkspaceDir:    filepath.Join(ee.config.Filesystem.BaseDir, job.Id, "work"),
 	}
 	return ee.StartProcess(ctx, opts)
-}
-
-// preProcessUploads handles upload processing before job execution (for scheduled jobs)
-func (ee *ExecutionEngine) preProcessUploads(ctx context.Context, opts *StartProcessOptions) error {
-	if opts.WorkspaceDir == "" {
-		opts.WorkspaceDir = filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id, "work")
-	}
-
-	// Ensure workspace exists
-	if err := ee.platform.MkdirAll(opts.WorkspaceDir, 0755); err != nil {
-		return fmt.Errorf("failed to create workspace: %w", err)
-	}
-
-	// Process uploads directly
-	streamConfig := &upload.StreamConfig{
-		JobID:        opts.Job.Id,
-		Uploads:      opts.Uploads,
-		MemoryLimit:  opts.Job.Limits.MaxMemory,
-		WorkspaceDir: opts.WorkspaceDir,
-	}
-
-	return ee.uploadManager.ProcessDirectUploads(ctx, streamConfig)
 }
 
 // createIsolatedSysProcAttr creates system process attributes for isolation
@@ -308,16 +381,13 @@ func (ee *ExecutionEngine) executeCommand(config *environment.JobConfig) error {
 		return fmt.Errorf("failed to resolve command: %w", err)
 	}
 
-	// Create and execute command
+	// Create command
 	cmd := ee.platform.CreateCommand(commandPath, config.Args...)
 
-	// Set standard streams to OS streams
-	// In init mode, we want the command to inherit the current process's streams
-	cmd.SetStdout(os.Stdout)
-	cmd.SetStderr(os.Stderr)
-	cmd.SetStdin(os.Stdin)
+	// DON'T set stdout/stderr - inherit from parent
+	// The parent already set them to NewWrite(store, jobId)
 
-	// Change to workspace if uploads were processed
+	// Change to workspace if needed
 	if config.HasUploadSession {
 		cmd.SetDir("/work")
 	}
