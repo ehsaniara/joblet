@@ -21,11 +21,24 @@ func newRunCmd() *cobra.Command {
 		Long: `Run a new job with the specified command and arguments, either immediately or scheduled for future execution.
 
 Examples:
-  # Immediate execution
+  # Immediate execution with Default network (bridge)
   rnx run nginx
   rnx run python3 script.py
   rnx run bash -c "curl https://example.com"
   rnx --node=srv1 run ps aux
+  
+  # No network
+  rnx run --network=none python3 process_local.py
+  
+  # Isolated network (external only)
+  rnx run --network=isolated wget https://example.com
+  
+  # Custom network with automatic hostname (job_<jobid>)
+  rnx run --network=backend python3 api.py
+  rnx run --network=backend postgres
+  
+  # With other flags
+  rnx run --network=frontend --max-cpu=50 --max-memory=512 node app.js
 
   # Scheduled execution
   rnx run --schedule="1hour" python3 script.py
@@ -76,6 +89,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		uploads    []string
 		uploadDirs []string
 		schedule   string
+		network    string
 	)
 
 	commandStartIndex := 0
@@ -105,6 +119,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		} else if !strings.HasPrefix(arg, "--") {
 			commandStartIndex = i
 			break
+		} else if strings.HasPrefix(arg, "--network=") {
+			network = strings.TrimPrefix(arg, "--network=")
 		} else {
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -167,6 +183,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		MaxIOBPS:  maxIOBPS,
 		Uploads:   fileUploads,
 		Schedule:  scheduledTimeRFC3339, // Send RFC3339 string to server
+		Network:   network,
 	}
 
 	// Submit job

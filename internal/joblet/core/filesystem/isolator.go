@@ -122,9 +122,40 @@ func (i *Isolator) validateJobContext() error {
 		return fmt.Errorf("not in job context - JOB_ID not set")
 	}
 
-	// Additional safety: check if we're PID 1 (should be in a PID namespace)
+	// check if we're PID 1 (should be in a PID namespace)
 	if i.platform.Getpid() != 1 {
 		return fmt.Errorf("not in isolated PID namespace - refusing filesystem isolation")
+	}
+
+	return nil
+}
+
+func (f *JobFilesystem) createEssentialFiles() error {
+	// Create /etc directory
+	etcDir := filepath.Join(f.RootDir, "etc")
+	if err := f.platform.MkdirAll(etcDir, 0755); err != nil {
+		return fmt.Errorf("failed to create /etc directory: %w", err)
+	}
+
+	// Create /etc/resolv.conf for DNS resolution
+	resolvConf := `# DNS configuration for Joblet container
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+options ndots:0
+`
+	resolvPath := filepath.Join(etcDir, "resolv.conf")
+	if err := f.platform.WriteFile(resolvPath, []byte(resolvConf), 0644); err != nil {
+		f.logger.Warn("failed to create resolv.conf", "error", err)
+		// Don't fail the job, just warn
+	}
+
+	// Create basic /etc/hosts
+	hostsContent := `127.0.0.1   localhost
+::1         localhost ip6-localhost ip6-loopback
+`
+	hostsPath := filepath.Join(etcDir, "hosts")
+	if err := f.platform.WriteFile(hostsPath, []byte(hostsContent), 0644); err != nil {
+		f.logger.Warn("failed to create hosts file", "error", err)
 	}
 
 	return nil
@@ -143,6 +174,11 @@ func (f *JobFilesystem) Setup() error {
 	// Create essential directory structure in the isolated root
 	if err := f.createEssentialDirs(); err != nil {
 		return fmt.Errorf("failed to create essential directories: %w", err)
+	}
+
+	// Create essential files
+	if err := f.createEssentialFiles(); err != nil {
+		return fmt.Errorf("failed to create essential files: %w", err)
 	}
 
 	// Mount allowed read-only directories from host
@@ -169,24 +205,37 @@ func (f *JobFilesystem) Setup() error {
 	return nil
 }
 
-// createEssentialDirs creates the basic directory structure needed in the isolated root
+// createEssentialDirs creates only the directories that are NOT in allowedMounts
 func (f *JobFilesystem) createEssentialDirs() error {
-	dirs := []string{
-		"bin", "usr/bin", "lib", "lib64", "usr/lib", "usr/lib64",
-		"etc", "tmp", "proc", "dev", "sys", "work",
+	// Directories that must exist but won't be populated by mounts
+	essentialDirs := []string{
+		"etc",     // For resolv.conf, hosts, etc.
+		"tmp",     // Will be bind mounted to job-specific tmp
+		"proc",    // For /proc mount
+		"dev",     // For device nodes
+		"sys",     // For potential sysfs mount
+		"work",    // Working directory
+		"var",     // For various runtime needs
+		"var/run", // For runtime files
+		"var/tmp", // Alternative tmp
 	}
 
-	for _, dir := range dirs {
+	// Create essential directories
+	for _, dir := range essentialDirs {
 		fullPath := filepath.Join(f.RootDir, dir)
 		if err := f.platform.MkdirAll(fullPath, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", fullPath, err)
 		}
 	}
+
+	// Directories for allowed mounts will be created by mountAllowedDirs
+	// This avoids duplication
 	return nil
 }
 
 // mountAllowedDirs mounts allowed directories from host as read-only
 func (f *JobFilesystem) mountAllowedDirs() error {
+	// Enhanced to create parent directories automatically
 	for _, allowedDir := range f.config.AllowedMounts {
 		// Skip if the host directory doesn't exist
 		if _, err := f.platform.Stat(allowedDir); f.platform.IsNotExist(err) {
@@ -196,9 +245,17 @@ func (f *JobFilesystem) mountAllowedDirs() error {
 
 		targetPath := filepath.Join(f.RootDir, strings.TrimPrefix(allowedDir, "/"))
 
-		// Create target directory if it doesn't exist
+		// Create ALL parent directories needed for the mount
+		// This replaces the need to pre-create them in createEssentialDirs
+		targetDir := filepath.Dir(targetPath)
+		if err := f.platform.MkdirAll(targetDir, 0755); err != nil {
+			f.logger.Warn("failed to create mount parent directory", "dir", targetDir, "error", err)
+			continue
+		}
+
+		// For leaf directories, create them too
 		if err := f.platform.MkdirAll(targetPath, 0755); err != nil {
-			f.logger.Warn("failed to create target directory", "target", targetPath, "error", err)
+			f.logger.Warn("failed to create mount target directory", "target", targetPath, "error", err)
 			continue
 		}
 
@@ -346,7 +403,7 @@ func (f *JobFilesystem) validateInJobContext() error {
 
 	// Check we're not already in a chroot by trying to access host root
 	if _, err := f.platform.Stat("/proc/1/root"); err == nil {
-		// Additional check: see if we can read host's root filesystem
+		// see if we can read host's root filesystem
 		if entries, e := f.platform.ReadDir("/"); e == nil && len(entries) > 10 {
 			// If we can see many entries in /, we're likely on the host filesystem
 			f.logger.Debug("safety check: many root entries visible, may be on host", "entries", len(entries))

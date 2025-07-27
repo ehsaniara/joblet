@@ -142,6 +142,17 @@ func (e *ExecCommand) Process() Process {
 	return &ExecProcess{process: e.cmd.Process}
 }
 
+func (e *ExecCommand) Kill() {
+	if e.cmd.Process == nil {
+		return
+	}
+	_ = e.cmd.Process.Kill()
+}
+
+func (e *ExecCommand) SetExtraFiles(files []*os.File) {
+	e.cmd.ExtraFiles = files
+}
+
 func (e *ExecCommand) SetStdout(w interface{}) {
 	e.cmd.Stdout = w.(io.Writer)
 }

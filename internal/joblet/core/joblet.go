@@ -52,20 +52,22 @@ type StartJobRequest struct {
 	Limits   domain.ResourceLimits
 	Uploads  []domain.FileUpload
 	Schedule string
+	Network  string
 }
 
 func (r StartJobRequest) GetCommand() string               { return r.Command }
 func (r StartJobRequest) GetArgs() []string                { return r.Args }
 func (r StartJobRequest) GetSchedule() string              { return r.Schedule }
 func (r StartJobRequest) GetLimits() domain.ResourceLimits { return r.Limits }
+func (r StartJobRequest) GetNetwork() string               { return r.Network }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components
-func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
+func NewPlatformJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
 
 	// Initialize all specialized c
-	c := initializeComponents(store, cfg, platformInterface, jobletLogger)
+	c := initializeComponents(store, cfg, platformInterface, jobletLogger, networkStore)
 
 	// Create the joblet
 	j := &Joblet{
@@ -105,7 +107,12 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config) interfaces.Joblet 
 }
 
 // StartJob validates and starts a job (immediate or scheduled)
-func (j *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string) (*domain.Job, error) {
+func (j *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string) (*domain.Job, error) {
+	j.logger.Debug("StartJob called",
+		"command", command,
+		"network", network,
+		"args", args)
+
 	// Build request
 	req := StartJobRequest{
 		Command: command,
@@ -118,12 +125,14 @@ func (j *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		},
 		Uploads:  uploads,
 		Schedule: schedule,
+		Network:  network,
 	}
 
 	log := j.logger.WithFields(
 		"command", command,
 		"uploadCount", len(uploads),
 		"schedule", schedule,
+		"network", network,
 	)
 	log.Debug("starting job")
 
@@ -258,14 +267,30 @@ func (j *Joblet) StopJob(ctx context.Context, jobID string) error {
 		return fmt.Errorf("job is not running: %s (status: %s)", jobID, jb.Status)
 	}
 
-	// Stop the process
-	if err := j.cleanup.CleanupJobWithProcess(ctx, jobID, jb.Pid); err != nil {
-		return fmt.Errorf("cleanup failed: %w", err)
+	// Check if cleanup is already in progress (from monitor)
+	if status, exists := j.cleanup.GetCleanupStatus(jobID); exists {
+		log.Debug("cleanup already in progress", "started", status.StartTime)
+		// Just update the job state
+		jb.Stop()
+		j.store.UpdateJob(jb)
+		return nil
 	}
 
-	// Update state
+	// Stop the process and cleanup
+	err := j.cleanup.CleanupJobWithProcess(ctx, jobID, jb.Pid)
+
+	// Update state regardless of cleanup result
 	jb.Stop()
 	j.store.UpdateJob(jb)
+
+	if err != nil {
+		// If cleanup is already in progress, that's OK
+		if err.Error() == fmt.Sprintf("cleanup already in progress for job %s", jobID) {
+			log.Debug("cleanup initiated by monitor, stop command completed")
+			return nil
+		}
+		return fmt.Errorf("cleanup failed: %w", err)
+	}
 
 	log.Info("job stopped")
 	return nil
@@ -335,7 +360,7 @@ func (j *Joblet) getActiveJobIDs() map[string]bool {
 }
 
 // initializeComponents creates all the specialized components
-func initializeComponents(store state.Store, cfg *config.Config, platform platform.Platform, logger *logger.Logger) *components {
+func initializeComponents(store state.Store, cfg *config.Config, platform platform.Platform, logger *logger.Logger, networkStore *state.NetworkStore) *components {
 	// Create core resources
 	cgroupResource := resource.New(cfg.Cgroup)
 	filesystemIsolator := filesystem.NewIsolator(cfg.Filesystem, platform)
@@ -375,6 +400,7 @@ func initializeComponents(store state.Store, cfg *config.Config, platform platfo
 		cfg,
 		logger,
 		jobIsolation,
+		networkStore,
 	)
 
 	// Create cleanup coordinator
@@ -384,6 +410,7 @@ func initializeComponents(store state.Store, cfg *config.Config, platform platfo
 		platform,
 		cfg,
 		logger,
+		networkStore,
 	)
 
 	return &components{

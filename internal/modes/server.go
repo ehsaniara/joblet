@@ -3,20 +3,20 @@ package modes
 import (
 	"context"
 	"fmt"
+	"joblet/internal/joblet"
+	"joblet/internal/joblet/server"
+	"joblet/internal/joblet/state"
 	"joblet/internal/modes/isolation"
 	"joblet/internal/modes/jobexec"
+	"joblet/pkg/config"
+	"joblet/pkg/logger"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
-
-	"joblet/internal/joblet"
-	"joblet/internal/joblet/server"
-	"joblet/internal/joblet/state"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
 )
 
 func RunServer(cfg *config.Config) error {
@@ -29,14 +29,24 @@ func RunServer(cfg *config.Config) error {
 	// Create state store
 	store := state.New()
 
+	// Create network store
+	networkConfig := &cfg.Network
+	if networkConfig.StateDir == "" {
+		networkConfig.StateDir = "/var/lib/joblet"
+	}
+	networkStore := state.NewNetworkStore(networkConfig)
+	if err := networkStore.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize network store: %w", err)
+	}
+
 	// Create joblet with configuration
-	jobletInstance := joblet.NewJoblet(store, cfg)
+	jobletInstance := joblet.NewJoblet(store, cfg, networkStore)
 	if jobletInstance == nil {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
 	// Start gRPC server with configuration
-	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg)
+	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg, networkStore)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}
@@ -75,6 +85,13 @@ func RunJobInit(cfg *config.Config) error {
 		"mode", "init",
 		"jobId", jobID)
 
+	// CRITICAL: Wait for network setup FIRST before any other operations
+	// This must happen before cgroup assignment or any isolation setup
+	// to ensure the process stays alive during network configuration
+	if err := waitForNetworkReady(initLogger); err != nil {
+		return fmt.Errorf("failed to wait for network ready: %w", err)
+	}
+
 	// Validate required environment
 	cgroupPath := os.Getenv("JOB_CGROUP_PATH")
 	if cgroupPath == "" {
@@ -109,6 +126,48 @@ func RunJobInit(cfg *config.Config) error {
 		return fmt.Errorf("job execution failed: %w", err)
 	}
 
+	return nil
+}
+
+// waitForNetworkReady waits for the parent process to signal that network setup is complete
+func waitForNetworkReady(logger *logger.Logger) error {
+	networkReadyFD := os.Getenv("NETWORK_READY_FD")
+	if networkReadyFD == "" {
+		logger.Debug("NETWORK_READY_FD not set, skipping network wait")
+		return nil
+	}
+
+	logger.Debug("waiting for network setup", "fd", networkReadyFD)
+
+	fd, err := strconv.Atoi(networkReadyFD)
+	if err != nil {
+		return fmt.Errorf("invalid network ready FD: %w", err)
+	}
+
+	// Open the file descriptor passed from parent
+	file := os.NewFile(uintptr(fd), "network-ready")
+	if file == nil {
+		return fmt.Errorf("failed to open network ready FD %d", fd)
+	}
+	defer file.Close()
+
+	// Note: Pipes don't support deadlines, so we skip setting one
+	// The parent process signals immediately after network setup, so this is safe
+
+	// Read one byte - this blocks until network is ready
+	buf := make([]byte, 1)
+	logger.Debug("blocking on network ready signal...")
+
+	n, err := file.Read(buf)
+	if err != nil {
+		return fmt.Errorf("failed to read network ready signal: %w", err)
+	}
+
+	if n != 1 {
+		return fmt.Errorf("unexpected read size from network ready FD: %d", n)
+	}
+
+	logger.Debug("network setup signal received, proceeding with initialization")
 	return nil
 }
 

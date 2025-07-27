@@ -16,15 +16,15 @@ type linuxJoblet struct {
 }
 
 // NewJoblet creates a Linux joblet
-func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
+func NewJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
 	return &linuxJoblet{
-		platformJoblet: NewPlatformJoblet(store, cfg),
+		platformJoblet: NewPlatformJoblet(store, cfg, networkStore),
 	}
 }
 
 // StartJob delegates to the platform joblet
-func (w *linuxJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string) (*domain.Job, error) {
-	return w.platformJoblet.StartJob(ctx, command, args, maxCPU, maxMemory, maxIOBPS, cpuCores, uploads, schedule)
+func (w *linuxJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string) (*domain.Job, error) {
+	return w.platformJoblet.StartJob(ctx, command, args, maxCPU, maxMemory, maxIOBPS, cpuCores, uploads, schedule, network)
 }
 
 // StopJob delegates to the platform joblet

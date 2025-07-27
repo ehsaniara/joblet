@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"joblet/internal/joblet/network"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -28,6 +29,8 @@ type ExecutionEngine struct {
 	config         *config.Config
 	logger         *logger.Logger
 	jobIsolation   *unprivileged.JobIsolation
+	networkSetup   *network.NetworkSetup
+	networkStore   *state.NetworkStore
 }
 
 // NewExecutionEngine creates a new execution engine
@@ -39,6 +42,7 @@ func NewExecutionEngine(
 	config *config.Config,
 	logger *logger.Logger,
 	jobIsolation *unprivileged.JobIsolation,
+	networkStore *state.NetworkStore,
 ) *ExecutionEngine {
 	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
 
@@ -51,6 +55,8 @@ func NewExecutionEngine(
 		config:         config,
 		logger:         logger.WithField("component", "execution-engine"),
 		jobIsolation:   jobIsolation,
+		networkSetup:   network.NewNetworkSetup(platform, networkStore),
+		networkStore:   networkStore,
 	}
 }
 
@@ -73,13 +79,13 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	// Create job base directory (simple directory, not full filesystem isolation)
+	// Create job base directory
 	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id)
 	if err := ee.platform.MkdirAll(filepath.Join(jobDir, "sbin"), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create job directory: %w", err)
 	}
 
-	// Copy joblet binary to job directory with generic name
+	// Copy joblet binary to job directory
 	isolatedInitPath := filepath.Join(jobDir, "sbin", "init")
 	if err := ee.copyInitBinary(execPath, isolatedInitPath); err != nil {
 		return nil, fmt.Errorf("failed to prepare init binary: %w", err)
@@ -92,17 +98,31 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 		}
 	}
 
-	// Build environment with generic path
+	// Build environment
 	envConfig := &environment.JobEnvironmentConfig{
 		Job:         opts.Job,
-		ExecutePath: "/sbin/init", // Generic path that will be visible after chroot
+		ExecutePath: "/sbin/init",
 		Uploads:     opts.Uploads,
 	}
 
 	env, streamCtx := ee.envBuilder.BuildJobEnvironment(envConfig)
-
-	// Add flag to indicate exec should be used
 	env = append(env, "JOBLET_EXEC_AFTER_ISOLATION=true")
+
+	// Setup network synchronization pipe if network is configured
+	var networkReadyR, networkReadyW *os.File
+	var extraFiles []*os.File
+
+	if ee.networkStore != nil && opts.Job.Network != "" {
+		r, w, err := os.Pipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create network sync pipe: %w", err)
+		}
+		networkReadyR, networkReadyW = r, w
+
+		// Pass the read end FD to child
+		env = append(env, "NETWORK_READY_FD=3")
+		extraFiles = []*os.File{networkReadyR}
+	}
 
 	// Start streaming if needed
 	if streamCtx != nil && opts.EnableStreaming {
@@ -114,7 +134,7 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 
 	// Create launch configuration
 	launchConfig := &process.LaunchConfig{
-		InitPath:    isolatedInitPath, // Use the copied binary
+		InitPath:    isolatedInitPath,
 		Environment: env,
 		SysProcAttr: ee.createIsolatedSysProcAttr(),
 		Stdout:      NewWrite(ee.store, opts.Job.Id),
@@ -122,17 +142,75 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 		JobID:       opts.Job.Id,
 		Command:     opts.Job.Command,
 		Args:        opts.Job.Args,
+		ExtraFiles:  extraFiles,
 	}
 
 	// Launch the process
 	result, err := ee.processManager.LaunchProcess(ctx, launchConfig)
 	if err != nil {
+		if networkReadyW != nil {
+			networkReadyW.Close()
+		}
+		if networkReadyR != nil {
+			networkReadyR.Close()
+		}
 		return nil, fmt.Errorf("failed to launch process: %w", err)
+	}
+
+	// Close the read end in parent
+	if networkReadyR != nil {
+		networkReadyR.Close()
+	}
+
+	// Setup network after process is launched
+	if ee.networkStore != nil && opts.Job.Network != "" && networkReadyW != nil {
+		defer networkReadyW.Close()
+
+		// For isolated network, we need simpler allocation
+		var alloc *network.JobAllocation
+		var allocErr error
+
+		if opts.Job.Network == "isolated" {
+			// Create a minimal allocation for isolated network
+			alloc = &network.JobAllocation{
+				JobID:   opts.Job.Id,
+				Network: "isolated",
+				// No IP allocation needed for isolated network
+			}
+		} else {
+			// Regular network allocation
+			hostname := fmt.Sprintf("job_%s", opts.Job.Id)
+			alloc, allocErr = ee.networkStore.AssignJobToNetwork(opts.Job.Id, opts.Job.Network, hostname)
+			if allocErr != nil {
+				result.Command.Kill()
+				return nil, fmt.Errorf("failed to assign network: %w", allocErr)
+			}
+		}
+
+		// Setup network in namespace
+		if setupErr := ee.networkSetup.SetupJobNetwork(alloc, int(result.PID)); setupErr != nil {
+			if opts.Job.Network != "isolated" {
+				ee.networkStore.ReleaseJob(opts.Job.Id)
+			}
+			// Check if process is still alive
+			if proc := result.Command.Process(); proc != nil {
+				if _, err := os.FindProcess(int(result.PID)); err == nil {
+					result.Command.Kill()
+				}
+			}
+			return nil, fmt.Errorf("failed to setup network: %w", setupErr)
+		}
+
+		// Signal that network is ready
+		_, writeErr := networkReadyW.Write([]byte{1})
+		if writeErr != nil {
+			log.Warn("failed to signal network ready", "error", writeErr)
+		}
 	}
 
 	log.Debug("process launched successfully",
 		"pid", result.PID,
-		"isolatedPath", isolatedInitPath)
+		"network", opts.Job.Network)
 
 	return result.Command, nil
 }

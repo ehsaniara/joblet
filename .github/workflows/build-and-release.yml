@@ -45,6 +45,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
+          args: --print-issued-lines=true --out-format=colored-line-number
 
   build-binary:
     needs: test

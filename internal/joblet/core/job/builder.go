@@ -34,6 +34,7 @@ type BuildRequest interface {
 	GetCommand() string
 	GetArgs() []string
 	GetLimits() domain.ResourceLimits
+	GetNetwork() string
 }
 
 // Build creates a new job from the request
@@ -51,6 +52,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		Status:     domain.StatusInitializing,
 		CgroupPath: b.generateCgroupPath(jobID),
 		StartTime:  time.Now(),
+		Network:    req.GetNetwork(),
 	}
 
 	// Apply resource limits with defaults
@@ -112,6 +114,7 @@ func (b *Builder) copyStrings(src []string) []string {
 // BuildParams can be used as an alternative to the interface approach
 type BuildParams struct {
 	Command string
+	Network string
 	Args    []string
 	Limits  domain.ResourceLimits
 }
@@ -120,6 +123,9 @@ type BuildParams struct {
 func (p BuildParams) GetCommand() string               { return p.Command }
 func (p BuildParams) GetArgs() []string                { return p.Args }
 func (p BuildParams) GetLimits() domain.ResourceLimits { return p.Limits }
+func (p BuildParams) GetNetwork() string {
+	return p.Network
+}
 
 // BuildFromParams builds a job from BuildParams (convenience method)
 func (b *Builder) BuildFromParams(params BuildParams) (*domain.Job, error) {

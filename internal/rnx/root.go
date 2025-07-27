@@ -51,6 +51,7 @@ func init() {
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newNodesCmd())
 	rootCmd.AddCommand(newHelpConfigCmd())
+	rootCmd.AddCommand(newNetworkCmd())
 }
 
 // newJobClient creates a client based on configuration

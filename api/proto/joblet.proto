@@ -10,6 +10,11 @@ service JobletService{
   rpc StopJob(StopJobReq) returns (StopJobRes){}
   rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
   rpc ListJobs(EmptyRequest) returns (Jobs){}
+
+  // Network management
+  rpc CreateNetwork(CreateNetworkReq) returns (CreateNetworkRes){}
+  rpc ListNetworks(EmptyRequest) returns (Networks){}
+  rpc RemoveNetwork(RemoveNetworkReq) returns (RemoveNetworkRes){}
 }
 
 message Jobs{
@@ -42,6 +47,7 @@ message RunJobReq{
   int32 maxIOBPS = 6;
   repeated FileUpload uploads = 7;
   string schedule = 8;          // RFC3339 formatted time string
+  string network = 9;           // Network name (none, isolated, bridge, or custom)
 }
 
 message FileUpload {
@@ -105,4 +111,35 @@ message GetJobLogsReq{
 
 message DataChunk {
   bytes payload = 1;
+}
+
+message CreateNetworkReq {
+  string name = 1;
+  string cidr = 2;
+}
+
+message CreateNetworkRes {
+  string name = 1;
+  string cidr = 2;
+  string bridge = 3;
+}
+
+message RemoveNetworkReq {
+  string name = 1;
+}
+
+message RemoveNetworkRes {
+  bool success = 1;
+  string message = 2;
+}
+
+message Network {
+  string name = 1;
+  string cidr = 2;
+  string bridge = 3;
+  int32 jobCount = 4;
+}
+
+message Networks {
+  repeated Network networks = 1;
 }

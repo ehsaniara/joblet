@@ -19,7 +19,7 @@ type darwinJoblet struct {
 }
 
 // NewJoblet creates a Darwin joblet for development
-func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
+func NewJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
 	return &darwinJoblet{
 		logger: logger.New().WithField("component", "darwin-joblet"),
 		config: cfg,
@@ -27,7 +27,7 @@ func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
 }
 
 // StartJob provides basic job execution on macOS (for development/testing)
-func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string) (*domain.Job, error) {
+func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string) (*domain.Job, error) {
 	w.logger.Warn("Darwin joblet has limited functionality - jobs will not be isolated")
 	if len(uploads) > 0 {
 		w.logger.Warn("File uploads are not supported on Darwin", "uploadCount", len(uploads))

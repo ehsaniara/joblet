@@ -13,7 +13,7 @@ import (
 	"net"
 )
 
-func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config) (*grpc.Server, error) {
+func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config, networkStore *state.NetworkStore) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -52,7 +52,8 @@ func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config
 	auth := auth2.NewGrpcAuthorization()
 	serverLogger.Debug("authorization module initialized")
 
-	jobService := NewJobServiceServer(auth, jobStore, joblet)
+	// Create job service with network store
+	jobService := NewJobServiceServer(auth, jobStore, joblet, networkStore)
 	pb.RegisterJobletServiceServer(grpcServer, jobService)
 
 	serverLogger.Debug("job service registered successfully")

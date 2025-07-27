@@ -8,6 +8,10 @@ import (
 )
 
 type FakeCommand struct {
+	KillStub        func()
+	killMutex       sync.RWMutex
+	killArgsForCall []struct {
+	}
 	ProcessStub        func() platform.Process
 	processMutex       sync.RWMutex
 	processArgsForCall []struct {
@@ -80,6 +84,30 @@ type FakeCommand struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeCommand) Kill() {
+	fake.killMutex.Lock()
+	fake.killArgsForCall = append(fake.killArgsForCall, struct {
+	}{})
+	stub := fake.KillStub
+	fake.recordInvocation("Kill", []interface{}{})
+	fake.killMutex.Unlock()
+	if stub != nil {
+		fake.KillStub()
+	}
+}
+
+func (fake *FakeCommand) KillCallCount() int {
+	fake.killMutex.RLock()
+	defer fake.killMutex.RUnlock()
+	return len(fake.killArgsForCall)
+}
+
+func (fake *FakeCommand) KillCalls(stub func()) {
+	fake.killMutex.Lock()
+	defer fake.killMutex.Unlock()
+	fake.KillStub = stub
 }
 
 func (fake *FakeCommand) Process() platform.Process {

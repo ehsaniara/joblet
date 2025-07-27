@@ -8,6 +8,6 @@ import (
 )
 
 // NewJoblet creates a platform-specific joblet implementation
-func NewJoblet(store state.Store, cfg *config.Config) interfaces.Joblet {
-	return core.NewJoblet(store, cfg)
+func NewJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
+	return core.NewJoblet(store, cfg, networkStore)
 }

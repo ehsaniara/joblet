@@ -167,17 +167,19 @@ func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream Doma
 	jobCopy := task.GetJob()
 	st.logger.Debug("starting log stream", "jobId", id, "status", string(jobCopy.Status))
 
-	// Handle different job states
-	if jobCopy.IsCompleted() {
-		// Job is already completed - send existing logs and return
-		buffer := task.GetBuffer()
-		if len(buffer) > 0 {
-			if err := stream.SendData(buffer); err != nil {
-				st.logger.Warn("failed to send completed job logs", "jobId", id, "error", err)
-				return err
-			}
-			st.logger.Debug("sent logs for completed job", "jobId", id, "logSize", len(buffer))
+	// Send existing buffer content for both completed AND running jobs
+	buffer := task.GetBuffer()
+	if len(buffer) > 0 {
+		if err := stream.SendData(buffer); err != nil {
+			st.logger.Warn("failed to send existing logs", "jobId", id, "error", err)
+			return err
 		}
+		st.logger.Debug("sent existing logs", "jobId", id, "logSize", len(buffer))
+	}
+
+	// If job is completed, we're done after sending the buffer
+	if jobCopy.IsCompleted() {
+		st.logger.Debug("job is completed, finishing stream", "jobId", id)
 		return nil
 	}
 

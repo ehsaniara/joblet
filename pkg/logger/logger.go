@@ -93,7 +93,6 @@ func (l *Logger) WithFields(keyVals ...interface{}) *Logger {
 		newLogger.fields[k] = v
 	}
 
-	// add new fields
 	for i := 0; i < len(keyVals); i += 2 {
 		if i+1 < len(keyVals) {
 			key := fmt.Sprintf("%v", keyVals[i])
@@ -165,7 +164,7 @@ func (l *Logger) log(level LogLevel, msg string, kv ...interface{}) {
 		allFields[k] = v
 	}
 
-	// add key/vals from this specific log call
+	// key/vals from this specific log call
 	for i := 0; i < len(kv); i += 2 {
 		if i+1 < len(kv) {
 			key := fmt.Sprintf("%v", kv[i])
@@ -184,14 +183,12 @@ func (l *Logger) formatLogLine(timestamp string, level LogLevel, msg string, fie
 	parts = append(parts, fmt.Sprintf("[%s]", timestamp))
 	parts = append(parts, fmt.Sprintf("[%s]", level.String()))
 
-	// Add mode if it's set
 	if l.mode != "" {
 		parts = append(parts, fmt.Sprintf("[%s]", l.mode))
 	}
 
 	parts = append(parts, msg)
 
-	// Add fields
 	if len(fields) > 0 {
 		var fieldParts []string
 		for key, value := range fields {
