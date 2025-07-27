@@ -79,6 +79,22 @@ Joblet consists of two components:
 - **Role-Based Access**: Admin (full control) and Viewer (read-only) roles
 - **Job Scheduling**: Future execution with priority queue management
 
+## 🧭 Comparison Table: Joblet vs Competitors
+| Feature / Tool            | **Joblet** (v2.10.0)                          | **Apache DolphinScheduler**                 | **Dkron**                              | **JobRunr**                     | **gVisor** / **Kata**                     |
+|---------------------------|-----------------------------------------------|---------------------------------------------|----------------------------------------|---------------------------------|-------------------------------------------|
+| **Type**                  | Linux-native job execution platform           | Distributed job orchestration engine        | Distributed cron job scheduler         | In-memory job scheduler for JVM | OCI container runtime sandboxing          |
+| **Isolation Mechanism**   | Linux **namespaces** + **cgroups v2**         | None (relies on system agents)              | None (delegates to OS processes)       | JVM sandboxing                  | Full syscall interception / VM isolation  |
+| **Execution Mode**        | Binary CLI + gRPC API                         | Web UI + REST API                           | Agent-based CLI + API                  | Java code only (embedded)       | Containerized / OCI only                  |
+| **Filesystem Isolation**  | ✅ via chroot + mount namespace                | ❌                                           | ❌                                      | ❌                               | ✅ full container FS isolation             |
+| **Network Isolation**     | Optional (separate netns)                     | ❌                                           | ❌                                      | ❌                               | ✅ (via container)                         |
+| **Resource Limits**       | ✅ CPU, memory, I/O, pids via cgroups          | ❌                                           | ❌                                      | ❌                               | ✅ via kernel interface                    |
+| **Programming Interface** | gRPC + binary CLI                             | REST API                                    | HTTP API + CLI                         | Java annotations / Spring       | OCI runtime interface only                |
+| **Real-time Logging**     | ✅ Built-in SSE log stream + file              | Partial (log files in worker nodes)         | No streaming, logs stored in etcd/disk | Logs via application only       | No – depends on container logging driver  |
+| **Job Types Supported**   | Bash, Python, binary, arbitrary Linux process | Shell scripts, SQL, Spark, Flink, Python    | Shell scripts, HTTP/Webhooks, Docker   | Java method jobs (Lambdas)      | Any Linux process                         |
+| **Security Model**        | Local users or mTLS + RBAC                    | LDAP/SSO + role permissions                 | Basic Auth + token-based               | In-app only                     | Depends on container runtime              |
+| **Deployment Complexity** | ✅ One binary                                  | ❌ Complex (ZooKeeper, DB, multiple workers) | ✅ Medium (agents per node)             | ✅ Simple (library import)       | ❌ Requires container runtime setup        |
+| **Use Case Fit**          | Secure workload exec (CI/CD, scripts, etc.)   | Large ETL / batch orchestration             | Distributed cron with clustering       | Background tasks in Java apps   | Secure container workloads (e.g. sandbox) |
+
 ## 📦 Installation
 
 ### Quick Start - Debian Package (Recommended)
