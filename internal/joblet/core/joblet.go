@@ -431,5 +431,4 @@ type components struct {
 	resourceManager *ResourceManager
 	executionEngine *ExecutionEngine
 	cleanup         *cleanup.Coordinator
-	networkStore    *state.NetworkStore
 }

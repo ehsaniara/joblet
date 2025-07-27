@@ -162,7 +162,7 @@ func (m *Manager) createAndStartCommand(config *LaunchConfig) (platform.Command,
 	}
 
 	// Add extra files for file descriptor passing
-	if config.ExtraFiles != nil && len(config.ExtraFiles) > 0 {
+	if len(config.ExtraFiles) > 0 {
 		cmd.SetExtraFiles(config.ExtraFiles)
 	}
 
