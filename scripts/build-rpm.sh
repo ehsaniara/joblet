@@ -248,10 +248,13 @@ fi
 /opt/joblet/scripts/rnx-config-template.yml
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
+/usr/local/bin/rnx
+/etc/modules-load.d/joblet.conf
 
 %dir /opt/joblet
 %dir /opt/joblet/scripts
 %dir /var/lib/joblet
+%dir /etc/modules-load.d
 
 %changelog
 * ${CHANGELOG_DATE} Joblet Build System <build@joblet.dev> - ${CLEAN_VERSION}-${RELEASE}
@@ -271,6 +274,7 @@ tar -czf "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}.tar.gz" \
 echo "📦 Building RPM package..."
 rpmbuild --define "_topdir $(pwd)/$BUILD_DIR" \
          --define "_arch $RPM_ARCH" \
+         --target "$RPM_ARCH" \
          -bb "$BUILD_DIR/SPECS/${PACKAGE_NAME}.spec"
 
 # Find the built package
