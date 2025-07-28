@@ -2,6 +2,8 @@ package modes
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"joblet/internal/joblet"
 	"joblet/internal/joblet/server"
@@ -71,11 +73,14 @@ func RunServer(cfg *config.Config) error {
 	return nil
 }
 
-// RunJobInit runs the joblet in job initialization mode
+// RunJobInit runs the joblet in job initialization mode with phase support
 func RunJobInit(cfg *config.Config) error {
 	initLogger := logger.WithField("mode", "init")
 
+	// Determine phase
+	phase := os.Getenv("JOB_PHASE")
 	jobID := os.Getenv("JOB_ID")
+
 	if jobID != "" {
 		initLogger = initLogger.WithField("jobId", jobID)
 	}
@@ -83,12 +88,64 @@ func RunJobInit(cfg *config.Config) error {
 	initLogger.Debug("joblet starting in INIT mode",
 		"platform", runtime.GOOS,
 		"mode", "init",
+		"phase", phase,
 		"jobId", jobID)
 
+	// Phase-specific handling
+	switch phase {
+	case "upload":
+		return runUploadPhase(cfg, initLogger)
+	case "execute":
+		return runExecutePhase(cfg, initLogger)
+	default:
+		// Legacy support - treat as execute phase
+		initLogger.Warn("no phase specified, assuming execute phase")
+		return runExecutePhase(cfg, initLogger)
+	}
+}
+
+// runUploadPhase handles the upload phase within full isolation
+func runUploadPhase(cfg *config.Config, logger *logger.Logger) error {
+	logger.Info("starting upload phase in isolation")
+
+	// Wait for network if needed (for consistency)
+	if err := waitForNetworkReady(logger); err != nil {
+		return fmt.Errorf("failed to wait for network ready: %w", err)
+	}
+
+	// Get cgroup path and assign immediately
+	cgroupPath := os.Getenv("JOB_CGROUP_PATH")
+	if cgroupPath == "" {
+		return fmt.Errorf("JOB_CGROUP_PATH environment variable is required")
+	}
+
+	// Assign to cgroup - THIS IS CRITICAL
+	if err := assignToCgroup(cgroupPath, logger); err != nil {
+		return fmt.Errorf("failed to assign to cgroup: %w", err)
+	}
+
+	// Verify cgroup assignment
+	if err := verifyCgroupAssignment(cgroupPath, logger); err != nil {
+		return fmt.Errorf("cgroup assignment verification failed: %w", err)
+	}
+
+	logger.Info("process assigned to cgroup, starting upload processing")
+
+	// Set up isolation
+	if err := isolation.Setup(logger); err != nil {
+		return fmt.Errorf("job isolation setup failed: %w", err)
+	}
+
+	// Process uploads within resource limits
+	return processUploadsInCgroup(logger)
+}
+
+// runExecutePhase handles the execution phase (existing logic refactored)
+func runExecutePhase(cfg *config.Config, logger *logger.Logger) error {
+	logger.Info("starting execution phase in isolation")
+
 	// CRITICAL: Wait for network setup FIRST before any other operations
-	// This must happen before cgroup assignment or any isolation setup
-	// to ensure the process stays alive during network configuration
-	if err := waitForNetworkReady(initLogger); err != nil {
+	if err := waitForNetworkReady(logger); err != nil {
 		return fmt.Errorf("failed to wait for network ready: %w", err)
 	}
 
@@ -99,12 +156,12 @@ func RunJobInit(cfg *config.Config) error {
 	}
 
 	// Assign to cgroup immediately
-	if err := assignToCgroup(cgroupPath, initLogger); err != nil {
+	if err := assignToCgroup(cgroupPath, logger); err != nil {
 		return fmt.Errorf("failed to assign to cgroup: %w", err)
 	}
 
 	// Verify cgroup assignment
-	if err := verifyCgroupAssignment(cgroupPath, initLogger); err != nil {
+	if err := verifyCgroupAssignment(cgroupPath, logger); err != nil {
 		return fmt.Errorf("cgroup assignment verification failed: %w", err)
 	}
 
@@ -114,19 +171,151 @@ func RunJobInit(cfg *config.Config) error {
 		"maxIOBPS":  os.Getenv("JOB_MAX_IOBPS"),
 	}
 
-	initLogger.Debug("resource limits applied", "limits", limits)
+	logger.Debug("resource limits applied", "limits", limits)
 
 	// Set up isolation
-	if err := isolation.Setup(initLogger); err != nil {
+	if err := isolation.Setup(logger); err != nil {
 		return fmt.Errorf("job isolation setup failed: %w", err)
 	}
 
 	// Execute the job using the new consolidated approach
-	if err := jobexec.Execute(initLogger); err != nil {
+	if err := jobexec.Execute(logger); err != nil {
 		return fmt.Errorf("job execution failed: %w", err)
 	}
 
 	return nil
+}
+
+// processUploadsInCgroup processes uploads within cgroup limits
+func processUploadsInCgroup(logger *logger.Logger) error {
+	// Get upload data from environment
+	uploadsB64 := os.Getenv("JOB_UPLOADS_DATA")
+	if uploadsB64 == "" {
+		return fmt.Errorf("no upload data provided")
+	}
+
+	// Decode base64
+	uploadsJSON, err := base64.StdEncoding.DecodeString(uploadsB64)
+	if err != nil {
+		return fmt.Errorf("failed to decode upload data: %w", err)
+	}
+
+	// Need to import domain package for FileUpload type
+	type FileUpload struct {
+		Path        string `json:"path"`
+		Content     []byte `json:"content"`
+		Mode        uint32 `json:"mode"`
+		IsDirectory bool   `json:"isDirectory"`
+		Size        int64  `json:"size"`
+	}
+
+	// Parse uploads
+	var uploads []FileUpload
+	if e := json.Unmarshal(uploadsJSON, &uploads); e != nil {
+		return fmt.Errorf("failed to parse upload data: %w", e)
+	}
+
+	logger.Info("processing uploads within cgroup limits", "count", len(uploads))
+
+	// Create workspace directory
+	workspaceDir := "/work"
+	if e := os.MkdirAll(workspaceDir, 0755); e != nil {
+		return fmt.Errorf("failed to create workspace: %w", e)
+	}
+
+	// Process each file - ALL I/O IS NOW SUBJECT TO CGROUP LIMITS
+	for _, upload := range uploads {
+		if e := processUploadFile(upload, workspaceDir, logger); e != nil {
+			// Log the error but include context about resource limits
+			logger.Error("failed to process upload file",
+				"path", upload.Path,
+				"size", len(upload.Content),
+				"error", e,
+				"hint", "possible resource limit exceeded")
+			return fmt.Errorf("upload processing failed for %s: %w", upload.Path, e)
+		}
+	}
+
+	logger.Info("all uploads processed successfully within resource limits")
+	return nil
+}
+
+// processUploadFile writes a single file within cgroup limits
+func processUploadFile(upload interface{}, workspaceDir string, logger *logger.Logger) error {
+	// Type assertion to access fields
+	u := upload.(struct {
+		Path        string `json:"path"`
+		Content     []byte `json:"content"`
+		Mode        uint32 `json:"mode"`
+		IsDirectory bool   `json:"isDirectory"`
+		Size        int64  `json:"size"`
+	})
+
+	fullPath := filepath.Join(workspaceDir, u.Path)
+
+	if u.IsDirectory {
+		// Create directory
+		mode := os.FileMode(u.Mode)
+		if mode == 0 {
+			mode = 0755
+		}
+		if err := os.MkdirAll(fullPath, mode); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+		logger.Debug("created directory", "path", u.Path)
+	} else {
+		// Create parent directory
+		parentDir := filepath.Dir(fullPath)
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			return fmt.Errorf("failed to create parent directory: %w", err)
+		}
+
+		// Write file - THIS WRITE IS SUBJECT TO MEMORY/IO LIMITS
+		mode := os.FileMode(u.Mode)
+		if mode == 0 {
+			mode = 0644
+		}
+
+		// Write in chunks to handle large files better
+		if err := writeFileInChunks(fullPath, u.Content, mode, logger); err != nil {
+			return fmt.Errorf("failed to write file: %w", err)
+		}
+
+		logger.Debug("wrote file within cgroup limits", "path", u.Path, "size", len(u.Content), "mode", mode)
+	}
+
+	return nil
+}
+
+// writeFileInChunks writes file data in chunks to better handle memory pressure
+func writeFileInChunks(path string, content []byte, mode os.FileMode, logger *logger.Logger) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Write in 64KB chunks
+	chunkSize := 64 * 1024
+	for offset := 0; offset < len(content); offset += chunkSize {
+		end := offset + chunkSize
+		if end > len(content) {
+			end = len(content)
+		}
+
+		chunk := content[offset:end]
+		if _, err := file.Write(chunk); err != nil {
+			// This error likely means we hit a resource limit
+			return fmt.Errorf("write failed at offset %d: %w", offset, err)
+		}
+
+		// Sync periodically to ensure data is written
+		if offset%(chunkSize*16) == 0 && offset > 0 {
+			file.Sync()
+		}
+	}
+
+	return file.Sync()
 }
 
 // waitForNetworkReady waits for the parent process to signal that network setup is complete

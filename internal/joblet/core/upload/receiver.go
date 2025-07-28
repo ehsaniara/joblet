@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -39,10 +40,18 @@ func (r *Receiver) ProcessAllFiles(pipePath string, workspacePath string) error 
 
 	log.Debug("opening upload pipe for reading", "pipePath", pipePath)
 
-	pipe, err := os.OpenFile(pipePath, os.O_RDONLY, 0)
+	// Add O_NONBLOCK to avoid blocking
+	pipe, err := os.OpenFile(pipePath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return fmt.Errorf("failed to open upload pipe: %w", err)
 	}
+
+	// Remove O_NONBLOCK after opening
+	if e := syscall.SetNonblock(int(pipe.Fd()), false); e != nil {
+		pipe.Close()
+		return fmt.Errorf("failed to set blocking mode: %w", e)
+	}
+
 	defer pipe.Close()
 
 	log.Debug("processing files from pipe", "workspacePath", workspacePath)

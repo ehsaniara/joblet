@@ -182,7 +182,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		MaxMemory: maxMemory,
 		MaxIOBPS:  maxIOBPS,
 		Uploads:   fileUploads,
-		Schedule:  scheduledTimeRFC3339, // Send RFC3339 string to server
+		Schedule:  scheduledTimeRFC3339,
 		Network:   network,
 	}
 

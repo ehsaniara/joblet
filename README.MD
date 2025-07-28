@@ -8,8 +8,6 @@
 
 <img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
-📝 **Note:** Project recently renamed from _Worker_ to **Joblet** and **RNX** (CLI)
-
 **Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process
 isolation, resource limits, real-time monitoring, **network isolation**, and **scheduled execution** - protecting your
 host system from

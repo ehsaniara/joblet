@@ -89,10 +89,6 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 			"jobId", newJob.Id,
 			"uploadsProcessed", len(domainUploads),
 			"scheduledTimeRFC3339", req.Schedule)
-	} else {
-		log.Debug("job created successfully",
-			"jobId", newJob.Id,
-			"uploadsProcessed", len(domainUploads))
 	}
 
 	return mappers.DomainToRunJobResponse(newJob), nil

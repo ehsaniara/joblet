@@ -8,11 +8,11 @@ import (
 
 // FileUpload represents a file to be uploaded to the job workspace with streaming support
 type FileUpload struct {
-	Path        string // Relative path in job workspace
-	Content     []byte // File content
-	Mode        uint32 // Unix file permissions
-	IsDirectory bool   // True if this represents a directory
-	Size        int64  // Total file size
+	Path        string `json:"path"`        // Relative path in job workspace
+	Content     []byte `json:"content"`     // File content
+	Mode        uint32 `json:"mode"`        // Unix file permissions
+	IsDirectory bool   `json:"isDirectory"` // True if this represents a directory
+	Size        int64  `json:"size"`        // Total file size
 }
 
 // UploadSession represents a file upload session with streaming capabilities
@@ -20,7 +20,6 @@ type UploadSession struct {
 	JobID       string
 	TotalFiles  int
 	TotalSize   int64
-	PipePath    string       // Named pipe for streaming files
 	Files       []FileUpload // All files
 	MemoryLimit int64        // Cgroup memory limit for chunking
 	ChunkSize   int          // Optimal chunk size based on memory
@@ -64,11 +63,6 @@ func (us *UploadSession) OptimizeForMemory(memoryLimitMB int32) {
 	if us.ChunkSize < 4096 {
 		us.ChunkSize = 4096
 	}
-}
-
-// GetWorkspacePath returns the absolute workspace path for the job
-func (us *UploadSession) GetWorkspacePath() string {
-	return fmt.Sprintf("/opt/joblet/jobs/%s/work", us.JobID)
 }
 
 // validateFilePath ensures file paths are safe
