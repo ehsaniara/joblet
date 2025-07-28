@@ -308,34 +308,6 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 	return append(baseEnv, jobEnv...)
 }
 
-// buildSimpleEnvironment builds environment without pipe-based uploads
-func (ee *ExecutionEngine) buildSimpleEnvironment(job *domain.Job, execPath string, hasUploads bool) []string {
-	baseEnv := ee.platform.Environ()
-
-	jobEnv := []string{
-		"JOBLET_MODE=init",
-		fmt.Sprintf("JOB_ID=%s", job.Id),
-		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
-		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
-		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
-		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
-		fmt.Sprintf("JOBLET_BINARY_PATH=%s", execPath),
-		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
-		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
-		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
-		"JOBLET_EXEC_AFTER_ISOLATION=true",
-
-		// Simple flag indicating uploads were pre-processed
-		fmt.Sprintf("JOB_HAS_UPLOADS=%t", hasUploads),
-	}
-
-	for i, arg := range job.Args {
-		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
-	}
-
-	return append(baseEnv, jobEnv...)
-}
-
 func (ee *ExecutionEngine) copyInitBinary(source, dest string) error {
 	// Ensure destination directory exists
 	destDir := filepath.Dir(dest)

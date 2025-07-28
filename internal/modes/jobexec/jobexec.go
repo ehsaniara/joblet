@@ -8,7 +8,6 @@ import (
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 	"path/filepath"
-	"strings"
 )
 
 // JobExecutor handles job execution in init mode with consolidated environment handling
@@ -149,46 +148,6 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	je.logger.Info("executing job command", "command", commandPath, "args", config.Args)
 	// Execute
 	return cmd.Run()
-}
-
-// cleanEnvironment removes joblet-specific environment variables
-func (je *JobExecutor) cleanEnvironment() []string {
-	current := je.platform.Environ()
-	cleaned := make([]string, 0, len(current))
-
-	// List of prefixes to remove
-	removePrefix := []string{
-		"JOBLET_",
-		"JOB_ID=",
-		"JOB_COMMAND=",
-		"JOB_CGROUP_",
-		"JOB_ARG_",
-		"JOB_MAX_",
-		"JOB_UPLOAD_",
-	}
-
-	for _, env := range current {
-		keep := true
-		for _, prefix := range removePrefix {
-			if strings.HasPrefix(env, prefix) {
-				keep = false
-				break
-			}
-		}
-		if keep {
-			cleaned = append(cleaned, env)
-		}
-	}
-
-	// minimal required environment
-	cleaned = append(cleaned,
-		"PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
-		"HOME=/tmp",
-		"USER=nobody",
-		"TERM=xterm",
-	)
-
-	return cleaned
 }
 
 // resolveCommandPath resolves the full path for a command

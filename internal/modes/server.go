@@ -311,11 +311,17 @@ func writeFileInChunks(path string, content []byte, mode os.FileMode, logger *lo
 
 		// Sync periodically to ensure data is written
 		if offset%(chunkSize*16) == 0 && offset > 0 {
-			file.Sync()
+			if e := file.Sync(); e != nil {
+				logger.Warn("failed to sync file during write", "error", e, "offset", offset)
+			}
 		}
 	}
 
-	return file.Sync()
+	if e := file.Sync(); e != nil {
+		logger.Warn("failed to final sync file", "error", e, "path", path)
+		return nil // Data was written, so we don't fail
+	}
+	return nil
 }
 
 // waitForNetworkReady waits for the parent process to signal that network setup is complete
