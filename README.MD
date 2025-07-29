@@ -360,12 +360,6 @@ rnx run --schedule="30min" --upload=data.csv --upload=process.py --network=backe
 # Example output with upload optimization
 $ rnx run --schedule="1hour" --upload-dir=dataset --network=analytics python3 process_data.py
 
-📤 Upload optimized for memory efficiency:
-   Total: 15 files (25.3 MB)
-   Small files: 12 (embedded in job)
-   Large files: 3 (streamed to job)
-   Memory-safe chunking: Enabled
-
 Job started:
 ID: 2
 Command: python3 process_data.py
@@ -373,6 +367,7 @@ Status: SCHEDULED
 Schedule Input: 1hour
 Scheduled Time: 2025-07-19T15:45:30Z
 Network: analytics
+Files: 15 uploaded successfully
 ```
 
 ### CPU Core Management
