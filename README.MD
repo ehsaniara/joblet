@@ -452,16 +452,23 @@ rnx stop <job-id>
 ### Remote Server Connection
 
 ```bash
-# Connect to remote daemon
-rnx --server=production:50051 run python3 script.py
+# List all configured nodes
+rnx nodes
+# Output:
+# Available nodes in configuration:
+#   - default (192.168.1.100:50051)
+#   - production (prod.example.com:50051)
+#   - staging (staging.example.com:50051)
+
+# Connect to specific node
+rnx --node=production run python3 script.py
 
 # Use different configurations
 rnx --config=prod-rnx-config.yml list
-rnx --node=production run deploy.sh
 
-# Set default server
-export JOBLET_SERVER=production:50051
-rnx list  # Uses production server
+# Set default node via environment
+export JOBLET_NODE=production
+rnx list  # Uses production node
 ```
 
 ### Real-World Examples
@@ -959,6 +966,18 @@ ip -s link show | grep veth
 - **Network**: Access to daemon port 50051
 
 ## 🚀 Command Reference
+
+### Core Commands
+
+| Command         | Description                                | Example                            |
+|-----------------|--------------------------------------------|------------------------------------|
+| `rnx run`       | Run a job with specified command and args  | `rnx run python3 script.py`        |
+| `rnx list`      | List all jobs (running and scheduled)      | `rnx list`                         |
+| `rnx status`    | Get detailed status of a specific job      | `rnx status 123`                   |
+| `rnx log`       | Stream live logs from a running job        | `rnx log 123`                      |
+| `rnx stop`      | Stop a running or scheduled job            | `rnx stop 123`                     |
+| `rnx nodes`     | List all configured server nodes           | `rnx nodes`                        |
+| `rnx config-help` | Show configuration file examples         | `rnx config-help`                  |
 
 ### Resource Limiting Flags
 

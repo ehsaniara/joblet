@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/network"
@@ -163,15 +164,16 @@ func (ee *ExecutionEngine) executeUploadPhase(ctx context.Context, opts *StartPr
 
 	// Wait with timeout
 	select {
-	case err := <-done:
-		if err != nil {
-			if exitError, ok := err.(*exec.ExitError); ok {
+	case e := <-done:
+		if e != nil {
+			var exitError *exec.ExitError
+			if errors.As(e, &exitError) {
 				log.Error("upload phase failed",
 					"exitCode", exitError.ExitCode(),
-					"error", err)
+					"error", e)
 				return fmt.Errorf("upload phase exited with code %d", exitError.ExitCode())
 			}
-			return fmt.Errorf("upload phase failed: %w", err)
+			return fmt.Errorf("upload phase failed: %w", e)
 		}
 		return nil // Success
 
