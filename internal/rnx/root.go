@@ -20,6 +20,11 @@ var rootCmd = &cobra.Command{
 	Short: "RNX - Remote eXecution client for Joblet",
 	Long:  "RNX (Remote eXecution) - Command Line Interface to interact with Joblet gRPC services using embedded certificates",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Skip config loading for run command since it has DisableFlagParsing and handles config loading manually
+		if cmd.Name() == "run" {
+			return
+		}
+
 		// Load client configuration - REQUIRED (no direct server connections)
 		var err error
 		nodeConfig, err = config.LoadClientConfig(configPath)

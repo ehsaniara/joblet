@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 	pb "joblet/api/gen"
+	"joblet/pkg/config"
 )
 
 func newRunCmd() *cobra.Command {
@@ -92,9 +93,23 @@ func runRun(cmd *cobra.Command, args []string) error {
 		network    string
 	)
 
-	commandStartIndex := 0
-	for i, arg := range args {
-		if strings.HasPrefix(arg, "--schedule=") {
+	commandStartIndex := -1
+
+	// Process arguments manually since DisableFlagParsing is enabled
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if strings.HasPrefix(arg, "--config=") {
+			configPath = strings.TrimPrefix(arg, "--config=")
+		} else if arg == "--config" && i+1 < len(args) {
+			configPath = args[i+1]
+			i++ // Skip the next argument since we consumed it
+		} else if strings.HasPrefix(arg, "--node=") {
+			nodeName = strings.TrimPrefix(arg, "--node=")
+		} else if arg == "--node" && i+1 < len(args) {
+			nodeName = args[i+1]
+			i++ // Skip the next argument since we consumed it
+		} else if strings.HasPrefix(arg, "--schedule=") {
 			schedule = strings.TrimPrefix(arg, "--schedule=")
 		} else if strings.HasPrefix(arg, "--cpu-cores=") {
 			cpuCores = strings.TrimPrefix(arg, "--cpu-cores=")
@@ -116,23 +131,36 @@ func runRun(cmd *cobra.Command, args []string) error {
 		} else if strings.HasPrefix(arg, "--upload-dir=") {
 			uploadDir := strings.TrimPrefix(arg, "--upload-dir=")
 			uploadDirs = append(uploadDirs, uploadDir)
+		} else if strings.HasPrefix(arg, "--network=") {
+			network = strings.TrimPrefix(arg, "--network=")
+		} else if arg == "--" {
+			// -- separator found, command starts at next position
+			if i+1 < len(args) {
+				commandStartIndex = i + 1
+			}
+			break
 		} else if !strings.HasPrefix(arg, "--") {
 			commandStartIndex = i
 			break
-		} else if strings.HasPrefix(arg, "--network=") {
-			network = strings.TrimPrefix(arg, "--network=")
 		} else {
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
 	}
 
-	if commandStartIndex >= len(args) {
+	if commandStartIndex < 0 || commandStartIndex >= len(args) {
 		return fmt.Errorf("must specify a command")
 	}
 
 	commandArgs := args[commandStartIndex:]
 	command := commandArgs[0]
 	cmdArgs := commandArgs[1:]
+
+	// Load client configuration manually since PersistentPreRun doesn't run with DisableFlagParsing
+	var err error
+	nodeConfig, err = config.LoadClientConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load client config: %w", err)
+	}
 
 	// Client creation using unified config
 	jobClient, err := newJobClient()

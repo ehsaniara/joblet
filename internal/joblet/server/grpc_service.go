@@ -48,6 +48,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 	)
 
 	log.Debug("run job request received")
+	log.Debug("DEBUG: received command", "command", req.Command, "args", req.Args)
 
 	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)

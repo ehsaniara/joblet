@@ -400,6 +400,13 @@ func (c *ClientConfig) ListNodes() []string {
 
 // findClientConfig looks for rnx-config.yml in common locations
 func findClientConfig() string {
+	// First check RNX_CONFIG environment variable
+	if envPath := os.Getenv("RNX_CONFIG"); envPath != "" {
+		if _, err := os.Stat(envPath); err == nil {
+			return envPath
+		}
+	}
+
 	locations := []string{
 		"./rnx-config.yml",
 		"./config/rnx-config.yml",

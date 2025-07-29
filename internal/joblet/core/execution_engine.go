@@ -80,6 +80,11 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 	log := ee.logger.WithField("jobID", opts.Job.Id)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
 
+	// Check if we're in CI mode - if so, use direct execution
+	if ee.platform.Getenv("JOBLET_CI_MODE") == "true" {
+		return ee.executeDirectCommand(ctx, opts)
+	}
+
 	// Get executable path
 	execPath, err := ee.platform.Executable()
 	if err != nil {
@@ -100,7 +105,7 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 
 	// CHANGED: Use two-phase execution for uploads
 	if len(opts.Uploads) > 0 {
-		log.Info("executing two-phase job with uploads")
+		log.Debug("executing two-phase job with uploads")
 
 		// Phase 1: Upload processing within isolation
 		if err := ee.executeUploadPhase(ctx, opts, isolatedInitPath); err != nil {
@@ -108,7 +113,7 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 			return nil, fmt.Errorf("upload phase failed: %w", err)
 		}
 
-		log.Info("upload phase completed successfully")
+		log.Debug("upload phase completed successfully")
 	}
 
 	// Phase 2: Job execution (with or without uploads)
@@ -423,4 +428,77 @@ func (ee *ExecutionEngine) resolveCommandPath(command string) (string, error) {
 	}
 
 	return "", fmt.Errorf("command %s not found", command)
+}
+
+// executeDirectCommand executes jobs directly without init binary in CI mode
+func (ee *ExecutionEngine) executeDirectCommand(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
+	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("mode", "direct")
+
+	// Create job directory for workspace
+	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id)
+	workDir := filepath.Join(jobDir, "work")
+
+	if err := ee.platform.MkdirAll(workDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create work directory: %w", err)
+	}
+
+	// Process uploads directly in the main process if any
+	if len(opts.Uploads) > 0 {
+
+		for _, upload := range opts.Uploads {
+			uploadPath := filepath.Join(workDir, upload.Path)
+
+			// Create parent directory if needed
+			if upload.IsDirectory {
+				if err := ee.platform.MkdirAll(uploadPath, os.FileMode(upload.Mode)); err != nil {
+					return nil, fmt.Errorf("failed to create upload directory %s: %w", upload.Path, err)
+				}
+			} else {
+				parentDir := filepath.Dir(uploadPath)
+				if err := ee.platform.MkdirAll(parentDir, 0755); err != nil {
+					return nil, fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+				}
+
+				// Write file content
+				if err := ee.platform.WriteFile(uploadPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+					return nil, fmt.Errorf("failed to write upload file %s: %w", upload.Path, err)
+				}
+			}
+		}
+	}
+
+	// Resolve command path
+	log.Debug("resolving command path", "command", opts.Job.Command)
+	commandPath, err := ee.resolveCommandPath(opts.Job.Command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve command: %w", err)
+	}
+	log.Debug("resolved command path", "commandPath", commandPath)
+
+	// Create command directly
+	cmd := ee.platform.CreateCommand(commandPath, opts.Job.Args...)
+
+	// Set working directory to workspace if uploads were processed
+	if len(opts.Uploads) > 0 {
+		cmd.SetDir(workDir)
+		log.Debug("set working directory to workspace", "workDir", workDir)
+	}
+
+	// Set up output capture
+	outputWriter := NewWrite(ee.store, opts.Job.Id)
+	cmd.SetStdout(outputWriter)
+	cmd.SetStderr(outputWriter)
+
+	// Set minimal environment
+	env := ee.platform.Environ()
+	env = append(env, fmt.Sprintf("JOB_ID=%s", opts.Job.Id))
+	env = append(env, "JOBLET_CI_MODE=true")
+	cmd.SetEnv(env)
+
+	// Start the command directly
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start CI command: %w", err)
+	}
+
+	return cmd, nil
 }
