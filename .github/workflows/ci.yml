@@ -24,3 +24,209 @@ jobs:
       - run: go test -v -race -coverprofile=coverage.out ./...
 
       - run: go tool cover -func=coverage.out
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq openssl
+
+      - name: Build binaries
+        run: |
+          # Build both binaries for Linux (CI runs on Ubuntu)
+          GOOS=linux GOARCH=amd64 go build -o bin/joblet ./cmd/joblet
+          GOOS=linux GOARCH=amd64 go build -o bin/rnx ./cmd/rnx
+          chmod +x bin/*
+
+      - name: Setup test certificates
+        run: |
+          # Create test certificates for CI with proper CA
+          mkdir -p /tmp/test-certs
+          
+          # Create CA key and certificate
+          openssl genrsa -out /tmp/test-certs/ca-key.pem 2048
+          openssl req -new -x509 -key /tmp/test-certs/ca-key.pem \
+            -out /tmp/test-certs/ca-cert.pem -days 365 \
+            -subj "/CN=Test CA"
+          
+          # Create server key and certificate signed by CA (CN must be "joblet")
+          openssl genrsa -out /tmp/test-certs/server-key.pem 2048
+          openssl req -new -key /tmp/test-certs/server-key.pem \
+            -out /tmp/test-certs/server.csr \
+            -subj "/CN=joblet"
+          openssl x509 -req -in /tmp/test-certs/server.csr \
+            -CA /tmp/test-certs/ca-cert.pem -CAkey /tmp/test-certs/ca-key.pem \
+            -out /tmp/test-certs/server-cert.pem -days 365 \
+            -CAcreateserial \
+            -extensions v3_req -extfile <(echo "[v3_req]
+          subjectAltName = DNS:localhost,DNS:joblet,IP:127.0.0.1")
+          
+          # Create client key and certificate signed by CA with admin role
+          openssl genrsa -out /tmp/test-certs/client-key.pem 2048
+          openssl req -new -key /tmp/test-certs/client-key.pem \
+            -out /tmp/test-certs/client.csr \
+            -subj "/CN=test-client/OU=admin"
+          openssl x509 -req -in /tmp/test-certs/client.csr \
+            -CA /tmp/test-certs/ca-cert.pem -CAkey /tmp/test-certs/ca-key.pem \
+            -out /tmp/test-certs/client-cert.pem -days 365 \
+            -CAcreateserial
+          
+          # Cleanup CSR files
+          rm -f /tmp/test-certs/*.csr
+
+      - name: Create test configurations
+        run: |
+          # Create directories with proper permissions
+          mkdir -p /tmp/joblet/config
+          mkdir -p /tmp/joblet/data
+          mkdir -p /tmp/joblet/state
+          mkdir -p /tmp/joblet/jobs
+          mkdir -p /tmp/joblet/tmp
+          mkdir -p /tmp/joblet/cgroup
+          
+          # Create joblet server config with embedded certificates
+          cat > /tmp/joblet/config/joblet-config.yml << EOF
+          server:
+            mode: "server"
+            address: "0.0.0.0"
+            port: 50051
+          security:
+            serverCert: |
+          $(sed 's/^/    /' /tmp/test-certs/server-cert.pem)
+            serverKey: |
+          $(sed 's/^/    /' /tmp/test-certs/server-key.pem)
+            caCert: |
+          $(sed 's/^/    /' /tmp/test-certs/ca-cert.pem)
+          joblet:
+            defaultCpuLimit: 0
+            defaultMemoryLimit: 0
+            defaultIoLimit: 0
+            maxConcurrentJobs: 100
+            jobTimeout: "1h"
+            cleanupTimeout: "5s"
+            validateCommands: true
+          logging:
+            level: "info"
+          network:
+            state_dir: "/tmp/joblet/state"
+            enabled: true
+            default_network: "bridge"
+            networks:
+              bridge:
+                cidr: "172.20.0.0/16"
+                bridge_name: "joblet0"
+          filesystem:
+            baseDir: "/tmp/joblet/jobs"
+            tmpDir: "/tmp/joblet/tmp"
+          cgroup:
+            baseDir: "/tmp/joblet/cgroup"
+          EOF
+          
+          # Create rnx client config with embedded certificates
+          cat > /tmp/joblet/config/rnx-config.yml << EOF
+          version: "3.0"
+          nodes:
+            default:
+              address: "localhost:50051"
+              cert: |
+          $(sed 's/^/      /' /tmp/test-certs/client-cert.pem)
+              key: |
+          $(sed 's/^/      /' /tmp/test-certs/client-key.pem)
+              ca: |
+          $(sed 's/^/      /' /tmp/test-certs/ca-cert.pem)
+          EOF
+
+      - name: Start joblet server
+        run: |
+          # Start joblet server in background with config and CI mode
+          JOBLET_CONFIG_PATH=/tmp/joblet/config/joblet-config.yml JOBLET_CI_MODE=true ./bin/joblet > /tmp/joblet-server.log 2>&1 &
+          echo $! > /tmp/joblet.pid
+          
+          # Wait for server to start
+          sleep 5
+          
+          # Verify server is running
+          if ! kill -0 $(cat /tmp/joblet.pid) 2>/dev/null; then
+            echo "Joblet server failed to start"
+            exit 1
+          fi
+          
+          echo "Joblet server started with PID: $(cat /tmp/joblet.pid)"
+          
+          # Test basic connectivity
+          export PATH="$PWD/bin:$PATH"
+          export RNX_CONFIG="/tmp/joblet/config/rnx-config.yml"
+          echo "Testing rnx connectivity..."
+          rnx list 2>&1 || echo "Initial rnx list failed with exit code: $?"
+          
+          # Check if server is listening
+          echo "Checking if server is listening on port 50051..."
+          netstat -tlnp 2>/dev/null | grep 50051 || echo "Port 50051 not found in netstat"
+          
+          # Check process
+          ps aux | grep joblet | grep -v grep || echo "Joblet process not found"
+          
+          # Show server log
+          echo "=== Joblet server log ==="
+          cat /tmp/joblet-server.log || echo "No server log found"
+          echo "========================"
+
+      - name: Run CI-compatible E2E tests
+        run: |
+          # Add binaries to PATH
+          export PATH="$PWD/bin:$PATH"
+          
+          # Set config paths and CI mode
+          export RNX_CONFIG="/tmp/joblet/config/rnx-config.yml"
+          export JOBLET_CONFIG="/tmp/joblet/config/joblet-config.yml"
+          export JOBLET_CI_MODE="true"
+          
+          # First run simple connectivity test
+          echo "Running simple connectivity test..."
+          ./tests/ci/test_simple_connectivity.sh || {
+              echo "Simple connectivity test failed, showing debug info..."
+              echo "=== Config files ==="
+              echo "Server config:"
+              head -20 /tmp/joblet/config/joblet-config.yml
+              echo "Client config:"  
+              head -20 /tmp/joblet/config/rnx-config.yml
+              echo "=== Server status ==="
+              ps aux | grep joblet | grep -v grep
+              echo "=== Port status ==="
+              ss -tlnp | grep 50051 || netstat -tlnp | grep 50051 || echo "Port check failed"
+              exit 1
+          }
+          
+          # Run full test suite
+          export PATH="$PWD/bin:$PATH"
+          export RNX_CONFIG="/tmp/joblet/config/rnx-config.yml"
+          export JOBLET_CONFIG="/tmp/joblet/config/joblet-config.yml"
+          ./tests/ci/run_ci_tests.sh
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-logs
+          path: |
+            /tmp/joblet_test_*
+            /tmp/joblet/config/*.yml
+            /tmp/joblet-server.log
+
+      - name: Stop joblet server
+        if: always()
+        run: |
+          if [[ -f /tmp/joblet.pid ]]; then
+            kill $(cat /tmp/joblet.pid) || true
+            rm -f /tmp/joblet.pid
+          fi
