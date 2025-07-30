@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"joblet/internal/joblet/domain"
 	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 	"os"
 	"sync"
 	"syscall"
@@ -20,6 +21,7 @@ type StreamContext struct {
 	PipePath string
 	JobID    string
 	manager  domain.UploadManager
+	platform platform.Platform
 	logger   *logger.Logger
 
 	// Synchronization fields
@@ -28,11 +30,12 @@ type StreamContext struct {
 }
 
 // NewStreamContext creates a new stream context
-func NewStreamContext(session *domain.UploadSession, pipePath string, jobID string, logger *logger.Logger) *StreamContext {
+func NewStreamContext(session *domain.UploadSession, pipePath string, jobID string, platform platform.Platform, logger *logger.Logger) *StreamContext {
 	return &StreamContext{
 		Session:  session,
 		PipePath: pipePath,
 		JobID:    jobID,
+		platform: platform,
 		logger:   logger.WithField("component", "streamContext"),
 	}
 }
@@ -133,7 +136,7 @@ func (sc *StreamContext) openPipeWithRetry(ctx context.Context) (*os.File, error
 		}
 
 		// Try to open in non-blocking mode
-		pipe, err := os.OpenFile(sc.PipePath, os.O_WRONLY|syscall.O_NONBLOCK, 0)
+		pipe, err := sc.platform.OpenFile(sc.PipePath, os.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err == nil {
 			// Successfully opened - now set to blocking mode for actual writes
 			if e := syscall.SetNonblock(int(pipe.Fd()), false); e != nil {

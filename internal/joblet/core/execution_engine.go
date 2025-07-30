@@ -49,7 +49,7 @@ func NewExecutionEngine(
 	jobIsolation *unprivileged.JobIsolation,
 	networkStore *state.NetworkStore,
 ) *ExecutionEngine {
-	uploadFactory := upload.NewFactory(logger)
+	uploadFactory := upload.NewFactory(platform, logger)
 	envBuilder := environment.NewBuilder(platform, uploadManager, uploadFactory, logger)
 
 	return &ExecutionEngine{

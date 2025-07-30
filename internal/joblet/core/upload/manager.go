@@ -101,7 +101,7 @@ func (m *Manager) StreamAllFiles(ctx context.Context, session *domain.UploadSess
 	log.Debug("starting file streaming", "fileCount", len(session.Files))
 
 	// Open pipe for writing (this will block until reader opens it)
-	pipe, err := os.OpenFile(pipePath, os.O_WRONLY, 0)
+	pipe, err := m.platform.OpenFile(pipePath, os.O_WRONLY, 0)
 	if err != nil {
 		return fmt.Errorf("failed to open upload pipe: %w", err)
 	}

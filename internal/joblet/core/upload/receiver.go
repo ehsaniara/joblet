@@ -41,7 +41,7 @@ func (r *Receiver) ProcessAllFiles(pipePath string, workspacePath string) error 
 	log.Debug("opening upload pipe for reading", "pipePath", pipePath)
 
 	// Add O_NONBLOCK to avoid blocking
-	pipe, err := os.OpenFile(pipePath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	pipe, err := r.platform.OpenFile(pipePath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return fmt.Errorf("failed to open upload pipe: %w", err)
 	}

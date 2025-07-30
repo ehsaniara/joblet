@@ -12,6 +12,7 @@ import (
 	"joblet/internal/modes/jobexec"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -31,12 +32,15 @@ func RunServer(cfg *config.Config) error {
 	// Create state store
 	store := state.New()
 
+	// Create platform instance
+	platformInstance := platform.NewPlatform()
+
 	// Create network store
 	networkConfig := &cfg.Network
 	if networkConfig.StateDir == "" {
 		networkConfig.StateDir = "/var/lib/joblet"
 	}
-	networkStore := state.NewNetworkStore(networkConfig)
+	networkStore := state.NewNetworkStore(networkConfig, platformInstance)
 	if err := networkStore.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize network store: %w", err)
 	}
@@ -77,9 +81,12 @@ func RunServer(cfg *config.Config) error {
 func RunJobInit(cfg *config.Config) error {
 	initLogger := logger.WithField("mode", "init")
 
+	// Create platform instance
+	platformInstance := platform.NewPlatform()
+
 	// Determine phase
-	phase := os.Getenv("JOB_PHASE")
-	jobID := os.Getenv("JOB_ID")
+	phase := platformInstance.Getenv("JOB_PHASE")
+	jobID := platformInstance.Getenv("JOB_ID")
 
 	if jobID != "" {
 		initLogger = initLogger.WithField("jobId", jobID)
@@ -94,38 +101,38 @@ func RunJobInit(cfg *config.Config) error {
 	// Phase-specific handling
 	switch phase {
 	case "upload":
-		return runUploadPhase(cfg, initLogger)
+		return runUploadPhase(cfg, initLogger, platformInstance)
 	case "execute":
-		return runExecutePhase(cfg, initLogger)
+		return runExecutePhase(cfg, initLogger, platformInstance)
 	default:
 		// Legacy support - treat as execute phase
 		initLogger.Warn("no phase specified, assuming execute phase")
-		return runExecutePhase(cfg, initLogger)
+		return runExecutePhase(cfg, initLogger, platformInstance)
 	}
 }
 
 // runUploadPhase handles the upload phase within full isolation
-func runUploadPhase(cfg *config.Config, logger *logger.Logger) error {
+func runUploadPhase(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
 	logger.Info("starting upload phase in isolation")
 
 	// Wait for network if needed (for consistency)
-	if err := waitForNetworkReady(logger); err != nil {
+	if err := waitForNetworkReady(logger, platform); err != nil {
 		return fmt.Errorf("failed to wait for network ready: %w", err)
 	}
 
 	// Get cgroup path and assign immediately
-	cgroupPath := os.Getenv("JOB_CGROUP_PATH")
+	cgroupPath := platform.Getenv("JOB_CGROUP_PATH")
 	if cgroupPath == "" {
 		return fmt.Errorf("JOB_CGROUP_PATH environment variable is required")
 	}
 
 	// Assign to cgroup - THIS IS CRITICAL
-	if err := assignToCgroup(cgroupPath, logger); err != nil {
+	if err := assignToCgroup(cgroupPath, logger, platform); err != nil {
 		return fmt.Errorf("failed to assign to cgroup: %w", err)
 	}
 
 	// Verify cgroup assignment
-	if err := verifyCgroupAssignment(cgroupPath, logger); err != nil {
+	if err := verifyCgroupAssignment(cgroupPath, logger, platform); err != nil {
 		return fmt.Errorf("cgroup assignment verification failed: %w", err)
 	}
 
@@ -137,38 +144,38 @@ func runUploadPhase(cfg *config.Config, logger *logger.Logger) error {
 	}
 
 	// Process uploads within resource limits
-	return processUploadsInCgroup(logger)
+	return processUploadsInCgroup(logger, platform)
 }
 
 // runExecutePhase handles the execution phase (existing logic refactored)
-func runExecutePhase(cfg *config.Config, logger *logger.Logger) error {
+func runExecutePhase(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
 	logger.Info("starting execution phase in isolation")
 
 	// CRITICAL: Wait for network setup FIRST before any other operations
-	if err := waitForNetworkReady(logger); err != nil {
+	if err := waitForNetworkReady(logger, platform); err != nil {
 		return fmt.Errorf("failed to wait for network ready: %w", err)
 	}
 
 	// Validate required environment
-	cgroupPath := os.Getenv("JOB_CGROUP_PATH")
+	cgroupPath := platform.Getenv("JOB_CGROUP_PATH")
 	if cgroupPath == "" {
 		return fmt.Errorf("JOB_CGROUP_PATH environment variable is required")
 	}
 
 	// Assign to cgroup immediately
-	if err := assignToCgroup(cgroupPath, logger); err != nil {
+	if err := assignToCgroup(cgroupPath, logger, platform); err != nil {
 		return fmt.Errorf("failed to assign to cgroup: %w", err)
 	}
 
 	// Verify cgroup assignment
-	if err := verifyCgroupAssignment(cgroupPath, logger); err != nil {
+	if err := verifyCgroupAssignment(cgroupPath, logger, platform); err != nil {
 		return fmt.Errorf("cgroup assignment verification failed: %w", err)
 	}
 
 	limits := map[string]string{
-		"maxCPU":    os.Getenv("JOB_MAX_CPU"),
-		"maxMemory": os.Getenv("JOB_MAX_MEMORY"),
-		"maxIOBPS":  os.Getenv("JOB_MAX_IOBPS"),
+		"maxCPU":    platform.Getenv("JOB_MAX_CPU"),
+		"maxMemory": platform.Getenv("JOB_MAX_MEMORY"),
+		"maxIOBPS":  platform.Getenv("JOB_MAX_IOBPS"),
 	}
 
 	logger.Debug("resource limits applied", "limits", limits)
@@ -196,9 +203,9 @@ type FileUpload struct {
 }
 
 // processUploadsInCgroup processes uploads within cgroup limits
-func processUploadsInCgroup(logger *logger.Logger) error {
+func processUploadsInCgroup(logger *logger.Logger, platform platform.Platform) error {
 	// Get upload data from environment
-	uploadsB64 := os.Getenv("JOB_UPLOADS_DATA")
+	uploadsB64 := platform.Getenv("JOB_UPLOADS_DATA")
 	if uploadsB64 == "" {
 		return fmt.Errorf("no upload data provided")
 	}
@@ -319,8 +326,8 @@ func writeFileInChunks(path string, content []byte, mode os.FileMode, logger *lo
 }
 
 // waitForNetworkReady waits for the parent process to signal that network setup is complete
-func waitForNetworkReady(logger *logger.Logger) error {
-	networkReadyFD := os.Getenv("NETWORK_READY_FD")
+func waitForNetworkReady(logger *logger.Logger, platform platform.Platform) error {
+	networkReadyFD := platform.Getenv("NETWORK_READY_FD")
 	if networkReadyFD == "" {
 		logger.Debug("NETWORK_READY_FD not set, skipping network wait")
 		return nil
@@ -361,7 +368,7 @@ func waitForNetworkReady(logger *logger.Logger) error {
 }
 
 // assignToCgroup assigns the current process to the specified cgroup
-func assignToCgroup(cgroupPath string, logger *logger.Logger) error {
+func assignToCgroup(cgroupPath string, logger *logger.Logger, platform platform.Platform) error {
 	if cgroupPath == "" {
 		return fmt.Errorf("cgroup path cannot be empty")
 	}
@@ -369,10 +376,10 @@ func assignToCgroup(cgroupPath string, logger *logger.Logger) error {
 	// The cgroupPath from environment is the namespace view (/sys/fs/cgroup)
 	// But we need to write to the HOST view of the cgroup
 	// Convert from namespace path to host path using JOB_CGROUP_HOST_PATH
-	hostCgroupPath := os.Getenv("JOB_CGROUP_HOST_PATH")
+	hostCgroupPath := platform.Getenv("JOB_CGROUP_HOST_PATH")
 	if hostCgroupPath == "" {
 		// Fallback: try to construct it
-		jobID := os.Getenv("JOB_ID")
+		jobID := platform.Getenv("JOB_ID")
 		if jobID == "" {
 			return fmt.Errorf("cannot determine cgroup path: JOB_CGROUP_HOST_PATH and JOB_ID not set")
 		}
@@ -403,7 +410,7 @@ func assignToCgroup(cgroupPath string, logger *logger.Logger) error {
 }
 
 // verifyCgroupAssignment verifies that the current process is in a cgroup namespace
-func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger) error {
+func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger, platform platform.Platform) error {
 	const cgroupFile = "/proc/self/cgroup"
 
 	// Read /proc/self/cgroup
@@ -422,7 +429,7 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger) er
 	}
 
 	// Extract job ID from expected path and verify it's in our cgroup view
-	jobID := os.Getenv("JOB_ID")
+	jobID := platform.Getenv("JOB_ID")
 	if jobID != "" && !strings.Contains(cgroupContent, jobID) {
 		logger.Warn("cgroup content doesn't contain job ID, but assignment may still be correct",
 			"jobID", jobID, "cgroupContent", cgroupContent)

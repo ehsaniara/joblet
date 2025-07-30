@@ -6,8 +6,8 @@ import (
 	"joblet/internal/joblet/network"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -28,6 +28,7 @@ type NetworkStore struct {
 	mu         sync.RWMutex
 	logger     *logger.Logger
 	config     *config.NetworkConfig
+	platform   platform.Platform
 
 	// Network components (interfaces to avoid circular dependency)
 	validator     NetworkValidator
@@ -65,13 +66,14 @@ type BandwidthLimiter interface {
 }
 
 // NewNetworkStore creates a new network store
-func NewNetworkStore(cfg *config.NetworkConfig) *NetworkStore {
+func NewNetworkStore(cfg *config.NetworkConfig, platform platform.Platform) *NetworkStore {
 	ns := &NetworkStore{
 		configFile: filepath.Join(cfg.StateDir, "networks.json"),
 		configs:    make(map[string]*network.NetworkConfig),
 		runtime:    make(map[string]*NetworkRuntime),
 		logger:     logger.WithField("component", "network-store"),
 		config:     cfg,
+		platform:   platform,
 
 		// Initialize network components
 		validator:  network.NewNetworkValidator(),
@@ -442,9 +444,9 @@ func (ns *NetworkStore) CleanupOrphaned() error {
 // Helper methods
 
 func (ns *NetworkStore) loadNetworkConfigs() error {
-	data, err := os.ReadFile(ns.configFile)
+	data, err := ns.platform.ReadFile(ns.configFile)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if ns.platform.IsNotExist(err) {
 			return nil // First run
 		}
 		return err
@@ -456,7 +458,7 @@ func (ns *NetworkStore) loadNetworkConfigs() error {
 func (ns *NetworkStore) saveNetworkConfigs() error {
 	// Ensure directory exists
 	dir := filepath.Dir(ns.configFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := ns.platform.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
@@ -465,7 +467,7 @@ func (ns *NetworkStore) saveNetworkConfigs() error {
 		return err
 	}
 
-	return os.WriteFile(ns.configFile, data, 0644)
+	return ns.platform.WriteFile(ns.configFile, data, 0644)
 }
 
 func (ns *NetworkStore) getNetworkJobs(networkName string) map[string]*network.JobAllocation {
