@@ -1,0 +1,19 @@
+customer_id,name,region,signup_date,customer_type
+101,Alice Johnson,North,2023-05-15,Premium
+102,Bob Smith,South,2023-06-20,Standard
+103,Carol Williams,East,2023-07-10,Premium
+104,David Brown,West,2023-08-05,Standard
+105,Emma Davis,North,2023-09-12,Premium
+106,Frank Miller,South,2023-10-08,Standard
+107,Grace Wilson,East,2023-11-22,Premium
+108,Henry Taylor,West,2023-12-01,Standard
+109,Iris Anderson,North,2024-01-15,Premium
+110,Jack Thomas,South,2024-01-28,Standard
+111,Kelly Jackson,East,2024-02-10,Premium
+112,Liam White,West,2024-02-20,Standard
+113,Mia Harris,North,2024-03-01,Premium
+114,Noah Martin,South,2024-03-05,Standard
+115,Olivia Thompson,East,2024-03-12,Premium
+116,Paul Garcia,West,2024-03-18,Standard
+117,Quinn Rodriguez,North,2024-03-25,Premium
+118,Ruby Lee,South,2024-04-01,Standard

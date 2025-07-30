@@ -1062,6 +1062,29 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Examples](https://github.com/ehsaniara/joblet/tree/main/examples) - Usage examples
 - [Contributing](.github/CONTRIBUTING.md) - Development guide
 
+## 📚 Examples
+
+### Python Data Analysis Example
+
+The [Python Data Analysis Example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) demonstrates:
+
+- **File uploads**: Upload Python scripts and CSV data for processing
+- **Dependency management**: Install pandas, numpy, matplotlib in chroot environment
+- **Network isolation**: Run analysis in isolated network environments
+- **Resource limits**: Control CPU and memory usage for data processing
+- **Real-world workflow**: Process sales data, generate insights and visualizations
+
+```bash
+# Quick start - run pandas analysis with automatic pip installation
+cd examples/python-data-analysis
+rnx run --upload-dir=. bash run_with_pandas.sh
+
+# Or use standard library version (no dependencies)
+rnx run --upload=analyze_sales_simple.py --upload=data/sales_data.csv --upload=data/customers.csv python3 analyze_sales_simple.py
+```
+
+See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) for more approaches including self-installing scripts and manual package management.
+
 ## 💡 Project Name History
 
 This project was previously known as "Worker" but was renamed to:
