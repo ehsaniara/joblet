@@ -1,0 +1,5 @@
+node_modules/
+tasks.db
+analysis_charts.png
+*.log
+.DS_Store

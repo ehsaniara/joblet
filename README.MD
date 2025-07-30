@@ -1085,6 +1085,33 @@ rnx run --upload=analyze_sales_simple.py --upload=data/sales_data.csv --upload=d
 
 See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) for more approaches including self-installing scripts and manual package management.
 
+### Node.js Web API Example
+
+The [Node.js Web API Example](https://github.com/ehsaniara/joblet/tree/main/examples/nodejs-web-api) demonstrates:
+
+- **REST API Server**: Express.js server with full CRUD operations
+- **Background Workers**: Asynchronous task processing with SQLite
+- **Service Communication**: Multiple services working together in custom networks
+- **npm Dependencies**: Package installation in isolated environment
+- **Production Patterns**: Health checks, graceful shutdown, error handling
+
+```bash
+# Quick start - run API server and worker
+cd examples/nodejs-web-api
+rnx network create myapp --cidr=10.100.0.0/24
+
+# Start API server
+rnx run --upload-dir=. --network=myapp --max-memory=512 bash run-api.sh
+
+# Start background worker (in another terminal)
+rnx run --upload-dir=. --network=myapp --max-memory=256 node worker.js
+
+# Test the API
+rnx run --upload=test-api.sh --network=myapp bash test-api.sh
+```
+
+See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/nodejs-web-api) for API endpoints, scheduling workers, and production considerations.
+
 ## 💡 Project Name History
 
 This project was previously known as "Worker" but was renamed to:
