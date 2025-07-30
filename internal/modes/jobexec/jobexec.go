@@ -126,7 +126,7 @@ func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
 	return nil
 }
 
-// executeCommand remains mostly the same but simpler
+// executeCommand uses exec to replace the init process with the job command
 func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	// Resolve command path
 	commandPath, err := je.resolveCommandPath(config.Command)
@@ -134,25 +134,32 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 		return fmt.Errorf("failed to resolve command: %w", err)
 	}
 
-	// Create command
-	cmd := je.platform.CreateCommand(commandPath, config.Args...)
-
-	// Set stdout and stderr to inherit from parent (which are connected to OutputWriter)
-	cmd.SetStdout(os.Stdout)
-	cmd.SetStderr(os.Stderr)
-
-	// Change to workspace if uploads were processed
+	// Change to workspace if uploads were processed (use os.Chdir since we're in isolated namespace)
 	if je.platform.Getenv("JOB_HAS_UPLOADS") == "true" {
 		workDir := "/work"
 		if _, err := je.platform.Stat(workDir); err == nil {
-			cmd.SetDir(workDir)
+			if err := os.Chdir(workDir); err != nil {
+				return fmt.Errorf("failed to change to workspace directory: %w", err)
+			}
 			je.logger.Debug("changed working directory to /work")
 		}
 	}
 
+	// Prepare arguments for exec - argv[0] should be the command name
+	argv := append([]string{commandPath}, config.Args...)
+
+	// Get current environment (already set up by parent process)
+	envv := je.platform.Environ()
+
 	je.logger.Info("executing job command", "command", commandPath, "args", config.Args)
-	// Execute
-	return cmd.Run()
+	je.logger.Debug("about to exec to replace init process with job command")
+
+	// Use exec to replace the current process (init) with the job command
+	// This makes the job command become PID 1 in the namespace, providing proper isolation
+	err = je.platform.Exec(commandPath, argv, envv)
+	// If we reach this point, exec failed
+	je.logger.Error("exec failed - job will not appear as PID 1", "error", err)
+	return fmt.Errorf("exec failed: %w", err)
 }
 
 // resolveCommandPath resolves the full path for a command

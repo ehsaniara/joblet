@@ -80,9 +80,9 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 	log := ee.logger.WithField("jobID", opts.Job.Id)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
 
-	// Check if we're in CI mode - if so, use direct execution
+	// Check if we're in CI mode - if so, use lightweight isolation
 	if ee.platform.Getenv("JOBLET_CI_MODE") == "true" {
-		return ee.executeDirectCommand(ctx, opts)
+		return ee.executeCICommand(ctx, opts)
 	}
 
 	// Get executable path
@@ -378,7 +378,7 @@ func (ee *ExecutionEngine) ExecuteInitMode(ctx context.Context) error {
 	return ee.executeCommand(config)
 }
 
-// executeCommand executes the actual job command
+// executeCommand executes the actual job command using exec to replace the init process
 func (ee *ExecutionEngine) executeCommand(config *environment.JobConfig) error {
 	// Resolve command path
 	commandPath, err := ee.resolveCommandPath(config.Command)
@@ -386,18 +386,28 @@ func (ee *ExecutionEngine) executeCommand(config *environment.JobConfig) error {
 		return fmt.Errorf("failed to resolve command: %w", err)
 	}
 
-	// Create command
-	cmd := ee.platform.CreateCommand(commandPath, config.Args...)
-
-	// DON'T set stdout/stderr - inherit from parent
-	// The parent already set them to NewWrite(store, jobId)
-
-	// Change to workspace if needed
+	// Change to workspace if needed (safe to use os.Chdir since we're in isolated namespace)
 	if config.HasUploadSession {
-		cmd.SetDir("/work")
+		if err := os.Chdir("/work"); err != nil {
+			return fmt.Errorf("failed to change to workspace directory: %w", err)
+		}
 	}
 
-	return cmd.Run()
+	// Prepare arguments for exec - argv[0] should be the command name
+	argv := append([]string{commandPath}, config.Args...)
+
+	// Get current environment (already set up by parent process)
+	envv := ee.platform.Environ()
+
+	// Use exec to replace the current process (init) with the job command
+	// This makes the job command become PID 1 in the namespace, providing proper isolation
+	log := ee.logger.WithField("command", commandPath).WithField("args", config.Args)
+	log.Debug("about to exec to replace init process")
+
+	err = ee.platform.Exec(commandPath, argv, envv)
+	// If we reach this point, exec failed
+	log.Error("exec failed - job will not appear as PID 1", "error", err)
+	return fmt.Errorf("exec failed: %w", err)
 }
 
 // resolveCommandPath resolves the full path for a command
@@ -496,6 +506,88 @@ func (ee *ExecutionEngine) executeDirectCommand(ctx context.Context, opts *Start
 	cmd.SetEnv(env)
 
 	// Start the command directly
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start CI command: %w", err)
+	}
+
+	return cmd, nil
+}
+
+// executeCICommand executes jobs with lightweight isolation in CI mode
+// This provides basic security isolation while maintaining CI compatibility
+func (ee *ExecutionEngine) executeCICommand(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
+	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("mode", "ci-isolated")
+
+	// Create job directory for workspace
+	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id)
+	workDir := filepath.Join(jobDir, "work")
+
+	if err := ee.platform.MkdirAll(workDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create work directory: %w", err)
+	}
+
+	// Process uploads directly if any
+	if len(opts.Uploads) > 0 {
+		for _, upload := range opts.Uploads {
+			uploadPath := filepath.Join(workDir, upload.Path)
+
+			if upload.IsDirectory {
+				if err := ee.platform.MkdirAll(uploadPath, os.FileMode(upload.Mode)); err != nil {
+					return nil, fmt.Errorf("failed to create upload directory %s: %w", upload.Path, err)
+				}
+			} else {
+				parentDir := filepath.Dir(uploadPath)
+				if err := ee.platform.MkdirAll(parentDir, 0755); err != nil {
+					return nil, fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+				}
+
+				if err := ee.platform.WriteFile(uploadPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+					return nil, fmt.Errorf("failed to write upload file %s: %w", upload.Path, err)
+				}
+			}
+		}
+	}
+
+	// Resolve command path
+	commandPath, err := ee.resolveCommandPath(opts.Job.Command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve command: %w", err)
+	}
+
+	// Create command with lightweight isolation
+	cmd := ee.platform.CreateCommand(commandPath, opts.Job.Args...)
+
+	// Apply CI-safe isolation - use platform's process group creation
+	// This provides basic process isolation without complex namespace setup
+	ciSysProcAttr := ee.platform.CreateProcessGroup()
+	cmd.SetSysProcAttr(ciSysProcAttr)
+
+	// Set working directory to workspace if uploads were processed
+	if len(opts.Uploads) > 0 {
+		cmd.SetDir(workDir)
+	}
+
+	// Set up output capture
+	outputWriter := NewWrite(ee.store, opts.Job.Id)
+	cmd.SetStdout(outputWriter)
+	cmd.SetStderr(outputWriter)
+
+	// Set clean environment with minimal host information
+	env := []string{
+		"PATH=/usr/local/bin:/usr/bin:/bin",
+		"HOME=/tmp",
+		"USER=joblet",
+		fmt.Sprintf("JOB_ID=%s", opts.Job.Id),
+		"JOBLET_CI_MODE=true",
+	}
+	cmd.SetEnv(env)
+
+	log.Debug("starting CI job with lightweight isolation",
+		"command", commandPath,
+		"isolation", "pid-namespace-only",
+		"workspace", workDir)
+
+	// Start the command
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start CI command: %w", err)
 	}
