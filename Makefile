@@ -3,7 +3,7 @@ REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/joblet
 REMOTE_ARCH ?= amd64
 
-.PHONY: all clean rnx joblet deploy-passwordless deploy-safe config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces deploy-with-user-namespaces test-user-namespace-job
+.PHONY: all clean rnx joblet deploy config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces test-user-namespace-job
 
 all: rnx joblet
 
@@ -23,8 +23,7 @@ help:
 	@echo "  make config-view       - View embedded certificates in config"
 	@echo ""
 	@echo "Deployment targets:"
-	@echo "  make deploy-passwordless - Deploy without password (requires sudo setup)"
-	@echo "  make deploy-safe       - Deploy with password prompt (safe)"
+	@echo "  make deploy - Deploy without password (requires sudo setup)"
 	@echo ""
 	@echo "Quick setup:"
 	@echo "  make setup-remote-passwordless - Complete passwordless setup"
@@ -34,7 +33,6 @@ help:
 	@echo "  make validate-user-namespaces  - Check user namespace support"
 	@echo "  make setup-user-namespaces     - Setup user namespace environment"
 	@echo "  make debug-user-namespaces     - Debug user namespace issues"
-	@echo "  make deploy-with-user-namespaces - Deploy with user namespace validation"
 	@echo "  make test-user-namespace-job   - Test job isolation"
 	@echo ""
 	@echo "Debugging:"
@@ -49,7 +47,7 @@ help:
 	@echo "  REMOTE_DIR  = $(REMOTE_DIR)"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make deploy-passwordless REMOTE_HOST=prod.example.com"
+	@echo "  make deploy REMOTE_HOST=prod.example.com"
 	@echo "  make config-download"
 	@echo "  make setup-remote-passwordless"
 
@@ -61,30 +59,12 @@ joblet:
 	@echo "Building Joblet..."
 	GOOS=linux GOARCH=$(REMOTE_ARCH) go build -o bin/joblet ./cmd/joblet
 
-deploy-passwordless: joblet
+deploy: joblet
 	@echo "🚀 Passwordless deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
 	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service && sudo cp /tmp/joblet/build/* $(REMOTE_DIR)/ && sudo chmod +x $(REMOTE_DIR)/* && sudo systemctl start joblet.service && echo "✅ Deployed successfully"'
-
-deploy-safe: joblet
-	@echo "🔐 Safe deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
-	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
-	@echo "Files uploaded. Installing with sudo..."
-	@read -s -p "Enter sudo password for $(REMOTE_USER)@$(REMOTE_HOST): " SUDO_PASS; \
-	echo ""; \
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "echo '$$SUDO_PASS' | sudo -S bash -c '\
-		echo \"Stopping service...\"; \
-		systemctl stop joblet.service 2>/dev/null || echo \"Service not running\"; \
-		echo \"Installing binaries...\"; \
-		cp /tmp/joblet/build/joblet $(REMOTE_DIR)/; \
-		chmod +x $(REMOTE_DIR)/joblet; \
-		echo \"Starting service...\"; \
-		systemctl start joblet.service; \
-		echo \"Checking service status...\"; \
-		systemctl is-active joblet.service >/dev/null && echo \"✅ Service started successfully\" || echo \"❌ Service failed to start\"'"
 
 live-log:
 	@echo "📊 Viewing live logs from $(REMOTE_USER)@$(REMOTE_HOST)..."
@@ -154,7 +134,7 @@ config-view:
 		echo "💡 Run 'make config-download' to download from server"; \
 	fi
 
-setup-remote-passwordless: config-remote-generate deploy-passwordless
+setup-remote-passwordless: config-remote-generate deploy
 	@echo "🎉 Complete passwordless setup finished!"
 	@echo "   Server: $(REMOTE_USER)@$(REMOTE_HOST)"
 	@echo "   Configuration: /opt/joblet/config/ (with embedded certificates)"
@@ -293,30 +273,6 @@ debug-user-namespaces:
 		id joblet 2>/dev/null || echo "  joblet user not found"; \
 		echo "📋 Service status:"; \
 		sudo systemctl status joblet.service --no-pager --lines=5 2>/dev/null || echo "  Service not found"'
-
-deploy-with-user-namespaces: joblet
-	@echo "🚀 Deploying with user namespace validation to $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@echo "📋 Validating remote user namespace support..."
-	@$(MAKE) validate-user-namespaces || (echo "❌ User namespace validation failed. Running setup..." && $(MAKE) setup-user-namespaces && $(MAKE) validate-user-namespaces)
-	@echo "📤 Uploading binaries..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
-	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
-	@echo "🔧 Installing with user namespace support..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		sudo systemctl stop joblet.service 2>/dev/null || echo "Service not running"; \
-		sudo cp /tmp/joblet/build/* $(REMOTE_DIR)/; \
-		sudo chmod +x $(REMOTE_DIR)/*; \
-		sudo chown joblet:joblet $(REMOTE_DIR)/*; \
-		echo "Starting service..."; \
-		sudo systemctl start joblet.service; \
-		echo "Checking service status..."; \
-		sleep 2; \
-		if sudo systemctl is-active joblet.service >/dev/null; then \
-			echo "✅ Service started successfully with user namespace support"; \
-		else \
-			echo "❌ Service failed to start. Checking logs..."; \
-			sudo journalctl -u joblet.service --no-pager --lines=10; \
-		fi'
 
 test-user-namespace-job: config-download
 	@echo "🧪 Testing job execution with user namespace isolation..."

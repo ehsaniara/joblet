@@ -16,6 +16,20 @@ export JOBLET_TEST_MODE="${JOBLET_TEST_MODE:-1}"
 export JOBLET_CONFIG="${JOBLET_CONFIG:-/tmp/joblet/config/joblet-config.yml}"
 export RNX_CONFIG="${RNX_CONFIG:-/tmp/joblet/config/rnx-config.yml}"
 
+# Function to find RNX binary
+find_rnx_binary() {
+    if command -v rnx >/dev/null 2>&1; then
+        echo "rnx"
+    elif [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/rnx" ]]; then
+        echo "$(dirname "$(dirname "$(dirname "$0")")")/rnx"
+    else
+        echo "rnx"  # fallback
+    fi
+}
+
+# Set RNX binary path
+export RNX_BINARY="${RNX_BINARY:-$(find_rnx_binary)}"
+
 # Test results tracking
 TEST_COUNT=0
 PASSED_COUNT=0
@@ -65,7 +79,7 @@ wait_for_server() {
     
     print_info "Waiting for joblet server to be ready..."
     
-    while ! rnx --config "$RNX_CONFIG" list >/dev/null 2>&1; do
+    while ! "$RNX_BINARY" --config "$RNX_CONFIG" list >/dev/null 2>&1; do
         attempt=$((attempt + 1))
         if [[ $attempt -ge $max_attempts ]]; then
             print_error "Joblet server failed to start within $max_attempts seconds"
@@ -82,8 +96,10 @@ wait_for_server() {
 check_prerequisites() {
     local missing_deps=()
     
-    # Check for required commands
-    command -v rnx >/dev/null 2>&1 || missing_deps+=("rnx")
+    # Check for required commands - check for rnx binary in project root first
+    if ! command -v rnx >/dev/null 2>&1 && ! [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/rnx" ]]; then
+        missing_deps+=("rnx")
+    fi
     command -v jq >/dev/null 2>&1 || missing_deps+=("jq")
     
     if [[ ${#missing_deps[@]} -ne 0 ]]; then
@@ -114,14 +130,14 @@ cleanup_test_jobs() {
     
     # Get list of jobs and stop any that match our test pattern
     local job_list
-    if job_list=$(rnx --config "$RNX_CONFIG" list 2>/dev/null); then
+    if job_list=$("$RNX_BINARY" --config "$RNX_CONFIG" list 2>/dev/null); then
         local job_ids
         job_ids=$(echo "$job_list" | jq -r '.[] | select(.command | contains("'$pattern'")) | .id' 2>/dev/null || echo "")
         
         for job_id in $job_ids; do
             if [[ -n "$job_id" && "$job_id" != "null" ]]; then
                 print_info "Stopping test job: $job_id"
-                rnx --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+                "$RNX_BINARY" --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
             fi
         done
     fi
@@ -150,7 +166,7 @@ wait_for_job_completion() {
     
     while [[ $elapsed -lt $timeout ]]; do
         local status
-        if status=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>/dev/null | jq -r '.status' 2>/dev/null); then
+        if status=$("$RNX_BINARY" --config "$RNX_CONFIG" status "$job_id" 2>/dev/null | jq -r '.status' 2>/dev/null); then
             if [[ "$status" == "COMPLETED" || "$status" == "STOPPED" || "$status" == "FAILED" ]]; then
                 return 0
             fi

@@ -312,6 +312,14 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_CPU_CORES=%s", job.Limits.CPUCores))
 	}
 
+	// Add volume information
+	if len(job.Volumes) > 0 {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUMES_COUNT=%d", len(job.Volumes)))
+		for i, volume := range job.Volumes {
+			jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUME_%d=%s", i, volume))
+		}
+	}
+
 	return append(baseEnv, jobEnv...)
 }
 

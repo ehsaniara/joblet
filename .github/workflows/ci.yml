@@ -93,6 +93,7 @@ jobs:
           mkdir -p /tmp/joblet/jobs
           mkdir -p /tmp/joblet/tmp
           mkdir -p /tmp/joblet/cgroup
+          mkdir -p /tmp/joblet/volumes
           
           # Create joblet server config with embedded certificates
           cat > /tmp/joblet/config/joblet-config.yml << EOF
@@ -130,6 +131,12 @@ jobs:
             tmpDir: "/tmp/joblet/tmp"
           cgroup:
             baseDir: "/tmp/joblet/cgroup"
+          volume:
+            state_dir: "/tmp/joblet/state"
+            base_path: "/tmp/joblet/volumes"
+            enabled: true
+            max_size: "1GB"
+            max_volumes: 10
           EOF
           
           # Create rnx client config with embedded certificates

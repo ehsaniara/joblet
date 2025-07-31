@@ -8,6 +8,7 @@ import (
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -32,7 +33,8 @@ type JobFilesystem struct {
 	RootDir  string
 	TmpDir   string
 	WorkDir  string
-	InitPath string // Path to the init binary inside the isolated environment
+	InitPath string   // Path to the init binary inside the isolated environment
+	Volumes  []string // Volume names to mount
 	platform platform.Platform
 	config   config.FilesystemConfig
 	logger   *logger.Logger
@@ -186,6 +188,33 @@ func (f *JobFilesystem) Setup() error {
 		return fmt.Errorf("failed to mount allowed directories: %w", err)
 	}
 
+	// Load volumes from environment if not already set
+	if len(f.Volumes) == 0 {
+		f.loadVolumesFromEnvironment()
+	}
+
+	// Mount volumes BEFORE chroot
+	if err := f.mountVolumes(); err != nil {
+		return fmt.Errorf("failed to mount volumes: %w", err)
+	}
+
+	// If no volumes are mounted, try to set up limited work directory (1MB)
+	if len(f.Volumes) == 0 {
+		if err := f.setupLimitedWorkDir(); err != nil {
+			log.Warn("failed to setup limited work directory, using unlimited work dir", "error", err)
+			// Ensure work directory is still accessible
+			workPath := filepath.Join(f.RootDir, "work")
+			if _, statErr := f.platform.Stat(workPath); statErr != nil {
+				// Work directory might have been corrupted, recreate it
+				if mkdirErr := f.platform.MkdirAll(workPath, 0755); mkdirErr != nil {
+					log.Error("failed to recreate work directory", "error", mkdirErr)
+				} else {
+					log.Debug("recreated work directory after mount failure")
+				}
+			}
+		}
+	}
+
 	// Mount pipes directory for uploads
 	if err := f.mountPipesDirectory(); err != nil {
 		// Log warning but don't fail - jobs without uploads should still work
@@ -225,6 +254,7 @@ func (f *JobFilesystem) createEssentialDirs() error {
 		"var",     // For various runtime needs
 		"var/run", // For runtime files
 		"var/tmp", // Alternative tmp
+		"volumes", // For volume mounts
 	}
 
 	// Create essential directories
@@ -378,6 +408,14 @@ func (f *JobFilesystem) Cleanup() error {
 	log := f.logger.WithField("operation", "cleanup")
 	log.Debug("cleaning up job filesystem")
 
+	// Unmount any tmpfs mounts before removing directories
+	// This handles the limited work directory if it was created
+	workLimitedPath := filepath.Join(f.RootDir, "work-limited")
+	if err := f.platform.Unmount(workLimitedPath, 0x1); err != nil { // 0x1 = MNT_FORCE
+		// Ignore error - mount might not exist
+		log.Debug("unmount work-limited failed (may not exist)", "error", err)
+	}
+
 	// Remove the job-specific directories
 	if err := f.platform.RemoveAll(f.RootDir); err != nil {
 		log.Warn("failed to remove job root directory", "error", err)
@@ -470,6 +508,128 @@ func (f *JobFilesystem) mountPipesDirectory() error {
 		"hostPath", hostPipesPath,
 		"targetPath", targetPipesPath)
 
+	return nil
+}
+
+// mountVolumes mounts all requested volumes into the chroot environment
+func (f *JobFilesystem) mountVolumes() error {
+	if len(f.Volumes) == 0 {
+		f.logger.Debug("no volumes to mount")
+		return nil
+	}
+
+	log := f.logger.WithField("operation", "mount-volumes")
+	log.Debug("mounting volumes", "count", len(f.Volumes), "volumes", f.Volumes)
+
+	for _, volumeName := range f.Volumes {
+		if err := f.mountSingleVolume(volumeName); err != nil {
+			log.Warn("failed to mount volume", "volume", volumeName, "error", err)
+			// Continue with other volumes, don't fail the entire job
+			continue
+		}
+	}
+
+	log.Debug("volume mounting completed")
+	return nil
+}
+
+// mountSingleVolume mounts a single volume into the job's chroot environment
+func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
+	log := f.logger.WithField("volume", volumeName)
+
+	// Host volume path - this is where the actual volume data lives
+	hostVolumePath := fmt.Sprintf("/opt/joblet/volumes/%s/data", volumeName)
+
+	// Check if host volume directory exists
+	if _, err := f.platform.Stat(hostVolumePath); err != nil {
+		if f.platform.IsNotExist(err) {
+			return fmt.Errorf("volume %s does not exist at %s", volumeName, hostVolumePath)
+		}
+		return fmt.Errorf("failed to stat volume directory: %w", err)
+	}
+
+	// Target path inside chroot - mount volumes under /volumes/{name}
+	targetVolumePath := filepath.Join(f.RootDir, "volumes", volumeName)
+
+	// Create the mount point directory
+	if err := f.platform.MkdirAll(targetVolumePath, 0755); err != nil {
+		return fmt.Errorf("failed to create volume mount point: %w", err)
+	}
+
+	// Bind mount the volume (read-write by default)
+	flags := uintptr(syscall.MS_BIND)
+	if err := f.platform.Mount(hostVolumePath, targetVolumePath, "", flags, ""); err != nil {
+		return fmt.Errorf("failed to bind mount volume: %w", err)
+	}
+
+	log.Debug("volume mounted successfully",
+		"hostPath", hostVolumePath,
+		"targetPath", targetVolumePath)
+
+	return nil
+}
+
+// SetVolumes sets the list of volumes to mount for this job
+func (f *JobFilesystem) SetVolumes(volumes []string) {
+	f.Volumes = volumes
+	f.logger.Debug("volumes set for job", "volumes", volumes)
+}
+
+// loadVolumesFromEnvironment loads volume names from environment variables
+func (f *JobFilesystem) loadVolumesFromEnvironment() {
+	volumeCountStr := f.platform.Getenv("JOB_VOLUMES_COUNT")
+	if volumeCountStr == "" {
+		return
+	}
+
+	volumeCount := 0
+	if count, err := strconv.Atoi(volumeCountStr); err == nil {
+		volumeCount = count
+	}
+
+	if volumeCount <= 0 {
+		return
+	}
+
+	volumes := make([]string, 0, volumeCount)
+	for i := 0; i < volumeCount; i++ {
+		volumeName := f.platform.Getenv(fmt.Sprintf("JOB_VOLUME_%d", i))
+		if volumeName != "" {
+			volumes = append(volumes, volumeName)
+		}
+	}
+
+	f.Volumes = volumes
+	f.logger.Debug("loaded volumes from environment", "volumes", volumes)
+}
+
+// setupLimitedWorkDir sets up a 1MB limited work directory for jobs without volumes
+func (f *JobFilesystem) setupLimitedWorkDir() error {
+	log := f.logger.WithField("operation", "setup-limited-work")
+	log.Debug("setting up limited work directory (1MB) for job without volumes")
+
+	// Create a temporary backing directory for the limited work space
+	limitedWorkPath := filepath.Join(f.RootDir, "work-limited")
+	if err := f.platform.MkdirAll(limitedWorkPath, 0755); err != nil {
+		return fmt.Errorf("failed to create limited work directory: %w", err)
+	}
+
+	// Mount tmpfs with 1MB size limit
+	sizeOpt := "size=1048576" // 1MB in bytes
+	flags := uintptr(0)
+	if err := f.platform.Mount("tmpfs", limitedWorkPath, "tmpfs", flags, sizeOpt); err != nil {
+		return fmt.Errorf("failed to mount limited tmpfs: %w", err)
+	}
+
+	// Now bind mount this limited directory to the actual work directory
+	workPath := filepath.Join(f.RootDir, "work")
+	if err := f.platform.Mount(limitedWorkPath, workPath, "", syscall.MS_BIND, ""); err != nil {
+		// Unmount the tmpfs if bind mount fails
+		_ = f.platform.Unmount(limitedWorkPath, 0)
+		return fmt.Errorf("failed to bind mount limited work directory: %w", err)
+	}
+
+	log.Debug("limited work directory set up successfully", "size", "1MB")
 	return nil
 }
 

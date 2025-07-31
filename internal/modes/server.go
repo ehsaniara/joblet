@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"joblet/internal/joblet"
+	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/server"
 	"joblet/internal/joblet/state"
 	"joblet/internal/modes/isolation"
@@ -45,6 +46,10 @@ func RunServer(cfg *config.Config) error {
 		return fmt.Errorf("failed to initialize network store: %w", err)
 	}
 
+	// Create volume manager
+	volumeStore := state.NewVolumeStore()
+	volumeManager := volume.NewManager(volumeStore, platformInstance, "/opt/joblet/volumes")
+
 	// Create joblet with configuration
 	jobletInstance := joblet.NewJoblet(store, cfg, networkStore)
 	if jobletInstance == nil {
@@ -52,7 +57,7 @@ func RunServer(cfg *config.Config) error {
 	}
 
 	// Start gRPC server with configuration
-	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg, networkStore)
+	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg, networkStore, volumeManager)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}

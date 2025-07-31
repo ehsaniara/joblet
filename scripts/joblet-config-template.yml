@@ -26,7 +26,7 @@ cgroup:
   cleanupTimeout: "1s"
 
 network:
-  state_dir: "/var/lib/joblet"
+  state_dir: "/opt/joblet/config"
   enabled: true
   default_network: "bridge"
   allow_custom_networks: true

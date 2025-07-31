@@ -27,6 +27,9 @@ const (
 	JobletService_CreateNetwork_FullMethodName = "/joblet.JobletService/CreateNetwork"
 	JobletService_ListNetworks_FullMethodName  = "/joblet.JobletService/ListNetworks"
 	JobletService_RemoveNetwork_FullMethodName = "/joblet.JobletService/RemoveNetwork"
+	JobletService_CreateVolume_FullMethodName  = "/joblet.JobletService/CreateVolume"
+	JobletService_ListVolumes_FullMethodName   = "/joblet.JobletService/ListVolumes"
+	JobletService_RemoveVolume_FullMethodName  = "/joblet.JobletService/RemoveVolume"
 )
 
 // JobletServiceClient is the client API for JobletService service.
@@ -42,6 +45,10 @@ type JobletServiceClient interface {
 	CreateNetwork(ctx context.Context, in *CreateNetworkReq, opts ...grpc.CallOption) (*CreateNetworkRes, error)
 	ListNetworks(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Networks, error)
 	RemoveNetwork(ctx context.Context, in *RemoveNetworkReq, opts ...grpc.CallOption) (*RemoveNetworkRes, error)
+	// Volume management
+	CreateVolume(ctx context.Context, in *CreateVolumeReq, opts ...grpc.CallOption) (*CreateVolumeRes, error)
+	ListVolumes(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Volumes, error)
+	RemoveVolume(ctx context.Context, in *RemoveVolumeReq, opts ...grpc.CallOption) (*RemoveVolumeRes, error)
 }
 
 type jobletServiceClient struct {
@@ -147,6 +154,33 @@ func (c *jobletServiceClient) RemoveNetwork(ctx context.Context, in *RemoveNetwo
 	return out, nil
 }
 
+func (c *jobletServiceClient) CreateVolume(ctx context.Context, in *CreateVolumeReq, opts ...grpc.CallOption) (*CreateVolumeRes, error) {
+	out := new(CreateVolumeRes)
+	err := c.cc.Invoke(ctx, JobletService_CreateVolume_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobletServiceClient) ListVolumes(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Volumes, error) {
+	out := new(Volumes)
+	err := c.cc.Invoke(ctx, JobletService_ListVolumes_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobletServiceClient) RemoveVolume(ctx context.Context, in *RemoveVolumeReq, opts ...grpc.CallOption) (*RemoveVolumeRes, error) {
+	out := new(RemoveVolumeRes)
+	err := c.cc.Invoke(ctx, JobletService_RemoveVolume_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // JobletServiceServer is the server API for JobletService service.
 // All implementations must embed UnimplementedJobletServiceServer
 // for forward compatibility
@@ -160,6 +194,10 @@ type JobletServiceServer interface {
 	CreateNetwork(context.Context, *CreateNetworkReq) (*CreateNetworkRes, error)
 	ListNetworks(context.Context, *EmptyRequest) (*Networks, error)
 	RemoveNetwork(context.Context, *RemoveNetworkReq) (*RemoveNetworkRes, error)
+	// Volume management
+	CreateVolume(context.Context, *CreateVolumeReq) (*CreateVolumeRes, error)
+	ListVolumes(context.Context, *EmptyRequest) (*Volumes, error)
+	RemoveVolume(context.Context, *RemoveVolumeReq) (*RemoveVolumeRes, error)
 	mustEmbedUnimplementedJobletServiceServer()
 }
 
@@ -190,6 +228,15 @@ func (UnimplementedJobletServiceServer) ListNetworks(context.Context, *EmptyRequ
 }
 func (UnimplementedJobletServiceServer) RemoveNetwork(context.Context, *RemoveNetworkReq) (*RemoveNetworkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveNetwork not implemented")
+}
+func (UnimplementedJobletServiceServer) CreateVolume(context.Context, *CreateVolumeReq) (*CreateVolumeRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateVolume not implemented")
+}
+func (UnimplementedJobletServiceServer) ListVolumes(context.Context, *EmptyRequest) (*Volumes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListVolumes not implemented")
+}
+func (UnimplementedJobletServiceServer) RemoveVolume(context.Context, *RemoveVolumeReq) (*RemoveVolumeRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveVolume not implemented")
 }
 func (UnimplementedJobletServiceServer) mustEmbedUnimplementedJobletServiceServer() {}
 
@@ -351,6 +398,60 @@ func _JobletService_RemoveNetwork_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _JobletService_CreateVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateVolumeReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobletServiceServer).CreateVolume(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobletService_CreateVolume_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobletServiceServer).CreateVolume(ctx, req.(*CreateVolumeReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobletService_ListVolumes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobletServiceServer).ListVolumes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobletService_ListVolumes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobletServiceServer).ListVolumes(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobletService_RemoveVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveVolumeReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobletServiceServer).RemoveVolume(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobletService_RemoveVolume_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobletServiceServer).RemoveVolume(ctx, req.(*RemoveVolumeReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // JobletService_ServiceDesc is the grpc.ServiceDesc for JobletService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -385,6 +486,18 @@ var JobletService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveNetwork",
 			Handler:    _JobletService_RemoveNetwork_Handler,
+		},
+		{
+			MethodName: "CreateVolume",
+			Handler:    _JobletService_CreateVolume_Handler,
+		},
+		{
+			MethodName: "ListVolumes",
+			Handler:    _JobletService_ListVolumes_Handler,
+		},
+		{
+			MethodName: "RemoveVolume",
+			Handler:    _JobletService_RemoveVolume_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

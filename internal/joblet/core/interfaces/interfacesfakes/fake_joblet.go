@@ -21,7 +21,7 @@ type FakeJoblet struct {
 	executeScheduledJobReturnsOnCall map[int]struct {
 		result1 error
 	}
-	StartJobStub        func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string) (*domain.Job, error)
+	StartJobStub        func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string, []string) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
 	startJobArgsForCall []struct {
 		arg1  context.Context
@@ -34,6 +34,7 @@ type FakeJoblet struct {
 		arg8  []domain.FileUpload
 		arg9  string
 		arg10 string
+		arg11 []string
 	}
 	startJobReturns struct {
 		result1 *domain.Job
@@ -121,7 +122,7 @@ func (fake *FakeJoblet) ExecuteScheduledJobReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32, arg7 string, arg8 []domain.FileUpload, arg9 string, arg10 string) (*domain.Job, error) {
+func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32, arg7 string, arg8 []domain.FileUpload, arg9 string, arg10 string, arg11 []string) (*domain.Job, error) {
 	var arg3Copy []string
 	if arg3 != nil {
 		arg3Copy = make([]string, len(arg3))
@@ -131,6 +132,11 @@ func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []strin
 	if arg8 != nil {
 		arg8Copy = make([]domain.FileUpload, len(arg8))
 		copy(arg8Copy, arg8)
+	}
+	var arg11Copy []string
+	if arg11 != nil {
+		arg11Copy = make([]string, len(arg11))
+		copy(arg11Copy, arg11)
 	}
 	fake.startJobMutex.Lock()
 	ret, specificReturn := fake.startJobReturnsOnCall[len(fake.startJobArgsForCall)]
@@ -145,13 +151,14 @@ func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []strin
 		arg8  []domain.FileUpload
 		arg9  string
 		arg10 string
-	}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9, arg10})
+		arg11 []string
+	}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9, arg10, arg11Copy})
 	stub := fake.StartJobStub
 	fakeReturns := fake.startJobReturns
-	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9, arg10})
+	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9, arg10, arg11Copy})
 	fake.startJobMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -165,17 +172,17 @@ func (fake *FakeJoblet) StartJobCallCount() int {
 	return len(fake.startJobArgsForCall)
 }
 
-func (fake *FakeJoblet) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string) (*domain.Job, error)) {
+func (fake *FakeJoblet) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string, []string) (*domain.Job, error)) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = stub
 }
 
-func (fake *FakeJoblet) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string) {
+func (fake *FakeJoblet) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string, []string) {
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	argsForCall := fake.startJobArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7, argsForCall.arg8, argsForCall.arg9, argsForCall.arg10
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7, argsForCall.arg8, argsForCall.arg9, argsForCall.arg10, argsForCall.arg11
 }
 
 func (fake *FakeJoblet) StartJobReturns(result1 *domain.Job, result2 error) {

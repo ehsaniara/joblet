@@ -10,6 +10,8 @@ import (
 	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core/interfaces"
+	"joblet/internal/joblet/core/volume"
+	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/mappers"
 	"joblet/internal/joblet/state"
 	"joblet/pkg/logger"
@@ -18,20 +20,22 @@ import (
 
 type JobServiceServer struct {
 	pb.UnimplementedJobletServiceServer
-	auth         auth2.GrpcAuthorization
-	jobStore     state.Store
-	joblet       interfaces.Joblet
-	logger       *logger.Logger
-	networkStore *state.NetworkStore
+	auth          auth2.GrpcAuthorization
+	jobStore      state.Store
+	joblet        interfaces.Joblet
+	logger        *logger.Logger
+	networkStore  *state.NetworkStore
+	volumeManager *volume.Manager
 }
 
-func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore state.Store, joblet interfaces.Joblet, networkStore *state.NetworkStore) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore state.Store, joblet interfaces.Joblet, networkStore *state.NetworkStore, volumeManager *volume.Manager) *JobServiceServer {
 	return &JobServiceServer{
-		auth:         auth,
-		jobStore:     jobStore,
-		joblet:       joblet,
-		networkStore: networkStore,
-		logger:       logger.WithField("component", "grpc-service"),
+		auth:          auth,
+		jobStore:      jobStore,
+		joblet:        joblet,
+		networkStore:  networkStore,
+		volumeManager: volumeManager,
+		logger:        logger.WithField("component", "grpc-service"),
 	}
 }
 
@@ -60,24 +64,20 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		req.Network = "bridge"
 	}
 
-	// Validate upload size limits
+	// Log upload information (no size limits enforced)
 	totalUploadSize := int64(0)
 	for _, upload := range req.Uploads {
 		totalUploadSize += int64(len(upload.Content))
 	}
 
-	// Set reasonable limits
-	const maxTotalUploadSize = 100 * 1024 * 1024 // 100MB total
-	if totalUploadSize > maxTotalUploadSize {
-		log.Error("upload size exceeds limit", "totalSize", totalUploadSize, "maxSize", maxTotalUploadSize)
-		return nil, status.Errorf(codes.InvalidArgument, "total upload size %.2f MB exceeds limit of %.2f MB",
-			float64(totalUploadSize)/1024/1024, float64(maxTotalUploadSize)/1024/1024)
+	if totalUploadSize > 0 {
+		log.Info("processing file uploads", "fileCount", len(req.Uploads), "totalSize", totalUploadSize)
 	}
 
 	domainUploads := mappers.ProtobufToFileUpload(req.Uploads)
 
 	// StartJob now expects RFC3339 formatted schedule string (already parsed by client)
-	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads, req.Schedule, req.Network)
+	newJob, err := s.joblet.StartJob(ctx, req.Command, req.Args, req.MaxCPU, req.MaxMemory, req.MaxIOBPS, req.CpuCores, domainUploads, req.Schedule, req.Network, req.Volumes)
 
 	if err != nil {
 		log.Error("job creation failed", "error", err)
@@ -299,5 +299,92 @@ func (s *JobServiceServer) RemoveNetwork(ctx context.Context, req *pb.RemoveNetw
 	return &pb.RemoveNetworkRes{
 		Success: true,
 		Message: "Network removed successfully",
+	}, nil
+}
+
+func (s *JobServiceServer) CreateVolume(ctx context.Context, req *pb.CreateVolumeReq) (*pb.CreateVolumeRes, error) {
+	log := s.logger.WithFields(
+		"operation", "CreateVolume",
+		"name", req.Name,
+		"size", req.Size,
+		"type", req.Type)
+
+	log.Debug("create volume request received")
+
+	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	// Create the volume
+	volume, err := s.volumeManager.CreateVolume(req.Name, req.Size, domain.VolumeType(req.Type))
+	if err != nil {
+		log.Error("failed to create volume", "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to create volume: %v", err)
+	}
+
+	log.Info("volume created successfully")
+
+	return &pb.CreateVolumeRes{
+		Name: volume.Name,
+		Size: volume.Size,
+		Type: string(volume.Type),
+		Path: volume.Path,
+	}, nil
+}
+
+func (s *JobServiceServer) ListVolumes(ctx context.Context, req *pb.EmptyRequest) (*pb.Volumes, error) {
+	log := s.logger.WithField("operation", "ListVolumes")
+
+	if err := s.auth.Authorized(ctx, auth2.StreamJobsOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	volumes := s.volumeManager.ListVolumes()
+
+	resp := &pb.Volumes{
+		Volumes: make([]*pb.Volume, 0, len(volumes)),
+	}
+
+	for _, vol := range volumes {
+		resp.Volumes = append(resp.Volumes, &pb.Volume{
+			Name:        vol.Name,
+			Size:        vol.Size,
+			Type:        string(vol.Type),
+			Path:        vol.Path,
+			CreatedTime: vol.CreatedTime.Format("2006-01-02T15:04:05Z07:00"),
+			JobCount:    vol.JobCount,
+		})
+	}
+
+	return resp, nil
+}
+
+func (s *JobServiceServer) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeReq) (*pb.RemoveVolumeRes, error) {
+	log := s.logger.WithFields(
+		"operation", "RemoveVolume",
+		"name", req.Name)
+
+	log.Debug("remove volume request received")
+
+	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	if err := s.volumeManager.RemoveVolume(req.Name); err != nil {
+		log.Error("failed to remove volume", "error", err)
+		return &pb.RemoveVolumeRes{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	log.Info("volume removed successfully")
+
+	return &pb.RemoveVolumeRes{
+		Success: true,
+		Message: "Volume removed successfully",
 	}, nil
 }
