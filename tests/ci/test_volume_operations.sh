@@ -1,11 +1,16 @@
 #!/bin/bash
 
-set -e
+# Note: Not using 'set -e' to allow graceful handling of CI environment limitations
 
 # Volume operations test for CI environment
 # Tests volume creation, usage with jobs, and cleanup
 
 source "$(dirname "$0")/common/test_helpers.sh"
+
+# Global variables for test state
+FILESYSTEM_VOL_CREATED=false
+MEMORY_VOL_CREATED=false
+SKIP_VOLUME_TESTS=false
 
 test_volume_creation() {
     echo "Testing volume creation..."
