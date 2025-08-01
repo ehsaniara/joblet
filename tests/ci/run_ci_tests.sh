@@ -61,6 +61,10 @@ run_test_suite "gRPC Communication Tests" "$SCRIPT_DIR/test_grpc_communication.s
 # Security tests
 run_test_suite "mTLS Authentication Tests" "$SCRIPT_DIR/test_mtls_auth.sh"
 
+# Volume tests
+run_test_suite "Volume Operations Tests" "$SCRIPT_DIR/test_volume_operations.sh"
+run_test_suite "Default Disk Quota Tests" "$SCRIPT_DIR/test_default_disk_quota.sh"
+
 # Print final summary
 print_suite_summary
 

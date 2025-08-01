@@ -23,11 +23,24 @@ const (
 type Operation string
 
 const (
-	RunJobOp     Operation = "run_job"
-	GetJobOp     Operation = "get_job"
-	StopJobOp    Operation = "stop_job"
-	ListJobsOp   Operation = "list_jobs"
-	StreamJobsOp Operation = "stream_jobs"
+	// Job operations
+	RunJobOp       Operation = "run_job"
+	GetJobOp       Operation = "get_job"
+	StopJobOp      Operation = "stop_job"
+	ListJobsOp     Operation = "list_jobs"
+	StreamJobsOp   Operation = "stream_jobs"
+	GetJobLogsOp   Operation = "get_job_logs"
+	GetJobStatusOp Operation = "get_job_status"
+
+	// Network operations
+	CreateNetworkOp Operation = "create_network"
+	ListNetworksOp  Operation = "list_networks"
+	RemoveNetworkOp Operation = "remove_network"
+
+	// Volume operations
+	CreateVolumeOp Operation = "create_volume"
+	ListVolumesOp  Operation = "list_volumes"
+	RemoveVolumeOp Operation = "remove_volume"
 )
 
 //counterfeiter:generate . GrpcAuthorization
@@ -76,12 +89,24 @@ func (s *grpcAuthorization) extractClientRole(ctx context.Context) (ClientRole, 
 func (s *grpcAuthorization) isOperationAllowed(role ClientRole, operation Operation) bool {
 	switch role {
 	case AdminRole:
+		// Admin can perform all operations
 		return true
 	case ViewerRole:
 		switch operation {
-		case GetJobOp, ListJobsOp, StreamJobsOp:
+		// Job operations - viewers can read but not modify
+		case GetJobOp, ListJobsOp, StreamJobsOp, GetJobLogsOp, GetJobStatusOp:
 			return true
 		case RunJobOp, StopJobOp:
+			return false
+		// Network operations - viewers can list but not create/remove
+		case ListNetworksOp:
+			return true
+		case CreateNetworkOp, RemoveNetworkOp:
+			return false
+		// Volume operations - viewers can list but not create/remove
+		case ListVolumesOp:
+			return true
+		case CreateVolumeOp, RemoveVolumeOp:
 			return false
 		default:
 			return false

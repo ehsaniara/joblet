@@ -53,6 +53,7 @@ type StartJobRequest struct {
 	Uploads  []domain.FileUpload
 	Schedule string
 	Network  string
+	Volumes  []string
 }
 
 func (r StartJobRequest) GetCommand() string               { return r.Command }
@@ -60,6 +61,7 @@ func (r StartJobRequest) GetArgs() []string                { return r.Args }
 func (r StartJobRequest) GetSchedule() string              { return r.Schedule }
 func (r StartJobRequest) GetLimits() domain.ResourceLimits { return r.Limits }
 func (r StartJobRequest) GetNetwork() string               { return r.Network }
+func (r StartJobRequest) GetVolumes() []string             { return r.Volumes }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components
 func NewPlatformJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
@@ -107,7 +109,7 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config, networkStore *stat
 }
 
 // StartJob validates and starts a job (immediate or scheduled)
-func (j *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string) (*domain.Job, error) {
+func (j *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string, volumes []string) (*domain.Job, error) {
 	j.logger.Debug("StartJob called",
 		"command", command,
 		"network", network,
@@ -126,6 +128,7 @@ func (j *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 		Uploads:  uploads,
 		Schedule: schedule,
 		Network:  network,
+		Volumes:  volumes,
 	}
 
 	log := j.logger.WithFields(

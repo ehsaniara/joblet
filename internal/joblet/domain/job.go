@@ -39,6 +39,7 @@ type Job struct {
 	ExitCode      int32          // Process exit status
 	ScheduledTime *time.Time     // When the job should start (nil for immediate execution)
 	Network       string         // Network name
+	Volumes       []string       // Volume names to mount
 }
 
 func (r *ResourceLimits) HasCoreRestriction() bool {
@@ -169,6 +170,8 @@ func (j *Job) DeepCopy() *Job {
 		CgroupPath: j.CgroupPath,
 		StartTime:  j.StartTime,
 		ExitCode:   j.ExitCode,
+		Network:    j.Network,
+		Volumes:    append([]string(nil), j.Volumes...),
 	}
 
 	if j.EndTime != nil {

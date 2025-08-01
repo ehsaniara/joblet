@@ -101,3 +101,15 @@ func (c *JobClient) ListNetworks(ctx context.Context) (*pb.Networks, error) {
 func (c *JobClient) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkReq) (*pb.RemoveNetworkRes, error) {
 	return c.client.RemoveNetwork(ctx, req)
 }
+
+func (c *JobClient) CreateVolume(ctx context.Context, req *pb.CreateVolumeReq) (*pb.CreateVolumeRes, error) {
+	return c.client.CreateVolume(ctx, req)
+}
+
+func (c *JobClient) ListVolumes(ctx context.Context) (*pb.Volumes, error) {
+	return c.client.ListVolumes(ctx, &pb.EmptyRequest{})
+}
+
+func (c *JobClient) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeReq) (*pb.RemoveVolumeRes, error) {
+	return c.client.RemoveVolume(ctx, req)
+}

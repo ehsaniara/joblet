@@ -9,7 +9,8 @@
 <img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
 **Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process
-isolation, resource limits, real-time monitoring, **network isolation**, and **scheduled execution** - protecting your
+isolation, resource limits, real-time monitoring, **network isolation**, **persistent volume storage**, and **scheduled
+execution** - protecting your
 host system from
 malicious or resource-hungry processes.
 
@@ -71,13 +72,16 @@ Joblet consists of two components:
 - **Process Isolation**: Jobs run in separate PID namespaces
 - **Filesystem Isolation**: Chroot environments with limited host access
 - **Network Isolation**: Four network modes with custom network support
+- **Volume Management**: Persistent storage with filesystem and memory-based volumes
 - **Resource Limits**: CPU, memory, I/O bandwidth, and CPU core controls
+- **Disk Quotas**: Default 1MB limit for jobs without volumes, enforced quotas on volumes
 - **CPU Core Binding**: Limit jobs to specific CPU cores for performance isolation
 - **Network Security**: mTLS encryption with certificate-based authentication
 - **Role-Based Access**: Admin (full control) and Viewer (read-only) roles
 - **Job Scheduling**: Future execution with priority queue management
 
 ## 🧭 Comparison Table: Joblet vs Competitors
+
 | Feature / Tool            | **Joblet** (v2.10.0)                          | **Apache DolphinScheduler**                 | **Dkron**                              | **JobRunr**                     | **gVisor** / **Kata**                     |
 |---------------------------|-----------------------------------------------|---------------------------------------------|----------------------------------------|---------------------------------|-------------------------------------------|
 | **Type**                  | Linux-native job execution platform           | Distributed job orchestration engine        | Distributed cron job scheduler         | In-memory job scheduler for JVM | OCI container runtime sandboxing          |
@@ -368,6 +372,168 @@ Schedule Input: 1hour
 Scheduled Time: 2025-07-19T15:45:30Z
 Network: analytics
 Files: 15 uploaded successfully
+```
+
+### Volume Management
+
+Joblet provides persistent volume storage that allows jobs to share data across multiple executions. Volumes persist
+data even after jobs complete, enabling data continuity and stateful workflows.
+
+#### Volume Types
+
+**1. Filesystem Volumes (Default)**
+
+- Directory-based persistent storage on host filesystem
+- Data persists across job executions and server restarts
+- Best for most use cases requiring data persistence
+
+**2. Memory Volumes (tmpfs)**
+
+- Memory-based temporary storage with size limits
+- High-performance but data is lost on server restart
+- Ideal for temporary caches and high-speed data processing
+
+#### Basic Volume Commands
+
+```bash
+# Create persistent volumes for data sharing
+rnx volume create backend --size=1GB                    # Filesystem volume (default)
+rnx volume create cache --size=500MB --type=memory      # Memory-based volume
+rnx volume create data --size=2GB --type=filesystem     # Explicit filesystem volume
+
+# List all volumes
+rnx volume list
+# Output:
+# NAME            SIZE     TYPE         CREATED                  
+# --------------- -------- ------------ -------------------------
+# backend         1GB      filesystem   2025-07-31 03:52:21      
+# cache           500MB    memory       2025-07-31 03:55:12      
+# data            2GB      filesystem   2025-07-31 03:58:03      
+
+# Remove unused volumes
+rnx volume remove cache
+```
+
+#### Using Volumes in Jobs
+
+```bash
+# Single volume usage
+rnx run --volume=backend python3 data_processor.py
+
+# Multiple volumes
+rnx run --volume=backend --volume=cache python3 app.py
+
+# Jobs can access volumes at /volumes/{volume-name}
+rnx run --volume=backend bash -c "ls -la /volumes/backend && echo 'data' > /volumes/backend/file.txt"
+
+# Multiple jobs sharing the same volume
+rnx run --volume=backend python3 producer.py    # Write data to volume
+rnx run --volume=backend python3 consumer.py    # Read data from volume
+```
+
+#### Volume Features
+
+- **Data Persistence**: Data survives job completion and server restarts (filesystem volumes)
+- **Multi-Job Access**: Multiple jobs can access the same volume simultaneously
+- **Size Limits**: Enforced storage limits (1GB, 500MB, 2GB, etc.)
+- **Isolation**: Volumes are mounted in isolated job environments at `/volumes/{name}`
+- **Thread Safety**: Concurrent access is managed by the underlying filesystem
+- **Automatic Cleanup**: Volumes can only be removed when not in use by any jobs
+
+#### Real-World Volume Examples
+
+**Database Storage**
+
+```bash
+# Create database volume
+rnx volume create postgres-data --size=5GB
+
+# Run PostgreSQL with persistent storage
+rnx run --volume=postgres-data --network=backend postgres -D /volumes/postgres-data
+
+# Access database from application
+rnx run --volume=postgres-data --network=backend python3 app.py
+```
+
+**Data Pipeline with Shared Storage**
+
+```bash
+# Create shared data volumes
+rnx volume create raw-data --size=10GB
+rnx volume create processed-data --size=5GB
+rnx volume create models --size=2GB
+
+# Data ingestion job
+rnx run --volume=raw-data --network=isolated python3 fetch_data.py
+
+# Data processing pipeline
+rnx run --volume=raw-data --volume=processed-data --cpu-cores="0-3" python3 etl.py
+
+# Model training with processed data
+rnx run --volume=processed-data --volume=models --cpu-cores="4-7" --max-memory=8192 python3 train.py
+
+# Inference service using trained models
+rnx run --volume=models --network=prod --schedule="1hour" python3 inference_api.py
+```
+
+**Cache and Session Storage**
+
+```bash
+# Create high-speed memory cache
+rnx volume create session-cache --size=1GB --type=memory
+
+# Web application with session storage
+rnx run --volume=session-cache --network=web --max-memory=2048 python3 web_app.py
+
+# Background job for cache maintenance
+rnx run --volume=session-cache --schedule="30min" python3 cache_cleanup.py
+```
+
+**Development Workflow with Persistent Storage**
+
+```bash
+# Create development volumes
+rnx volume create node-modules --size=2GB      # npm dependencies
+rnx volume create build-cache --size=1GB       # Build artifacts
+
+# Install dependencies once
+rnx run --volume=node-modules --upload-dir=. npm install
+
+# Build with cache persistence
+rnx run --volume=node-modules --volume=build-cache --upload-dir=. npm run build
+
+# Run tests with cached dependencies
+rnx run --volume=node-modules --upload-dir=. npm test
+
+# Development server with hot reload
+rnx run --volume=node-modules --volume=build-cache --upload-dir=. --network=dev npm start
+```
+
+**Backup and Archival**
+
+```bash
+# Create backup volume
+rnx volume create daily-backups --size=50GB
+
+# Scheduled backup job
+rnx run --schedule="2025-07-20T02:00:00" --volume=daily-backups --network=isolated backup_script.sh
+
+# Archive old backups
+rnx run --schedule="2025-07-27T03:00:00" --volume=daily-backups python3 archive_old_backups.py
+```
+
+#### Combining Volumes with Other Features
+
+```bash
+# Volume + Network + Resource limits + Scheduling
+rnx run --schedule="1hour" --volume=data --volume=logs --network=analytics --cpu-cores="0-3" --max-memory=4096 batch_job.py
+
+# Volume + File uploads + Network isolation
+rnx run --upload-dir=config --volume=persistent-data --network=none secure_processor.py
+
+# Volume + Multi-node deployment
+rnx --node=node1 run --volume=shared-storage python3 distributed_task.py
+rnx --node=node2 run --volume=shared-storage python3 distributed_task.py
 ```
 
 ### CPU Core Management
@@ -964,15 +1130,15 @@ ip -s link show | grep veth
 
 ### Core Commands
 
-| Command         | Description                                | Example                            |
-|-----------------|--------------------------------------------|------------------------------------|
-| `rnx run`       | Run a job with specified command and args  | `rnx run python3 script.py`        |
-| `rnx list`      | List all jobs (running and scheduled)      | `rnx list`                         |
-| `rnx status`    | Get detailed status of a specific job      | `rnx status 123`                   |
-| `rnx log`       | Stream live logs from a running job        | `rnx log 123`                      |
-| `rnx stop`      | Stop a running or scheduled job            | `rnx stop 123`                     |
-| `rnx nodes`     | List all configured server nodes           | `rnx nodes`                        |
-| `rnx config-help` | Show configuration file examples         | `rnx config-help`                  |
+| Command           | Description                               | Example                     |
+|-------------------|-------------------------------------------|-----------------------------|
+| `rnx run`         | Run a job with specified command and args | `rnx run python3 script.py` |
+| `rnx list`        | List all jobs (running and scheduled)     | `rnx list`                  |
+| `rnx status`      | Get detailed status of a specific job     | `rnx status 123`            |
+| `rnx log`         | Stream live logs from a running job       | `rnx log 123`               |
+| `rnx stop`        | Stop a running or scheduled job           | `rnx stop 123`              |
+| `rnx nodes`       | List all configured server nodes          | `rnx nodes`                 |
+| `rnx config-help` | Show configuration file examples          | `rnx config-help`           |
 
 ### Resource Limiting Flags
 
@@ -996,6 +1162,14 @@ ip -s link show | grep veth
 | `rnx network create` | Create custom network | `rnx network create dev --cidr=10.1.0.0/24` |
 | `rnx network list`   | List all networks     | `rnx network list`                          |
 | `rnx network remove` | Remove custom network | `rnx network remove dev`                    |
+
+### Volume Commands
+
+| Command             | Description              | Example                             |
+|---------------------|--------------------------|-------------------------------------|
+| `rnx volume create` | Create persistent volume | `rnx volume create data --size=1GB` |
+| `rnx volume list`   | List all volumes         | `rnx volume list`                   |
+| `rnx volume remove` | Remove unused volume     | `rnx volume remove data`            |
 
 ### File Upload Flags
 
@@ -1066,7 +1240,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Python Data Analysis Example
 
-The [Python Data Analysis Example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) demonstrates:
+The [Python Data Analysis Example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis)
+demonstrates:
 
 - **File uploads**: Upload Python scripts and CSV data for processing
 - **Dependency management**: Install pandas, numpy, matplotlib in chroot environment
@@ -1083,7 +1258,8 @@ rnx run --upload-dir=. bash run_with_pandas.sh
 rnx run --upload=analyze_sales_simple.py --upload=data/sales_data.csv --upload=data/customers.csv python3 analyze_sales_simple.py
 ```
 
-See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) for more approaches including self-installing scripts and manual package management.
+See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) for more approaches
+including self-installing scripts and manual package management.
 
 ### Node.js Web API Example
 
@@ -1110,7 +1286,8 @@ rnx run --upload-dir=. --network=myapp --max-memory=256 node worker.js
 rnx run --upload=test-api.sh --network=myapp bash test-api.sh
 ```
 
-See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/nodejs-web-api) for API endpoints, scheduling workers, and production considerations.
+See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/nodejs-web-api) for API endpoints,
+scheduling workers, and production considerations.
 
 ## 💡 Project Name History
 

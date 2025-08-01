@@ -7,13 +7,14 @@ import (
 	pb "joblet/api/gen"
 	auth2 "joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core/interfaces"
+	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"net"
 )
 
-func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config, networkStore *state.NetworkStore) (*grpc.Server, error) {
+func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config, networkStore *state.NetworkStore, volumeManager *volume.Manager) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -52,8 +53,8 @@ func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config
 	auth := auth2.NewGrpcAuthorization()
 	serverLogger.Debug("authorization module initialized")
 
-	// Create job service with network store
-	jobService := NewJobServiceServer(auth, jobStore, joblet, networkStore)
+	// Create job service with network store and volume manager
+	jobService := NewJobServiceServer(auth, jobStore, joblet, networkStore, volumeManager)
 	pb.RegisterJobletServiceServer(grpcServer, jobService)
 
 	serverLogger.Debug("job service registered successfully")

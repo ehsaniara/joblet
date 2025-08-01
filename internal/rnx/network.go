@@ -143,12 +143,11 @@ func runNetworkList(cmd *cobra.Command, args []string) error {
 	})
 
 	// Display header
-	fmt.Printf("%-15s %-18s %-15s %s\n", "NAME", "CIDR", "BRIDGE", "JOBS")
-	fmt.Printf("%s %s %s %s\n",
+	fmt.Printf("%-15s %-18s %s\n", "NAME", "CIDR", "BRIDGE")
+	fmt.Printf("%s %s %s\n",
 		strings.Repeat("-", 15),
 		strings.Repeat("-", 18),
-		strings.Repeat("-", 15),
-		strings.Repeat("-", 4))
+		strings.Repeat("-", 15))
 
 	// Display networks
 	for _, net := range resp.Networks {
@@ -157,11 +156,10 @@ func runNetworkList(cmd *cobra.Command, args []string) error {
 			typeIndicator = " (built-in)"
 		}
 
-		fmt.Printf("%-15s %-18s %-15s %d%s\n",
+		fmt.Printf("%-15s %-18s %s%s\n",
 			net.Name,
 			net.Cidr,
 			net.Bridge,
-			net.JobCount,
 			typeIndicator)
 	}
 

@@ -15,6 +15,11 @@ service JobletService{
   rpc CreateNetwork(CreateNetworkReq) returns (CreateNetworkRes){}
   rpc ListNetworks(EmptyRequest) returns (Networks){}
   rpc RemoveNetwork(RemoveNetworkReq) returns (RemoveNetworkRes){}
+  
+  // Volume management
+  rpc CreateVolume(CreateVolumeReq) returns (CreateVolumeRes){}
+  rpc ListVolumes(EmptyRequest) returns (Volumes){}
+  rpc RemoveVolume(RemoveVolumeReq) returns (RemoveVolumeRes){}
 }
 
 message Jobs{
@@ -48,6 +53,7 @@ message RunJobReq{
   repeated FileUpload uploads = 7;
   string schedule = 8;          // RFC3339 formatted time string
   string network = 9;           // Network name (none, isolated, bridge, or custom)
+  repeated string volumes = 10; // Volume names to mount
 }
 
 message FileUpload {
@@ -142,4 +148,39 @@ message Network {
 
 message Networks {
   repeated Network networks = 1;
+}
+
+message CreateVolumeReq {
+  string name = 1;
+  string size = 2;        // Size limit (e.g., "1GB", "500MB")
+  string type = 3;        // "filesystem" or "memory"
+}
+
+message CreateVolumeRes {
+  string name = 1;
+  string size = 2;
+  string type = 3;
+  string path = 4;        // Host path where volume is stored
+}
+
+message RemoveVolumeReq {
+  string name = 1;
+}
+
+message RemoveVolumeRes {
+  bool success = 1;
+  string message = 2;
+}
+
+message Volume {
+  string name = 1;
+  string size = 2;
+  string type = 3;
+  string path = 4;
+  string createdTime = 5;
+  int32 jobCount = 6;     // Number of jobs currently using this volume
+}
+
+message Volumes {
+  repeated Volume volumes = 1;
 }

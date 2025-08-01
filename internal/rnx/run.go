@@ -53,6 +53,12 @@ File Upload Examples:
   rnx run --schedule="1hour" --upload-dir=. python3 main.py
   rnx run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
 
+Volume Examples:
+  # Use persistent volumes to share data between jobs
+  rnx run --volume=backend --upload=App1.jar java -jar App1.jar
+  rnx run --volume=backend --upload=App2.jar java -jar App2.jar
+  rnx run --volume=cache --volume=data python3 process.py
+
 Scheduling Formats:
   # Relative time
   --schedule="1hour"      # 1 hour from now
@@ -91,6 +97,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		uploadDirs []string
 		schedule   string
 		network    string
+		volumes    []string
 	)
 
 	commandStartIndex := -1
@@ -133,6 +140,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 			uploadDirs = append(uploadDirs, uploadDir)
 		} else if strings.HasPrefix(arg, "--network=") {
 			network = strings.TrimPrefix(arg, "--network=")
+		} else if strings.HasPrefix(arg, "--volume=") {
+			volumeName := strings.TrimPrefix(arg, "--volume=")
+			volumes = append(volumes, volumeName)
 		} else if arg == "--" {
 			// -- separator found, command starts at next position
 			if i+1 < len(args) {
@@ -212,6 +222,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		Uploads:   fileUploads,
 		Schedule:  scheduledTimeRFC3339,
 		Network:   network,
+		Volumes:   volumes,
 	}
 
 	// Submit job
@@ -276,6 +287,7 @@ func processFileUploads(uploads []string, uploadDirs []string) ([]*pb.FileUpload
 		if err != nil {
 			return nil, fmt.Errorf("directory upload failed for %s: %w", uploadDir, err)
 		}
+
 		result = append(result, dirUploads...)
 	}
 

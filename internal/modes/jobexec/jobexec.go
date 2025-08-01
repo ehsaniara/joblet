@@ -151,7 +151,7 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	// Get current environment (already set up by parent process)
 	envv := je.platform.Environ()
 
-	je.logger.Info("executing job command", "command", commandPath, "args", config.Args)
+	je.logger.Debug("executing job command", "command", commandPath, "args", config.Args)
 	je.logger.Debug("about to exec to replace init process with job command")
 
 	// Use exec to replace the current process (init) with the job command
