@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 // NetworkRuntime represents runtime state for a network
 type NetworkRuntime struct {
 	Config network.NetworkConfig
@@ -39,27 +41,34 @@ type NetworkStore struct {
 }
 
 // BridgeManager interface to avoid circular import with setup.go
+//
+//counterfeiter:generate . BridgeManager
 type BridgeManager interface {
 	RemoveBridge(networkName string) error
 }
 
 // NetworkValidator Interfaces to avoid circular dependencies
+//
+//counterfeiter:generate . NetworkValidator
 type NetworkValidator interface {
 	ValidateBridgeName(name string) error
 	ValidateCIDR(cidr string, existingNetworks map[string]string) error
 }
 
+//counterfeiter:generate . NetworkCleaner
 type NetworkCleaner interface {
 	StartPeriodicCleanup(interval time.Duration)
 	CleanupOrphanedInterfaces() error
 }
 
+//counterfeiter:generate . DNSManager
 type DNSManager interface {
 	SetupJobDNS(pid int, alloc *network.JobAllocation, networkJobs map[string]*network.JobAllocation) error
 	CleanupJobDNS(jobID string) error
 	UpdateNetworkDNS(networkName string, activeJobs []*network.JobAllocation) error
 }
 
+//counterfeiter:generate . BandwidthLimiter
 type BandwidthLimiter interface {
 	ApplyJobLimits(vethName string, limits network.NetworkLimits) error
 	RemoveJobLimits(vethName string) error
@@ -103,7 +112,7 @@ func (ns *NetworkStore) Initialize() error {
 		ns.logger.Warn("failed to load network configs, using defaults", "error", err)
 	}
 
-	// Ensure default networks exist from config
+	// Ensure default networks exist from networkConfig
 	if ns.config != nil && ns.config.Networks != nil {
 		for name, netDef := range ns.config.Networks {
 			if _, exists := ns.configs[name]; !exists {
@@ -114,7 +123,7 @@ func (ns *NetworkStore) Initialize() error {
 			}
 		}
 	} else {
-		// Fallback if no config provided
+		// Fallback if no networkConfig provided
 		if _, exists := ns.configs["bridge"]; !exists {
 			ns.configs["bridge"] = &network.NetworkConfig{
 				CIDR:   "172.20.0.0/16",
@@ -124,10 +133,10 @@ func (ns *NetworkStore) Initialize() error {
 	}
 
 	// Initialize runtime state for all networks
-	for name, config := range ns.configs {
+	for name, networkConfig := range ns.configs {
 		ns.runtime[name] = &NetworkRuntime{
-			Config: *config,
-			IPPool: NewIPPool(config.CIDR),
+			Config: *networkConfig,
+			IPPool: NewIPPool(networkConfig.CIDR),
 		}
 	}
 

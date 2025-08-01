@@ -1,50 +1,18 @@
-package state
+package state_test
 
 import (
 	"context"
 	"fmt"
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/state"
+	"joblet/internal/joblet/state/statefakes"
 	"sync"
 	"testing"
 	"time"
 )
 
-// mockDomainStreamer for testing
-type mockDomainStreamer struct {
-	receivedData       [][]byte
-	receivedKeepalives int
-	ctx                context.Context
-	mu                 sync.Mutex
-}
-
-func (m *mockDomainStreamer) SendData(data []byte) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.receivedData = append(m.receivedData, data)
-	return nil
-}
-
-func (m *mockDomainStreamer) SendKeepalive() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.receivedKeepalives++
-	return nil
-}
-
-func (m *mockDomainStreamer) Context() context.Context {
-	return m.ctx
-}
-
-func (m *mockDomainStreamer) GetReceivedData() [][]byte {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	result := make([][]byte, len(m.receivedData))
-	copy(result, m.receivedData)
-	return result
-}
-
 func TestStore_CreateAndGetJob(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	job := &domain.Job{
 		Id:      "test-job-1",
@@ -83,7 +51,7 @@ func TestStore_CreateAndGetJob(t *testing.T) {
 }
 
 func TestStore_CreateDuplicateJob(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	job := &domain.Job{
 		Id:      "duplicate-job",
@@ -103,7 +71,7 @@ func TestStore_CreateDuplicateJob(t *testing.T) {
 }
 
 func TestStore_UpdateJob(t *testing.T) {
-	s := New()
+	s := state.New()
 
 	job := &domain.Job{
 		Id:      "update-test",
@@ -134,7 +102,7 @@ func TestStore_UpdateJob(t *testing.T) {
 }
 
 func TestStore_ListJobs(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	// Create multiple jobs
 	jobs := []*domain.Job{
@@ -167,7 +135,7 @@ func TestStore_ListJobs(t *testing.T) {
 }
 
 func TestStore_WriteToBuffer(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	job := &domain.Job{
 		Id:      "buffer-test",
@@ -195,7 +163,7 @@ func TestStore_WriteToBuffer(t *testing.T) {
 }
 
 func TestStore_WriteToNonExistentJob(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	// Should not panic when writing to non-existent job
 	store.WriteToBuffer("non-existent", []byte("test"))
@@ -204,7 +172,7 @@ func TestStore_WriteToNonExistentJob(t *testing.T) {
 }
 
 func TestStore_GetOutputNonExistentJob(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	_, _, err := store.GetOutput("non-existent")
 	if err == nil {
@@ -213,7 +181,7 @@ func TestStore_GetOutputNonExistentJob(t *testing.T) {
 }
 
 func TestStore_SendUpdatesToClientCancellation(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	job := &domain.Job{
 		Id:      "cancel-test",
@@ -224,12 +192,13 @@ func TestStore_SendUpdatesToClientCancellation(t *testing.T) {
 	store.CreateNewJob(job)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	mockStreamer := &mockDomainStreamer{ctx: ctx}
+	fakeStreamer := &statefakes.FakeDomainStreamer{}
+	fakeStreamer.ContextReturns(ctx)
 
 	// Start streaming
 	errCh := make(chan error, 1)
 	go func() {
-		err := store.SendUpdatesToClient(ctx, "cancel-test", mockStreamer)
+		err := store.SendUpdatesToClient(ctx, "cancel-test", fakeStreamer)
 		errCh <- err
 	}()
 
@@ -248,19 +217,20 @@ func TestStore_SendUpdatesToClientCancellation(t *testing.T) {
 }
 
 func TestStore_SendUpdatesToNonExistentJob(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	ctx := context.Background()
-	mockStreamer := &mockDomainStreamer{ctx: ctx}
+	fakeStreamer := &statefakes.FakeDomainStreamer{}
+	fakeStreamer.ContextReturns(ctx)
 
-	err := store.SendUpdatesToClient(ctx, "non-existent", mockStreamer)
+	err := store.SendUpdatesToClient(ctx, "non-existent", fakeStreamer)
 	if err == nil {
 		t.Error("Expected error for non-existent job")
 	}
 }
 
 func TestStore_SendUpdatesToNonRunningJob(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	job := &domain.Job{
 		Id:      "completed-job",
@@ -271,16 +241,17 @@ func TestStore_SendUpdatesToNonRunningJob(t *testing.T) {
 	store.CreateNewJob(job)
 
 	ctx := context.Background()
-	mockStreamer := &mockDomainStreamer{ctx: ctx}
+	fakeStreamer := &statefakes.FakeDomainStreamer{}
+	fakeStreamer.ContextReturns(ctx)
 
-	err := store.SendUpdatesToClient(ctx, "completed-job", mockStreamer)
+	err := store.SendUpdatesToClient(ctx, "completed-job", fakeStreamer)
 	if err != nil {
 		t.Errorf("Expected no error for completed job, got %v", err)
 	}
 }
 
 func TestStore_ConcurrentAccess(t *testing.T) {
-	store := New()
+	store := state.New()
 
 	// Test concurrent job creation
 	var wg sync.WaitGroup
@@ -310,7 +281,7 @@ func TestStore_ConcurrentAccess(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkStore_CreateJob(b *testing.B) {
-	store := New()
+	store := state.New()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -324,7 +295,7 @@ func BenchmarkStore_CreateJob(b *testing.B) {
 }
 
 func BenchmarkStore_GetJob(b *testing.B) {
-	store := New()
+	store := state.New()
 
 	// Create test job
 	job := &domain.Job{
@@ -341,7 +312,7 @@ func BenchmarkStore_GetJob(b *testing.B) {
 }
 
 func BenchmarkStore_WriteToBuffer(b *testing.B) {
-	store := New()
+	store := state.New()
 
 	job := &domain.Job{
 		Id:      "bench-write",
