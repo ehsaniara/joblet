@@ -198,11 +198,20 @@ func (f *JobFilesystem) Setup() error {
 		return fmt.Errorf("failed to mount volumes: %w", err)
 	}
 
-	// If no volumes are mounted, set up limited work directory (1MB)
+	// If no volumes are mounted, try to set up limited work directory (1MB)
 	if len(f.Volumes) == 0 {
 		if err := f.setupLimitedWorkDir(); err != nil {
-			log.Warn("failed to setup limited work directory", "error", err)
-			// Don't fail - continue with unlimited work dir
+			log.Warn("failed to setup limited work directory, using unlimited work dir", "error", err)
+			// Ensure work directory is still accessible
+			workPath := filepath.Join(f.RootDir, "work")
+			if _, statErr := f.platform.Stat(workPath); statErr != nil {
+				// Work directory might have been corrupted, recreate it
+				if mkdirErr := f.platform.MkdirAll(workPath, 0755); mkdirErr != nil {
+					log.Error("failed to recreate work directory", "error", mkdirErr)
+				} else {
+					log.Debug("recreated work directory after mount failure")
+				}
+			}
 		}
 	}
 
