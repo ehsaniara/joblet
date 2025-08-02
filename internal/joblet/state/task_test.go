@@ -75,7 +75,8 @@ func TestTask_UpdateJob(t *testing.T) {
 
 	// Update job
 	updatedJob := originalJob.DeepCopy()
-	_ = updatedJob.MarkAsRunning(5678)
+	updatedJob.Status = domain.StatusRunning
+	updatedJob.Pid = 5678
 
 	task.UpdateJob(updatedJob)
 

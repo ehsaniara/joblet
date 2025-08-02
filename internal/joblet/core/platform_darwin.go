@@ -27,26 +27,26 @@ func NewJoblet(store state.Store, cfg *config.Config, networkStore *state.Networ
 }
 
 // StartJob provides basic job execution on macOS (for development/testing)
-func (w *darwinJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string, volumes []string) (*domain.Job, error) {
+func (w *darwinJoblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
 	w.logger.Warn("Darwin joblet has limited functionality - jobs will not be isolated")
-	if len(uploads) > 0 {
-		w.logger.Warn("File uploads are not supported on Darwin", "uploadCount", len(uploads))
+	if len(req.Uploads) > 0 {
+		w.logger.Warn("File uploads are not supported on Darwin", "uploadCount", len(req.Uploads))
 	}
-	if schedule != "" {
-		w.logger.Warn("Job scheduling is not supported on Darwin", "schedule", schedule)
+	if req.Schedule != "" {
+		w.logger.Warn("Job scheduling is not supported on Darwin", "schedule", req.Schedule)
 	}
 	return nil, fmt.Errorf("Darwin joblet not fully implemented - use Linux for production")
 }
 
 // StopJob stops a job on macOS (basic implementation)
-func (w *darwinJoblet) StopJob(ctx context.Context, jobId string) error {
-	w.logger.Warn("Darwin joblet stop job called")
+func (w *darwinJoblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) error {
+	w.logger.Warn("Darwin joblet stop job called", "jobID", req.JobID)
 	return fmt.Errorf("Darwin joblet not fully implemented")
 }
 
 // ExecuteScheduledJob executes a scheduled job on macOS (basic implementation)
-func (w *darwinJoblet) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
-	w.logger.Warn("Darwin joblet scheduled execution called")
+func (w *darwinJoblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
+	w.logger.Warn("Darwin joblet scheduled execution called", "jobID", req.Job.Id)
 	return fmt.Errorf("Darwin joblet not fully implemented")
 }
 

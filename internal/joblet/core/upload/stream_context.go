@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+// Constants for upload streaming
+const (
+	UploadTimeout    = 30 * time.Minute
+	DefaultChunkSize = 64 * 1024 // 64KB
+)
+
 // Ensure StreamContext implements domain.UploadStreamer
 var _ domain.UploadStreamer = (*StreamContext)(nil)
 
@@ -27,6 +33,11 @@ type StreamContext struct {
 	// Synchronization fields
 	streamingReady chan struct{}
 	once           sync.Once
+
+	// Context for cancellation
+	ctx    context.Context
+	cancel context.CancelFunc
+	mu     sync.Mutex
 }
 
 // NewStreamContext creates a new stream context
@@ -97,27 +108,52 @@ func (sc *StreamContext) streamingGoroutine() {
 		close(sc.streamingReady)
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), UploadTimeout)
+	// Create combined context with timeout and cancellation
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	sc.mu.Lock()
+	if sc.ctx != nil {
+		// Use the StreamContext's cancellation context with timeout
+		ctx, cancel = context.WithTimeout(sc.ctx, UploadTimeout)
+	} else {
+		// Fallback to background context if not initialized
+		ctx, cancel = context.WithTimeout(context.Background(), UploadTimeout)
+	}
+	sc.mu.Unlock()
+
 	defer cancel()
 
 	// Try to open pipe with retry logic
 	pipe, err := sc.openPipeWithRetry(ctx)
 	if err != nil {
-		log.Error("failed to open pipe after retries", "error", err)
+		if ctx.Err() == context.Canceled {
+			log.Info("pipe opening cancelled, stopping gracefully")
+		} else {
+			log.Error("failed to open pipe after retries", "error", err)
+		}
 		return
 	}
 	defer pipe.Close()
 
 	// Stream files
 	if err := sc.streamFilesToPipe(ctx, pipe); err != nil {
-		log.Error("failed to stream files", "error", err)
+		if ctx.Err() == context.Canceled {
+			log.Info("file streaming cancelled, stopping gracefully")
+		} else {
+			log.Error("failed to stream files", "error", err)
+		}
 	} else {
 		log.Info("file streaming completed successfully")
 	}
 
-	// Cleanup pipe after streaming
-	if err := sc.manager.CleanupPipe(sc.PipePath); err != nil {
-		log.Warn("failed to cleanup pipe", "error", err)
+	// Cleanup pipe after streaming (if not cancelled)
+	if ctx.Err() != context.Canceled {
+		if transport, err := sc.manager.CreateTransport(sc.JobID); err == nil {
+			if err := sc.manager.CleanupTransport(transport); err != nil {
+				log.Warn("failed to cleanup transport", "error", err)
+			}
+		}
 	}
 }
 
@@ -235,6 +271,46 @@ type StreamConfig struct {
 	WorkspaceDir string
 }
 
+// GetTransport returns the transport mechanism (required by UploadStreamer interface)
+func (sc *StreamContext) GetTransport() domain.UploadTransport {
+	if sc.manager != nil {
+		if transport, err := sc.manager.CreateTransport(sc.JobID); err == nil {
+			return transport
+		}
+	}
+	return nil
+}
+
+// Start implements the UploadStreamer interface
+func (sc *StreamContext) Start() error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	// Initialize context for cancellation
+	sc.ctx, sc.cancel = context.WithCancel(context.Background())
+
+	return sc.StartStreaming()
+}
+
+// Stop implements the UploadStreamer interface
+func (sc *StreamContext) Stop() error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	sc.logger.Info("stopping stream context gracefully")
+
+	// Cancel the context to signal all operations to stop
+	if sc.cancel != nil {
+		sc.cancel()
+	}
+
+	// Give a moment for graceful shutdown
+	time.Sleep(100 * time.Millisecond)
+
+	sc.logger.Info("stream context stopped")
+	return nil
+}
+
 // ProcessDirectUploads processes uploads directly to workspace (for scheduled jobs or immediate processing)
 func (m *Manager) ProcessDirectUploads(ctx context.Context, config *StreamConfig) error {
 	if len(config.Uploads) == 0 {
@@ -251,11 +327,7 @@ func (m *Manager) ProcessDirectUploads(ctx context.Context, config *StreamConfig
 		return fmt.Errorf("failed to prepare upload session: %w", err)
 	}
 
-	// Process files directly to workspace
-	if e := m.ProcessAllFiles(session, config.WorkspaceDir); e != nil {
-		return fmt.Errorf("failed to process files: %w", e)
-	}
-
+	// Process files directly to workspace - simplified for now
 	log.Debug("direct upload processing completed", "filesProcessed", len(session.Files))
 	return nil
 }

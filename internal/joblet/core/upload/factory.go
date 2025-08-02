@@ -25,5 +25,4 @@ func (f *Factory) CreateStreamContext(session *domain.UploadSession, pipePath st
 	return NewStreamContext(session, pipePath, jobID, f.platform, f.logger)
 }
 
-// Ensure Factory implements domain.UploadSessionFactory
-var _ domain.UploadSessionFactory = (*Factory)(nil)
+// Factory provides upload streaming functionality

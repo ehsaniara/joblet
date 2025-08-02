@@ -1,4 +1,3 @@
-// internal/joblet/core/resource_manager.go
 package core
 
 import (
@@ -61,7 +60,7 @@ func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
 	}
 
 	// Apply CPU core restrictions if specified
-	if job.Limits.CPUCores != "" {
+	if !job.Limits.CPUCores.IsEmpty() {
 		if err := rm.applyCPUCoreRestrictions(job); err != nil {
 			rm.cleanupAll(job.Id)
 			return fmt.Errorf("CPU core setup failed: %w", err)
@@ -97,7 +96,7 @@ func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *
 	streamConfig := &upload.StreamConfig{
 		JobID:        job.Id,
 		Uploads:      uploads,
-		MemoryLimit:  job.Limits.MaxMemory,
+		MemoryLimit:  job.Limits.Memory.Megabytes(),
 		WorkspaceDir: workspaceDir,
 	}
 
@@ -122,9 +121,9 @@ func (rm *ResourceManager) createWorkspace(jobID string) error {
 func (rm *ResourceManager) createCgroup(job *domain.Job) error {
 	if err := rm.cgroup.Create(
 		job.CgroupPath,
-		job.Limits.MaxCPU,
-		job.Limits.MaxMemory,
-		job.Limits.MaxIOBPS,
+		job.Limits.CPU.Value(),
+		job.Limits.Memory.Megabytes(),
+		int32(job.Limits.IOBandwidth.BytesPerSecond()),
 	); err != nil {
 		return fmt.Errorf("cgroup creation failed: %w", err)
 	}
@@ -135,7 +134,7 @@ func (rm *ResourceManager) applyCPUCoreRestrictions(job *domain.Job) error {
 	log := rm.logger.WithFields("jobID", job.Id, "cores", job.Limits.CPUCores)
 	log.Debug("applying CPU core restrictions")
 
-	if err := rm.cgroup.SetCPUCores(job.CgroupPath, job.Limits.CPUCores); err != nil {
+	if err := rm.cgroup.SetCPUCores(job.CgroupPath, job.Limits.CPUCores.String()); err != nil {
 		return fmt.Errorf("failed to set CPU cores: %w", err)
 	}
 

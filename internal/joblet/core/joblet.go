@@ -84,8 +84,8 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config, networkStore *stat
 		cleanup:         c.cleanup,
 	}
 
-	// Create scheduler
-	s := scheduler.New(j)
+	// Create scheduler with adapter
+	s := scheduler.New(&schedulerAdapter{joblet: j})
 	j.scheduler = s
 
 	// Setup cgroup controllers
@@ -109,33 +109,36 @@ func NewPlatformJoblet(store state.Store, cfg *config.Config, networkStore *stat
 }
 
 // StartJob validates and starts a job (immediate or scheduled)
-func (j *Joblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string, volumes []string) (*domain.Job, error) {
+func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
 	j.logger.Debug("StartJob called",
-		"command", command,
-		"network", network,
-		"args", args)
+		"command", req.Command,
+		"network", req.Network,
+		"args", req.Args)
 
-	// Build request
-	req := StartJobRequest{
-		Command: command,
-		Args:    args,
-		Limits: domain.ResourceLimits{
-			MaxCPU:    maxCPU,
-			MaxMemory: maxMemory,
-			MaxIOBPS:  maxIOBPS,
-			CPUCores:  cpuCores,
-		},
-		Uploads:  uploads,
-		Schedule: schedule,
-		Network:  network,
-		Volumes:  volumes,
+	// Convert interface request to internal request using simplified approach
+	limits := domain.NewResourceLimitsFromParams(
+		req.Resources.MaxCPU,
+		req.Resources.CPUCores,
+		req.Resources.MaxMemory,
+		int64(req.Resources.MaxIOBPS),
+	)
+
+	// Build internal request
+	internalReq := StartJobRequest{
+		Command:  req.Command,
+		Args:     req.Args,
+		Limits:   *limits,
+		Uploads:  req.Uploads,
+		Schedule: req.Schedule,
+		Network:  req.Network,
+		Volumes:  req.Volumes,
 	}
 
 	log := j.logger.WithFields(
-		"command", command,
-		"uploadCount", len(uploads),
-		"schedule", schedule,
-		"network", network,
+		"command", req.Command,
+		"uploadCount", len(req.Uploads),
+		"schedule", req.Schedule,
+		"network", req.Network,
 	)
 	log.Debug("starting job")
 
@@ -147,21 +150,21 @@ func (j *Joblet) StartJob(ctx context.Context, command string, args []string, ma
 	}
 
 	// 1. Validate the request
-	if err := j.validator.ValidateJobRequest(command, args, schedule, req.Limits); err != nil {
+	if err := j.validator.ValidateJobRequest(internalReq.Command, internalReq.Args, internalReq.Schedule, internalReq.Limits); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
 	// 2. Build the job
-	jb, err := j.jobBuilder.Build(req)
+	jb, err := j.jobBuilder.Build(internalReq)
 	if err != nil {
 		return nil, fmt.Errorf("job creation failed: %w", err)
 	}
 
 	// 3. Route to appropriate handler
-	if schedule != "" {
-		return j.scheduleJob(ctx, jb, req)
+	if internalReq.Schedule != "" {
+		return j.scheduleJob(ctx, jb, internalReq)
 	}
-	return j.executeJob(ctx, jb, req)
+	return j.executeJob(ctx, jb, internalReq)
 }
 
 // scheduleJob handles scheduled job execution
@@ -227,38 +230,37 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 	return job, nil
 }
 
-// ExecuteScheduledJob implements scheduler.JobExecutor interface
-func (j *Joblet) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
-	log := j.logger.WithField("jobID", job.Id)
+// ExecuteScheduledJob implements the interfaces.Joblet interface for scheduled job execution
+func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
+	jobObj := req.Job
+	log := j.logger.WithField("jobID", jobObj.Id)
 	log.Info("executing scheduled job")
 
 	// Transition state
-	if err := job.MarkAsInitializing(); err != nil {
-		return fmt.Errorf("invalid state transition: %w", err)
-	}
-	j.store.UpdateJob(job)
+	jobObj.Status = domain.StatusInitializing
+	j.store.UpdateJob(jobObj)
 
 	// Execute (uploads already processed during scheduling)
-	_, err := j.executeJob(ctx, job, StartJobRequest{})
+	_, err := j.executeJob(ctx, jobObj, StartJobRequest{})
 	return err
 }
 
 // StopJob stops a running or scheduled job
-func (j *Joblet) StopJob(ctx context.Context, jobID string) error {
-	log := j.logger.WithField("jobID", jobID)
-	log.Debug("stopping job")
+func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) error {
+	log := j.logger.WithField("jobID", req.JobID)
+	log.Debug("stopping job", "force", req.Force, "reason", req.Reason)
 
-	jb, exists := j.store.GetJob(jobID)
+	jb, exists := j.store.GetJob(req.JobID)
 	if !exists {
-		return fmt.Errorf("job not found: %s", jobID)
+		return fmt.Errorf("job not found: %s", req.JobID)
 	}
 
 	// Handle scheduled jobs
 	if jb.IsScheduled() {
-		if j.scheduler.RemoveJob(jobID) {
-			jb.Stop()
+		if j.scheduler.RemoveJob(req.JobID) {
+			jb.Status = domain.StatusStopped
 			j.store.UpdateJob(jb)
-			_ = j.cleanup.CleanupJob(jobID)
+			_ = j.cleanup.CleanupJob(req.JobID)
 			log.Info("scheduled job cancelled")
 			return nil
 		}
@@ -267,28 +269,28 @@ func (j *Joblet) StopJob(ctx context.Context, jobID string) error {
 
 	// Handle running jobs
 	if !jb.IsRunning() {
-		return fmt.Errorf("job is not running: %s (status: %s)", jobID, jb.Status)
+		return fmt.Errorf("job is not running: %s (status: %s)", req.JobID, jb.Status)
 	}
 
 	// Check if cleanup is already in progress (from monitor)
-	if status, exists := j.cleanup.GetCleanupStatus(jobID); exists {
+	if status, exists := j.cleanup.GetCleanupStatus(req.JobID); exists {
 		log.Debug("cleanup already in progress", "started", status.StartTime)
 		// Just update the job state
-		jb.Stop()
+		jb.Status = domain.StatusStopped
 		j.store.UpdateJob(jb)
 		return nil
 	}
 
 	// Stop the process and cleanup
-	err := j.cleanup.CleanupJobWithProcess(ctx, jobID, jb.Pid)
+	err := j.cleanup.CleanupJobWithProcess(ctx, req.JobID, jb.Pid)
 
 	// Update state regardless of cleanup result
-	jb.Stop()
+	jb.Status = domain.StatusStopped
 	j.store.UpdateJob(jb)
 
 	if err != nil {
 		// If cleanup is already in progress, that's OK
-		if err.Error() == fmt.Sprintf("cleanup already in progress for job %s", jobID) {
+		if err.Error() == fmt.Sprintf("cleanup already in progress for job %s", req.JobID) {
 			log.Debug("cleanup initiated by monitor, stop command completed")
 			return nil
 		}
@@ -316,10 +318,14 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		} else {
 			exitCode = -1
 		}
-		job.Fail(exitCode)
+		job.Status = domain.StatusFailed
+		job.ExitCode = exitCode
+		job.EndTime = &[]time.Time{time.Now()}[0]
 	} else {
 		exitCode = 0
-		job.Complete(exitCode)
+		job.Status = domain.StatusCompleted
+		job.ExitCode = exitCode
+		job.EndTime = &[]time.Time{time.Now()}[0]
 	}
 
 	// Update state
@@ -339,12 +345,14 @@ func (j *Joblet) updateJobRunning(job *domain.Job, cmd platform.Command) {
 	if proc := cmd.Process(); proc != nil {
 		job.Pid = int32(proc.Pid())
 	}
-	_ = job.MarkAsRunning(job.Pid)
+	job.Status = domain.StatusRunning
 	j.store.UpdateJob(job)
 }
 
 func (j *Joblet) handleExecutionFailure(job *domain.Job) {
-	job.Fail(-1)
+	job.Status = domain.StatusFailed
+	job.ExitCode = -1
+	job.EndTime = &[]time.Time{time.Now()}[0]
 	j.store.UpdateJob(job)
 	if err := j.cleanup.CleanupJob(job.Id); err != nil {
 		j.logger.Error("cleanup failed after execution failure",
@@ -434,4 +442,17 @@ type components struct {
 	resourceManager *ResourceManager
 	executionEngine *ExecutionEngine
 	cleanup         *cleanup.Coordinator
+}
+
+// schedulerAdapter adapts the Joblet to the scheduler.JobExecutor interface
+type schedulerAdapter struct {
+	joblet *Joblet
+}
+
+// ExecuteScheduledJob adapts the old scheduler interface to the new one
+func (sa *schedulerAdapter) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
+	req := interfaces.ExecuteScheduledJobRequest{
+		Job: job,
+	}
+	return sa.joblet.ExecuteScheduledJob(ctx, req)
 }

@@ -15,15 +15,11 @@ func TestStore_CreateAndGetJob(t *testing.T) {
 	store := state.New()
 
 	job := &domain.Job{
-		Id:      "test-job-1",
-		Command: "echo",
-		Args:    []string{"hello"},
-		Status:  domain.StatusInitializing,
-		Limits: domain.ResourceLimits{
-			MaxCPU:    100,
-			MaxMemory: 512,
-			MaxIOBPS:  1000,
-		},
+		Id:        "test-job-1",
+		Command:   "echo",
+		Args:      []string{"hello"},
+		Status:    domain.StatusInitializing,
+		Limits:    *domain.NewResourceLimitsFromParams(100, "", 512, 1000),
 		StartTime: time.Now(),
 	}
 
@@ -83,7 +79,8 @@ func TestStore_UpdateJob(t *testing.T) {
 
 	// Update the job
 	updatedJob := job.DeepCopy()
-	_ = updatedJob.MarkAsRunning(1234)
+	updatedJob.Status = domain.StatusRunning
+	updatedJob.Pid = 1234
 
 	s.UpdateJob(updatedJob)
 

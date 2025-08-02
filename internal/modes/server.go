@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"joblet/internal/joblet"
 	"joblet/internal/joblet/core/volume"
+	"joblet/internal/joblet/monitoring"
 	"joblet/internal/joblet/server"
 	"joblet/internal/joblet/state"
 	"joblet/internal/modes/isolation"
@@ -56,8 +57,15 @@ func RunServer(cfg *config.Config) error {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
+	// Create and start monitoring service with config
+	monitoringService := monitoring.NewServiceFromConfig(&cfg.Monitoring)
+	if err := monitoringService.Start(); err != nil {
+		return fmt.Errorf("failed to start monitoring service: %w", err)
+	}
+	log.Info("monitoring service started successfully")
+
 	// Start gRPC server with configuration
-	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg, networkStore, volumeManager)
+	grpcServer, err := server.StartGRPCServer(store, jobletInstance, cfg, networkStore, volumeManager, monitoringService)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}
@@ -76,6 +84,11 @@ func RunServer(cfg *config.Config) error {
 	log.Info("received shutdown signal, stopping server...")
 
 	// Graceful shutdown
+	log.Info("stopping monitoring service...")
+	if err := monitoringService.Stop(); err != nil {
+		log.Error("error stopping monitoring service", "error", err)
+	}
+
 	grpcServer.GracefulStop()
 	log.Info("server stopped gracefully")
 
@@ -154,7 +167,7 @@ func runUploadPhase(cfg *config.Config, logger *logger.Logger, platform platform
 
 // runExecutePhase handles the execution phase (existing logic refactored)
 func runExecutePhase(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
-	logger.Info("starting execution phase in isolation")
+	logger.Debug("starting execution phase in isolation")
 
 	// CRITICAL: Wait for network setup FIRST before any other operations
 	if err := waitForNetworkReady(logger, platform); err != nil {

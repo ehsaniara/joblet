@@ -24,11 +24,8 @@ func NewJobExecutor(platform platform.Platform, logger *logger.Logger) *JobExecu
 	// Create upload manager
 	uploadManager := upload.NewManager(platform, logger)
 
-	// Create upload factory for creating stream contexts
-	uploadFactory := upload.NewFactory(platform, logger)
-
-	// Create environment builder with all dependencies
-	envBuilder := environment.NewBuilder(platform, uploadManager, uploadFactory, logger)
+	// Create environment builder with the correct parameters
+	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
 
 	return &JobExecutor{
 		platform:      platform,

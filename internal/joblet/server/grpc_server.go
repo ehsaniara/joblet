@@ -8,13 +8,14 @@ import (
 	auth2 "joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/core/volume"
+	"joblet/internal/joblet/monitoring"
 	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"net"
 )
 
-func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config, networkStore *state.NetworkStore, volumeManager *volume.Manager) (*grpc.Server, error) {
+func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config, networkStore *state.NetworkStore, volumeManager *volume.Manager, monitoringService *monitoring.Service) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -53,11 +54,23 @@ func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config
 	auth := auth2.NewGrpcAuthorization()
 	serverLogger.Debug("authorization module initialized")
 
-	// Create job service with network store and volume manager
-	jobService := NewJobServiceServer(auth, jobStore, joblet, networkStore, volumeManager)
+	// Create and register job service (no longer needs network/volume dependencies)
+	jobService := NewJobServiceServer(auth, jobStore, joblet)
 	pb.RegisterJobletServiceServer(grpcServer, jobService)
 
-	serverLogger.Debug("job service registered successfully")
+	// Create and register network service
+	networkService := NewNetworkServiceServer(auth, networkStore)
+	pb.RegisterNetworkServiceServer(grpcServer, networkService)
+
+	// Create and register volume service
+	volumeService := NewVolumeServiceServer(auth, volumeManager)
+	pb.RegisterVolumeServiceServer(grpcServer, volumeService)
+
+	// Create and register monitoring service
+	monitoringGrpcService := NewMonitoringServiceServer(monitoringService)
+	pb.RegisterMonitoringServiceServer(grpcServer, monitoringGrpcService)
+
+	serverLogger.Debug("all gRPC services registered successfully", "services", []string{"job", "network", "volume", "monitoring"})
 
 	serverLogger.Debug("creating TCP listener", "address", serverAddress)
 

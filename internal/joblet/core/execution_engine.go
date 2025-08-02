@@ -49,8 +49,8 @@ func NewExecutionEngine(
 	jobIsolation *unprivileged.JobIsolation,
 	networkStore *state.NetworkStore,
 ) *ExecutionEngine {
-	uploadFactory := upload.NewFactory(platform, logger)
-	envBuilder := environment.NewBuilder(platform, uploadManager, uploadFactory, logger)
+	// Create environment builder with the correct parameters
+	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
 
 	return &ExecutionEngine{
 		processManager: processManager,
@@ -303,13 +303,13 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 		fmt.Sprintf("JOB_ID=%s", job.Id),
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
-		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
-		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
-		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.CPU.Value()),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.Memory.Megabytes()),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.IOBandwidth.BytesPerSecond()),
 	}
 
-	if job.Limits.CPUCores != "" {
-		jobEnv = append(jobEnv, fmt.Sprintf("JOB_CPU_CORES=%s", job.Limits.CPUCores))
+	if !job.Limits.CPUCores.IsEmpty() {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_CPU_CORES=%s", job.Limits.CPUCores.String()))
 	}
 
 	// Add volume information

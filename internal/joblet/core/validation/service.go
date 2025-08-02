@@ -24,10 +24,6 @@ func (v *Service) ResourceValidator() *ResourceValidator {
 }
 
 func (v *Service) ValidateJobRequest(command string, args []string, schedule string, limits domain.ResourceLimits) error {
-	//if err := v.commandValidator.Validate(command, args); err != nil {
-	//	return fmt.Errorf("command validation: %w", err)
-	//}
-
 	if schedule != "" {
 		if err := v.scheduleValidator.Validate(schedule); err != nil {
 			return fmt.Errorf("schedule validation: %w", err)

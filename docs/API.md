@@ -13,6 +13,7 @@ authentication, and usage examples.
 - [Error Handling](#error-handling)
 - [Code Examples](#code-examples)
 - [CLI Reference](#cli-reference)
+- [Recent Updates](#recent-updates)
 
 ## Overview
 
@@ -595,3 +596,35 @@ sudo journalctl -u joblet -f
 - **Resource Usage**: Check cgroup statistics in `/sys/fs/cgroup/joblet.slice/`
 - **Network**: Monitor gRPC connection count and latency
 - **Memory**: Track job output buffer sizes and cleanup efficiency
+
+## Recent Updates
+
+### Version 2.10.0 (August 2025)
+
+#### API Implementations
+- **GetJobLogs**: Fully implemented streaming job logs functionality
+  - Real-time log streaming for running jobs
+  - Historical log retrieval for completed jobs
+  - Support for multiple concurrent stream clients
+  - Automatic cleanup and backpressure handling
+
+- **ListJobs**: Fully implemented job listing functionality
+  - Returns all jobs with complete metadata
+  - Includes job status, resource limits, and timestamps
+  - Proper authorization checks for admin/viewer roles
+
+#### Monitoring Enhancements
+- **Enhanced CPU Metrics**: Added detailed CPU breakdown (user, system, idle, I/O wait)
+- **Top Processes Display**: Shows top 10 processes by CPU usage in monitor commands
+- **Improved Table Formatting**: Optimized column widths for better readability
+- **Network Interface Monitoring**: Limited to 10 active interfaces for clarity
+
+#### Code Improvements
+- **Simplified Resource Limits**: Removed complex builder pattern in favor of simple constructors
+- **File Upload Enhancements**: Removed artificial size limits (previously 50MB per file, 100MB total)
+- **CI/CD Compatibility**: Enhanced test suite to handle containerized environments gracefully
+
+### Migration Notes
+- No breaking changes to existing API contracts
+- All new implementations follow established patterns
+- Backward compatibility maintained for all client versions
