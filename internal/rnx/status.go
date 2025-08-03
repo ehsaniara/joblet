@@ -2,11 +2,18 @@ package rnx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	pb "joblet/api/gen"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	statusJSON bool
 )
 
 func newStatusCmd() *cobra.Command {
@@ -16,6 +23,8 @@ func newStatusCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE:  runStatus,
 	}
+
+	cmd.Flags().BoolVar(&statusJSON, "json", false, "Output in JSON format")
 
 	return cmd
 }
@@ -35,6 +44,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	response, err := jobClient.GetJobStatus(ctx, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to get job status: %v", err)
+	}
+
+	if statusJSON {
+		return outputJobStatusJSON(response)
 	}
 
 	// Display basic job information
@@ -156,4 +169,12 @@ func formatDuration(d time.Duration) string {
 		}
 		return fmt.Sprintf("%dd%dh", days, hours)
 	}
+}
+
+// outputJobStatusJSON outputs the job status in JSON format
+func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
+	// Use the protobuf's native JSON marshaling to preserve field names and see the actual data
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(response)
 }

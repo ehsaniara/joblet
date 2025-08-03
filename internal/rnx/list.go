@@ -2,12 +2,18 @@ package rnx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	pb "joblet/api/gen"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	listJSON bool
 )
 
 func newListCmd() *cobra.Command {
@@ -16,6 +22,8 @@ func newListCmd() *cobra.Command {
 		Short: "List all jobs",
 		RunE:  runList,
 	}
+
+	cmd.Flags().BoolVar(&listJSON, "json", false, "Output in JSON format")
 
 	return cmd
 }
@@ -37,8 +45,16 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(response.Jobs) == 0 {
-		fmt.Println("No jobs found")
+		if listJSON {
+			fmt.Println("[]")
+		} else {
+			fmt.Println("No jobs found")
+		}
 		return nil
+	}
+
+	if listJSON {
+		return outputJobsJSON(response.Jobs)
 	}
 
 	formatJobList(response.Jobs)
@@ -122,4 +138,45 @@ func formatCommand(command string, args []string) string {
 	}
 
 	return fullCommand
+}
+
+// outputJobsJSON outputs the jobs in JSON format
+func outputJobsJSON(jobs []*pb.Job) error {
+	// Convert protobuf jobs to a simpler structure for JSON output
+	type jsonJob struct {
+		ID            string   `json:"id"`
+		Status        string   `json:"status"`
+		StartTime     string   `json:"start_time"`
+		EndTime       string   `json:"end_time,omitempty"`
+		Command       string   `json:"command"`
+		Args          []string `json:"args,omitempty"`
+		ExitCode      int32    `json:"exit_code,omitempty"`
+		MaxCPU        int32    `json:"max_cpu,omitempty"`
+		MaxMemory     int32    `json:"max_memory,omitempty"`
+		MaxIOBPS      int32    `json:"max_iobps,omitempty"`
+		CPUCores      string   `json:"cpu_cores,omitempty"`
+		ScheduledTime string   `json:"scheduled_time,omitempty"`
+	}
+
+	jsonJobs := make([]jsonJob, len(jobs))
+	for i, job := range jobs {
+		jsonJobs[i] = jsonJob{
+			ID:            job.Id,
+			Status:        job.Status,
+			StartTime:     job.StartTime,
+			EndTime:       job.EndTime,
+			Command:       job.Command,
+			Args:          job.Args,
+			ExitCode:      job.ExitCode,
+			MaxCPU:        job.MaxCPU,
+			MaxMemory:     job.MaxMemory,
+			MaxIOBPS:      job.MaxIOBPS,
+			CPUCores:      job.CpuCores,
+			ScheduledTime: job.ScheduledTime,
+		}
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(jsonJobs)
 }

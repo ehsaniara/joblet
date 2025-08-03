@@ -29,7 +29,8 @@ go.work.sum
 /.idea
 /bin
 
-# applicatioin specific
+# application specific
 certs
 tmp
 config
+
