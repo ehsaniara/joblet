@@ -4,22 +4,33 @@ option go_package = "./";
 
 package joblet;
 
-service JobletService{
+// Job execution service
+service JobletService {
   rpc RunJob(RunJobReq) returns (RunJobRes){}
   rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes){}
   rpc StopJob(StopJobReq) returns (StopJobRes){}
   rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
   rpc ListJobs(EmptyRequest) returns (Jobs){}
+}
 
-  // Network management
+// Network management service
+service NetworkService {
   rpc CreateNetwork(CreateNetworkReq) returns (CreateNetworkRes){}
   rpc ListNetworks(EmptyRequest) returns (Networks){}
   rpc RemoveNetwork(RemoveNetworkReq) returns (RemoveNetworkRes){}
-  
-  // Volume management
+}
+
+// Volume management service
+service VolumeService {
   rpc CreateVolume(CreateVolumeReq) returns (CreateVolumeRes){}
   rpc ListVolumes(EmptyRequest) returns (Volumes){}
   rpc RemoveVolume(RemoveVolumeReq) returns (RemoveVolumeRes){}
+}
+
+// System monitoring service
+service MonitoringService {
+  rpc GetSystemStatus(EmptyRequest) returns (SystemStatusRes){}
+  rpc StreamSystemMetrics(StreamMetricsReq) returns (stream SystemMetricsRes){}
 }
 
 message Jobs{
@@ -183,4 +194,162 @@ message Volume {
 
 message Volumes {
   repeated Volume volumes = 1;
+}
+
+// System monitoring messages
+
+message SystemStatusRes {
+  string timestamp = 1;
+  bool available = 2;
+  HostInfo host = 3;
+  CPUMetrics cpu = 4;
+  MemoryMetrics memory = 5;
+  repeated DiskMetrics disks = 6;
+  repeated NetworkMetrics networks = 7;
+  IOMetrics io = 8;
+  ProcessMetrics processes = 9;
+  CloudInfo cloud = 10;
+}
+
+message SystemMetricsRes {
+  string timestamp = 1;
+  HostInfo host = 2;
+  CPUMetrics cpu = 3;
+  MemoryMetrics memory = 4;
+  repeated DiskMetrics disks = 5;
+  repeated NetworkMetrics networks = 6;
+  IOMetrics io = 7;
+  ProcessMetrics processes = 8;
+  CloudInfo cloud = 9;
+}
+
+message StreamMetricsReq {
+  int32 intervalSeconds = 1; // How often to send updates (default: 5)
+  repeated string metricTypes = 2; // Optional: filter by types
+}
+
+// Monitoring data structures
+
+message HostInfo {
+  string hostname = 1;
+  string os = 2;
+  string platform = 3;
+  string platformFamily = 4;
+  string platformVersion = 5;
+  string kernelVersion = 6;
+  string kernelArch = 7;
+  string architecture = 8;
+  int32 cpuCount = 9;
+  int64 totalMemory = 10;
+  string bootTime = 11;
+  int64 uptime = 12;
+}
+
+message CPUMetrics {
+  int32 cores = 1;
+  double usagePercent = 2;
+  double userTime = 3;
+  double systemTime = 4;
+  double idleTime = 5;
+  double ioWaitTime = 6;
+  double stealTime = 7;
+  repeated double loadAverage = 8; // 1, 5, 15 minute averages
+  repeated double perCoreUsage = 9;
+}
+
+message MemoryMetrics {
+  int64 totalBytes = 1;
+  int64 usedBytes = 2;
+  int64 freeBytes = 3;
+  int64 availableBytes = 4;
+  double usagePercent = 5;
+  int64 cachedBytes = 6;
+  int64 bufferedBytes = 7;
+  int64 swapTotal = 8;
+  int64 swapUsed = 9;
+  int64 swapFree = 10;
+}
+
+message DiskMetrics {
+  string device = 1;
+  string mountPoint = 2;
+  string filesystem = 3;
+  int64 totalBytes = 4;
+  int64 usedBytes = 5;
+  int64 freeBytes = 6;
+  double usagePercent = 7;
+  int64 inodesTotal = 8;
+  int64 inodesUsed = 9;
+  int64 inodesFree = 10;
+  double inodesUsagePercent = 11;
+}
+
+message NetworkMetrics {
+  string interface = 1;
+  int64 bytesReceived = 2;
+  int64 bytesSent = 3;
+  int64 packetsReceived = 4;
+  int64 packetsSent = 5;
+  int64 errorsIn = 6;
+  int64 errorsOut = 7;
+  int64 dropsIn = 8;
+  int64 dropsOut = 9;
+  double receiveRate = 10; // bytes per second
+  double transmitRate = 11; // bytes per second
+}
+
+message IOMetrics {
+  int64 totalReads = 1;
+  int64 totalWrites = 2;
+  int64 readBytes = 3;
+  int64 writeBytes = 4;
+  double readRate = 5;  // bytes per second
+  double writeRate = 6; // bytes per second
+  repeated DiskIOMetrics diskIO = 7;
+}
+
+message DiskIOMetrics {
+  string device = 1;
+  int64 readsCompleted = 2;
+  int64 writesCompleted = 3;
+  int64 readBytes = 4;
+  int64 writeBytes = 5;
+  int64 readTime = 6;  // milliseconds
+  int64 writeTime = 7; // milliseconds
+  int64 ioTime = 8;    // milliseconds
+  double utilization = 9; // percentage
+}
+
+message ProcessMetrics {
+  int32 totalProcesses = 1;
+  int32 runningProcesses = 2;
+  int32 sleepingProcesses = 3;
+  int32 stoppedProcesses = 4;
+  int32 zombieProcesses = 5;
+  int32 totalThreads = 6;
+  repeated ProcessInfo topByCPU = 7;
+  repeated ProcessInfo topByMemory = 8;
+}
+
+message ProcessInfo {
+  int32 pid = 1;
+  int32 ppid = 2;
+  string name = 3;
+  string command = 4;
+  double cpuPercent = 5;
+  double memoryPercent = 6;
+  int64 memoryBytes = 7;
+  string status = 8;
+  string startTime = 9;
+  string user = 10;
+}
+
+message CloudInfo {
+  string provider = 1;
+  string region = 2;
+  string zone = 3;
+  string instanceID = 4;
+  string instanceType = 5;
+  string hypervisorType = 6;
+  map<string, string> metadata = 7;
 }

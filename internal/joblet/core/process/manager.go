@@ -471,9 +471,9 @@ func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
 		// Use generic path instead of revealing host structure
 		fmt.Sprintf("JOBLET_BINARY_PATH=%s", "/sbin/init"),
-		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.MaxCPU),
-		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.MaxMemory),
-		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.MaxIOBPS),
+		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.CPU.Value()),
+		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.Memory.Megabytes()),
+		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.IOBandwidth.BytesPerSecond()),
 	}
 
 	for i, arg := range job.Args {

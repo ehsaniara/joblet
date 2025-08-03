@@ -14,8 +14,11 @@ import (
 )
 
 type JobClient struct {
-	client pb.JobletServiceClient
-	conn   *grpc.ClientConn
+	jobClient        pb.JobletServiceClient
+	networkClient    pb.NetworkServiceClient
+	volumeClient     pb.VolumeServiceClient
+	monitoringClient pb.MonitoringServiceClient
+	conn             *grpc.ClientConn
 }
 
 // NewJobClient creates a new job client from a node configuration
@@ -42,8 +45,11 @@ func NewJobClient(node *config.Node) (*JobClient, error) {
 	}
 
 	return &JobClient{
-		client: pb.NewJobletServiceClient(conn),
-		conn:   conn,
+		jobClient:        pb.NewJobletServiceClient(conn),
+		networkClient:    pb.NewNetworkServiceClient(conn),
+		volumeClient:     pb.NewVolumeServiceClient(conn),
+		monitoringClient: pb.NewMonitoringServiceClient(conn),
+		conn:             conn,
 	}, nil
 }
 
@@ -55,18 +61,18 @@ func (c *JobClient) Close() error {
 }
 
 func (c *JobClient) RunJob(ctx context.Context, job *pb.RunJobReq) (*pb.RunJobRes, error) {
-	return c.client.RunJob(ctx, job)
+	return c.jobClient.RunJob(ctx, job)
 }
 
 func (c *JobClient) GetJobStatus(ctx context.Context, id string) (*pb.GetJobStatusRes, error) {
-	return c.client.GetJobStatus(ctx, &pb.GetJobStatusReq{Id: id})
+	return c.jobClient.GetJobStatus(ctx, &pb.GetJobStatusReq{Id: id})
 }
 
 func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	resp, err := c.client.StopJob(ctx, &pb.StopJobReq{Id: id})
+	resp, err := c.jobClient.StopJob(ctx, &pb.StopJobReq{Id: id})
 	if err != nil {
 		if s, ok := status.FromError(err); ok {
 			if s.Code() == codes.DeadlineExceeded {
@@ -79,11 +85,11 @@ func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, err
 }
 
 func (c *JobClient) ListJobs(ctx context.Context) (*pb.Jobs, error) {
-	return c.client.ListJobs(ctx, &pb.EmptyRequest{})
+	return c.jobClient.ListJobs(ctx, &pb.EmptyRequest{})
 }
 
 func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobletService_GetJobLogsClient, error) {
-	stream, err := c.client.GetJobLogs(ctx, &pb.GetJobLogsReq{Id: id})
+	stream, err := c.jobClient.GetJobLogs(ctx, &pb.GetJobLogsReq{Id: id})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start log stream: %v", err)
 	}
@@ -91,25 +97,35 @@ func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobletService
 }
 
 func (c *JobClient) CreateNetwork(ctx context.Context, req *pb.CreateNetworkReq) (*pb.CreateNetworkRes, error) {
-	return c.client.CreateNetwork(ctx, req)
+	return c.networkClient.CreateNetwork(ctx, req)
 }
 
 func (c *JobClient) ListNetworks(ctx context.Context) (*pb.Networks, error) {
-	return c.client.ListNetworks(ctx, &pb.EmptyRequest{})
+	return c.networkClient.ListNetworks(ctx, &pb.EmptyRequest{})
 }
 
 func (c *JobClient) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkReq) (*pb.RemoveNetworkRes, error) {
-	return c.client.RemoveNetwork(ctx, req)
+	return c.networkClient.RemoveNetwork(ctx, req)
 }
 
 func (c *JobClient) CreateVolume(ctx context.Context, req *pb.CreateVolumeReq) (*pb.CreateVolumeRes, error) {
-	return c.client.CreateVolume(ctx, req)
+	return c.volumeClient.CreateVolume(ctx, req)
 }
 
 func (c *JobClient) ListVolumes(ctx context.Context) (*pb.Volumes, error) {
-	return c.client.ListVolumes(ctx, &pb.EmptyRequest{})
+	return c.volumeClient.ListVolumes(ctx, &pb.EmptyRequest{})
 }
 
 func (c *JobClient) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeReq) (*pb.RemoveVolumeRes, error) {
-	return c.client.RemoveVolume(ctx, req)
+	return c.volumeClient.RemoveVolume(ctx, req)
+}
+
+// Monitoring service methods
+
+func (c *JobClient) GetSystemStatus(ctx context.Context) (*pb.SystemStatusRes, error) {
+	return c.monitoringClient.GetSystemStatus(ctx, &pb.EmptyRequest{})
+}
+
+func (c *JobClient) StreamSystemMetrics(ctx context.Context, req *pb.StreamMetricsReq) (pb.MonitoringService_StreamSystemMetricsClient, error) {
+	return c.monitoringClient.StreamSystemMetrics(ctx, req)
 }

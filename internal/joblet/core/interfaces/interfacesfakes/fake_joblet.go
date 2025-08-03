@@ -9,11 +9,11 @@ import (
 )
 
 type FakeJoblet struct {
-	ExecuteScheduledJobStub        func(context.Context, *domain.Job) error
+	ExecuteScheduledJobStub        func(context.Context, interfaces.ExecuteScheduledJobRequest) error
 	executeScheduledJobMutex       sync.RWMutex
 	executeScheduledJobArgsForCall []struct {
 		arg1 context.Context
-		arg2 *domain.Job
+		arg2 interfaces.ExecuteScheduledJobRequest
 	}
 	executeScheduledJobReturns struct {
 		result1 error
@@ -21,20 +21,11 @@ type FakeJoblet struct {
 	executeScheduledJobReturnsOnCall map[int]struct {
 		result1 error
 	}
-	StartJobStub        func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string, []string) (*domain.Job, error)
+	StartJobStub        func(context.Context, interfaces.StartJobRequest) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
 	startJobArgsForCall []struct {
-		arg1  context.Context
-		arg2  string
-		arg3  []string
-		arg4  int32
-		arg5  int32
-		arg6  int32
-		arg7  string
-		arg8  []domain.FileUpload
-		arg9  string
-		arg10 string
-		arg11 []string
+		arg1 context.Context
+		arg2 interfaces.StartJobRequest
 	}
 	startJobReturns struct {
 		result1 *domain.Job
@@ -44,11 +35,11 @@ type FakeJoblet struct {
 		result1 *domain.Job
 		result2 error
 	}
-	StopJobStub        func(context.Context, string) error
+	StopJobStub        func(context.Context, interfaces.StopJobRequest) error
 	stopJobMutex       sync.RWMutex
 	stopJobArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
+		arg2 interfaces.StopJobRequest
 	}
 	stopJobReturns struct {
 		result1 error
@@ -60,12 +51,12 @@ type FakeJoblet struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeJoblet) ExecuteScheduledJob(arg1 context.Context, arg2 *domain.Job) error {
+func (fake *FakeJoblet) ExecuteScheduledJob(arg1 context.Context, arg2 interfaces.ExecuteScheduledJobRequest) error {
 	fake.executeScheduledJobMutex.Lock()
 	ret, specificReturn := fake.executeScheduledJobReturnsOnCall[len(fake.executeScheduledJobArgsForCall)]
 	fake.executeScheduledJobArgsForCall = append(fake.executeScheduledJobArgsForCall, struct {
 		arg1 context.Context
-		arg2 *domain.Job
+		arg2 interfaces.ExecuteScheduledJobRequest
 	}{arg1, arg2})
 	stub := fake.ExecuteScheduledJobStub
 	fakeReturns := fake.executeScheduledJobReturns
@@ -86,13 +77,13 @@ func (fake *FakeJoblet) ExecuteScheduledJobCallCount() int {
 	return len(fake.executeScheduledJobArgsForCall)
 }
 
-func (fake *FakeJoblet) ExecuteScheduledJobCalls(stub func(context.Context, *domain.Job) error) {
+func (fake *FakeJoblet) ExecuteScheduledJobCalls(stub func(context.Context, interfaces.ExecuteScheduledJobRequest) error) {
 	fake.executeScheduledJobMutex.Lock()
 	defer fake.executeScheduledJobMutex.Unlock()
 	fake.ExecuteScheduledJobStub = stub
 }
 
-func (fake *FakeJoblet) ExecuteScheduledJobArgsForCall(i int) (context.Context, *domain.Job) {
+func (fake *FakeJoblet) ExecuteScheduledJobArgsForCall(i int) (context.Context, interfaces.ExecuteScheduledJobRequest) {
 	fake.executeScheduledJobMutex.RLock()
 	defer fake.executeScheduledJobMutex.RUnlock()
 	argsForCall := fake.executeScheduledJobArgsForCall[i]
@@ -122,43 +113,19 @@ func (fake *FakeJoblet) ExecuteScheduledJobReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 string, arg3 []string, arg4 int32, arg5 int32, arg6 int32, arg7 string, arg8 []domain.FileUpload, arg9 string, arg10 string, arg11 []string) (*domain.Job, error) {
-	var arg3Copy []string
-	if arg3 != nil {
-		arg3Copy = make([]string, len(arg3))
-		copy(arg3Copy, arg3)
-	}
-	var arg8Copy []domain.FileUpload
-	if arg8 != nil {
-		arg8Copy = make([]domain.FileUpload, len(arg8))
-		copy(arg8Copy, arg8)
-	}
-	var arg11Copy []string
-	if arg11 != nil {
-		arg11Copy = make([]string, len(arg11))
-		copy(arg11Copy, arg11)
-	}
+func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 interfaces.StartJobRequest) (*domain.Job, error) {
 	fake.startJobMutex.Lock()
 	ret, specificReturn := fake.startJobReturnsOnCall[len(fake.startJobArgsForCall)]
 	fake.startJobArgsForCall = append(fake.startJobArgsForCall, struct {
-		arg1  context.Context
-		arg2  string
-		arg3  []string
-		arg4  int32
-		arg5  int32
-		arg6  int32
-		arg7  string
-		arg8  []domain.FileUpload
-		arg9  string
-		arg10 string
-		arg11 []string
-	}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9, arg10, arg11Copy})
+		arg1 context.Context
+		arg2 interfaces.StartJobRequest
+	}{arg1, arg2})
 	stub := fake.StartJobStub
 	fakeReturns := fake.startJobReturns
-	fake.recordInvocation("StartJob", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6, arg7, arg8Copy, arg9, arg10, arg11Copy})
+	fake.recordInvocation("StartJob", []interface{}{arg1, arg2})
 	fake.startJobMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -172,17 +139,17 @@ func (fake *FakeJoblet) StartJobCallCount() int {
 	return len(fake.startJobArgsForCall)
 }
 
-func (fake *FakeJoblet) StartJobCalls(stub func(context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string, []string) (*domain.Job, error)) {
+func (fake *FakeJoblet) StartJobCalls(stub func(context.Context, interfaces.StartJobRequest) (*domain.Job, error)) {
 	fake.startJobMutex.Lock()
 	defer fake.startJobMutex.Unlock()
 	fake.StartJobStub = stub
 }
 
-func (fake *FakeJoblet) StartJobArgsForCall(i int) (context.Context, string, []string, int32, int32, int32, string, []domain.FileUpload, string, string, []string) {
+func (fake *FakeJoblet) StartJobArgsForCall(i int) (context.Context, interfaces.StartJobRequest) {
 	fake.startJobMutex.RLock()
 	defer fake.startJobMutex.RUnlock()
 	argsForCall := fake.startJobArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7, argsForCall.arg8, argsForCall.arg9, argsForCall.arg10, argsForCall.arg11
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeJoblet) StartJobReturns(result1 *domain.Job, result2 error) {
@@ -211,12 +178,12 @@ func (fake *FakeJoblet) StartJobReturnsOnCall(i int, result1 *domain.Job, result
 	}{result1, result2}
 }
 
-func (fake *FakeJoblet) StopJob(arg1 context.Context, arg2 string) error {
+func (fake *FakeJoblet) StopJob(arg1 context.Context, arg2 interfaces.StopJobRequest) error {
 	fake.stopJobMutex.Lock()
 	ret, specificReturn := fake.stopJobReturnsOnCall[len(fake.stopJobArgsForCall)]
 	fake.stopJobArgsForCall = append(fake.stopJobArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
+		arg2 interfaces.StopJobRequest
 	}{arg1, arg2})
 	stub := fake.StopJobStub
 	fakeReturns := fake.stopJobReturns
@@ -237,13 +204,13 @@ func (fake *FakeJoblet) StopJobCallCount() int {
 	return len(fake.stopJobArgsForCall)
 }
 
-func (fake *FakeJoblet) StopJobCalls(stub func(context.Context, string) error) {
+func (fake *FakeJoblet) StopJobCalls(stub func(context.Context, interfaces.StopJobRequest) error) {
 	fake.stopJobMutex.Lock()
 	defer fake.stopJobMutex.Unlock()
 	fake.StopJobStub = stub
 }
 
-func (fake *FakeJoblet) StopJobArgsForCall(i int) (context.Context, string) {
+func (fake *FakeJoblet) StopJobArgsForCall(i int) (context.Context, interfaces.StopJobRequest) {
 	fake.stopJobMutex.RLock()
 	defer fake.stopJobMutex.RUnlock()
 	argsForCall := fake.stopJobArgsForCall[i]

@@ -64,3 +64,18 @@ logging:
   level: "INFO"
   format: "text"
   output: "stdout"
+
+monitoring:
+  enabled: true
+  collection:
+    system_interval: "10s"      # How often to collect system metrics
+    process_interval: "30s"     # How often to collect process metrics
+    cloud_detection: true       # Enable cloud environment detection
+  storage:
+    retention_hours: 24         # How long to keep raw metrics in memory
+    max_memory_mb: 100          # Maximum memory usage for metrics storage
+    aggregation: # Time-series aggregation settings
+      - interval: "1h"          # Create hourly summaries
+        retention: "168h"       # Keep for 7 days
+      - interval: "24h"         # Create daily summaries  
+        retention: "720h"       # Keep for 30 days

@@ -2,35 +2,33 @@ package domain
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
-	"strings"
 	"time"
 )
 
+// JobStatus represents the current state of a job
 type JobStatus string
 
 const (
-	StatusScheduled    JobStatus = "SCHEDULED"
-	StatusInitializing JobStatus = "INITIALIZING"
+	StatusPending      JobStatus = "PENDING"
 	StatusRunning      JobStatus = "RUNNING"
 	StatusCompleted    JobStatus = "COMPLETED"
 	StatusFailed       JobStatus = "FAILED"
 	StatusStopped      JobStatus = "STOPPED"
+	StatusScheduled    JobStatus = "SCHEDULED"
+	StatusInitializing JobStatus = "INITIALIZING"
 )
 
-type ResourceLimits struct {
-	MaxCPU    int32  // Percentage of CPU time (0-100+ for multiple cores)
-	MaxMemory int32  // Memory in MB
-	MaxIOBPS  int32  // IO bandwidth
-	CPUCores  string // Core specification: "0-3", "1,3,5", "2", or "" for no limit
-}
+var (
+	// ErrInvalidCommand is returned when job command is empty
+	ErrInvalidCommand = errors.New("job command cannot be empty")
+)
 
+// Job represents a job with improved resource limits using value objects
 type Job struct {
 	Id            string         // Unique identifier for job tracking
 	Command       string         // Executable command path
 	Args          []string       // Command line arguments
-	Limits        ResourceLimits // CPU/memory/IO constraints
+	Limits        ResourceLimits // CPU/memory/IO constraints using value objects
 	Status        JobStatus      // Current execution state
 	Pid           int32          // Process ID when running
 	CgroupPath    string         // Filesystem path for resource limits
@@ -42,35 +40,12 @@ type Job struct {
 	Volumes       []string       // Volume names to mount
 }
 
-func (r *ResourceLimits) HasCoreRestriction() bool {
-	return r.CPUCores != ""
-}
-
-func (r *ResourceLimits) ParseCoreCount() int {
-	if r.CPUCores == "" {
-		return 0
-	}
-
-	// Parse "0-3" -> 4 cores, "1,3,5" -> 3 cores, "2" -> 1 core
-	cores := strings.Split(strings.ReplaceAll(r.CPUCores, "-", ","), ",")
-
-	// Handle ranges like "0-3"
-	if strings.Contains(r.CPUCores, "-") {
-		parts := strings.Split(r.CPUCores, "-")
-		if len(parts) == 2 {
-			start, _ := strconv.Atoi(parts[0])
-			end, _ := strconv.Atoi(parts[1])
-			return end - start + 1
-		}
-	}
-
-	return len(cores)
-}
-
+// IsRunning returns true if the job is currently running
 func (j *Job) IsRunning() bool {
 	return j.Status == StatusRunning
 }
 
+// IsCompleted returns true if the job has completed execution
 func (j *Job) IsCompleted() bool {
 	return j.Status == StatusCompleted || j.Status == StatusFailed || j.Status == StatusStopped
 }
@@ -80,78 +55,47 @@ func (j *Job) IsScheduled() bool {
 	return j.Status == StatusScheduled
 }
 
-// IsDue returns true if a scheduled job is ready to execute
-func (j *Job) IsDue() bool {
-	if !j.IsScheduled() || j.ScheduledTime == nil {
-		return false
-	}
-	return time.Now().After(*j.ScheduledTime) || time.Now().Equal(*j.ScheduledTime)
+// HasResourceLimits returns true if any resource limits are set
+func (j *Job) HasResourceLimits() bool {
+	return j.Limits.HasCPULimit() ||
+		j.Limits.HasMemoryLimit() ||
+		j.Limits.HasIOLimit() ||
+		j.Limits.HasCoreRestriction()
 }
 
-// GetExecutionTime returns the time when this job should execute
-// For immediate jobs, returns StartTime. For scheduled jobs, returns ScheduledTime.
-func (j *Job) GetExecutionTime() time.Time {
-	if j.ScheduledTime != nil {
-		return *j.ScheduledTime
+// GetDuration returns the job execution duration
+func (j *Job) GetDuration() time.Duration {
+	if j.EndTime == nil {
+		if j.IsRunning() {
+			return time.Since(j.StartTime)
+		}
+		return 0
 	}
-	return j.StartTime
+	return j.EndTime.Sub(j.StartTime)
 }
 
-// MarkAsRunning transitions job from INITIALIZING to RUNNING state with given PID
-func (j *Job) MarkAsRunning(pid int32) error {
-	if j.Status != StatusInitializing {
-		return fmt.Errorf("cannot mark job as running: current status is %s, expected %s", j.Status, StatusInitializing)
+// GetScheduleDelay returns how long until the job is scheduled to run
+func (j *Job) GetScheduleDelay() time.Duration {
+	if j.ScheduledTime == nil || !j.IsScheduled() {
+		return 0
+	}
+	delay := time.Until(*j.ScheduledTime)
+	if delay < 0 {
+		return 0 // Already past scheduled time
+	}
+	return delay
+}
+
+// Validate validates the job configuration
+func (j *Job) Validate() error {
+	if j.Command == "" {
+		return ErrInvalidCommand
 	}
 
-	if pid <= 0 {
-		return errors.New("PID must be positive")
-	}
+	// Validate is built into the ResourceLimits through the builder
+	// No additional validation needed here
 
-	j.Status = StatusRunning
-	j.Pid = pid
 	return nil
-}
-
-// MarkAsInitializing transitions job from SCHEDULED to INITIALIZING state
-func (j *Job) MarkAsInitializing() error {
-	if j.Status != StatusScheduled {
-		return fmt.Errorf("cannot mark job as initializing: current status is %s, expected %s", j.Status, StatusScheduled)
-	}
-
-	j.Status = StatusInitializing
-	return nil
-}
-
-// Complete marks job as successfully finished with given exit code
-func (j *Job) Complete(exitCode int32) {
-	j.Status = StatusCompleted
-	j.ExitCode = exitCode
-	now := time.Now()
-	j.EndTime = &now
-}
-
-// Fail marks job as failed with given exit code
-func (j *Job) Fail(exitCode int32) {
-	j.Status = StatusFailed
-	j.ExitCode = exitCode
-	now := time.Now()
-	j.EndTime = &now
-}
-
-// Stop marks job as stopped (terminated by user)
-func (j *Job) Stop() {
-	j.Status = StatusStopped
-	j.ExitCode = -1 // Conventional exit code for terminated processes
-	now := time.Now()
-	j.EndTime = &now
-}
-
-// Duration returns how long the job has been running or took to complete
-func (j *Job) Duration() time.Duration {
-	if j.EndTime != nil {
-		return j.EndTime.Sub(j.StartTime)
-	}
-	return time.Since(j.StartTime)
 }
 
 // DeepCopy creates a deep copy of the job
@@ -160,29 +104,33 @@ func (j *Job) DeepCopy() *Job {
 		return nil
 	}
 
-	cp := &Job{
+	jobCopy := &Job{
 		Id:         j.Id,
 		Command:    j.Command,
-		Args:       append([]string(nil), j.Args...),
-		Limits:     j.Limits,
+		Args:       make([]string, len(j.Args)),
+		Limits:     j.Limits, // Value objects are safe to copy
 		Status:     j.Status,
 		Pid:        j.Pid,
 		CgroupPath: j.CgroupPath,
 		StartTime:  j.StartTime,
 		ExitCode:   j.ExitCode,
 		Network:    j.Network,
-		Volumes:    append([]string(nil), j.Volumes...),
+		Volumes:    make([]string, len(j.Volumes)),
 	}
 
+	// Copy slices
+	copy(jobCopy.Args, j.Args)
+	copy(jobCopy.Volumes, j.Volumes)
+
+	// Copy pointers
 	if j.EndTime != nil {
-		endTimeCopy := *j.EndTime
-		cp.EndTime = &endTimeCopy
+		endTime := *j.EndTime
+		jobCopy.EndTime = &endTime
 	}
-
 	if j.ScheduledTime != nil {
-		scheduledTimeCopy := *j.ScheduledTime
-		cp.ScheduledTime = &scheduledTimeCopy
+		scheduledTime := *j.ScheduledTime
+		jobCopy.ScheduledTime = &scheduledTime
 	}
 
-	return cp
+	return jobCopy
 }

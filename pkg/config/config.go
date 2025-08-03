@@ -22,6 +22,7 @@ type Config struct {
 	GRPC       GRPCConfig       `yaml:"grpc" json:"grpc"`
 	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
 	Network    NetworkConfig    `yaml:"network"`
+	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring"`
 }
 
 type NetworkConfig struct {
@@ -102,6 +103,19 @@ type LoggingConfig struct {
 	Output string `yaml:"output" json:"output"`
 }
 
+// MonitoringConfig holds monitoring system configuration
+type MonitoringConfig struct {
+	Enabled    bool                 `yaml:"enabled" json:"enabled"`
+	Collection MonitoringCollection `yaml:"collection" json:"collection"`
+}
+
+// MonitoringCollection holds collection settings
+type MonitoringCollection struct {
+	SystemInterval  time.Duration `yaml:"system_interval" json:"system_interval"`
+	ProcessInterval time.Duration `yaml:"process_interval" json:"process_interval"`
+	CloudDetection  bool          `yaml:"cloud_detection" json:"cloud_detection"`
+}
+
 // ClientConfig represents the client-side configuration with multiple nodes
 type ClientConfig struct {
 	Version string           `yaml:"version"`
@@ -164,6 +178,14 @@ var DefaultConfig = Config{
 		Level:  "INFO",
 		Format: "text",
 		Output: "stdout",
+	},
+	Monitoring: MonitoringConfig{
+		Enabled: true,
+		Collection: MonitoringCollection{
+			SystemInterval:  10 * time.Second,
+			ProcessInterval: 30 * time.Second,
+			CloudDetection:  true,
+		},
 	},
 }
 

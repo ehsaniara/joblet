@@ -23,18 +23,18 @@ func NewJoblet(store state.Store, cfg *config.Config, networkStore *state.Networ
 }
 
 // StartJob delegates to the platform joblet
-func (w *linuxJoblet) StartJob(ctx context.Context, command string, args []string, maxCPU, maxMemory, maxIOBPS int32, cpuCores string, uploads []domain.FileUpload, schedule string, network string, volumes []string) (*domain.Job, error) {
-	return w.platformJoblet.StartJob(ctx, command, args, maxCPU, maxMemory, maxIOBPS, cpuCores, uploads, schedule, network, volumes)
+func (w *linuxJoblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
+	return w.platformJoblet.StartJob(ctx, req)
 }
 
 // StopJob delegates to the platform joblet
-func (w *linuxJoblet) StopJob(ctx context.Context, jobId string) error {
-	return w.platformJoblet.StopJob(ctx, jobId)
+func (w *linuxJoblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) error {
+	return w.platformJoblet.StopJob(ctx, req)
 }
 
 // ExecuteScheduledJob delegates to the platform joblet
-func (w *linuxJoblet) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
-	return w.platformJoblet.ExecuteScheduledJob(ctx, job)
+func (w *linuxJoblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
+	return w.platformJoblet.ExecuteScheduledJob(ctx, req)
 }
 
 // Ensure linuxJoblet implements interfaces

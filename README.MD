@@ -1,5 +1,7 @@
 # Joblet / RNX - Secure Linux Process Execution Platform
 
+**Note:** Joblet is an excellent foundation for building agentic AI systems
+
 [![Tests](https://github.com/ehsaniara/joblet/actions/workflows/ci.yml/badge.svg)](https://github.com/ehsaniara/joblet/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ehsaniara/joblet)](https://goreportcard.com/report/github.com/ehsaniara/joblet)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/ehsaniara/joblet)](https://golang.org/)
@@ -355,7 +357,7 @@ rnx run --schedule="30min" --upload=data.csv --upload=process.py --network=backe
 - **Memory-Optimized**: Small files (<1MB) are embedded, large files (≥1MB) are streamed
 - **OOM Protection**: Dynamic chunking based on job memory limits prevents out-of-memory kills
 - **Progress Feedback**: Real-time upload progress and optimization information
-- **Size Limits**: 50MB per file, 100MB total upload size
+- **No Size Limits**: Files can be as large and numerous as needed (removed artificial limits)
 - **Directory Structure**: Preserves full directory hierarchy in job workspace
 - **Security**: Path traversal protection and system directory access prevention
 - **Scheduling Support**: File uploads work seamlessly with scheduled jobs
@@ -608,6 +610,15 @@ rnx log <job-id>
 
 # Stop running job
 rnx stop <job-id>
+
+# Monitor system metrics in real-time
+rnx monitor watch
+
+# Get current system status
+rnx monitor status
+
+# Get condensed metrics view
+rnx monitor top
 ```
 
 ### Remote Server Connection
@@ -1082,10 +1093,19 @@ sudo ln -sf /opt/joblet/rnx /usr/local/bin/rnx
 ### Performance Monitoring
 
 ```bash
-# Monitor CPU core usage
-mpstat -P ALL 2                               # Per-core statistics every 2 seconds
+# Real-time system monitoring with Joblet
+rnx monitor watch                              # Live system metrics with tables
+rnx monitor watch --interval=2                # Update every 2 seconds
+rnx monitor watch --compact                   # Compact network display
+rnx monitor watch --filter=cpu,memory         # Show only CPU and memory
 
-# Check process CPU affinity
+# System snapshots
+rnx monitor status                            # Comprehensive system info
+rnx monitor status --json                     # JSON format for scripting
+rnx monitor top                               # Quick overview
+
+# Traditional Linux monitoring
+mpstat -P ALL 2                               # Per-core statistics every 2 seconds
 ps -eo pid,comm,psr,pcpu | grep your_process  # PSR column shows current core
 
 # Monitor cgroup resource usage
@@ -1139,6 +1159,14 @@ ip -s link show | grep veth
 | `rnx stop`        | Stop a running or scheduled job           | `rnx stop 123`              |
 | `rnx nodes`       | List all configured server nodes          | `rnx nodes`                 |
 | `rnx config-help` | Show configuration file examples          | `rnx config-help`           |
+
+### Monitoring Commands
+
+| Command              | Description                            | Example                          |
+|----------------------|----------------------------------------|----------------------------------|
+| `rnx monitor watch`  | Real-time system metrics monitoring   | `rnx monitor watch --interval=2` |
+| `rnx monitor status` | Current system status snapshot        | `rnx monitor status --json`      |
+| `rnx monitor top`    | Condensed current metrics view        | `rnx monitor top --filter=cpu`   |
 
 ### Resource Limiting Flags
 
@@ -1288,6 +1316,30 @@ rnx run --upload=test-api.sh --network=myapp bash test-api.sh
 
 See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/nodejs-web-api) for API endpoints,
 scheduling workers, and production considerations.
+
+## 📋 Recent Changes & Improvements
+
+### Version 2.10.0 (August 2025)
+
+#### 🎯 API Enhancements
+- **GetJobLogs Implementation**: Full streaming logs support for real-time job output monitoring
+- **ListJobs Implementation**: Complete job listing with metadata and status information
+
+#### 📊 Monitoring Improvements  
+- **Enhanced CPU Metrics**: Detailed breakdown showing user, system, idle, and I/O wait percentages
+- **Top Processes Display**: Monitor shows top 10 processes by CPU usage in formatted tables
+- **Optimized Table Formatting**: Better column width management for improved readability
+- **Network Interface Limits**: Display capped at 10 most active interfaces for clarity
+
+#### 🛠️ Code Quality
+- **Simplified Resource Limits**: Removed complex builder pattern for cleaner, more maintainable code
+- **File Upload Enhancement**: Removed artificial 50MB/file and 100MB total limits - now unlimited
+- **CI/CD Improvements**: Test suite gracefully handles containerized environments
+
+#### 🔧 Technical Details
+- No breaking changes to existing APIs
+- Backward compatibility maintained for all client versions  
+- Improved error messages and logging throughout
 
 ## 💡 Project Name History
 

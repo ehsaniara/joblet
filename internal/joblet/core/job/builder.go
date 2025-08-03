@@ -61,7 +61,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	job.Limits = b.applyResourceDefaults(req.GetLimits())
 
 	// Calculate effective CPU if cores are specified
-	if job.Limits.CPUCores != "" {
+	if !job.Limits.CPUCores.IsEmpty() {
 		b.resValidator.CalculateEffectiveLimits(&job.Limits)
 	}
 
@@ -72,30 +72,40 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 
 	b.logger.Debug("job built successfully",
 		"jobID", jobID,
-		"cpu", job.Limits.MaxCPU,
-		"memory", job.Limits.MaxMemory,
-		"io", job.Limits.MaxIOBPS)
+		"cpu", job.Limits.CPU.Value(),
+		"memory", job.Limits.Memory.Megabytes(),
+		"io", job.Limits.IOBandwidth.BytesPerSecond())
 
 	return job, nil
 }
 
 // applyResourceDefaults applies default resource limits
 func (b *Builder) applyResourceDefaults(limits domain.ResourceLimits) domain.ResourceLimits {
-	result := limits
-
-	if result.MaxCPU <= 0 {
-		result.MaxCPU = b.config.Joblet.DefaultCPULimit
+	// Use existing values or defaults
+	cpuValue := limits.CPU.Value()
+	if cpuValue <= 0 {
+		cpuValue = b.config.Joblet.DefaultCPULimit
 	}
 
-	if result.MaxMemory <= 0 {
-		result.MaxMemory = b.config.Joblet.DefaultMemoryLimit
+	memoryValue := limits.Memory.Megabytes()
+	if memoryValue <= 0 {
+		memoryValue = b.config.Joblet.DefaultMemoryLimit
 	}
 
-	if result.MaxIOBPS <= 0 {
-		result.MaxIOBPS = b.config.Joblet.DefaultIOLimit
+	ioValue := limits.IOBandwidth.BytesPerSecond()
+	if ioValue <= 0 {
+		ioValue = int64(b.config.Joblet.DefaultIOLimit)
 	}
 
-	return result
+	// Use CPU cores from existing limits or empty string
+	cpuCores := ""
+	if !limits.CPUCores.IsEmpty() {
+		cpuCores = limits.CPUCores.String()
+	}
+
+	// Create new limits with defaults applied
+	result := domain.NewResourceLimitsFromParams(cpuValue, cpuCores, memoryValue, ioValue)
+	return *result
 }
 
 // generateCgroupPath generates the cgroup path for a job
