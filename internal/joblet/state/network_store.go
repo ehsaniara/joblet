@@ -15,14 +15,18 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-// NetworkRuntime represents runtime state for a network
+// NetworkRuntime represents runtime state for a network including IP allocation.
+// Contains the network configuration, IP pool for address management,
+// and a thread-safe map of active job allocations within the network.
 type NetworkRuntime struct {
 	Config network.NetworkConfig
 	IPPool *IPPool
 	Jobs   sync.Map // JobID -> *network.JobAllocation
 }
 
-// NetworkStore manages network configurations and runtime state
+// NetworkStore manages network configurations and runtime state for job networking.
+// Provides thread-safe operations for creating/removing networks, assigning jobs
+// to networks, and managing network resources like IP allocation and DNS.
 type NetworkStore struct {
 	configFile string
 	configs    map[string]*network.NetworkConfig
@@ -40,41 +44,61 @@ type NetworkStore struct {
 	bridgeManager BridgeManager
 }
 
-// BridgeManager interface to avoid circular import with setup.go
+// BridgeManager interface to avoid circular import with setup.go.
+// Provides bridge network infrastructure management capabilities.
 //
 //counterfeiter:generate . BridgeManager
 type BridgeManager interface {
+	// RemoveBridge removes a network bridge by name.
 	RemoveBridge(networkName string) error
 }
 
-// NetworkValidator Interfaces to avoid circular dependencies
+// NetworkValidator provides network configuration validation.
+// Validates bridge names and CIDR ranges to prevent conflicts.
 //
 //counterfeiter:generate . NetworkValidator
 type NetworkValidator interface {
+	// ValidateBridgeName ensures bridge name follows naming rules.
 	ValidateBridgeName(name string) error
+	// ValidateCIDR ensures CIDR doesn't conflict with existing networks.
 	ValidateCIDR(cidr string, existingNetworks map[string]string) error
 }
 
+// NetworkCleaner provides cleanup operations for orphaned network resources.
+//
 //counterfeiter:generate . NetworkCleaner
 type NetworkCleaner interface {
+	// StartPeriodicCleanup starts automatic cleanup of orphaned interfaces.
 	StartPeriodicCleanup(interval time.Duration)
+	// CleanupOrphanedInterfaces removes abandoned network interfaces.
 	CleanupOrphanedInterfaces() error
 }
 
+// DNSManager provides DNS resolution services for jobs within networks.
+//
 //counterfeiter:generate . DNSManager
 type DNSManager interface {
+	// SetupJobDNS configures DNS resolution for a job's network namespace.
 	SetupJobDNS(pid int, alloc *network.JobAllocation, networkJobs map[string]*network.JobAllocation) error
+	// CleanupJobDNS removes DNS configuration for a completed job.
 	CleanupJobDNS(jobID string) error
+	// UpdateNetworkDNS refreshes DNS records for all jobs in a network.
 	UpdateNetworkDNS(networkName string, activeJobs []*network.JobAllocation) error
 }
 
+// BandwidthLimiter provides network traffic shaping capabilities.
+//
 //counterfeiter:generate . BandwidthLimiter
 type BandwidthLimiter interface {
+	// ApplyJobLimits applies bandwidth restrictions to a job's network interface.
 	ApplyJobLimits(vethName string, limits network.NetworkLimits) error
+	// RemoveJobLimits removes bandwidth restrictions from a network interface.
 	RemoveJobLimits(vethName string) error
 }
 
-// NewNetworkStore creates a new network store
+// NewNetworkStore creates a new network store with initialized components.
+// Sets up network validators, cleaners, DNS manager, and bandwidth limiter.
+// Starts periodic cleanup of orphaned network interfaces.
 func NewNetworkStore(cfg *config.NetworkConfig, platform platform.Platform) *NetworkStore {
 	ns := &NetworkStore{
 		configFile: filepath.Join(cfg.StateDir, "networks.json"),
@@ -97,12 +121,15 @@ func NewNetworkStore(cfg *config.NetworkConfig, platform platform.Platform) *Net
 	return ns
 }
 
-// SetBridgeManager setter method to inject the bridge manager
+// SetBridgeManager injects the bridge manager dependency.
+// Used to avoid circular dependencies during initialization.
 func (ns *NetworkStore) SetBridgeManager(bm BridgeManager) {
 	ns.bridgeManager = bm
 }
 
-// Initialize loads networks from disk and sets up defaults
+// Initialize loads networks from disk and sets up default networks.
+// Creates runtime state for each network including IP pools.
+// Ensures default bridge network exists and saves configuration.
 func (ns *NetworkStore) Initialize() error {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
@@ -144,7 +171,9 @@ func (ns *NetworkStore) Initialize() error {
 	return ns.saveNetworkConfigs()
 }
 
-// CreateNetwork creates a new custom network
+// CreateNetwork creates a new custom network with the specified CIDR.
+// Validates network name and CIDR, creates bridge name, and initializes
+// runtime state including IP pool. Thread-safe operation.
 func (ns *NetworkStore) CreateNetwork(name, cidr string) error {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
@@ -200,7 +229,9 @@ func (ns *NetworkStore) CreateNetwork(name, cidr string) error {
 	return ns.saveNetworkConfigs()
 }
 
-// RemoveNetwork removes a custom network
+// RemoveNetwork removes a custom network after validation.
+// Prevents removal of built-in networks and networks with active jobs.
+// Removes bridge infrastructure and cleans up configuration.
 func (ns *NetworkStore) RemoveNetwork(name string) error {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
@@ -243,7 +274,9 @@ func (ns *NetworkStore) RemoveNetwork(name string) error {
 	return ns.saveNetworkConfigs()
 }
 
-// ListNetworks returns all networks with their job counts
+// ListNetworks returns all networks with their current job counts.
+// Includes special networks (none, isolated) and runtime network information.
+// Thread-safe read operation with network statistics.
 func (ns *NetworkStore) ListNetworks() map[string]network.NetworkInfo {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
@@ -283,7 +316,9 @@ func (ns *NetworkStore) ListNetworks() map[string]network.NetworkInfo {
 	return result
 }
 
-// AssignJobToNetwork allocates network resources for a job
+// AssignJobToNetwork allocates network resources for a job.
+// Handles special networks (none, isolated) and assigns IP addresses
+// for bridge networks. Creates veth pair names and stores allocation.
 func (ns *NetworkStore) AssignJobToNetwork(jobID, networkName, hostname string) (*network.JobAllocation, error) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
@@ -343,7 +378,9 @@ func (ns *NetworkStore) AssignJobToNetwork(jobID, networkName, hostname string) 
 	return alloc, nil
 }
 
-// SetupJobNetworkComplete is called after network setup to configure DNS
+// SetupJobNetworkComplete configures DNS after network setup is complete.
+// Sets up DNS resolution for the job and updates DNS for other jobs
+// in the same network. Skips DNS for special networks.
 func (ns *NetworkStore) SetupJobNetworkComplete(jobID string, pid int) error {
 	alloc, err := ns.GetJobAllocation(jobID)
 	if err != nil {
@@ -370,7 +407,9 @@ func (ns *NetworkStore) SetupJobNetworkComplete(jobID string, pid int) error {
 	return nil
 }
 
-// ApplyBandwidthLimits applies bandwidth limits to a job
+// ApplyBandwidthLimits applies ingress and egress bandwidth limits to a job.
+// Configures traffic shaping on the job's veth interface.
+// Skips networks without veth pairs (none, isolated).
 func (ns *NetworkStore) ApplyBandwidthLimits(jobID string, ingressBPS, egressBPS int64) error {
 	alloc, err := ns.GetJobAllocation(jobID)
 	if err != nil {
@@ -391,7 +430,9 @@ func (ns *NetworkStore) ApplyBandwidthLimits(jobID string, ingressBPS, egressBPS
 	return ns.limiter.ApplyJobLimits(alloc.VethHost, limits)
 }
 
-// ReleaseJob releases network resources for a job
+// ReleaseJob releases all network resources allocated to a job.
+// Releases IP address, removes bandwidth limits, cleans up DNS,
+// and updates DNS for remaining jobs in the network.
 func (ns *NetworkStore) ReleaseJob(jobID string) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
@@ -431,7 +472,9 @@ func (ns *NetworkStore) ReleaseJob(jobID string) {
 	}
 }
 
-// GetJobAllocation retrieves a job's network allocation
+// GetJobAllocation retrieves a job's current network allocation.
+// Searches all networks to find the job's allocation information.
+// Thread-safe read operation.
 func (ns *NetworkStore) GetJobAllocation(jobID string) (*network.JobAllocation, error) {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
@@ -445,13 +488,16 @@ func (ns *NetworkStore) GetJobAllocation(jobID string) (*network.JobAllocation, 
 	return nil, fmt.Errorf("no network allocation found for job %s", jobID)
 }
 
-// CleanupOrphaned performs manual cleanup of orphaned resources
+// CleanupOrphaned performs manual cleanup of orphaned network resources.
+// Removes abandoned network interfaces that are no longer in use.
 func (ns *NetworkStore) CleanupOrphaned() error {
 	return ns.cleaner.CleanupOrphanedInterfaces()
 }
 
-// Helper methods
+// Helper methods for internal operations
 
+// loadNetworkConfigs loads network configurations from persistent storage.
+// Returns nil on first run when config file doesn't exist.
 func (ns *NetworkStore) loadNetworkConfigs() error {
 	data, err := ns.platform.ReadFile(ns.configFile)
 	if err != nil {
@@ -464,6 +510,8 @@ func (ns *NetworkStore) loadNetworkConfigs() error {
 	return json.Unmarshal(data, &ns.configs)
 }
 
+// saveNetworkConfigs persists network configurations to disk.
+// Ensures directory exists and saves JSON-formatted configuration.
 func (ns *NetworkStore) saveNetworkConfigs() error {
 	// Ensure directory exists
 	dir := filepath.Dir(ns.configFile)
@@ -479,6 +527,8 @@ func (ns *NetworkStore) saveNetworkConfigs() error {
 	return ns.platform.WriteFile(ns.configFile, data, 0644)
 }
 
+// getNetworkJobs retrieves all active job allocations for a network.
+// Used for DNS updates and network management operations.
 func (ns *NetworkStore) getNetworkJobs(networkName string) map[string]*network.JobAllocation {
 	jobs := make(map[string]*network.JobAllocation)
 
@@ -494,6 +544,8 @@ func (ns *NetworkStore) getNetworkJobs(networkName string) map[string]*network.J
 	return jobs
 }
 
+// updateNetworkDNS updates DNS records for all jobs in a network.
+// Called asynchronously when jobs join or leave networks.
 func (ns *NetworkStore) updateNetworkDNS(networkName string) {
 	// Get all active jobs in the network
 	var activeJobs []*network.JobAllocation
@@ -511,7 +563,9 @@ func (ns *NetworkStore) updateNetworkDNS(networkName string) {
 	}
 }
 
-// GetNetworkConfig retrieves the configuration for a network
+// GetNetworkConfig retrieves the configuration for a network by name.
+// Searches runtime state first, then stored configurations.
+// Thread-safe read operation.
 func (ns *NetworkStore) GetNetworkConfig(name string) (*network.NetworkConfig, error) {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()

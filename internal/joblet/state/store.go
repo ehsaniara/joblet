@@ -10,21 +10,44 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
+// Store defines the interface for managing job state and output buffering.
+// It provides thread-safe operations for job lifecycle management and real-time log streaming.
+//
 //counterfeiter:generate . Store
 type Store interface {
+	// CreateNewJob adds a new job to the store with initial state.
+	// Creates a new Task wrapper for the job and stores it by job ID.
 	CreateNewJob(job *domain.Job)
+	// UpdateJob updates an existing job's state and notifies subscribers.
+	// Publishes status updates and shuts down subscribers if job is completed.
 	UpdateJob(job *domain.Job)
+	// GetJob retrieves a job by ID.
+	// Returns the job and true if found, nil and false otherwise.
 	GetJob(id string) (*domain.Job, bool)
+	// ListJobs returns all jobs currently stored in the system.
+	// Returns a slice containing copies of all job instances.
 	ListJobs() []*domain.Job
+	// WriteToBuffer appends log data to a job's output buffer.
+	// Notifies subscribers of new log chunks for real-time streaming.
 	WriteToBuffer(jobId string, chunk []byte)
+	// GetOutput retrieves the complete output buffer for a job.
+	// Returns the buffer data, whether job is still running, and any error.
 	GetOutput(id string) ([]byte, bool, error)
+	// SendUpdatesToClient streams job logs and status updates to a client.
+	// Handles both existing buffer content and real-time updates for running jobs.
 	SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error
 }
 
+// DomainStreamer defines the interface for streaming data to clients.
+// Provides methods for sending log data and keepalive messages.
+//
 //counterfeiter:generate . DomainStreamer
 type DomainStreamer interface {
+	// SendData sends log data chunk to the client stream.
 	SendData(data []byte) error
+	// SendKeepalive sends a keepalive message to maintain connection.
 	SendKeepalive() error
+	// Context returns the streaming context for cancellation handling.
 	Context() context.Context
 }
 
@@ -34,6 +57,8 @@ type store struct {
 	logger *logger.Logger
 }
 
+// New creates a new Store instance with initialized task map and logger.
+// Returns a thread-safe store implementation for job state management.
 func New() Store {
 	s := &store{
 		tasks:  make(map[string]*Task),
@@ -44,6 +69,9 @@ func New() Store {
 	return s
 }
 
+// WriteToBuffer appends log data to the specified job's output buffer.
+// Thread-safe operation that notifies subscribers of new log chunks.
+// Warns if attempting to write to non-existent job.
 func (st *store) WriteToBuffer(jobId string, chunk []byte) {
 	st.mutex.RLock()
 	defer st.mutex.RUnlock()
@@ -57,6 +85,9 @@ func (st *store) WriteToBuffer(jobId string, chunk []byte) {
 	tk.WriteToBuffer(chunk)
 }
 
+// GetJob retrieves a job by its ID from the store.
+// Returns a deep copy of the job to prevent external mutations.
+// Returns nil and false if job doesn't exist.
 func (st *store) GetJob(id string) (*domain.Job, bool) {
 	st.mutex.RLock()
 	defer st.mutex.RUnlock()
@@ -73,7 +104,9 @@ func (st *store) GetJob(id string) (*domain.Job, bool) {
 	return job, true
 }
 
-// CreateNewJob to add new job with all fields in the job struct, used only at the time of create
+// CreateNewJob adds a new job to the store with complete initialization.
+// Creates a Task wrapper for the job and stores it by job ID.
+// Warns if job already exists and skips creation to prevent duplicates.
 func (st *store) CreateNewJob(job *domain.Job) {
 	st.mutex.Lock()
 	defer st.mutex.Unlock()
@@ -88,6 +121,9 @@ func (st *store) CreateNewJob(job *domain.Job) {
 	st.logger.Debug("new task created", "jobId", job.Id, "command", job.Command, "totalTasks", len(st.tasks))
 }
 
+// UpdateJob updates an existing job's state and publishes changes.
+// Notifies all subscribers of status updates and shuts down completed jobs.
+// Warns if attempting to update non-existent job.
 func (st *store) UpdateJob(job *domain.Job) {
 	st.mutex.RLock()
 	tk, exists := st.tasks[job.Id]
@@ -112,6 +148,9 @@ func (st *store) UpdateJob(job *domain.Job) {
 	}
 }
 
+// ListJobs returns all jobs currently stored in the system.
+// Returns deep copies of jobs to prevent external mutations.
+// Thread-safe operation with read lock protection.
 func (st *store) ListJobs() []*domain.Job {
 	st.mutex.RLock()
 	defer st.mutex.RUnlock()
@@ -128,6 +167,9 @@ func (st *store) ListJobs() []*domain.Job {
 	return jobs
 }
 
+// GetOutput retrieves the complete output buffer for a job.
+// Returns the buffer data, whether job is still running, and any error.
+// Returns error if job doesn't exist in the store.
 func (st *store) GetOutput(id string) ([]byte, bool, error) {
 	st.mutex.RLock()
 	tk, exists := st.tasks[id]
@@ -146,7 +188,10 @@ func (st *store) GetOutput(id string) ([]byte, bool, error) {
 	return buffer, isRunning, nil
 }
 
-// SendUpdatesToClient sends the job log updates for scheduled, running, and completed jobs
+// SendUpdatesToClient streams job logs and status updates to a client.
+// Sends existing buffer content immediately, then subscribes to real-time updates.
+// Handles scheduled, running, and completed jobs appropriately.
+// Returns error if job doesn't exist or streaming fails.
 func (st *store) SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error {
 	st.mutex.RLock()
 	task, exists := st.tasks[id]
