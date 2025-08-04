@@ -134,8 +134,16 @@ func (rm *ResourceManager) applyCPUCoreRestrictions(job *domain.Job) error {
 	log := rm.logger.WithFields("jobID", job.Id, "cores", job.Limits.CPUCores)
 	log.Debug("applying CPU core restrictions")
 
+	// Apply CPU core restrictions to both the main cgroup and process subgroup
 	if err := rm.cgroup.SetCPUCores(job.CgroupPath, job.Limits.CPUCores.String()); err != nil {
-		return fmt.Errorf("failed to set CPU cores: %w", err)
+		return fmt.Errorf("failed to set CPU cores on main cgroup: %w", err)
+	}
+
+	// Also apply to the process subgroup where the actual process will be placed
+	processSubgroupPath := filepath.Join(job.CgroupPath, "proc")
+	if err := rm.cgroup.SetCPUCores(processSubgroupPath, job.Limits.CPUCores.String()); err != nil {
+		log.Warn("failed to set CPU cores on process subgroup", "error", err)
+		// Don't fail - the main cgroup restriction should still work
 	}
 
 	log.Info("CPU core restrictions applied")

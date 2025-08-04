@@ -404,6 +404,9 @@ func assignToCgroup(cgroupPath string, logger *logger.Logger, platform platform.
 		hostCgroupPath = fmt.Sprintf("/sys/fs/cgroup/joblet.slice/joblet.service/job-%s", jobID)
 	}
 
+	// Use the process subgroup to satisfy "no internal processes" rule
+	hostCgroupPath = filepath.Join(hostCgroupPath, "proc")
+
 	pid := os.Getpid()
 	procsFile := filepath.Join(hostCgroupPath, "cgroup.procs")
 	pidBytes := []byte(fmt.Sprintf("%d", pid))

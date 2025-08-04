@@ -146,6 +146,36 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+// enableSubtreeControl enables subtree control for proper child process containment
+func (c *cgroup) enableSubtreeControl(cgroupPath string) error {
+	log := c.logger.WithField("operation", "enable-subtree-control")
+
+	subtreeControlFile := filepath.Join(cgroupPath, "cgroup.subtree_control")
+
+	// Get the controllers that should be enabled for this cgroup
+	var controllersToEnable []string
+	for _, controller := range c.config.EnableControllers {
+		controllersToEnable = append(controllersToEnable, "+"+controller)
+	}
+
+	if len(controllersToEnable) == 0 {
+		log.Debug("no controllers to enable for subtree")
+		return nil
+	}
+
+	controllersStr := strings.Join(controllersToEnable, " ")
+
+	// Write the controllers to the subtree_control file
+	if err := os.WriteFile(subtreeControlFile, []byte(controllersStr), 0644); err != nil {
+		return fmt.Errorf("failed to enable subtree control: %w", err)
+	}
+
+	log.Debug("enabled subtree control for child process containment",
+		"controllers", controllersStr, "cgroupPath", cgroupPath)
+
+	return nil
+}
+
 func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
 	log := c.logger.WithFields(
 		"cgroupPath", cgroupJobDir,
@@ -168,6 +198,18 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 	// Create the cgroup directory
 	if err := os.MkdirAll(cgroupJobDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cgroup directory: %w", err)
+	}
+
+	// Create a process subgroup to satisfy "no internal processes" rule
+	processSubgroup := filepath.Join(cgroupJobDir, "proc")
+	if err := os.MkdirAll(processSubgroup, 0755); err != nil {
+		return fmt.Errorf("failed to create process subgroup: %w", err)
+	}
+
+	// Enable subtree control in the job cgroup (not the process subgroup)
+	if err := c.enableSubtreeControl(cgroupJobDir); err != nil {
+		log.Warn("failed to enable subtree control", "error", err)
+		// Continue anyway - this might not be critical for basic functionality
 	}
 
 	// Wait for controller files to appear
