@@ -1,6 +1,7 @@
 package volume
 
 import (
+	"encoding/json"
 	"fmt"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/state"
@@ -441,4 +442,120 @@ func (m *Manager) getLoopDeviceFromInfo(volumePath string) (string, string, erro
 	}
 
 	return loopDevice, backingFile, nil
+}
+
+// ScanVolumes scans the volume base directory and loads existing volumes into the state store
+func (m *Manager) ScanVolumes() error {
+	log := m.logger.WithField("operation", "scan-volumes")
+	log.Debug("scanning for existing volumes", "basePath", m.basePath)
+
+	// Create base path if it doesn't exist
+	if err := m.platform.MkdirAll(m.basePath, 0755); err != nil {
+		return fmt.Errorf("failed to create volume base directory: %w", err)
+	}
+
+	// Read directory entries
+	entries, err := os.ReadDir(m.basePath)
+	if err != nil {
+		return fmt.Errorf("failed to read volume directory: %w", err)
+	}
+
+	loadedCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		volumeName := entry.Name()
+		volumePath := filepath.Join(m.basePath, volumeName)
+		metaFile := filepath.Join(volumePath, "volume-info.json")
+
+		// Check if volume metadata exists
+		metaData, err := m.platform.ReadFile(metaFile)
+		if err != nil {
+			log.Warn("skipping directory without volume metadata", "name", volumeName, "error", err)
+			continue
+		}
+
+		// Parse volume metadata
+		var volumeInfo struct {
+			Name        string `json:"name"`
+			Type        string `json:"type"`
+			Size        string `json:"size"`
+			SizeBytes   int64  `json:"sizeBytes"`
+			CreatedTime string `json:"createdTime"`
+		}
+
+		if err := json.Unmarshal(metaData, &volumeInfo); err != nil {
+			log.Warn("failed to parse volume metadata", "volume", volumeName, "error", err)
+			continue
+		}
+
+		// Recreate volume object
+		volumeType := domain.VolumeType(volumeInfo.Type)
+		if volumeType != domain.VolumeTypeFilesystem && volumeType != domain.VolumeTypeMemory {
+			log.Warn("invalid volume type", "volume", volumeName, "type", volumeInfo.Type)
+			continue
+		}
+
+		// Parse creation time
+		createdTime, err := time.Parse(time.RFC3339, volumeInfo.CreatedTime)
+		if err != nil {
+			log.Warn("failed to parse volume creation time, using current time", "volume", volumeName, "error", err)
+			createdTime = time.Now()
+		}
+
+		volume := &domain.Volume{
+			Name:        volumeInfo.Name,
+			Type:        volumeType,
+			Size:        volumeInfo.Size,
+			SizeBytes:   volumeInfo.SizeBytes,
+			Path:        volumePath,
+			CreatedTime: createdTime,
+			JobCount:    0,
+		}
+
+		// For memory volumes, remount them
+		if volume.Type == domain.VolumeTypeMemory {
+			dataDir := filepath.Join(volumePath, "data")
+			// Check if already mounted
+			if !m.isMounted(dataDir) {
+				if err := m.setupMemoryVolume(volume, dataDir); err != nil {
+					log.Warn("failed to remount memory volume", "volume", volumeName, "error", err)
+					continue
+				}
+			}
+		}
+
+		// Add to state store
+		if err := m.volumeStore.CreateVolume(volume); err != nil {
+			log.Warn("failed to load volume into state store", "volume", volumeName, "error", err)
+			continue
+		}
+
+		loadedCount++
+		log.Debug("loaded existing volume", "name", volumeName, "type", string(volumeType), "size", volumeInfo.Size)
+	}
+
+	log.Info("volume scan completed", "scanned", len(entries), "loaded", loadedCount)
+	return nil
+}
+
+// isMounted checks if a path is currently mounted
+func (m *Manager) isMounted(path string) bool {
+	// Read /proc/mounts to check if path is mounted
+	content, err := m.platform.ReadFile("/proc/mounts")
+	if err != nil {
+		return false
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[1] == path {
+			return true
+		}
+	}
+
+	return false
 }

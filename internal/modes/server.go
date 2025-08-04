@@ -51,6 +51,12 @@ func RunServer(cfg *config.Config) error {
 	volumeStore := state.NewVolumeStore()
 	volumeManager := volume.NewManager(volumeStore, platformInstance, "/opt/joblet/volumes")
 
+	// Scan and load existing volumes
+	if err := volumeManager.ScanVolumes(); err != nil {
+		log.Error("failed to scan existing volumes", "error", err)
+		// Continue - don't fail server startup due to volume scan errors
+	}
+
 	// Create joblet with configuration
 	jobletInstance := joblet.NewJoblet(store, cfg, networkStore)
 	if jobletInstance == nil {
