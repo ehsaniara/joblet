@@ -308,11 +308,7 @@ func (ns *NetworkSetup) ensureBridge(networkName string) error {
 	}
 
 	// Setup network isolation
-	if err := ns.setupNetworkIsolation(networkName, bridgeName); err != nil {
-		ns.logger.Warn("failed to setup network isolation",
-			"network", networkName, "error", err)
-		// Don't fail the bridge creation, just log the warning
-	}
+	ns.setupNetworkIsolation(networkName, bridgeName)
 
 	return nil
 }
@@ -390,13 +386,7 @@ func (ns *NetworkSetup) execInNamespace(netnsPath string, args ...string) error 
 	return nil
 }
 
-// getNetworkCIDR retrieves the CIDR block for a named network.
-// This method first attempts to get the CIDR from the network store configuration,
-// then falls back to hardcoded defaults if the store is unavailable:
-//   - "bridge" network: 172.20.0.0/16
-//   - other networks: 10.1.0.0/24
-//
-// The CIDR defines the IP address range available for job allocation.
+// getNetworkCIDR retrieves the CIDR block for a named network
 func (ns *NetworkSetup) getNetworkCIDR(networkName string) string {
 	if ns.networkStore != nil {
 		config, err := ns.networkStore.GetNetworkConfig(networkName)
@@ -405,9 +395,15 @@ func (ns *NetworkSetup) getNetworkCIDR(networkName string) string {
 		}
 	}
 
-	// Fallback for when networkStore is not available
 	if networkName == "bridge" {
+		if bridgeCIDR := ns.platform.Getenv("JOBLET_BRIDGE_NETWORK_CIDR"); bridgeCIDR != "" {
+			return bridgeCIDR
+		}
 		return "172.20.0.0/16"
+	}
+
+	if defaultCIDR := ns.platform.Getenv("JOBLET_DEFAULT_NETWORK_CIDR"); defaultCIDR != "" {
+		return defaultCIDR
 	}
 	return "10.1.0.0/24"
 }
@@ -473,12 +469,12 @@ func (ns *NetworkSetup) setupHostsFile(pid int, alloc *JobAllocation) error {
 //
 // This ensures that jobs in different networks cannot communicate with each other,
 // providing network-level security isolation between different job groups.
-func (ns *NetworkSetup) setupNetworkIsolation(networkName string, bridgeName string) error {
+func (ns *NetworkSetup) setupNetworkIsolation(networkName string, bridgeName string) {
 	// Don't isolate the default bridge network (for backward compatibility)
 	// You might want to change this policy
 	if networkName == "bridge" {
 		ns.logger.Debug("skipping isolation for default bridge network")
-		return nil
+		return
 	}
 
 	// Get list of other bridges to isolate from
@@ -513,8 +509,6 @@ func (ns *NetworkSetup) setupNetworkIsolation(networkName string, bridgeName str
 		ns.logger.Debug("added isolation rules between bridges",
 			"bridge1", bridgeName, "bridge2", otherBridge)
 	}
-
-	return nil
 }
 
 // getExistingBridges discovers all joblet-managed bridge interfaces on the system.
@@ -566,7 +560,7 @@ func (ns *NetworkSetup) getExistingBridges() []string {
 //
 // This cleanup prevents iptables rule accumulation and ensures proper firewall
 // state when networks are dynamically created and destroyed.
-func (ns *NetworkSetup) cleanupNetworkIsolation(bridgeName string) error {
+func (ns *NetworkSetup) cleanupNetworkIsolation(bridgeName string) {
 	// Get list of other bridges
 	bridges := ns.getExistingBridges()
 
@@ -588,8 +582,6 @@ func (ns *NetworkSetup) cleanupNetworkIsolation(bridgeName string) error {
 	// Also remove NAT rule for this network's CIDR
 	// This would need the CIDR passed in or looked up
 	// For now, this is a simplified version
-
-	return nil
 }
 
 // RemoveBridge completely removes a network bridge and associated resources.
@@ -609,9 +601,7 @@ func (ns *NetworkSetup) RemoveBridge(networkName string) error {
 	}
 
 	// Clean up isolation rules first
-	if err := ns.cleanupNetworkIsolation(bridgeName); err != nil {
-		ns.logger.Warn("failed to cleanup isolation rules", "error", err)
-	}
+	ns.cleanupNetworkIsolation(bridgeName)
 
 	// Get CIDR for NAT cleanup
 	cidr := ns.getNetworkCIDR(networkName)

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"time"
 
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/cleanup"
 	"joblet/internal/joblet/core/filesystem"
 	"joblet/internal/joblet/core/interfaces"
@@ -20,7 +21,6 @@ import (
 	"joblet/internal/joblet/core/validation"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/scheduler"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -31,7 +31,7 @@ import (
 // Joblet orchestrates job execution using specialized components
 type Joblet struct {
 	// Core dependencies
-	store    state.Store
+	store    adapters.JobStoreAdapter
 	config   *config.Config
 	logger   *logger.Logger
 	platform platform.Platform
@@ -64,7 +64,7 @@ func (r StartJobRequest) GetNetwork() string               { return r.Network }
 func (r StartJobRequest) GetVolumes() []string             { return r.Volumes }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components
-func NewPlatformJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
+func NewPlatformJoblet(store adapters.JobStoreAdapter, cfg *config.Config, networkStore adapters.NetworkStoreAdapter) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
 
@@ -371,7 +371,7 @@ func (j *Joblet) getActiveJobIDs() map[string]bool {
 }
 
 // initializeComponents creates all the specialized components
-func initializeComponents(store state.Store, cfg *config.Config, platform platform.Platform, logger *logger.Logger, networkStore *state.NetworkStore) *components {
+func initializeComponents(store adapters.JobStoreAdapter, cfg *config.Config, platform platform.Platform, logger *logger.Logger, networkStore adapters.NetworkStoreAdapter) *components {
 	// Create core resources
 	cgroupResource := resource.New(cfg.Cgroup)
 	filesystemIsolator := filesystem.NewIsolator(cfg.Filesystem, platform)
@@ -402,7 +402,7 @@ func initializeComponents(store state.Store, cfg *config.Config, platform platfo
 		uploadMgr:  uploadManager,
 	}
 
-	// Create execution engine
+	// Create execution engine with network store adapter
 	executionEngine := NewExecutionEngine(
 		processManager,
 		uploadManager,
@@ -414,7 +414,7 @@ func initializeComponents(store state.Store, cfg *config.Config, platform platfo
 		networkStore,
 	)
 
-	// Create cleanup coordinator
+	// Create cleanup coordinator with network store adapter
 	c := cleanup.NewCoordinator(
 		processManager,
 		cgroupResource,

@@ -41,7 +41,11 @@ type Service struct {
 	wg      sync.WaitGroup
 }
 
-// NewService creates a new monitoring service
+// NewService creates a new monitoring service with the specified configuration.
+// It initializes all metric collectors (CPU, memory, disk, network, I/O, process),
+// sets up cloud detection, and prepares the service for monitoring operations.
+// If config is nil, it uses default configuration values.
+// Returns a fully configured Service instance ready to be started.
 func NewService(config *domain.MonitoringConfig) *Service {
 	if config == nil {
 		config = DefaultConfig()
@@ -72,20 +76,27 @@ func NewService(config *domain.MonitoringConfig) *Service {
 	return service
 }
 
-// NewServiceFromConfig creates a new monitoring service from config package types
+// NewServiceFromConfig creates a new monitoring service from configuration package types.
+// This is a convenience constructor that converts config.MonitoringConfig to domain.MonitoringConfig
+// and creates a new Service instance. This bridges the gap between the config package
+// and the monitoring domain package types.
+// Returns a new Service instance configured with the provided settings.
 func NewServiceFromConfig(cfg *config.MonitoringConfig) *Service {
 	domainConfig := &domain.MonitoringConfig{
 		Enabled: cfg.Enabled,
 		Collection: domain.CollectionConfig{
-			SystemInterval:  cfg.Collection.SystemInterval,
-			ProcessInterval: cfg.Collection.ProcessInterval,
-			CloudDetection:  cfg.Collection.CloudDetection,
+			SystemInterval:  cfg.SystemInterval,
+			ProcessInterval: cfg.ProcessInterval,
+			CloudDetection:  cfg.CloudDetection,
 		},
 	}
 	return NewService(domainConfig)
 }
 
-// DefaultConfig returns a default monitoring configuration
+// DefaultConfig returns a default monitoring configuration with sensible defaults.
+// Sets system metrics collection interval to 10 seconds, process metrics to 60 seconds,
+// enables cloud detection, and activates monitoring by default.
+// Used as fallback configuration when no specific config is provided.
 func DefaultConfig() *domain.MonitoringConfig {
 	return &domain.MonitoringConfig{
 		Enabled: true,
@@ -97,7 +108,15 @@ func DefaultConfig() *domain.MonitoringConfig {
 	}
 }
 
-// Start starts the monitoring service
+// Start initiates the monitoring service and begins metric collection.
+// Creates background goroutines for:
+//   - Cloud environment detection (if enabled)
+//   - System metrics collection (CPU, memory, disk, network, I/O)
+//   - Process metrics collection (running processes and statistics)
+//
+// The service runs continuously until Stop() is called.
+// Returns error if service is already running or fails to start.
+// Thread-safe and idempotent - multiple calls have no effect.
 func (s *Service) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -133,7 +152,12 @@ func (s *Service) Start() error {
 	return nil
 }
 
-// Stop stops the monitoring service
+// Stop gracefully shuts down the monitoring service.
+// Cancels the context to signal all goroutines to stop,
+// waits for all background collection routines to finish,
+// and marks the service as stopped.
+// Thread-safe and idempotent - multiple calls have no effect.
+// Returns error (currently always nil for interface compatibility).
 func (s *Service) Stop() error {
 	s.mu.Lock()
 	if !s.running {
@@ -162,28 +186,41 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-// IsRunning returns true if the service is currently running
+// IsRunning returns the current running state of the monitoring service.
+// Thread-safe method that checks if the service is actively collecting metrics.
+// Returns true if Start() has been called and Stop() has not been called,
+// false otherwise.
 func (s *Service) IsRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.running
 }
 
-// GetLatestMetrics returns the current system metrics
+// GetLatestMetrics returns the most recently collected system metrics snapshot.
+// Provides current readings for CPU, memory, disk, network, I/O, and process metrics.
+// Returns nil if no metrics have been collected yet (service not started or just started).
+// Thread-safe method that returns a pointer to the internal metrics structure.
 func (s *Service) GetLatestMetrics() *domain.SystemMetrics {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.currentMetrics
 }
 
-// GetCloudInfo returns detected cloud environment information
+// GetCloudInfo returns information about the detected cloud environment.
+// Provides details about the cloud provider (AWS, GCP, Azure, etc.) if detected.
+// Returns nil if cloud detection is disabled, failed, or no cloud environment detected.
+// Thread-safe method that returns cached cloud detection results.
 func (s *Service) GetCloudInfo() *domain.CloudInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.cloudInfo
 }
 
-// GetSystemStatus returns a comprehensive system status
+// GetSystemStatus returns a comprehensive view of the current system state.
+// Combines latest metrics with cloud information into a single status object.
+// Includes availability flag indicating if metrics collection is working.
+// Returns SystemStatus with Available=false if no metrics have been collected yet.
+// Thread-safe method suitable for health checks and monitoring dashboards.
 func (s *Service) GetSystemStatus() *SystemStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -223,7 +260,12 @@ type SystemStatus struct {
 	Cloud     *domain.CloudInfo       `json:"cloud,omitempty"`
 }
 
-// detectCloudEnvironment runs cloud detection
+// detectCloudEnvironment performs cloud provider detection in a background goroutine.
+// Attempts to identify the cloud environment (AWS, GCP, Azure, etc.) by checking
+// metadata services and environment indicators with a 5-second timeout.
+// Updates the service's cloudInfo field with detection results.
+// Handles context cancellation gracefully and logs detection results.
+// Runs once at service startup if cloud detection is enabled.
 func (s *Service) detectCloudEnvironment() {
 	defer s.wg.Done()
 
@@ -266,7 +308,12 @@ func (s *Service) detectCloudEnvironment() {
 	}
 }
 
-// collectSystemMetrics runs the main system metrics collection loop
+// collectSystemMetrics runs the primary metrics collection loop in a background goroutine.
+// Continuously collects system metrics (CPU, memory, disk, network, I/O) at the
+// configured system interval (default 10 seconds).
+// Performs initial collection immediately, then runs on ticker schedule.
+// Handles context cancellation for graceful shutdown.
+// Updates the service's currentMetrics field with fresh data on each collection cycle.
 func (s *Service) collectSystemMetrics() {
 	defer s.wg.Done()
 
@@ -289,7 +336,12 @@ func (s *Service) collectSystemMetrics() {
 	}
 }
 
-// collectProcessMetrics runs the process metrics collection loop
+// collectProcessMetrics runs the process-specific metrics collection loop.
+// Currently placeholder for future process-specific collection at different intervals.
+// Process metrics are collected as part of system metrics collection for now.
+// Could be extended to collect detailed per-process statistics less frequently
+// than system metrics to reduce overhead.
+// Handles context cancellation for graceful shutdown.
 func (s *Service) collectProcessMetrics() {
 	defer s.wg.Done()
 
@@ -310,7 +362,19 @@ func (s *Service) collectProcessMetrics() {
 	}
 }
 
-// collectAndStoreSystemMetrics collects all system metrics and stores them
+// collectAndStoreSystemMetrics performs a complete system metrics collection cycle.
+// Orchestrates collection from all individual metric collectors:
+//   - Host information (hostname, uptime, OS details)
+//   - CPU metrics (usage, load averages, core count)
+//   - Memory metrics (total, used, available, swap)
+//   - Disk metrics (usage, I/O statistics for each disk)
+//   - Network metrics (interface statistics, traffic counters)
+//   - I/O metrics (read/write operations and bytes)
+//   - Process metrics (count, top processes by CPU/memory)
+//
+// Handles collection errors gracefully with fallback empty structs.
+// Updates the service's currentMetrics atomically for thread-safe access.
+// Respects context cancellation to avoid work during shutdown.
 func (s *Service) collectAndStoreSystemMetrics() {
 	// Check if we should stop before doing any work
 	select {

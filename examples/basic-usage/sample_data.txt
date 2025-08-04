@@ -1,0 +1,43 @@
+Welcome to Joblet Basic Usage Examples!
+========================================
+
+This is a sample data file used to demonstrate file operations in Joblet.
+
+Sample data entries:
+- Entry 1: Basic text processing
+- Entry 2: File handling demonstrations  
+- Entry 3: Workspace usage examples
+- Entry 4: Upload and download workflows
+- Entry 5: Data persistence concepts
+
+Technical information:
+- File format: Plain text
+- Encoding: UTF-8
+- Line count: Various commands will count these lines
+- Use case: Demonstrating file upload and processing
+
+Commands you can try with this file:
+1. wc -l sample_data.txt    # Count lines
+2. wc -w sample_data.txt    # Count words  
+3. wc -c sample_data.txt    # Count characters
+4. head -5 sample_data.txt  # Show first 5 lines
+5. tail -3 sample_data.txt  # Show last 3 lines
+6. grep "Entry" sample_data.txt  # Find lines containing "Entry"
+7. cat sample_data.txt      # Display entire file
+
+This file helps you understand how Joblet handles file uploads and workspace management.
+
+Joblet Features Demonstrated:
+✓ File upload with --upload parameter
+✓ Workspace directory structure (/work)
+✓ File processing within isolated job environments
+✓ Standard Unix command compatibility
+✓ Text processing and analysis workflows
+
+Next Steps:
+- Try uploading this file with different commands
+- Experiment with file processing tools
+- Learn about persistent storage with volumes
+- Explore advanced file handling patterns
+
+Happy learning with Joblet!
