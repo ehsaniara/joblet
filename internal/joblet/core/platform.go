@@ -4,9 +4,9 @@ package core
 
 import (
 	"context"
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 )
 
@@ -16,7 +16,7 @@ type linuxJoblet struct {
 }
 
 // NewJoblet creates a Linux joblet
-func NewJoblet(store state.Store, cfg *config.Config, networkStore *state.NetworkStore) interfaces.Joblet {
+func NewJoblet(store adapters.JobStoreAdapter, cfg *config.Config, networkStore adapters.NetworkStoreAdapter) interfaces.Joblet {
 	return &linuxJoblet{
 		platformJoblet: NewPlatformJoblet(store, cfg, networkStore),
 	}

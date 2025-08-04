@@ -53,7 +53,7 @@ help:
 
 rnx:
 	@echo "Building RNX CLI..."
-	GOOS=darwin GOARCH=$(REMOTE_ARCH) go build -o bin/rnx ./cmd/rnx
+	GOOS=$(GOOS) GOARCH=$(REMOTE_ARCH) go build -o bin/rnx ./cmd/rnx
 
 joblet:
 	@echo "Building Joblet..."

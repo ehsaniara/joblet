@@ -3,6 +3,7 @@ package validation
 import (
 	"fmt"
 	"joblet/internal/joblet/domain"
+	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"runtime"
 	"strconv"
@@ -21,17 +22,20 @@ type ResourceValidator struct {
 	minCPUPercent int32
 	minMemoryMB   int32
 	minIOBPS      int32
+
+	// Configuration reference
+	config *config.Config
 }
 
 // NewResourceValidator creates a new resource validator
 func NewResourceValidator() *ResourceValidator {
 	return &ResourceValidator{
-		// Maximum limits
+		// Maximum limits (fallback values if no config provided)
 		maxCPUPercent: 1000,    // 10 cores worth
 		maxMemoryMB:   32768,   // 32GB
 		maxIOBPS:      1000000, // 1GB/s
 
-		// Minimum limits
+		// Minimum limits (fallback values if no config provided)
 		minCPUPercent: 10,   // 0.1 core
 		minMemoryMB:   64,   // 64MB minimum
 		minIOBPS:      1000, // 1KB/s minimum
@@ -39,6 +43,47 @@ func NewResourceValidator() *ResourceValidator {
 		// System info
 		availableCores: runtime.NumCPU(),
 	}
+}
+
+// NewResourceValidatorWithConfig creates a new resource validator with configuration
+func NewResourceValidatorWithConfig(cfg *config.Config) *ResourceValidator {
+	rv := &ResourceValidator{
+		config:         cfg,
+		availableCores: runtime.NumCPU(),
+	}
+
+	// Use configuration limits or fallback to defaults
+	if cfg != nil && cfg.Joblet.MaxCPULimit > 0 {
+		rv.maxCPUPercent = cfg.Joblet.MaxCPULimit
+	} else {
+		rv.maxCPUPercent = 1000 // 10 cores worth
+	}
+
+	if cfg != nil && cfg.Joblet.MaxMemoryLimit > 0 {
+		rv.maxMemoryMB = cfg.Joblet.MaxMemoryLimit
+	} else {
+		rv.maxMemoryMB = 32768 // 32GB
+	}
+
+	if cfg != nil && cfg.Joblet.MaxIOLimit > 0 {
+		rv.maxIOBPS = cfg.Joblet.MaxIOLimit
+	} else {
+		rv.maxIOBPS = 1000000 // 1GB/s
+	}
+
+	// Set minimum limits from configuration (0 = no minimum)
+	if cfg != nil {
+		rv.minCPUPercent = cfg.Joblet.MinCPULimit
+		rv.minMemoryMB = cfg.Joblet.MinMemoryLimit
+		rv.minIOBPS = cfg.Joblet.MinIOLimit
+	} else {
+		// Fallback defaults
+		rv.minCPUPercent = 10 // 0.1 core
+		rv.minMemoryMB = 64   // 64MB minimum
+		rv.minIOBPS = 1000    // 1KB/s minimum
+	}
+
+	return rv
 }
 
 // Validate validates resource limits
@@ -80,7 +125,8 @@ func (rv *ResourceValidator) validateCPU(maxCPU int32, cpuCores string) error {
 	}
 
 	if maxCPU > 0 {
-		if maxCPU < rv.minCPUPercent {
+		// Check minimum limit only if configured (0 = no minimum)
+		if rv.minCPUPercent > 0 && maxCPU < rv.minCPUPercent {
 			return fmt.Errorf("CPU limit too low (minimum %d%%)", rv.minCPUPercent)
 		}
 
@@ -99,7 +145,8 @@ func (rv *ResourceValidator) validateMemory(maxMemory int32) error {
 	}
 
 	if maxMemory > 0 {
-		if maxMemory < rv.minMemoryMB {
+		// Check minimum limit only if configured (0 = no minimum)
+		if rv.minMemoryMB > 0 && maxMemory < rv.minMemoryMB {
 			return fmt.Errorf("memory limit too low (minimum %dMB)", rv.minMemoryMB)
 		}
 
@@ -118,7 +165,8 @@ func (rv *ResourceValidator) validateIO(maxIOBPS int32) error {
 	}
 
 	if maxIOBPS > 0 {
-		if maxIOBPS < rv.minIOBPS {
+		// Check minimum limit only if configured (0 = no minimum)
+		if rv.minIOBPS > 0 && maxIOBPS < rv.minIOBPS {
 			return fmt.Errorf("IO limit too low (minimum %d BPS)", rv.minIOBPS)
 		}
 

@@ -3,8 +3,8 @@ package volume
 import (
 	"encoding/json"
 	"fmt"
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 	"os"
@@ -17,7 +17,7 @@ import (
 
 // Manager handles volume creation, management, and cleanup
 type Manager struct {
-	volumeStore state.VolumeStore
+	volumeStore adapters.VolumeStoreAdapter
 	platform    platform.Platform
 	logger      *logger.Logger
 	basePath    string // Base directory for volume storage (e.g., /opt/joblet/volumes)
@@ -26,7 +26,7 @@ type Manager struct {
 // NewManager creates a new volume manager instance with the provided dependencies.
 // It initializes the manager with a volume store for state management, platform abstraction
 // for OS operations, and a base path where volumes will be stored on disk.
-func NewManager(volumeStore state.VolumeStore, platform platform.Platform, basePath string) *Manager {
+func NewManager(volumeStore adapters.VolumeStoreAdapter, platform platform.Platform, basePath string) *Manager {
 	return &Manager{
 		volumeStore: volumeStore,
 		platform:    platform,
