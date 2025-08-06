@@ -68,8 +68,9 @@ func (c *CPUCollector) Collect() (*domain.CPUMetrics, error) {
 	currentTime := time.Now()
 
 	metrics := &domain.CPUMetrics{
-		LoadAverage: loadAvg,
-		Cores:       len(currentStats.cores),
+		LoadAverage:  loadAvg,
+		Cores:        len(currentStats.cores),
+		PerCoreUsage: make([]float64, len(currentStats.cores)), // Initialize with zeros
 	}
 
 	// Calculate usage percentages if we have previous stats
@@ -88,7 +89,6 @@ func (c *CPUCollector) Collect() (*domain.CPUMetrics, error) {
 		}
 
 		// Calculate per-core usage
-		metrics.PerCoreUsage = make([]float64, len(currentStats.cores))
 		for i, core := range currentStats.cores {
 			if i < len(c.lastStats.cores) {
 				lastCore := c.lastStats.cores[i]
