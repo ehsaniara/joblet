@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/cobra"
 	pb "joblet/api/gen"
+
+	"github.com/spf13/cobra"
 )
 
 func newMonitorCmd() *cobra.Command {
@@ -216,7 +217,7 @@ func runMonitorWatch(interval int, metricTypes []string, compact bool) error {
 
 		// Clear screen and move cursor to top
 		fmt.Print("\033[2J\033[H")
-		fmt.Printf("System Metrics - %s (refreshing every %ds)\n\n", resp.Timestamp, interval)
+		fmt.Printf("\nSystem Metrics - %s (refreshing every %ds)\n\n", resp.Timestamp, interval)
 
 		displaySystemMetricsWithOptions(resp, compact)
 	}

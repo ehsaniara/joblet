@@ -2,9 +2,6 @@ package server
 
 import (
 	"fmt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/keepalive"
 	pb "joblet/api/gen"
 	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
@@ -14,6 +11,10 @@ import (
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"net"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 )
 
 // StartGRPCServer initializes and starts the main Joblet gRPC server.

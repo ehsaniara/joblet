@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"joblet/pkg/client"
 	"joblet/pkg/config"
+
+	"github.com/spf13/cobra"
 )
 
 var (

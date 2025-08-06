@@ -4,26 +4,29 @@ Learn Joblet fundamentals with simple, practical examples covering core features
 
 ## 📚 Examples Overview
 
-| Example | Files | Description | Complexity | Resources |
-|---------|-------|-------------|------------|-----------|
-| [Simple Commands](#simple-commands) | `01_simple_commands.sh` | Execute basic shell commands | Beginner | 64MB RAM |
-| [File Operations](#file-operations) | `02_file_operations.sh`, `sample_data.txt` | Upload files and workspace usage | Beginner | 128MB RAM |
-| [Resource Management](#resource-management) | `03_resource_limits.sh` | CPU, memory, and I/O limits | Beginner | 256MB RAM |
-| [Volume Storage](#volume-storage) | `04_volume_storage.sh` | Persistent data storage | Intermediate | 512MB RAM |
-| [Job Monitoring](#job-monitoring) | `05_job_monitoring.sh` | Track job status and logs | Intermediate | 128MB RAM |
-| [Environment Variables](#environment-variables) | `06_environment.sh` | Configuration with env vars | Beginner | 64MB RAM |
-| [Network Basics](#network-basics) | `07_network_basics.sh` | Network isolation concepts | Intermediate | 128MB RAM |
-| [Complete Demo Suite](#complete-demo-suite) | `run_demos.sh` | All basic examples in sequence | All Levels | 1GB RAM |
+| Example                                     | Files                                      | Description                      | Complexity   | Resources |
+|---------------------------------------------|--------------------------------------------|----------------------------------|--------------|-----------|
+| [Simple Commands](#simple-commands)         | `01_simple_commands.sh`                    | Execute basic shell commands     | Beginner     | 64MB RAM  |
+| [File Operations](#file-operations)         | `02_file_operations.sh`, `sample_data.txt` | Upload files and workspace usage | Beginner     | 128MB RAM |
+| [Resource Management](#resource-management) | `03_resource_limits.sh`                    | CPU, memory, and I/O limits      | Beginner     | 256MB RAM |
+| [Volume Storage](#volume-storage)           | `04_volume_storage.sh`                     | Persistent data storage          | Intermediate | 512MB RAM |
+| [Job Monitoring](#job-monitoring)           | `05_job_monitoring.sh`                     | Track job status and logs        | Intermediate | 128MB RAM |
+| [Network Basics](#network-basics)           | `07_network_basics.sh`                     | Network isolation concepts       | Intermediate | 128MB RAM |
+| [Complete Demo Suite](#complete-demo-suite) | `run_demos.sh`                             | All basic examples in sequence   | All Levels   | 1GB RAM   |
 
 ## 🚀 Quick Start
 
 ### Run All Basic Examples
+
 ```bash
 # Execute complete basic usage demo
 ./run_demos.sh
 ```
 
+This will run all examples in sequence with explanations and pauses for learning.
+
 ### Run Individual Examples
+
 ```bash
 # Simple commands
 ./01_simple_commands.sh
@@ -39,368 +42,248 @@ Learn Joblet fundamentals with simple, practical examples covering core features
 
 Learn the basics of running commands with Joblet.
 
-### Files Included
+### File Included
+
 - **`01_simple_commands.sh`**: Basic command execution examples
 
 ### What It Demonstrates
-- Running simple shell commands
-- Getting command output
-- Understanding job lifecycle
-- Basic error handling
 
-### Key Commands
+- Running simple shell commands in isolated environments
+- Understanding how jobs are submitted and executed
+- Getting familiar with the basic `rnx run` syntax
+- Viewing job output and status
+
+### Key Concepts
+
+- **Job Submission**: How commands are sent to the Joblet server
+- **Isolation**: Each job runs in its own isolated environment
+- **Command Syntax**: Basic `rnx run <command>` usage
+- **Output Handling**: How to see results from executed jobs
+
+### Usage
+
 ```bash
-# Basic command execution
-rnx run echo "Hello, Joblet!"
-
-# Command with arguments
-rnx run ls -la
-
-# Multiple commands in sequence
-rnx run bash -c "pwd && ls && date"
-
-# Check system information
-rnx run uname -a
+./01_simple_commands.sh
 ```
 
-### Expected Output
-- Command execution results
-- Job completion status
-- System information from Joblet server environment
+This example will demonstrate basic command execution patterns and help you understand the Joblet workflow.
 
 ## 📁 File Operations
 
-Learn how to upload files and work with the job workspace.
+Learn how to upload files and work with job workspaces.
 
 ### Files Included
+
 - **`02_file_operations.sh`**: File upload and workspace examples
 - **`sample_data.txt`**: Sample data file for demonstrations
 
 ### What It Demonstrates
-- Uploading single files
-- Uploading directories
-- Working directory structure
-- File processing workflows
 
-### Key Commands
+- Uploading files to job workspaces
+- Accessing uploaded files within jobs
+- Understanding the job workspace directory structure
+- File processing patterns
+
+### Key Concepts
+
+- **File Upload**: Using `--upload` to send files to jobs
+- **Workspace**: Each job gets its own isolated workspace
+- **File Access**: How to reference uploaded files in commands
+- **Data Processing**: Common patterns for processing uploaded data
+
+### Usage
+
 ```bash
-# Upload and process a file
-rnx run --upload=sample_data.txt cat sample_data.txt
-
-# Upload directory and list contents
-rnx run --upload-dir=./data ls -la data/
-
-# Process uploaded file
-rnx run --upload=sample_data.txt wc -l sample_data.txt
-
-# Working directory exploration
-rnx run --upload=sample_data.txt bash -c "pwd && ls -la && cat sample_data.txt"
+./02_file_operations.sh
 ```
-
-### Expected Output
-- File contents and processing results
-- Directory structure exploration
-- Understanding of `/work` directory layout
 
 ## ⚡ Resource Management
 
-Learn how to set and monitor resource limits for jobs.
+Learn how to control CPU, memory, and I/O resources for jobs.
 
-### Files Included
-- **`03_resource_limits.sh`**: Resource management examples
+### File Included
+
+- **`03_resource_limits.sh`**: Resource limit examples
 
 ### What It Demonstrates
-- CPU percentage limits
-- Memory limits in MB
-- I/O bandwidth controls
-- CPU core affinity
-- Resource monitoring
 
-### Key Commands
+- Setting memory limits with `--max-memory`
+- Controlling CPU usage with `--max-cpu`
+- Understanding resource allocation and limits
+- Preventing resource exhaustion
+
+### Key Concepts
+
+- **Memory Limits**: Controlling maximum memory usage per job
+- **CPU Limits**: Setting CPU percentage limits
+- **Resource Isolation**: How limits protect system resources
+- **Performance Tuning**: Choosing appropriate resource limits
+
+### Usage
+
 ```bash
-# Memory limit
-rnx run --max-memory=256 python3 -c "import os; print(f'Memory limit demo')"
-
-# CPU limit (50% of available CPU)
-rnx run --max-cpu=50 bash -c "echo 'CPU limited job'; sleep 5"
-
-# I/O bandwidth limit
-rnx run --max-iobps=1048576 dd if=/dev/zero of=/tmp/test bs=1M count=10
-
-# CPU core binding (cores 0-1)
-rnx run --cpu-cores="0-1" bash -c "echo 'Running on specific CPU cores'"
-
-# Combined resource limits
-rnx run --max-cpu=25 --max-memory=128 --max-iobps=524288 \
-  bash -c "echo 'Resource constrained job'"
+./03_resource_limits.sh
 ```
-
-### Expected Output
-- Jobs running within specified resource constraints
-- Understanding of resource limit enforcement
-- Performance impact of different limits
 
 ## 💾 Volume Storage
 
-Learn persistent data storage with Joblet volumes.
+Learn about persistent data storage with volumes.
 
-### Files Included
-- **`04_volume_storage.sh`**: Volume management and usage examples
+### File Included
+
+- **`04_volume_storage.sh`**: Volume creation and usage examples
 
 ### What It Demonstrates
-- Creating volumes (filesystem and memory types)
-- Mounting volumes in jobs
-- Data persistence across job runs
-- Volume management lifecycle
 
-### Key Commands
+- Creating persistent volumes for data storage
+- Using volumes to share data between jobs
+- Understanding volume types (filesystem vs memory)
+- Data persistence beyond job lifecycle
+
+### Key Concepts
+
+- **Volume Creation**: Creating named storage volumes
+- **Volume Types**: Filesystem (persistent) vs memory (temporary)
+- **Data Sharing**: Using volumes to pass data between jobs
+- **Persistence**: How data survives job completion
+
+### Usage
+
 ```bash
-# Create volumes
-rnx volume create my-data --size=100MB --type=filesystem
-rnx volume create temp-cache --size=50MB --type=memory
-
-# Use volume in job
-rnx run --volume=my-data bash -c "echo 'Hello Volume' > /volumes/my-data/greeting.txt"
-
-# Verify data persistence
-rnx run --volume=my-data cat /volumes/my-data/greeting.txt
-
-# List volumes
-rnx volume list
-
-# Clean up
-rnx volume remove temp-cache
+./04_volume_storage.sh
 ```
-
-### Expected Output
-- Data persisting across multiple job runs
-- Understanding of volume mount points (`/volumes/<name>/`)
-- Differences between filesystem and memory volume types
 
 ## 📊 Job Monitoring
 
-Learn how to monitor and manage running jobs.
+Learn how to track job status and view logs.
 
-### Files Included
-- **`05_job_monitoring.sh`**: Job monitoring and management examples
+### File Included
 
-### What It Demonstrates
-- Listing active and completed jobs
-- Checking job status
-- Viewing job logs
-- Stopping running jobs
-- Real-time monitoring
-
-### Key Commands
-```bash
-# Start a long-running job
-rnx run --name="long-task" sleep 60 &
-
-# List all jobs
-rnx list
-
-# Check specific job status
-rnx status <job-id>
-
-# View job logs
-rnx log <job-id>
-
-# Follow logs in real-time
-rnx log -f <job-id>
-
-# Stop a running job
-rnx stop <job-id>
-
-# Monitor system in real-time
-rnx monitor
-```
-
-### Expected Output
-- Job lifecycle understanding
-- Real-time log streaming
-- System resource monitoring
-- Job management workflows
-
-## 🌍 Environment Variables
-
-Learn how to pass configuration to jobs using environment variables.
-
-### Files Included
-- **`06_environment.sh`**: Environment variable examples
+- **`05_job_monitoring.sh`**: Job monitoring and logging examples
 
 ### What It Demonstrates
-- Setting environment variables
-- Using env vars in scripts
-- Configuration management
-- Secure credential handling concepts
 
-### Key Commands
+- Checking job status with `rnx list`
+- Viewing job logs with `rnx log`
+- Understanding job lifecycle states
+- Monitoring long-running jobs
+
+### Key Concepts
+
+- **Job Status**: Understanding RUNNING, COMPLETED, FAILED states
+- **Log Viewing**: Accessing job output and error logs
+- **Job Management**: Tracking multiple concurrent jobs
+- **Debugging**: Using logs to troubleshoot job issues
+
+### Usage
+
 ```bash
-# Simple environment variable
-rnx run --env=MESSAGE="Hello World" bash -c 'echo $MESSAGE'
-
-# Multiple environment variables
-rnx run --env=USER=demo --env=ROLE=admin --env=DEBUG=true \
-  bash -c 'echo "User: $USER, Role: $ROLE, Debug: $DEBUG"'
-
-# Environment in script processing
-rnx run --env=INPUT_FILE=data.txt --env=OUTPUT_DIR=/tmp \
-  bash -c 'echo "Processing $INPUT_FILE to $OUTPUT_DIR"'
-
-# Using environment with uploaded files
-rnx run --upload=sample_data.txt --env=LINES_TO_SHOW=5 \
-  bash -c 'head -n $LINES_TO_SHOW sample_data.txt'
+./05_job_monitoring.sh
 ```
-
-### Expected Output
-- Dynamic job configuration using environment variables
-- Understanding of environment variable scope and usage
-- Best practices for configuration management
 
 ## 🌐 Network Basics
 
 Learn network isolation and connectivity concepts.
 
-### Files Included
+### File Included
+
 - **`07_network_basics.sh`**: Network configuration examples
 
 ### What It Demonstrates
-- Default bridge networking
-- Network isolation modes
-- Custom networks (if supported)
-- Connectivity testing
 
-### Key Commands
+- Default network behavior for jobs
+- Network isolation between jobs
+- Understanding job connectivity limitations
+- Basic networking concepts in isolated environments
+
+### Key Concepts
+
+- **Network Isolation**: How jobs are isolated from each other
+- **Default Networking**: Standard network configuration for jobs
+- **Connectivity**: What jobs can and cannot access
+- **Security**: Network-based security in job execution
+
+### Usage
+
 ```bash
-# Default networking (bridge mode)
-rnx run ping -c 3 google.com
-
-# No network access
-rnx run --network=none ping -c 1 google.com || echo "No network access (expected)"
-
-# Host networking (shares host network)
-rnx run --network=host ip addr show
-
-# Check network connectivity
-rnx run --network=bridge curl -s https://httpbin.org/ip
-
-# Network information
-rnx run ip route show
+./07_network_basics.sh
 ```
 
-### Expected Output
-- Understanding of different network modes
-- Network isolation demonstration
-- Connectivity testing results
+## 🎬 Complete Demo Suite
 
-## 🔄 Complete Demo Suite
+Run all basic usage examples in sequence with guided explanations.
 
-Execute all basic usage examples with a single command.
+### File Included
 
-### Files Included
-- **`run_demos.sh`**: Master basic usage demo script
+- **`run_demos.sh`**: Master script that runs all examples
 
-### What It Runs
+### What It Demonstrates
+
+All basic Joblet concepts in a structured learning path:
+
 1. **Simple Commands**: Basic command execution
 2. **File Operations**: Upload and workspace usage
 3. **Resource Management**: CPU, memory, and I/O limits
 4. **Volume Storage**: Persistent data storage
 5. **Job Monitoring**: Status tracking and log viewing
-6. **Environment Variables**: Configuration management
-7. **Network Basics**: Network connectivity and isolation
+6. **Network Basics**: Network connectivity and isolation
 
-### Execution
+### Key Features
+
+- **Interactive Learning**: Pauses between sections for understanding
+- **Comprehensive Coverage**: All basic concepts in one script
+- **Progressive Complexity**: Builds from simple to advanced concepts
+- **Practical Examples**: Real-world usage patterns
+
+### Usage
+
 ```bash
-# Run complete basic usage demo suite
 ./run_demos.sh
 ```
 
-### Demo Flow
-1. Demonstrates basic command execution
-2. Shows file upload and processing workflows
-3. Explains resource limit enforcement
-4. Creates volumes and demonstrates data persistence
-5. Shows job monitoring and management
-6. Demonstrates environment variable usage
-7. Explains network isolation concepts
-8. Provides guidance for next steps
+The script provides an interactive learning experience with explanations and examples for each concept.
 
-## 📁 Demo Results
+## 💡 Best Practices Demonstrated
 
-After running the demos, you'll understand:
+### Command Execution
 
-### Core Concepts
-- How Joblet executes commands in isolated environments
-- Job lifecycle from creation to completion
-- Resource management and monitoring
-- Data persistence with volumes
+- **Start Simple**: Begin with basic commands before complex operations
+- **Test Connectivity**: Always verify connection to Joblet server first
+- **Use Appropriate Resources**: Set memory and CPU limits based on job needs
 
-### Practical Skills
-- Running basic and complex commands
-- Managing files and workspaces
-- Setting appropriate resource limits
-- Using volumes for data persistence
-- Monitoring and managing jobs
-- Configuring jobs with environment variables
+### File Management
 
-### Best Practices
-- When to use different resource limits
-- Choosing between filesystem and memory volumes
-- Network security considerations
-- Job naming and organization strategies
+- **Upload Strategy**: Only upload files that jobs actually need
+- **Workspace Organization**: Keep job workspaces clean and organized
+- **Data Validation**: Verify uploaded files exist before processing
 
-## 🎯 Next Steps
+### Resource Planning
 
-After mastering these basics, explore more advanced examples:
+- **Right-Size Jobs**: Use appropriate resource limits for each job
+- **Monitor Usage**: Track resource consumption to optimize limits
+- **Prevent Exhaustion**: Set limits to protect system resources
 
-1. **Python Analytics**: `cd ../python-analytics/`
-   - Data science workflows with pandas and scikit-learn
-   - Machine learning model training and persistence
+### Data Persistence
 
-2. **Node.js Applications**: `cd ../nodejs/`
-   - API testing and microservice deployment
-   - Build pipelines and event processing
+- **Use Volumes Wisely**: Create volumes for data that needs persistence
+- **Volume Types**: Choose filesystem for persistence, memory for speed
+- **Clean Up**: Remove unused volumes to free resources
 
-3. **Agentic AI**: `cd ../agentic-ai/`
-   - LLM inference and multi-agent systems
-   - RAG implementation and distributed training
+### Job Management
 
-4. **Advanced Patterns**: `cd ../advanced/`
-   - Multi-node coordination
-   - Performance optimization
-   - Production deployment strategies
+- **Monitor Progress**: Regularly check job status and logs
+- **Handle Failures**: Plan for job failures and implement recovery
+- **Log Analysis**: Use job logs for debugging and optimization
 
-## 📊 Monitoring Your Jobs
+## 🚀 Next Steps
 
-```bash
-# Real-time system monitoring
-rnx monitor
-
-# Check all jobs
-rnx list
-
-# Get job details
-rnx status <job-id>
-
-# View job logs
-rnx log <job-id>
-
-# Check volume usage
-rnx volume list
-```
-
-## 💡 Tips for Success
-
-- **Start Small**: Begin with simple commands before complex workflows
-- **Use Resource Limits**: Always set appropriate limits for production usage
-- **Name Your Jobs**: Use `--name` for easy identification
-- **Monitor Resources**: Use `rnx monitor` to understand system usage
-- **Persist Important Data**: Use volumes for data that must survive job completion
-- **Check Logs**: Use `rnx log` to debug issues and understand job behavior
+1. **Master the Basics**: Work through all examples in order
+2. **Experiment**: Try variations of the examples with your own data
+3. **Scale Up**: Move to advanced examples when comfortable with basics
+4. **Production Use**: Apply concepts to real-world workflows
 
 ## 📚 Additional Resources
 
-- [RNX CLI Reference](../../docs/RNX_CLI_REFERENCE.md)
-- [Volume Management Guide](../../docs/VOLUME_MANAGEMENT.md)
-- [Resource Management Best Practices](../../docs/RESOURCE_MANAGEMENT.md)
-- [Joblet Configuration](../../docs/CONFIGURATION.md)
+- [Advanced Examples](../advanced/) - Complex job coordination patterns
+- [Python Analytics](../python-analytics/) - Data processing workflows
+- [Joblet Documentation](../../docs/) - Complete feature documentation

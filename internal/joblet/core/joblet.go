@@ -167,7 +167,9 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 	return j.executeJob(ctx, jb, internalReq)
 }
 
-// scheduleJob handles scheduled job execution
+// scheduleJob handles scheduled job execution by parsing the schedule time,
+// preparing uploads, and queuing the job for future execution. It validates
+// the schedule format and coordinates with the scheduler for timing management.
 func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
 	log := j.logger.WithField("jobID", job.Id)
 
@@ -200,7 +202,9 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobR
 	return job, nil
 }
 
-// executeJob handles immediate job execution
+// executeJob handles immediate job execution by setting up resources,
+// coordinating with the execution engine, and starting monitoring.
+// It manages the complete lifecycle from resource allocation to process start.
 func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
 	log := j.logger.WithField("jobID", job.Id)
 	log.Debug("executing job immediately")
@@ -301,7 +305,9 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 	return nil
 }
 
-// monitorJob monitors a running job until completion
+// monitorJob monitors a running job until completion, handling exit codes,
+// coordinating cleanup operations, and managing state transitions.
+// It runs asynchronously and ensures proper resource cleanup regardless of job outcome.
 func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
 	log := j.logger.WithField("jobID", job.Id)
 	log.Debug("starting job monitoring")

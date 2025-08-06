@@ -15,7 +15,9 @@ func NewNetworkValidator() *NetworkValidator {
 	return &NetworkValidator{}
 }
 
-// ValidateCIDR checks if a CIDR is valid and doesn't conflict
+// ValidateCIDR validates a CIDR block for network creation, checking format validity,
+// minimum subnet size requirements (/30 minimum), and overlap detection with existing networks.
+// It also validates against system network conflicts to prevent routing issues.
 func (nv *NetworkValidator) ValidateCIDR(cidr string, existingNetworks map[string]string) error {
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
@@ -65,7 +67,9 @@ func (nv *NetworkValidator) ValidateBridgeName(name string) error {
 	return nil
 }
 
-// networksOverlap performs comprehensive overlap check
+// networksOverlap performs comprehensive overlap detection between two CIDR blocks.
+// It checks multiple overlap scenarios including network containment, broadcast address
+// conflicts, and ensures complete network isolation to prevent routing conflicts.
 func (nv *NetworkValidator) networksOverlap(cidr1, cidr2 string) bool {
 	_, net1, _ := net.ParseCIDR(cidr1)
 	_, net2, _ := net.ParseCIDR(cidr2)

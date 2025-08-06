@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	pb "joblet/api/gen"
 	"joblet/pkg/config"
+
+	"github.com/spf13/cobra"
 )
 
 func newRunCmd() *cobra.Command {

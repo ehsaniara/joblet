@@ -118,7 +118,9 @@ func (rv *ResourceValidator) Validate(limits domain.ResourceLimits) error {
 	return nil
 }
 
-// validateCPU validates CPU limits
+// validateCPU validates CPU percentage limits against configured minimum and maximum bounds.
+// It ensures CPU values are non-negative and within acceptable ranges for system stability.
+// Also validates CPU core specifications when provided alongside percentage limits.
 func (rv *ResourceValidator) validateCPU(maxCPU int32, cpuCores string) error {
 	if maxCPU < 0 {
 		return fmt.Errorf("CPU limit cannot be negative")
@@ -138,7 +140,9 @@ func (rv *ResourceValidator) validateCPU(maxCPU int32, cpuCores string) error {
 	return nil
 }
 
-// validateMemory validates memory limits
+// validateMemory validates memory limits in megabytes against configured bounds.
+// It ensures memory values are non-negative and within acceptable ranges to prevent
+// system resource exhaustion while allowing reasonable job resource allocation.
 func (rv *ResourceValidator) validateMemory(maxMemory int32) error {
 	if maxMemory < 0 {
 		return fmt.Errorf("memory limit cannot be negative")

@@ -27,7 +27,9 @@ func NewManager(platform platform.Platform, logger *logger.Logger) *Manager {
 	}
 }
 
-// PrepareUploadSession creates an upload session optimized for the given memory limit
+// PrepareUploadSession creates and optimizes an upload session for the given memory constraints.
+// It validates upload content, calculates total file sizes, and configures memory-aware processing
+// to ensure uploads fit within the specified memory limits without system resource exhaustion.
 func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload, memoryLimitMB int32) (*domain.UploadSession, error) {
 	session := &domain.UploadSession{
 		JobID: jobID,

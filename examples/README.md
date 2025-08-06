@@ -1,162 +1,234 @@
 # Joblet Examples
 
-This directory contains comprehensive examples demonstrating how to use Joblet for various use cases, from simple command execution to complex agentic AI workflows.
+Comprehensive examples demonstrating Joblet's capabilities, from simple command execution to advanced job coordination
+patterns.
 
 ## 📁 Directory Structure
 
-### 🐍 [Python Analytics](./python-analytics/)
-- **Sales Analysis**: Real sales data processing with pandas and matplotlib
-- **Customer Segmentation**: K-means clustering with scikit-learn and model persistence
-- **Distributed Feature Engineering**: Parallel data processing across multiple jobs
-- **Complete Demo Suite**: Automated execution with `run_demos.sh`
+### 🐍 [Python Analytics](./python-analytics/) ✅ **Always Works**
 
-### 🟨 [Node.js](./nodejs/)
-- **API Testing**: Comprehensive test suite with Jest and result collection
-- **Microservice Demo**: Express.js service with health checks and middleware
-- **Data Processing**: CSV stream processing with transformations and reporting
-- **Build Pipeline**: Complete CI/CD workflow with caching and artifact generation
-- **Event Processing**: Real-time event handling with metrics and workflow triggers
-- **Complete Demo Suite**: Automated execution with `run_demos.sh`
+- **Sales Analysis**: Statistical analysis using Python standard library
+- **Customer Segmentation**: K-means clustering implemented from scratch
+- **Time Series Processing**: Data generation and moving averages
+- **Dependencies**: Python 3 standard library only
+- **Status**: ✅ Works out of the box with Python 3
 
-### 🤖 [Agentic AI Foundations](./agentic-ai/)
-- **LLM Inference Service**: Language model inference with intelligent caching and metrics
-- **Multi-Agent System**: Coordinated workflows with researcher, analyst, and writer agents
-- **RAG System**: Retrieval-Augmented Generation with vector database and semantic search
-- **Distributed Training**: Multi-worker ML training simulation with synchronization
-- **Complete Demo Suite**: Automated execution with `run_demos.sh`
+### 💻 [Basic Usage](./basic-usage/) ✅ **Always Works**
 
-### 🎆 [Master Demo Suite](./)
-- **`run_all_demos.sh`**: Execute all examples across Python, Node.js, and AI
-- **`DEMO_SETUP.md`**: Complete setup and troubleshooting guide
-- **Comprehensive Results**: Inspect outputs, metrics, and artifacts across all demos
+- **Simple Commands**: Basic command execution patterns
+- **File Operations**: Upload files and workspace management
+- **Resource Management**: CPU, memory, and I/O limits
+- **Volume Storage**: Persistent data storage between jobs
+- **Job Monitoring**: Status tracking and log viewing
+- **Dependencies**: Shell commands only
+- **Status**: ✅ Always works
 
-### 📚 [Basic Usage](./basic-usage/)
-- **Getting Started**: First commands, simple examples
-- **Resource Management**: CPU, memory, I/O limits
-- **File Operations**: Uploads, downloads, workspace usage
-- **Networking**: Custom networks, isolation patterns
+### 🔗 [Advanced Examples](./advanced/) ✅ **Works with Python 3**
 
-### 🚀 [Advanced Usage](./advanced/)
-- **Distributed Computing**: Multi-node job coordination
-- **Performance Optimization**: Resource tuning, monitoring
-- **Security Patterns**: Network isolation, secure execution
-- **Production Deployment**: Scaling, monitoring, maintenance
+- **Job Coordination**: Sequential jobs with data dependencies
+- **Volume Sharing**: Data passing between isolated jobs
+- **Error Handling**: Robust job pipeline patterns
+- **Dependencies**: Python 3 standard library
+- **Status**: ✅ Works with Python 3
 
-## 🎯 Quick Examples
+### 🟨 [Node.js](./nodejs/) ⚠️ **Requires Node.js**
 
-### Run All Demos
+- **System Analysis**: Platform and process information
+- **Data Processing**: JSON manipulation and statistics
+- **File Operations**: Built-in module demonstrations
+- **Dependencies**: Node.js runtime in job environment
+- **Status**: ⚠️ Requires Node.js installation
+
+### 🤖 [Agentic AI](./agentic-ai/) ⚠️ **Requires Dependencies**
+
+- **AI/ML Workflows**: Various AI-related examples
+- **Dependencies**: External Python packages
+- **Status**: ⚠️ May require additional setup
+
+## 🚀 Quick Start
+
+### Recommended Path (Always Works)
+
 ```bash
-# Execute comprehensive demo suite
-cd examples/
+# 1. Start with Python Analytics (most comprehensive working example)
+cd python-analytics/
+./run_demo.sh
+
+# 2. Try Basic Usage (fundamental concepts)
+cd ../basic-usage/
+./run_demos.sh
+
+# 3. Explore Advanced Patterns (job coordination)
+cd ../advanced/
+./job_coordination.sh
+```
+
+### Run All Working Examples
+
+```bash
+# Execute all working examples
 ./run_all_demos.sh
 ```
 
-### Individual Demo Suites
+This will attempt to run all examples and report which ones succeed.
+
+## 🎯 Key Examples by Use Case
+
+### Data Analysis & Processing
+
+- **[Python Analytics](./python-analytics/)** - Complete data analysis pipeline
+- **[Advanced Job Coordination](./advanced/)** - Multi-step data workflows
+
+### Learning Joblet Fundamentals
+
+- **[Basic Usage](./basic-usage/)** - Core concepts and patterns
+- **[Simple Commands](./basic-usage/01_simple_commands.sh)** - Start here
+
+### Production Patterns
+
+- **[Volume Storage](./basic-usage/04_volume_storage.sh)** - Persistent data
+- **[Resource Limits](./basic-usage/03_resource_limits.sh)** - Resource management
+- **[Job Coordination](./advanced/job_coordination.sh)** - Complex workflows
+
+## 💡 Example Status Guide
+
+### ✅ Always Works
+
+These examples use only commonly available tools:
+
+- **Python Analytics**: Uses Python 3 standard library
+- **Basic Usage**: Uses shell commands only
+- **Advanced Coordination**: Uses Python 3 standard library
+
+### ⚠️ May Require Setup
+
+These examples need specific runtime environments:
+
+- **Node.js**: Requires Node.js in job environment
+- **Agentic AI**: May require external packages
+
+## 🔧 Prerequisites
+
+### Minimal Setup (for ✅ examples)
+
+- Joblet server running
+- RNX client configured
+- Python 3 available in job environment (for analytics)
+
+### Full Setup (for all examples)
+
+- Node.js runtime (for Node.js examples)
+- External package installation capability (for AI examples)
+
+## 📚 Learning Path
+
+### 1. Start Here (5 minutes)
+
 ```bash
-# Python Analytics & ML
+cd basic-usage/
+./01_simple_commands.sh
+```
+
+### 2. Try Data Processing (10 minutes)
+
+```bash
 cd python-analytics/
-./run_demos.sh
+./run_demo.sh
+```
 
-# Node.js Applications
-cd nodejs/
-./run_demos.sh
+### 3. Learn Job Coordination (15 minutes)
 
-# Agentic AI Foundations
-cd agentic-ai/
+```bash
+cd advanced/
+./job_coordination.sh
+```
+
+### 4. Explore All Basics (30 minutes)
+
+```bash
+cd basic-usage/
 ./run_demos.sh
 ```
 
-### Sample Individual Commands
-```bash
-# Sales analysis with data visualization
-rnx run --upload=sales_data.csv --upload=analyze_sales.py \
-       --volume=analytics-data --max-memory=512 \
-       python3 analyze_sales.py
+## 🎉 Expected Results
 
-# Multi-agent AI workflow
-rnx run --upload=multi_agent_system.py \
-       --volume=ai-outputs --max-memory=4096 \
-       python3 multi_agent_system.py
+### After Python Analytics
 
-# Node.js API testing suite
-rnx run --upload-dir=. --volume=nodejs-projects \
-       --max-memory=256 npm test
-```
+- Sales analysis results in JSON format
+- Customer segmentation data
+- Time series processing output
 
-## 🛠️ Prerequisites
+### After Job Coordination
 
-- **Joblet Server**: Running joblet daemon with proper configuration
-- **RNX Client**: Configured with server connection
-- **Dependencies**: Language runtimes, tools as needed by examples
+- Multi-job workflow demonstration
+- Data passing between jobs
+- Dependency management patterns
 
-## 📖 Getting Started
+### After Basic Usage
 
-1. **Setup Joblet**: Follow the [Quick Start Guide](../docs/QUICKSTART.md)
-2. **Choose Use Case**: Browse examples by technology or use case
-3. **Run Examples**: Each directory has detailed README with step-by-step instructions
-4. **Adapt & Extend**: Modify examples for your specific needs
+- Understanding of core Joblet concepts
+- File upload and volume usage
+- Resource management experience
 
-## 📁 What You'll Get
-
-After running the demos, you'll have comprehensive examples of:
-
-### Python Analytics Results
-- Sales trend analysis with matplotlib visualizations
-- Trained K-means clustering model with customer segments
-- Distributed feature engineering across multiple parallel jobs
-- Performance metrics and processing statistics
-
-### Node.js Application Results
-- API test results with comprehensive coverage reports
-- Running microservice with health checks and logging
-- Processed CSV data with stream transformations
-- Complete build pipeline with artifacts and reports
-- Event processing logs with real-time metrics
-
-### Agentic AI Results
-- LLM inference responses with caching statistics
-- Multi-agent workflow coordination results
-- RAG system responses with source attribution
-- Distributed training metrics and model artifacts
-- End-to-end AI pipeline results
-
-## 🔗 Related Documentation
-
-- [RNX CLI Reference](../docs/RNX_CLI_REFERENCE.md) - Complete command reference
-- [DEMO_SETUP.md](./DEMO_SETUP.md) - Detailed setup and troubleshooting guide
-- [Configuration Guide](../docs/CONFIGURATION.md) - Server and client setup
-- [Volume Management](../docs/VOLUME_MANAGEMENT.md) - Persistent storage patterns
-
-## 📊 Monitoring Your Demo Results
+## 🔍 Inspecting Results
 
 ```bash
-# Monitor all jobs in real-time
-rnx monitor
+# View analytics results
+rnx run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json
 
-# Check job status and resource usage  
-rnx list
+# View coordination results  
+rnx run --volume=shared-data cat /volumes/shared-data/results.json
 
-# View volume usage across all demos
+# List all volumes
 rnx volume list
 
-# Inspect specific results
-rnx run --volume=analytics-data cat /volumes/analytics-data/results/monthly_sales.csv
-rnx run --volume=ai-outputs cat /volumes/ai-outputs/inference_results_*.json
-rnx run --volume=nodejs-projects cat /volumes/nodejs-projects/reports/test-report.txt
+# Check job history
+rnx list
 ```
 
-## 🤝 Contributing Examples
+## 🛠️ Troubleshooting
 
-Have a great use case? We'd love to include it! See each subdirectory for contribution guidelines and example templates.
+### Common Issues
 
-## 🎆 Ready for Production
+#### "command not found"
 
-These examples demonstrate Joblet's readiness for:
-- **Agentic AI Foundations**: LLM inference, multi-agent coordination, RAG systems
-- **Data Science Workflows**: ML training, distributed processing, analytics pipelines  
-- **Application Development**: API testing, build pipelines, microservice deployment
-- **Production Patterns**: Resource management, persistent storage, comprehensive monitoring
+- **Python scripts**: Ensure Python 3 is available in job environment
+- **Node.js scripts**: Node.js may not be installed in job environment
+- **Solution**: Stick to ✅ examples or install missing runtime
 
-## 📝 License
+#### Job failures
 
-All examples are provided under the same license as Joblet. See [LICENSE](../LICENSE) for details.
+```bash
+# Check job logs
+rnx log <job-id>
+
+# View job status
+rnx list
+```
+
+#### Resource issues
+
+```bash
+# Monitor system resources
+rnx monitor
+
+# Adjust memory limits in scripts (--max-memory=512)
+```
+
+## 📖 Documentation
+
+Each example directory contains detailed README files:
+
+- **[Python Analytics README](./python-analytics/README.md)**
+- **[Basic Usage README](./basic-usage/README.md)**
+- **[Advanced README](./advanced/README.md)**
+- **[Node.js README](./nodejs/README.md)**
+
+## 🚀 Next Steps
+
+1. **Master the Basics**: Complete basic-usage examples
+2. **Explore Analytics**: Try python-analytics examples
+3. **Learn Coordination**: Understand advanced job patterns
+4. **Apply to Your Use Case**: Adapt examples for your workflows
+
+Start with the ✅ examples for the best experience!

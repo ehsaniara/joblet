@@ -20,7 +20,9 @@ func NewDNSManager(stateDir string) *DNSManager {
 	}
 }
 
-// SetupJobDNS configures DNS for a job in a network
+// SetupJobDNS configures DNS resolution for a job within its network namespace.
+// It generates custom hosts file entries for hostname resolution between jobs in the same network,
+// enabling jobs to communicate using hostnames rather than raw IP addresses.
 func (dm *DNSManager) SetupJobDNS(pid int, alloc *JobAllocation, networkJobs map[string]*JobAllocation) error {
 	// Skip DNS setup for special networks
 	if alloc.Network == "none" || alloc.Network == "isolated" {
@@ -139,6 +141,9 @@ func (dm *DNSManager) getJobPID(jobID string) int {
 }
 
 // Helper function to get short hostname
+// getShortHostname extracts a short alias from a full hostname for DNS resolution.
+// It simplifies job hostnames by removing prefixes and provides convenient short names
+// for easier inter-job communication within networks.
 func getShortHostname(hostname string) string {
 	// Extract meaningful short name from hostname
 	// e.g., "job_abc123" -> "abc123"

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/spf13/cobra"
-	"google.golang.org/grpc/status"
 	"io"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/spf13/cobra"
+	"google.golang.org/grpc/status"
 )
 
 func newLogCmd() *cobra.Command {
