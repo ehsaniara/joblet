@@ -6,11 +6,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	pb "joblet/api/gen"
+	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/mappers"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/logger"
 )
 
@@ -18,13 +18,13 @@ import (
 type JobServiceServer struct {
 	pb.UnimplementedJobletServiceServer
 	auth     auth2.GrpcAuthorization
-	jobStore state.Store
-	joblet   interfaces.Joblet // Uses the new interface
+	jobStore adapters.JobStoreAdapter // Uses the new adapter interface
+	joblet   interfaces.Joblet        // Uses the new interface
 	logger   *logger.Logger
 }
 
 // NewJobServiceServer creates a new job service that uses request objects
-func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore state.Store, joblet interfaces.Joblet) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GrpcAuthorization, jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet) *JobServiceServer {
 	return &JobServiceServer{
 		auth:     auth,
 		jobStore: jobStore,

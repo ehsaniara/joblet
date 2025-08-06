@@ -75,7 +75,7 @@ func (dm *DNSManager) generateHostsContent(alloc *JobAllocation, networkJobs map
 }
 
 // bindMountHosts mounts the hosts file into the container namespace
-func (dm *DNSManager) bindMountHosts(pid int, hostsPath string) error {
+func (dm *DNSManager) bindMountHosts(pid int, _ string) error {
 	// Target path in the container
 	targetPath := fmt.Sprintf("/proc/%d/root/etc/hosts", pid)
 

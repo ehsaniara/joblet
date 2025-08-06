@@ -7,30 +7,30 @@ server:
   timeout: "10s"
   minTlsVersion: "1.3"
 
-# Security section will be added by certs_gen_embedded.sh
-# DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
-
 joblet:
-  defaultCpuLimit: 100
-  defaultMemoryLimit: 512
-  defaultIoLimit: 0
-  maxConcurrentJobs: 100
-  jobTimeout: "30m"
-  cleanupTimeout: "2s"
-  validateCommands: true
+  defaultCpuLimit: 0            # No CPU limit by default (0 = unlimited)
+  defaultMemoryLimit: 0         # No memory limit by default (0 = unlimited)
+  defaultIoLimit: 0             # No I/O limit by default (0 = unlimited)
+  maxConcurrentJobs: 0          # No job concurrency limit (0 = unlimited)
+  jobTimeout: "0s"              # No job timeout by default (0 = unlimited)
+  cleanupTimeout: "100ms"       # Fast cleanup for performance
+  validateCommands: false       # Skip validation for maximum speed
 
 cgroup:
   baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service"
   namespaceMount: "/sys/fs/cgroup"
   enableControllers: [ "memory", "cpu", "io", "pids", "cpuset" ]
-  cleanupTimeout: "1s"
+  cleanupTimeout: "100ms"       # Fast cgroup cleanup for performance
 
 network:
-  state_dir: "/opt/joblet/config"
+  state_dir: "/opt/joblet/network"
   enabled: true
   default_network: "bridge"
   allow_custom_networks: true
-  max_custom_networks: 50
+  max_custom_networks: 0       # No limit on custom networks (0 = unlimited)
+  # Network storage configuration - file-based persistence
+  storage:
+    path: "/opt/joblet/network"  # Directory for network state files
   networks:
     bridge:
       cidr: "172.20.0.0/16"
@@ -39,6 +39,7 @@ network:
 filesystem:
   baseDir: "/opt/joblet/jobs"
   tmpDir: "/tmp/job-{JOB_ID}"
+  workspaceDir: "/work"         # Directory for job uploads and execution
   allowedMounts:
     - "/usr/bin"
     - "/bin"
@@ -54,28 +55,46 @@ filesystem:
   blockDevices: false
 
 grpc:
-  maxRecvMsgSize: 262144
-  maxSendMsgSize: 1048576
-  maxHeaderListSize: 524288
-  keepAliveTime: "30s"
-  keepAliveTimeout: "5s"
+  # Production-grade gRPC settings for high-performance traffic
+  maxRecvMsgSize: 134217728        # 128MB - handle large file uploads/downloads
+  maxSendMsgSize: 134217728        # 128MB - handle large responses and streaming
+  maxHeaderListSize: 16777216      # 16MB - handle large metadata/headers
+  keepAliveTime: "10s"             # More frequent keepalives for connection health
+  keepAliveTimeout: "3s"           # Faster timeout detection
+  maxConcurrentStreams: 1000       # High concurrent stream limit
+  connectionTimeout: "10s"         # Connection establishment timeout
+  maxConnectionIdle: "300s"        # 5min idle before cleanup
+  maxConnectionAge: "1800s"        # 30min max connection lifetime
+  maxConnectionAgeGrace: "30s"     # Grace period for connection shutdown
 
 logging:
   level: "INFO"
   format: "text"
   output: "stdout"
 
+# Buffer configuration - consolidated pub-sub and buffer settings for job log streaming and storage
+buffers:
+  default_config:
+    type: "memory"              # Options: memory, ring, persistent
+    initial_capacity: 2097152   # 2MB initial buffer for high-throughput streaming
+    max_capacity: 0             # Maximum buffer size (0 = unlimited)
+    max_subscribers: 0          # Maximum subscribers per buffer (0 = unlimited)
+    subscriber_buffer_size: 1000 # Large channel buffer for high concurrency
+    pubsub_buffer_size: 10000   # Large pub-sub channel buffer for high-throughput production traffic
+    enable_metrics: true        # Enable metrics for log streaming debugging
+    upload_timeout: "10m"       # Extended timeout for large uploads
+    chunk_size: 1048576         # 1MB chunks for optimal streaming performance
+
+# Volume management configuration
+volumes:
+  base_path: "/opt/joblet/volumes"  # Base directory for all volumes
+  default_disk_quota_bytes: 1048576  # Default disk quota for jobs without volumes (1MB)
+
 monitoring:
   enabled: true
-  collection:
-    system_interval: "10s"      # How often to collect system metrics
-    process_interval: "30s"     # How often to collect process metrics
-    cloud_detection: true       # Enable cloud environment detection
-  storage:
-    retention_hours: 24         # How long to keep raw metrics in memory
-    max_memory_mb: 100          # Maximum memory usage for metrics storage
-    aggregation: # Time-series aggregation settings
-      - interval: "1h"          # Create hourly summaries
-        retention: "168h"       # Keep for 7 days
-      - interval: "24h"         # Create daily summaries  
-        retention: "720h"       # Keep for 30 days
+  system_interval: "10s"
+  process_interval: "30s"
+  cloud_detection: true
+
+# Security section will be added by certs_gen_embedded.sh
+# DO NOT ADD CERTIFICATES HERE - they will be embedded automatically

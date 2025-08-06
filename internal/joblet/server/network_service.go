@@ -2,13 +2,14 @@ package server
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pb "joblet/api/gen"
+	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/logger"
 )
 
@@ -16,12 +17,12 @@ import (
 type NetworkServiceServer struct {
 	pb.UnimplementedNetworkServiceServer
 	auth         auth2.GrpcAuthorization
-	networkStore *state.NetworkStore
+	networkStore adapters.NetworkStoreAdapter
 	logger       *logger.Logger
 }
 
 // NewNetworkServiceServer creates a new network service server
-func NewNetworkServiceServer(auth auth2.GrpcAuthorization, networkStore *state.NetworkStore) *NetworkServiceServer {
+func NewNetworkServiceServer(auth auth2.GrpcAuthorization, networkStore adapters.NetworkStoreAdapter) *NetworkServiceServer {
 	return &NetworkServiceServer{
 		auth:         auth,
 		networkStore: networkStore,
@@ -43,15 +44,26 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 		return nil, err
 	}
 
+	// Create network config for the adapter
+	networkConfig := &adapters.NetworkConfig{
+		Name:      req.Name,
+		Type:      "custom",
+		CIDR:      req.Cidr,
+		Gateway:   "", // Will be calculated by adapter
+		DNS:       []string{},
+		Metadata:  make(map[string]string),
+		CreatedAt: time.Now().Unix(),
+		UpdatedAt: time.Now().Unix(),
+	}
+
 	// Create the network
-	if err := s.networkStore.CreateNetwork(req.Name, req.Cidr); err != nil {
+	if err := s.networkStore.CreateNetwork(networkConfig); err != nil {
 		log.Error("failed to create network", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create network: %v", err)
 	}
 
 	// Get network info for response
-	networks := s.networkStore.ListNetworks()
-	netInfo, exists := networks[req.Name]
+	network, exists := s.networkStore.GetNetwork(req.Name)
 	if !exists {
 		return nil, status.Errorf(codes.Internal, "network created but not found")
 	}
@@ -59,9 +71,9 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 	log.Info("network created successfully")
 
 	return &pb.CreateNetworkRes{
-		Name:   netInfo.Name,
-		Cidr:   netInfo.CIDR,
-		Bridge: netInfo.Bridge,
+		Name:   network.Name,
+		Cidr:   network.CIDR,
+		Bridge: network.BridgeName,
 	}, nil
 }
 
@@ -80,12 +92,16 @@ func (s *NetworkServiceServer) ListNetworks(ctx context.Context, req *pb.EmptyRe
 		Networks: make([]*pb.Network, 0, len(networks)),
 	}
 
-	for _, net := range networks {
+	for _, network := range networks {
+		// Count jobs in this network for compatibility
+		jobsInNetwork := s.networkStore.ListJobsInNetwork(network.Name)
+		jobCount := int32(len(jobsInNetwork))
+
 		resp.Networks = append(resp.Networks, &pb.Network{
-			Name:     net.Name,
-			Cidr:     net.CIDR,
-			Bridge:   net.Bridge,
-			JobCount: int32(net.JobCount),
+			Name:     network.Name,
+			Cidr:     network.CIDR,
+			Bridge:   network.BridgeName,
+			JobCount: jobCount,
 		})
 	}
 

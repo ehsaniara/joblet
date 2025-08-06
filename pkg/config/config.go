@@ -23,6 +23,8 @@ type Config struct {
 	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
 	Network    NetworkConfig    `yaml:"network"`
 	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring"`
+	Buffers    BuffersConfig    `yaml:"buffers" json:"buffers"`
+	Volumes    VolumesConfig    `yaml:"volumes" json:"volumes"`
 }
 
 type NetworkConfig struct {
@@ -32,6 +34,7 @@ type NetworkConfig struct {
 	Networks            map[string]NetworkDefinition `yaml:"networks"`
 	AllowCustomNetworks bool                         `yaml:"allow_custom_networks"`
 	MaxCustomNetworks   int                          `yaml:"max_custom_networks"`
+	Storage             NetworkStorageConfig         `yaml:"storage"`
 }
 
 type NetworkDefinition struct {
@@ -42,6 +45,10 @@ type NetworkDefinition struct {
 type IPAllocationConfig struct {
 	StartOffset int `yaml:"start_offset"`
 	EndReserve  int `yaml:"end_reserve"`
+}
+
+type NetworkStorageConfig struct {
+	Path string `yaml:"path" json:"path"`
 }
 
 // ServerConfig holds server-specific configuration
@@ -69,6 +76,14 @@ type JobletConfig struct {
 	JobTimeout         time.Duration `yaml:"jobTimeout" json:"jobTimeout"`
 	CleanupTimeout     time.Duration `yaml:"cleanupTimeout" json:"cleanupTimeout"`
 	ValidateCommands   bool          `yaml:"validateCommands" json:"validateCommands"`
+
+	// Resource validation limits
+	MinCPULimit    int32 `yaml:"minCpuLimit" json:"minCpuLimit"`       // Minimum CPU percentage (0 = no limit)
+	MaxCPULimit    int32 `yaml:"maxCpuLimit" json:"maxCpuLimit"`       // Maximum CPU percentage
+	MinMemoryLimit int32 `yaml:"minMemoryLimit" json:"minMemoryLimit"` // Minimum memory MB (0 = no limit)
+	MaxMemoryLimit int32 `yaml:"maxMemoryLimit" json:"maxMemoryLimit"` // Maximum memory MB
+	MinIOLimit     int32 `yaml:"minIoLimit" json:"minIoLimit"`         // Minimum IO BPS (0 = no limit)
+	MaxIOLimit     int32 `yaml:"maxIoLimit" json:"maxIoLimit"`         // Maximum IO BPS
 }
 
 // CgroupConfig holds cgroup-related configuration
@@ -83,17 +98,23 @@ type CgroupConfig struct {
 type FilesystemConfig struct {
 	BaseDir       string   `yaml:"baseDir" json:"baseDir"`
 	TmpDir        string   `yaml:"tmpDir" json:"tmpDir"`
+	WorkspaceDir  string   `yaml:"workspaceDir" json:"workspaceDir"`
 	AllowedMounts []string `yaml:"allowedMounts" json:"allowedMounts"`
 	BlockDevices  bool     `yaml:"blockDevices" json:"blockDevices"`
 }
 
 // GRPCConfig holds gRPC-specific configuration
 type GRPCConfig struct {
-	MaxRecvMsgSize    int32         `yaml:"maxRecvMsgSize" json:"maxRecvMsgSize"`
-	MaxSendMsgSize    int32         `yaml:"maxSendMsgSize" json:"maxSendMsgSize"`
-	MaxHeaderListSize int32         `yaml:"maxHeaderListSize" json:"maxHeaderListSize"`
-	KeepAliveTime     time.Duration `yaml:"keepAliveTime" json:"keepAliveTime"`
-	KeepAliveTimeout  time.Duration `yaml:"keepAliveTimeout" json:"keepAliveTimeout"`
+	MaxRecvMsgSize        int32         `yaml:"maxRecvMsgSize" json:"maxRecvMsgSize"`
+	MaxSendMsgSize        int32         `yaml:"maxSendMsgSize" json:"maxSendMsgSize"`
+	MaxHeaderListSize     int32         `yaml:"maxHeaderListSize" json:"maxHeaderListSize"`
+	KeepAliveTime         time.Duration `yaml:"keepAliveTime" json:"keepAliveTime"`
+	KeepAliveTimeout      time.Duration `yaml:"keepAliveTimeout" json:"keepAliveTimeout"`
+	MaxConcurrentStreams  uint32        `yaml:"maxConcurrentStreams" json:"maxConcurrentStreams"`
+	ConnectionTimeout     time.Duration `yaml:"connectionTimeout" json:"connectionTimeout"`
+	MaxConnectionIdle     time.Duration `yaml:"maxConnectionIdle" json:"maxConnectionIdle"`
+	MaxConnectionAge      time.Duration `yaml:"maxConnectionAge" json:"maxConnectionAge"`
+	MaxConnectionAgeGrace time.Duration `yaml:"maxConnectionAgeGrace" json:"maxConnectionAgeGrace"`
 }
 
 // LoggingConfig holds logging configuration
@@ -105,12 +126,7 @@ type LoggingConfig struct {
 
 // MonitoringConfig holds monitoring system configuration
 type MonitoringConfig struct {
-	Enabled    bool                 `yaml:"enabled" json:"enabled"`
-	Collection MonitoringCollection `yaml:"collection" json:"collection"`
-}
-
-// MonitoringCollection holds collection settings
-type MonitoringCollection struct {
+	Enabled         bool          `yaml:"enabled" json:"enabled"`
 	SystemInterval  time.Duration `yaml:"system_interval" json:"system_interval"`
 	ProcessInterval time.Duration `yaml:"process_interval" json:"process_interval"`
 	CloudDetection  bool          `yaml:"cloud_detection" json:"cloud_detection"`
@@ -128,6 +144,30 @@ type Node struct {
 	Cert    string `yaml:"cert"` // Embedded PEM certificate
 	Key     string `yaml:"key"`  // Embedded PEM private key
 	CA      string `yaml:"ca"`   // Embedded PEM CA certificate
+}
+
+// BuffersConfig holds consolidated buffer and pub-sub configuration
+type BuffersConfig struct {
+	DefaultConfig BufferDefaultConfig `yaml:"default_config" json:"default_config"`
+}
+
+// BufferDefaultConfig holds default buffer configuration (consolidated with pub-sub settings)
+type BufferDefaultConfig struct {
+	Type                 string        `yaml:"type" json:"type"`
+	InitialCapacity      int64         `yaml:"initial_capacity" json:"initial_capacity"`
+	MaxCapacity          int64         `yaml:"max_capacity" json:"max_capacity"`
+	MaxSubscribers       int           `yaml:"max_subscribers" json:"max_subscribers"`
+	SubscriberBufferSize int           `yaml:"subscriber_buffer_size" json:"subscriber_buffer_size"`
+	PubsubBufferSize     int           `yaml:"pubsub_buffer_size" json:"pubsub_buffer_size"`
+	EnableMetrics        bool          `yaml:"enable_metrics" json:"enable_metrics"`
+	UploadTimeout        time.Duration `yaml:"upload_timeout" json:"upload_timeout"`
+	ChunkSize            int           `yaml:"chunk_size" json:"chunk_size"`
+}
+
+// VolumesConfig holds volume management configuration
+type VolumesConfig struct {
+	BasePath              string `yaml:"base_path" json:"base_path"`
+	DefaultDiskQuotaBytes int64  `yaml:"default_disk_quota_bytes" json:"default_disk_quota_bytes"`
 }
 
 // DefaultConfig provides default configuration values
@@ -154,6 +194,14 @@ var DefaultConfig = Config{
 		JobTimeout:         1 * time.Hour,
 		CleanupTimeout:     5 * time.Second,
 		ValidateCommands:   true,
+
+		// Resource validation limits (0 = no minimum/maximum)
+		MinCPULimit:    0,       // No minimum CPU limit
+		MaxCPULimit:    1000,    // 10 cores worth (1000%)
+		MinMemoryLimit: 1,       // 1MB minimum - configurable!
+		MaxMemoryLimit: 32768,   // 32GB maximum
+		MinIOLimit:     0,       // No minimum IO limit
+		MaxIOLimit:     1000000, // 1GB/s maximum
 	},
 	Cgroup: CgroupConfig{
 		BaseDir:           "/sys/fs/cgroup/joblet.slice/joblet.service",
@@ -164,41 +212,92 @@ var DefaultConfig = Config{
 	Filesystem: FilesystemConfig{
 		BaseDir:       "/opt/joblet/jobs",
 		TmpDir:        "/tmp/job-{JOB_ID}",
+		WorkspaceDir:  "/work",
 		AllowedMounts: []string{"/usr/bin", "/bin", "/lib", "/lib64"},
 		BlockDevices:  false,
 	},
 	GRPC: GRPCConfig{
-		MaxRecvMsgSize:    512 * 1024,
-		MaxSendMsgSize:    4 * 1024 * 1024,
-		MaxHeaderListSize: 1 * 1024 * 1024,
-		KeepAliveTime:     30 * time.Second,
-		KeepAliveTimeout:  5 * time.Second,
+		MaxRecvMsgSize:        134217728,          // 128MB for production traffic
+		MaxSendMsgSize:        134217728,          // 128MB for production traffic
+		MaxHeaderListSize:     16777216,           // 16MB for production traffic
+		KeepAliveTime:         10 * time.Second,   // More frequent keepalives
+		KeepAliveTimeout:      3 * time.Second,    // Faster timeout detection
+		MaxConcurrentStreams:  1000,               // High concurrent streams
+		ConnectionTimeout:     10 * time.Second,   // Connection timeout
+		MaxConnectionIdle:     300 * time.Second,  // 5min idle
+		MaxConnectionAge:      1800 * time.Second, // 30min max age
+		MaxConnectionAgeGrace: 30 * time.Second,   // 30s grace period
 	},
 	Logging: LoggingConfig{
 		Level:  "INFO",
 		Format: "text",
 		Output: "stdout",
 	},
-	Monitoring: MonitoringConfig{
-		Enabled: true,
-		Collection: MonitoringCollection{
-			SystemInterval:  10 * time.Second,
-			ProcessInterval: 30 * time.Second,
-			CloudDetection:  true,
+	Network: NetworkConfig{
+		StateDir:            "/opt/joblet/network",
+		Enabled:             true,
+		DefaultNetwork:      "bridge",
+		AllowCustomNetworks: true,
+		MaxCustomNetworks:   50,
+		Storage: NetworkStorageConfig{
+			Path: "/opt/joblet/network",
 		},
+		Networks: map[string]NetworkDefinition{
+			"bridge": {
+				CIDR:       "172.20.0.0/16",
+				BridgeName: "joblet0",
+			},
+		},
+	},
+	Monitoring: MonitoringConfig{
+		Enabled:         true,
+		SystemInterval:  10 * time.Second,
+		ProcessInterval: 30 * time.Second,
+		CloudDetection:  true,
+	},
+	Buffers: BuffersConfig{
+		DefaultConfig: BufferDefaultConfig{
+			Type:                 "memory",
+			InitialCapacity:      2097152,          // 2MB initial buffer for high-throughput
+			MaxCapacity:          0,                // Unlimited for production
+			MaxSubscribers:       0,                // Unlimited for production
+			SubscriberBufferSize: 1000,             // Large channel buffer for high concurrency
+			PubsubBufferSize:     10000,            // Large pub-sub channel buffer (consolidated from pubsub section)
+			EnableMetrics:        false,            // Disabled for maximum performance
+			UploadTimeout:        10 * time.Minute, // Extended timeout for large uploads
+			ChunkSize:            1048576,          // 1MB chunks for optimal streaming
+		},
+	},
+	Volumes: VolumesConfig{
+		BasePath:              "/opt/joblet/volumes",
+		DefaultDiskQuotaBytes: 1048576, // 1MB default
 	},
 }
 
-// GetServerAddress Server-specific convenience methods
+// GetServerAddress returns the complete server address in "host:port" format.
+// Combines the configured server address and port into a single string
+// suitable for network listeners and client connections.
+// Example: "0.0.0.0:50051" or "localhost:8080"
 func (c *Config) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", c.Server.Address, c.Server.Port)
 }
 
+// GetCgroupPath constructs the full cgroup path for a specific job.
+// Takes a job ID and combines it with the configured cgroup base directory
+// to create a unique cgroup path for resource isolation.
+// Returns path in format: "/sys/fs/cgroup/joblet.slice/joblet.service/job-{jobID}"
 func (c *Config) GetCgroupPath(jobID string) string {
 	return filepath.Join(c.Cgroup.BaseDir, "job-"+jobID)
 }
 
-// GetServerTLSConfig returns TLS configuration from embedded certificates
+// GetServerTLSConfig creates a server-side TLS configuration from embedded certificates.
+// Parses the PEM-encoded server certificate, private key, and CA certificate
+// from the security configuration section to create a TLS config that:
+//   - Requires client certificate authentication (mTLS)
+//   - Uses TLS 1.3 minimum version for security
+//   - Validates client certificates against the configured CA
+//
+// Returns configured tls.Config or error if certificate parsing fails.
 func (c *Config) GetServerTLSConfig() (*tls.Config, error) {
 	if c.Security.ServerCert == "" || c.Security.ServerKey == "" || c.Security.CACert == "" {
 		return nil, fmt.Errorf("server certificates are not configured in security section")
@@ -227,7 +326,15 @@ func (c *Config) GetServerTLSConfig() (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// GetClientTLSConfig returns client TLS configuration from node certificates
+// GetClientTLSConfig creates a client-side TLS configuration from node certificates.
+// Parses the PEM-encoded client certificate, private key, and CA certificate
+// from the node configuration to create a TLS config that:
+//   - Presents client certificate for mTLS authentication
+//   - Validates server certificate against the configured CA
+//   - Uses TLS 1.3 minimum version for security
+//   - Sets server name to "joblet" for certificate validation
+//
+// Returns configured tls.Config or error if certificate parsing fails.
 func (n *Node) GetClientTLSConfig() (*tls.Config, error) {
 	if n.Cert == "" || n.Key == "" || n.CA == "" {
 		return nil, fmt.Errorf("client certificates are not configured for node")
@@ -256,7 +363,17 @@ func (n *Node) GetClientTLSConfig() (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// LoadConfig loads configuration for server/daemon
+// LoadConfig loads the main server configuration from file and environment variables.
+//  1. Path specified in JOBLET_CONFIG_PATH environment variable
+//  2. /opt/joblet/config/joblet-config.yml
+//  3. ./config/joblet-config.yml
+//  4. ./joblet-config.yml
+//  5. /etc/joblet/joblet-config.yml
+//  5. /etc/joblet/joblet-config.yml
+//
+// Applies environment variable overrides for server address, mode, and logging.
+// Validates the final configuration before returning.
+// Returns (config, configPath, error) - configPath indicates source of configuration.
 func LoadConfig() (*Config, string, error) {
 	config := DefaultConfig
 
@@ -288,7 +405,11 @@ func LoadConfig() (*Config, string, error) {
 	return &config, path, nil
 }
 
-// loadFromFile loads configuration from YAML file
+// loadFromFile loads configuration from the first available YAML file.
+// Searches common configuration locations and parses the first found file.
+// Updates the provided config struct with values from the file.
+// Returns the path of the loaded file or "built-in defaults" if no file found.
+// Does not return error if no file is found - uses defaults instead.
 func loadFromFile(config *Config) (string, error) {
 	configPaths := []string{
 		os.Getenv("JOBLET_CONFIG_PATH"),
@@ -322,7 +443,16 @@ func loadFromFile(config *Config) (string, error) {
 	return "built-in defaults (no config file found)", nil
 }
 
-// Validate validates the configuration
+// Validate performs comprehensive validation of the configuration.
+// Checks all configuration sections for:
+//   - Valid port ranges (1-65535)
+//   - Valid server modes ("server" or "init")
+//   - Non-negative resource limits
+//   - Absolute paths for cgroup directories
+//   - Valid logging levels
+//
+// Returns error describing the first validation failure found.
+// Does not validate certificates as they may be populated later.
 func (c *Config) Validate() error {
 	if c.Server.Port < 1 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
@@ -340,7 +470,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid default memory limit: %d", c.Joblet.DefaultMemoryLimit)
 	}
 
-	if c.Joblet.MaxConcurrentJobs < 1 {
+	if c.Joblet.MaxConcurrentJobs < 0 {
 		return fmt.Errorf("invalid max concurrent jobs: %d", c.Joblet.MaxConcurrentJobs)
 	}
 
@@ -364,7 +494,24 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// LoadClientConfig loads client configuration from file
+// LoadClientConfig loads RNX client configuration from the specified file.
+//
+//  1. Path from RNX_CONFIG environment variable
+//
+//  2. ./rnx-config.yml
+//
+//  3. ./config/rnx-config.yml
+//
+//  4. ~/.rnx/rnx-config.yml
+//
+//  5. /etc/joblet/rnx-config.yml
+//
+//  6. /opt/joblet/config/rnx-config.yml
+//
+//  6. /opt/joblet/config/rnx-config.yml
+//
+// Parses YAML configuration and validates that at least one node is configured.
+// Returns ClientConfig with node definitions for connecting to Joblet servers.
 func LoadClientConfig(configPath string) (*ClientConfig, error) {
 	if configPath == "" {
 		// Look for rnx-config.yml in common locations
@@ -397,7 +544,11 @@ func LoadClientConfig(configPath string) (*ClientConfig, error) {
 	return &config, nil
 }
 
-// GetNode returns the configuration for a specific node
+// GetNode retrieves the configuration for a named Joblet server node.
+// If nodeName is empty, defaults to "default" node.
+// Returns the Node configuration containing server address and certificates,
+// or error if the specified node name is not found in the configuration.
+// Used by RNX client to select which Joblet server to connect to.
 func (c *ClientConfig) GetNode(nodeName string) (*Node, error) {
 	if nodeName == "" {
 		nodeName = "default"
@@ -411,7 +562,10 @@ func (c *ClientConfig) GetNode(nodeName string) (*Node, error) {
 	return node, nil
 }
 
-// ListNodes returns all available node names
+// ListNodes returns a slice of all configured node names.
+// Provides a list of available Joblet servers that the client can connect to.
+// Used by RNX client for node discovery and selection.
+// Returns empty slice if no nodes are configured.
 func (c *ClientConfig) ListNodes() []string {
 	var nodes []string
 	for name := range c.Nodes {
@@ -420,7 +574,11 @@ func (c *ClientConfig) ListNodes() []string {
 	return nodes
 }
 
-// findClientConfig looks for rnx-config.yml in common locations
+// findClientConfig searches for RNX client configuration file in standard locations.
+// First checks RNX_CONFIG environment variable, then searches common paths.
+// Returns the path of the first found configuration file.
+// Returns empty string if no configuration file is found.
+// Used internally by LoadClientConfig when no specific path is provided.
 func findClientConfig() string {
 	// First check RNX_CONFIG environment variable
 	if envPath := os.Getenv("RNX_CONFIG"); envPath != "" {

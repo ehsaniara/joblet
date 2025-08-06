@@ -4,18 +4,29 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	pb "joblet/api/gen"
+	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/monitoring"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"net"
 )
 
-func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config.Config, networkStore *state.NetworkStore, volumeManager *volume.Manager, monitoringService *monitoring.Service) (*grpc.Server, error) {
+// StartGRPCServer initializes and starts the main Joblet gRPC server.
+// Configures the server with:
+//   - mTLS authentication using embedded certificates
+//   - High-performance settings for production traffic (128MB messages, 1000 concurrent streams)
+//   - Keepalive parameters for connection health monitoring
+//   - All Joblet services: Job execution, Network management, Volume management, Monitoring
+//
+// Creates a non-blocking server that listens on the configured address and po
+// Creates a non-blocking server that listens on the configured address and port.
+// Returns the gRPC server instance for graceful shutdown control.
+func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStoreAdapter, volumeManager *volume.Manager, monitoringService *monitoring.Service) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -42,12 +53,26 @@ func StartGRPCServer(jobStore state.Store, joblet interfaces.Joblet, cfg *config
 		grpc.MaxRecvMsgSize(int(cfg.GRPC.MaxRecvMsgSize)),
 		grpc.MaxSendMsgSize(int(cfg.GRPC.MaxSendMsgSize)),
 		grpc.MaxHeaderListSize(uint32(cfg.GRPC.MaxHeaderListSize)),
+		grpc.MaxConcurrentStreams(cfg.GRPC.MaxConcurrentStreams),
+		grpc.ConnectionTimeout(cfg.GRPC.ConnectionTimeout),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time:    cfg.GRPC.KeepAliveTime,
+			Timeout: cfg.GRPC.KeepAliveTimeout,
+		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             cfg.GRPC.KeepAliveTime / 2, // Allow keepalive pings every KeepAliveTime/2
+			PermitWithoutStream: true,                       // Allow keepalive pings even when no streams are active
+		}),
 	}
 
-	serverLogger.Debug("gRPC server options configured",
+	serverLogger.Debug("gRPC server options configured for high-performance production traffic",
 		"maxRecvMsgSize", cfg.GRPC.MaxRecvMsgSize,
 		"maxSendMsgSize", cfg.GRPC.MaxSendMsgSize,
-		"maxHeaderListSize", cfg.GRPC.MaxHeaderListSize)
+		"maxHeaderListSize", cfg.GRPC.MaxHeaderListSize,
+		"maxConcurrentStreams", cfg.GRPC.MaxConcurrentStreams,
+		"connectionTimeout", cfg.GRPC.ConnectionTimeout,
+		"keepAliveTime", cfg.GRPC.KeepAliveTime,
+		"keepAliveTimeout", cfg.GRPC.KeepAliveTimeout)
 
 	grpcServer := grpc.NewServer(grpcOptions...)
 

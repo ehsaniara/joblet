@@ -19,6 +19,10 @@ type Isolator struct {
 	logger   *logger.Logger
 }
 
+// NewIsolator creates a new filesystem isolator with the given configuration.
+// The isolator provides secure filesystem isolation for job execution using
+// chroot, bind mounts, and namespace isolation techniques.
+// Returns an Isolator instance ready to create isolated job filesystems.
 func NewIsolator(cfg config.FilesystemConfig, platform platform.Platform) *Isolator {
 	return &Isolator{
 		platform: platform,
@@ -40,7 +44,11 @@ type JobFilesystem struct {
 	logger   *logger.Logger
 }
 
-// PrepareInitBinary prepare the init binary
+// PrepareInitBinary copies the joblet init binary into the isolated filesystem.
+// Creates /sbin directory in the chroot environment and copies the host binary
+// to /sbin/init with executable permissions. This binary will be executed as
+// PID 1 inside the isolated environment to manage the job process.
+// Returns error if directory creation or binary copying fails.
 func (f *JobFilesystem) PrepareInitBinary(hostBinaryPath string) error {
 	log := f.logger.WithField("operation", "prepare-init-binary")
 
@@ -75,7 +83,15 @@ func (f *JobFilesystem) PrepareInitBinary(hostBinaryPath string) error {
 	return nil
 }
 
-// CreateJobFilesystem creates an isolated filesystem for a job
+// CreateJobFilesystem creates a new isolated filesystem environment for a job.
+// Sets up the directory structure needed for job execution:
+//   - Job root directory under configured base path
+//   - Temporary directory with job ID substitution
+//   - Work directory for job files and execution
+//
+// Performs safety validation to ensure running in proper job conte
+// Performs safety validation to ensure running in proper job context.
+// Returns JobFilesystem instance ready for setup and chroot operations.
 func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 	log := i.logger.WithField("jobID", jobID)
 	log.Debug("creating isolated filesystem for job")
@@ -116,7 +132,13 @@ func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 	return filesystem, nil
 }
 
-// validateJobContext ensures we're running in a job context, not on the host
+// validateJobContext ensures the process is running in a safe job environment.
+// Performs critical safety checks to prevent filesystem isolation on the host:
+//   - Verifies JOB_ID environment variable is set
+//   - Confirms process is PID 1 (running in PID namespace)
+//
+// These checks prevent accidental host filesystem corruption during development.
+// Returns error if not running in proper isolated job context.
 func (i *Isolator) validateJobContext() error {
 	// Check if we're in a job by looking for JOB_ID environment variable
 	jobID := i.platform.Getenv("JOB_ID")
@@ -132,6 +154,13 @@ func (i *Isolator) validateJobContext() error {
 	return nil
 }
 
+// createEssentialFiles creates basic system files needed in the isolated environment.
+// Sets up minimal /etc directory with:
+//   - /etc/resolv.conf with DNS configuration (Google DNS servers)
+//   - /etc/hosts with localhost mappings
+//
+// These files enable basic network resolution and hostname lookup within jobs.
+// Logs warnings but does not fail job execution if file creation fails.
 func (f *JobFilesystem) createEssentialFiles() error {
 	// Create /etc directory
 	etcDir := filepath.Join(f.RootDir, "etc")
@@ -163,7 +192,31 @@ options ndots:0
 	return nil
 }
 
-// Setup performs the actual filesystem isolation using chroot and mounts
+// Setup performs complete filesystem isolation for the job environment.
+//
+//  1. Validates running in job context (safety check)
+//
+//  2. Creates essential directory structure
+//
+//  3. Creates basic system files (/etc/resolv.conf, /etc/hosts)
+//
+//  4. Mounts allowed read-only directories from host
+//
+//  5. Loads and mounts job volumes
+//
+//  6. Sets up limited work directory (1MB) if no volumes
+//
+//  7. Mounts upload pipes directory
+//
+//  8. Sets up isolated /tmp directory
+//
+//  9. Performs chroot to isolated environment
+//
+//  10. Mounts essential filesystems (/proc, /dev)
+//
+//  10. Mounts essential filesystems (/proc, /dev)
+//
+// Returns error if any step fails - job cannot proceed without proper isolation.
 func (f *JobFilesystem) Setup() error {
 	log := f.logger.WithField("operation", "filesystem-setup")
 	log.Debug("setting up filesystem isolation")
@@ -241,7 +294,16 @@ func (f *JobFilesystem) Setup() error {
 	return nil
 }
 
-// createEssentialDirs creates only the directories that are NOT in allowedMounts
+// createEssentialDirs creates the basic directory structure in the isolated root.
+// Creates directories that won't be populated by bind mounts:
+//   - /etc (for configuration files)
+//   - /tmp (will be bind mounted to job-specific tmp)
+//   - /proc, /dev, /sys (for essential filesystems)
+//   - /work (working directory for job execution)
+//   - /var, /var/run, /var/tmp (runtime directories)
+//   - /volumes (mount point for persistent volumes)
+//
+// Directories for allowed mounts are created dynamically during mount operations.
 func (f *JobFilesystem) createEssentialDirs() error {
 	// Directories that must exist but won't be populated by mounts
 	essentialDirs := []string{
@@ -270,7 +332,12 @@ func (f *JobFilesystem) createEssentialDirs() error {
 	return nil
 }
 
-// mountAllowedDirs mounts allowed directories from host as read-only
+// mountAllowedDirs bind mounts essential host directories into the isolated environment.
+// Creates read-only mounts for system directories like /bin, /usr/bin, /lib, etc.
+// that are needed for job execution but should not be writable.
+// Automatically creates parent directories and handles missing host directories gracefully.
+// Each mount is first bound, then remounted as read-only for security.
+// Continues with remaining mounts if individual mounts fail.
 func (f *JobFilesystem) mountAllowedDirs() error {
 	// Enhanced to create parent directories automatically
 	for _, allowedDir := range f.config.AllowedMounts {
@@ -314,7 +381,11 @@ func (f *JobFilesystem) mountAllowedDirs() error {
 	return nil
 }
 
-// setupTmpDir sets up the isolated /tmp directory
+// setupTmpDir creates an isolated temporary directory for the job.
+// Bind mounts the job-specific temporary directory (from host) to /tmp
+// in the isolated environment, providing writable temporary space that
+// is automatically cleaned up when the job completes.
+// Each job gets its own isolated /tmp to prevent interference.
 func (f *JobFilesystem) setupTmpDir() error {
 	tmpPath := filepath.Join(f.RootDir, "tmp")
 
@@ -327,7 +398,12 @@ func (f *JobFilesystem) setupTmpDir() error {
 	return nil
 }
 
-// performChroot performs the actual chroot operation
+// performChroot executes the chroot system call to isolate the filesystem.
+// Changes to the prepared isolated root directory, performs chroot operation,
+// then changes working directory to the configured workspace (/work by default).
+// After chroot, the process can only access files within the isolated environment.
+// Falls back to /tmp or / if workspace directory is not accessible.
+// This is the critical isolation step that restricts filesystem access.
 func (f *JobFilesystem) performChroot() error {
 	log := f.logger.WithField("operation", "chroot")
 
@@ -341,9 +417,13 @@ func (f *JobFilesystem) performChroot() error {
 		return fmt.Errorf("chroot operation failed: %w", err)
 	}
 
-	// Change to /work directory inside the chroot
-	if err := syscall.Chdir("/work"); err != nil {
-		// If /work doesn't exist, go to /tmp
+	// Change to workspace directory inside the chroot
+	workspaceDir := f.config.WorkspaceDir
+	if workspaceDir == "" {
+		workspaceDir = "/work" // fallback to default
+	}
+	if err := syscall.Chdir(workspaceDir); err != nil {
+		// If workspace doesn't exist, go to /tmp
 		if er := syscall.Chdir("/tmp"); er != nil {
 			// Last resort: stay in /
 			if e := syscall.Chdir("/"); e != nil {
@@ -356,7 +436,15 @@ func (f *JobFilesystem) performChroot() error {
 	return nil
 }
 
-// mountEssentialFS mounts essential filesystems (proc, minimal dev) AFTER chroot
+// mountEssentialFS sets up essential device nodes after chroot isolation.
+// Creates minimal /dev entries needed for basic program operation:
+//   - /dev/null (null device)
+
+//   - /dev/zero (zero device)
+//   - /dev/random, /dev/urandom (entropy devices)
+//
+// These device nodes are required by most programs and provide secure
+// access to kernel functionality within the isolated environment.
 func (f *JobFilesystem) mountEssentialFS() error {
 	log := f.logger.WithField("operation", "mount-essential")
 
@@ -370,7 +458,14 @@ func (f *JobFilesystem) mountEssentialFS() error {
 	return nil
 }
 
-// createEssentialDevices creates minimal /dev entries needed for basic operation
+// createEssentialDevices creates character device nodes in /dev directory.
+// Uses mknod system call to create device files with proper major/minor numbers:
+//   - /dev/null (1,3) - discards all writes, returns EOF on reads
+//   - /dev/zero (1,5) - returns null bytes on reads
+//   - /dev/random (1,8) - cryptographically secure random bytes
+//   - /dev/urandom (1,9) - pseudorandom bytes (faster than /dev/random)
+//
+// Ignores errors if devices already exist, logs warnings for creation failures.
 func (f *JobFilesystem) createEssentialDevices() error {
 	// Create /dev/null
 	if err := syscall.Mknod("/dev/null", syscall.S_IFCHR|0666, int(makedev(1, 3))); err != nil {
@@ -403,7 +498,14 @@ func (f *JobFilesystem) createEssentialDevices() error {
 	return nil
 }
 
-// Cleanup removes the job filesystem (called from host)
+// Cleanup removes all job filesystem resources after job completion.
+// Called from the host system (not within chroot) to clean up:
+//   - Unmounts any tmpfs mounts (limited work directories)
+//   - Removes job root directory and all contents
+//   - Removes job-specific temporary directory
+//
+// Handles cleanup failures gracefully with warnings rather than errors
+// to prevent cleanup issues from affecting other jobs.
 func (f *JobFilesystem) Cleanup() error {
 	log := f.logger.WithField("operation", "cleanup")
 	log.Debug("cleaning up job filesystem")
@@ -429,7 +531,14 @@ func (f *JobFilesystem) Cleanup() error {
 	return nil
 }
 
-// validateInJobContext performs additional safety checks before chroot
+// validateInJobContext performs final safety validation before chroot execution.
+// Critical safety checks to prevent host system corruption:
+//   - Confirms JOB_ID environment variable matches expected job ID
+//   - Verifies process is PID 1 (isolated PID namespace)
+//   - Checks we're not already in a chroot environment
+//
+// These validations are the last line of defense against accidental
+// host system isolation during development or misconfiguration.
 func (f *JobFilesystem) validateInJobContext() error {
 	// Ensure we have JOB_ID environment variable
 	jobID := f.platform.Getenv("JOB_ID")
@@ -458,8 +567,12 @@ func (f *JobFilesystem) validateInJobContext() error {
 	return nil
 }
 
-// mountPipesDirectory mounts the host pipes directory into the chroot
-// This allows the init process to access upload pipes created by the server
+// mountPipesDirectory enables file upload functionality within the isolated environment.
+// Bind mounts the host pipes directory (where server creates upload pipes) into
+// the chroot at the same path structure. This allows the init process to access
+// named pipes for file uploads while maintaining path consistency.
+// Creates directory structure as needed and handles missing pipes gracefully.
+// File uploads won't work if this mount fails, but job can still execute.
 func (f *JobFilesystem) mountPipesDirectory() error {
 	// Get job ID from environment
 	jobID := f.platform.Getenv("JOB_ID")
@@ -469,7 +582,7 @@ func (f *JobFilesystem) mountPipesDirectory() error {
 	}
 
 	// Host pipes directory (where server creates the pipe)
-	hostPipesPath := fmt.Sprintf("/opt/joblet/jobs/%s/pipes", jobID)
+	hostPipesPath := fmt.Sprintf("%s/%s/pipes", f.config.BaseDir, jobID)
 
 	// Check if host pipes directory exists
 	if _, err := f.platform.Stat(hostPipesPath); err != nil {
@@ -511,7 +624,12 @@ func (f *JobFilesystem) mountPipesDirectory() error {
 	return nil
 }
 
-// mountVolumes mounts all requested volumes into the chroot environment
+// mountVolumes attaches persistent storage volumes to the job environment.
+// Iterates through all volumes assigned to the job and bind mounts each one
+// from the host volume storage location to /volumes/{name} in the chroot.
+// Volumes provide persistent, writable storage that survives job restarts.
+// Continues mounting remaining volumes if individual volume mounts fail,
+// ensuring partial volume failures don't prevent job execution.
 func (f *JobFilesystem) mountVolumes() error {
 	if len(f.Volumes) == 0 {
 		f.logger.Debug("no volumes to mount")
@@ -533,12 +651,16 @@ func (f *JobFilesystem) mountVolumes() error {
 	return nil
 }
 
-// mountSingleVolume mounts a single volume into the job's chroot environment
+// mountSingleVolume performs the mount operation for one specific volume.
+// Validates the volume exists on the host, creates the mount point directory
+// in the chroot (/volumes/{volumeName}), and bind mounts the volume data.
+// Volumes are mounted read-write by default to allow job data persistence.
+// Returns error if volume doesn't exist or mount operation fails.
 func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
 	log := f.logger.WithField("volume", volumeName)
 
 	// Host volume path - this is where the actual volume data lives
-	hostVolumePath := fmt.Sprintf("/opt/joblet/volumes/%s/data", volumeName)
+	hostVolumePath := fmt.Sprintf("%s/%s/data", f.getVolumesBasePath(), volumeName)
 
 	// Check if host volume directory exists
 	if _, err := f.platform.Stat(hostVolumePath); err != nil {
@@ -569,13 +691,21 @@ func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
 	return nil
 }
 
-// SetVolumes sets the list of volumes to mount for this job
+// SetVolumes configures which persistent volumes should be mounted for this job.
+// Takes a slice of volume names that should be available at /volumes/{name}
+// within the job environment. Called by the job execution system before
+// filesystem setup to configure volume access.
+// Volume names must correspond to existing volumes in the volume store.
 func (f *JobFilesystem) SetVolumes(volumes []string) {
 	f.Volumes = volumes
 	f.logger.Debug("volumes set for job", "volumes", volumes)
 }
 
-// loadVolumesFromEnvironment loads volume names from environment variables
+// loadVolumesFromEnvironment reads volume configuration from environment variables.
+// Parses JOB_VOLUMES_COUNT and JOB_VOLUME_{index} environment variables
+// to determine which volumes should be mounted for the job.
+// Used as fallback when volumes aren't explicitly set via SetVolumes.
+// Environment variables are set by the job execution system.
 func (f *JobFilesystem) loadVolumesFromEnvironment() {
 	volumeCountStr := f.platform.Getenv("JOB_VOLUMES_COUNT")
 	if volumeCountStr == "" {
@@ -603,7 +733,12 @@ func (f *JobFilesystem) loadVolumesFromEnvironment() {
 	f.logger.Debug("loaded volumes from environment", "volumes", volumes)
 }
 
-// setupLimitedWorkDir sets up a 1MB limited work directory for jobs without volumes
+// setupLimitedWorkDir creates a size-limited work directory for jobs without volumes.
+// Mounts a tmpfs filesystem with configured size limit (default 1MB) to provide
+// writable workspace while preventing runaway disk usage.
+// The limited workspace is then bind mounted to /work in the chroot.
+// Used for jobs that don't have persistent volumes but need some writable space.
+// Falls back to unlimited work directory if tmpfs mount fails.
 func (f *JobFilesystem) setupLimitedWorkDir() error {
 	log := f.logger.WithField("operation", "setup-limited-work")
 	log.Debug("setting up limited work directory (1MB) for job without volumes")
@@ -614,8 +749,8 @@ func (f *JobFilesystem) setupLimitedWorkDir() error {
 		return fmt.Errorf("failed to create limited work directory: %w", err)
 	}
 
-	// Mount tmpfs with 1MB size limit
-	sizeOpt := "size=1048576" // 1MB in bytes
+	// Mount tmpfs with configured size limit
+	sizeOpt := fmt.Sprintf("size=%d", f.getDefaultDiskQuotaBytes())
 	flags := uintptr(0)
 	if err := f.platform.Mount("tmpfs", limitedWorkPath, "tmpfs", flags, sizeOpt); err != nil {
 		return fmt.Errorf("failed to mount limited tmpfs: %w", err)
@@ -633,7 +768,35 @@ func (f *JobFilesystem) setupLimitedWorkDir() error {
 	return nil
 }
 
-// Helper function to create device numbers
+// makedev creates a device number from major and minor numbers.
+// Combines major and minor device numbers into the format expected by mknod.
+// Used for creating character device nodes like /dev/null, /dev/zero.
+// Linux device number format: major number in high bits, minor in low bits.
 func makedev(major, minor uint32) uint64 {
 	return uint64(major<<8 | minor)
+}
+
+// getVolumesBasePath returns the host directory where volume data is stored.
+// Checks JOBLET_VOLUMES_BASE_PATH environment variable first,
+// then falls back to default /opt/joblet/volumes location.
+// Used to locate volume data directories on the host for bind mounting.
+func (f *JobFilesystem) getVolumesBasePath() string {
+	if volumesBasePath := f.platform.Getenv("JOBLET_VOLUMES_BASE_PATH"); volumesBasePath != "" {
+		return volumesBasePath
+	}
+	return "/opt/joblet/volumes"
+}
+
+// getDefaultDiskQuotaBytes returns the size limit for job work directories.
+// Checks JOBLET_DEFAULT_DISK_QUOTA_BYTES environment variable first,
+// then falls back to 1MB (1048576 bytes) default.
+// Used to limit tmpfs size for jobs without persistent volumes
+// to prevent excessive memory usage.
+func (f *JobFilesystem) getDefaultDiskQuotaBytes() int64 {
+	if diskQuotaStr := f.platform.Getenv("JOBLET_DEFAULT_DISK_QUOTA_BYTES"); diskQuotaStr != "" {
+		if quota, err := strconv.ParseInt(diskQuotaStr, 10, 64); err == nil && quota > 0 {
+			return quota
+		}
+	}
+	return 1048576 // 1MB default
 }

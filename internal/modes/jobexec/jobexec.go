@@ -1,3 +1,5 @@
+//go:build linux
+
 package jobexec
 
 import (
@@ -5,6 +7,7 @@ import (
 	"fmt"
 	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/core/upload"
+	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 	"os"
@@ -17,10 +20,11 @@ type JobExecutor struct {
 	logger        *logger.Logger
 	envBuilder    *environment.Builder
 	uploadManager *upload.Manager
+	config        *config.Config
 }
 
 // NewJobExecutor creates a new job executor
-func NewJobExecutor(platform platform.Platform, logger *logger.Logger) *JobExecutor {
+func NewJobExecutor(platform platform.Platform, logger *logger.Logger, cfg *config.Config) *JobExecutor {
 	// Create upload manager
 	uploadManager := upload.NewManager(platform, logger)
 
@@ -32,6 +36,7 @@ func NewJobExecutor(platform platform.Platform, logger *logger.Logger) *JobExecu
 		logger:        logger.WithField("component", "job-executor"),
 		envBuilder:    envBuilder,
 		uploadManager: uploadManager, // Store for direct access if needed
+		config:        cfg,
 	}
 }
 
@@ -66,7 +71,12 @@ func (je *JobExecutor) ExecuteInInitMode() error {
 // Execute executes the job using consolidated environment handling
 func Execute(logger *logger.Logger) error {
 	p := platform.NewPlatform()
-	executor := NewJobExecutor(p, logger)
+	// Load configuration - this is needed for workspace directory
+	cfg, _, err := config.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+	executor := NewJobExecutor(p, logger, cfg)
 	return executor.ExecuteJob()
 }
 
@@ -103,7 +113,10 @@ func (je *JobExecutor) ExecuteJob() error {
 func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
 	log := je.logger.WithField("operation", "process-uploads")
 
-	workspaceDir := "/work"
+	workspaceDir := je.config.Filesystem.WorkspaceDir
+	if workspaceDir == "" {
+		return fmt.Errorf("workspace directory not configured")
+	}
 	log.Debug("processing uploads from pipe",
 		"pipePath", config.UploadPipePath,
 		"workspace", workspaceDir)
@@ -133,12 +146,15 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 
 	// Change to workspace if uploads were processed (use os.Chdir since we're in isolated namespace)
 	if je.platform.Getenv("JOB_HAS_UPLOADS") == "true" {
-		workDir := "/work"
+		workDir := je.config.Filesystem.WorkspaceDir
+		if workDir == "" {
+			return fmt.Errorf("workspace directory not configured")
+		}
 		if _, err := je.platform.Stat(workDir); err == nil {
 			if err := os.Chdir(workDir); err != nil {
 				return fmt.Errorf("failed to change to workspace directory: %w", err)
 			}
-			je.logger.Debug("changed working directory to /work")
+			je.logger.Debug("changed working directory", "workDir", workDir)
 		}
 	}
 

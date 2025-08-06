@@ -1,3 +1,5 @@
+//go:build linux
+
 package core
 
 import (
@@ -8,49 +10,80 @@ import (
 	"fmt"
 	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/network"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
 
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/process"
 	"joblet/internal/joblet/core/unprivileged"
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/state"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 )
 
-// ExecutionEngine handles job execution logic with consolidated environment management
+// ExecutionEngine handles job execution logic with consolidated environment management.
+// This engine provides comprehensive job execution capabilities including:
+//   - Process isolation using namespaces and cgroups
+//   - Two-phase execution for upload processing and job execution
+//   - Network setup and allocation management
+//   - Resource limit enforcement and monitoring
+//   - CI-compatible lightweight execution mode
+//
+// The engine supports both full isolation mode (production) and CI mode (development/testing).
+// Thread-safe for concurrent job execution.
 type ExecutionEngine struct {
 	processManager *process.Manager
 	uploadManager  *upload.Manager
 	envBuilder     *environment.Builder
 	platform       platform.Platform
-	store          state.Store
+	store          adapters.JobStoreAdapter
 	config         *config.Config
 	logger         *logger.Logger
 	jobIsolation   *unprivileged.JobIsolation
 	networkSetup   *network.NetworkSetup
-	networkStore   *state.NetworkStore
+	networkStore   adapters.NetworkStoreAdapter
 }
 
-// NewExecutionEngine creates a new execution engine
+// NewExecutionEngine creates a new execution engine with all required dependencies.
+// Initializes the engine with process management, upload handling, network setup,
+// and isolation capabilities. Returns a fully configured engine ready for job execution.
+//
+// Parameters:
+//   - processManager: Handles process lifecycle and execution
+//   - uploadManager: Manages file uploads and workspace preparation
+//   - platform: Platform abstraction for system operations
+//   - store: Job storage adapter for state management and logging
+//   - config: Configuration settings for execution behavior
+//   - logger: Structured logging interface
+//   - jobIsolation: Provides security isolation capabilities
+//   - networkStore: Network management and allocation storage
+//
+// Returns: Configured ExecutionEngine instance ready for job execution
 func NewExecutionEngine(
 	processManager *process.Manager,
 	uploadManager *upload.Manager,
 	platform platform.Platform,
-	store state.Store,
+	store adapters.JobStoreAdapter,
 	config *config.Config,
 	logger *logger.Logger,
 	jobIsolation *unprivileged.JobIsolation,
-	networkStore *state.NetworkStore,
+	networkStore adapters.NetworkStoreAdapter,
 ) *ExecutionEngine {
 	// Create environment builder with the correct parameters
 	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
+
+	var networkSetup *network.NetworkSetup
+	if networkStore != nil {
+		// Create bridge to adapt NetworkStoreAdapter to NetworkStoreInterface
+		networkStoreInterface := adapters.NewNetworkSetupBridge(networkStore)
+		networkSetup = network.NewNetworkSetup(platform, networkStoreInterface)
+	}
 
 	return &ExecutionEngine{
 		processManager: processManager,
@@ -61,7 +94,7 @@ func NewExecutionEngine(
 		config:         config,
 		logger:         logger.WithField("component", "execution-engine"),
 		jobIsolation:   jobIsolation,
-		networkSetup:   network.NewNetworkSetup(platform, networkStore),
+		networkSetup:   networkSetup,
 		networkStore:   networkStore,
 	}
 }
@@ -75,7 +108,19 @@ type StartProcessOptions struct {
 	PreProcessUploads bool // For scheduled jobs that need uploads processed beforehand
 }
 
-// StartProcess starts a job process with proper isolation and phased execution
+// StartProcess starts a job process with proper isolation and phased execution.
+// Implements a two-phase execution model:
+//  1. Upload phase: Processes file uploads within resource constraints
+//  2. Execution phase: Runs the actual job command with full isolation
+//
+// Supports both full isolation mode (production) and CI mode (development/testing).
+// Handles network setup, resource limits, and proper cleanup on failures.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - opts: Process options including job details, uploads, and configuration
+//
+// Returns: Command interface for process control, or error if startup fails
 func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
 	log := ee.logger.WithField("jobID", opts.Job.Id)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
@@ -120,7 +165,17 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 	return ee.executeJobPhase(ctx, opts, isolatedInitPath)
 }
 
-// executeUploadPhase runs the upload phase in full isolation
+// executeUploadPhase runs the upload phase in full isolation.
+// Processes file uploads within cgroup resource limits to prevent resource exhaustion.
+// Uses base64 encoding to safely pass upload data through environment variables.
+// Runs with full namespace isolation for security.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - opts: Process options containing uploads to process
+//   - initPath: Path to the isolated init binary
+//
+// Returns: Error if upload processing fails, nil on success
 func (ee *ExecutionEngine) executeUploadPhase(ctx context.Context, opts *StartProcessOptions, initPath string) error {
 	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("phase", "upload")
 
@@ -186,13 +241,23 @@ func (ee *ExecutionEngine) executeUploadPhase(ctx context.Context, opts *StartPr
 		cmd.Kill()
 		return ctx.Err()
 
-	case <-time.After(5 * time.Minute): // Upload timeout
+	case <-time.After(ee.config.Buffers.DefaultConfig.UploadTimeout): // Upload timeout from config
 		cmd.Kill()
 		return fmt.Errorf("upload phase timeout")
 	}
 }
 
-// executeJobPhase runs the main job execution phase
+// executeJobPhase runs the main job execution phase.
+// Launches the actual job command with full isolation, network setup, and resource limits.
+// Handles network allocation, synchronization with child process, and proper cleanup.
+// Returns the running command for monitoring and control.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - opts: Process options containing job command and configuration
+//   - initPath: Path to the isolated init binary
+//
+// Returns: Running command interface, or error if execution setup fails
 func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProcessOptions, initPath string) (platform.Command, error) {
 	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("phase", "execute")
 
@@ -258,23 +323,79 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 				JobID:   opts.Job.Id,
 				Network: "isolated",
 			}
-		} else {
-			// Regular network allocation
+		} else if ee.networkStore != nil {
+			// Regular network allocation using adapter
+			// First allocate IP address from the network
+			ipAddress, ipErr := ee.networkStore.AllocateIP(opts.Job.Network)
+			if ipErr != nil {
+				result.Command.Kill()
+				return nil, fmt.Errorf("failed to allocate IP: %w", ipErr)
+			}
+
 			hostname := fmt.Sprintf("job_%s", opts.Job.Id)
-			alloc, allocErr = ee.networkStore.AssignJobToNetwork(opts.Job.Id, opts.Job.Network, hostname)
+			adapterAlloc := &adapters.JobNetworkAllocation{
+				JobID:       opts.Job.Id,
+				NetworkName: opts.Job.Network,
+				IPAddress:   ipAddress,
+				Hostname:    hostname,
+				AssignedAt:  time.Now().Unix(),
+			}
+			allocErr = ee.networkStore.AssignJobToNetwork(opts.Job.Id, opts.Job.Network, adapterAlloc)
 			if allocErr != nil {
+				// Release the allocated IP on error
+				if releaseErr := ee.networkStore.ReleaseIP(opts.Job.Network, ipAddress); releaseErr != nil {
+					log.Warn("failed to release IP during cleanup", "ip", ipAddress, "error", releaseErr)
+				}
 				result.Command.Kill()
 				return nil, fmt.Errorf("failed to assign network: %w", allocErr)
+			}
+
+			// Convert adapter allocation to network allocation for consistency
+			// Generate veth names based on PID for bridge networks
+			pid := int(result.PID)
+			ip := net.ParseIP(ipAddress)
+			if ip == nil {
+				result.Command.Kill()
+				// Release the allocated IP on error
+				if releaseErr := ee.networkStore.ReleaseIP(opts.Job.Network, ipAddress); releaseErr != nil {
+					log.Warn("failed to release IP during cleanup", "ip", ipAddress, "error", releaseErr)
+				}
+				return nil, fmt.Errorf("failed to parse IP address '%s'", ipAddress)
+			}
+			alloc = &network.JobAllocation{
+				JobID:    adapterAlloc.JobID,
+				Network:  adapterAlloc.NetworkName,
+				IP:       ip,
+				Hostname: adapterAlloc.Hostname,
+				VethHost: fmt.Sprintf("vjob%d", pid%10000),
+				VethPeer: fmt.Sprintf("vjob%dp", pid%10000),
+			}
+		} else {
+			// No network store available - create basic allocation
+			// Generate veth names based on PID for consistency
+			pid := int(result.PID)
+			alloc = &network.JobAllocation{
+				JobID:    opts.Job.Id,
+				Network:  opts.Job.Network,
+				VethHost: fmt.Sprintf("vjob%d", pid%10000),
+				VethPeer: fmt.Sprintf("vjob%dp", pid%10000),
 			}
 		}
 
 		// Setup network in namespace
-		if setupErr := ee.networkSetup.SetupJobNetwork(alloc, int(result.PID)); setupErr != nil {
-			if opts.Job.Network != "isolated" {
-				ee.networkStore.ReleaseJob(opts.Job.Id)
+		if ee.networkSetup != nil {
+			if setupErr := ee.networkSetup.SetupJobNetwork(alloc, int(result.PID)); setupErr != nil {
+				if opts.Job.Network != "isolated" && ee.networkStore != nil {
+					if removeErr := ee.networkStore.RemoveJobFromNetwork(opts.Job.Id); removeErr != nil {
+						// Log the error but continue with cleanup
+						ee.logger.Warn("failed to remove job from network during cleanup",
+							"JobId", opts.Job.Id,
+							"error", removeErr)
+					}
+				}
+				result.Command.Kill()
+				return nil, fmt.Errorf("failed to setup network: %w", setupErr)
 			}
-			result.Command.Kill()
-			return nil, fmt.Errorf("failed to setup network: %w", setupErr)
 		}
 
 		// Signal that network is ready - INLINE instead of calling setupJobNetwork
@@ -293,7 +414,15 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 	return result.Command, nil
 }
 
-// buildPhaseEnvironment builds common environment for both phases
+// buildPhaseEnvironment builds common environment variables for both execution phases.
+// Creates environment with job metadata, resource limits, cgroup paths, and volume information.
+// Combines base environment with job-specific variables for isolation setup.
+//
+// Parameters:
+//   - job: Job domain object containing limits and configuration
+//   - phase: Execution phase ("upload" or "execute")
+//
+// Returns: Complete environment variable slice for process execution
 func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) []string {
 	baseEnv := ee.platform.Environ()
 
@@ -323,6 +452,15 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 	return append(baseEnv, jobEnv...)
 }
 
+// copyInitBinary copies the joblet binary to the job's isolated directory.
+// Ensures the init binary is available within the job's filesystem namespace.
+// Creates necessary directories and sets proper execute permissions.
+//
+// Parameters:
+//   - source: Path to the original joblet binary
+//   - dest: Destination path within the job directory
+//
+// Returns: Error if copy operation fails, nil on success
 func (ee *ExecutionEngine) copyInitBinary(source, dest string) error {
 	// Ensure destination directory exists
 	destDir := filepath.Dir(dest)
@@ -340,7 +478,16 @@ func (ee *ExecutionEngine) copyInitBinary(source, dest string) error {
 	return ee.platform.WriteFile(dest, input, 0755)
 }
 
-// StartProcessWithUploads starts a job process with upload support (compatibility method)
+// StartProcessWithUploads starts a job process with upload support (compatibility method).
+// Provides backward compatibility for existing code that uses the simpler interface.
+// Creates StartProcessOptions internally and delegates to StartProcess.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - job: Job domain object containing command and configuration
+//   - uploads: File uploads to process before job execution
+//
+// Returns: Command interface for process control, or error if startup fails
 func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) (platform.Command, error) {
 	opts := &StartProcessOptions{
 		Job:             job,
@@ -351,12 +498,24 @@ func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *dom
 	return ee.StartProcess(ctx, opts)
 }
 
-// createIsolatedSysProcAttr creates system process attributes for isolation
+// createIsolatedSysProcAttr creates system process attributes for isolation.
+// Delegates to the job isolation component to create appropriate namespace
+// and security attributes for process isolation.
+//
+// Returns: System process attributes configured for isolation
 func (ee *ExecutionEngine) createIsolatedSysProcAttr() *syscall.SysProcAttr {
 	return ee.jobIsolation.CreateIsolatedSysProcAttr()
 }
 
-// ExecuteInitMode executes a job in init mode (inside the isolated environment)
+// ExecuteInitMode executes a job in init mode (inside the isolated environment).
+// Called when the process is running as PID 1 inside an isolated namespace.
+// Loads job configuration from environment, processes uploads if present,
+// and executes the actual job command using exec to replace the init process.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//
+// Returns: Error if initialization or execution fails
 func (ee *ExecutionEngine) ExecuteInitMode(ctx context.Context) error {
 	// Load configuration from environment
 	config, err := ee.envBuilder.LoadJobConfigFromEnvironment()
@@ -369,7 +528,10 @@ func (ee *ExecutionEngine) ExecuteInitMode(ctx context.Context) error {
 
 	// Process uploads if present
 	if config.HasUploadSession && config.UploadPipePath != "" {
-		workspaceDir := "/work"
+		workspaceDir := ee.config.Filesystem.WorkspaceDir
+		if workspaceDir == "" {
+			return fmt.Errorf("workspace directory not configured")
+		}
 		receiver := upload.NewReceiver(ee.platform, ee.logger)
 
 		if err := ee.platform.MkdirAll(workspaceDir, 0755); err != nil {
@@ -386,7 +548,15 @@ func (ee *ExecutionEngine) ExecuteInitMode(ctx context.Context) error {
 	return ee.executeCommand(config)
 }
 
-// executeCommand executes the actual job command using exec to replace the init process
+// executeCommand executes the actual job command using exec to replace the init process.
+// Resolves the command path, changes to workspace directory if needed,
+// and uses exec syscall to replace the current process with the job command.
+// This makes the job command become PID 1 in the namespace for proper isolation.
+//
+// Parameters:
+//   - config: Job configuration loaded from environment variables
+//
+// Returns: Error if command resolution or exec fails (exec should not return on success)
 func (ee *ExecutionEngine) executeCommand(config *environment.JobConfig) error {
 	// Resolve command path
 	commandPath, err := ee.resolveCommandPath(config.Command)
@@ -396,7 +566,11 @@ func (ee *ExecutionEngine) executeCommand(config *environment.JobConfig) error {
 
 	// Change to workspace if needed (safe to use os.Chdir since we're in isolated namespace)
 	if config.HasUploadSession {
-		if err := os.Chdir("/work"); err != nil {
+		workspaceDir := ee.config.Filesystem.WorkspaceDir
+		if workspaceDir == "" {
+			return fmt.Errorf("workspace directory not configured")
+		}
+		if err := os.Chdir(workspaceDir); err != nil {
 			return fmt.Errorf("failed to change to workspace directory: %w", err)
 		}
 	}
@@ -418,7 +592,14 @@ func (ee *ExecutionEngine) executeCommand(config *environment.JobConfig) error {
 	return fmt.Errorf("exec failed: %w", err)
 }
 
-// resolveCommandPath resolves the full path for a command
+// resolveCommandPath resolves the full path for a command.
+// Checks if command is already absolute, searches PATH, and tries common locations.
+// Ensures the command exists and is executable before returning the path.
+//
+// Parameters:
+//   - command: Command name or path to resolve
+//
+// Returns: Full path to executable command, or error if not found
 func (ee *ExecutionEngine) resolveCommandPath(command string) (string, error) {
 	// Check if it's already an absolute path
 	if filepath.IsAbs(command) {
@@ -448,9 +629,18 @@ func (ee *ExecutionEngine) resolveCommandPath(command string) (string, error) {
 	return "", fmt.Errorf("command %s not found", command)
 }
 
-// executeCICommand executes jobs with lightweight isolation in CI mode
-// This provides basic security isolation while maintaining CI compatibility
-func (ee *ExecutionEngine) executeCICommand(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
+// executeCICommand executes jobs with lightweight isolation in CI mode.
+// Provides basic security isolation while maintaining CI compatibility.
+// Processes uploads directly without full namespace isolation,
+// uses process groups for basic isolation, and sets minimal environment.
+// Designed to work in containerized CI environments with limited privileges.
+//
+// Parameters:
+//   - ctx: Context (unused but maintained for interface compatibility)
+//   - opts: Process options containing job and upload configuration
+//
+// Returns: Command interface for CI-compatible job execution, or error if setup fails
+func (ee *ExecutionEngine) executeCICommand(_ context.Context, opts *StartProcessOptions) (platform.Command, error) {
 	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("mode", "ci-isolated")
 
 	// Create job directory for workspace

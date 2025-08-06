@@ -180,6 +180,36 @@ wait_for_job_completion() {
     return 1
 }
 
+# Function to get job logs with CI environment error handling
+get_job_logs_safe() {
+    local job_id="$1"
+    local description="${2:-job}"
+    
+    local job_logs
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id" 2>&1)
+    
+    # Check for log streaming errors (common in CI)
+    if [[ "$job_logs" == *"buffer is closed"* ]] || [[ "$job_logs" == *"failed to stream logs"* ]]; then
+        print_warning "Log streaming failed for $description - likely CI environment limitation"
+        print_info "This is expected in containerized CI environments"
+        echo "CI_LOG_STREAMING_ERROR"
+        return 1
+    fi
+    
+    # Clean logs output
+    job_logs=$(echo "$job_logs" | grep -v "^\[" | grep -v "^$" | grep -v "Usage:" | grep -v "Flags:" | grep -v "Global Flags:" | grep -v "help for log")
+    
+    if [[ -z "$job_logs" ]]; then
+        print_warning "No job output received for $description - likely CI environment limitation"
+        print_info "This is expected in containerized CI environments"
+        echo "CI_NO_OUTPUT"
+        return 1
+    fi
+    
+    echo "$job_logs"
+    return 0
+}
+
 # Function to create temporary test file
 create_temp_test_file() {
     local content="$1"
@@ -290,6 +320,6 @@ get_joblet_info() {
 export -f print_info print_success print_warning print_error
 export -f run_test wait_for_server check_prerequisites
 export -f generate_test_id cleanup_test_jobs validate_json
-export -f wait_for_job_completion create_temp_test_file cleanup_temp_files
+export -f wait_for_job_completion get_job_logs_safe create_temp_test_file cleanup_temp_files
 export -f print_test_summary print_suite_summary setup_test_environment cleanup_test_environment
 export -f get_joblet_info

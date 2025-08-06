@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	pb "joblet/api/gen"
+	"joblet/internal/joblet/adapters/adaptersfakes"
 	"joblet/internal/joblet/auth/authfakes"
-	"joblet/internal/joblet/core/interfaces"
+	"joblet/internal/joblet/core/interfaces/interfacesfakes"
 	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/state"
 )
 
 func TestNewJobServiceServer(t *testing.T) {
 	mockAuth := &authfakes.FakeGrpcAuthorization{}
-	mockStore := state.New()
-	mockJoblet := &MockJoblet{}
+	mockStore := &adaptersfakes.FakeJobStoreAdapter{}
+	mockJoblet := &interfacesfakes.FakeJoblet{}
 
 	server := NewJobServiceServer(mockAuth, mockStore, mockJoblet)
 
@@ -37,13 +37,16 @@ func TestNewJobServiceServer(t *testing.T) {
 
 func TestListJobs_EmptyStore(t *testing.T) {
 	mockAuth := &authfakes.FakeGrpcAuthorization{}
-	mockStore := state.New()
-	mockJoblet := &MockJoblet{}
+	mockStore := &adaptersfakes.FakeJobStoreAdapter{}
+	mockJoblet := &interfacesfakes.FakeJoblet{}
 
 	server := NewJobServiceServer(mockAuth, mockStore, mockJoblet)
 
 	// Mock successful authorization
 	mockAuth.AuthorizedReturns(nil)
+
+	// Mock empty store
+	mockStore.ListJobsReturns([]*domain.Job{})
 
 	req := &pb.EmptyRequest{}
 	resp, err := server.ListJobs(context.Background(), req)
@@ -63,12 +66,12 @@ func TestListJobs_EmptyStore(t *testing.T) {
 
 func TestListJobs_WithJobs(t *testing.T) {
 	mockAuth := &authfakes.FakeGrpcAuthorization{}
-	mockStore := state.New()
-	mockJoblet := &MockJoblet{}
+	mockStore := &adaptersfakes.FakeJobStoreAdapter{}
+	mockJoblet := &interfacesfakes.FakeJoblet{}
 
 	server := NewJobServiceServer(mockAuth, mockStore, mockJoblet)
 
-	// Add a test job to the store
+	// Create a test job
 	testJob := &domain.Job{
 		Id:      "test-job-1",
 		Command: "echo",
@@ -76,10 +79,12 @@ func TestListJobs_WithJobs(t *testing.T) {
 		Status:  domain.StatusCompleted,
 		Limits:  *domain.NewResourceLimits(),
 	}
-	mockStore.CreateNewJob(testJob)
 
 	// Mock successful authorization
 	mockAuth.AuthorizedReturns(nil)
+
+	// Mock store with one job
+	mockStore.ListJobsReturns([]*domain.Job{testJob})
 
 	req := &pb.EmptyRequest{}
 	resp, err := server.ListJobs(context.Background(), req)
@@ -105,19 +110,4 @@ func TestListJobs_WithJobs(t *testing.T) {
 			t.Errorf("Expected command 'echo', got '%s'", job.Command)
 		}
 	}
-}
-
-// MockJoblet implements a minimal Joblet interface for testing
-type MockJoblet struct{}
-
-func (m *MockJoblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
-	return nil, nil
-}
-
-func (m *MockJoblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) error {
-	return nil
-}
-
-func (m *MockJoblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
-	return nil
 }

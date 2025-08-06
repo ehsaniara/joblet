@@ -1,10 +1,12 @@
+//go:build linux
+
 package cleanup
 
 import (
 	"context"
 	"fmt"
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/network"
-	"joblet/internal/joblet/state"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -29,7 +31,7 @@ type Coordinator struct {
 	activeCleanups sync.Map // jobID -> cleanup status
 
 	networkSetup *network.NetworkSetup
-	networkStore *state.NetworkStore
+	networkStore adapters.NetworkStoreAdapter
 }
 
 // CleanupStatus tracks the status of a cleanup operation
@@ -50,8 +52,15 @@ func NewCoordinator(
 	platform platform.Platform,
 	config *config.Config,
 	logger *logger.Logger,
-	networkStore *state.NetworkStore,
+	networkStore adapters.NetworkStoreAdapter,
 ) *Coordinator {
+	var networkSetup *network.NetworkSetup
+	if networkStore != nil {
+		// Create bridge to adapt NetworkStoreAdapter to NetworkStoreInterface
+		networkStoreInterface := adapters.NewNetworkSetupBridge(networkStore)
+		networkSetup = network.NewNetworkSetup(platform, networkStoreInterface)
+	}
+
 	return &Coordinator{
 		processManager: processManager,
 		cgroup:         cgroup,
@@ -59,7 +68,7 @@ func NewCoordinator(
 		config:         config,
 		logger:         logger.WithField("component", "cleanup-coordinator"),
 		networkStore:   networkStore,
-		networkSetup:   network.NewNetworkSetup(platform, networkStore),
+		networkSetup:   networkSetup,
 	}
 }
 
@@ -104,15 +113,30 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 		status.Errors = append(status.Errors, fmt.Errorf("additional: %w", err))
 	}
 
-	// Clean up network resources
-	if alloc, err := c.networkStore.GetJobAllocation(jobID); err == nil {
-		if err := c.networkSetup.CleanupJobNetwork(alloc); err != nil {
-			c.logger.Warn("failed to cleanup network", "jobID", jobID, "error", err)
+	// Clean up network resources if network store is available
+	if c.networkStore != nil {
+		if adapterAlloc, exists := c.networkStore.GetJobNetworkAllocation(jobID); exists {
+			if c.networkSetup != nil {
+				// Convert adapter allocation to network allocation for cleanup
+				alloc := &network.JobAllocation{
+					JobID:    adapterAlloc.JobID,
+					Network:  adapterAlloc.NetworkName,
+					Hostname: adapterAlloc.Hostname,
+					// IP will be empty but that's ok for cleanup
+				}
+				if err := c.networkSetup.CleanupJobNetwork(alloc); err != nil {
+					c.logger.Warn("failed to cleanup network", "jobID", jobID, "error", err)
+				}
+			}
+		}
+
+		// Release network allocation using the adapter method
+		if removeErr := c.networkStore.RemoveJobFromNetwork(jobID); removeErr != nil {
+			c.logger.Warn("failed to remove job from network store",
+				"jobID", jobID,
+				"error", removeErr)
 		}
 	}
-
-	// Release network allocation
-	c.networkStore.ReleaseJob(jobID)
 
 	status.Completed = true
 

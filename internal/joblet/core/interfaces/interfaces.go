@@ -20,3 +20,10 @@ type Joblet interface {
 
 	//SetExtraFiles(files []*os.File)
 }
+
+// NetworkStore is a minimal interface for network operations used by core components
+// It matches the essential operations from adapters.NetworkStoreAdapter
+type NetworkStore interface {
+	// Basic operations that core components need
+	// Implementation will be provided by adapters.NetworkStoreAdapter
+}
