@@ -118,7 +118,7 @@ run_demo "02_file_operations.sh" "File Operations"
 run_demo "03_resource_limits.sh" "Resource Management"
 run_demo "04_volume_storage.sh" "Volume Storage"
 run_demo "05_job_monitoring.sh" "Job Monitoring"
-run_demo "06_environment.sh" "Environment Variables"
+# Environment variables example removed (--env flag not supported by rnx)
 run_demo "07_network_basics.sh" "Network Basics"
 
 # Calculate completion time

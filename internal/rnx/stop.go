@@ -3,8 +3,9 @@ package rnx
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func newStopCmd() *cobra.Command {

@@ -1,16 +1,21 @@
 # Joblet Demo Setup Guide
 
-This guide helps you run the comprehensive Joblet examples that demonstrate Python analytics, Node.js applications, and agentic AI foundations.
+This guide helps you run the Joblet examples that demonstrate core functionality with minimal dependencies.
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Prerequisites
 
+**Essential:**
+
 - **Joblet Server**: Running joblet daemon
 - **RNX Client**: Configured and connected to server
-- **Python 3.8+**: For Python examples  
-- **Node.js 16+**: For Node.js examples
-- **Dependencies**: Will be installed automatically during demos
+- **Python 3**: For analytics examples (uses standard library only)
+
+**Optional:**
+
+- **Node.js**: For Node.js examples (if available in job environment)
+- **Additional packages**: Only needed for specific examples
 
 ### 2. Verify Setup
 
@@ -18,227 +23,153 @@ This guide helps you run the comprehensive Joblet examples that demonstrate Pyth
 # Check RNX connection
 rnx list
 
-# Check system status
-rnx monitor status
+# Check server connectivity
+rnx run echo "Hello Joblet"
 ```
 
-### 3. Run All Demos
+### 3. Run Working Examples
+
+#### Recommended: Start with Python Analytics (Always Works)
 
 ```bash
-# Run comprehensive demo suite
-cd examples/
+cd python-analytics/
+./run_demo.sh
+```
+
+#### Basic Usage (Always Works)
+
+```bash
+cd basic-usage/
+./run_demos.sh
+```
+
+#### Advanced Job Coordination (Works with Python 3)
+
+```bash
+cd advanced/
+./job_coordination.sh
+```
+
+### 4. Run All Working Demos
+
+```bash
+# Run all working examples
 ./run_all_demos.sh
 ```
 
-### 4. Run Individual Demos
+## 📚 Demo Contents
 
-```bash
-# Python Analytics & ML
-cd python-analytics/
-./run_demos.sh
+### Python Analytics (`python-analytics/`)
 
-# Node.js Applications  
-cd nodejs/
-./run_demos.sh
+- **Dependencies**: Python 3 standard library only
+- **Features**: Sales analysis, customer segmentation, time series processing
+- **Storage**: Results saved to persistent volumes
+- **Status**: ✅ Always works with Python 3
 
-# Agentic AI Foundations
-cd agentic-ai/
-./run_demos.sh
-```
+### Basic Usage (`basic-usage/`)
 
-## Demo Contents
+- **Dependencies**: Shell commands only
+- **Features**: File operations, resource limits, volume storage, job monitoring
+- **Storage**: Temporary files and volumes
+- **Status**: ✅ Always works
 
-### 🐍 Python Analytics (`python-analytics/`)
+### Advanced Examples (`advanced/`)
 
-**Files Created:**
-- `analyze_sales.py` - Sales data analysis with pandas
-- `train_clustering.py` - ML customer segmentation  
-- `feature_engineering.py` - Distributed data processing
-- `sales_data.csv` - Sample sales dataset
-- `customers.csv` - Sample customer data
-- `requirements.txt` - Python dependencies
+- **Dependencies**: Python 3 standard library
+- **Features**: Job coordination, data passing between jobs
+- **Storage**: Persistent volumes for coordination
+- **Status**: ✅ Works with Python 3
 
-**What It Demonstrates:**
-- Data analysis with pandas and matplotlib
-- Machine learning with scikit-learn
-- Distributed processing across multiple jobs
-- Persistent storage of results and models
-- Resource management (CPU, memory limits)
+### Node.js Examples (`nodejs/`)
 
-### 🟨 Node.js (`nodejs/`)
+- **Dependencies**: Node.js runtime in job environment
+- **Features**: System analysis, data processing with built-in modules
+- **Storage**: Results to volumes if Node.js available
+- **Status**: ⚠️ Requires Node.js in job environment
 
-**Files Created:**
-- `package.json` - Node.js project configuration
-- `app.js` - Express.js microservice
-- `api.test.js` - Comprehensive API test suite
-- `process_data.js` - CSV data processing
-- `event-processor.js` - Real-time event handling
-- `build-pipeline.sh` - Complete CI/CD pipeline
+## 🔧 Troubleshooting
 
-**What It Demonstrates:**
-- API testing and validation
-- Microservice deployment patterns
-- Data processing with streams
-- Build automation and CI/CD
-- Event-driven architecture
-- Error handling and logging
+### Common Issues
 
-### 🤖 Agentic AI (`agentic-ai/`)
+#### "command not found" errors
 
-**Files Created:**
-- `llm_inference.py` - LLM service with caching
-- `multi_agent_system.py` - Coordinated multi-agent workflow
-- `rag_system.py` - RAG with vector database
-- `distributed_training.py` - Distributed ML training
-- `requirements.txt` - AI/ML dependencies
+- **Python scripts**: Ensure Python 3 is installed in job environment
+- **Node.js scripts**: Node.js may not be available in job environment
+- **Solution**: Use Python examples instead, or install missing runtime
 
-**What It Demonstrates:**
-- LLM inference with intelligent caching
-- Multi-agent coordination and task distribution
-- Semantic search and retrieval-augmented generation
-- Distributed machine learning training
-- End-to-end AI pipeline orchestration
-- Performance monitoring and metrics collection
+#### Job failures
 
-## Expected Outputs
+- **Check logs**: `rnx log <job-id>`
+- **Resource limits**: Increase memory limits if needed
+- **Dependencies**: Use examples with minimal dependencies
 
-### Volume Structure
-After running demos, you'll have:
+#### Volume errors
 
-```
-/volumes/
-├── analytics-data/          # Python analytics results
-│   ├── results/            # Analysis outputs
-│   ├── processed/          # Feature engineering results
-│   └── raw/               # Input data chunks
-├── ml-models/              # Machine learning artifacts
-│   ├── clustering_model_*.pkl
-│   ├── model_metadata_*.json
-│   └── cluster_summary_*.csv
-├── nodejs-projects/        # Node.js outputs
-│   ├── reports/           # Test and build reports
-│   ├── builds/            # Build artifacts
-│   ├── events/            # Event processing logs
-│   └── logs/              # Application logs
-├── ai-cache/              # AI inference cache
-├── ai-outputs/            # AI processing results
-├── ai-metrics/            # AI performance metrics
-└── ai-models/             # AI model artifacts
-```
+- **Storage space**: Ensure adequate disk space on server
+- **Permissions**: Check Joblet server permissions
+- **Cleanup**: Remove unused volumes with `rnx volume remove`
 
-### Sample Results
+### Debug Commands
 
-**Python Analytics:**
-- Monthly sales trend visualization
-- Customer segmentation model (K-means)  
-- Feature engineering pipeline results
-- Performance metrics and processing reports
-
-**Node.js Applications:**
-- API test results with coverage metrics
-- Build pipeline artifacts and reports
-- Event processing logs and statistics
-- Data transformation outputs
-
-**Agentic AI:**
-- LLM inference results with caching stats
-- Multi-agent coordination workflow outputs
-- RAG system responses with source attribution
-- Distributed training metrics and model artifacts
-
-## Monitoring & Inspection
-
-### View Job Status
 ```bash
 # List all jobs
 rnx list
 
-# Monitor system in real-time
+# View job output
+rnx log <job-id>
+
+# Check volumes
+rnx volume list
+
+# Monitor system
 rnx monitor
-
-# Check specific job logs
-rnx log <job-id>
 ```
 
-### Inspect Results
-```bash
-# View volume contents
-rnx volume list
+## 📊 Expected Results
 
-# Browse analytics results
-rnx run --volume=analytics-data ls -la /volumes/analytics-data/
-
-# Check AI outputs
-rnx run --volume=ai-outputs find /volumes/ai-outputs -name "*.json"
-
-# Read specific results
-rnx run --volume=ai-outputs cat /volumes/ai-outputs/inference_results_*.json
-```
-
-### Performance Analysis
-```bash
-# System metrics
-rnx monitor status --json
-
-# Resource utilization
-rnx list --json | jq '.[] | {id, status, max_memory, max_cpu}'
-
-# Volume usage
-rnx volume list --json | jq '.[] | {name, size_used, size_total}'
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Connection Problems:**
-```bash
-# Check RNX configuration
-rnx nodes
-
-# Test connection
-rnx run echo "test"
-```
-
-**Volume Issues:**
-```bash
-# Check volume status
-rnx volume list
-
-# Recreate if needed
-rnx volume remove analytics-data
-rnx volume create analytics-data --size=2GB --type=filesystem
-```
-
-**Job Failures:**
-```bash
-# Check job logs
-rnx log <job-id>
-
-# Check system resources
-rnx monitor status
-```
-
-### Cleanup
+### After Running Python Analytics
 
 ```bash
-# Remove demo volumes (optional)
-rnx volume remove analytics-data ml-models nodejs-projects
-rnx volume remove ai-cache ai-outputs ai-metrics ai-models
+# View sales analysis
+rnx run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json
 
-# Stop running jobs
-rnx list | grep RUNNING | awk '{print $1}' | xargs -I {} rnx stop {}
+# View processed time series
+rnx run --volume=analytics-data ls /volumes/analytics-data/processed/
 ```
 
-## Next Steps
+### After Running Job Coordination
 
-1. **Customize Examples**: Modify scripts for your specific use cases
-2. **Scale Up**: Increase resource limits and data sizes
-3. **Production Deployment**: Implement monitoring, alerting, and CI/CD
-4. **Integration**: Connect with your existing data and AI infrastructure
+```bash
+# View coordination results
+rnx run --volume=shared-data cat /volumes/shared-data/results.json
+```
 
-## Support
+## 💡 Best Practices
 
-- Review individual README files in each demo directory
-- Check [Joblet Documentation](../docs/) for detailed configuration
-- Examine job logs with `rnx log <job-id>` for troubleshooting
+### For Reliable Demos
+
+1. **Start Simple**: Begin with basic-usage examples
+2. **Check Prerequisites**: Verify required runtimes are available
+3. **Monitor Resources**: Watch memory and CPU usage
+4. **Clean Up**: Remove unused volumes and jobs periodically
+
+### For Production Use
+
+1. **Resource Planning**: Set appropriate CPU and memory limits
+2. **Error Handling**: Implement proper error checking
+3. **Monitoring**: Use logging and status tracking
+4. **Security**: Follow security best practices for production workloads
+
+## 📚 Next Steps
+
+1. **Explore Examples**: Run each demo to understand different patterns
+2. **Modify Data**: Replace sample data with your own datasets
+3. **Scale Up**: Increase resource limits for larger workloads
+4. **Custom Workflows**: Build your own job coordination patterns
+
+## Getting Help
+
+- **Check Logs**: Always start with `rnx log <job-id>` for failures
+- **Resource Issues**: Monitor with `rnx monitor`
+- **Connectivity**: Test with simple `rnx run echo "test"` commands
+- **Documentation**: See individual example README files for specific guidance

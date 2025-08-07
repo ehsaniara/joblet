@@ -112,6 +112,9 @@ func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *
 
 // Private helper methods
 
+// createWorkspace creates a dedicated workspace directory for the job.
+// The workspace is created under the base filesystem directory with the job ID
+// as the subdirectory name, with permissions set to 0755 for proper isolation.
 func (rm *ResourceManager) createWorkspace(jobID string) error {
 	baseDir := filepath.Join(rm.config.Filesystem.BaseDir, jobID)
 	if err := rm.platform.MkdirAll(baseDir, 0755); err != nil {
@@ -120,6 +123,9 @@ func (rm *ResourceManager) createWorkspace(jobID string) error {
 	return nil
 }
 
+// createCgroup creates and configures a cgroup for the job with specified resource limits.
+// It applies CPU, memory, and IO bandwidth constraints as defined in the job's resource limits.
+// The cgroup path is derived from the job configuration and created in the system cgroup hierarchy.
 func (rm *ResourceManager) createCgroup(job *domain.Job) error {
 	if err := rm.cgroup.Create(
 		job.CgroupPath,
@@ -132,6 +138,9 @@ func (rm *ResourceManager) createCgroup(job *domain.Job) error {
 	return nil
 }
 
+// applyCPUCoreRestrictions applies CPU core affinity restrictions to the job's cgroup.
+// It configures CPU core limitations on both the main cgroup and process subgroup,
+// ensuring that the job runs only on the specified CPU cores for performance isolation.
 func (rm *ResourceManager) applyCPUCoreRestrictions(job *domain.Job) error {
 	log := rm.logger.WithFields("jobID", job.Id, "cores", job.Limits.CPUCores)
 	log.Debug("applying CPU core restrictions")

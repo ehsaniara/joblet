@@ -5,11 +5,12 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
-	"strings"
 )
 
 type ClientRole string

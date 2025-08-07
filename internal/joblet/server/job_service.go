@@ -3,8 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	pb "joblet/api/gen"
 	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
@@ -12,6 +10,9 @@ import (
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/mappers"
 	"joblet/pkg/logger"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // JobServiceServer uses the new request object pattern and improved interfaces
