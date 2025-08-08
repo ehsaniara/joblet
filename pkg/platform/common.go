@@ -98,6 +98,15 @@ func (bp *BasePlatform) CreateCommand(name string, args ...string) *ExecCommand 
 	return &ExecCommand{cmd: exec.Command(name, args...)}
 }
 
+func (bp *BasePlatform) CommandContext(ctx interface{}, name string, args ...string) Command {
+	if ctx == nil {
+		return &ExecCommand{cmd: exec.Command(name, args...)}
+	}
+	// In a real implementation, we'd use context.Context here
+	// For now, just create a regular command
+	return &ExecCommand{cmd: exec.Command(name, args...)}
+}
+
 func (bp *BasePlatform) IsExist(err error) bool {
 	return os.IsExist(err)
 }
@@ -108,6 +117,24 @@ func (lp *LinuxPlatform) RemoveAll(dir string) error {
 
 func (lp *LinuxPlatform) ReadDir(s string) ([]os.DirEntry, error) {
 	return os.ReadDir(s)
+}
+
+// DirExists checks if a directory exists
+func (bp *BasePlatform) DirExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+// FileExists checks if a file exists
+func (bp *BasePlatform) FileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 // ExecCommand wraps exec.Cmd to implement Command interface

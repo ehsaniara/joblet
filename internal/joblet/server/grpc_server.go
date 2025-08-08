@@ -10,6 +10,7 @@ import (
 	"joblet/internal/joblet/monitoring"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
+	"joblet/pkg/platform"
 	"net"
 
 	"google.golang.org/grpc"
@@ -27,7 +28,7 @@ import (
 // Creates a non-blocking server that listens on the configured address and po
 // Creates a non-blocking server that listens on the configured address and port.
 // Returns the gRPC server instance for graceful shutdown control.
-func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStoreAdapter, volumeManager *volume.Manager, monitoringService *monitoring.Service) (*grpc.Server, error) {
+func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStoreAdapter, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -96,7 +97,11 @@ func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet
 	monitoringGrpcService := NewMonitoringServiceServer(monitoringService)
 	pb.RegisterMonitoringServiceServer(grpcServer, monitoringGrpcService)
 
-	serverLogger.Debug("all gRPC services registered successfully", "services", []string{"job", "network", "volume", "monitoring"})
+	// Create and register runtime service
+	runtimeService := NewRuntimeServiceServer(auth, cfg.Runtime.BasePath, platform)
+	pb.RegisterRuntimeServiceServer(grpcServer, runtimeService)
+
+	serverLogger.Debug("all gRPC services registered successfully", "services", []string{"job", "network", "volume", "monitoring", "runtime"})
 
 	serverLogger.Debug("creating TCP listener", "address", serverAddress)
 

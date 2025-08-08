@@ -60,6 +60,7 @@ func init() {
 	rootCmd.AddCommand(newNetworkCmd())
 	rootCmd.AddCommand(newVolumeCmd())
 	rootCmd.AddCommand(newMonitorCmd())
+	rootCmd.AddCommand(newRuntimeCmd())
 }
 
 // newJobClient creates a client based on configuration

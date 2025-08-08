@@ -38,6 +38,7 @@ type Job struct {
 	ScheduledTime *time.Time     // When the job should start (nil for immediate execution)
 	Network       string         // Network name
 	Volumes       []string       // Volume names to mount
+	Runtime       string         // Runtime specification (e.g., "python:3.11+ml")
 }
 
 // IsRunning returns true if the job is currently running

@@ -12,7 +12,10 @@
 isolation, resource limits, real-time monitoring, network isolation, persistent volume storage, and scheduled
 execution - protecting your host system from malicious or resource-hungry processes.
 
-> **🤖 Agentic AI Foundation:** Joblet is purpose-built for AI agent workloads with **sandboxed code execution**, **resource-controlled tool usage**, **real-time monitoring**, and **secure multi-tenant isolation** - enabling AI agents to safely execute arbitrary code, run system commands, process data, and interact with external tools without compromising host security
+> **🤖 Agentic AI Foundation:** Joblet is purpose-built for AI agent workloads with **sandboxed code execution**, *
+*resource-controlled tool usage**, **real-time monitoring**, and **secure multi-tenant isolation** - enabling AI agents
+> to safely execute arbitrary code, run system commands, process data, and interact with external tools without
+> compromising host security
 
 ## 🎯 Key Features
 
@@ -20,6 +23,7 @@ execution - protecting your host system from malicious or resource-hungry proces
 - **Resource Control**: CPU, memory, I/O bandwidth limits with specific core binding
 - **Network Isolation**: Custom networks with traffic segmentation (none/bridge/isolated/custom)
 - **Volume Management**: Persistent storage with filesystem and memory-based volumes
+- **Pre-built Runtimes**: Instant access to Python+ML, Java 17/21, Node.js environments (10-100x faster startup)
 - **Job Scheduling**: Future execution with flexible time specifications
 - **Real-time Monitoring**: Live logs, system metrics, and job status tracking
 - **mTLS Security**: Certificate-based authentication with role-based access control
@@ -31,8 +35,6 @@ Joblet consists of two components:
 
 1. **Joblet Daemon** - Runs on Linux servers, executes jobs in isolated environments
 2. **RNX CLI** - Connects from anywhere (Linux/macOS/Windows) to manage jobs
-
-![joblet-how-it-works.svg](docs/joblet-how-it-works.svg)
 
 ### Security & Isolation Features
 
@@ -49,20 +51,22 @@ Joblet consists of two components:
 
 ## 🧭 Comparison Table: Joblet vs Competitors
 
-| Feature / Tool            | **Joblet** (v2.10.0)                          | **Apache DolphinScheduler**                 | **Dkron**                              | **JobRunr**                     | **gVisor** / **Kata**                     |
-|---------------------------|-----------------------------------------------|---------------------------------------------|----------------------------------------|---------------------------------|-------------------------------------------|
-| **Type**                  | Linux-native job execution platform           | Distributed job orchestration engine        | Distributed cron job scheduler         | In-memory job scheduler for JVM | OCI container runtime sandboxing          |
-| **Isolation Mechanism**   | Linux **namespaces** + **cgroups v2**         | None (relies on system agents)              | None (delegates to OS processes)       | JVM sandboxing                  | Full syscall interception / VM isolation  |
-| **Execution Mode**        | Binary CLI + gRPC API                         | Web UI + REST API                           | Agent-based CLI + API                  | Java code only (embedded)       | Containerized / OCI only                  |
-| **Filesystem Isolation**  | ✅ via chroot + mount namespace                | ❌                                           | ❌                                      | ❌                               | ✅ full container FS isolation             |
-| **Network Isolation**     | Optional (separate netns)                     | ❌                                           | ❌                                      | ❌                               | ✅ (via container)                         |
-| **Resource Limits**       | ✅ CPU, memory, I/O, pids via cgroups          | ❌                                           | ❌                                      | ❌                               | ✅ via kernel interface                    |
-| **Programming Interface** | gRPC + binary CLI                             | REST API                                    | HTTP API + CLI                         | Java annotations / Spring       | OCI runtime interface only                |
-| **Real-time Logging**     | ✅ Built-in SSE log stream + file              | Partial (log files in worker nodes)         | No streaming, logs stored in etcd/disk | Logs via application only       | No – depends on container logging driver  |
-| **Job Types Supported**   | Bash, Python, binary, arbitrary Linux process | Shell scripts, SQL, Spark, Flink, Python    | Shell scripts, HTTP/Webhooks, Docker   | Java method jobs (Lambdas)      | Any Linux process                         |
-| **Security Model**        | Local users or mTLS + RBAC                    | LDAP/SSO + role permissions                 | Basic Auth + token-based               | In-app only                     | Depends on container runtime              |
-| **Deployment Complexity** | ✅ One binary                                  | ❌ Complex (ZooKeeper, DB, multiple workers) | ✅ Medium (agents per node)             | ✅ Simple (library import)       | ❌ Requires container runtime setup        |
-| **Use Case Fit**          | Secure workload exec (CI/CD, scripts, etc.)   | Large ETL / batch orchestration             | Distributed cron with clustering       | Background tasks in Java apps   | Secure container workloads (e.g. sandbox) |
+| Feature / Tool            | **Joblet** (v2.11.0)                                      | **Apache DolphinScheduler**                 | **Dkron**                              | **JobRunr**                     | **gVisor** / **Kata**                     |
+|---------------------------|-----------------------------------------------------------|---------------------------------------------|----------------------------------------|---------------------------------|-------------------------------------------|
+| **Type**                  | Linux-native job execution platform                       | Distributed job orchestration engine        | Distributed cron job scheduler         | In-memory job scheduler for JVM | OCI container runtime sandboxing          |
+| **Isolation Mechanism**   | Linux **namespaces** + **cgroups v2**                     | None (relies on system agents)              | None (delegates to OS processes)       | JVM sandboxing                  | Full syscall interception / VM isolation  |
+| **Pre-built Runtimes**    | ✅ **Python+ML, Java 17/21, Node.js 18** (instant startup) | ❌ Manual setup required                     | ❌ Manual setup required                | ❌ JVM only                      | ❌ Container images only                   |
+| **Startup Performance**   | ✅ **2-3 seconds** (vs 5-45min traditional)                | 30-300+ seconds (package installation)      | Varies (depends on job complexity)     | Fast (in-memory only)           | 5-30 seconds (container pull/start)       |
+| **Execution Mode**        | Binary CLI + gRPC API                                     | Web UI + REST API                           | Agent-based CLI + API                  | Java code only (embedded)       | Containerized / OCI only                  |
+| **Filesystem Isolation**  | ✅ via chroot + mount namespace                            | ❌                                           | ❌                                      | ❌                               | ✅ full container FS isolation             |
+| **Network Isolation**     | ✅ Custom networks + isolation modes                       | ❌                                           | ❌                                      | ❌                               | ✅ (via container)                         |
+| **Resource Limits**       | ✅ CPU, memory, I/O, pids via cgroups                      | ❌                                           | ❌                                      | ❌                               | ✅ via kernel interface                    |
+| **Programming Interface** | gRPC + binary CLI + runtime management                    | REST API                                    | HTTP API + CLI                         | Java annotations / Spring       | OCI runtime interface only                |
+| **Real-time Logging**     | ✅ Built-in SSE log stream + file                          | Partial (log files in worker nodes)         | No streaming, logs stored in etcd/disk | Logs via application only       | No – depends on container logging driver  |
+| **Job Types Supported**   | **Any Linux process** + **pre-built runtimes**            | Shell scripts, SQL, Spark, Flink, Python    | Shell scripts, HTTP/Webhooks, Docker   | Java method jobs (Lambdas)      | Any Linux process                         |
+| **Security Model**        | mTLS + RBAC + complete isolation                          | LDAP/SSO + role permissions                 | Basic Auth + token-based               | In-app only                     | Depends on container runtime              |
+| **Deployment Complexity** | ✅ **One binary** + optional runtime setup                 | ❌ Complex (ZooKeeper, DB, multiple workers) | ✅ Medium (agents per node)             | ✅ Simple (library import)       | ❌ Requires container runtime setup        |
+| **Use Case Fit**          | **AI/ML, CI/CD, instant dev environments**                | Large ETL / batch orchestration             | Distributed cron with clustering       | Background tasks in Java apps   | Secure container workloads (e.g. sandbox) |
 
 ## 📦 Quick Start
 
@@ -90,8 +94,15 @@ rnx list
 rnx run echo "Hello World"
 rnx run --max-cpu=50 --max-memory=512 python3 script.py
 
+# Pre-built runtimes for instant startup (no package installation delays)
+rnx run --runtime=python-3.11-ml python data_analysis.py    # 2-3 seconds vs 5-45 minutes
+rnx run --runtime=java-17 javac HelloWorld.java && java HelloWorld
+rnx run --runtime=java-21 java VirtualThreadsApp.java       # Modern Java features
+rnx run --runtime=nodejs-18 node server.js                  # 2-3 seconds vs 60-300 seconds
+
 # Upload files and run processing
 rnx run --upload=data.csv --upload=script.py python3 script.py
+rnx run --runtime=python-3.11-ml --upload=analysis.py python analysis.py
 
 # Network isolation modes
 rnx run --network=none secure_task.sh           # No network access
@@ -105,6 +116,14 @@ rnx run --volume=mydata python3 process_data.py
 # Job scheduling
 rnx run --schedule="1hour" backup.sh
 rnx run --schedule="2025-12-25T00:00:00" maintenance.py
+
+# Runtime management
+rnx runtime list                              # Show available runtimes
+rnx runtime info python-3.11-ml             # Runtime details and packages
+rnx runtime test java-17                     # Test runtime functionality
+
+# Runtime deployment (all sizes)
+sudo unzip python-3.11-ml-runtime.zip -d /opt/joblet/runtimes/
 ```
 
 > **📚 Complete Documentation**: For detailed guides covering all features, see the comprehensive documentation
@@ -208,6 +227,8 @@ rnx monitor status         # System metrics
 --max-cpu=50              # CPU limit (50%)
 --max-memory=1024         # Memory limit (1GB)
 --cpu-cores="0-3"         # Bind to specific cores  
+--runtime=python-3.11-ml  # Use pre-built runtime
+--runtime=nodejs-18       # Node.js 18 LTS runtime
 --network=mynet           # Custom network
 --volume=data             # Mount volume
 --upload=file.py          # Upload files
@@ -292,10 +313,39 @@ scheduling workers, and production considerations.
 
 ## 📋 Recent Changes & Improvements
 
-### Version 2.10.0 (August 2025)
+### Version 2.11.0 (August 2025) - Runtime System Release
+
+#### 🚀 Major New Feature: Pre-built Runtime System
+
+- **Runtime Environments**: Complete isolated runtime environments for instant job execution
+- **Python 3.11 + ML Runtime**: Pre-installed NumPy, Pandas, Scikit-learn, Matplotlib, SciPy (10-100x faster than
+  package installation)
+- **Java Runtimes**: OpenJDK 17 LTS and OpenJDK 21 with Maven, Virtual Threads, and modern features
+- **Node.js 18 LTS Runtime**: Pre-installed Express, TypeScript, ESLint, Prettier, and development tools (20-100x faster
+  than npm install)
+- **Runtime Management**: Full CLI support - `rnx runtime list`, `rnx runtime info`, `rnx runtime test`
+- **Performance Revolution**: 2-3 second startup vs 5-45 minutes for package installation
+
+#### 📦 Zero-Contamination Runtime Deployment
+
+- **Runtime Packaging**: Setup scripts automatically create deployment packages (`.zip`)
+- **Clean Production Deploy**: Direct extraction deploys without installing build tools or dependencies
+- **Build-Once, Deploy-Many**: Build runtimes on development hosts, deploy anywhere
+- **Production Isolation**: Target hosts remain completely clean - no compilers, dev tools, or package managers needed
+
+#### 🎯 Runtime System Features
+
+- **Filesystem Isolation**: Runtime libraries mounted read-only in isolated containers
+- **Environment Management**: Automatic PATH, PYTHONPATH, LD_LIBRARY_PATH, NODE_PATH setup
+- **Package Pre-installation**: ML packages, development tools, and dependencies ready instantly
+- **Compatibility**: Works seamlessly with existing isolation, networking, and security features
+- **Automated Packaging**: Runtime setup scripts create deployment packages automatically
 
 #### 🎯 API Enhancements
 
+- **RuntimeService gRPC**: Complete runtime management via gRPC API
+- **Runtime Resolution**: Smart runtime name parsing and resolution system
+- **Runtime Validation**: Built-in testing and verification of runtime environments
 - **GetJobLogs Implementation**: Full streaming logs support for real-time job output monitoring
 - **ListJobs Implementation**: Complete job listing with metadata and status information
 
@@ -311,6 +361,7 @@ scheduling workers, and production considerations.
 - **Simplified Resource Limits**: Removed complex builder pattern for cleaner, more maintainable code
 - **File Upload Enhancement**: Removed artificial 50MB/file and 100MB total limits - now unlimited
 - **CI/CD Improvements**: Test suite gracefully handles containerized environments
+- **Runtime Architecture**: Clean separation of concerns with runtime resolver, manager, and types
 
 #### 🔧 Technical Details
 

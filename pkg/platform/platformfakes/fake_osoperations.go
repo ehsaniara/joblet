@@ -8,6 +8,17 @@ import (
 )
 
 type FakeOSOperations struct {
+	DirExistsStub        func(string) bool
+	dirExistsMutex       sync.RWMutex
+	dirExistsArgsForCall []struct {
+		arg1 string
+	}
+	dirExistsReturns struct {
+		result1 bool
+	}
+	dirExistsReturnsOnCall map[int]struct {
+		result1 bool
+	}
 	EnvironStub        func() []string
 	environMutex       sync.RWMutex
 	environArgsForCall []struct {
@@ -34,6 +45,17 @@ type FakeOSOperations struct {
 	exitMutex       sync.RWMutex
 	exitArgsForCall []struct {
 		arg1 int
+	}
+	FileExistsStub        func(string) bool
+	fileExistsMutex       sync.RWMutex
+	fileExistsArgsForCall []struct {
+		arg1 string
+	}
+	fileExistsReturns struct {
+		result1 bool
+	}
+	fileExistsReturnsOnCall map[int]struct {
+		result1 bool
 	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
@@ -195,6 +217,67 @@ type FakeOSOperations struct {
 	invocationsMutex sync.RWMutex
 }
 
+func (fake *FakeOSOperations) DirExists(arg1 string) bool {
+	fake.dirExistsMutex.Lock()
+	ret, specificReturn := fake.dirExistsReturnsOnCall[len(fake.dirExistsArgsForCall)]
+	fake.dirExistsArgsForCall = append(fake.dirExistsArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.DirExistsStub
+	fakeReturns := fake.dirExistsReturns
+	fake.recordInvocation("DirExists", []interface{}{arg1})
+	fake.dirExistsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOSOperations) DirExistsCallCount() int {
+	fake.dirExistsMutex.RLock()
+	defer fake.dirExistsMutex.RUnlock()
+	return len(fake.dirExistsArgsForCall)
+}
+
+func (fake *FakeOSOperations) DirExistsCalls(stub func(string) bool) {
+	fake.dirExistsMutex.Lock()
+	defer fake.dirExistsMutex.Unlock()
+	fake.DirExistsStub = stub
+}
+
+func (fake *FakeOSOperations) DirExistsArgsForCall(i int) string {
+	fake.dirExistsMutex.RLock()
+	defer fake.dirExistsMutex.RUnlock()
+	argsForCall := fake.dirExistsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOSOperations) DirExistsReturns(result1 bool) {
+	fake.dirExistsMutex.Lock()
+	defer fake.dirExistsMutex.Unlock()
+	fake.DirExistsStub = nil
+	fake.dirExistsReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakeOSOperations) DirExistsReturnsOnCall(i int, result1 bool) {
+	fake.dirExistsMutex.Lock()
+	defer fake.dirExistsMutex.Unlock()
+	fake.DirExistsStub = nil
+	if fake.dirExistsReturnsOnCall == nil {
+		fake.dirExistsReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.dirExistsReturnsOnCall[i] = struct {
+		result1 bool
+	}{result1}
+}
+
 func (fake *FakeOSOperations) Environ() []string {
 	fake.environMutex.Lock()
 	ret, specificReturn := fake.environReturnsOnCall[len(fake.environArgsForCall)]
@@ -334,6 +417,67 @@ func (fake *FakeOSOperations) ExitArgsForCall(i int) int {
 	defer fake.exitMutex.RUnlock()
 	argsForCall := fake.exitArgsForCall[i]
 	return argsForCall.arg1
+}
+
+func (fake *FakeOSOperations) FileExists(arg1 string) bool {
+	fake.fileExistsMutex.Lock()
+	ret, specificReturn := fake.fileExistsReturnsOnCall[len(fake.fileExistsArgsForCall)]
+	fake.fileExistsArgsForCall = append(fake.fileExistsArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.FileExistsStub
+	fakeReturns := fake.fileExistsReturns
+	fake.recordInvocation("FileExists", []interface{}{arg1})
+	fake.fileExistsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeOSOperations) FileExistsCallCount() int {
+	fake.fileExistsMutex.RLock()
+	defer fake.fileExistsMutex.RUnlock()
+	return len(fake.fileExistsArgsForCall)
+}
+
+func (fake *FakeOSOperations) FileExistsCalls(stub func(string) bool) {
+	fake.fileExistsMutex.Lock()
+	defer fake.fileExistsMutex.Unlock()
+	fake.FileExistsStub = stub
+}
+
+func (fake *FakeOSOperations) FileExistsArgsForCall(i int) string {
+	fake.fileExistsMutex.RLock()
+	defer fake.fileExistsMutex.RUnlock()
+	argsForCall := fake.fileExistsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOSOperations) FileExistsReturns(result1 bool) {
+	fake.fileExistsMutex.Lock()
+	defer fake.fileExistsMutex.Unlock()
+	fake.FileExistsStub = nil
+	fake.fileExistsReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakeOSOperations) FileExistsReturnsOnCall(i int, result1 bool) {
+	fake.fileExistsMutex.Lock()
+	defer fake.fileExistsMutex.Unlock()
+	fake.FileExistsStub = nil
+	if fake.fileExistsReturnsOnCall == nil {
+		fake.fileExistsReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.fileExistsReturnsOnCall[i] = struct {
+		result1 bool
+	}{result1}
 }
 
 func (fake *FakeOSOperations) Getenv(arg1 string) string {

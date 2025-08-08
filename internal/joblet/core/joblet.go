@@ -20,6 +20,7 @@ import (
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/core/validation"
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/runtime"
 	"joblet/internal/joblet/scheduler"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
@@ -54,6 +55,7 @@ type StartJobRequest struct {
 	Schedule string
 	Network  string
 	Volumes  []string
+	Runtime  string
 }
 
 func (r StartJobRequest) GetCommand() string               { return r.Command }
@@ -62,6 +64,7 @@ func (r StartJobRequest) GetSchedule() string              { return r.Schedule }
 func (r StartJobRequest) GetLimits() domain.ResourceLimits { return r.Limits }
 func (r StartJobRequest) GetNetwork() string               { return r.Network }
 func (r StartJobRequest) GetVolumes() []string             { return r.Volumes }
+func (r StartJobRequest) GetRuntime() string               { return r.Runtime }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components
 func NewPlatformJoblet(store adapters.JobStoreAdapter, cfg *config.Config, networkStore adapters.NetworkStoreAdapter) interfaces.Joblet {
@@ -132,6 +135,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 		Schedule: req.Schedule,
 		Network:  req.Network,
 		Volumes:  req.Volumes,
+		Runtime:  req.Runtime,
 	}
 
 	log := j.logger.WithFields(
@@ -398,6 +402,12 @@ func initializeComponents(store adapters.JobStoreAdapter, cfg *config.Config, pl
 	idGenerator := job.NewIDGenerator("job", "node")
 	jobBuilder := job.NewBuilder(cfg, idGenerator, validator.ResourceValidator())
 
+	// Create runtime manager if runtime support is enabled
+	var runtimeManager *runtime.Manager
+	if cfg.Runtime.Enabled {
+		runtimeManager = runtime.NewManager(cfg.Runtime.BasePath, platform)
+	}
+
 	// Create resource manager
 	resourceManager := &ResourceManager{
 		cgroup:     cgroupResource,
@@ -428,6 +438,7 @@ func initializeComponents(store adapters.JobStoreAdapter, cfg *config.Config, pl
 		cfg,
 		logger,
 		networkStore,
+		runtimeManager,
 	)
 
 	return &components{

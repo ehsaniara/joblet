@@ -33,6 +33,13 @@ service MonitoringService {
   rpc StreamSystemMetrics(StreamMetricsReq) returns (stream SystemMetricsRes){}
 }
 
+// Runtime management service
+service RuntimeService {
+  rpc ListRuntimes(EmptyRequest) returns (RuntimesRes){}
+  rpc GetRuntimeInfo(RuntimeInfoReq) returns (RuntimeInfoRes){}
+  rpc TestRuntime(RuntimeTestReq) returns (RuntimeTestRes){}
+}
+
 message Jobs{
   repeated Job jobs = 1;
 }
@@ -50,6 +57,7 @@ message Job{
   string endTime = 10;
   int32 exitCode = 11;
   string scheduledTime = 12;    // When the job should execute (RFC3339 format, empty if immediate)
+  string runtime = 13;          // Runtime specification used for the job
 }
 
 message EmptyRequest {}
@@ -65,6 +73,7 @@ message RunJobReq{
   string schedule = 8;          // RFC3339 formatted time string
   string network = 9;           // Network name (none, isolated, bridge, or custom)
   repeated string volumes = 10; // Volume names to mount
+  string runtime = 11;          // Runtime specification (e.g., "python:3.11+ml")
 }
 
 message FileUpload {
@@ -352,4 +361,45 @@ message CloudInfo {
   string instanceType = 5;
   string hypervisorType = 6;
   map<string, string> metadata = 7;
+}
+
+// Runtime management messages
+message RuntimesRes {
+  repeated RuntimeInfo runtimes = 1;
+}
+
+message RuntimeInfo {
+  string name = 1;                  // e.g., "python:3.11+ml"
+  string language = 2;              // e.g., "python"
+  string version = 3;               // e.g., "3.11"
+  string description = 4;           // Human readable description
+  int64 sizeBytes = 5;              // Runtime size in bytes
+  repeated string packages = 6;     // Pre-installed packages
+  bool available = 7;               // Whether runtime is ready for use
+  RuntimeRequirements requirements = 8;
+}
+
+message RuntimeRequirements {
+  repeated string architectures = 1; // e.g., ["x86_64", "amd64"]
+  bool gpu = 2;                      // Whether GPU is required
+}
+
+message RuntimeInfoReq {
+  string runtime = 1;               // e.g., "python:3.11+ml"
+}
+
+message RuntimeInfoRes {
+  RuntimeInfo runtime = 1;
+  bool found = 2;
+}
+
+message RuntimeTestReq {
+  string runtime = 1;               // e.g., "python:3.11+ml"
+}
+
+message RuntimeTestRes {
+  bool success = 2;
+  string output = 3;
+  string error = 4;
+  int32 exitCode = 5;
 }

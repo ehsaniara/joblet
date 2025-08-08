@@ -96,5 +96,10 @@ monitoring:
   process_interval: "30s"
   cloud_detection: true
 
+# Runtime System Configuration
+runtime:
+  enabled: true
+  base_path: "/opt/joblet/runtimes"
+
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically

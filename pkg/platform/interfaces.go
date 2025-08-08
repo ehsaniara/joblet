@@ -45,6 +45,10 @@ type OSOperations interface {
 	IsExist(err error) bool
 	RemoveAll(dir string) error
 	ReadDir(s string) ([]os.DirEntry, error)
+
+	// Additional helpers
+	DirExists(path string) bool
+	FileExists(path string) bool
 }
 
 // SyscallOperations defines low-level system call operations
@@ -66,6 +70,7 @@ type SyscallOperations interface {
 //counterfeiter:generate . CommandFactory
 type CommandFactory interface {
 	CreateCommand(name string, args ...string) *ExecCommand
+	CommandContext(ctx interface{}, name string, args ...string) Command
 }
 
 // Command represents an executing command

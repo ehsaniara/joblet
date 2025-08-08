@@ -9,6 +9,19 @@ import (
 )
 
 type FakePlatform struct {
+	CommandContextStub        func(interface{}, string, ...string) platform.Command
+	commandContextMutex       sync.RWMutex
+	commandContextArgsForCall []struct {
+		arg1 interface{}
+		arg2 string
+		arg3 []string
+	}
+	commandContextReturns struct {
+		result1 platform.Command
+	}
+	commandContextReturnsOnCall map[int]struct {
+		result1 platform.Command
+	}
 	CreateCommandStub        func(string, ...string) *platform.ExecCommand
 	createCommandMutex       sync.RWMutex
 	createCommandArgsForCall []struct {
@@ -30,6 +43,17 @@ type FakePlatform struct {
 	}
 	createProcessGroupReturnsOnCall map[int]struct {
 		result1 *syscall.SysProcAttr
+	}
+	DirExistsStub        func(string) bool
+	dirExistsMutex       sync.RWMutex
+	dirExistsArgsForCall []struct {
+		arg1 string
+	}
+	dirExistsReturns struct {
+		result1 bool
+	}
+	dirExistsReturnsOnCall map[int]struct {
+		result1 bool
 	}
 	EnvironStub        func() []string
 	environMutex       sync.RWMutex
@@ -70,6 +94,17 @@ type FakePlatform struct {
 	exitMutex       sync.RWMutex
 	exitArgsForCall []struct {
 		arg1 int
+	}
+	FileExistsStub        func(string) bool
+	fileExistsMutex       sync.RWMutex
+	fileExistsArgsForCall []struct {
+		arg1 string
+	}
+	fileExistsReturns struct {
+		result1 bool
+	}
+	fileExistsReturnsOnCall map[int]struct {
+		result1 bool
 	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
@@ -283,6 +318,69 @@ type FakePlatform struct {
 	invocationsMutex sync.RWMutex
 }
 
+func (fake *FakePlatform) CommandContext(arg1 interface{}, arg2 string, arg3 ...string) platform.Command {
+	fake.commandContextMutex.Lock()
+	ret, specificReturn := fake.commandContextReturnsOnCall[len(fake.commandContextArgsForCall)]
+	fake.commandContextArgsForCall = append(fake.commandContextArgsForCall, struct {
+		arg1 interface{}
+		arg2 string
+		arg3 []string
+	}{arg1, arg2, arg3})
+	stub := fake.CommandContextStub
+	fakeReturns := fake.commandContextReturns
+	fake.recordInvocation("CommandContext", []interface{}{arg1, arg2, arg3})
+	fake.commandContextMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePlatform) CommandContextCallCount() int {
+	fake.commandContextMutex.RLock()
+	defer fake.commandContextMutex.RUnlock()
+	return len(fake.commandContextArgsForCall)
+}
+
+func (fake *FakePlatform) CommandContextCalls(stub func(interface{}, string, ...string) platform.Command) {
+	fake.commandContextMutex.Lock()
+	defer fake.commandContextMutex.Unlock()
+	fake.CommandContextStub = stub
+}
+
+func (fake *FakePlatform) CommandContextArgsForCall(i int) (interface{}, string, []string) {
+	fake.commandContextMutex.RLock()
+	defer fake.commandContextMutex.RUnlock()
+	argsForCall := fake.commandContextArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakePlatform) CommandContextReturns(result1 platform.Command) {
+	fake.commandContextMutex.Lock()
+	defer fake.commandContextMutex.Unlock()
+	fake.CommandContextStub = nil
+	fake.commandContextReturns = struct {
+		result1 platform.Command
+	}{result1}
+}
+
+func (fake *FakePlatform) CommandContextReturnsOnCall(i int, result1 platform.Command) {
+	fake.commandContextMutex.Lock()
+	defer fake.commandContextMutex.Unlock()
+	fake.CommandContextStub = nil
+	if fake.commandContextReturnsOnCall == nil {
+		fake.commandContextReturnsOnCall = make(map[int]struct {
+			result1 platform.Command
+		})
+	}
+	fake.commandContextReturnsOnCall[i] = struct {
+		result1 platform.Command
+	}{result1}
+}
+
 func (fake *FakePlatform) CreateCommand(arg1 string, arg2 ...string) *platform.ExecCommand {
 	fake.createCommandMutex.Lock()
 	ret, specificReturn := fake.createCommandReturnsOnCall[len(fake.createCommandArgsForCall)]
@@ -395,6 +493,67 @@ func (fake *FakePlatform) CreateProcessGroupReturnsOnCall(i int, result1 *syscal
 	}
 	fake.createProcessGroupReturnsOnCall[i] = struct {
 		result1 *syscall.SysProcAttr
+	}{result1}
+}
+
+func (fake *FakePlatform) DirExists(arg1 string) bool {
+	fake.dirExistsMutex.Lock()
+	ret, specificReturn := fake.dirExistsReturnsOnCall[len(fake.dirExistsArgsForCall)]
+	fake.dirExistsArgsForCall = append(fake.dirExistsArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.DirExistsStub
+	fakeReturns := fake.dirExistsReturns
+	fake.recordInvocation("DirExists", []interface{}{arg1})
+	fake.dirExistsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePlatform) DirExistsCallCount() int {
+	fake.dirExistsMutex.RLock()
+	defer fake.dirExistsMutex.RUnlock()
+	return len(fake.dirExistsArgsForCall)
+}
+
+func (fake *FakePlatform) DirExistsCalls(stub func(string) bool) {
+	fake.dirExistsMutex.Lock()
+	defer fake.dirExistsMutex.Unlock()
+	fake.DirExistsStub = stub
+}
+
+func (fake *FakePlatform) DirExistsArgsForCall(i int) string {
+	fake.dirExistsMutex.RLock()
+	defer fake.dirExistsMutex.RUnlock()
+	argsForCall := fake.dirExistsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) DirExistsReturns(result1 bool) {
+	fake.dirExistsMutex.Lock()
+	defer fake.dirExistsMutex.Unlock()
+	fake.DirExistsStub = nil
+	fake.dirExistsReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakePlatform) DirExistsReturnsOnCall(i int, result1 bool) {
+	fake.dirExistsMutex.Lock()
+	defer fake.dirExistsMutex.Unlock()
+	fake.DirExistsStub = nil
+	if fake.dirExistsReturnsOnCall == nil {
+		fake.dirExistsReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.dirExistsReturnsOnCall[i] = struct {
+		result1 bool
 	}{result1}
 }
 
@@ -610,6 +769,67 @@ func (fake *FakePlatform) ExitArgsForCall(i int) int {
 	defer fake.exitMutex.RUnlock()
 	argsForCall := fake.exitArgsForCall[i]
 	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) FileExists(arg1 string) bool {
+	fake.fileExistsMutex.Lock()
+	ret, specificReturn := fake.fileExistsReturnsOnCall[len(fake.fileExistsArgsForCall)]
+	fake.fileExistsArgsForCall = append(fake.fileExistsArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.FileExistsStub
+	fakeReturns := fake.fileExistsReturns
+	fake.recordInvocation("FileExists", []interface{}{arg1})
+	fake.fileExistsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePlatform) FileExistsCallCount() int {
+	fake.fileExistsMutex.RLock()
+	defer fake.fileExistsMutex.RUnlock()
+	return len(fake.fileExistsArgsForCall)
+}
+
+func (fake *FakePlatform) FileExistsCalls(stub func(string) bool) {
+	fake.fileExistsMutex.Lock()
+	defer fake.fileExistsMutex.Unlock()
+	fake.FileExistsStub = stub
+}
+
+func (fake *FakePlatform) FileExistsArgsForCall(i int) string {
+	fake.fileExistsMutex.RLock()
+	defer fake.fileExistsMutex.RUnlock()
+	argsForCall := fake.fileExistsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) FileExistsReturns(result1 bool) {
+	fake.fileExistsMutex.Lock()
+	defer fake.fileExistsMutex.Unlock()
+	fake.FileExistsStub = nil
+	fake.fileExistsReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakePlatform) FileExistsReturnsOnCall(i int, result1 bool) {
+	fake.fileExistsMutex.Lock()
+	defer fake.fileExistsMutex.Unlock()
+	fake.FileExistsStub = nil
+	if fake.fileExistsReturnsOnCall == nil {
+		fake.fileExistsReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.fileExistsReturnsOnCall[i] = struct {
+		result1 bool
+	}{result1}
 }
 
 func (fake *FakePlatform) Getenv(arg1 string) string {

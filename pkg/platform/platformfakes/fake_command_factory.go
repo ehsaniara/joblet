@@ -7,6 +7,19 @@ import (
 )
 
 type FakeCommandFactory struct {
+	CommandContextStub        func(interface{}, string, ...string) platform.Command
+	commandContextMutex       sync.RWMutex
+	commandContextArgsForCall []struct {
+		arg1 interface{}
+		arg2 string
+		arg3 []string
+	}
+	commandContextReturns struct {
+		result1 platform.Command
+	}
+	commandContextReturnsOnCall map[int]struct {
+		result1 platform.Command
+	}
 	CreateCommandStub        func(string, ...string) *platform.ExecCommand
 	createCommandMutex       sync.RWMutex
 	createCommandArgsForCall []struct {
@@ -21,6 +34,69 @@ type FakeCommandFactory struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeCommandFactory) CommandContext(arg1 interface{}, arg2 string, arg3 ...string) platform.Command {
+	fake.commandContextMutex.Lock()
+	ret, specificReturn := fake.commandContextReturnsOnCall[len(fake.commandContextArgsForCall)]
+	fake.commandContextArgsForCall = append(fake.commandContextArgsForCall, struct {
+		arg1 interface{}
+		arg2 string
+		arg3 []string
+	}{arg1, arg2, arg3})
+	stub := fake.CommandContextStub
+	fakeReturns := fake.commandContextReturns
+	fake.recordInvocation("CommandContext", []interface{}{arg1, arg2, arg3})
+	fake.commandContextMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeCommandFactory) CommandContextCallCount() int {
+	fake.commandContextMutex.RLock()
+	defer fake.commandContextMutex.RUnlock()
+	return len(fake.commandContextArgsForCall)
+}
+
+func (fake *FakeCommandFactory) CommandContextCalls(stub func(interface{}, string, ...string) platform.Command) {
+	fake.commandContextMutex.Lock()
+	defer fake.commandContextMutex.Unlock()
+	fake.CommandContextStub = stub
+}
+
+func (fake *FakeCommandFactory) CommandContextArgsForCall(i int) (interface{}, string, []string) {
+	fake.commandContextMutex.RLock()
+	defer fake.commandContextMutex.RUnlock()
+	argsForCall := fake.commandContextArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeCommandFactory) CommandContextReturns(result1 platform.Command) {
+	fake.commandContextMutex.Lock()
+	defer fake.commandContextMutex.Unlock()
+	fake.CommandContextStub = nil
+	fake.commandContextReturns = struct {
+		result1 platform.Command
+	}{result1}
+}
+
+func (fake *FakeCommandFactory) CommandContextReturnsOnCall(i int, result1 platform.Command) {
+	fake.commandContextMutex.Lock()
+	defer fake.commandContextMutex.Unlock()
+	fake.CommandContextStub = nil
+	if fake.commandContextReturnsOnCall == nil {
+		fake.commandContextReturnsOnCall = make(map[int]struct {
+			result1 platform.Command
+		})
+	}
+	fake.commandContextReturnsOnCall[i] = struct {
+		result1 platform.Command
+	}{result1}
 }
 
 func (fake *FakeCommandFactory) CreateCommand(arg1 string, arg2 ...string) *platform.ExecCommand {

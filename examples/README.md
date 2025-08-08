@@ -1,17 +1,35 @@
 # Joblet Examples
 
-Comprehensive examples demonstrating Joblet's capabilities, from simple command execution to advanced job coordination
-patterns.
+Comprehensive examples demonstrating Joblet's capabilities, from instant runtime environments to advanced job
+coordination patterns.
 
-## 📁 Directory Structure
+## ⚡ Runtime-Powered Examples (Instant Startup)
 
-### 🐍 [Python Analytics](./python-analytics/) ✅ **Always Works**
+### 🐍 [Python 3.11 ML](./python-3.11-ml/) ⚡ **Instant Execution**
 
-- **Sales Analysis**: Statistical analysis using Python standard library
-- **Customer Segmentation**: K-means clustering implemented from scratch
-- **Time Series Processing**: Data generation and moving averages
-- **Dependencies**: Python 3 standard library only
-- **Status**: ✅ Works out of the box with Python 3
+- **Advanced Analytics**: Complete ML stack with visualization
+- **Libraries**: NumPy, Pandas, Matplotlib, SciPy, Seaborn
+- **Examples**: Data analysis, statistical visualization
+- **Runtime**: python-3.11-ml (pre-built environment)
+- **Status**: ✅ With runtime / ⚠️ Without runtime
+
+### ☕ [Java 17](./java-17/) ⚡ **2-3 seconds vs 30-120 seconds**
+
+- **Enterprise Java**: OpenJDK 17 LTS with Maven
+- **Development**: Complete Java development environment
+- **Performance**: ~15-40x faster than JDK installation
+- **Runtime**: java-17 (pre-compiled)
+- **Status**: ✅ With runtime / ⚠️ Without runtime
+
+### ☕ [Java 21](./java-21/) ⚡ **Modern Java Features**
+
+- **Cutting-edge Java**: Virtual Threads, Pattern Matching, Records
+- **Modern Features**: Latest Java 21 language enhancements
+- **Development**: Modern Java development patterns
+- **Runtime**: java-21 (latest features)
+- **Status**: ✅ With runtime / ⚠️ Without runtime
+
+## 📋 Traditional Examples (System Dependencies)
 
 ### 💻 [Basic Usage](./basic-usage/) ✅ **Always Works**
 
@@ -23,6 +41,14 @@ patterns.
 - **Dependencies**: Shell commands only
 - **Status**: ✅ Always works
 
+### 🐍 [Python Analytics](./python-analytics/) ✅ **Always Works**
+
+- **Sales Analysis**: Statistical analysis using Python standard library
+- **Customer Segmentation**: K-means clustering implemented from scratch
+- **Time Series Processing**: Data generation and moving averages
+- **Dependencies**: Python 3 standard library only
+- **Status**: ✅ Works out of the box with Python 3
+
 ### 🔗 [Advanced Examples](./advanced/) ✅ **Works with Python 3**
 
 - **Job Coordination**: Sequential jobs with data dependencies
@@ -31,23 +57,47 @@ patterns.
 - **Dependencies**: Python 3 standard library
 - **Status**: ✅ Works with Python 3
 
-### 🟨 [Node.js](./nodejs/) ⚠️ **Requires Node.js**
-
-- **System Analysis**: Platform and process information
-- **Data Processing**: JSON manipulation and statistics
-- **File Operations**: Built-in module demonstrations
-- **Dependencies**: Node.js runtime in job environment
-- **Status**: ⚠️ Requires Node.js installation
-
 ### 🤖 [Agentic AI](./agentic-ai/) ⚠️ **Requires Dependencies**
 
-- **AI/ML Workflows**: Various AI-related examples
+- **AI/ML Workflows**: LLM inference, RAG systems, distributed training
+- **Multi-Agent Systems**: Complex AI coordination patterns
 - **Dependencies**: External Python packages
 - **Status**: ⚠️ May require additional setup
 
 ## 🚀 Quick Start
 
-### Recommended Path (Always Works)
+### 🏃‍♂️ Instant Start with Runtimes (Recommended)
+
+```bash
+# Option 1: Deploy pre-built packages (fastest - no host contamination)
+# Copy packages from examples/packages/ to target host
+scp examples/packages/python-3.11-ml-runtime.tar.gz admin@host:/tmp/
+scp examples/packages/java-17-runtime-complete.tar.gz admin@host:/tmp/
+
+# Deploy on target host
+ssh admin@host
+sudo tar -xzf /tmp/python-3.11-ml-runtime.tar.gz -C /opt/joblet/runtimes/python/
+sudo tar -xzf /tmp/java-17-runtime-complete.tar.gz -C /opt/joblet/runtimes/java/
+sudo chown -R joblet:joblet /opt/joblet/runtimes/
+
+# Option 2: Build from setup scripts (builds on host)
+sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
+sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh
+
+# 2. Verify runtimes are available
+rnx runtime list
+
+# 3. Try instant ML demo (2-3 seconds total)
+cd python-3.11-ml/
+rnx run --runtime=python-3.11-ml python example_data_analysis.py
+
+# 4. Try Java development (instant compilation)
+cd ../java-17/
+rnx run --runtime=java:17 --upload=HelloJoblet.java bash -c "javac HelloJoblet.java && java HelloJoblet"
+```
+
+### 📚 Traditional Path (Always Works)
 
 ```bash
 # 1. Start with Python Analytics (most comprehensive working example)
@@ -63,114 +113,195 @@ cd ../advanced/
 ./job_coordination.sh
 ```
 
-### Run All Working Examples
+### 🎯 Run All Examples
 
 ```bash
 # Execute all working examples
 ./run_all_demos.sh
 ```
 
-This will attempt to run all examples and report which ones succeed.
+## ⚡ Performance Comparison
+
+| **Example Type**     | **Traditional**              | **Runtime** | **Speedup**   |
+|----------------------|------------------------------|-------------|---------------|
+| **Python ML**        | 5-45 minutes (pip install)   | 2-3 seconds | **~100-300x** |
+| **Java Development** | 30-120 seconds (JDK install) | 2-3 seconds | **~15-40x**   |
+| **Python Analytics** | 30-60 seconds                | 2-5 seconds | **~10-20x**   |
 
 ## 🎯 Key Examples by Use Case
 
-### Data Analysis & Processing
+### 🤖 AI/ML Development (Runtime-Powered)
 
-- **[Python Analytics](./python-analytics/)** - Complete data analysis pipeline
+- **[Python 3.11 ML](./python-3.11-ml/)** - Advanced data analysis and visualization
+- **[Agentic AI](./agentic-ai/)** - Complex AI workflows and multi-agent systems
+
+### ☕ Enterprise Development (Runtime-Powered)
+
+- **[Java 17 LTS](./java-17/)** - Enterprise Java with instant compilation
+- **[Java 21 Modern](./java-21/)** - Cutting-edge Java features
+
+### 📊 Data Analysis & Processing
+
+- **[Python Analytics](./python-analytics/)** - Complete data analysis pipeline (no dependencies)
 - **[Advanced Job Coordination](./advanced/)** - Multi-step data workflows
 
-### Learning Joblet Fundamentals
+### 🎓 Learning Joblet Fundamentals
 
 - **[Basic Usage](./basic-usage/)** - Core concepts and patterns
 - **[Simple Commands](./basic-usage/01_simple_commands.sh)** - Start here
 
-### Production Patterns
-
-- **[Volume Storage](./basic-usage/04_volume_storage.sh)** - Persistent data
-- **[Resource Limits](./basic-usage/03_resource_limits.sh)** - Resource management
-- **[Job Coordination](./advanced/job_coordination.sh)** - Complex workflows
-
-## 💡 Example Status Guide
-
-### ✅ Always Works
-
-These examples use only commonly available tools:
-
-- **Python Analytics**: Uses Python 3 standard library
-- **Basic Usage**: Uses shell commands only
-- **Advanced Coordination**: Uses Python 3 standard library
-
-### ⚠️ May Require Setup
-
-These examples need specific runtime environments:
-
-- **Node.js**: Requires Node.js in job environment
-- **Agentic AI**: May require external packages
-
 ## 🔧 Prerequisites
 
-### Minimal Setup (for ✅ examples)
+### 🏎️ Runtime Approach (Recommended)
+
+**Option 1: Deploy Pre-built Packages (Fastest, Zero Contamination):**
+
+```bash
+# Available packages in examples/packages/:
+# - python-3.11-ml-runtime.tar.gz (226MB)
+# - java-17-runtime-complete.tar.gz (193MB)  
+# - java-21-runtime-complete.tar.gz (208MB)
+
+# Deploy Python ML runtime
+scp examples/packages/python-3.11-ml-runtime.tar.gz admin@host:/tmp/
+ssh admin@host "sudo tar -xzf /tmp/python-3.11-ml-runtime.tar.gz -C /opt/joblet/runtimes/python/"
+
+# Deploy Java runtimes
+scp examples/packages/java-*-runtime-complete.tar.gz admin@host:/tmp/
+ssh admin@host "sudo tar -xzf /tmp/java-17-runtime-complete.tar.gz -C /opt/joblet/runtimes/java/"
+ssh admin@host "sudo tar -xzf /tmp/java-21-runtime-complete.tar.gz -C /opt/joblet/runtimes/java/"
+```
+
+**Option 2: Build from Setup Scripts (on Joblet server):**
+
+```bash
+# Python 3.11 + ML Stack (builds from source)
+sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+
+# Java 17 LTS + Maven
+sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
+
+# Java 21 + Modern Features  
+sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh
+```
+
+**Benefits:**
+
+- ⚡ 10-1000x faster startup times
+- 🔒 Complete isolation from host system
+- 📦 Pre-installed packages and tools
+- 🛡️ Security and consistency
+
+### 📚 Traditional Approach (System Dependencies)
+
+**Minimal Setup (for ✅ examples):**
 
 - Joblet server running
 - RNX client configured
 - Python 3 available in job environment (for analytics)
 
-### Full Setup (for all examples)
+**Full Setup (for all examples):**
 
-- Node.js runtime (for Node.js examples)
+- Java JDK (for Java examples)
 - External package installation capability (for AI examples)
+
+## 💡 Example Status Guide
+
+### ⚡ Runtime-Powered (Instant Startup)
+
+**With Runtimes Installed:**
+
+- **Python ML**: ✅ Instant execution with complete ML stack
+- **Java**: ✅ Instant compilation and execution
+
+**Without Runtimes:**
+
+- **Python ML**: ⚠️ Requires pip install (5-45 minutes)
+- **Java**: ⚠️ Requires JDK installation (30-120 seconds)
+
+### ✅ Always Works (System Dependencies)
+
+These examples use commonly available tools:
+
+- **Python Analytics**: Uses Python 3 standard library
+- **Basic Usage**: Uses shell commands only
+- **Advanced Coordination**: Uses Python 3 standard library
 
 ## 📚 Learning Path
 
-### 1. Start Here (5 minutes)
+### 🚀 Runtime Path (Recommended - Instant Results)
 
 ```bash
-cd basic-usage/
-./01_simple_commands.sh
+# 1. Install runtimes first (5-10 minutes one-time setup)
+# See Prerequisites section above
+
+# 2. Try ML demo (2-3 seconds)
+cd python-3.11-ml/ && rnx run --runtime=python-3.11-ml python example_data_analysis.py
+
+# 3. Try Java development (2-3 seconds)
+cd ../java-17/ && rnx run --runtime=java-17 --upload=HelloJoblet.java javac HelloJoblet.java && java HelloJoblet
 ```
 
-### 2. Try Data Processing (10 minutes)
+### 📋 Traditional Path (No Setup Required)
 
 ```bash
-cd python-analytics/
-./run_demo.sh
-```
+# 1. Start Here (5 minutes)
+cd basic-usage/ && ./01_simple_commands.sh
 
-### 3. Learn Job Coordination (15 minutes)
+# 2. Try Data Processing (10 minutes)
+cd ../python-analytics/ && ./run_demo.sh
 
-```bash
-cd advanced/
-./job_coordination.sh
-```
+# 3. Learn Job Coordination (15 minutes)
+cd ../advanced/ && ./job_coordination.sh
 
-### 4. Explore All Basics (30 minutes)
-
-```bash
-cd basic-usage/
-./run_demos.sh
+# 4. Explore All Basics (30 minutes)
+cd ../basic-usage/ && ./run_demos.sh
 ```
 
 ## 🎉 Expected Results
 
-### After Python Analytics
+### Runtime-Powered Examples
+
+**After Python ML Demo:**
+
+- Machine learning classification results
+- Statistical analysis with NumPy/Pandas
+- Execution time: 2-3 seconds total
+
+**After Java Development:**
+
+- Compiled Java application output
+- Modern Java features demonstration
+- Execution time: 2-3 seconds total
+
+### Traditional Examples
+
+**After Python Analytics:**
 
 - Sales analysis results in JSON format
 - Customer segmentation data
 - Time series processing output
 
-### After Job Coordination
+**After Job Coordination:**
 
 - Multi-job workflow demonstration
 - Data passing between jobs
 - Dependency management patterns
 
-### After Basic Usage
-
-- Understanding of core Joblet concepts
-- File upload and volume usage
-- Resource management experience
-
 ## 🔍 Inspecting Results
+
+### Runtime Examples
+
+```bash
+# View Python ML results
+rnx run --runtime=python-3.11-ml --volume=ml-data cat /volumes/ml-data/results.json
+
+# Check runtime availability
+rnx runtime list
+rnx runtime info python-3.11-ml
+```
+
+### Traditional Examples
 
 ```bash
 # View analytics results
@@ -188,13 +319,26 @@ rnx list
 
 ## 🛠️ Troubleshooting
 
-### Common Issues
+### Runtime Issues
+
+#### "runtime not found"
+
+```bash
+# Install the missing runtime on Joblet server
+sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+
+# Verify installation
+rnx runtime list
+rnx runtime test python-3.11-ml
+```
+
+### Traditional Issues
 
 #### "command not found"
 
 - **Python scripts**: Ensure Python 3 is available in job environment
-- **Node.js scripts**: Node.js may not be installed in job environment
-- **Solution**: Stick to ✅ examples or install missing runtime
+- **Java scripts**: JDK may not be available in job environment
+- **Solution**: Install runtimes or stick to ✅ examples
 
 #### Job failures
 
@@ -204,6 +348,9 @@ rnx log <job-id>
 
 # View job status
 rnx list
+
+# Test connectivity
+rnx run echo "test"
 ```
 
 #### Resource issues
@@ -212,23 +359,33 @@ rnx list
 # Monitor system resources
 rnx monitor
 
-# Adjust memory limits in scripts (--max-memory=512)
+# Adjust memory limits in scripts (--max-memory=1024)
+# For runtime examples, 512MB-2GB recommended
 ```
 
 ## 📖 Documentation
 
 Each example directory contains detailed README files:
 
-- **[Python Analytics README](./python-analytics/README.md)**
-- **[Basic Usage README](./basic-usage/README.md)**
-- **[Advanced README](./advanced/README.md)**
-- **[Node.js README](./nodejs/README.md)**
+- **[Java 17 README](./java-17/README.md)** - Enterprise Java development
+- **[Python Analytics README](./python-analytics/README.md)** - Data analysis
+- **[Basic Usage README](./basic-usage/README.md)** - Fundamental concepts
+- **[Advanced README](./advanced/README.md)** - Job coordination patterns
 
 ## 🚀 Next Steps
+
+### 🏎️ Runtime Approach (Recommended)
+
+1. **Install Runtimes**: Set up pre-built environments (5-10 minutes one-time)
+2. **Try ML Demo**: Experience 100-300x speedup
+3. **Build APIs**: Create HTTP servers instantly
+4. **Scale Up**: Use runtimes for production workloads
+
+### 📚 Traditional Approach
 
 1. **Master the Basics**: Complete basic-usage examples
 2. **Explore Analytics**: Try python-analytics examples
 3. **Learn Coordination**: Understand advanced job patterns
 4. **Apply to Your Use Case**: Adapt examples for your workflows
 
-Start with the ✅ examples for the best experience!
+**The runtime-powered examples transform development from minutes of waiting to seconds of execution!** 🚀

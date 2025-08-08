@@ -18,6 +18,7 @@ type JobClient struct {
 	networkClient    pb.NetworkServiceClient
 	volumeClient     pb.VolumeServiceClient
 	monitoringClient pb.MonitoringServiceClient
+	runtimeClient    pb.RuntimeServiceClient
 	conn             *grpc.ClientConn
 }
 
@@ -49,6 +50,7 @@ func NewJobClient(node *config.Node) (*JobClient, error) {
 		networkClient:    pb.NewNetworkServiceClient(conn),
 		volumeClient:     pb.NewVolumeServiceClient(conn),
 		monitoringClient: pb.NewMonitoringServiceClient(conn),
+		runtimeClient:    pb.NewRuntimeServiceClient(conn),
 		conn:             conn,
 	}, nil
 }
@@ -128,4 +130,18 @@ func (c *JobClient) GetSystemStatus(ctx context.Context) (*pb.SystemStatusRes, e
 
 func (c *JobClient) StreamSystemMetrics(ctx context.Context, req *pb.StreamMetricsReq) (pb.MonitoringService_StreamSystemMetricsClient, error) {
 	return c.monitoringClient.StreamSystemMetrics(ctx, req)
+}
+
+// Runtime service methods
+
+func (c *JobClient) ListRuntimes(ctx context.Context) (*pb.RuntimesRes, error) {
+	return c.runtimeClient.ListRuntimes(ctx, &pb.EmptyRequest{})
+}
+
+func (c *JobClient) GetRuntimeInfo(ctx context.Context, req *pb.RuntimeInfoReq) (*pb.RuntimeInfoRes, error) {
+	return c.runtimeClient.GetRuntimeInfo(ctx, req)
+}
+
+func (c *JobClient) TestRuntime(ctx context.Context, req *pb.RuntimeTestReq) (*pb.RuntimeTestRes, error) {
+	return c.runtimeClient.TestRuntime(ctx, req)
 }

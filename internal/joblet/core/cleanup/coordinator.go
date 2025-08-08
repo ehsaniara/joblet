@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/network"
+	"joblet/internal/joblet/runtime"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,6 +27,7 @@ type Coordinator struct {
 	platform       platform.Platform
 	config         *config.Config
 	logger         *logger.Logger
+	runtimeManager *runtime.Manager
 
 	// Cleanup tracking
 	activeCleanups sync.Map // jobID -> cleanup status
@@ -53,6 +55,7 @@ func NewCoordinator(
 	config *config.Config,
 	logger *logger.Logger,
 	networkStore adapters.NetworkStoreAdapter,
+	runtimeManager *runtime.Manager,
 ) *Coordinator {
 	var networkSetup *network.NetworkSetup
 	if networkStore != nil {
@@ -69,6 +72,7 @@ func NewCoordinator(
 		logger:         logger.WithField("component", "cleanup-coordinator"),
 		networkStore:   networkStore,
 		networkSetup:   networkSetup,
+		runtimeManager: runtimeManager,
 	}
 }
 
@@ -107,7 +111,15 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 		status.FilesCleaned = true
 	}
 
-	// 3. Clean up any remaining resources
+	// 3. Clean up runtime resources if runtime manager is available
+	if c.runtimeManager != nil {
+		if err := c.cleanupRuntime(jobID); err != nil {
+			log.Error("runtime cleanup failed", "error", err)
+			status.Errors = append(status.Errors, fmt.Errorf("runtime: %w", err))
+		}
+	}
+
+	// 4. Clean up any remaining resources
 	if err := c.cleanupAdditionalResources(jobID); err != nil {
 		log.Error("additional resource cleanup failed", "error", err)
 		status.Errors = append(status.Errors, fmt.Errorf("additional: %w", err))
@@ -345,4 +357,36 @@ func (c *Coordinator) SchedulePeriodicCleanup(ctx context.Context, interval time
 			}
 		}
 	}
+}
+
+// cleanupRuntime cleans up runtime resources for a job
+func (c *Coordinator) cleanupRuntime(jobID string) error {
+	log := c.logger.WithField("jobID", jobID).WithField("component", "runtime-cleanup")
+	log.Debug("cleaning up runtime resources")
+
+	jobRootDir := filepath.Join(c.config.Filesystem.BaseDir, jobID)
+
+	// We need to get the job's runtime info from the store to know what to cleanup
+	// For now, we'll attempt cleanup based on common runtime patterns
+	// In a more sophisticated implementation, we'd store runtime info with the job
+
+	// Attempt to unmount common runtime paths
+	commonRuntimePaths := []string{
+		"/usr/local/bin",
+		"/usr/local/lib",
+		"/usr/lib/jvm",
+		"/usr/local/node",
+		"/usr/local/go",
+	}
+
+	for _, runtimePath := range commonRuntimePaths {
+		mountPoint := filepath.Join(jobRootDir, strings.TrimPrefix(runtimePath, "/"))
+		if c.platform.DirExists(mountPoint) {
+			// Try to unmount - ignore errors since some paths may not be mounted
+			_ = c.platform.Unmount(mountPoint, 0)
+			log.Debug("attempted unmount", "path", mountPoint)
+		}
+	}
+
+	return nil
 }

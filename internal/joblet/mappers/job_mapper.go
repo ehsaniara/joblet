@@ -32,6 +32,7 @@ func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 		Status:    string(job.Status),
 		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
 		ExitCode:  job.ExitCode,
+		Runtime:   job.Runtime,
 	}
 
 	if job.EndTime != nil {
@@ -62,6 +63,7 @@ func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
 		Limits:     *limits,
 		Status:     domain.JobStatus(pbJob.Status),
 		ExitCode:   pbJob.ExitCode,
+		Runtime:    pbJob.Runtime,
 		CgroupPath: "", // Not in protobuf
 		Pid:        0,  // Not in protobuf
 	}

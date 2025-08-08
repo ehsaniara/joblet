@@ -7,3 +7,8 @@ func NewPlatform() Platform {
 		BasePlatform: NewBasePlatform(),
 	}
 }
+
+// NewLinuxPlatform creates a Linux platform implementation
+func NewLinuxPlatform() Platform {
+	return NewPlatform()
+}

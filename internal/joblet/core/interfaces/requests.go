@@ -24,6 +24,9 @@ type StartJobRequest struct {
 
 	// Volume mounts
 	Volumes []string // volume names to mount
+
+	// Runtime specification
+	Runtime string // runtime specification (e.g., "python:3.11+ml")
 }
 
 // ResourceLimits encapsulates resource constraints for a job

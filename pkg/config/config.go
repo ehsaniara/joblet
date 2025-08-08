@@ -25,6 +25,7 @@ type Config struct {
 	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring"`
 	Buffers    BuffersConfig    `yaml:"buffers" json:"buffers"`
 	Volumes    VolumesConfig    `yaml:"volumes" json:"volumes"`
+	Runtime    RuntimeConfig    `yaml:"runtime" json:"runtime"`
 }
 
 type NetworkConfig struct {
@@ -170,6 +171,12 @@ type VolumesConfig struct {
 	DefaultDiskQuotaBytes int64  `yaml:"default_disk_quota_bytes" json:"default_disk_quota_bytes"`
 }
 
+// RuntimeConfig holds runtime system configuration
+type RuntimeConfig struct {
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+	BasePath string `yaml:"base_path" json:"base_path"`
+}
+
 // DefaultConfig provides default configuration values
 var DefaultConfig = Config{
 	Version: "3.0",
@@ -271,6 +278,10 @@ var DefaultConfig = Config{
 	Volumes: VolumesConfig{
 		BasePath:              "/opt/joblet/volumes",
 		DefaultDiskQuotaBytes: 1048576, // 1MB default
+	},
+	Runtime: RuntimeConfig{
+		Enabled:  false, // Disabled by default, enable when runtimes are installed
+		BasePath: "/opt/joblet/runtimes",
 	},
 }
 

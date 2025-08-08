@@ -60,6 +60,13 @@ Volume Examples:
   rnx run --volume=backend --upload=App2.jar java -jar App2.jar
   rnx run --volume=cache --volume=data python3 process.py
 
+Runtime Examples:
+  # Use pre-built runtime environments for fast job startup
+  rnx run --runtime=python:3.11 --upload=script.py python script.py
+  rnx run --runtime=java:17 --jar myapp.jar
+  rnx run --runtime=python:3.11+ml+gpu python train_model.py
+  rnx run --runtime=node:18 --upload=app.js node app.js
+
 Scheduling Formats:
   # Relative time
   --schedule="1hour"      # 1 hour from now
@@ -79,7 +86,10 @@ Flags:
   --max-iobps=N       Max IO BPS
   --cpu-cores=SPEC    CPU cores specification
   --upload=FILE       Upload a file to the job workspace
-  --upload-dir=DIR    Upload entire directory to the job workspace`,
+  --upload-dir=DIR    Upload entire directory to the job workspace
+  --runtime=SPEC      Use pre-built runtime (e.g., python:3.11, java:17)
+  --volume=NAME       Mount persistent volume
+  --network=NAME      Use network configuration`,
 		Args:               cobra.MinimumNArgs(1),
 		RunE:               runRun,
 		DisableFlagParsing: true,
@@ -99,6 +109,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		schedule   string
 		network    string
 		volumes    []string
+		runtime    string
 	)
 
 	commandStartIndex := -1
@@ -144,6 +155,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		} else if strings.HasPrefix(arg, "--volume=") {
 			volumeName := strings.TrimPrefix(arg, "--volume=")
 			volumes = append(volumes, volumeName)
+		} else if strings.HasPrefix(arg, "--runtime=") {
+			runtime = strings.TrimPrefix(arg, "--runtime=")
 		} else if arg == "--" {
 			// -- separator found, command starts at next position
 			if i+1 < len(args) {
@@ -224,6 +237,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		Schedule:  scheduledTimeRFC3339,
 		Network:   network,
 		Volumes:   volumes,
+		Runtime:   runtime,
 	}
 
 	// Submit job

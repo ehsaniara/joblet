@@ -1,6 +1,7 @@
 # Joblet Demo Setup Guide
 
-This guide helps you run the Joblet examples that demonstrate core functionality with minimal dependencies.
+This guide helps you run the Joblet examples that demonstrate core functionality, including pre-built runtime
+environments for instant execution.
 
 ## 🚀 Quick Start
 
@@ -10,12 +11,17 @@ This guide helps you run the Joblet examples that demonstrate core functionality
 
 - **Joblet Server**: Running joblet daemon
 - **RNX Client**: Configured and connected to server
+
+**Pre-built Runtimes (Recommended for best experience):**
+
+- **Python 3.11 + ML Runtime**: `sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh`
+- **Java 17 LTS Runtime**: `sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh`
+- **Java 21 Runtime**: `sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh`
+
+**Fallback (System Dependencies):**
+
 - **Python 3**: For analytics examples (uses standard library only)
-
-**Optional:**
-
-- **Node.js**: For Node.js examples (if available in job environment)
-- **Additional packages**: Only needed for specific examples
+- **Java**: For Java examples (if available in job environment)
 
 ### 2. Verify Setup
 
@@ -25,25 +31,59 @@ rnx list
 
 # Check server connectivity
 rnx run echo "Hello Joblet"
+
+# Check available runtimes (if installed)
+rnx runtime list
+
+# Test runtime functionality
+rnx runtime test python-3.11-ml    # If Python runtime installed
 ```
 
 ### 3. Run Working Examples
 
-#### Recommended: Start with Python Analytics (Always Works)
+#### 🚀 Runtime-Powered Examples (Instant Startup)
+
+**Python ML Examples:**
 
 ```bash
-cd python-analytics/
+# Machine Learning Demo (2-3 seconds vs 5-45 minutes traditional)
+cd python-ml/
 ./run_demo.sh
+
+# Data Analysis Example
+cd python-3.11-ml/
+rnx run --runtime=python-3.11-ml --upload=example_data_analysis.py python example_data_analysis.py
 ```
 
-#### Basic Usage (Always Works)
+**Java Development:**
+
+```bash
+# Java 17 LTS Example
+cd java-17/
+rnx run --runtime=java-17 --upload=HelloJoblet.java javac HelloJoblet.java && java HelloJoblet
+
+# Java 21 with Modern Features
+cd java-21/
+rnx run --runtime=java-21 --upload=VirtualThreadExample.java javac VirtualThreadExample.java && java VirtualThreadExample
+```
+
+#### 📋 Traditional Examples (System Dependencies)
+
+**Basic Usage (Always Works):**
 
 ```bash
 cd basic-usage/
 ./run_demos.sh
 ```
 
-#### Advanced Job Coordination (Works with Python 3)
+**Python Analytics (Standard Library):**
+
+```bash
+cd python-analytics/
+./run_demo.sh
+```
+
+**Advanced Job Coordination:**
 
 ```bash
 cd advanced/
@@ -59,12 +99,34 @@ cd advanced/
 
 ## 📚 Demo Contents
 
-### Python Analytics (`python-analytics/`)
+### 🚀 Runtime-Powered Examples (Instant Startup)
 
-- **Dependencies**: Python 3 standard library only
-- **Features**: Sales analysis, customer segmentation, time series processing
+### Python ML (`python-ml/`)
+
+- **Runtime**: python-3.11-ml (2-3 seconds startup)
+- **Features**: Machine learning with NumPy, Pandas, Scikit-learn
+- **Examples**: Data classification, statistical analysis
+- **Performance**: ~100-300x faster than package installation
+- **Status**: ✅ With runtime / ⚠️ Without runtime
+
+### Python 3.11 ML (`python-3.11-ml/`)
+
+- **Runtime**: python-3.11-ml (instant execution)
+- **Features**: Advanced data analysis, visualization
+- **Libraries**: NumPy, Pandas, Matplotlib, SciPy
 - **Storage**: Results saved to persistent volumes
-- **Status**: ✅ Always works with Python 3
+- **Status**: ✅ With runtime / ⚠️ Without runtime
+
+### Java Examples (`java-17/`, `java-21/`)
+
+- **Runtime**: java-17 or java-21 (instant compilation)
+- **Features**: Enterprise Java, modern language features
+- **Tools**: Maven, JDK tools, Virtual Threads (Java 21)
+- **Examples**: Hello World, modern Java features
+- **Performance**: ~15-40x faster than JDK installation
+- **Status**: ✅ With runtime / ⚠️ Without runtime
+
+### 📋 Traditional Examples (System Dependencies)
 
 ### Basic Usage (`basic-usage/`)
 
@@ -73,6 +135,13 @@ cd advanced/
 - **Storage**: Temporary files and volumes
 - **Status**: ✅ Always works
 
+### Python Analytics (`python-analytics/`)
+
+- **Dependencies**: Python 3 standard library only
+- **Features**: Sales analysis, customer segmentation, time series processing
+- **Storage**: Results saved to persistent volumes
+- **Status**: ✅ Always works with Python 3
+
 ### Advanced Examples (`advanced/`)
 
 - **Dependencies**: Python 3 standard library
@@ -80,12 +149,12 @@ cd advanced/
 - **Storage**: Persistent volumes for coordination
 - **Status**: ✅ Works with Python 3
 
-### Node.js Examples (`nodejs/`)
+### Agentic AI (`agentic-ai/`)
 
-- **Dependencies**: Node.js runtime in job environment
-- **Features**: System analysis, data processing with built-in modules
-- **Storage**: Results to volumes if Node.js available
-- **Status**: ⚠️ Requires Node.js in job environment
+- **Dependencies**: Python 3 + pip packages
+- **Features**: LLM inference, RAG systems, distributed training
+- **Examples**: Multi-agent systems, AI workflows
+- **Status**: ⚠️ Requires package installation
 
 ## 🔧 Troubleshooting
 
@@ -93,9 +162,17 @@ cd advanced/
 
 #### "command not found" errors
 
+**With Runtimes (Recommended):**
+
+- **Python**: Install runtime: `sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh`
+- **Java**: Install runtime: `sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh`
+- **Verify**: Check with `rnx runtime list`
+
+**With System Dependencies:**
+
 - **Python scripts**: Ensure Python 3 is installed in job environment
-- **Node.js scripts**: Node.js may not be available in job environment
-- **Solution**: Use Python examples instead, or install missing runtime
+- **Java scripts**: JDK may not be available in job environment
+- **Fallback**: Use basic-usage or python-analytics examples
 
 #### Job failures
 

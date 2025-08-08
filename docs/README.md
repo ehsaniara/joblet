@@ -12,12 +12,15 @@ Welcome to the complete Joblet documentation! This guide covers everything you n
 ### User Guides
 - [**RNX CLI Reference**](./RNX_CLI_REFERENCE.md) - Complete command reference with examples
 - [**Job Execution Guide**](./JOB_EXECUTION.md) - Running jobs with resource limits and isolation
+- [**Runtime System**](./RUNTIME_SYSTEM.md) - Pre-built environments for instant job execution
 - [**Volume Management**](./VOLUME_MANAGEMENT.md) - Persistent and temporary storage for jobs
 - [**Network Management**](./NETWORK_MANAGEMENT.md) - Network isolation and custom networks
 - [**Monitoring & Metrics**](./MONITORING.md) - System and job monitoring
 
 ### Advanced Topics
 - [**Security Guide**](./SECURITY.md) - mTLS, authentication, and best practices
+- [**Runtime Deployment**](./RUNTIME_DEPLOYMENT.md) - Zero-contamination runtime deployment for production
+- [**Runtime Advanced Scenarios**](./RUNTIME_ADVANCED_SCENARIOS.md) - Enterprise deployment patterns and CI/CD integration
 - [**Multi-Node Setup**](./MULTI_NODE.md) - Managing multiple Joblet servers
 - [**CI/CD Integration**](./CI_CD_INTEGRATION.md) - Using Joblet in CI/CD pipelines
 - [**Troubleshooting**](./TROUBLESHOOTING.md) - Common issues and solutions

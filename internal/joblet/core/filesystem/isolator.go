@@ -33,15 +33,18 @@ func NewIsolator(cfg config.FilesystemConfig, platform platform.Platform) *Isola
 
 // JobFilesystem represents an isolated filesystem for a job
 type JobFilesystem struct {
-	JobID    string
-	RootDir  string
-	TmpDir   string
-	WorkDir  string
-	InitPath string   // Path to the init binary inside the isolated environment
-	Volumes  []string // Volume names to mount
-	platform platform.Platform
-	config   config.FilesystemConfig
-	logger   *logger.Logger
+	JobID         string
+	RootDir       string
+	TmpDir        string
+	WorkDir       string
+	InitPath      string      // Path to the init binary inside the isolated environment
+	Volumes       []string    // Volume names to mount
+	Runtime       string      // Runtime specification
+	RuntimePath   string      // Path to runtime base directory
+	RuntimeConfig interface{} // Runtime configuration data
+	platform      platform.Platform
+	config        config.FilesystemConfig
+	logger        *logger.Logger
 }
 
 // PrepareInitBinary copies the joblet init binary into the isolated filesystem.
@@ -246,6 +249,9 @@ func (f *JobFilesystem) Setup() error {
 		f.loadVolumesFromEnvironment()
 	}
 
+	// Load runtime information from environment
+	f.loadRuntimeFromEnvironment()
+
 	// Mount volumes BEFORE chroot
 	if err := f.mountVolumes(); err != nil {
 		return fmt.Errorf("failed to mount volumes: %w", err)
@@ -267,6 +273,13 @@ func (f *JobFilesystem) Setup() error {
 			}
 		}
 	}
+
+	// Mount runtime if specified BEFORE chroot
+	f.logger.Debug("about to mount runtime", "runtime", f.Runtime)
+	if err := f.mountRuntime(); err != nil {
+		return fmt.Errorf("failed to mount runtime: %w", err)
+	}
+	f.logger.Debug("finished mounting runtime", "runtime", f.Runtime)
 
 	// Mount pipes directory for uploads
 	if err := f.mountPipesDirectory(); err != nil {
@@ -387,7 +400,17 @@ func (f *JobFilesystem) mountAllowedDirs() error {
 // is automatically cleaned up when the job completes.
 // Each job gets its own isolated /tmp to prevent interference.
 func (f *JobFilesystem) setupTmpDir() error {
+	// Create the job-specific tmp directory on the host
+	if err := f.platform.MkdirAll(f.TmpDir, 0755); err != nil {
+		return fmt.Errorf("failed to create job tmp directory: %w", err)
+	}
+
 	tmpPath := filepath.Join(f.RootDir, "tmp")
+
+	// Create the tmp mount point in the isolated root
+	if err := f.platform.MkdirAll(tmpPath, 0755); err != nil {
+		return fmt.Errorf("failed to create tmp mount point: %w", err)
+	}
 
 	// Bind mount the job-specific tmp to /tmp in the isolated root
 	if err := f.platform.Mount(f.TmpDir, tmpPath, "", syscall.MS_BIND, ""); err != nil {
@@ -467,6 +490,13 @@ func (f *JobFilesystem) mountEssentialFS() error {
 //
 // Ignores errors if devices already exist, logs warnings for creation failures.
 func (f *JobFilesystem) createEssentialDevices() error {
+	// Ensure /dev directory exists
+	if err := f.platform.MkdirAll("/dev", 0755); err != nil {
+		if !f.platform.IsExist(err) {
+			return fmt.Errorf("failed to create /dev directory: %w", err)
+		}
+	}
+
 	// Create /dev/null
 	if err := syscall.Mknod("/dev/null", syscall.S_IFCHR|0666, int(makedev(1, 3))); err != nil {
 		if !f.platform.IsExist(err) {
@@ -799,4 +829,167 @@ func (f *JobFilesystem) getDefaultDiskQuotaBytes() int64 {
 		}
 	}
 	return 1048576 // 1MB default
+}
+
+// loadRuntimeFromEnvironment reads runtime configuration from environment variables
+func (f *JobFilesystem) loadRuntimeFromEnvironment() {
+	f.Runtime = f.platform.Getenv("JOB_RUNTIME")
+	f.RuntimePath = f.platform.Getenv("JOB_RUNTIME_PATH")
+	f.logger.Debug("attempting to load runtime from environment", "JOB_RUNTIME", f.Runtime, "JOB_RUNTIME_PATH", f.RuntimePath)
+	if f.Runtime != "" {
+		f.logger.Info("loaded runtime from environment", "runtime", f.Runtime, "path", f.RuntimePath)
+	} else {
+		f.logger.Debug("no runtime specified in environment")
+	}
+}
+
+// mountRuntime mounts the runtime directories if runtime is specified
+func (f *JobFilesystem) mountRuntime() error {
+	if f.Runtime == "" {
+		f.logger.Debug("no runtime specified, skipping runtime mount")
+		return nil
+	}
+
+	log := f.logger.WithField("runtime", f.Runtime)
+	log.Debug("mounting runtime for job")
+
+	// Check if we have a runtime manager available through environment
+	runtimeManagerPath := f.platform.Getenv("RUNTIME_MANAGER_PATH")
+	if runtimeManagerPath == "" {
+		// Try default runtime path
+		runtimeManagerPath = "/opt/joblet/runtimes"
+	}
+
+	// Create runtime manager to resolve and mount runtime
+	if err := f.mountRuntimeWithManager(runtimeManagerPath); err != nil {
+		return fmt.Errorf("failed to mount runtime %s: %w", f.Runtime, err)
+	}
+
+	log.Info("runtime mounted successfully", "runtime", f.Runtime)
+	return nil
+}
+
+// mountRuntimeWithManager uses the runtime manager to mount runtime
+func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
+	// Import the runtime manager types here
+	type RuntimeMount struct {
+		Source    string   `yaml:"source"`
+		Target    string   `yaml:"target"`
+		ReadOnly  bool     `yaml:"readonly"`
+		Selective []string `yaml:"selective"`
+	}
+
+	type RuntimeConfig struct {
+		Name        string            `yaml:"name"`
+		Mounts      []RuntimeMount    `yaml:"mounts"`
+		Environment map[string]string `yaml:"environment"`
+	}
+
+	// Parse runtime spec and find runtime directory
+	parts := strings.Split(f.Runtime, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid runtime specification: %s", f.Runtime)
+	}
+
+	language := parts[0]
+	version := parts[1]
+	runtimeDirName := fmt.Sprintf("%s-%s", language, strings.ReplaceAll(version, "+", "-"))
+	runtimeDir := filepath.Join(runtimeBasePath, language, runtimeDirName)
+
+	// Load runtime.yml file
+	configPath := filepath.Join(runtimeDir, "runtime.yml")
+	configData, err := f.platform.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read runtime config: %w", err)
+	}
+
+	// Parse YAML configuration using a simple YAML parser
+	var config RuntimeConfig
+	lines := strings.Split(string(configData), "\n")
+	var currentMount *RuntimeMount
+	inMounts := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "mounts:") {
+			inMounts = true
+			continue
+		}
+
+		if inMounts {
+			if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "  - ") {
+				// New mount entry
+				if currentMount != nil {
+					config.Mounts = append(config.Mounts, *currentMount)
+				}
+				currentMount = &RuntimeMount{}
+				continue
+			} else if currentMount != nil && (strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t")) {
+				// Mount property
+				if strings.Contains(line, "source:") {
+					currentMount.Source = strings.TrimSpace(strings.Split(line, ":")[1])
+					currentMount.Source = strings.Trim(currentMount.Source, "\"'")
+				} else if strings.Contains(line, "target:") {
+					currentMount.Target = strings.TrimSpace(strings.Split(line, ":")[1])
+					currentMount.Target = strings.Trim(currentMount.Target, "\"'")
+				} else if strings.Contains(line, "readonly:") {
+					currentMount.ReadOnly = strings.Contains(line, "true")
+				}
+			} else if !strings.HasPrefix(line, "  ") {
+				// End of mounts section
+				if currentMount != nil {
+					config.Mounts = append(config.Mounts, *currentMount)
+					currentMount = nil
+				}
+				inMounts = false
+			}
+		}
+	}
+
+	// Don't forget the last mount
+	if currentMount != nil {
+		config.Mounts = append(config.Mounts, *currentMount)
+	}
+
+	// Mount each directory according to runtime config
+	for _, mount := range config.Mounts {
+		sourcePath := filepath.Join(runtimeDir, mount.Source)
+		targetPath := filepath.Join(f.RootDir, strings.TrimPrefix(mount.Target, "/"))
+
+		// Check if source exists
+		if _, err := f.platform.Stat(sourcePath); err != nil {
+			if f.platform.IsNotExist(err) {
+				f.logger.Debug("skipping non-existent runtime source", "path", sourcePath)
+				continue
+			}
+			return fmt.Errorf("failed to stat runtime source %s: %w", sourcePath, err)
+		}
+
+		// Create target directory
+		if err := f.platform.MkdirAll(targetPath, 0755); err != nil {
+			return fmt.Errorf("failed to create runtime target %s: %w", targetPath, err)
+		}
+
+		// Bind mount
+		flags := uintptr(syscall.MS_BIND)
+		if err := f.platform.Mount(sourcePath, targetPath, "", flags, ""); err != nil {
+			return fmt.Errorf("failed to mount %s to %s: %w", sourcePath, targetPath, err)
+		}
+
+		// Remount as read-only if specified
+		if mount.ReadOnly {
+			flags = uintptr(syscall.MS_BIND | syscall.MS_REMOUNT | syscall.MS_RDONLY)
+			if err := f.platform.Mount("", targetPath, "", flags, ""); err != nil {
+				f.logger.Warn("failed to remount as read-only", "target", targetPath, "error", err)
+			}
+		}
+
+		f.logger.Debug("mounted runtime path", "source", sourcePath, "target", targetPath)
+	}
+
+	return nil
 }

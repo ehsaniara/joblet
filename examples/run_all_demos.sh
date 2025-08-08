@@ -110,7 +110,7 @@ if [ ${#FAILED_DEMOS[@]} -gt 0 ]; then
     done
     echo ""
     echo "💡 Common reasons for failures:"
-    echo "   • Missing dependencies (Python packages, Node.js, etc.)"
+    echo "   • Missing dependencies (Python packages, etc.)"
     echo "   • Insufficient system resources"
     echo "   • Network connectivity issues"
     echo ""

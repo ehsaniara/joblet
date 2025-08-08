@@ -10,6 +10,7 @@ import (
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/mappers"
 	"joblet/pkg/logger"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -59,6 +60,20 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
 
+	// TEMPORARY WORKAROUND: Extract runtime from command args if present
+	if jobRequest.Runtime == "" && len(req.Args) > 0 {
+		for i, arg := range req.Args {
+			if strings.HasPrefix(arg, "RUNTIME=") {
+				runtime := strings.TrimPrefix(arg, "RUNTIME=")
+				jobRequest.Runtime = runtime
+				log.Info("runtime extracted from args (workaround)", "runtime", runtime)
+				// Remove the RUNTIME= arg from the args list
+				req.Args = append(req.Args[:i], req.Args[i+1:]...)
+				break
+			}
+		}
+	}
+
 	// Log the cleaned request structure
 	log.Info("starting job with request object",
 		"command", jobRequest.Command,
@@ -69,6 +84,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobReq) (*pb.R
 			jobRequest.Resources.CPUCores),
 		"network", jobRequest.Network,
 		"volumes", jobRequest.Volumes,
+		"runtime", jobRequest.Runtime,
 		"uploadCount", len(jobRequest.Uploads))
 
 	// Use the new interface with request object
@@ -204,6 +220,7 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobReq) (*interfaces.S
 		Schedule: req.Schedule,
 		Network:  network,
 		Volumes:  req.Volumes,
+		Runtime:  req.Runtime,
 	}
 
 	// Validate the request
@@ -245,6 +262,105 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 		}
 	}
 
+	// Validate runtime specification if provided
+	if req.Runtime != "" {
+		if err := s.validateRuntime(req.Runtime); err != nil {
+			return fmt.Errorf("invalid runtime: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateRuntime validates the runtime specification
+func (s *JobServiceServer) validateRuntime(runtimeSpec string) error {
+	// Basic format validation
+	if runtimeSpec == "" {
+		return fmt.Errorf("runtime specification cannot be empty")
+	}
+
+	// Support both formats:
+	// 1. Traditional format: language:version or language:version+tags (e.g., "python:3.11+ml")
+	// 2. Runtime name format: language-version-tags (e.g., "python-3.11-ml")
+
+	if strings.Contains(runtimeSpec, ":") {
+		// Traditional format: language:version+tags
+		return s.validateTraditionalRuntimeFormat(runtimeSpec)
+	} else {
+		// Runtime name format: language-version-tags
+		return s.validateRuntimeNameFormat(runtimeSpec)
+	}
+}
+
+// validateTraditionalRuntimeFormat validates language:version+tags format
+func (s *JobServiceServer) validateTraditionalRuntimeFormat(runtimeSpec string) error {
+	parts := strings.Split(runtimeSpec, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("runtime specification must be in format 'language:version' or 'language:version+tag'")
+	}
+
+	language := parts[0]
+	versionPart := parts[1]
+
+	// Validate language
+	validLanguages := []string{"python", "java", "node", "go"}
+	validLanguage := false
+	for _, validLang := range validLanguages {
+		if language == validLang {
+			validLanguage = true
+			break
+		}
+	}
+	if !validLanguage {
+		return fmt.Errorf("unsupported runtime language '%s', supported: %s", language, strings.Join(validLanguages, ", "))
+	}
+
+	// Validate version format (simple validation)
+	versionAndTags := strings.Split(versionPart, "+")
+	version := versionAndTags[0]
+	if version == "" {
+		return fmt.Errorf("version cannot be empty")
+	}
+
+	// Basic version format validation
+	if len(version) > 20 {
+		return fmt.Errorf("version too long")
+	}
+
+	s.logger.Debug("runtime validation passed (traditional format)", "runtime", runtimeSpec)
+	return nil
+}
+
+// validateRuntimeNameFormat validates language-version-tags format
+func (s *JobServiceServer) validateRuntimeNameFormat(runtimeSpec string) error {
+	// Basic sanity checks for runtime name format
+	if len(runtimeSpec) == 0 {
+		return fmt.Errorf("runtime name cannot be empty")
+	}
+
+	if len(runtimeSpec) > 50 {
+		return fmt.Errorf("runtime name too long (max 50 characters)")
+	}
+
+	// Check for valid characters (letters, numbers, hyphens, dots)
+	for _, char := range runtimeSpec {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '-' || char == '.') {
+			return fmt.Errorf("runtime name contains invalid character: '%c'", char)
+		}
+	}
+
+	// Must start with a letter
+	if len(runtimeSpec) > 0 {
+		first := runtimeSpec[0]
+		if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z')) {
+			return fmt.Errorf("runtime name must start with a letter")
+		}
+	}
+
+	s.logger.Debug("runtime validation passed (name format)", "runtime", runtimeSpec)
 	return nil
 }
 

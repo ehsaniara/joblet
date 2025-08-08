@@ -22,6 +22,7 @@ import (
 	"joblet/internal/joblet/core/unprivileged"
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/runtime"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -48,6 +49,7 @@ type ExecutionEngine struct {
 	jobIsolation   *unprivileged.JobIsolation
 	networkSetup   *network.NetworkSetup
 	networkStore   adapters.NetworkStoreAdapter
+	runtimeManager *runtime.Manager
 }
 
 // NewExecutionEngine creates a new execution engine with all required dependencies.
@@ -85,6 +87,16 @@ func NewExecutionEngine(
 		networkSetup = network.NewNetworkSetup(platform, networkStoreInterface)
 	}
 
+	// Create runtime manager if runtime support is enabled
+	var runtimeManager *runtime.Manager
+	logger.Debug("checking runtime configuration", "enabled", config.Runtime.Enabled, "basePath", config.Runtime.BasePath)
+	if config.Runtime.Enabled {
+		logger.Info("runtime support enabled", "basePath", config.Runtime.BasePath)
+		runtimeManager = runtime.NewManager(config.Runtime.BasePath, platform)
+	} else {
+		logger.Info("runtime support disabled")
+	}
+
 	return &ExecutionEngine{
 		processManager: processManager,
 		uploadManager:  uploadManager,
@@ -96,6 +108,7 @@ func NewExecutionEngine(
 		jobIsolation:   jobIsolation,
 		networkSetup:   networkSetup,
 		networkStore:   networkStore,
+		runtimeManager: runtimeManager,
 	}
 }
 
@@ -446,6 +459,30 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUMES_COUNT=%d", len(job.Volumes)))
 		for i, volume := range job.Volumes {
 			jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUME_%d=%s", i, volume))
+		}
+	}
+
+	// Add runtime information
+	if job.Runtime != "" {
+		jobEnv = append(jobEnv, fmt.Sprintf("JOB_RUNTIME=%s", job.Runtime))
+
+		// Resolve runtime configuration if runtime manager is available
+		if ee.runtimeManager != nil {
+			ee.logger.Debug("attempting runtime configuration resolution", "runtime", job.Runtime)
+			if runtimeConfig, err := ee.runtimeManager.ResolveRuntimeConfig(job.Runtime); err == nil {
+				ee.logger.Info("runtime config resolved for child process", "runtime", job.Runtime, "name", runtimeConfig.Name)
+				// Add runtime path for child process mounting
+				jobEnv = append(jobEnv, fmt.Sprintf("RUNTIME_MANAGER_PATH=%s", ee.config.Runtime.BasePath))
+				// Add runtime environment variables
+				runtimeEnv := ee.runtimeManager.GetEnvironmentVariables(runtimeConfig)
+				for key, value := range runtimeEnv {
+					jobEnv = append(jobEnv, fmt.Sprintf("%s=%s", key, value))
+				}
+			} else {
+				ee.logger.Warn("failed to resolve runtime config for child", "runtime", job.Runtime, "error", err)
+			}
+		} else {
+			ee.logger.Debug("runtime manager not available", "runtime", job.Runtime)
 		}
 	}
 
