@@ -3054,12 +3054,11 @@ type RuntimeInfo struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`               // e.g., "python:3.11+ml"
 	Language      string                 `protobuf:"bytes,2,opt,name=language,proto3" json:"language,omitempty"`       // e.g., "python"
 	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`         // e.g., "3.11"
-	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`               // e.g., "system"
-	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"` // Human readable description
-	SizeBytes     int64                  `protobuf:"varint,6,opt,name=sizeBytes,proto3" json:"sizeBytes,omitempty"`    // Runtime size in bytes
-	Packages      []string               `protobuf:"bytes,7,rep,name=packages,proto3" json:"packages,omitempty"`       // Pre-installed packages
-	Available     bool                   `protobuf:"varint,8,opt,name=available,proto3" json:"available,omitempty"`    // Whether runtime is ready for use
-	Requirements  *RuntimeRequirements   `protobuf:"bytes,9,opt,name=requirements,proto3" json:"requirements,omitempty"`
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"` // Human readable description
+	SizeBytes     int64                  `protobuf:"varint,5,opt,name=sizeBytes,proto3" json:"sizeBytes,omitempty"`    // Runtime size in bytes
+	Packages      []string               `protobuf:"bytes,6,rep,name=packages,proto3" json:"packages,omitempty"`       // Pre-installed packages
+	Available     bool                   `protobuf:"varint,7,opt,name=available,proto3" json:"available,omitempty"`    // Whether runtime is ready for use
+	Requirements  *RuntimeRequirements   `protobuf:"bytes,8,opt,name=requirements,proto3" json:"requirements,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3115,13 +3114,6 @@ func (x *RuntimeInfo) GetVersion() string {
 	return ""
 }
 
-func (x *RuntimeInfo) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
 func (x *RuntimeInfo) GetDescription() string {
 	if x != nil {
 		return x.Description
@@ -3158,13 +3150,11 @@ func (x *RuntimeInfo) GetRequirements() *RuntimeRequirements {
 }
 
 type RuntimeRequirements struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	MinMemory         string                 `protobuf:"bytes,1,opt,name=minMemory,proto3" json:"minMemory,omitempty"`                 // e.g., "512MB"
-	RecommendedMemory string                 `protobuf:"bytes,2,opt,name=recommendedMemory,proto3" json:"recommendedMemory,omitempty"` // e.g., "2GB"
-	Architectures     []string               `protobuf:"bytes,3,rep,name=architectures,proto3" json:"architectures,omitempty"`         // e.g., ["x86_64", "amd64"]
-	Gpu               bool                   `protobuf:"varint,4,opt,name=gpu,proto3" json:"gpu,omitempty"`                            // Whether GPU is required
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Architectures []string               `protobuf:"bytes,1,rep,name=architectures,proto3" json:"architectures,omitempty"` // e.g., ["x86_64", "amd64"]
+	Gpu           bool                   `protobuf:"varint,2,opt,name=gpu,proto3" json:"gpu,omitempty"`                    // Whether GPU is required
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuntimeRequirements) Reset() {
@@ -3195,20 +3185,6 @@ func (x *RuntimeRequirements) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RuntimeRequirements.ProtoReflect.Descriptor instead.
 func (*RuntimeRequirements) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{39}
-}
-
-func (x *RuntimeRequirements) GetMinMemory() string {
-	if x != nil {
-		return x.MinMemory
-	}
-	return ""
-}
-
-func (x *RuntimeRequirements) GetRecommendedMemory() string {
-	if x != nil {
-		return x.RecommendedMemory
-	}
-	return ""
 }
 
 func (x *RuntimeRequirements) GetArchitectures() []string {
@@ -3727,22 +3703,19 @@ const file_joblet_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +
 	"\vRuntimesRes\x12/\n" +
-	"\bruntimes\x18\x01 \x03(\v2\x13.joblet.RuntimeInfoR\bruntimes\"\xa6\x02\n" +
+	"\bruntimes\x18\x01 \x03(\v2\x13.joblet.RuntimeInfoR\bruntimes\"\x92\x02\n" +
 	"\vRuntimeInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\blanguage\x18\x02 \x01(\tR\blanguage\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversion\x12\x12\n" +
-	"\x04type\x18\x04 \x01(\tR\x04type\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x1c\n" +
-	"\tsizeBytes\x18\x06 \x01(\x03R\tsizeBytes\x12\x1a\n" +
-	"\bpackages\x18\a \x03(\tR\bpackages\x12\x1c\n" +
-	"\tavailable\x18\b \x01(\bR\tavailable\x12?\n" +
-	"\frequirements\x18\t \x01(\v2\x1b.joblet.RuntimeRequirementsR\frequirements\"\x99\x01\n" +
-	"\x13RuntimeRequirements\x12\x1c\n" +
-	"\tminMemory\x18\x01 \x01(\tR\tminMemory\x12,\n" +
-	"\x11recommendedMemory\x18\x02 \x01(\tR\x11recommendedMemory\x12$\n" +
-	"\rarchitectures\x18\x03 \x03(\tR\rarchitectures\x12\x10\n" +
-	"\x03gpu\x18\x04 \x01(\bR\x03gpu\"*\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1c\n" +
+	"\tsizeBytes\x18\x05 \x01(\x03R\tsizeBytes\x12\x1a\n" +
+	"\bpackages\x18\x06 \x03(\tR\bpackages\x12\x1c\n" +
+	"\tavailable\x18\a \x01(\bR\tavailable\x12?\n" +
+	"\frequirements\x18\b \x01(\v2\x1b.joblet.RuntimeRequirementsR\frequirements\"M\n" +
+	"\x13RuntimeRequirements\x12$\n" +
+	"\rarchitectures\x18\x01 \x03(\tR\rarchitectures\x12\x10\n" +
+	"\x03gpu\x18\x02 \x01(\bR\x03gpu\"*\n" +
 	"\x0eRuntimeInfoReq\x12\x18\n" +
 	"\aruntime\x18\x01 \x01(\tR\aruntime\"U\n" +
 	"\x0eRuntimeInfoRes\x12-\n" +

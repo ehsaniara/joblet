@@ -182,26 +182,31 @@ func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
 		return command, nil
 	}
 
-	// Try PATH lookup
-	if path, err := je.platform.LookPath(command); err == nil {
-		return path, nil
-	}
-
-	// Try common locations
+	// Try common locations first - check /usr/local/bin first for runtime binaries
+	// We check these first because PATH may not be set correctly in the chroot environment
 	commonPaths := []string{
-		filepath.Join("/bin", command),
+		filepath.Join("/usr/local/bin", command), // Check runtime location first
 		filepath.Join("/usr/bin", command),
-		filepath.Join("/usr/local/bin", command),
+		filepath.Join("/bin", command),
 		filepath.Join("/sbin", command),
 		filepath.Join("/usr/sbin", command),
 	}
 
 	for _, path := range commonPaths {
 		if _, err := je.platform.Stat(path); err == nil {
+			je.logger.Debug("resolved command at", "command", command, "path", path)
 			return path, nil
 		}
 	}
 
+	// Fall back to PATH lookup if not found in common locations
+	if path, err := je.platform.LookPath(command); err == nil {
+		je.logger.Debug("resolved command via PATH", "command", command, "path", path)
+		return path, nil
+	}
+
+	// Log what we checked for debugging
+	je.logger.Debug("command not found in any location", "command", command, "checked", commonPaths)
 	return "", fmt.Errorf("command %s not found", command)
 }
 

@@ -4,15 +4,11 @@ package core
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/network"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -161,104 +157,39 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 		return nil, fmt.Errorf("failed to prepare init binary: %w", e)
 	}
 
-	// CHANGED: Use two-phase execution for uploads
+	// CHANGED: Process uploads directly to host work directory (secure within job boundary)
 	if len(opts.Uploads) > 0 {
-		log.Debug("executing two-phase job with uploads")
+		log.Debug("processing uploads directly to work directory")
 
-		// Phase 1: Upload processing within isolation
-		if err := ee.executeUploadPhase(ctx, opts, isolatedInitPath); err != nil {
-			// we Don't cleanup here - let the caller handle it
-			return nil, fmt.Errorf("upload phase failed: %w", err)
+		// Process uploads directly to the host work directory before chroot
+		// This ensures files are available during execution phase
+		hostWorkDir := filepath.Join(jobDir, "work")
+		if err := os.MkdirAll(hostWorkDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create host work directory: %w", err)
 		}
 
-		log.Debug("upload phase completed successfully")
+		log.Info("created host work directory", "hostWorkDir", hostWorkDir)
+
+		if err := ee.processUploadsDirectly(opts.Uploads, hostWorkDir); err != nil {
+			return nil, fmt.Errorf("upload processing failed: %w", err)
+		}
+
+		// Verify files were written
+		if files, err := os.ReadDir(hostWorkDir); err == nil {
+			log.Info("files written to host work directory", "count", len(files), "workDir", hostWorkDir)
+			for _, file := range files {
+				log.Debug("file in work dir", "name", file.Name(), "isDir", file.IsDir())
+			}
+		}
+
+		log.Debug("uploads processed successfully to work directory")
 	}
 
-	// Phase 2: Job execution (with or without uploads)
+	// Execute job with files now available in work directory
 	return ee.executeJobPhase(ctx, opts, isolatedInitPath)
 }
 
-// executeUploadPhase runs the upload phase in full isolation.
-// Processes file uploads within cgroup resource limits to prevent resource exhaustion.
-// Uses base64 encoding to safely pass upload data through environment variables.
-// Runs with full namespace isolation for security.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control
-//   - opts: Process options containing uploads to process
-//   - initPath: Path to the isolated init binary
-//
-// Returns: Error if upload processing fails, nil on success
-func (ee *ExecutionEngine) executeUploadPhase(ctx context.Context, opts *StartProcessOptions, initPath string) error {
-	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("phase", "upload")
-
-	// Serialize uploads to pass via environment
-	uploadsJSON, err := json.Marshal(opts.Uploads)
-	if err != nil {
-		return fmt.Errorf("failed to serialize uploads: %w", err)
-	}
-
-	// Encode to base64 to avoid issues with special characters
-	uploadsB64 := base64.StdEncoding.EncodeToString(uploadsJSON)
-
-	// Build environment for upload phase
-	env := ee.buildPhaseEnvironment(opts.Job, "upload")
-	env = append(env, fmt.Sprintf("JOB_UPLOADS_DATA=%s", uploadsB64))
-	env = append(env, fmt.Sprintf("JOB_UPLOADS_COUNT=%d", len(opts.Uploads)))
-
-	// Create output writer for upload phase logs
-	uploadOutput := NewWrite(ee.store, opts.Job.Id)
-
-	// Launch upload phase process with full isolation
-	launchConfig := &process.LaunchConfig{
-		InitPath:    initPath,
-		Environment: env,
-		SysProcAttr: ee.createIsolatedSysProcAttr(), // Full isolation!
-		Stdout:      uploadOutput,
-		Stderr:      uploadOutput,
-		JobID:       opts.Job.Id,
-		Command:     "upload-phase", // Internal marker
-		Args:        []string{},
-	}
-
-	result, err := ee.processManager.LaunchProcess(ctx, launchConfig)
-	if err != nil {
-		return fmt.Errorf("failed to launch upload phase: %w", err)
-	}
-
-	// Wait for upload phase to complete
-	cmd := result.Command
-
-	// Create a channel to wait for process completion
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	// Wait with timeout
-	select {
-	case e := <-done:
-		if e != nil {
-			var exitError *exec.ExitError
-			if errors.As(e, &exitError) {
-				log.Error("upload phase failed",
-					"exitCode", exitError.ExitCode(),
-					"error", e)
-				return fmt.Errorf("upload phase exited with code %d", exitError.ExitCode())
-			}
-			return fmt.Errorf("upload phase failed: %w", e)
-		}
-		return nil // Success
-
-	case <-ctx.Done():
-		cmd.Kill()
-		return ctx.Err()
-
-	case <-time.After(ee.config.Buffers.DefaultConfig.UploadTimeout): // Upload timeout from config
-		cmd.Kill()
-		return fmt.Errorf("upload phase timeout")
-	}
-}
+// Upload processing is now handled directly before chroot - no separate phase needed
 
 // executeJobPhase runs the main job execution phase.
 // Launches the actual job command with full isolation, network setup, and resource limits.
@@ -487,6 +418,40 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 	}
 
 	return append(baseEnv, jobEnv...)
+}
+
+// processUploadsDirectly processes file uploads directly to the work directory
+// This runs on the host (before chroot) to ensure files persist between phases
+func (ee *ExecutionEngine) processUploadsDirectly(uploads []domain.FileUpload, workDir string) error {
+	log := ee.logger.WithField("component", "upload-processor")
+	log.Info("processing uploads directly to work directory", "count", len(uploads), "workDir", workDir)
+
+	// Process each upload file
+	for _, upload := range uploads {
+		fullPath := filepath.Join(workDir, upload.Path)
+
+		if upload.IsDirectory {
+			// Create directory
+			if err := os.MkdirAll(fullPath, os.FileMode(upload.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
+			}
+			log.Debug("created directory", "path", upload.Path, "mode", os.FileMode(upload.Mode))
+		} else {
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
+			}
+
+			// Write file content
+			if err := os.WriteFile(fullPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
+			}
+			log.Debug("wrote file", "path", upload.Path, "size", len(upload.Content), "mode", os.FileMode(upload.Mode))
+		}
+	}
+
+	log.Info("all uploads processed successfully to work directory")
+	return nil
 }
 
 // copyInitBinary copies the joblet binary to the job's isolated directory.

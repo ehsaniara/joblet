@@ -266,6 +266,9 @@ mounts:
   - source: "python-install/lib"
     target: "/usr/local/lib"
     readonly: true
+  - source: "ml-venv"
+    target: "/opt/joblet/runtimes/python/python-3.11-ml/ml-venv"
+    readonly: true
 
 environment:
   PYTHON_HOME: "/usr/local"

@@ -66,7 +66,7 @@ Joblet consists of two components:
 | **Job Types Supported**   | **Any Linux process** + **pre-built runtimes**            | Shell scripts, SQL, Spark, Flink, Python    | Shell scripts, HTTP/Webhooks, Docker   | Java method jobs (Lambdas)      | Any Linux process                         |
 | **Security Model**        | mTLS + RBAC + complete isolation                          | LDAP/SSO + role permissions                 | Basic Auth + token-based               | In-app only                     | Depends on container runtime              |
 | **Deployment Complexity** | ✅ **One binary** + optional runtime setup                 | ❌ Complex (ZooKeeper, DB, multiple workers) | ✅ Medium (agents per node)             | ✅ Simple (library import)       | ❌ Requires container runtime setup        |
-| **Use Case Fit**          | **AI/ML, CI/CD, instant dev environments**                | Large ETL / batch orchestration             | Distributed cron with clustering       | Background tasks in Java apps   | Secure container workloads (e.g. sandbox) |
+| **Use Case Fit**          | **AI/ML, Pipeline, instant dev environments**             | Large ETL / batch orchestration             | Distributed cron with clustering       | Background tasks in Java apps   | Secure container workloads (e.g. sandbox) |
 
 ## 📦 Quick Start
 

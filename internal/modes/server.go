@@ -349,30 +349,9 @@ type FileUpload struct {
 	Size        int64  `json:"size"`
 }
 
-// processUploadsInCgroup processes uploads within cgroup limits.
-// Decodes base64-encoded upload data from environment variables,
-// creates workspace directory, and processes each file/directory
-// within memory and I/O resource constraints enforced by cgroups.
-//
-// Parameters:
-//   - cfg: Configuration with filesystem settings
-//   - logger: Structured logger for upload processing
-//   - platform: Platform abstraction for environment access
-//
-// Returns: Error if upload decoding or file processing fails
-func processUploadsInCgroup(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
-	// Get upload data from environment
-	uploadsB64 := platform.Getenv("JOB_UPLOADS_DATA")
-	if uploadsB64 == "" {
-		return fmt.Errorf("no upload data provided")
-	}
-
-	// Decode base64
-	uploadsJSON, err := base64.StdEncoding.DecodeString(uploadsB64)
-	if err != nil {
-		return fmt.Errorf("failed to decode upload data: %w", err)
-	}
-
+// processUploadsFromJSON processes upload data from JSON bytes.
+// Common function used by both environment variable and file-based approaches.
+func processUploadsFromJSON(uploadsJSON []byte, cfg *config.Config, logger *logger.Logger) error {
 	// Parse uploads
 	var uploads []FileUpload
 	if e := json.Unmarshal(uploadsJSON, &uploads); e != nil {
@@ -405,6 +384,45 @@ func processUploadsInCgroup(cfg *config.Config, logger *logger.Logger, platform 
 
 	logger.Info("all uploads processed successfully within resource limits")
 	return nil
+}
+
+// processUploadsInCgroup processes uploads within cgroup limits.
+// Decodes base64-encoded upload data from environment variables,
+// creates workspace directory, and processes each file/directory
+// within memory and I/O resource constraints enforced by cgroups.
+//
+// Parameters:
+//   - cfg: Configuration with filesystem settings
+//   - logger: Structured logger for upload processing
+//   - platform: Platform abstraction for environment access
+//
+// Returns: Error if upload decoding or file processing fails
+func processUploadsInCgroup(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
+	// Get upload data from file instead of environment variable to avoid "argument list too long"
+	uploadsFile := platform.Getenv("JOB_UPLOADS_FILE")
+	if uploadsFile == "" {
+		// Fallback to old environment variable approach for backward compatibility
+		uploadsB64 := platform.Getenv("JOB_UPLOADS_DATA")
+		if uploadsB64 == "" {
+			return fmt.Errorf("no upload data provided")
+		}
+
+		// Decode base64 for old approach
+		uploadsJSON, err := base64.StdEncoding.DecodeString(uploadsB64)
+		if err != nil {
+			return fmt.Errorf("failed to decode upload data: %w", err)
+		}
+
+		return processUploadsFromJSON(uploadsJSON, cfg, logger)
+	}
+
+	// New approach: Read upload data from file
+	uploadsJSON, err := os.ReadFile(uploadsFile)
+	if err != nil {
+		return fmt.Errorf("failed to read uploads file %s: %w", uploadsFile, err)
+	}
+
+	return processUploadsFromJSON(uploadsJSON, cfg, logger)
 }
 
 // processUploadFile writes a single file within cgroup limits.

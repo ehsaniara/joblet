@@ -258,11 +258,18 @@ func (f *JobFilesystem) Setup() error {
 	}
 
 	// If no volumes are mounted, try to set up limited work directory (1MB)
-	if len(f.Volumes) == 0 {
+	// BUT skip if work directory already contains uploaded files
+	workPath := filepath.Join(f.RootDir, "work")
+	workDirHasFiles := false
+	if files, err := f.platform.ReadDir(workPath); err == nil && len(files) > 0 {
+		workDirHasFiles = true
+		log.Info("work directory contains uploaded files, skipping tmpfs mount", "fileCount", len(files))
+	}
+
+	if len(f.Volumes) == 0 && !workDirHasFiles {
 		if err := f.setupLimitedWorkDir(); err != nil {
 			log.Warn("failed to setup limited work directory, using unlimited work dir", "error", err)
 			// Ensure work directory is still accessible
-			workPath := filepath.Join(f.RootDir, "work")
 			if _, statErr := f.platform.Stat(workPath); statErr != nil {
 				// Work directory might have been corrupted, recreate it
 				if mkdirErr := f.platform.MkdirAll(workPath, 0755); mkdirErr != nil {
@@ -921,26 +928,33 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 		}
 
 		if inMounts {
-			if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "  - ") {
-				// New mount entry
+			if strings.Contains(line, "- source:") || strings.HasPrefix(line, "  - source:") {
+				// New mount entry starting with source directly
 				if currentMount != nil {
 					config.Mounts = append(config.Mounts, *currentMount)
 				}
 				currentMount = &RuntimeMount{}
-				continue
-			} else if currentMount != nil && (strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t")) {
-				// Mount property
-				if strings.Contains(line, "source:") {
-					currentMount.Source = strings.TrimSpace(strings.Split(line, ":")[1])
+				// Parse source from the same line
+				parts := strings.SplitN(line, "source:", 2)
+				if len(parts) == 2 {
+					currentMount.Source = strings.TrimSpace(parts[1])
 					currentMount.Source = strings.Trim(currentMount.Source, "\"'")
-				} else if strings.Contains(line, "target:") {
-					currentMount.Target = strings.TrimSpace(strings.Split(line, ":")[1])
-					currentMount.Target = strings.Trim(currentMount.Target, "\"'")
-				} else if strings.Contains(line, "readonly:") {
-					currentMount.ReadOnly = strings.Contains(line, "true")
 				}
-			} else if !strings.HasPrefix(line, "  ") {
-				// End of mounts section
+				continue
+			} else if currentMount != nil && strings.Contains(line, ":") {
+				// Mount property
+				trimmedLine := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmedLine, "target:") {
+					currentMount.Target = strings.TrimSpace(strings.SplitN(trimmedLine, ":", 2)[1])
+					currentMount.Target = strings.Trim(currentMount.Target, "\"'")
+				} else if strings.HasPrefix(trimmedLine, "readonly:") {
+					currentMount.ReadOnly = strings.Contains(trimmedLine, "true")
+				} else if strings.HasPrefix(trimmedLine, "selective:") {
+					// Skip selective for now - placeholder for future implementation
+					_ = trimmedLine // Acknowledge that we're intentionally ignoring this
+				}
+			} else if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				// End of mounts section - line with no indentation
 				if currentMount != nil {
 					config.Mounts = append(config.Mounts, *currentMount)
 					currentMount = nil
@@ -955,10 +969,26 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 		config.Mounts = append(config.Mounts, *currentMount)
 	}
 
+	// If no mounts were parsed, this is an error - runtime.yml is malformed
+	if len(config.Mounts) == 0 {
+		f.logger.Warn("no mounts found in runtime.yml, falling back to simple mount", "runtimeDir", runtimeDir)
+		// Fall back to mounting the entire runtime dir
+		targetPath := f.RootDir
+		flags := uintptr(syscall.MS_BIND)
+		if err := f.platform.Mount(runtimeDir, targetPath, "", flags, ""); err != nil {
+			return fmt.Errorf("failed to mount runtime dir %s to %s: %w", runtimeDir, targetPath, err)
+		}
+		f.logger.Info("mounted runtime path", "source", runtimeDir, "target", targetPath, "readonly", false)
+		return nil
+	}
+
 	// Mount each directory according to runtime config
+	f.logger.Debug("mounting runtime paths", "numMounts", len(config.Mounts), "rootDir", f.RootDir, "parsedMounts", config.Mounts)
 	for _, mount := range config.Mounts {
 		sourcePath := filepath.Join(runtimeDir, mount.Source)
 		targetPath := filepath.Join(f.RootDir, strings.TrimPrefix(mount.Target, "/"))
+
+		f.logger.Debug("preparing to mount", "source", sourcePath, "target", targetPath, "mount", mount)
 
 		// Check if source exists
 		if _, err := f.platform.Stat(sourcePath); err != nil {
@@ -988,7 +1018,7 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 			}
 		}
 
-		f.logger.Debug("mounted runtime path", "source", sourcePath, "target", targetPath)
+		f.logger.Info("mounted runtime path", "source", sourcePath, "target", targetPath, "readonly", mount.ReadOnly)
 	}
 
 	return nil

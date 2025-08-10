@@ -113,14 +113,9 @@ func (i *Isolator) setupFilesystemIsolation() error {
 	}
 
 	// Set up the filesystem isolation (chroot, mounts, etc.)
+	// Note: jobFS.Setup() handles runtime mounting internally before chroot
 	if err := jobFS.Setup(); err != nil {
 		return fmt.Errorf("failed to setup filesystem isolation: %w", err)
-	}
-
-	// Mount runtime if specified BEFORE completing isolation
-	if err := i.mountRuntimeForJob(jobID, jobFS); err != nil {
-		// Log error but don't fail the job
-		i.logger.Warn("failed to mount runtime, job will run without runtime", "error", err)
 	}
 
 	i.logger.Debug("filesystem isolation setup completed successfully", "jobID", jobID)
@@ -240,6 +235,9 @@ func (i *Isolator) readProcDir() ([]string, error) {
 }
 
 // mountRuntimeForJob mounts the runtime directories if runtime is specified
+// DEPRECATED: This function is no longer used. Runtime mounting is handled by JobFilesystem.Setup()
+// in isolator.go before chroot, not after. Keeping for reference.
+/*
 func (i *Isolator) mountRuntimeForJob(jobID string, jobFS interface{}) error {
 	runtime := i.platform.Getenv("JOB_RUNTIME")
 	if runtime == "" {
@@ -319,6 +317,7 @@ func (i *Isolator) mountRuntimeForJob(jobID string, jobFS interface{}) error {
 	i.logger.Info("runtime mounted successfully", "runtime", runtime)
 	return nil
 }
+*/
 
 // RuntimeMount represents a runtime mount configuration
 type RuntimeMount struct {
@@ -328,6 +327,8 @@ type RuntimeMount struct {
 }
 
 // parseRuntimeMounts parses YAML mounts configuration
+// DEPRECATED: Only used by deprecated mountRuntimeForJob function
+/*
 func (i *Isolator) parseRuntimeMounts(yamlContent string) []RuntimeMount {
 	var mounts []RuntimeMount
 	lines := strings.Split(yamlContent, "\n")
@@ -382,3 +383,4 @@ func (i *Isolator) parseRuntimeMounts(yamlContent string) []RuntimeMount {
 
 	return mounts
 }
+*/

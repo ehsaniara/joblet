@@ -110,13 +110,15 @@ setup_runtime() {
     echo "🔗 Creating runtime mount structure..."
     mkdir -p bin lib
     
-    # Create symlinks for mounting into jobs (point to actual binaries)
-    ln -sf ../jdk/bin/java bin/java
-    ln -sf ../jdk/bin/javac bin/javac
-    ln -sf ../jdk/bin/jar bin/jar
-    ln -sf ../jdk/bin/javap bin/javap
-    ln -sf ../jdk/bin/jshell bin/jshell
-    ln -sf ../maven/bin/mvn bin/mvn
+    # Create symlinks for mounting into jobs (absolute paths within chroot environment)
+    # These point to the mounted JDK binaries at /usr/local/jdk-bin/ within chroot
+    ln -sf /usr/local/jdk-bin/java bin/java
+    ln -sf /usr/local/jdk-bin/javac bin/javac
+    ln -sf /usr/local/jdk-bin/jar bin/jar
+    ln -sf /usr/local/jdk-bin/javap bin/javap
+    ln -sf /usr/local/jdk-bin/jshell bin/jshell
+    # Maven is mounted separately at /usr/local/maven
+    ln -sf /usr/local/maven/bin/mvn bin/mvn
     
     # Link Java libraries
     ln -sf "$RUNTIME_DIR/jdk/lib" lib/jdk-lib
@@ -152,6 +154,9 @@ mounts:
     selective: ["java", "javac", "jar", "javap", "jshell", "mvn"]
   - source: "maven"
     target: "/usr/local/maven"
+    readonly: true
+  - source: "jdk"
+    target: "/opt/joblet/runtimes/java/java-21/jdk"
     readonly: true
 
 environment:
