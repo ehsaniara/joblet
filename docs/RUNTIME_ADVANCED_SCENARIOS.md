@@ -110,7 +110,7 @@ jobs:
       
       - name: Build Runtime
         run: |
-          sudo ./examples/runtimes/${{ matrix.runtime }}/setup_${{ matrix.runtime }}.sh
+          sudo ./runtimes/${{ matrix.runtime }}/setup_${{ matrix.runtime }}.sh
           
       - name: Security Scan
         run: |
@@ -186,7 +186,7 @@ pipeline {
             when { params.RUNTIME != 'all' }
             steps {
                 sh """
-                    sudo ./examples/runtimes/${params.RUNTIME}/setup_${params.RUNTIME}.sh
+                    sudo ./runtimes/${params.RUNTIME}/setup_${params.RUNTIME}.sh
                     zip -T /tmp/runtime-deployments/${params.RUNTIME}-runtime.zip
                 """
             }
@@ -197,17 +197,17 @@ pipeline {
             parallel {
                 stage('Python ML') {
                     steps {
-                        sh 'sudo ./examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh'
+                        sh 'sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh'
                     }
                 }
                 stage('Node.js') {
                     steps {
-                        sh 'sudo ./examples/runtimes/node-18/setup_node_18.sh'
+                        sh 'sudo ./runtimes/node-18/setup_node_18.sh'
                     }
                 }
                 stage('Java') {
                     steps {
-                        sh 'sudo ./examples/runtimes/java-17/setup_java_17.sh'
+                        sh 'sudo ./runtimes/java-17/setup_java_17.sh'
                     }
                 }
             }
@@ -297,7 +297,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY examples/runtimes/ ./runtimes/
+COPY runtimes/ ./runtimes/
 
 # Build script
 COPY <<EOF build_runtimes.sh

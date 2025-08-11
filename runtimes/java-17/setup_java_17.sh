@@ -3,7 +3,7 @@
 # OpenJDK 17 LTS Runtime Setup Script
 # Creates completely isolated OpenJDK 17 environment with Maven
 # ⚠️  WARNING: This script installs wget/curl on the host system if missing
-# ⚠️  See /opt/joblet/examples/runtimes/CONTAMINATION_WARNING.md for details
+# ⚠️  See /opt/joblet/runtimes/CONTAMINATION_WARNING.md for details
 
 set -e
 

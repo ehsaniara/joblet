@@ -14,9 +14,9 @@ environments for instant execution.
 
 **Pre-built Runtimes (Recommended for best experience):**
 
-- **Python 3.11 + ML Runtime**: `sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh`
-- **Java 17 LTS Runtime**: `sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh`
-- **Java 21 Runtime**: `sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh`
+- **Python 3.11 + ML Runtime**: `sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh`
+- **Java 17 LTS Runtime**: `sudo /opt/joblet/runtimes/java-17/setup_java_17.sh`
+- **Java 21 Runtime**: `sudo /opt/joblet/runtimes/java-21/setup_java_21.sh`
 
 **Fallback (System Dependencies):**
 
@@ -164,8 +164,8 @@ cd advanced/
 
 **With Runtimes (Recommended):**
 
-- **Python**: Install runtime: `sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh`
-- **Java**: Install runtime: `sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh`
+- **Python**: Install runtime: `sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh`
+- **Java**: Install runtime: `sudo /opt/joblet/runtimes/java-17/setup_java_17.sh`
 - **Verify**: Check with `rnx runtime list`
 
 **With System Dependencies:**

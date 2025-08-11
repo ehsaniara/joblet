@@ -3,7 +3,7 @@
 # Python 3.11 + ML Runtime Setup Script
 # Creates completely isolated Python 3.11 environment with ML packages
 # ⚠️  WARNING: This script installs build dependencies on the host system
-# ⚠️  See /opt/joblet/examples/runtimes/CONTAMINATION_WARNING.md for details
+# ⚠️  See /opt/joblet/runtimes/CONTAMINATION_WARNING.md for details
 # 
 # IMPORTANT: This script includes the critical Python shared library mount
 # that was discovered during runtime development to fix library loading errors.

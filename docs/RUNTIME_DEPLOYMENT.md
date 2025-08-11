@@ -51,19 +51,19 @@ On a development or build host where contamination is acceptable:
 
 ```bash
 # Python 3.11 + ML Runtime (~226MB package)
-sudo ./examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 
 # Java 17 LTS Runtime (~193MB package)
-sudo ./examples/runtimes/java-17/setup_java_17.sh
+sudo ./runtimes/java-17/setup_java_17.sh
 
 # Java 21 LTS Runtime (~208MB package)
-sudo ./examples/runtimes/java-21/setup_java_21.sh
+sudo ./runtimes/java-21/setup_java_21.sh
 
 # Node.js 18 LTS Runtime (~150MB package)  
-sudo ./examples/runtimes/node-18/setup_node_18.sh
+sudo ./runtimes/node-18/setup_node_18.sh
 
 # Java 17 LTS Runtime (~200MB package)
-sudo ./examples/runtimes/java-17/setup_java_17.sh
+sudo ./runtimes/java-17/setup_java_17.sh
 ```
 
 Each script automatically:
@@ -158,7 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Build Runtime
-        run: sudo ./examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+        run: sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
       
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
@@ -184,7 +184,7 @@ docker run -it --rm -v $(pwd)/packages:/output ubuntu:22.04 bash
 apt update && apt install -y git
 git clone https://github.com/ehsaniara/joblet.git
 cd joblet
-sudo ./examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 cp /tmp/runtime-deployments/* /output/
 ```
 

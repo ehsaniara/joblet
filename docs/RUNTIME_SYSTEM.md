@@ -141,10 +141,10 @@ Runtimes are installed on the Joblet server (not the client):
 
 ```bash
 # On the Joblet server (requires root)
-sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
-sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
-sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh
-sudo /opt/joblet/examples/runtimes/nodejs-18/setup_nodejs_18.sh
+sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo /opt/joblet/runtimes/java-17/setup_java_17.sh
+sudo /opt/joblet/runtimes/java-21/setup_java_21.sh
+sudo /opt/joblet/runtimes/nodejs-18/setup_nodejs_18.sh
 ```
 
 ### 2. List Available Runtimes
@@ -222,7 +222,7 @@ The runtime system supports **zero-contamination deployment** for production env
 
 ```bash
 # Step 1: Build runtime (on development/build host)
-sudo ./examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 # ✅ Creates: /tmp/runtime-deployments/python-3.11-ml-runtime.zip
 
 # Step 2: Copy to workstation
@@ -501,7 +501,7 @@ requirements:
    - Test thoroughly in isolation
 
 4. **Create Setup Script** (see existing examples):
-   - `/opt/joblet/examples/runtimes/<name>/setup_<name>.sh`
+   - `/opt/joblet/runtimes/<name>/setup_<name>.sh`
    - Automated installation and configuration
    - Host system cleanup
 
@@ -600,7 +600,7 @@ EOF
 **Solution**: Install the runtime on the server
 ```bash
 # On Joblet server
-sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 ```
 
 #### 2. Library Loading Errors
@@ -613,7 +613,7 @@ sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 sudo rm -rf /opt/joblet/runtimes/python/python-3.11-ml
 
 # Reinstall with updated script
-sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 ```
 
 #### 3. Memory Issues

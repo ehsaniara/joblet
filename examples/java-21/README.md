@@ -49,7 +49,7 @@ sudo chown -R joblet:joblet /opt/joblet/runtimes/java/java-21
 
 ```bash
 # On Joblet host (as root)
-sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh
+sudo /opt/joblet/runtimes/java-21/setup_java_21.sh
 ```
 
 ### Running Examples

@@ -116,9 +116,9 @@ sudo chown -R joblet:joblet /opt/joblet/runtimes/python/python-3.11-ml
 
 ```bash
 # On the target host (as root)
-sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
-sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh
-sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+sudo /opt/joblet/runtimes/java-17/setup_java_17.sh
+sudo /opt/joblet/runtimes/java-21/setup_java_21.sh
+sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 ```
 
 ### Method 3: Automated Deployment Script
@@ -209,10 +209,10 @@ tar -czf python-3.11-ml-runtime.tar.gz python-3.11-ml/
 
 ```bash
 # Build and package Java 17
-sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh package
+sudo /opt/joblet/runtimes/java-17/setup_java_17.sh package
 
 # Build and package Python ML
-sudo /opt/joblet/examples/runtimes/python-3.11-ml/setup_python_3_11_ml.sh package
+sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh package
 
 # Packages will be created in /tmp/runtime-packages/
 ```
@@ -263,7 +263,7 @@ For large-scale deployments, consider:
 
 ```bash
 # 1. Update runtime on build host
-sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
+sudo /opt/joblet/runtimes/java-17/setup_java_17.sh
 
 # 2. Create new package
 cd /opt/joblet/runtimes/java

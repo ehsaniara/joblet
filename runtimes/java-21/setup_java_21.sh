@@ -4,7 +4,7 @@
 # Creates completely isolated OpenJDK 21 environment with Maven
 # Includes modern Java features like Virtual Threads (Project Loom)
 # ⚠️  WARNING: This script installs wget/curl on the host system if missing
-# ⚠️  See /opt/joblet/examples/runtimes/CONTAMINATION_WARNING.md for details
+# ⚠️  See /opt/joblet/runtimes/CONTAMINATION_WARNING.md for details
 
 set -e
 

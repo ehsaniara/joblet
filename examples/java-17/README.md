@@ -43,7 +43,7 @@ sudo chown -R joblet:joblet /opt/joblet/runtimes/java/java-17
 
 ```bash
 # On Joblet host (as root)
-sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
+sudo /opt/joblet/runtimes/java-17/setup_java_17.sh
 ```
 
 ### Running Examples

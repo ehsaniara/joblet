@@ -360,6 +360,7 @@ scheduling workers, and production considerations.
 - **External Scripts**: Moved from embedded commands to debuggable external script files
 - **Realistic Features**: Removed unsupported features, using only current Joblet capabilities
 - **Resource Optimization**: Updated CPU/memory limits to realistic values (≤80% CPU, ≤6GB RAM)
+- **Architectural Cleanup**: Moved `/examples/runtimes` to `/runtimes` for logical separation of infrastructure vs examples
 
 #### 📂 Updated Examples
 - ✅ **agentic-ai/**: AI workflows with ML inference, RAG systems, multi-agent coordination

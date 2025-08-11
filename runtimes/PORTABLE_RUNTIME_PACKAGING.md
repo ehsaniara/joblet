@@ -157,7 +157,7 @@ set -euo pipefail
 
 BUILD_DIR="/opt/joblet/runtimes"
 PACKAGE_DIR="/tmp/runtime-packages"
-SCRIPT_DIR="/opt/joblet/examples/runtimes"
+SCRIPT_DIR="/opt/joblet/runtimes"
 
 echo "🏗️ Building Joblet Runtime Packages"
 echo "=================================="
@@ -220,7 +220,7 @@ name: Build Runtime Packages
 on:
   push:
     paths:
-      - 'examples/runtimes/**'
+      - 'runtimes/**'
   workflow_dispatch:
 
 jobs:
@@ -231,8 +231,8 @@ jobs:
 
       - name: Build Runtime Packages
         run: |
-          chmod +x examples/runtimes/runtime_manager.sh
-          sudo examples/runtimes/runtime_manager.sh build-all
+          chmod +x runtimes/runtime_manager.sh
+          sudo runtimes/runtime_manager.sh build-all
 
       - name: Upload Packages
         uses: actions/upload-artifact@v4

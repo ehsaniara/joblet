@@ -21,15 +21,15 @@ Build runtime packages locally using the setup scripts:
 
 ```bash
 # Build Java 17 runtime
-cd examples/runtimes/java-17
+cd runtimes/java-17
 ./setup_java_17.sh
 
 # Build Java 21 runtime  
-cd examples/runtimes/java-21
+cd runtimes/java-21
 ./setup_java_21.sh
 
 # Build Python 3.11 ML runtime
-cd examples/runtimes/python-3.11-ml
+cd runtimes/python-3.11-ml
 ./setup_python_3_11_ml.sh
 ```
 
