@@ -122,10 +122,10 @@ jobs:
                 self.b1 = np.zeros((1, hidden_size))
                 self.W2 = np.random.randn(hidden_size, output_size) * 0.01
                 self.b2 = np.zeros((1, output_size))
-            
+        
             def sigmoid(self, x):
                 return 1 / (1 + np.exp(-x))
-            
+        
             def forward(self, X):
                 self.z1 = np.dot(X, self.W1) + self.b1
                 self.a1 = self.sigmoid(self.z1)

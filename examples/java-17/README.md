@@ -4,8 +4,7 @@ Enterprise Java development with the `java:17` runtime environment - instant com
 
 ## ⚡ Runtime Features
 
-- **Java Version**: OpenJDK 17.0.11 (Long Term Support)
-- **Build Tools**: Apache Maven 3.9.6
+- **Java Version**: OpenJDK 17.0.12 (Long Term Support)
 - **Development Tools**: javac, jar, javap, jshell (interactive REPL)
 - **Package Size**: ~193MB compressed
 - **Memory**: 512MB-2GB recommended
@@ -78,53 +77,34 @@ public class HelloJoblet {
 }
 ```
 
-## 🔧 Maven Projects
+## 🔧 Java Project Development
 
-### Basic Maven Build
+### Compile and Run Java Applications
 
 ```bash
-# Create a simple Maven project
-rnx run --runtime=java:17 bash -c "
-mvn archetype:generate \
-  -DgroupId=com.example \
-  -DartifactId=demo \
-  -DarchetypeArtifactId=maven-archetype-quickstart \
-  -DinteractiveMode=false
-"
+# Compile a Java source file
+rnx run --runtime=java:17 --upload=MyApp.java javac MyApp.java
 
-# Build Maven project
-rnx run --runtime=java:17 --volume=maven-cache --upload-dir=demo \
-  mvn clean package
+# Run the compiled class
+rnx run --runtime=java:17 java MyApp
 
-# Run Maven project
-rnx run --runtime=java:17 --upload-dir=demo \
-  mvn exec:java -Dexec.mainClass="com.example.App"
+# Compile and run in one command
+rnx run --runtime=java:17 --upload=MyApp.java \
+  bash -c "javac MyApp.java && java MyApp"
 ```
 
-### Spring Boot Application
+### Create and Run JAR Files
 
 ```bash
-# Generate Spring Boot project (create project structure first)
-rnx run --runtime=java:17 --volume=spring-project bash -c "
-cd /volumes/spring-project && \
-curl https://start.spring.io/starter.zip \
-  -d dependencies=web,actuator \
-  -d type=maven-project \
-  -d language=java \
-  -d javaVersion=17 \
-  -d groupId=com.example \
-  -d artifactId=demo \
-  -o demo.zip && \
-unzip demo.zip
+# Create a JAR file with manifest
+rnx run --runtime=java:17 --upload-dir=src bash -c "
+javac src/*.java && \
+echo 'Main-Class: Main' > manifest.txt && \
+jar cfm app.jar manifest.txt *.class
 "
 
-# Build Spring Boot application
-rnx run --runtime=java:17 --volume=spring-project \
-  bash -c "cd /volumes/spring-project && mvn clean package"
-
-# Run Spring Boot application
-rnx run --runtime=java:17 --volume=spring-project --network=spring-app --port=8080:8080 \
-  bash -c "cd /volumes/spring-project && java -jar target/*.jar"
+# Run the JAR file
+rnx run --runtime=java:17 --upload=app.jar java -jar app.jar
 ```
 
 ## 🎯 Common Use Cases
@@ -258,12 +238,12 @@ rnx run --runtime=java:17 --volume=java-builds \
 
 ## ⚡ Performance Comparison
 
-| Operation         | Traditional    | Runtime       | Speedup   |
-|-------------------|----------------|---------------|-----------|
-| JDK Installation  | 30-120 seconds | 0 seconds     | ∞         |
-| Job Startup       | 10-30 seconds  | 2-3 seconds   | **5-10x** |
-| Maven First Build | 60-300 seconds | 10-30 seconds | **6-10x** |
-| Compilation       | 5-10 seconds   | 1-2 seconds   | **3-5x**  |
+| Operation        | Traditional    | Runtime     | Speedup   |
+|------------------|----------------|-------------|-----------|
+| JDK Installation | 30-120 seconds | 0 seconds   | ∞         |
+| Job Startup      | 10-30 seconds  | 2-3 seconds | **5-10x** |
+| JAR Creation     | 10-20 seconds  | 2-5 seconds | **4-5x**  |
+| Compilation      | 5-10 seconds   | 1-2 seconds | **3-5x**  |
 
 ## 🔍 Debugging and Profiling
 
@@ -321,7 +301,7 @@ The Java 17 runtime provides:
 
 - ⚡ **Instant Startup**: 2-3 seconds vs minutes
 - 🔒 **Complete Isolation**: Zero host contamination
-- 📦 **Enterprise Ready**: Full JDK with Maven
+- 📦 **Enterprise Ready**: Full JDK with all development tools
 - 🚀 **Production Grade**: LTS support
 - 💾 **Efficient**: ~193MB compressed package
 

@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Python 3.11 Runtime Setup Script
-# Creates a minimal Python runtime for project dependencies
+# Multi-Architecture Python 3.11 Runtime Setup Script
+# Supports: amd64, arm64, armhf on Ubuntu, Debian, CentOS, RHEL, Fedora, openSUSE, Arch, Alpine
+# ⚠️  WARNING: This script installs build dependencies on the host system
+# ⚠️  See /opt/joblet/runtimes/CONTAMINATION_WARNING.md for details
 
 set -e
 
@@ -10,11 +12,23 @@ RUNTIME_BASE_DIR="/opt/joblet/runtimes"
 RUNTIME_DIR="$RUNTIME_BASE_DIR/python/python-3.11"
 PYTHON_VERSION="3.11.9"
 
-echo "🐍 Setting up Python 3.11 Runtime"
-echo "==================================="
+# Load system detection library
+if [[ -f "$SCRIPT_DIR/../common/detect_system.sh" ]]; then
+    source "$SCRIPT_DIR/../common/detect_system.sh"
+elif [[ -f "/tmp/common/detect_system.sh" ]]; then
+    source "/tmp/common/detect_system.sh"
+else
+    echo "❌ System detection library not found"
+    exit 1
+fi
+
+echo "🐍 Setting up Multi-Architecture Python 3.11 Runtime"
+echo "====================================================="
 echo "Target: $RUNTIME_DIR"
-echo "Purpose: Minimal Python for Lambda-style dependencies"
+echo "⚠️  WARNING: This script will install build dependencies on the host system"
+echo "⚠️  Impact: ~100-200MB of build tools and packages"
 echo
+
 
 # Check if running as root
 check_root() {
@@ -27,16 +41,22 @@ check_root() {
 }
 
 # Main setup function
-setup_runtime() {
+main() {
     check_root
     
+    # Detect system configuration
+    if ! detect_system; then
+        show_supported_platforms
+        exit 1
+    fi
+    
     # Create runtime directory structure
-    echo "📁 Creating runtime directory..."
+    echo "📁 Creating isolated runtime directory..."
     mkdir -p "$RUNTIME_DIR"
     cd "$RUNTIME_DIR"
     
     # Check if already installed
-    if [[ -f "$RUNTIME_DIR/runtime.yml" && -f "$RUNTIME_DIR/bin/python3" ]]; then
+    if [[ -f "$RUNTIME_DIR/runtime.yml" && -d "$RUNTIME_DIR/python-install" ]]; then
         echo "✅ Python 3.11 runtime already installed"
         echo "   Location: $RUNTIME_DIR"
         echo "   To reinstall, remove the directory first:"
@@ -44,32 +64,63 @@ setup_runtime() {
         exit 0
     fi
     
-    # Install minimal build dependencies temporarily
-    echo "📦 Installing temporary build dependencies..."
-    apt-get update -qq
-    apt-get install -y wget build-essential libssl-dev zlib1g-dev \
-                       libbz2-dev libreadline-dev libsqlite3-dev \
-                       libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev
+    # Get Python build dependencies for the detected distribution
+    echo "📦 Getting Python build dependencies for $DETECTED_DISTRO..."
+    PYTHON_DEPS=$(get_python_packages)
+    if [[ $? -ne 0 ]]; then
+        echo "$PYTHON_DEPS"  # Error message
+        show_supported_platforms
+        exit 1
+    fi
     
-    # Download and compile Python in isolation
-    echo "⬇️  Downloading Python $PYTHON_VERSION source..."
-    wget -q "https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz"
+    echo "📦 Installing Python build dependencies: $PYTHON_DEPS"
+    install_packages "$PYTHON_DEPS"
+    
+    # Download Python source
+    echo "⬇️  Downloading Python $PYTHON_VERSION source for $DETECTED_ARCH..."
+    PYTHON_URL="https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz"
+    
+    download_file "$PYTHON_URL" "Python-$PYTHON_VERSION.tgz"
     
     echo "📦 Extracting Python source..."
     tar -xzf "Python-$PYTHON_VERSION.tgz"
     cd "Python-$PYTHON_VERSION"
     
-    # Configure Python for runtime installation
-    echo "⚙️  Configuring Python for runtime..."
-    ./configure --prefix="$RUNTIME_DIR/python-install" \
-               --enable-optimizations \
-               --with-ensurepip=install \
-               --enable-shared \
-               LDFLAGS="-Wl,-rpath=$RUNTIME_DIR/python-install/lib"
+    # Configure Python for the specific architecture
+    echo "⚙️  Configuring Python for $DETECTED_ARCH on $DETECTED_DISTRO..."
+    CONFIGURE_FLAGS="--prefix=$RUNTIME_DIR/python-install --enable-optimizations --with-ensurepip=install --enable-shared"
     
-    # Compile and install Python
-    echo "🔨 Compiling Python (this may take 10-15 minutes)..."
-    make -j$(nproc) > /dev/null 2>&1
+    # Architecture-specific optimizations
+    case "$DETECTED_ARCH" in
+        amd64)
+            CONFIGURE_FLAGS="$CONFIGURE_FLAGS --enable-optimizations"
+            ;;
+        arm64)
+            CONFIGURE_FLAGS="$CONFIGURE_FLAGS --build=aarch64-linux-gnu"
+            ;;
+        armhf)
+            CONFIGURE_FLAGS="$CONFIGURE_FLAGS --build=arm-linux-gnueabihf --disable-optimizations"
+            ;;
+    esac
+    
+    # Set RPATH for shared library loading
+    CONFIGURE_FLAGS="$CONFIGURE_FLAGS LDFLAGS=\"-Wl,-rpath=$RUNTIME_DIR/python-install/lib\""
+    
+    echo "🔧 Configuration: $CONFIGURE_FLAGS"
+    eval "./configure $CONFIGURE_FLAGS"
+    
+    # Compile Python (architecture-optimized)
+    echo "🔨 Compiling Python for $DETECTED_ARCH (this may take several minutes)..."
+    MAKE_JOBS=$(nproc)
+    case "$DETECTED_ARCH" in
+        armhf)
+            # Use fewer jobs on ARM 32-bit to avoid memory issues
+            MAKE_JOBS=$((MAKE_JOBS / 2))
+            [[ $MAKE_JOBS -lt 1 ]] && MAKE_JOBS=1
+            ;;
+    esac
+    
+    make -j$MAKE_JOBS > /dev/null 2>&1
     
     echo "📦 Installing Python to isolated runtime directory..."
     make install > /dev/null 2>&1
@@ -78,16 +129,8 @@ setup_runtime() {
     cd "$RUNTIME_DIR"
     rm -rf "Python-$PYTHON_VERSION" "Python-$PYTHON_VERSION.tgz"
     
-    # Remove build dependencies
-    echo "🧹 Removing build dependencies from host..."
-    apt-get remove -y wget build-essential libssl-dev zlib1g-dev \
-                      libbz2-dev libreadline-dev libsqlite3-dev \
-                      libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev
-    apt-get autoremove -y
-    apt-get clean
-    
     # Verify Python installation
-    echo "🔍 Verifying Python installation..."
+    echo "🔍 Verifying isolated Python installation..."
     PYTHON_BIN="$RUNTIME_DIR/python-install/bin/python3"
     
     if [[ ! -f "$PYTHON_BIN" ]]; then
@@ -96,179 +139,94 @@ setup_runtime() {
     fi
     
     INSTALLED_VERSION=$($PYTHON_BIN --version)
-    echo "✅ Python installed: $INSTALLED_VERSION"
+    echo "✅ Isolated Python installed: $INSTALLED_VERSION"
     
-    # Create mount structure for joblet runtime system
-    echo "🔗 Creating runtime mount structure..."
-    mkdir -p bin lib
+    # Create basic virtual environment
+    echo "🏗️  Creating base virtual environment..."
+    $PYTHON_BIN -m venv base-venv
     
-    # Create wrapper scripts for local lib detection
-    cat > bin/python << 'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper script with local lib detection
-export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:$LD_LIBRARY_PATH"
-
-# Auto-detect local dependency directories
-if [[ -d "./lib" ]]; then
-    export PYTHONPATH="./lib:$PYTHONPATH"
-fi
-if [[ -d "./site-packages" ]]; then
-    export PYTHONPATH="./site-packages:$PYTHONPATH"
-fi
-
-WRAPPER_EOF
-    echo "exec \"$RUNTIME_DIR/python-install/bin/python3\" \"\$@\"" >> bin/python
+    # Upgrade pip in the virtual environment
+    source base-venv/bin/activate
+    pip install --upgrade pip > /dev/null 2>&1
     
-    cat > bin/python3 << 'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper script with lib detection
-export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:$LD_LIBRARY_PATH"
-
-# Auto-detect local dependency directories
-if [[ -d "./lib" ]]; then
-    export PYTHONPATH="./lib:$PYTHONPATH"
-fi
-if [[ -d "./site-packages" ]]; then
-    export PYTHONPATH="./site-packages:$PYTHONPATH"
-fi
-
-WRAPPER_EOF
-    echo "exec \"$RUNTIME_DIR/python-install/bin/python3\" \"\$@\"" >> bin/python3
+    # Install common packages
+    echo "📚 Installing common Python packages..."
+    pip install requests urllib3 certifi charset-normalizer idna > /dev/null 2>&1
     
-    cat > bin/python3.11 << 'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper script with lib detection
-export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:$LD_LIBRARY_PATH"
-
-# Auto-detect dependency directories
-if [[ -d "./lib" ]]; then
-    export PYTHONPATH="./lib:$PYTHONPATH"
-fi
-if [[ -d "./site-packages" ]]; then
-    export PYTHONPATH="./site-packages:$PYTHONPATH"
-fi
-
-WRAPPER_EOF
-    echo "exec \"$RUNTIME_DIR/python-install/bin/python3.11\" \"\$@\"" >> bin/python3.11
+    deactivate
     
-    # Make wrapper scripts executable
-    chmod +x bin/python bin/python3 bin/python3.11
+    # Set correct ownership
+    echo "👤 Setting ownership to joblet user..."
+    chown -R joblet:joblet "$RUNTIME_DIR" 2>/dev/null || echo "⚠️  joblet user not found, keeping root ownership"
     
-    # Link pip and libraries
-    ln -sf "$RUNTIME_DIR/python-install/bin/pip3" bin/pip
-    ln -sf "$RUNTIME_DIR/python-install/bin/pip3" bin/pip3
-    ln -sf "$RUNTIME_DIR/python-install/lib" lib/
-    
-    # Set proper permissions
-    echo "🔐 Setting permissions..."
-    chown -R joblet:joblet "$RUNTIME_BASE_DIR" 2>/dev/null || {
-        echo "⚠️  joblet user not found, using root ownership"
-        chown -R root:root "$RUNTIME_BASE_DIR"
-    }
-    chmod -R 755 "$RUNTIME_BASE_DIR"
-    
-    # Create runtime configuration
-    echo "⚙️  Creating runtime configuration..."
-    cat > "$RUNTIME_DIR/runtime.yml" << 'EOF'
-name: "python-3.11"
-version: "3.11"
-description: "Python 3.11 runtime for packaged project dependencies"
-
-mounts:
-  - source: "bin"
-    target: "/usr/local/bin"
-    readonly: true
-    selective: ["python", "python3", "python3.11", "pip", "pip3"]
-  - source: "lib"
-    target: "/usr/local/lib"
-    readonly: true
-  - source: "python-install"
-    target: "/opt/joblet/runtimes/python/python-3.11/python-install"
-    readonly: true
-
+    # Create runtime manifest with system information
+    cat > "$RUNTIME_DIR/runtime.yml" << EOF
+name: "python:3.11"
+version: "3.11.9"
+description: "Python 3.11 with virtual environment support"
+type: "python"
+created: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+system:
+  architecture: "$DETECTED_ARCH"
+  os: "$DETECTED_OS"
+  distribution: "$DETECTED_DISTRO"
+  package_manager: "$DETECTED_PACKAGE_MANAGER"
+paths:
+  python_home: "$RUNTIME_DIR/python-install"
+  venv_home: "$RUNTIME_DIR/base-venv"
+binaries:
+  python: "$RUNTIME_DIR/base-venv/bin/python"
+  python3: "$RUNTIME_DIR/base-venv/bin/python3"
+  pip: "$RUNTIME_DIR/base-venv/bin/pip"
+  pip3: "$RUNTIME_DIR/base-venv/bin/pip3"
 environment:
-  PYTHON_HOME: "/usr/local"
-  PATH_PREPEND: "/usr/local/bin"
-  LD_LIBRARY_PATH: "/usr/local/lib:/usr/local/lib64"
-
-package_manager:
-  type: "pip"
-  cache_volume: "pip-cache"
-
-requirements:
-  architectures: ["x86_64", "amd64"]
-
+  PYTHON_HOME: "$RUNTIME_DIR/python-install"
+  PYTHONPATH: "$RUNTIME_DIR/base-venv/lib/python3.11/site-packages"
+  PATH: "$RUNTIME_DIR/base-venv/bin:\$PATH"
+  LD_LIBRARY_PATH: "$RUNTIME_DIR/python-install/lib"
 features:
-  - "Python 3.11.9"
-  - "Packaged dependency support"
-  - "Auto-detection of ./lib directories"
-  - "pip package manager"
-  - "SSL/TLS support"
-  - "SQLite3 support"
-
-usage:
-  dependency_style: "packaged"
-  examples:
-    - "pip install pandas numpy --target lib/"
-    - "rnx run --runtime=python:3.11 --upload-dir=project python main.py"
+  - "Pattern Matching (Python 3.10+)"
+  - "Structural Pattern Matching"
+  - "Exception Groups (Python 3.11+)"
+  - "Task Groups (asyncio)"
+  - "TOML support (tomllib)"
+  - "Virtual Environment Support"
+packages:
+  - "requests"
+  - "urllib3"
+  - "certifi"
 EOF
     
-    # Test the installation
-    echo "🧪 Testing runtime installation..."
-    source bin/python --version > /dev/null 2>&1 || echo "⚠️  Direct test failed (expected in build environment)"
-    
-    # Create package for distribution
-    echo "📦 Creating distribution package..."
-    cd "$RUNTIME_BASE_DIR"
-    tar -czf /tmp/python-3.11-runtime.tar.gz python/python-3.11/
-    
-    # Calculate sizes
-    RUNTIME_SIZE=$(du -sh "$RUNTIME_DIR" | cut -f1)
-    PACKAGE_SIZE=$(du -sh /tmp/python-3.11-runtime.tar.gz | cut -f1)
-    
-    echo "✅ Python 3.11 Runtime Setup Complete!"
+    # Display success information
     echo ""
-    echo "📊 Runtime Statistics:"
-    echo "   • Runtime Size: $RUNTIME_SIZE (vs ~226MB for ML version)"
-    echo "   • Package Size: $PACKAGE_SIZE"
-    echo "   • Location: $RUNTIME_DIR"
-    echo "   • Package: /tmp/python-3.11-runtime.tar.gz"
+    echo "🎉 Python 3.11 Runtime Installation Complete!"
+    echo "=============================================="
+    echo "✅ Architecture: $DETECTED_ARCH"
+    echo "✅ Distribution: $DETECTED_DISTRO"
+    echo "✅ Python Version: $(echo "$INSTALLED_VERSION" | cut -d' ' -f2)"
+    echo "✅ Installation Path: $RUNTIME_DIR"
+    echo "✅ Runtime Manifest: $RUNTIME_DIR/runtime.yml"
     echo ""
-    echo "🚀 Packaged Dependencies Usage:"
-    echo "   # Create project with dependencies"
-    echo "   mkdir my-project && cd my-project"
-    echo "   echo 'pandas==2.1.0' > requirements.txt"
-    echo "   pip install -r requirements.txt --target lib/"
-    echo "   rnx run --runtime=python:3.11 --upload-dir=my-project python main.py"
+    echo "🧪 Test the runtime:"
+    echo "   rnx runtime list"
+    echo "   rnx runtime info python:3.11"
+    echo "   rnx run --runtime=python:3.11 python --version"
     echo ""
-    echo "📋 Configuration: $RUNTIME_DIR/runtime.yml"
+    echo "📚 Example usage:"
+    echo "   cd /opt/joblet/examples/python-analytics"
+    echo "   rnx run --template=jobs.yaml:sales-analysis"
+    echo ""
 }
 
-# Test function
-test_runtime() {
-    echo "🧪 Testing Python 3.11 Runtime"
-    echo "==============================="
-    
-    if [[ ! -d "$RUNTIME_DIR" || ! -f "$RUNTIME_DIR/runtime.yml" ]]; then
-        echo "❌ Runtime not found. Run setup first."
-        exit 1
-    fi
-    
-    echo "✅ Runtime directory exists"
-    echo "✅ Configuration file exists"
-    echo "🎉 Runtime ready for projects!"
-}
+# Show usage if requested
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    echo "Multi-Architecture Python 3.11 Runtime Setup"
+    echo ""
+    echo "Usage: sudo $0"
+    echo ""
+    show_supported_platforms
+    exit 0
+fi
 
-# Main execution
-case "${1:-setup}" in
-    "setup")
-        setup_runtime
-        ;;
-    "test")
-        test_runtime
-        ;;
-    *)
-        echo "Usage: $0 [setup|test]"
-        exit 1
-        ;;
-esac
+# Run main function
+main "$@"

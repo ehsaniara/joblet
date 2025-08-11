@@ -51,40 +51,13 @@ jobs:
     args:
       - "-c"
       - |
-        cat > Java17Features.java << 'EOF'
-        public class Java17Features {
-            public static void main(String[] args) {
-                // Text blocks (Java 15+)
-                String textBlock = """
-                    This is a text block
-                    introduced in Java 15
-                    and fully supported in Java 17
-                    """;
-                System.out.println("Text Block Demo:");
-                System.out.println(textBlock);
-        
-                // Pattern matching for switch (Preview in Java 17)
-                Object obj = "Hello";
-                String result = switch (obj) {
-                    case Integer i -> "Integer: " + i;
-                    case String s -> "String: " + s;
-                    case null -> "Null value";
-                    default -> "Unknown type";
-                };
-                System.out.println("Pattern Matching: " + result);
-        
-                // Records (Java 14+)
-                record Person(String name, int age) {}
-                Person person = new Person("Alice", 30);
-                System.out.println("Record: " + person);
-            }
-        }
-        EOF
-        
         echo "Compiling Java 17 features demo..."
-        javac --enable-preview --release 17 Java17Features.java
+        javac Java17Features.java
         echo "Running Java 17 features demo..."
-        java --enable-preview Java17Features
+        java Java17Features
+    uploads:
+      files:
+        - "Java17Features.java"
     resources:
       max_memory: 512
 
@@ -96,32 +69,24 @@ jobs:
     args:
       - "-c"
       - |
-        echo "Creating Java application..."
-        cat > Main.java << 'EOF'
-        public class Main {
-            public static void main(String[] args) {
-                System.out.println("Running from JAR file!");
-                System.out.println("Java version: " + System.getProperty("java.version"));
-                System.out.println("JVM vendor: " + System.getProperty("java.vendor"));
-            }
-        }
-        EOF
-        
-        echo "Compiling..."
-        javac Main.java
+        echo "Compiling HelloJoblet..."
+        javac HelloJoblet.java
         
         echo "Creating manifest..."
-        echo "Main-Class: Main" > manifest.txt
+        printf "Main-Class: HelloJoblet\n" > manifest.txt
         
         echo "Creating JAR..."
-        jar cfm app.jar manifest.txt Main.class
+        jar cfm app.jar manifest.txt HelloJoblet.class
         
         echo "Running JAR..."
         java -jar app.jar
+    uploads:
+      files:
+        - "HelloJoblet.java"
     resources:
       max_memory: 512
 
-  # Memory and performance testing
+  # Memory and performance testing using HelloJoblet with arguments
   performance-test:
     name: "Performance Test"
     description: "Test Java application performance with resource limits"
@@ -129,96 +94,34 @@ jobs:
     args:
       - "-c"
       - |
-        cat > PerformanceTest.java << 'EOF'
-        import java.util.*;
-        import java.time.*;
-        
-        public class PerformanceTest {
-            public static void main(String[] args) {
-                System.out.println("Starting performance test...");
-        
-                // Memory test
-                Runtime runtime = Runtime.getRuntime();
-                System.out.println("Max memory: " + runtime.maxMemory() / 1024 / 1024 + " MB");
-                System.out.println("Total memory: " + runtime.totalMemory() / 1024 / 1024 + " MB");
-                System.out.println("Free memory: " + runtime.freeMemory() / 1024 / 1024 + " MB");
-        
-                // CPU test
-                System.out.println("Available processors: " + runtime.availableProcessors());
-        
-                // Collection performance
-                Instant start = Instant.now();
-                List<Integer> list = new ArrayList<>();
-                for (int i = 0; i < 1000000; i++) {
-                    list.add(i);
-                }
-                Instant end = Instant.now();
-                Duration duration = Duration.between(start, end);
-                System.out.println("Added 1M elements in: " + duration.toMillis() + " ms");
-        
-                // Stream processing
-                start = Instant.now();
-                long sum = list.stream()
-                    .filter(n -> n % 2 == 0)
-                    .mapToLong(Integer::longValue)
-                    .sum();
-                end = Instant.now();
-                duration = Duration.between(start, end);
-                System.out.println("Stream processing in: " + duration.toMillis() + " ms");
-                System.out.println("Sum of even numbers: " + sum);
-            }
-        }
-        EOF
-        
-        javac PerformanceTest.java
-        java -Xms256m -Xmx768m PerformanceTest
+        echo "Compiling and running performance test..."
+        javac HelloJoblet.java
+        echo "\n=== Performance Test with JVM Options ==="
+        java -Xms256m -Xmx768m -XX:+PrintGC HelloJoblet performance-test
+    uploads:
+      files:
+        - "HelloJoblet.java"
     resources:
       max_memory: 1024
       max_cpu: 75
 
-  # Persistent data with volumes
-  data-persistence:
-    name: "Data Persistence"
-    description: "Java app with persistent storage"
+  # Simple compilation test
+  compile-test:
+    name: "Compilation Test"
+    description: "Test compilation of multiple Java files"
     command: bash
     args:
       - "-c"
       - |
-        cat > DataPersistence.java << 'EOF'
-        import java.io.*;
-        import java.nio.file.*;
-        import java.time.LocalDateTime;
-        
-        public class DataPersistence {
-            public static void main(String[] args) throws IOException {
-                String volumePath = "/volumes/java-data";
-                Path dataFile = Paths.get(volumePath, "data.txt");
-        
-                // Check if volume is mounted
-                if (!Files.exists(Paths.get(volumePath))) {
-                    System.out.println("Volume not mounted, using temp storage");
-                    volumePath = "/tmp";
-                    dataFile = Paths.get(volumePath, "data.txt");
-                }
-        
-                // Write data
-                String data = "Java 17 data written at: " + LocalDateTime.now();
-                Files.writeString(dataFile, data + "\n", 
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-                System.out.println("Data written: " + data);
-        
-                // Read all data
-                System.out.println("\nAll persisted data:");
-                if (Files.exists(dataFile)) {
-                    Files.lines(dataFile).forEach(System.out::println);
-                }
-            }
-        }
-        EOF
-        
-        javac DataPersistence.java
-        java DataPersistence
-    volumes:
-      - "java-data"
+        echo "Compiling all Java files..."
+        javac *.java
+        echo "Running HelloJoblet..."
+        java HelloJoblet compile-test
+        echo "Running Java17Features..."
+        java Java17Features
+    uploads:
+      files:
+        - "HelloJoblet.java"
+        - "Java17Features.java"
     resources:
       max_memory: 512

@@ -6,7 +6,6 @@ cutting-edge Java features.
 ## ⚡ Runtime Features
 
 - **Java Version**: OpenJDK 21.0.4 (Long Term Support)
-- **Build Tools**: Apache Maven 3.9.6
 - **Modern Features**:
     - Virtual Threads (Project Loom) - massive concurrency
     - Pattern Matching for switch expressions
@@ -257,34 +256,45 @@ echo 'Handled 1000 concurrent requests with virtual threads!'
 "
 ```
 
-## 🔧 Advanced Maven Projects
+## 🔧 Advanced Java 21 Projects
 
-### Spring Boot 3 with Virtual Threads
+### Building Complex Applications with Virtual Threads
 
 ```bash
-# Create Spring Boot 3 project with Virtual Threads
-rnx run --runtime=java:21 --volume=spring3-project bash -c "
-cd /volumes/spring3-project && \
-curl https://start.spring.io/starter.zip \
-  -d dependencies=web,actuator \
-  -d type=maven-project \
-  -d language=java \
-  -d javaVersion=21 \
-  -d bootVersion=3.2.0 \
-  -d groupId=com.example \
-  -d artifactId=vthread-demo \
-  -o demo.zip && \
-unzip demo.zip
+# Create a multi-file Java project using virtual threads
+rnx run --runtime=java:21 --volume=java21-project bash -c "
+mkdir -p /volumes/java21-project/src/com/example && \
+cd /volumes/java21-project && \
+cat > src/com/example/Server.java << 'EOF'
+package com.example;
+
+import java.util.concurrent.Executors;
+
+public class Server {
+    public static void main(String[] args) throws Exception {
+        System.out.println(\"Starting server with virtual threads...\");
+        
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i < 1000; i++) {
+                final int id = i;
+                executor.submit(() -> {
+                    System.out.println(\"Virtual thread \" + id + \": \" + Thread.currentThread());
+                    try { Thread.sleep(1000); } catch (Exception e) {}
+                });
+            }
+        }
+        System.out.println(\"Handled 1000 virtual threads!\");
+    }
+}
+EOF
 "
 
-# Configure for virtual threads
-rnx run --runtime=java:21 --volume=spring3-project bash -c "
-echo 'spring.threads.virtual.enabled=true' >> /volumes/spring3-project/src/main/resources/application.properties
+# Compile and run the application
+rnx run --runtime=java:21 --volume=java21-project bash -c "
+cd /volumes/java21-project && \
+javac -d out src/com/example/*.java && \
+java -cp out com.example.Server
 "
-
-# Build and run with virtual threads
-rnx run --runtime=java:21 --volume=spring3-project --network=spring3-app --port=8080:8080 \
-  bash -c "cd /volumes/spring3-project && mvn spring-boot:run"
 ```
 
 ## ⚡ Performance Comparison

@@ -7,19 +7,23 @@ coordination patterns.
 
 ### 🎯 YAML Template System
 
-Each example directory now includes a `jobs.yaml` file that defines multiple job configurations. Instead of complex multi-flag commands, you can run jobs with simple template references:
+Each example directory now includes a `jobs.yaml` file that defines multiple job configurations. Instead of complex
+multi-flag commands, you can run jobs with simple template references:
 
 **Before (Complex):**
+
 ```bash
 rnx run --runtime=python:3.11-ml --upload=script.py --volume=data --volume=results --max-memory=2048 --max-cpu=75 python3 script.py
 ```
 
 **After (Simple):**
+
 ```bash
 rnx run --template=jobs.yaml:ml-analysis
 ```
 
 **Template Benefits:**
+
 - ✅ **Simplified Commands**: One-liner execution instead of multi-flag commands
 - ✅ **Predefined Jobs**: Common use cases pre-configured and tested
 - ✅ **Easy Discovery**: See all available jobs with `cat jobs.yaml`
@@ -32,7 +36,7 @@ rnx run --template=jobs.yaml:ml-analysis
 ✅ **Realistic Features**: Removed unsupported/future features, using only current Joblet capabilities  
 ✅ **Resource Limits**: Updated to realistic CPU/memory constraints (≤80% CPU, ≤6GB RAM)  
 ✅ **Clean Templates**: Eliminated preview features and experimental options  
-✅ **Supported Runtimes**: Only uses available runtimes (`python:3.11`, `python:3.11-ml`, `java:17`, `java:21`)  
+✅ **Supported Runtimes**: Only uses available runtimes (`python:3.11`, `python:3.11-ml`, `java:17`, `java:21`)
 
 ## ⚡ Runtime-Powered Examples (Instant Startup)
 
