@@ -1,8 +1,9 @@
-package rnx
+package resources
 
 import (
 	"context"
 	"fmt"
+	"joblet/internal/rnx/common"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -13,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRuntimeCmd() *cobra.Command {
+func NewRuntimeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "runtime",
 		Short: "Manage pre-built runtime environments",
@@ -36,14 +37,14 @@ Examples:
   rnx runtime install python:3.11 --packages="numpy pandas scikit-learn"`,
 	}
 
-	cmd.AddCommand(newRuntimeListCmd())
-	cmd.AddCommand(newRuntimeInfoCmd())
-	cmd.AddCommand(newRuntimeTestCmd())
+	cmd.AddCommand(NewRuntimeListCmd())
+	cmd.AddCommand(NewRuntimeInfoCmd())
+	cmd.AddCommand(NewRuntimeTestCmd())
 
 	return cmd
 }
 
-func newRuntimeListCmd() *cobra.Command {
+func NewRuntimeListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List available runtimes",
@@ -54,7 +55,7 @@ func newRuntimeListCmd() *cobra.Command {
 
 func runRuntimeList(cmd *cobra.Command, args []string) error {
 	// Create client and connect to server
-	client, err := newJobClient()
+	client, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -110,7 +111,7 @@ func runRuntimeList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func newRuntimeInfoCmd() *cobra.Command {
+func NewRuntimeInfoCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "info <runtime>",
 		Short: "Get detailed information about a runtime",
@@ -124,7 +125,7 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	runtimeSpec := args[0]
 
 	// Create client and connect to server
-	client, err := newJobClient()
+	client, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -176,7 +177,7 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func newRuntimeTestCmd() *cobra.Command {
+func NewRuntimeTestCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "test <runtime>",
 		Short: "Test a runtime environment",
@@ -192,7 +193,7 @@ func runRuntimeTest(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Testing runtime: %s\n", runtimeSpec)
 
 	// Create client and connect to server
-	client, err := newJobClient()
+	client, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

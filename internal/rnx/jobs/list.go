@@ -1,10 +1,11 @@
-package rnx
+package jobs
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	pb "joblet/api/gen"
+	"joblet/internal/rnx/common"
 	"os"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ var (
 	listJSON bool
 )
 
-func newListCmd() *cobra.Command {
+func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all jobs",
@@ -30,7 +31,7 @@ func newListCmd() *cobra.Command {
 
 func runList(cmd *cobra.Command, args []string) error {
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

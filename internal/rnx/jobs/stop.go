@@ -1,14 +1,15 @@
-package rnx
+package jobs
 
 import (
 	"context"
 	"fmt"
+	"joblet/internal/rnx/common"
 	"time"
 
 	"github.com/spf13/cobra"
 )
 
-func newStopCmd() *cobra.Command {
+func NewStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop <job-id>",
 		Short: "Stop a running job",
@@ -22,7 +23,7 @@ func newStopCmd() *cobra.Command {
 func runStop(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

@@ -1,8 +1,9 @@
-package rnx
+package resources
 
 import (
 	"context"
 	"fmt"
+	"joblet/internal/rnx/common"
 	"sort"
 	"strings"
 	"time"
@@ -12,21 +13,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newNetworkCmd() *cobra.Command {
+func NewNetworkCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "network",
 		Short: "Manage job networks",
 		Long:  "Create, list, and remove custom networks for job isolation",
 	}
 
-	cmd.AddCommand(newNetworkCreateCmd())
-	cmd.AddCommand(newNetworkListCmd())
-	cmd.AddCommand(newNetworkRemoveCmd())
+	cmd.AddCommand(NewNetworkCreateCmd())
+	cmd.AddCommand(NewNetworkListCmd())
+	cmd.AddCommand(NewNetworkRemoveCmd())
 
 	return cmd
 }
 
-func newNetworkCreateCmd() *cobra.Command {
+func NewNetworkCreateCmd() *cobra.Command {
 	var cidr string
 
 	cmd := &cobra.Command{
@@ -50,7 +51,7 @@ Examples:
 	return cmd
 }
 
-func newNetworkListCmd() *cobra.Command {
+func NewNetworkListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all networks",
@@ -62,7 +63,7 @@ func newNetworkListCmd() *cobra.Command {
 	return cmd
 }
 
-func newNetworkRemoveCmd() *cobra.Command {
+func NewNetworkRemoveCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a network",
@@ -84,7 +85,7 @@ func runNetworkCreate(name, cidr string) error {
 		return fmt.Errorf("cannot use reserved network name: %s", name)
 	}
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -113,7 +114,7 @@ func runNetworkCreate(name, cidr string) error {
 }
 
 func runNetworkList(cmd *cobra.Command, args []string) error {
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -175,7 +176,7 @@ func runNetworkRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot remove built-in network: %s", name)
 	}
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

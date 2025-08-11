@@ -1,10 +1,11 @@
-package rnx
+package jobs
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	pb "joblet/api/gen"
+	"joblet/internal/rnx/common"
 	"os"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ var (
 	statusJSON bool
 )
 
-func newStatusCmd() *cobra.Command {
+func NewStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status <job-id>",
 		Short: "Get the status of a job by ID",
@@ -32,7 +33,7 @@ func newStatusCmd() *cobra.Command {
 func runStatus(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

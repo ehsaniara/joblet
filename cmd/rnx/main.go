@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"joblet/internal/rnx"
+	"joblet/internal/rnx/cli"
 )
 
 func main() {
-	if err := rnx.Execute(); err != nil {
+	if err := cli.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

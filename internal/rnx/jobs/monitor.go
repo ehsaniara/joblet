@@ -1,9 +1,10 @@
-package rnx
+package jobs
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"joblet/internal/rnx/common"
 	"time"
 
 	pb "joblet/api/gen"
@@ -11,21 +12,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newMonitorCmd() *cobra.Command {
+func NewMonitorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "monitor",
 		Short: "Monitor system metrics",
 		Long:  "Monitor system metrics including CPU, memory, disk, network, and processes",
 	}
 
-	cmd.AddCommand(newMonitorStatusCmd())
-	cmd.AddCommand(newMonitorTopCmd())
-	cmd.AddCommand(newMonitorWatchCmd())
+	cmd.AddCommand(NewMonitorStatusCmd())
+	cmd.AddCommand(NewMonitorTopCmd())
+	cmd.AddCommand(NewMonitorWatchCmd())
 
 	return cmd
 }
 
-func newMonitorStatusCmd() *cobra.Command {
+func NewMonitorStatusCmd() *cobra.Command {
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
@@ -53,7 +54,7 @@ Examples:
 	return cmd
 }
 
-func newMonitorTopCmd() *cobra.Command {
+func NewMonitorTopCmd() *cobra.Command {
 	var metricTypes []string
 
 	cmd := &cobra.Command{
@@ -85,7 +86,7 @@ Examples:
 	return cmd
 }
 
-func newMonitorWatchCmd() *cobra.Command {
+func NewMonitorWatchCmd() *cobra.Command {
 	var (
 		interval    int
 		metricTypes []string
@@ -127,7 +128,7 @@ Examples:
 // Command implementations
 
 func runMonitorStatus(jsonOutput bool) error {
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -155,7 +156,7 @@ func runMonitorStatus(jsonOutput bool) error {
 }
 
 func runMonitorTop(metricTypes []string) error {
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -188,7 +189,7 @@ func runMonitorTop(metricTypes []string) error {
 }
 
 func runMonitorWatch(interval int, metricTypes []string, compact bool) error {
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

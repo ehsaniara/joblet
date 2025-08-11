@@ -1,4 +1,4 @@
-package rnx
+package cli
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newHelpConfigCmd() *cobra.Command {
+func NewHelpConfigCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config-help",
 		Short: "Show configuration file examples with embedded certificates",

@@ -1,13 +1,15 @@
-package rnx
+package cli
 
 import (
 	"fmt"
 	"sort"
 
+	"joblet/internal/rnx/common"
+
 	"github.com/spf13/cobra"
 )
 
-func newNodesCmd() *cobra.Command {
+func NewNodesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "nodes",
 		Short: "List available nodes from configuration",
@@ -19,12 +21,12 @@ func newNodesCmd() *cobra.Command {
 }
 
 func runNodes(cmd *cobra.Command, args []string) error {
-	// nodeConfig should be loaded by PersistentPreRun, but check anyway
-	if nodeConfig == nil {
+	// NodeConfig should be loaded by PersistentPreRun, but check anyway
+	if common.NodeConfig == nil {
 		return fmt.Errorf("no client configuration loaded. Please ensure rnx-config-template.yml exists")
 	}
 
-	nodes := nodeConfig.ListNodes()
+	nodes := common.NodeConfig.ListNodes()
 	if len(nodes) == 0 {
 		return fmt.Errorf("no nodes configured in rnx-config-template.yml")
 	}
@@ -35,7 +37,7 @@ func runNodes(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Available nodes from configuration:\n\n")
 
 	for _, name := range nodes {
-		node, err := nodeConfig.GetNode(name)
+		node, err := common.NodeConfig.GetNode(name)
 		if err != nil {
 			fmt.Printf("❌ %s: Error - %v\n", name, err)
 			continue

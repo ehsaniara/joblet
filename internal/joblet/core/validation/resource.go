@@ -37,7 +37,7 @@ func NewResourceValidator() *ResourceValidator {
 
 		// Minimum limits (fallback values if no config provided)
 		minCPUPercent: 10,   // 0.1 core
-		minMemoryMB:   64,   // 64MB minimum
+		minMemoryMB:   1,    // 1MB minimum
 		minIOBPS:      1000, // 1KB/s minimum
 
 		// System info
@@ -79,7 +79,7 @@ func NewResourceValidatorWithConfig(cfg *config.Config) *ResourceValidator {
 	} else {
 		// Fallback defaults
 		rv.minCPUPercent = 10 // 0.1 core
-		rv.minMemoryMB = 64   // 64MB minimum
+		rv.minMemoryMB = 1    // 1MB minimum
 		rv.minIOBPS = 1000    // 1KB/s minimum
 	}
 

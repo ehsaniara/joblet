@@ -1,8 +1,9 @@
-package rnx
+package jobs
 
 import (
 	"context"
 	"fmt"
+	"joblet/internal/rnx/common"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,12 +12,13 @@ import (
 	"time"
 
 	pb "joblet/api/gen"
-	"joblet/pkg/config"
+	"joblet/internal/rnx/templates"
+	pkgconfig "joblet/pkg/config"
 
 	"github.com/spf13/cobra"
 )
 
-func newRunCmd() *cobra.Command {
+func NewRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run <command> [args...]",
 		Short: "Run a new job immediately or schedule it for later",
@@ -41,6 +43,11 @@ Examples:
   
   # With other flags
   rnx run --network=frontend --max-cpu=50 --max-memory=512 node app.js
+
+  # Using YAML template
+  rnx run --template=jobs.yaml:analytics
+  rnx run --template=ml-pipeline.yaml
+  rnx run --template=deploy.yaml:production --args="v1.2.3"
 
   # Scheduled execution
   rnx run --schedule="1hour" python3 script.py
@@ -80,6 +87,7 @@ Scheduling Formats:
   --schedule="2025-07-18T20:02:48-07:00"     # With timezone
 
 Flags:
+  --template=FILE[:JOB] Load job configuration from YAML file
   --schedule=SPEC     Schedule job for future execution
   --max-cpu=N         Max CPU percentage
   --max-memory=N      Max Memory in MB  
@@ -110,6 +118,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		network    string
 		volumes    []string
 		runtime    string
+		template   string
 	)
 
 	commandStartIndex := -1
@@ -118,15 +127,20 @@ func runRun(cmd *cobra.Command, args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		if strings.HasPrefix(arg, "--config=") {
-			configPath = strings.TrimPrefix(arg, "--config=")
+		if strings.HasPrefix(arg, "--template=") {
+			template = strings.TrimPrefix(arg, "--template=")
+		} else if arg == "--template" && i+1 < len(args) {
+			template = args[i+1]
+			i++ // Skip the next argument since we consumed it
+		} else if strings.HasPrefix(arg, "--config=") {
+			common.ConfigPath = strings.TrimPrefix(arg, "--config=")
 		} else if arg == "--config" && i+1 < len(args) {
-			configPath = args[i+1]
+			common.ConfigPath = args[i+1]
 			i++ // Skip the next argument since we consumed it
 		} else if strings.HasPrefix(arg, "--node=") {
-			nodeName = strings.TrimPrefix(arg, "--node=")
+			common.NodeName = strings.TrimPrefix(arg, "--node=")
 		} else if arg == "--node" && i+1 < len(args) {
-			nodeName = args[i+1]
+			common.NodeName = args[i+1]
 			i++ // Skip the next argument since we consumed it
 		} else if strings.HasPrefix(arg, "--schedule=") {
 			schedule = strings.TrimPrefix(arg, "--schedule=")
@@ -171,8 +185,54 @@ func runRun(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Handle template loading if provided
+	if template != "" {
+		jobConfig, err := loadTemplateConfig(template)
+		if err != nil {
+			return fmt.Errorf("failed to load template: %w", err)
+		}
+
+		// Apply template configuration
+		if jobConfig.Resources.MaxCPU > 0 && maxCPU == 0 {
+			maxCPU = int32(jobConfig.Resources.MaxCPU)
+		}
+		if jobConfig.Resources.MaxMemory > 0 && maxMemory == 0 {
+			maxMemory = int32(jobConfig.Resources.MaxMemory)
+		}
+		if jobConfig.Resources.MaxIOBPS > 0 && maxIOBPS == 0 {
+			maxIOBPS = int32(jobConfig.Resources.MaxIOBPS)
+		}
+		if jobConfig.Resources.CPUCores != "" && cpuCores == "" {
+			cpuCores = jobConfig.Resources.CPUCores
+		}
+		if jobConfig.Network != "" && network == "" {
+			network = jobConfig.Network
+		}
+		if jobConfig.Runtime != "" && runtime == "" {
+			runtime = jobConfig.Runtime
+		}
+		if jobConfig.Schedule != "" && schedule == "" {
+			schedule = jobConfig.Schedule
+		}
+
+		// Append volumes from template
+		volumes = append(volumes, jobConfig.Volumes...)
+
+		// Append uploads from template
+		uploads = append(uploads, jobConfig.Uploads.Files...)
+		uploadDirs = append(uploadDirs, jobConfig.Uploads.Directories...)
+
+		// If no command provided in args, use template command
+		if commandStartIndex < 0 && jobConfig.Command != "" {
+			commandArgs := []string{jobConfig.Command}
+			commandArgs = append(commandArgs, jobConfig.Args...)
+			args = append(args, commandArgs...)
+			commandStartIndex = len(args) - len(commandArgs)
+		}
+	}
+
 	if commandStartIndex < 0 || commandStartIndex >= len(args) {
-		return fmt.Errorf("must specify a command")
+		return fmt.Errorf("must specify a command or use --template with a job definition")
 	}
 
 	commandArgs := args[commandStartIndex:]
@@ -181,13 +241,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Load client configuration manually since PersistentPreRun doesn't run with DisableFlagParsing
 	var err error
-	nodeConfig, err = config.LoadClientConfig(configPath)
+	common.NodeConfig, err = pkgconfig.LoadClientConfig(common.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to load client config: %w", err)
 	}
 
 	// Client creation using unified config
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -473,4 +533,46 @@ func parseRelativeTime(spec string) (time.Time, error) {
 	}
 
 	return time.Now().Add(totalDuration), nil
+}
+
+// loadTemplateConfig loads a job configuration from a YAML template file
+func loadTemplateConfig(templateSpec string) (*templates.JobConfig, error) {
+	// Parse template spec (format: file.yaml or file.yaml:jobname)
+	parts := strings.SplitN(templateSpec, ":", 2)
+	templateFile := parts[0]
+	jobName := ""
+	if len(parts) > 1 {
+		jobName = parts[1]
+	}
+
+	// Load the YAML configuration
+	jobSet, err := templates.LoadConfig(templateFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load template file %s: %w", templateFile, err)
+	}
+
+	// If no job name specified and there's only one job, use it
+	if jobName == "" {
+		if len(jobSet.Jobs) == 1 {
+			for _, job := range jobSet.Jobs {
+				return &job, nil
+			}
+		} else if len(jobSet.Jobs) > 1 {
+			var jobNames []string
+			for name := range jobSet.Jobs {
+				jobNames = append(jobNames, name)
+			}
+			return nil, fmt.Errorf("multiple jobs found in template, please specify one: %s", strings.Join(jobNames, ", "))
+		} else {
+			// Return empty config with defaults applied
+			return &jobSet.Defaults, nil
+		}
+	}
+
+	// Look for the specified job
+	if job, exists := jobSet.Jobs[jobName]; exists {
+		return &job, nil
+	}
+
+	return nil, fmt.Errorf("job '%s' not found in template %s", jobName, templateFile)
 }

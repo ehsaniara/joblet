@@ -1,8 +1,9 @@
-package rnx
+package resources
 
 import (
 	"context"
 	"fmt"
+	"joblet/internal/rnx/common"
 	"sort"
 	"strings"
 	"time"
@@ -12,21 +13,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newVolumeCmd() *cobra.Command {
+func NewVolumeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "volume",
 		Short: "Manage job volumes",
 		Long:  "Create, list, and remove persistent volumes for job data sharing",
 	}
 
-	cmd.AddCommand(newVolumeCreateCmd())
-	cmd.AddCommand(newVolumeListCmd())
-	cmd.AddCommand(newVolumeRemoveCmd())
+	cmd.AddCommand(NewVolumeCreateCmd())
+	cmd.AddCommand(NewVolumeListCmd())
+	cmd.AddCommand(NewVolumeRemoveCmd())
 
 	return cmd
 }
 
-func newVolumeCreateCmd() *cobra.Command {
+func NewVolumeCreateCmd() *cobra.Command {
 	var size string
 	var volumeType string
 
@@ -56,7 +57,7 @@ Examples:
 	return cmd
 }
 
-func newVolumeListCmd() *cobra.Command {
+func NewVolumeListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all volumes",
@@ -68,7 +69,7 @@ func newVolumeListCmd() *cobra.Command {
 	return cmd
 }
 
-func newVolumeRemoveCmd() *cobra.Command {
+func NewVolumeRemoveCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a volume",
@@ -90,7 +91,7 @@ func runVolumeCreate(name, size, volumeType string) error {
 		return fmt.Errorf("invalid volume type: %s (must be 'filesystem' or 'memory')", volumeType)
 	}
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -121,7 +122,7 @@ func runVolumeCreate(name, size, volumeType string) error {
 }
 
 func runVolumeList(cmd *cobra.Command, args []string) error {
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -176,7 +177,7 @@ func runVolumeList(cmd *cobra.Command, args []string) error {
 func runVolumeRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

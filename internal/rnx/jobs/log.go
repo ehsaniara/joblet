@@ -1,10 +1,11 @@
-package rnx
+package jobs
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"joblet/internal/rnx/common"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func newLogCmd() *cobra.Command {
+func NewLogCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "log <job-id>",
 		Short: "Stream job logs",
@@ -47,7 +48,7 @@ func runLog(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	jobClient, err := newJobClient()
+	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
