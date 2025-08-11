@@ -1,0 +1,359 @@
+version: "1.0"
+
+# Python 3.11 ML Examples - Machine Learning and Data Science
+defaults:
+  runtime: "python:3.11-ml"
+  resources:
+    max_memory: 2048
+    max_cpu: 75
+
+jobs:
+  # Data analysis example
+  data-analysis:
+    name: "Data Analysis"
+    description: "Comprehensive data analysis with pandas and numpy"
+    command: python3
+    args:
+      - "example_data_analysis.py"
+    uploads:
+      files:
+        - "example_data_analysis.py"
+    volumes:
+      - "ml-data"
+      - "ml-results"
+    resources:
+      max_memory: 2048
+
+  # Machine learning model training
+  train-model:
+    name: "ML Model Training"
+    description: "Train a scikit-learn model"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > train_model.py << 'EOF'
+        import numpy as np
+        import pandas as pd
+        from sklearn.model_selection import train_test_split
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.metrics import accuracy_score, classification_report
+        import joblib
+        import json
+        from datetime import datetime
+        
+        print("=== Machine Learning Model Training ===")
+        
+        # Generate synthetic data
+        np.random.seed(42)
+        n_samples = 1000
+        n_features = 20
+        
+        X = np.random.randn(n_samples, n_features)
+        y = (X[:, 0] + X[:, 1] * 0.5 + np.random.randn(n_samples) * 0.1 > 0).astype(int)
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        print(f"Training samples: {len(X_train)}")
+        print(f"Test samples: {len(X_test)}")
+        
+        # Train model
+        print("\nTraining Random Forest model...")
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+        
+        # Evaluate
+        y_pred = model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        
+        print(f"\nModel Accuracy: {accuracy:.4f}")
+        print("\nClassification Report:")
+        print(classification_report(y_test, y_pred))
+        
+        # Save model
+        model_path = "/volumes/ml-models/random_forest_model.pkl"
+        joblib.dump(model, model_path)
+        print(f"\nModel saved to: {model_path}")
+        
+        # Save metrics
+        metrics = {
+            "accuracy": float(accuracy),
+            "timestamp": datetime.now().isoformat(),
+            "n_samples": n_samples,
+            "n_features": n_features
+        }
+        
+        with open("/volumes/ml-results/training_metrics.json", "w") as f:
+            json.dump(metrics, f, indent=2)
+        
+        print("Training metrics saved!")
+        EOF
+        
+        python3 train_model.py
+    volumes:
+      - "ml-models"
+      - "ml-results"
+    resources:
+      max_memory: 3072
+      max_cpu: 75
+
+  # Deep learning with TensorFlow/PyTorch
+  deep-learning:
+    name: "Deep Learning Example"
+    description: "Neural network training example"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > deep_learning.py << 'EOF'
+        import numpy as np
+        import warnings
+        warnings.filterwarnings('ignore')
+        
+        print("=== Deep Learning Example ===")
+        print("Note: This example uses numpy to simulate neural network operations")
+        print("(TensorFlow/PyTorch would require additional installation)")
+        
+        # Simple neural network implementation with numpy
+        class SimpleNN:
+            def __init__(self, input_size, hidden_size, output_size):
+                self.W1 = np.random.randn(input_size, hidden_size) * 0.01
+                self.b1 = np.zeros((1, hidden_size))
+                self.W2 = np.random.randn(hidden_size, output_size) * 0.01
+                self.b2 = np.zeros((1, output_size))
+            
+            def sigmoid(self, x):
+                return 1 / (1 + np.exp(-x))
+            
+            def forward(self, X):
+                self.z1 = np.dot(X, self.W1) + self.b1
+                self.a1 = self.sigmoid(self.z1)
+                self.z2 = np.dot(self.a1, self.W2) + self.b2
+                self.a2 = self.sigmoid(self.z2)
+                return self.a2
+        
+        # Generate data
+        np.random.seed(42)
+        X = np.random.randn(100, 10)
+        y = np.random.randint(0, 2, (100, 1))
+        
+        # Create and train network
+        nn = SimpleNN(10, 20, 1)
+        
+        print("\nTraining simple neural network...")
+        for epoch in range(100):
+            output = nn.forward(X)
+            loss = np.mean((output - y) ** 2)
+            if epoch % 20 == 0:
+                print(f"Epoch {epoch}, Loss: {loss:.4f}")
+        
+        print("\nNeural network training completed!")
+        
+        # Save results
+        results = {
+            "final_loss": float(loss),
+            "architecture": "10-20-1",
+            "epochs": 100
+        }
+        
+        import json
+        with open("/volumes/ml-results/nn_results.json", "w") as f:
+            json.dump(results, f, indent=2)
+        
+        print("Results saved to volume!")
+        EOF
+        
+        python3 deep_learning.py
+    volumes:
+      - "ml-results"
+    resources:
+      max_memory: 4096
+      max_cpu: 80
+    runtime: "python:3.11-ml"
+
+  # Data visualization
+  visualization:
+    name: "Data Visualization"
+    description: "Create data visualizations with matplotlib"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > visualize.py << 'EOF'
+        import numpy as np
+        import matplotlib
+        matplotlib.use('Agg')  # Non-interactive backend
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from datetime import datetime
+        
+        print("=== Data Visualization Example ===")
+        
+        # Set style
+        sns.set_style("whitegrid")
+        
+        # Generate sample data
+        np.random.seed(42)
+        data1 = np.random.normal(100, 15, 200)
+        data2 = np.random.normal(130, 20, 200)
+        
+        # Create figure with subplots
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        
+        # Histogram
+        axes[0, 0].hist([data1, data2], bins=20, label=['Group A', 'Group B'], alpha=0.7)
+        axes[0, 0].set_title('Histogram Comparison')
+        axes[0, 0].legend()
+        
+        # Box plot
+        axes[0, 1].boxplot([data1, data2], labels=['Group A', 'Group B'])
+        axes[0, 1].set_title('Box Plot Comparison')
+        
+        # Scatter plot
+        axes[1, 0].scatter(data1[:100], data2[:100], alpha=0.5)
+        axes[1, 0].set_title('Scatter Plot')
+        axes[1, 0].set_xlabel('Group A')
+        axes[1, 0].set_ylabel('Group B')
+        
+        # Line plot
+        x = np.linspace(0, 10, 100)
+        y1 = np.sin(x)
+        y2 = np.cos(x)
+        axes[1, 1].plot(x, y1, label='sin(x)')
+        axes[1, 1].plot(x, y2, label='cos(x)')
+        axes[1, 1].set_title('Trigonometric Functions')
+        axes[1, 1].legend()
+        
+        plt.tight_layout()
+        
+        # Save figure
+        output_path = f"/volumes/ml-results/visualization_{datetime.now():%Y%m%d_%H%M%S}.png"
+        plt.savefig(output_path, dpi=150)
+        print(f"Visualization saved to: {output_path}")
+        
+        # Create summary
+        summary = {
+            "samples": len(data1),
+            "group_a_mean": float(np.mean(data1)),
+            "group_b_mean": float(np.mean(data2)),
+            "correlation": float(np.corrcoef(data1[:100], data2[:100])[0, 1])
+        }
+        
+        import json
+        with open("/volumes/ml-results/viz_summary.json", "w") as f:
+            json.dump(summary, f, indent=2)
+        
+        print("Visualization complete!")
+        EOF
+        
+        python3 visualize.py
+    volumes:
+      - "ml-results"
+    resources:
+      max_memory: 1024
+
+  # Feature engineering pipeline
+  feature-engineering:
+    name: "Feature Engineering"
+    description: "Advanced feature engineering for ML"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > feature_engineering.py << 'EOF'
+        import numpy as np
+        import pandas as pd
+        from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+        from sklearn.decomposition import PCA
+        from sklearn.feature_selection import SelectKBest, f_classif
+        
+        print("=== Feature Engineering Pipeline ===")
+        
+        # Generate sample dataset
+        np.random.seed(42)
+        n_samples = 1000
+        
+        data = {
+            'feature1': np.random.randn(n_samples),
+            'feature2': np.random.exponential(2, n_samples),
+            'feature3': np.random.uniform(0, 100, n_samples),
+            'categorical': np.random.choice(['A', 'B', 'C'], n_samples),
+            'target': np.random.randint(0, 2, n_samples)
+        }
+        
+        df = pd.DataFrame(data)
+        print(f"Original shape: {df.shape}")
+        print(f"Features: {list(df.columns)}")
+        
+        # 1. Handle categorical variables
+        print("\n1. One-hot encoding categorical features...")
+        df_encoded = pd.get_dummies(df, columns=['categorical'])
+        
+        # 2. Create polynomial features
+        print("2. Creating polynomial features...")
+        numeric_features = ['feature1', 'feature2', 'feature3']
+        poly = PolynomialFeatures(degree=2, include_bias=False)
+        poly_features = poly.fit_transform(df[numeric_features])
+        poly_df = pd.DataFrame(poly_features, columns=poly.get_feature_names_out(numeric_features))
+        
+        # 3. Scaling
+        print("3. Scaling features...")
+        scaler = StandardScaler()
+        scaled_features = scaler.fit_transform(poly_df)
+        
+        # 4. PCA for dimensionality reduction
+        print("4. Applying PCA...")
+        pca = PCA(n_components=0.95)  # Keep 95% variance
+        pca_features = pca.fit_transform(scaled_features)
+        print(f"   Reduced from {scaled_features.shape[1]} to {pca_features.shape[1]} components")
+        
+        # 5. Feature selection
+        print("5. Selecting best features...")
+        selector = SelectKBest(f_classif, k=10)
+        X = df_encoded.drop('target', axis=1)
+        y = df_encoded['target']
+        selected_features = selector.fit_transform(X, y)
+        
+        # Save engineered features
+        engineered_df = pd.DataFrame(pca_features)
+        engineered_df['target'] = y.values
+        engineered_df.to_csv('/volumes/ml-data/engineered_features.csv', index=False)
+        
+        print(f"\nFinal engineered dataset shape: {engineered_df.shape}")
+        print("Engineered features saved to volume!")
+        
+        # Save feature importance
+        feature_scores = pd.DataFrame({
+            'feature': X.columns,
+            'score': selector.scores_
+        }).sort_values('score', ascending=False)
+        
+        print("\nTop 5 important features:")
+        print(feature_scores.head())
+        
+        feature_scores.to_csv('/volumes/ml-results/feature_importance.csv', index=False)
+        EOF
+        
+        python3 feature_engineering.py
+    volumes:
+      - "ml-data"
+      - "ml-results"
+    resources:
+      max_memory: 2048
+
+  # Setup ML environment
+  setup-ml:
+    name: "Setup ML Environment"
+    description: "Install additional ML packages"
+    command: bash
+    args:
+      - "setup.sh"
+    uploads:
+      files:
+        - "setup.sh"
+        - "requirements.txt"
+    volumes:
+      - "python-packages"
+    resources:
+      max_memory: 2048

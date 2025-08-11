@@ -5,6 +5,7 @@ The pre-built runtime packages are large binary files (600MB+ total) and are not
 ## Download Locations
 
 ### Option 1: GitHub Releases (Recommended)
+
 Download the latest runtime packages from GitHub Releases:
 
 ```bash
@@ -15,6 +16,7 @@ curl -L https://github.com/ehsaniara/joblet/releases/latest/download/python-3.11
 ```
 
 ### Option 2: Build from Source
+
 Build runtime packages locally using the setup scripts:
 
 ```bash
@@ -33,11 +35,11 @@ cd examples/runtimes/python-3.11-ml
 
 ## Package Information
 
-| Runtime | File | Size | Description |
-|---------|------|------|-------------|
-| Java 17 | `java-17-runtime-complete.tar.gz` | ~193MB | OpenJDK 17 + Maven + Gradle |
-| Java 21 | `java-21-runtime-complete.tar.gz` | ~208MB | OpenJDK 21 + Modern Features |
-| Python 3.11 ML | `python-3.11-ml-runtime.tar.gz` | ~226MB | Python 3.11 + ML Libraries |
+| Runtime        | File                              | Size   | Description                  |
+|----------------|-----------------------------------|--------|------------------------------|
+| Java 17        | `java-17-runtime-complete.tar.gz` | ~193MB | OpenJDK 17 + Maven + Gradle  |
+| Java 21        | `java-21-runtime-complete.tar.gz` | ~208MB | OpenJDK 21 + Modern Features |
+| Python 3.11 ML | `python-3.11-ml-runtime.tar.gz`   | ~226MB | Python 3.11 + ML Libraries   |
 
 ## Installation
 

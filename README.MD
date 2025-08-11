@@ -89,6 +89,23 @@ rnx list
 
 ## 🚀 Basic Usage
 
+### 🎯 YAML Templates (NEW - Simplified Job Execution)
+
+All examples now support YAML templates for one-liner job execution:
+
+```bash
+# Run pre-configured jobs with simple templates
+rnx run --template=jobs.yaml:ml-analysis      # Python ML data analysis
+rnx run --template=jobs.yaml:hello-joblet     # Java application
+rnx run --template=jobs.yaml:hello-world      # Basic demo
+rnx run --template=jobs.yaml:sales-analysis   # Python analytics
+
+# Discover available jobs in any example directory
+cat jobs.yaml                                 # Shows all configured jobs
+```
+
+### 💻 Traditional Commands
+
 ```bash
 # Run commands with full isolation
 rnx run echo "Hello World"
@@ -260,28 +277,50 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📚 Examples
 
-### Python Data Analysis Example
+### 🎯 YAML Template Examples (NEW)
 
-The [Python Data Analysis Example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis)
-demonstrates:
-
-- **File uploads**: Upload Python scripts and CSV data for processing
-- **Dependency management**: Install pandas, numpy, matplotlib in chroot environment
-- **Network isolation**: Run analysis in isolated network environments
-- **Resource limits**: Control CPU and memory usage for data processing
-- **Real-world workflow**: Process sales data, generate insights and visualizations
+All examples now include YAML templates for simplified execution:
 
 ```bash
-# Quick start - run pandas analysis with automatic pip installation
-cd examples/python-data-analysis
-rnx run --upload-dir=. bash run_with_pandas.sh
+# Python ML data analysis (pre-built runtime)
+cd examples/python-3.11-ml
+rnx run --template=jobs.yaml:ml-analysis        # 2-3 seconds vs 5-45 minutes
 
-# Or use standard library version (no dependencies)
-rnx run --upload=analyze_sales_simple.py --upload=data/sales_data.csv --upload=data/customers.csv python3 analyze_sales_simple.py
+# Java enterprise development
+cd examples/java-17  
+rnx run --template=jobs.yaml:hello-joblet       # Instant compilation
+
+# Basic Joblet concepts
+cd examples/basic-usage
+rnx run --template=jobs.yaml:hello-world        # Simple demo
+rnx run --template=jobs.yaml:file-ops           # File operations
+
+# Python analytics (standard library)
+cd examples/python-analytics
+rnx run --template=jobs.yaml:sales-analysis     # Sales data analysis
 ```
 
-See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/python-data-analysis) for more approaches
-including self-installing scripts and manual package management.
+### Python Data Analysis Example
+
+The [Python Analytics Example](examples/python-analytics/) demonstrates:
+
+- **YAML Templates**: Simple job execution with `rnx run --template=jobs.yaml:job-name`
+- **External Scripts**: Debuggable Python scripts in `scripts/` directory
+- **Standard Library Only**: No external dependencies required
+- **Resource Limits**: Realistic CPU and memory usage
+- **Real-world Workflow**: Sales analysis, customer segmentation, time series
+
+```bash
+# Quick start with templates
+cd examples/python-analytics
+rnx run --template=jobs.yaml:sales-analysis     # Sales data analysis
+rnx run --template=jobs.yaml:time-series        # Time series processing
+
+# Traditional method
+./run_demo.sh
+```
+
+See the [full example](examples/python-analytics/) for comprehensive analytics workflows.
 
 ### Node.js Web API Example
 
@@ -312,6 +351,23 @@ See the [full example](https://github.com/ehsaniara/joblet/tree/main/examples/no
 scheduling workers, and production considerations.
 
 ## 📋 Recent Changes & Improvements
+
+### Latest Updates (January 2025) - YAML Template System
+
+#### 🎯 New YAML Template System
+- **Simplified Job Execution**: Run complex jobs with `rnx run --template=jobs.yaml:job-name`
+- **Pre-configured Examples**: All 6 example directories now include `jobs.yaml` files
+- **External Scripts**: Moved from embedded commands to debuggable external script files
+- **Realistic Features**: Removed unsupported features, using only current Joblet capabilities
+- **Resource Optimization**: Updated CPU/memory limits to realistic values (≤80% CPU, ≤6GB RAM)
+
+#### 📂 Updated Examples
+- ✅ **agentic-ai/**: AI workflows with ML inference, RAG systems, multi-agent coordination
+- ✅ **basic-usage/**: Fundamental concepts with external shell scripts
+- ✅ **java-17/**: Enterprise Java development with realistic features
+- ✅ **java-21/**: Modern Java with Virtual Threads (no preview features)
+- ✅ **python-3.11-ml/**: ML data analysis with proper runtime references
+- ✅ **python-analytics/**: Clean analytics using Python standard library
 
 ### Version 2.11.0 (August 2025) - Runtime System Release
 

@@ -1,0 +1,127 @@
+version: "1.0"
+
+# Basic Usage Examples - Learn Joblet Fundamentals
+defaults:
+  resources:
+    max_memory: 256
+    max_cpu: 50
+
+jobs:
+  # Simple command execution
+  hello-world:
+    name: "Hello World"
+    description: "Basic command execution example"
+    command: echo
+    args:
+      - "Hello from Joblet!"
+    resources:
+      max_memory: 64
+
+  # File operations demo
+  file-ops:
+    name: "File Operations"
+    description: "Demonstrate file upload and workspace usage"
+    command: bash
+    args:
+      - "scripts/file-operations.sh"
+    uploads:
+      files:
+        - "scripts/file-operations.sh"
+        - "sample_data.txt"
+    resources:
+      max_memory: 128
+
+  # Resource limits testing
+  resource-test:
+    name: "Resource Limits Test"
+    description: "Test CPU and memory limits"
+    command: bash
+    args:
+      - "scripts/resource-test.sh"
+    uploads:
+      files:
+        - "scripts/resource-test.sh"
+    resources:
+      max_memory: 256
+      max_cpu: 25  # Limited to 25% CPU
+
+  # Volume storage demo
+  volume-demo:
+    name: "Volume Storage"
+    description: "Demonstrate persistent volume usage"
+    command: bash
+    args:
+      - "scripts/volume-demo.sh"
+    uploads:
+      files:
+        - "scripts/volume-demo.sh"
+    volumes:
+      - "demo-data"
+    resources:
+      max_memory: 128
+
+  # Job monitoring demo
+  long-runner:
+    name: "Long Running Job"
+    description: "Job for demonstrating monitoring features"
+    command: bash
+    args:
+      - "scripts/long-runner.sh"
+    uploads:
+      files:
+        - "scripts/long-runner.sh"
+    resources:
+      max_memory: 128
+      max_cpu: 10
+
+  # Network isolation demo
+  network-test:
+    name: "Network Test"
+    description: "Test network isolation and connectivity"
+    command: bash
+    args:
+      - "scripts/network-test.sh"
+    uploads:
+      files:
+        - "scripts/network-test.sh"
+    resources:
+      max_memory: 128
+
+  # Multi-step workflow
+  workflow:
+    name: "Multi-Step Workflow"
+    description: "Complex job with multiple steps"
+    command: bash
+    args:
+      - "scripts/workflow.sh"
+    uploads:
+      files:
+        - "scripts/workflow.sh"
+    volumes:
+      - "demo-data"
+    resources:
+      max_memory: 256
+      max_cpu: 50
+
+  # Run all basic demos
+  run-all-demos:
+    name: "Run All Basic Demos"
+    description: "Execute all basic usage demos"
+    command: bash
+    args:
+      - "run_demos.sh"
+    uploads:
+      files:
+        - "run_demos.sh"
+        - "sample_data.txt"
+        - "scripts/file-operations.sh"
+        - "scripts/resource-test.sh"
+        - "scripts/volume-demo.sh"
+        - "scripts/long-runner.sh"
+        - "scripts/network-test.sh"
+        - "scripts/workflow.sh"
+    volumes:
+      - "demo-data"
+    resources:
+      max_memory: 512
+      max_cpu: 50

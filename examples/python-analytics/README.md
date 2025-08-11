@@ -1,18 +1,35 @@
 # Python Analytics Examples
 
-Examples demonstrating how to use Joblet for Python-based data analytics workflows using only the Python standard library.
+Examples demonstrating how to use Joblet for Python-based data analytics workflows using only the Python standard
+library.
 
 ## 📊 Overview
 
-These examples show how to perform data analytics tasks in Joblet's isolated environment without requiring external dependencies. All examples use only Python 3's standard library.
+These examples show how to perform data analytics tasks in Joblet's isolated environment without requiring external
+dependencies. All examples use only Python 3's standard library.
 
-| Example | Files | Description | Resources |
-|---------|-------|-------------|-----------|
-| Sales Analysis | `simple_analytics.py`, `sales_data.csv` | Statistical analysis of sales data | 512MB RAM |
-| Customer Segmentation | `simple_analytics.py`, `customers.csv` | K-means clustering from scratch | 512MB RAM |
-| Time Series Processing | `simple_analytics.py` | Generate and process time series data | 512MB RAM |
+| Example                | Files                                   | Description                           | Resources |
+|------------------------|-----------------------------------------|---------------------------------------|-----------|
+| Sales Analysis         | `simple_analytics.py`, `sales_data.csv` | Statistical analysis of sales data    | 512MB RAM |
+| Customer Segmentation  | `simple_analytics.py`, `customers.csv`  | K-means clustering from scratch       | 512MB RAM |
+| Time Series Processing | `simple_analytics.py`                   | Generate and process time series data | 512MB RAM |
 
 ## 🚀 Quick Start
+
+### Using YAML Templates (NEW - Recommended)
+
+```bash
+# Run specific analytics examples using the template
+rnx run --template=jobs.yaml:sales-analysis        # Sales data statistical analysis
+rnx run --template=jobs.yaml:customer-segmentation # K-means clustering from scratch
+rnx run --template=jobs.yaml:time-series          # Time series data processing
+rnx run --template=jobs.yaml:complete-analytics   # Full analytics pipeline
+
+# Setup volumes first (handled automatically by templates)
+rnx run --template=jobs.yaml:setup-volumes
+```
+
+### Traditional Method
 
 ```bash
 # Run the complete analytics demo
@@ -20,6 +37,7 @@ These examples show how to perform data analytics tasks in Joblet's isolated env
 ```
 
 This will:
+
 1. Create persistent volumes for data storage
 2. Upload sample data and Python scripts
 3. Execute analytics in an isolated environment
@@ -28,7 +46,7 @@ This will:
 ## 📋 Prerequisites
 
 - Joblet server with Python 3 installed
-- RNX client configured and connected  
+- RNX client configured and connected
 - 512MB RAM available for jobs
 
 No external Python packages required - everything runs with the standard library!
@@ -36,16 +54,19 @@ No external Python packages required - everything runs with the standard library
 ## 📈 Features
 
 ### Sales Analysis
+
 - Calculate total revenue, average sale, median, and standard deviation
 - Group sales by product category
 - Export results as JSON for further processing
 
-### Customer Segmentation  
+### Customer Segmentation
+
 - Implement K-means clustering from scratch
 - Segment customers based on age, income, and spending patterns
 - Analyze cluster characteristics
 
 ### Time Series Processing
+
 - Generate synthetic time series data
 - Calculate moving averages
 - Process data in chunks for scalability
@@ -105,16 +126,19 @@ python-analytics/
 ## 💡 Key Concepts Demonstrated
 
 ### Resource Management
+
 - Jobs run with memory limits (512MB)
 - Isolated execution environment
 - No dependency conflicts
 
 ### Data Persistence
+
 - Results saved to persistent volumes
 - Data accessible across job runs
 - JSON format for easy inspection
 
 ### Pure Python Implementation
+
 - Statistical analysis with `statistics` module
 - K-means clustering implemented from scratch
 - CSV processing with `csv` module

@@ -1,0 +1,68 @@
+version: "1.0"
+
+# Default settings applied to all jobs unless overridden
+defaults:
+  resources:
+    max_memory: 256
+    max_cpu: 50
+  network: bridge
+
+jobs:
+  # Simple hello world job
+  hello:
+    name: "Hello World"
+    description: "Simple greeting job"
+    command: echo
+    args:
+      - "Hello, World!"
+    resources:
+      max_memory: 64
+
+  # Python analytics job with uploads and volumes
+  analytics:
+    name: "Python Analytics"
+    description: "Data analysis with Python"
+    command: python3
+    args:
+      - "analyze.py"
+    uploads:
+      files:
+        - "analyze.py"
+        - "data.csv"
+    volumes:
+      - "analytics-data"
+    resources:
+      max_memory: 512
+      max_cpu: 75
+    runtime: "python:3.11"
+
+  # Long-running server job
+  webserver:
+    name: "Web Server"
+    description: "Nginx web server"
+    command: nginx
+    args:
+      - "-g"
+      - "daemon off;"
+    network: frontend
+    resources:
+      max_memory: 128
+      max_cpu: 25
+    volumes:
+      - "web-content"
+
+  # Scheduled backup job
+  backup:
+    name: "Backup Job"
+    description: "Scheduled backup task"
+    command: bash
+    args:
+      - "-c"
+      - "tar -czf /volumes/backups/backup-$(date +%Y%m%d).tar.gz /data"
+    schedule: "1hour"
+    volumes:
+      - "backups"
+      - "data"
+    resources:
+      max_memory: 512
+      max_iobps: 1048576  # 1MB/s I/O limit

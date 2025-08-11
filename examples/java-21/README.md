@@ -1,26 +1,40 @@
 # Java 21 LTS Examples
 
-Modern Java development with the `java:21` runtime environment - featuring Virtual Threads, Pattern Matching, and cutting-edge Java features.
+Modern Java development with the `java:21` runtime environment - featuring Virtual Threads, Pattern Matching, and
+cutting-edge Java features.
 
 ## ⚡ Runtime Features
 
 - **Java Version**: OpenJDK 21.0.4 (Long Term Support)
 - **Build Tools**: Apache Maven 3.9.6
 - **Modern Features**:
-  - Virtual Threads (Project Loom) - massive concurrency
-  - Pattern Matching for switch expressions
-  - String Templates (Preview feature)
-  - Record Patterns
-  - Foreign Function & Memory API
+    - Virtual Threads (Project Loom) - massive concurrency
+    - Pattern Matching for switch expressions
+    - String Templates (Preview feature)
+    - Record Patterns
+    - Foreign Function & Memory API
 - **Package Size**: ~208MB compressed
 - **Memory**: 512MB-2GB recommended
 - **Startup Time**: 2-3 seconds (vs 30-120 seconds traditional)
 
 ## 🚀 Quick Start
 
+### Using YAML Templates (NEW - Recommended)
+
+```bash
+# Run specific Java 21 example using the template
+rnx run --template=jobs.yaml:virtual-threads      # Virtual threads demo
+rnx run --template=jobs.yaml:java21-features      # Java 21 language features
+rnx run --template=jobs.yaml:virtual-server       # HTTP server with virtual threads
+rnx run --template=jobs.yaml:thread-comparison    # Platform vs Virtual threads comparison
+rnx run --template=jobs.yaml:structured-concurrency  # Structured concurrency patterns
+rnx run --template=jobs.yaml:graalvm-ready        # GraalVM-optimized application
+```
+
 ### Prerequisites
 
 **Option 1: Deploy Pre-built Package (Recommended)**
+
 ```bash
 # Copy package from examples/packages/ (208MB)
 scp examples/packages/java-21-runtime-complete.tar.gz admin@host:/tmp/
@@ -32,6 +46,7 @@ sudo chown -R joblet:joblet /opt/joblet/runtimes/java/java-21
 ```
 
 **Option 2: Build from Setup Script**
+
 ```bash
 # On Joblet host (as root)
 sudo /opt/joblet/examples/runtimes/java-21/setup_java_21.sh
@@ -71,6 +86,7 @@ javac PatternTest.java && java PatternTest"
 ## 📁 Example Files
 
 ### `VirtualThreadExample.java`
+
 ```java
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -111,6 +127,7 @@ public class VirtualThreadExample {
 ## 🎯 Modern Java 21 Features
 
 ### Virtual Threads (Project Loom)
+
 ```java
 // MassiveConcurrency.java
 import java.util.concurrent.*;
@@ -142,6 +159,7 @@ public class MassiveConcurrency {
 ```
 
 ### Pattern Matching with Records
+
 ```java
 // ModernPatterns.java
 public class ModernPatterns {
@@ -167,6 +185,7 @@ public class ModernPatterns {
 ```
 
 ### String Templates (Preview)
+
 ```java
 // StringTemplates.java
 public class StringTemplates {
@@ -194,7 +213,9 @@ public class StringTemplates {
 
 ```java
 // VirtualThreadServer.java
+
 import com.sun.net.httpserver.*;
+
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
@@ -202,19 +223,19 @@ import java.util.concurrent.Executors;
 public class VirtualThreadServer {
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);
-        
+
         // Use virtual threads for handling requests
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        
+
         server.createContext("/", exchange -> {
-            String response = "Handled by virtual thread: " + 
-                            Thread.currentThread().toString();
+            String response = "Handled by virtual thread: " +
+                    Thread.currentThread().toString();
             exchange.sendResponseHeaders(200, response.length());
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(response.getBytes());
             }
         });
-        
+
         server.start();
         System.out.println("Server running on port 8000 with virtual threads");
     }
@@ -239,6 +260,7 @@ echo 'Handled 1000 concurrent requests with virtual threads!'
 ## 🔧 Advanced Maven Projects
 
 ### Spring Boot 3 with Virtual Threads
+
 ```bash
 # Create Spring Boot 3 project with Virtual Threads
 rnx run --runtime=java:21 --volume=spring3-project bash -c "
@@ -267,12 +289,12 @@ rnx run --runtime=java:21 --volume=spring3-project --network=spring3-app --port=
 
 ## ⚡ Performance Comparison
 
-| Feature | Traditional Threads | Virtual Threads | Improvement |
-|---------|-------------------|-----------------|-------------|
-| Thread Creation | ~1MB stack per thread | ~1KB per virtual thread | **1000x** |
-| Max Concurrent Threads | ~4,000 (4GB RAM) | ~4,000,000 (4GB RAM) | **1000x** |
-| Context Switch | ~1-10 μs | ~0.1-1 μs | **10x** |
-| HTTP Server Capacity | ~1K concurrent | ~100K concurrent | **100x** |
+| Feature                | Traditional Threads   | Virtual Threads         | Improvement |
+|------------------------|-----------------------|-------------------------|-------------|
+| Thread Creation        | ~1MB stack per thread | ~1KB per virtual thread | **1000x**   |
+| Max Concurrent Threads | ~4,000 (4GB RAM)      | ~4,000,000 (4GB RAM)    | **1000x**   |
+| Context Switch         | ~1-10 μs              | ~0.1-1 μs               | **10x**     |
+| HTTP Server Capacity   | ~1K concurrent        | ~100K concurrent        | **100x**    |
 
 ## 🔍 JVM Diagnostics and Monitoring
 
@@ -294,6 +316,7 @@ rnx run --runtime=java:21 --max-memory=4096 \
 ## 🛠️ Troubleshooting
 
 ### Virtual Threads Not Working
+
 ```bash
 # Verify Java 21
 rnx run --runtime=java:21 java -version
@@ -310,6 +333,7 @@ EOF
 ```
 
 ### Preview Features
+
 ```bash
 # Enable preview features
 rnx run --runtime=java:21 javac --enable-preview --release 21 ModernApp.java
@@ -327,6 +351,7 @@ rnx run --runtime=java:21 java --enable-preview ModernApp
 ## 🎯 Summary
 
 The Java 21 runtime provides:
+
 - ⚡ **Virtual Threads**: Million-scale concurrency
 - 🔄 **Pattern Matching**: Cleaner, more expressive code
 - 📦 **Modern Features**: Latest Java innovations

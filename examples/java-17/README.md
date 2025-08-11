@@ -13,9 +13,22 @@ Enterprise Java development with the `java:17` runtime environment - instant com
 
 ## 🚀 Quick Start
 
+### Using YAML Templates (NEW - Recommended)
+
+```bash
+# Run specific Java 17 example using the template
+rnx run --template=jobs.yaml:hello-joblet      # Compile and run HelloJoblet
+rnx run --template=jobs.yaml:optimized-jvm     # Run with JVM optimization
+rnx run --template=jobs.yaml:java17-features   # Demonstrate Java 17 features
+rnx run --template=jobs.yaml:jar-package       # Package as JAR and run
+rnx run --template=jobs.yaml:performance-test  # Performance testing
+rnx run --template=jobs.yaml:data-persistence  # Persistent storage example
+```
+
 ### Prerequisites
 
 **Option 1: Deploy Pre-built Package (Recommended)**
+
 ```bash
 # Copy package from examples/packages/ (193MB)
 scp examples/packages/java-17-runtime-complete.tar.gz admin@host:/tmp/
@@ -27,6 +40,7 @@ sudo chown -R joblet:joblet /opt/joblet/runtimes/java/java-17
 ```
 
 **Option 2: Build from Setup Script**
+
 ```bash
 # On Joblet host (as root)
 sudo /opt/joblet/examples/runtimes/java-17/setup_java_17.sh
@@ -52,6 +66,7 @@ rnx run --runtime=java:17 bash -c "echo 'public class Test { public static void 
 ## 📁 Example Files
 
 ### `HelloJoblet.java`
+
 ```java
 public class HelloJoblet {
     public static void main(String[] args) {
@@ -66,6 +81,7 @@ public class HelloJoblet {
 ## 🔧 Maven Projects
 
 ### Basic Maven Build
+
 ```bash
 # Create a simple Maven project
 rnx run --runtime=java:17 bash -c "
@@ -86,6 +102,7 @@ rnx run --runtime=java:17 --upload-dir=demo \
 ```
 
 ### Spring Boot Application
+
 ```bash
 # Generate Spring Boot project (create project structure first)
 rnx run --runtime=java:17 --volume=spring-project bash -c "
@@ -113,8 +130,10 @@ rnx run --runtime=java:17 --volume=spring-project --network=spring-app --port=80
 ## 🎯 Common Use Cases
 
 ### Enterprise Application Development
+
 ```java
 // EnterpriseApp.java
+
 import java.util.*;
 import java.util.stream.*;
 import java.util.concurrent.*;
@@ -123,25 +142,28 @@ public class EnterpriseApp {
     public static void main(String[] args) {
         // Modern Java 17 features
         var employees = List.of("Alice", "Bob", "Charlie");
-        
+
         // Stream processing
         employees.stream()
-            .filter(e -> e.length() > 3)
-            .map(String::toUpperCase)
-            .forEach(System.out::println);
-        
+                .filter(e -> e.length() > 3)
+                .map(String::toUpperCase)
+                .forEach(System.out::println);
+
         // Concurrent processing
         try (var executor = Executors.newFixedThreadPool(4)) {
             var futures = employees.stream()
-                .map(e -> executor.submit(() -> process(e)))
-                .collect(Collectors.toList());
-            
+                    .map(e -> executor.submit(() -> process(e)))
+                    .collect(Collectors.toList());
+
             futures.forEach(f -> {
-                try { f.get(); } catch (Exception ex) { }
+                try {
+                    f.get();
+                } catch (Exception ex) {
+                }
             });
         }
     }
-    
+
     static void process(String employee) {
         System.out.println("Processing: " + employee);
     }
@@ -149,6 +171,7 @@ public class EnterpriseApp {
 ```
 
 ### JShell Interactive Development
+
 ```bash
 # Start interactive session
 rnx run --runtime=java:17 jshell
@@ -162,6 +185,7 @@ jshell> System.out.println(person)
 ```
 
 ### JAR Creation and Execution
+
 ```bash
 # Create and package JAR
 rnx run --runtime=java:17 --volume=java-artifacts bash -c "
@@ -183,9 +207,12 @@ rnx run --runtime=java:17 --volume=java-artifacts \
 ## 🌐 Network Capabilities
 
 ### HTTP Server
+
 ```java
 // SimpleHttpServer.java
+
 import com.sun.net.httpserver.*;
+
 import java.io.*;
 import java.net.InetSocketAddress;
 
@@ -231,12 +258,12 @@ rnx run --runtime=java:17 --volume=java-builds \
 
 ## ⚡ Performance Comparison
 
-| Operation | Traditional | Runtime | Speedup |
-|-----------|------------|---------|----------|
-| JDK Installation | 30-120 seconds | 0 seconds | ∞ |
-| Job Startup | 10-30 seconds | 2-3 seconds | **5-10x** |
+| Operation         | Traditional    | Runtime       | Speedup   |
+|-------------------|----------------|---------------|-----------|
+| JDK Installation  | 30-120 seconds | 0 seconds     | ∞         |
+| Job Startup       | 10-30 seconds  | 2-3 seconds   | **5-10x** |
 | Maven First Build | 60-300 seconds | 10-30 seconds | **6-10x** |
-| Compilation | 5-10 seconds | 1-2 seconds | **3-5x** |
+| Compilation       | 5-10 seconds   | 1-2 seconds   | **3-5x**  |
 
 ## 🔍 Debugging and Profiling
 
@@ -256,6 +283,7 @@ rnx run --runtime=java:17 --max-memory=2048 \
 ## 🛠️ Troubleshooting
 
 ### Runtime Not Found
+
 ```bash
 # Check if runtime is installed
 rnx runtime list
@@ -265,6 +293,7 @@ sudo tar -xzf java-17-runtime-complete.tar.gz -C /opt/joblet/runtimes/java/
 ```
 
 ### Classpath Issues
+
 ```bash
 # Set classpath explicitly
 rnx run --runtime=java:17 --upload-dir=libs \
@@ -272,6 +301,7 @@ rnx run --runtime=java:17 --upload-dir=libs \
 ```
 
 ### Memory Errors
+
 ```bash
 # Increase heap size
 rnx run --runtime=java:17 --max-memory=4096 \
@@ -288,6 +318,7 @@ rnx run --runtime=java:17 --max-memory=4096 \
 ## 🎯 Summary
 
 The Java 17 runtime provides:
+
 - ⚡ **Instant Startup**: 2-3 seconds vs minutes
 - 🔒 **Complete Isolation**: Zero host contamination
 - 📦 **Enterprise Ready**: Full JDK with Maven

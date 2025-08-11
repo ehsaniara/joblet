@@ -1,0 +1,13 @@
+version: "1.0"
+
+jobs:
+  test:
+    name: "Simple Test"
+    description: "A simple test job"
+    command: bash
+    args:
+      - "-c"
+      - "echo 'Running from template'; date; echo 'Memory limit:'; cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo 'N/A'"
+    resources:
+      max_memory: 256
+      max_cpu: 50

@@ -3,6 +3,37 @@
 Comprehensive examples demonstrating Joblet's capabilities, from instant runtime environments to advanced job
 coordination patterns.
 
+## ⚡ Recent Improvements
+
+### 🎯 YAML Template System
+
+Each example directory now includes a `jobs.yaml` file that defines multiple job configurations. Instead of complex multi-flag commands, you can run jobs with simple template references:
+
+**Before (Complex):**
+```bash
+rnx run --runtime=python:3.11-ml --upload=script.py --volume=data --volume=results --max-memory=2048 --max-cpu=75 python3 script.py
+```
+
+**After (Simple):**
+```bash
+rnx run --template=jobs.yaml:ml-analysis
+```
+
+**Template Benefits:**
+- ✅ **Simplified Commands**: One-liner execution instead of multi-flag commands
+- ✅ **Predefined Jobs**: Common use cases pre-configured and tested
+- ✅ **Easy Discovery**: See all available jobs with `cat jobs.yaml`
+- ✅ **Consistent Resource Limits**: Optimized memory/CPU settings per job type
+- ✅ **External Scripts**: Debuggable script files instead of embedded commands
+
+### 🛠️ Technical Improvements
+
+✅ **External Scripts**: Moved from embedded scripts to debuggable external files  
+✅ **Realistic Features**: Removed unsupported/future features, using only current Joblet capabilities  
+✅ **Resource Limits**: Updated to realistic CPU/memory constraints (≤80% CPU, ≤6GB RAM)  
+✅ **Clean Templates**: Eliminated preview features and experimental options  
+✅ **Supported Runtimes**: Only uses available runtimes (`python:3.11`, `python:3.11-ml`, `java:17`, `java:21`)  
+
 ## ⚡ Runtime-Powered Examples (Instant Startup)
 
 ### 🐍 [Python 3.11 ML](./python-3.11-ml/) ⚡ **Instant Execution**
@@ -66,7 +97,27 @@ coordination patterns.
 
 ## 🚀 Quick Start
 
-### 🏃‍♂️ Instant Start with Runtimes (Recommended)
+### 🎯 YAML Templates (NEW - Recommended)
+
+All examples now support YAML templates for simplified job execution:
+
+```bash
+# Run examples using YAML templates (simple one-liner)
+cd python-3.11-ml/
+rnx run --template=jobs.yaml:ml-analysis      # Data analysis with pre-installed ML libs
+
+cd ../java-17/
+rnx run --template=jobs.yaml:hello-joblet     # Compile and run Java application
+
+cd ../basic-usage/
+rnx run --template=jobs.yaml:hello-world      # Basic hello world
+rnx run --template=jobs.yaml:file-ops         # File operations demo
+
+cd ../python-analytics/
+rnx run --template=jobs.yaml:sales-analysis   # Sales data analysis
+```
+
+### 🏃‍♂️ Traditional Method
 
 ```bash
 # Option 1: Deploy pre-built packages (fastest - no host contamination)
@@ -104,7 +155,7 @@ rnx run --runtime=java:17 --upload=HelloJoblet.java bash -c "javac HelloJoblet.j
 cd python-analytics/
 ./run_demo.sh
 
-# 2. Try Basic Usage (fundamental concepts)
+# 2. Try Basic Usage (fundamental concepts) 
 cd ../basic-usage/
 ./run_demos.sh
 

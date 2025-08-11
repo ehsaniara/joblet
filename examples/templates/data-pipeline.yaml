@@ -1,0 +1,169 @@
+version: "1.0"
+
+# Data Processing Pipeline with Resource Limits
+defaults:
+  network: "data-network"
+  resources:
+    max_memory: 512
+    max_cpu: 50
+    max_iobps: 1048576  # 1MB/s default I/O
+
+jobs:
+  # ETL Job with multiple steps
+  etl:
+    name: "ETL Pipeline"
+    description: "Extract, Transform, Load data pipeline"
+    command: bash
+    args:
+      - "-c"
+      - |
+        set -e
+        echo "Starting ETL Pipeline..."
+        
+        # Extract
+        echo "Extracting data from source..."
+        python3 /scripts/extract.py --source=/volumes/raw-data --output=/tmp/extracted
+        
+        # Transform
+        echo "Transforming data..."
+        python3 /scripts/transform.py --input=/tmp/extracted --output=/tmp/transformed
+        
+        # Load
+        echo "Loading data to destination..."
+        python3 /scripts/load.py --input=/tmp/transformed --destination=/volumes/processed-data
+        
+        echo "ETL Pipeline completed!"
+    uploads:
+      directories:
+        - "scripts"
+    volumes:
+      - "raw-data"
+      - "processed-data"
+      - "etl-logs"
+    resources:
+      max_memory: 2048
+      max_cpu: 75
+      max_iobps: 5242880  # 5MB/s for heavy I/O
+    runtime: "python:3.11"
+    schedule: "6hour"
+
+  # Data validation job
+  validate:
+    name: "Data Validator"
+    description: "Validate data quality and integrity"
+    command: python3
+    args:
+      - "validate.py"
+      - "--input=/volumes/processed-data"
+      - "--report=/volumes/validation-reports"
+    uploads:
+      files:
+        - "validate.py"
+        - "validation_rules.yaml"
+    volumes:
+      - "processed-data"
+      - "validation-reports"
+    resources:
+      max_memory: 512
+
+  # Data compression job
+  compress:
+    name: "Data Compressor"
+    description: "Compress old data for archival"
+    command: bash
+    args:
+      - "-c"
+      - |
+        find /volumes/processed-data -type f -mtime +7 -exec gzip {} \;
+        echo "Compression completed"
+    volumes:
+      - "processed-data"
+    schedule: "24hour"
+    resources:
+      max_memory: 256
+      max_cpu: 25
+      max_iobps: 2097152  # 2MB/s
+
+  # Database backup job
+  db-backup:
+    name: "Database Backup"
+    description: "Backup PostgreSQL database"
+    command: bash
+    args:
+      - "-c"
+      - |
+        DATE=$(date +%Y%m%d_%H%M%S)
+        pg_dump -h db-host -U dbuser -d mydb | gzip > /volumes/backups/db_backup_${DATE}.sql.gz
+        # Keep only last 7 days of backups
+        find /volumes/backups -name "db_backup_*.sql.gz" -mtime +7 -delete
+    volumes:
+      - "backups"
+    network: "database"
+    schedule: "12hour"
+    resources:
+      max_memory: 512
+      max_iobps: 3145728  # 3MB/s
+
+  # Report generator
+  report:
+    name: "Report Generator"
+    description: "Generate daily reports from processed data"
+    command: python3
+    args:
+      - "generate_report.py"
+      - "--data=/volumes/processed-data"
+      - "--output=/volumes/reports"
+      - "--format=pdf"
+    uploads:
+      files:
+        - "generate_report.py"
+        - "report_template.html"
+    volumes:
+      - "processed-data"
+      - "reports"
+    schedule: "24hour"
+    resources:
+      max_memory: 1024
+      max_cpu: 60
+
+  # Data sync job
+  sync:
+    name: "Data Synchronizer"
+    description: "Sync data between storage systems"
+    command: rsync
+    args:
+      - "-avz"
+      - "--delete"
+      - "/volumes/source-data/"
+      - "/volumes/backup-data/"
+    volumes:
+      - "source-data"
+      - "backup-data"
+    schedule: "4hour"
+    resources:
+      max_memory: 256
+      max_cpu: 30
+      max_iobps: 4194304  # 4MB/s
+
+  # Cleanup job
+  cleanup:
+    name: "Cleanup Job"
+    description: "Remove old temporary files and logs"
+    command: bash
+    args:
+      - "-c"
+      - |
+        # Remove temp files older than 3 days
+        find /tmp -type f -mtime +3 -delete 2>/dev/null || true
+        
+        # Rotate logs
+        find /volumes/logs -name "*.log" -size +100M -exec gzip {} \;
+        find /volumes/logs -name "*.log.gz" -mtime +30 -delete
+        
+        echo "Cleanup completed"
+    volumes:
+      - "logs"
+    schedule: "24hour"
+    resources:
+      max_memory: 128
+      max_cpu: 20

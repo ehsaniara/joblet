@@ -14,6 +14,18 @@ This example demonstrates **two different runtime approaches** for the same ML c
 
 ## 🚀 Quick Start
 
+### Using YAML Templates (NEW - Recommended)
+
+```bash
+# Run ML analysis examples using the template
+rnx run --template=jobs.yaml:ml-analysis           # Data analysis with pre-installed ML libs
+rnx run --template=jobs.yaml:ml-packaged           # Same analysis with packaged dependencies
+rnx run --template=jobs.yaml:feature-engineering   # Feature engineering pipeline
+rnx run --template=jobs.yaml:model-training        # Model training and evaluation
+rnx run --template=jobs.yaml:visualization         # Data visualization generation
+rnx run --template=jobs.yaml:ml-pipeline           # Complete ML pipeline
+```
+
 ### Option 1: Heavy Runtime (`python:3.11-ml`)
 
 ```bash

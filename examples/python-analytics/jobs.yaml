@@ -1,0 +1,142 @@
+version: "1.0"
+
+# Python Analytics Examples - Data Processing and Analysis
+defaults:
+  runtime: "python:3.11"
+  resources:
+    max_memory: 512
+    max_cpu: 50
+
+jobs:
+  # Simple analytics with standard library
+  simple-analytics:
+    name: "Simple Analytics"
+    description: "Data analytics using only Python standard library"
+    command: python3
+    args:
+      - "simple_analytics.py"
+    uploads:
+      files:
+        - "simple_analytics.py"
+        - "sales_data.csv"
+        - "customers.csv"
+    volumes:
+      - "analytics-data"
+      - "ml-models"
+    resources:
+      max_memory: 512
+
+  # Sales analysis
+  sales-analysis:
+    name: "Sales Data Analysis"
+    description: "Analyze sales data and generate reports"
+    command: python3
+    args:
+      - "scripts/analyze_sales.py"
+    uploads:
+      files:
+        - "scripts/analyze_sales.py"
+        - "sales_data.csv"
+    volumes:
+      - "analytics-data"
+    resources:
+      max_memory: 256
+
+  # Customer segmentation
+  customer-segmentation:
+    name: "Customer Segmentation"
+    description: "Segment customers based on behavior"
+    command: python3
+    args:
+      - "scripts/segment_customers.py"
+    uploads:
+      files:
+        - "scripts/segment_customers.py"
+        - "customers.csv"
+    volumes:
+      - "analytics-data"
+    resources:
+      max_memory: 256
+
+  # Time series analysis
+  time-series:
+    name: "Time Series Analysis"
+    description: "Analyze time-based patterns in data"
+    command: python3
+    args:
+      - "scripts/time_series.py"
+    volumes:
+      - "analytics-data"
+    resources:
+      max_memory: 512
+
+  # Report generation
+  generate-report:
+    name: "Generate Analytics Report"
+    description: "Combine all analytics into a comprehensive report"
+    command: python3
+    args:
+      - "scripts/combine_reports.py"
+    uploads:
+      files:
+        - "scripts/combine_reports.py"
+    volumes:
+      - "analytics-data"
+    resources:
+      max_memory: 256
+
+  # Setup volumes for analytics
+  setup-volumes:
+    name: "Setup Analytics Volumes"
+    description: "Create required volumes for analytics processing"
+    command: echo
+    args:
+      - "Analytics volumes should be created with: rnx volume create analytics-data"
+    resources:
+      max_memory: 64
+
+  # Complete analytics workflow
+  complete-analytics:
+    name: "Complete Analytics Workflow"
+    description: "Run sales analysis, customer segmentation, and time series analysis"
+    command: bash
+    args:
+      - "scripts/run_complete_analytics.sh"
+    uploads:
+      files:
+        - "scripts/run_complete_analytics.sh"
+        - "scripts/analyze_sales.py"
+        - "scripts/segment_customers.py"
+        - "scripts/time_series.py"
+        - "scripts/combine_reports.py"
+        - "sales_data.csv"
+        - "customers.csv"
+    volumes:
+      - "analytics-data"
+    resources:
+      max_memory: 1024
+      max_cpu: 75
+
+  # Run all analytics
+  run-all:
+    name: "Run All Analytics"
+    description: "Execute all analytics jobs in sequence"
+    command: bash
+    args:
+      - "run_demo.sh"
+    uploads:
+      files:
+        - "run_demo.sh"
+        - "simple_analytics.py"
+        - "scripts/analyze_sales.py"
+        - "scripts/segment_customers.py"
+        - "scripts/time_series.py"
+        - "scripts/combine_reports.py"
+        - "sales_data.csv"
+        - "customers.csv"
+    volumes:
+      - "analytics-data"
+      - "ml-models"
+    resources:
+      max_memory: 1024
+      max_cpu: 75

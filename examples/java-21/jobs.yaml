@@ -1,0 +1,311 @@
+version: "1.0"
+
+# Java 21 Examples - Latest LTS with Virtual Threads
+defaults:
+  runtime: "java:21"
+  resources:
+    max_memory: 1024
+    max_cpu: 50
+
+jobs:
+  # Virtual threads demonstration
+  virtual-threads:
+    name: "Virtual Threads Demo"
+    description: "Demonstrate Java 21 virtual threads for massive concurrency"
+    command: bash
+    args:
+      - "-c"
+      - |
+        echo "Compiling Virtual Threads example..."
+        javac VirtualThreadExample.java
+        echo "Running with virtual threads..."
+        java VirtualThreadExample
+    uploads:
+      files:
+        - "VirtualThreadExample.java"
+    resources:
+      max_memory: 1024
+      max_cpu: 75
+
+  # Pattern matching and record patterns (Java 21)
+  java21-features:
+    name: "Java 21 Features"
+    description: "Showcase Java 21 language enhancements"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > Java21Features.java << 'EOF'
+        import java.util.concurrent.*;
+        import java.time.Duration;
+        
+        public class Java21Features {
+            // Record pattern matching (Java 21)
+            record Point(int x, int y) {}
+            record Rectangle(Point topLeft, Point bottomRight) {}
+        
+            public static void main(String[] args) throws Exception {
+                System.out.println("=== Java 21 Features Demo ===\n");
+        
+                // Pattern matching for switch with records
+                Rectangle rect = new Rectangle(new Point(0, 0), new Point(10, 10));
+                String description = switch (rect) {
+                    case Rectangle(Point(var x1, var y1), Point(var x2, var y2)) -> 
+                        String.format("Rectangle from (%d,%d) to (%d,%d)", x1, y1, x2, y2);
+                };
+                System.out.println("Pattern Matching: " + description);
+        
+                // String templates (Preview)
+                String name = "Java 21";
+                int version = 21;
+                // Note: String templates are preview, would need --enable-preview
+                System.out.println("String formatting: " + name + " version " + version);
+        
+                // Sequenced collections
+                var list = new java.util.ArrayList<String>();
+                list.add("first");
+                list.add("middle");
+                list.add("last");
+                System.out.println("First element: " + list.getFirst());
+                System.out.println("Last element: " + list.getLast());
+        
+                // Virtual threads for I/O operations
+                System.out.println("\nVirtual Threads for I/O:");
+                try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                    var futures = new java.util.ArrayList<Future<String>>();
+                    for (int i = 0; i < 10; i++) {
+                        final int id = i;
+                        futures.add(executor.submit(() -> {
+                            Thread.sleep(100);
+                            return "Task " + id + " on " + Thread.currentThread();
+                        }));
+                    }
+                    for (var future : futures) {
+                        System.out.println(future.get());
+                    }
+                }
+            }
+        }
+        EOF
+        
+        javac Java21Features.java
+        java Java21Features
+    resources:
+      max_memory: 1024
+
+  # High concurrency web server with virtual threads
+  virtual-server:
+    name: "Virtual Thread Server"
+    description: "Simple HTTP server using virtual threads"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > VirtualServer.java << 'EOF'
+        import com.sun.net.httpserver.*;
+        import java.io.*;
+        import java.net.InetSocketAddress;
+        import java.util.concurrent.*;
+        
+        public class VirtualServer {
+            public static void main(String[] args) throws Exception {
+                HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        
+                // Use virtual threads for handling requests
+                server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+        
+                server.createContext("/", exchange -> {
+                    String response = "Hello from Virtual Thread: " + Thread.currentThread();
+                    exchange.sendResponseHeaders(200, response.length());
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(response.getBytes());
+                    }
+                });
+        
+                server.start();
+                System.out.println("Server running on port 8080 with virtual threads");
+                System.out.println("Server will run for 30 seconds...");
+        
+                Thread.sleep(30000);
+                server.stop(0);
+                System.out.println("Server stopped");
+            }
+        }
+        EOF
+        
+        javac VirtualServer.java
+        java VirtualServer
+    network: "frontend"
+    resources:
+      max_memory: 512
+      max_cpu: 50
+
+  # Performance comparison: Platform threads vs Virtual threads
+  thread-comparison:
+    name: "Thread Performance Comparison"
+    description: "Compare platform threads vs virtual threads performance"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > ThreadComparison.java << 'EOF'
+        import java.util.concurrent.*;
+        import java.time.*;
+        
+        public class ThreadComparison {
+            static final int TASK_COUNT = 10000;
+            static final int TASK_DURATION_MS = 100;
+        
+            public static void main(String[] args) throws Exception {
+                System.out.println("Comparing Platform Threads vs Virtual Threads");
+                System.out.println("Tasks: " + TASK_COUNT);
+                System.out.println("Task duration: " + TASK_DURATION_MS + "ms\n");
+        
+                // Platform threads (limited by OS threads)
+                System.out.println("Testing with Platform Threads (limited pool):");
+                Instant start = Instant.now();
+                try (var executor = Executors.newFixedThreadPool(100)) {
+                    var futures = new ConcurrentLinkedQueue<Future<String>>();
+                    for (int i = 0; i < Math.min(TASK_COUNT, 1000); i++) {
+                        futures.add(executor.submit(() -> {
+                            Thread.sleep(TASK_DURATION_MS);
+                            return "done";
+                        }));
+                    }
+                    for (var future : futures) {
+                        future.get();
+                    }
+                }
+                Duration platformDuration = Duration.between(start, Instant.now());
+                System.out.println("Platform threads time: " + platformDuration.toMillis() + "ms\n");
+        
+                // Virtual threads (unlimited)
+                System.out.println("Testing with Virtual Threads:");
+                start = Instant.now();
+                try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                    var futures = new ConcurrentLinkedQueue<Future<String>>();
+                    for (int i = 0; i < TASK_COUNT; i++) {
+                        futures.add(executor.submit(() -> {
+                            Thread.sleep(TASK_DURATION_MS);
+                            return "done";
+                        }));
+                    }
+                    for (var future : futures) {
+                        future.get();
+                    }
+                }
+                Duration virtualDuration = Duration.between(start, Instant.now());
+                System.out.println("Virtual threads time: " + virtualDuration.toMillis() + "ms");
+        
+                System.out.println("\nVirtual threads are " + 
+                    (platformDuration.toMillis() / Math.max(1, virtualDuration.toMillis())) + 
+                    "x faster for this I/O-bound workload!");
+            }
+        }
+        EOF
+        
+        javac ThreadComparison.java
+        java ThreadComparison
+    resources:
+      max_memory: 2048
+      max_cpu: 80
+
+  # Structured concurrency example
+  structured-concurrency:
+    name: "Structured Concurrency"
+    description: "Demonstrate structured concurrency patterns"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > StructuredConcurrency.java << 'EOF'
+        import java.util.concurrent.*;
+        import java.time.*;
+        
+        public class StructuredConcurrency {
+            public static void main(String[] args) throws Exception {
+                System.out.println("Structured Concurrency with Virtual Threads\n");
+        
+                // Scoped task execution
+                try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+                    Future<String> user = scope.fork(() -> fetchUser());
+                    Future<String> order = scope.fork(() -> fetchOrder());
+                    Future<String> inventory = scope.fork(() -> fetchInventory());
+        
+                    scope.join();           // Wait for all tasks
+                    scope.throwIfFailed();  // Propagate any errors
+        
+                    // All tasks completed successfully
+                    System.out.println("User: " + user.resultNow());
+                    System.out.println("Order: " + order.resultNow());
+                    System.out.println("Inventory: " + inventory.resultNow());
+                }
+        
+                System.out.println("\nAll tasks completed with structured concurrency!");
+            }
+        
+            static String fetchUser() throws InterruptedException {
+                Thread.sleep(500);
+                return "User data fetched";
+            }
+        
+            static String fetchOrder() throws InterruptedException {
+                Thread.sleep(300);
+                return "Order data fetched";
+            }
+        
+            static String fetchInventory() throws InterruptedException {
+                Thread.sleep(400);
+                return "Inventory data fetched";
+            }
+        }
+        EOF
+        
+        javac StructuredConcurrency.java
+        java StructuredConcurrency
+    resources:
+      max_memory: 1024
+
+  # GraalVM native image preparation (if using GraalVM JDK)
+  graalvm-ready:
+    name: "GraalVM Ready App"
+    description: "Application optimized for GraalVM native compilation"
+    command: bash
+    args:
+      - "-c"
+      - |
+        cat > GraalReady.java << 'EOF'
+        public class GraalReady {
+            public static void main(String[] args) {
+                System.out.println("=== GraalVM-Ready Application ===");
+        
+                // Avoid reflection
+                String message = "Hello from Java 21!";
+                System.out.println(message);
+        
+                // Simple computation
+                long sum = 0;
+                for (int i = 1; i <= 1000000; i++) {
+                    sum += i;
+                }
+                System.out.println("Sum of 1 to 1M: " + sum);
+        
+                // Display JVM info
+                System.out.println("\nJVM Information:");
+                System.out.println("Java Version: " + System.getProperty("java.version"));
+                System.out.println("JVM Name: " + System.getProperty("java.vm.name"));
+                System.out.println("JVM Vendor: " + System.getProperty("java.vm.vendor"));
+        
+                // This app is optimized for AOT compilation with GraalVM
+                System.out.println("\nThis app is optimized for GraalVM native-image compilation!");
+            }
+        }
+        EOF
+        
+        javac GraalReady.java
+        java GraalReady
+        
+        # Note: To compile to native, you would run:
+        # native-image GraalReady (requires GraalVM)
+    resources:
+      max_memory: 512

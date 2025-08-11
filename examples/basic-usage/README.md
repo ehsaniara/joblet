@@ -16,7 +16,22 @@ Learn Joblet fundamentals with simple, practical examples covering core features
 
 ## 🚀 Quick Start
 
-### Run All Basic Examples
+### Using YAML Templates (NEW - Recommended)
+
+```bash
+# Run specific example using the template
+rnx run --template=jobs.yaml:hello-world      # Basic hello world
+rnx run --template=jobs.yaml:file-ops         # File operations demo
+rnx run --template=jobs.yaml:resource-test    # Resource limits testing
+rnx run --template=jobs.yaml:volume-demo      # Volume storage demo
+rnx run --template=jobs.yaml:network-test     # Network isolation test
+rnx run --template=jobs.yaml:workflow         # Multi-step workflow
+
+# Run all demos using template
+rnx run --template=jobs.yaml:run-all-demos
+```
+
+### Run All Basic Examples (Traditional Method)
 
 ```bash
 # Execute complete basic usage demo

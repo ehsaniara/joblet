@@ -1,0 +1,123 @@
+version: "1.0"
+
+# Machine Learning Pipeline Configuration
+defaults:
+  runtime: "python:3.11-ml"
+  network: "ml-network"
+  resources:
+    max_memory: 2048
+    max_cpu: 80
+
+jobs:
+  # Data preprocessing job
+  preprocess:
+    name: "Data Preprocessing"
+    description: "Clean and prepare data for training"
+    command: python3
+    args:
+      - "preprocess.py"
+      - "--input=/volumes/raw-data"
+      - "--output=/volumes/processed-data"
+    uploads:
+      files:
+        - "preprocess.py"
+    volumes:
+      - "raw-data"
+      - "processed-data"
+    resources:
+      max_memory: 1024
+
+  # Model training job with GPU support
+  train:
+    name: "Model Training"
+    description: "Train ML model with processed data"
+    command: python3
+    args:
+      - "train.py"
+      - "--data=/volumes/processed-data"
+      - "--model=/volumes/models"
+      - "--epochs=100"
+    uploads:
+      files:
+        - "train.py"
+        - "model_config.yaml"
+    volumes:
+      - "processed-data"
+      - "models"
+      - "training-logs"
+    resources:
+      max_memory: 4096
+      max_cpu: 100
+      cpu_cores: "0-7"  # Use 8 CPU cores
+    runtime: "python:3.11-ml-gpu"
+
+  # Model evaluation job
+  evaluate:
+    name: "Model Evaluation"
+    description: "Evaluate trained model performance"
+    command: python3
+    args:
+      - "evaluate.py"
+      - "--model=/volumes/models/latest"
+      - "--test-data=/volumes/test-data"
+      - "--output=/volumes/evaluation-results"
+    uploads:
+      files:
+        - "evaluate.py"
+    volumes:
+      - "models"
+      - "test-data"
+      - "evaluation-results"
+    resources:
+      max_memory: 1024
+      max_cpu: 50
+
+  # Inference server
+  inference:
+    name: "Inference Server"
+    description: "Serve model for predictions"
+    command: python3
+    args:
+      - "serve.py"
+      - "--model=/volumes/models/production"
+      - "--port=8080"
+    uploads:
+      files:
+        - "serve.py"
+    volumes:
+      - "models"
+    network: "inference-network"
+    resources:
+      max_memory: 512
+      max_cpu: 50
+
+  # Full pipeline orchestration
+  pipeline:
+    name: "Full ML Pipeline"
+    description: "Run complete ML pipeline"
+    command: bash
+    args:
+      - "-c"
+      - |
+        echo "Starting ML Pipeline..."
+        python3 preprocess.py --input=/volumes/raw-data --output=/volumes/processed-data &&
+        python3 train.py --data=/volumes/processed-data --model=/volumes/models --epochs=100 &&
+        python3 evaluate.py --model=/volumes/models/latest --test-data=/volumes/test-data --output=/volumes/evaluation-results &&
+        echo "Pipeline completed successfully!"
+    uploads:
+      files:
+        - "preprocess.py"
+        - "train.py"
+        - "evaluate.py"
+        - "model_config.yaml"
+    volumes:
+      - "raw-data"
+      - "processed-data"
+      - "models"
+      - "test-data"
+      - "evaluation-results"
+      - "training-logs"
+    resources:
+      max_memory: 4096
+      max_cpu: 100
+    runtime: "python:3.11-ml-gpu"
