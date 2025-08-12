@@ -189,6 +189,9 @@ main() {
     echo "👤 Setting ownership to joblet user..."
     chown -R joblet:joblet "$RUNTIME_DIR" 2>/dev/null || echo "⚠️  joblet user not found, keeping root ownership"
     
+    # Fix Python symlinks for container isolation
+    fix_python_symlinks
+    
     # Create runtime manifest with system and ML information
     create_runtime_manifest
     
@@ -275,6 +278,24 @@ install_limited_ml_packages() {
     echo "   Basic NumPy and standard library available for lightweight ML tasks"
 }
 
+# Fix Python symlinks for isolated containers
+fix_python_symlinks() {
+    echo "🔧 Fixing Python symlinks for container isolation..."
+    
+    # Remove broken symlinks that point to absolute paths
+    rm -f "$RUNTIME_DIR/ml-venv/bin/python" "$RUNTIME_DIR/ml-venv/bin/python3"
+    
+    # Copy the actual Python binary to make it self-contained
+    cp "$RUNTIME_DIR/python-install/bin/python3.11" "$RUNTIME_DIR/ml-venv/bin/python"
+    
+    # Create relative symlinks
+    cd "$RUNTIME_DIR/ml-venv/bin"
+    ln -s python python3
+    cd - > /dev/null
+    
+    echo "   ✅ Python binary copied and symlinks fixed"
+}
+
 # Create runtime manifest
 create_runtime_manifest() {
     cat > "$RUNTIME_DIR/runtime.yml" << EOF
@@ -297,11 +318,20 @@ binaries:
   python3: "$RUNTIME_DIR/ml-venv/bin/python3"
   pip: "$RUNTIME_DIR/ml-venv/bin/pip"
   pip3: "$RUNTIME_DIR/ml-venv/bin/pip3"
+mounts:
+  - source: "ml-venv/bin"
+    target: "/usr/local/bin"
+    readonly: false
+  - source: "python-install/lib"
+    target: "/usr/local/lib"
+    readonly: false
+  - source: "ml-venv/lib/python3.11/site-packages"
+    target: "/usr/local/lib/python3.11/site-packages"
+    readonly: false
 environment:
-  PYTHON_HOME: "$RUNTIME_DIR/python-install"
-  PYTHONPATH: "$RUNTIME_DIR/ml-venv/lib/python3.11/site-packages"
-  PATH: "$RUNTIME_DIR/ml-venv/bin:\$PATH"
-  LD_LIBRARY_PATH: "$RUNTIME_DIR/python-install/lib"
+  PYTHON_HOME: "/usr/local"
+  PYTHONPATH: "/usr/local/lib/python3.11/site-packages"
+  LD_LIBRARY_PATH: "/usr/local/lib"
 features:
   - "NumPy for numerical computing"
   - "Pandas for data analysis ($([[ $ML_SUPPORT != "limited" ]] && echo "available" || echo "limited"))"

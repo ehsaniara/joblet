@@ -1,6 +1,7 @@
 # Runtime Advanced Scenarios
 
-This document covers advanced deployment patterns, enterprise scenarios, and sophisticated runtime management techniques for production environments.
+This document covers advanced deployment patterns, enterprise scenarios, and sophisticated runtime management techniques
+for production environments.
 
 ## 🏢 Enterprise Deployment Patterns
 
@@ -90,7 +91,7 @@ done
 name: Runtime Build & Deploy Pipeline
 on:
   push:
-    paths: 
+    paths:
       - 'runtimes/**'
       - '.github/workflows/runtime-deploy.yml'
 
@@ -100,28 +101,28 @@ env:
 
 jobs:
   build-runtime:
-    runs-on: [self-hosted, linux, build-cluster]
+    runs-on: [ self-hosted, linux, build-cluster ]
     strategy:
       matrix:
-        runtime: [python-3.11-ml, node-18, java-17]
-    
+        runtime: [ python-3.11-ml, node-18, java-17 ]
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Build Runtime
         run: |
           sudo ./runtimes/${{ matrix.runtime }}/setup_${{ matrix.runtime }}.sh
-          
+
       - name: Security Scan
         run: |
           # Scan runtime for vulnerabilities
           trivy fs /opt/joblet/runtimes/ --format table --exit-code 1
-          
+
       - name: Package Verification
         run: |
           # Verify package integrity
           zip -T /tmp/runtime-deployments/${{ matrix.runtime }}-runtime.zip
-          
+
       - name: Upload to Registry
         run: |
           curl -X PUT \
@@ -133,7 +134,7 @@ jobs:
     needs: build-runtime
     runs-on: ubuntu-latest
     environment: staging
-    
+
     steps:
       - name: Deploy to Staging
         run: |
@@ -143,11 +144,11 @@ jobs:
               curl -H "Authorization: Bearer ${{ env.REGISTRY_TOKEN }}" \
                    "${{ env.ARTIFACT_REGISTRY }}/${runtime}-runtime.zip" \
                    -o "${runtime}-runtime.zip"
-              
+
               # Deploy to staging host
               scp "${runtime}-runtime.zip" admin@${host}:/tmp/
               ssh admin@${host} "sudo unzip /tmp/${runtime}-runtime.zip -d /opt/joblet/runtimes/"
-              
+
               # Integration test
               ssh admin@${host} "rnx runtime test ${runtime}"
             done
@@ -157,7 +158,7 @@ jobs:
     needs: deploy-staging
     runs-on: ubuntu-latest
     environment: production
-    
+
     steps:
       - name: Production Deployment
         run: |
@@ -171,16 +172,16 @@ jobs:
 ```groovy
 pipeline {
     agent { label 'linux-build' }
-    
+
     parameters {
-        choice(name: 'RUNTIME', 
-               choices: ['python-3.11-ml', 'node-18', 'java-17', 'all'], 
-               description: 'Runtime to deploy')
-        choice(name: 'ENVIRONMENT', 
-               choices: ['staging', 'production'], 
-               description: 'Target environment')
+        choice(name: 'RUNTIME',
+                choices: ['python-3.11-ml', 'node-18', 'java-17', 'all'],
+                description: 'Runtime to deploy')
+        choice(name: 'ENVIRONMENT',
+                choices: ['staging', 'production'],
+                description: 'Target environment')
     }
-    
+
     stages {
         stage('Build Runtime') {
             when { params.RUNTIME != 'all' }
@@ -191,7 +192,7 @@ pipeline {
                 """
             }
         }
-        
+
         stage('Build All Runtimes') {
             when { params.RUNTIME == 'all' }
             parallel {
@@ -212,7 +213,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Security Scan') {
             steps {
                 sh '''
@@ -225,16 +226,16 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Deploy to Staging') {
             when { params.ENVIRONMENT == 'staging' }
             steps {
                 script {
                     def hosts = env.STAGING_HOSTS.split(',')
-                    def runtimes = params.RUNTIME == 'all' ? 
-                        ['python-3.11-ml', 'node-18', 'java-17'] : 
-                        [params.RUNTIME]
-                    
+                    def runtimes = params.RUNTIME == 'all' ?
+                            ['python-3.11-ml', 'node-18', 'java-17'] :
+                            [params.RUNTIME]
+
                     hosts.each { host ->
                         runtimes.each { runtime ->
                             sh """
@@ -247,18 +248,18 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Production Approval') {
             when { params.ENVIRONMENT == 'production' }
             steps {
-                input message: 'Deploy to Production?', 
-                      ok: 'Deploy',
-                      parameters: [
-                          string(name: 'APPROVER', description: 'Your name for audit trail')
-                      ]
+                input message: 'Deploy to Production?',
+                        ok: 'Deploy',
+                        parameters: [
+                                string(name: 'APPROVER', description: 'Your name for audit trail')
+                        ]
             }
         }
-        
+
         stage('Deploy to Production') {
             when { params.ENVIRONMENT == 'production' }
             steps {
@@ -266,15 +267,15 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             slackSend channel: '#deployments',
-                      message: "✅ Runtime deployment successful: ${params.RUNTIME} → ${params.ENVIRONMENT}"
+                    message: "✅ Runtime deployment successful: ${params.RUNTIME} → ${params.ENVIRONMENT}"
         }
         failure {
             slackSend channel: '#alerts',
-                      message: "❌ Runtime deployment failed: ${params.RUNTIME} → ${params.ENVIRONMENT}"
+                    message: "❌ Runtime deployment failed: ${params.RUNTIME} → ${params.ENVIRONMENT}"
         }
     }
 }

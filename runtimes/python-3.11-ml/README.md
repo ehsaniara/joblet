@@ -368,7 +368,7 @@ binaries:
 features:
   - "NumPy for numerical computing"
   - "Pandas for data analysis (available)"
-  - "Scikit-learn for ML (full support)" 
+  - "Scikit-learn for ML (full support)"
   - "Matplotlib for visualization (available)"
   - "SciPy for scientific computing (available)"
   - "Architecture-optimized build"

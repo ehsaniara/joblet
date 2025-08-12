@@ -253,7 +253,7 @@ The runtime creates a detailed manifest at `/opt/joblet/runtimes/java/java-21/ru
 
 ```yaml
 name: "java:21"
-version: "21.0.4"  
+version: "21.0.4"
 description: "OpenJDK 21 LTS with Apache Maven"
 type: "java"
 system:
@@ -282,13 +282,14 @@ features:
 
 ```java
 // VirtualThreadsDemo.java
+
 import java.time.Duration;
 import java.util.concurrent.Executors;
 
 public class VirtualThreadsDemo {
     public static void main(String[] args) throws InterruptedException {
         System.out.println("Java 21 Virtual Threads Demo");
-        
+
         // Create virtual thread executor
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             // Launch 100,000 virtual threads
@@ -316,21 +317,26 @@ public class VirtualThreadsDemo {
 ```java
 // PatternMatchingAdvanced.java
 public class PatternMatchingAdvanced {
-    public sealed interface Shape permits Circle, Rectangle {}
-    public record Circle(double radius) implements Shape {}
-    public record Rectangle(double width, double height) implements Shape {}
-    
+    public sealed interface Shape permits Circle, Rectangle {
+    }
+
+    public record Circle(double radius) implements Shape {
+    }
+
+    public record Rectangle(double width, double height) implements Shape {
+    }
+
     public static double calculateArea(Shape shape) {
         return switch (shape) {
             case Circle(var radius) -> Math.PI * radius * radius;
             case Rectangle(var width, var height) -> width * height;
         };
     }
-    
+
     public static void main(String[] args) {
         Shape circle = new Circle(5.0);
         Shape rectangle = new Rectangle(4.0, 6.0);
-        
+
         System.out.println("Circle area: " + calculateArea(circle));
         System.out.println("Rectangle area: " + calculateArea(rectangle));
     }

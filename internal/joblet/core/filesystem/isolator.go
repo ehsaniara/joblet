@@ -223,6 +223,7 @@ options ndots:0
 func (f *JobFilesystem) Setup() error {
 	log := f.logger.WithField("operation", "filesystem-setup")
 	log.Debug("setting up filesystem isolation")
+	log.Debug("JobFilesystem.Setup() called", "jobID", f.JobID, "currentVolumes", f.Volumes)
 
 	// Double-check we're in a job context
 	if err := f.validateInJobContext(); err != nil {
@@ -245,17 +246,23 @@ func (f *JobFilesystem) Setup() error {
 	}
 
 	// Load volumes from environment if not already set
+	f.logger.Debug("checking volume setup", "jobID", f.JobID, "currentVolumes", f.Volumes, "volumeCount", len(f.Volumes))
 	if len(f.Volumes) == 0 {
+		f.logger.Debug("loading volumes from environment", "jobID", f.JobID)
 		f.loadVolumesFromEnvironment()
+	} else {
+		f.logger.Debug("volumes already set, skipping environment load", "jobID", f.JobID, "volumes", f.Volumes)
 	}
 
 	// Load runtime information from environment
 	f.loadRuntimeFromEnvironment()
 
 	// Mount volumes BEFORE chroot
+	f.logger.Debug("about to mount volumes", "jobID", f.JobID, "volumes", f.Volumes, "volumeCount", len(f.Volumes))
 	if err := f.mountVolumes(); err != nil {
 		return fmt.Errorf("failed to mount volumes: %w", err)
 	}
+	f.logger.Debug("volume mounting completed", "jobID", f.JobID)
 
 	// If no volumes are mounted, try to set up limited work directory (1MB)
 	// BUT skip if work directory already contains uploaded files
@@ -668,11 +675,13 @@ func (f *JobFilesystem) mountPipesDirectory() error {
 // Continues mounting remaining volumes if individual volume mounts fail,
 // ensuring partial volume failures don't prevent job execution.
 func (f *JobFilesystem) mountVolumes() error {
+	f.logger.Debug("mountVolumes() called", "jobID", f.JobID, "volumes", f.Volumes, "volumeCount", len(f.Volumes))
 	if len(f.Volumes) == 0 {
-		f.logger.Debug("no volumes to mount")
+		f.logger.Debug("no volumes to mount - returning early", "jobID", f.JobID)
 		return nil
 	}
 
+	f.logger.Debug("volumes present, proceeding to mount", "jobID", f.JobID, "volumes", f.Volumes)
 	log := f.logger.WithField("operation", "mount-volumes")
 	log.Debug("mounting volumes", "count", len(f.Volumes), "volumes", f.Volumes)
 
@@ -695,29 +704,42 @@ func (f *JobFilesystem) mountVolumes() error {
 // Returns error if volume doesn't exist or mount operation fails.
 func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
 	log := f.logger.WithField("volume", volumeName)
+	log.Debug("mounting single volume", "volumeName", volumeName, "jobID", f.JobID)
 
 	// Host volume path - this is where the actual volume data lives
 	hostVolumePath := fmt.Sprintf("%s/%s/data", f.getVolumesBasePath(), volumeName)
+	log.Debug("checking volume path", "hostVolumePath", hostVolumePath, "volumeName", volumeName)
 
 	// Check if host volume directory exists
-	if _, err := f.platform.Stat(hostVolumePath); err != nil {
+	log.Debug("calling platform.Stat", "hostVolumePath", hostVolumePath)
+	stat, err := f.platform.Stat(hostVolumePath)
+	log.Debug("platform.Stat completed", "error", err, "stat", stat)
+	if err != nil {
 		if f.platform.IsNotExist(err) {
+			log.Warn("volume does not exist", "hostVolumePath", hostVolumePath, "volumeName", volumeName)
 			return fmt.Errorf("volume %s does not exist at %s", volumeName, hostVolumePath)
 		}
+		log.Error("failed to stat volume directory", "error", err, "hostVolumePath", hostVolumePath)
 		return fmt.Errorf("failed to stat volume directory: %w", err)
 	}
+	log.Debug("volume path exists, proceeding to mount", "hostVolumePath", hostVolumePath)
 
 	// Target path inside chroot - mount volumes under /volumes/{name}
 	targetVolumePath := filepath.Join(f.RootDir, "volumes", volumeName)
+	log.Debug("creating target volume path", "targetVolumePath", targetVolumePath)
 
 	// Create the mount point directory
 	if err := f.platform.MkdirAll(targetVolumePath, 0755); err != nil {
+		log.Error("failed to create volume mount point", "error", err, "targetVolumePath", targetVolumePath)
 		return fmt.Errorf("failed to create volume mount point: %w", err)
 	}
+	log.Debug("target volume path created successfully", "targetVolumePath", targetVolumePath)
 
 	// Bind mount the volume (read-write by default)
 	flags := uintptr(syscall.MS_BIND)
+	log.Debug("performing bind mount", "hostPath", hostVolumePath, "targetPath", targetVolumePath, "flags", flags)
 	if err := f.platform.Mount(hostVolumePath, targetVolumePath, "", flags, ""); err != nil {
+		log.Error("failed to bind mount volume", "error", err, "hostPath", hostVolumePath, "targetPath", targetVolumePath)
 		return fmt.Errorf("failed to bind mount volume: %w", err)
 	}
 
@@ -745,7 +767,9 @@ func (f *JobFilesystem) SetVolumes(volumes []string) {
 // Environment variables are set by the job execution system.
 func (f *JobFilesystem) loadVolumesFromEnvironment() {
 	volumeCountStr := f.platform.Getenv("JOB_VOLUMES_COUNT")
+	f.logger.Debug("checking for volume environment variables", "JOB_VOLUMES_COUNT", volumeCountStr, "jobID", f.JobID)
 	if volumeCountStr == "" {
+		f.logger.Debug("no volume environment variables found - volumes will not be mounted", "jobID", f.JobID)
 		return
 	}
 
@@ -760,14 +784,16 @@ func (f *JobFilesystem) loadVolumesFromEnvironment() {
 
 	volumes := make([]string, 0, volumeCount)
 	for i := 0; i < volumeCount; i++ {
-		volumeName := f.platform.Getenv(fmt.Sprintf("JOB_VOLUME_%d", i))
+		envVar := fmt.Sprintf("JOB_VOLUME_%d", i)
+		volumeName := f.platform.Getenv(envVar)
+		f.logger.Debug("checking volume environment variable", "envVar", envVar, "volumeName", volumeName, "jobID", f.JobID)
 		if volumeName != "" {
 			volumes = append(volumes, volumeName)
 		}
 	}
 
 	f.Volumes = volumes
-	f.logger.Debug("loaded volumes from environment", "volumes", volumes)
+	f.logger.Debug("loaded volumes from environment", "volumes", volumes, "volumeCount", len(volumes), "jobID", f.JobID)
 }
 
 // setupLimitedWorkDir creates a size-limited work directory for jobs without volumes.

@@ -133,6 +133,7 @@ type StartProcessOptions struct {
 func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
 	log := ee.logger.WithField("jobID", opts.Job.Id)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
+	log.Debug("execution engine StartProcess called with volumes", "jobID", opts.Job.Id, "volumes", opts.Job.Volumes, "volumeCount", len(opts.Job.Volumes))
 
 	// Check if we're in CI mode - if so, use lightweight isolation
 	if ee.platform.Getenv("JOBLET_CI_MODE") == "true" {
@@ -391,6 +392,9 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 		for i, volume := range job.Volumes {
 			jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUME_%d=%s", i, volume))
 		}
+		ee.logger.Debug("volume environment variables set successfully", "jobID", job.Id, "volumeCount", len(job.Volumes))
+	} else {
+		ee.logger.Debug("no volumes to set for job", "jobID", job.Id)
 	}
 
 	// Add runtime information

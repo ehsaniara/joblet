@@ -222,6 +222,7 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 	j.store.CreateNewJob(job)
 
 	// Start execution
+	log.Debug("calling execution engine with job volumes", "jobId", job.Id, "volumes", job.Volumes, "volumeCount", len(job.Volumes))
 	cmd, err := j.executionEngine.StartProcessWithUploads(ctx, job, req.Uploads)
 	if err != nil {
 		j.handleExecutionFailure(job)

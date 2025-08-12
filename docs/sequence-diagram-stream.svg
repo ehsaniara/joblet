@@ -3,7 +3,8 @@
     <rect width="1000" height="700" fill="#ccc"/>
 
     <!-- Title -->
-    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">
+    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold"
+          fill="#333">
         Worker Streaming - Sequence Diagram
     </text>
 
@@ -11,37 +12,43 @@
     <g id="actors">
         <!-- Client -->
         <rect x="50" y="60" width="80" height="40" rx="5" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
-        <text x="90" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        <text x="90" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+              fill="white">
             Client
         </text>
 
         <!-- gRPC Service -->
         <rect x="200" y="60" width="100" height="40" rx="5" fill="#7c3aed" stroke="#5b21b6" stroke-width="2"/>
-        <text x="250" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        <text x="250" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+              fill="white">
             gRPC Service
         </text>
 
         <!-- Store -->
         <rect x="370" y="60" width="80" height="40" rx="5" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
-        <text x="410" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        <text x="410" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+              fill="white">
             Store
         </text>
 
         <!-- Task -->
         <rect x="520" y="60" width="80" height="40" rx="5" fill="#10b981" stroke="#047857" stroke-width="2"/>
-        <text x="560" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        <text x="560" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+              fill="white">
             Task
         </text>
 
         <!-- Output Writer -->
         <rect x="670" y="60" width="100" height="40" rx="5" fill="#8b5cf6" stroke="#7c3aed" stroke-width="2"/>
-        <text x="720" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        <text x="720" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+              fill="white">
             OutputWriter
         </text>
 
         <!-- Job Process -->
         <rect x="840" y="60" width="100" height="40" rx="5" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
-        <text x="890" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+        <text x="890" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold"
+              fill="white">
             Job Process
         </text>
     </g>
@@ -101,7 +108,8 @@
         </text>
 
         <!-- Live Streaming Loop -->
-        <rect x="40" y="300" width="900" height="280" rx="5" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="10,5"/>
+        <rect x="40" y="300" width="900" height="280" rx="5" fill="none" stroke="#10b981" stroke-width="2"
+              stroke-dasharray="10,5"/>
         <text x="50" y="320" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#10b981">
             Live Streaming Loop
         </text>
@@ -170,7 +178,8 @@
     <!-- Timeline -->
     <g id="timeline">
         <rect x="40" y="600" width="820" height="30" fill="#f5f5f5" stroke="#e0e0e0" stroke-width="1" rx="5"/>
-        <text x="450" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#666666">
+        <text x="450" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+              fill="#666666">
             Timeline: Request → Auth → Historical → Live Stream → Complete
         </text>
     </g>

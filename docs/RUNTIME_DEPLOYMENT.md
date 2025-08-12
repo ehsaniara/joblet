@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Joblet Runtime Deployment system enables **zero-contamination** deployment of complex runtime environments. Build runtimes once on development hosts, then deploy clean packages to production without installing any build tools or dependencies.
+The Joblet Runtime Deployment system enables **zero-contamination** deployment of complex runtime environments. Build
+runtimes once on development hosts, then deploy clean packages to production without installing any build tools or
+dependencies.
 
 ## 🏗️ Deployment Architecture
 
@@ -67,6 +69,7 @@ sudo ./runtimes/java-17/setup_java_17.sh
 ```
 
 Each script automatically:
+
 1. **Builds** the complete runtime environment
 2. **Installs** all dependencies and packages
 3. **Creates** deployment package at `/tmp/runtime-deployments/[runtime]-runtime.zip`
@@ -114,29 +117,32 @@ rnx run --runtime=python-3.11-ml python script.py
 
 ## 🎯 Available Runtimes
 
-| Runtime | Package Size | Contents | Use Case |
-|---------|-------------|-----------|----------|
-| **python-3.11-ml** | ~700MB | Python 3.11 + NumPy, Pandas, Scikit-learn, Matplotlib, TensorFlow, PyTorch | ML/AI, Data Analysis |
-| **node-18** | ~150MB | Node.js 18 LTS + npm, Express, TypeScript, ESLint | Web Development, APIs |
-| **java-17** | ~200MB | OpenJDK 17 LTS + Maven, common libraries | Enterprise Java Apps |
+| Runtime            | Package Size | Contents                                                                   | Use Case              |
+|--------------------|--------------|----------------------------------------------------------------------------|-----------------------|
+| **python-3.11-ml** | ~700MB       | Python 3.11 + NumPy, Pandas, Scikit-learn, Matplotlib, TensorFlow, PyTorch | ML/AI, Data Analysis  |
+| **node-18**        | ~150MB       | Node.js 18 LTS + npm, Express, TypeScript, ESLint                          | Web Development, APIs |
+| **java-17**        | ~200MB       | OpenJDK 17 LTS + Maven, common libraries                                   | Enterprise Java Apps  |
 
 ## 🔒 Security & Isolation
 
 ### Zero-Contamination Guarantee
 
 **Production hosts require NO:**
+
 - Compilers (gcc, g++, javac)
 - Package managers (apt, yum, npm, pip)
 - Build tools (make, cmake, maven)
 - Development headers (python3-dev, etc.)
 
 **Only requirement:**
+
 - Joblet daemon running
 - RNX client with runtime package
 
 ### Runtime Isolation
 
 Each deployed runtime is completely isolated:
+
 - **Filesystem**: Read-only mount in job containers
 - **Environment**: Automatic PATH/library setup
 - **Dependencies**: Self-contained, no host contamination
@@ -151,7 +157,7 @@ Each deployed runtime is completely isolated:
 name: Deploy Runtime
 on:
   push:
-    paths: ['runtimes/**']
+    paths: [ 'runtimes/**' ]
 
 jobs:
   build-and-deploy:
@@ -159,13 +165,13 @@ jobs:
     steps:
       - name: Build Runtime
         run: sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
-      
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: python-runtime
           path: /tmp/runtime-deployments/python-3.11-ml-runtime.zip
-      
+
       - name: Deploy to Production
         run: |
           for host in ${{ secrets.PROD_HOSTS }}; do
@@ -230,6 +236,7 @@ ssh admin@prod-host "sudo unzip /shared/nfs/python-3.11-ml-runtime.zip -d /opt/j
 ```
 
 After extraction, the runtime is immediately available:
+
 ```bash
 rnx runtime list              # Runtime appears in list
 rnx runtime test python-3.11-ml  # Test the runtime
@@ -263,6 +270,6 @@ rnx run --runtime=python-3.11-ml python -c "import numpy; print('✅ Runtime wor
 ## 📚 Related Documentation
 
 - [Runtime System Architecture](RUNTIME_SYSTEM.md)
-- [Security Considerations](SECURITY.md)  
+- [Security Considerations](SECURITY.md)
 - [Performance Optimization](docs/RUNTIME_PERFORMANCE.md)
 - [Custom Runtime Creation](docs/CUSTOM_RUNTIMES.md)

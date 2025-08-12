@@ -13,6 +13,16 @@ service JobletService {
   rpc ListJobs(EmptyRequest) returns (Jobs){}
 }
 
+// Workflow management service
+service JobService {
+  rpc RunJob(RunJobRequest) returns (RunJobResponse){}
+  rpc CreateWorkflow(CreateWorkflowRequest) returns (CreateWorkflowResponse){}
+  rpc GetWorkflowStatus(GetWorkflowStatusRequest) returns (GetWorkflowStatusResponse){}
+  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse){}
+  rpc GetWorkflowJobs(GetWorkflowJobsRequest) returns (GetWorkflowJobsResponse){}
+  rpc CancelWorkflow(CancelWorkflowRequest) returns (CancelWorkflowResponse){}
+}
+
 // Network management service
 service NetworkService {
   rpc CreateNetwork(CreateNetworkReq) returns (CreateNetworkRes){}
@@ -402,4 +412,115 @@ message RuntimeTestRes {
   string output = 3;
   string error = 4;
   int32 exitCode = 5;
+}
+
+// Workflow management messages
+
+message RunJobRequest {
+  string command = 1;
+  repeated string args = 2;
+  int32 maxCpu = 3;
+  string cpuCores = 4;
+  int32 maxMemory = 5;
+  int32 maxIobps = 6;
+  repeated FileUpload uploads = 7;
+  string schedule = 8;
+  string network = 9;
+  repeated string volumes = 10;
+  string runtime = 11;
+  string workDir = 12;
+  map<string, string> environment = 13;
+
+  // Workflow fields
+  int32 workflowId = 14;
+  string jobName = 15;
+  repeated JobRequirement requirements = 16;
+}
+
+message RunJobResponse {
+  string jobId = 1;
+  string status = 2;
+}
+
+message JobRequirement {
+  string jobId = 1;
+  string jobName = 2;
+  string status = 3;
+  string expression = 4;
+}
+
+message CreateWorkflowRequest {
+  string name = 1;
+  string template = 2;
+  int32 totalJobs = 3;
+  repeated string jobOrder = 4;
+  string yamlContent = 5;  // Optional: YAML content for client-side upload
+  repeated FileUpload workflowFiles = 6;  // Optional: Files referenced in workflow jobs
+}
+
+message CreateWorkflowResponse {
+  int32 workflowId = 1;
+}
+
+message GetWorkflowStatusRequest {
+  int32 workflowId = 1;
+}
+
+message GetWorkflowStatusResponse {
+  WorkflowInfo workflow = 1;
+  repeated WorkflowJob jobs = 2;
+}
+
+message ListWorkflowsRequest {
+  bool includeCompleted = 1;
+}
+
+message ListWorkflowsResponse {
+  repeated WorkflowInfo workflows = 1;
+}
+
+message GetWorkflowJobsRequest {
+  int32 workflowId = 1;
+}
+
+message GetWorkflowJobsResponse {
+  repeated WorkflowJob jobs = 1;
+}
+
+message CancelWorkflowRequest {
+  int32 workflowId = 1;
+}
+
+message CancelWorkflowResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message WorkflowInfo {
+  int32 id = 1;
+  string name = 2;
+  string template = 3;
+  string status = 4;
+  int32 totalJobs = 5;
+  int32 completedJobs = 6;
+  int32 failedJobs = 7;
+  int32 canceledJobs = 8;
+  Timestamp createdAt = 9;
+  Timestamp startedAt = 10;
+  Timestamp completedAt = 11;
+}
+
+message WorkflowJob {
+  string jobId = 1;
+  string name = 2;
+  string status = 3;
+  repeated string dependencies = 4;
+  Timestamp startTime = 5;
+  Timestamp endTime = 6;
+  int32 exitCode = 7;
+}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
 }

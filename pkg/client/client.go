@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	pb "joblet/api/gen"
+	"joblet/pkg/config"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
-	pb "joblet/api/gen"
-	"joblet/pkg/config"
 )
 
 type JobClient struct {
@@ -60,6 +61,10 @@ func (c *JobClient) Close() error {
 		return c.conn.Close()
 	}
 	return nil
+}
+
+func (c *JobClient) GetConn() *grpc.ClientConn {
+	return c.conn
 }
 
 func (c *JobClient) RunJob(ctx context.Context, job *pb.RunJobReq) (*pb.RunJobRes, error) {

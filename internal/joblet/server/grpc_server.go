@@ -8,6 +8,7 @@ import (
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/monitoring"
+	"joblet/internal/joblet/workflow"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -85,6 +86,11 @@ func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet
 	jobService := NewJobServiceServer(auth, jobStore, joblet)
 	pb.RegisterJobletServiceServer(grpcServer, jobService)
 
+	// Create workflow manager and workflow service
+	workflowManager := workflow.NewWorkflowManager()
+	workflowService := NewWorkflowServiceServer(auth, jobStore, joblet, workflowManager)
+	pb.RegisterJobServiceServer(grpcServer, workflowService)
+
 	// Create and register network service
 	networkService := NewNetworkServiceServer(auth, networkStore)
 	pb.RegisterNetworkServiceServer(grpcServer, networkService)
@@ -101,7 +107,7 @@ func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet
 	runtimeService := NewRuntimeServiceServer(auth, cfg.Runtime.BasePath, platform)
 	pb.RegisterRuntimeServiceServer(grpcServer, runtimeService)
 
-	serverLogger.Debug("all gRPC services registered successfully", "services", []string{"job", "network", "volume", "monitoring", "runtime"})
+	serverLogger.Debug("all gRPC services registered successfully", "services", []string{"job", "workflow", "network", "volume", "monitoring", "runtime"})
 
 	serverLogger.Debug("creating TCP listener", "address", serverAddress)
 

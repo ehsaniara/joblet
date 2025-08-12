@@ -322,6 +322,39 @@ rnx run --template=jobs.yaml:time-series        # Time series processing
 
 See the [full example](examples/python-analytics/) for comprehensive analytics workflows.
 
+### Workflow Examples
+
+The [Workflow Examples](examples/workflows/) demonstrate advanced job orchestration and dependency management:
+
+- **ML Pipeline**: Complete machine learning workflow with data prep → feature selection → training → evaluation →
+  deployment
+- **Data Pipeline**: ETL workflow with extraction → validation → transformation → loading → reporting (✅ Volume mounting
+  verified)
+- **Parallel Processing**: Independent batch jobs running concurrently without dependencies
+- **Multi-Workflow**: Multiple named workflows in a single template file
+- **Deployment Pipeline**: Build → test → package → deploy → verify workflow
+
+```bash
+# Individual job execution (currently supported)
+cd examples/workflows/ml-pipeline
+rnx run --template=ml-pipeline.yaml:data-validation
+
+# Full workflow orchestration (pending integration)  
+cd examples/workflows/ml-pipeline
+rnx run --template=ml-pipeline.yaml
+```
+
+**Features Demonstrated:**
+
+- File uploads with `uploads.files` for script deployment
+- Volume mounting with `volumes` for data persistence across jobs
+- Runtime environments with `runtime: "python:3.11"`
+- Resource limits (CPU/memory) per job
+- Complex dependency expressions with boolean logic
+- Sequential and parallel execution patterns
+
+See the [workflow documentation](examples/workflows/README.md) for detailed guides and realistic job templates.
+
 ### Node.js Web API Example
 
 The [Node.js Web API Example](https://github.com/ehsaniara/joblet/tree/main/examples/nodejs-web-api) demonstrates:
@@ -354,15 +387,26 @@ scheduling workers, and production considerations.
 
 ### Latest Updates (January 2025) - YAML Template System
 
+#### 🎯 New Workflow Orchestration System
+
+- **Multi-Job Workflows**: Execute complex job dependencies with automatic ordering
+- **Volume Sharing**: Persistent data sharing between workflow jobs using mounted volumes
+- **Dependency Management**: Define job dependencies with automatic execution scheduling
+- **YAML Workflow Templates**: Complete workflows defined in single YAML files
+- **Production-Ready**: End-to-end tested with data pipeline workflows (extract → validate → transform → load → report)
+
 #### 🎯 New YAML Template System
+
 - **Simplified Job Execution**: Run complex jobs with `rnx run --template=jobs.yaml:job-name`
 - **Pre-configured Examples**: All 6 example directories now include `jobs.yaml` files
 - **External Scripts**: Moved from embedded commands to debuggable external script files
 - **Realistic Features**: Removed unsupported features, using only current Joblet capabilities
 - **Resource Optimization**: Updated CPU/memory limits to realistic values (≤80% CPU, ≤6GB RAM)
-- **Architectural Cleanup**: Moved `/examples/runtimes` to `/runtimes` for logical separation of infrastructure vs examples
+- **Architectural Cleanup**: Moved `/examples/runtimes` to `/runtimes` for logical separation of infrastructure vs
+  examples
 
 #### 📂 Updated Examples
+
 - ✅ **agentic-ai/**: AI workflows with ML inference, RAG systems, multi-agent coordination
 - ✅ **basic-usage/**: Fundamental concepts with external shell scripts
 - ✅ **java-17/**: Enterprise Java development with realistic features

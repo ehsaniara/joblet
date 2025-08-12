@@ -17,6 +17,9 @@ var (
 	listJSON bool
 )
 
+// NewListCmd creates a new cobra command for listing jobs.
+// The command supports JSON output format via the --json flag.
+// Lists all jobs with their basic information including ID, status, and command.
 func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -29,6 +32,9 @@ func NewListCmd() *cobra.Command {
 	return cmd
 }
 
+// runList executes the job listing command.
+// Connects to the Joblet server, retrieves all jobs, and displays them
+// in either human-readable table format or JSON format based on flags.
 func runList(cmd *cobra.Command, args []string) error {
 
 	jobClient, err := common.NewJobClient()

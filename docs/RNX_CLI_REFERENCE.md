@@ -6,23 +6,23 @@ Complete reference for the RNX command-line interface, including all commands, o
 
 - [Global Options](#global-options)
 - [Job Commands](#job-commands)
-  - [run](#rnx-run)
-  - [list](#rnx-list)
-  - [status](#rnx-status)
-  - [log](#rnx-log)
-  - [stop](#rnx-stop)
+    - [run](#rnx-run)
+    - [list](#rnx-list)
+    - [status](#rnx-status)
+    - [log](#rnx-log)
+    - [stop](#rnx-stop)
 - [Volume Commands](#volume-commands)
-  - [volume create](#rnx-volume-create)
-  - [volume list](#rnx-volume-list)
-  - [volume remove](#rnx-volume-remove)
+    - [volume create](#rnx-volume-create)
+    - [volume list](#rnx-volume-list)
+    - [volume remove](#rnx-volume-remove)
 - [Network Commands](#network-commands)
-  - [network create](#rnx-network-create)
-  - [network list](#rnx-network-list)
-  - [network delete](#rnx-network-delete)
+    - [network create](#rnx-network-create)
+    - [network list](#rnx-network-list)
+    - [network delete](#rnx-network-delete)
 - [System Commands](#system-commands)
-  - [monitor](#rnx-monitor)
-  - [nodes](#rnx-nodes)
-  - [help](#rnx-help)
+    - [monitor](#rnx-monitor)
+    - [nodes](#rnx-nodes)
+    - [help](#rnx-help)
 
 ## Global Options
 
@@ -38,6 +38,7 @@ Options available for all commands:
 ### Configuration File Locations
 
 RNX searches for configuration in this order:
+
 1. `./rnx-config.yml`
 2. `./config/rnx-config.yml`
 3. `~/.rnx/rnx-config.yml`
@@ -56,20 +57,20 @@ rnx run [flags] <command> [args...]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--max-cpu` | Maximum CPU usage percentage (0-10000) | 0 (unlimited) |
-| `--max-memory` | Maximum memory in MB | 0 (unlimited) |
-| `--max-iobps` | Maximum I/O bytes per second | 0 (unlimited) |
-| `--cpu-cores` | CPU cores to use (e.g., "0-3" or "1,3,5") | "" (all cores) |
-| `--network` | Network mode: bridge, host, none, or custom | "bridge" |
-| `--volume` | Volume to mount (can be specified multiple times) | none |
-| `--env` | Environment variable (can be specified multiple times) | none |
-| `--workdir` | Working directory inside container | "/work" |
-| `--upload` | Upload file to workspace (can be specified multiple times) | none |
-| `--upload-dir` | Upload directory to workspace | none |
-| `--schedule` | Schedule job execution (duration or RFC3339 time) | immediate |
-| `--name` | Job name for identification | auto-generated |
+| Flag           | Description                                                | Default        |
+|----------------|------------------------------------------------------------|----------------|
+| `--max-cpu`    | Maximum CPU usage percentage (0-10000)                     | 0 (unlimited)  |
+| `--max-memory` | Maximum memory in MB                                       | 0 (unlimited)  |
+| `--max-iobps`  | Maximum I/O bytes per second                               | 0 (unlimited)  |
+| `--cpu-cores`  | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
+| `--network`    | Network mode: bridge, host, none, or custom                | "bridge"       |
+| `--volume`     | Volume to mount (can be specified multiple times)          | none           |
+| `--env`        | Environment variable (can be specified multiple times)     | none           |
+| `--workdir`    | Working directory inside container                         | "/work"        |
+| `--upload`     | Upload file to workspace (can be specified multiple times) | none           |
+| `--upload-dir` | Upload directory to workspace                              | none           |
+| `--schedule`   | Schedule job execution (duration or RFC3339 time)          | immediate      |
+| `--name`       | Job name for identification                                | auto-generated |
 
 #### Examples
 
@@ -130,20 +131,22 @@ rnx list [flags]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--json` | Output in JSON format | false |
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Output Format
 
 **Table Format (default):**
-- **ID**: Job identifier  
+
+- **ID**: Job identifier
 - **STATUS**: Current job status (RUNNING, COMPLETED, FAILED, STOPPED, SCHEDULED)
 - **START TIME**: When the job started (format: YYYY-MM-DD HH:MM:SS)
 - **COMMAND**: The command being executed (truncated to 80 chars if too long)
 
 **JSON Format:**
-Outputs a JSON array with detailed job information including all resource limits, volumes, network, and scheduling information.
+Outputs a JSON array with detailed job information including all resource limits, volumes, network, and scheduling
+information.
 
 #### Examples
 
@@ -201,9 +204,9 @@ rnx status [flags] <job-id>
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--json` | Output in JSON format | false |
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Examples
 
@@ -239,6 +242,7 @@ rnx status --json 42 | jq .exit_code
 ```
 
 #### Output includes:
+
 - Job ID and command
 - Current status
 - Start/end times
@@ -256,11 +260,11 @@ rnx log [flags] <job-id>
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--follow`, `-f` | Stream logs in real-time | false |
-| `--tail` | Number of lines to show from end | all |
-| `--timestamps` | Show timestamps | false |
+| Flag             | Description                      | Default |
+|------------------|----------------------------------|---------|
+| `--follow`, `-f` | Stream logs in real-time         | false   |
+| `--tail`         | Number of lines to show from end | all     |
+| `--timestamps`   | Show timestamps                  | false   |
 
 #### Examples
 
@@ -308,9 +312,9 @@ rnx volume create <name> [flags]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--size` | Volume size (e.g., 1GB, 500MB) | required |
+| Flag     | Description                       | Default      |
+|----------|-----------------------------------|--------------|
+| `--size` | Volume size (e.g., 1GB, 500MB)    | required     |
 | `--type` | Volume type: filesystem or memory | "filesystem" |
 
 #### Examples
@@ -337,9 +341,9 @@ rnx volume list [flags]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--json` | Output in JSON format | false |
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Examples
 
@@ -384,8 +388,8 @@ rnx network create <name> [flags]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
+| Flag     | Description                       | Default  |
+|----------|-----------------------------------|----------|
 | `--cidr` | Network CIDR (e.g., 10.10.0.0/24) | required |
 
 #### Examples
@@ -410,9 +414,9 @@ rnx network list [flags]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--json` | Output in JSON format | false |
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Examples
 
@@ -459,10 +463,10 @@ rnx monitor [subcommand] [flags]
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--interval` | Update interval in seconds | 2 |
-| `--json` | Output in JSON format | false |
+| Flag         | Description                | Default |
+|--------------|----------------------------|---------|
+| `--interval` | Update interval in seconds | 2       |
+| `--json`     | Output in JSON format      | false   |
 
 #### Examples
 
@@ -565,11 +569,11 @@ done
       --upload-dir=. \
       --env=CI=true \
       npm test
-    
+
     # Check job status
     JOB_ID=$(rnx list --json | jq -r '.[-1].id')
     rnx status $JOB_ID
-    
+
     # Get test results
     rnx run --volume=test-results cat /volumes/test-results/report.xml
 ```
@@ -606,14 +610,14 @@ nodes:
     ca: |
       -----BEGIN CERTIFICATE-----
       ...
-  
+
   staging:
     address: "staging-server:50051"
     cert: |
       -----BEGIN CERTIFICATE-----
       ...
     # ... rest of credentials
-  
+
   viewer:
     address: "prod-server:50051"
     cert: |

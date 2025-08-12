@@ -1,16 +1,19 @@
 # Runtime System Guide
 
-The Joblet Runtime System provides **pre-built, isolated runtime environments** that eliminate package installation delays and provide instant access to language runtimes and their ecosystems.
+The Joblet Runtime System provides **pre-built, isolated runtime environments** that eliminate package installation
+delays and provide instant access to language runtimes and their ecosystems.
 
 ## 🚀 Why Runtime System?
 
 ### The Traditional Problem
+
 ```bash
 # Traditional approach: 5-45 minutes every time
 rnx run 'apt-get update && apt-get install python3-pip && pip install pandas numpy scikit-learn matplotlib && python analysis.py'
 ```
 
 ### The Runtime Solution
+
 ```bash
 # Runtime approach: 2-3 seconds total
 rnx run --runtime=python-3.11-ml python analysis.py
@@ -36,14 +39,14 @@ rnx run --runtime=python-3.11-ml python analysis.py
 
 - **Python**: 3.11.9 (compiled from source for optimal performance)
 - **Pre-installed Packages**:
-  - NumPy 1.24.x (pinned to 1.x for compatibility)
-  - Pandas 2.0.x (data analysis)
-  - Scikit-learn 1.3.x (complete ML toolkit)
-  - Matplotlib 3.7.x (visualization)
-  - Seaborn 0.12.x (statistical plotting)
-  - SciPy 1.11.x (scientific computing)
-  - Requests 2.31.0 (HTTP library)
-  - OpenPyXL 3.1.2 (Excel file support)
+    - NumPy 1.24.x (pinned to 1.x for compatibility)
+    - Pandas 2.0.x (data analysis)
+    - Scikit-learn 1.3.x (complete ML toolkit)
+    - Matplotlib 3.7.x (visualization)
+    - Seaborn 0.12.x (statistical plotting)
+    - SciPy 1.11.x (scientific computing)
+    - Requests 2.31.0 (HTTP library)
+    - OpenPyXL 3.1.2 (Excel file support)
 - **Package Size**: ~226MB compressed
 - **Setup Time**: ~2-3 seconds vs 5-45 minutes traditional
 - **Use Cases**: Data analysis, machine learning, AI development, research
@@ -73,11 +76,11 @@ rnx runtime info python-3.11-ml  # See all packages and details
 - **Java**: OpenJDK 21.0.4 (Long Term Support)
 - **Build Tools**: Apache Maven 3.9.6
 - **Modern Features**:
-  - Virtual Threads (Project Loom)
-  - Pattern Matching for switch
-  - String Templates (Preview)
-  - Record Patterns
-  - Foreign Function & Memory API
+    - Virtual Threads (Project Loom)
+    - Pattern Matching for switch
+    - String Templates (Preview)
+    - Record Patterns
+    - Foreign Function & Memory API
 - **Package Size**: ~208MB compressed
 - **Use Cases**: Modern Java development, high-concurrency applications
 
@@ -94,12 +97,12 @@ rnx run --runtime=java-17 --upload=pom.xml --upload=src/ mvn compile exec:java
 
 - **Node.js**: 18.20.4 LTS (compiled from source for optimal performance)
 - **Pre-installed Packages**:
-  - Express 4.19.2 (web framework)
-  - TypeScript 5.5.4 (TypeScript compiler and types)
-  - @types/node 18.19.42 (Node.js TypeScript types)
-  - Nodemon 3.1.4 (development auto-restart)
-  - ESLint 8.57.0 (code linting)
-  - Prettier 3.3.3 (code formatting)
+    - Express 4.19.2 (web framework)
+    - TypeScript 5.5.4 (TypeScript compiler and types)
+    - @types/node 18.19.42 (Node.js TypeScript types)
+    - Nodemon 3.1.4 (development auto-restart)
+    - ESLint 8.57.0 (code linting)
+    - Prettier 3.3.3 (code formatting)
 - **Setup Time**: ~2-3 seconds vs 60-300 seconds traditional
 - **Use Cases**: Web APIs, microservices, real-time applications, TypeScript development
 
@@ -117,12 +120,12 @@ rnx runtime info nodejs-18  # See all packages and details
 
 - **Java**: OpenJDK 21.0.4 (Latest LTS)
 - **Modern Features**:
-  - Virtual Threads (Project Loom) for massive concurrency
-  - Pattern Matching for switch expressions
-  - String Templates (Preview)
-  - Record Patterns
-  - Foreign Function & Memory API (Preview)
-  - Vector API (Incubator)
+    - Virtual Threads (Project Loom) for massive concurrency
+    - Pattern Matching for switch expressions
+    - String Templates (Preview)
+    - Record Patterns
+    - Foreign Function & Memory API (Preview)
+    - Vector API (Incubator)
 - **Build Tools**: Apache Maven 3.9.6
 - **Tools**: javac, jar, javap, jshell, jcmd, jstat
 - **Use Cases**: Modern applications, high-performance computing, research
@@ -155,6 +158,7 @@ rnx runtime list
 ```
 
 **Output:**
+
 ```
 RUNTIME         VERSION  TYPE    SIZE     DESCRIPTION
 -------         -------  ----    ----     -----------
@@ -174,6 +178,7 @@ rnx runtime info python-3.11-ml
 ```
 
 **Output:**
+
 ```
 Runtime: python-3.11-ml
 Type: system
@@ -205,6 +210,7 @@ rnx runtime test python-3.11-ml
 ```
 
 **Output:**
+
 ```
 Testing runtime: python-3.11-ml
 ✓ Runtime test passed
@@ -216,7 +222,8 @@ To test the runtime in a job:
 
 ## 📦 Runtime Deployment
 
-The runtime system supports **zero-contamination deployment** for production environments. Build runtimes once on development hosts, then deploy clean packages anywhere without installing build tools.
+The runtime system supports **zero-contamination deployment** for production environments. Build runtimes once on
+development hosts, then deploy clean packages anywhere without installing build tools.
 
 ### Quick Deployment Workflow
 
@@ -253,12 +260,14 @@ done
 ### Package Contents
 
 Each runtime package is a self-contained zip file containing:
+
 - Complete runtime environment (binaries, libraries)
 - All pre-installed packages and dependencies
 - Runtime metadata for auto-detection
 - Proper directory structure for deployment
 
-> **📚 Detailed Guide**: See [RUNTIME_DEPLOYMENT.md](RUNTIME_DEPLOYMENT.md) for comprehensive deployment documentation, CI/CD integration, and advanced scenarios.
+> **📚 Detailed Guide**: See [RUNTIME_DEPLOYMENT.md](RUNTIME_DEPLOYMENT.md) for comprehensive deployment documentation,
+> CI/CD integration, and advanced scenarios.
 
 ## 🎯 Runtime Management
 
@@ -316,24 +325,26 @@ Runtime names support multiple formats:
 
 ### Startup Time Benchmarks
 
-| **Scenario** | **Traditional** | **Runtime** | **Speedup** |
-|-------------|----------------|-------------|-------------|
-| Python + NumPy/Pandas | 5-15 minutes | 2-3 seconds | **100-300x** |
-| Python + Full ML Stack | 15-45 minutes | 2-3 seconds | **300-1000x** |
-| Java Development | 30-120 seconds | 2-3 seconds | **15-40x** |
-| Node.js + Dependencies | 60-300 seconds | 2-3 seconds | **20-100x** |
+| **Scenario**           | **Traditional** | **Runtime** | **Speedup**   |
+|------------------------|-----------------|-------------|---------------|
+| Python + NumPy/Pandas  | 5-15 minutes    | 2-3 seconds | **100-300x**  |
+| Python + Full ML Stack | 15-45 minutes   | 2-3 seconds | **300-1000x** |
+| Java Development       | 30-120 seconds  | 2-3 seconds | **15-40x**    |
+| Node.js + Dependencies | 60-300 seconds  | 2-3 seconds | **20-100x**   |
 
 ### Real-World Examples
 
 #### Data Science Workflow
 
 **Traditional Approach:**
+
 ```bash
 # 15-30 minutes every time
 rnx run 'apt-get update && apt-get install -y python3-pip && pip install pandas numpy scikit-learn matplotlib seaborn && python analysis.py'
 ```
 
 **Runtime Approach:**
+
 ```bash
 # 2-3 seconds total
 rnx run --runtime=python-3.11-ml python analysis.py
@@ -342,12 +353,14 @@ rnx run --runtime=python-3.11-ml python analysis.py
 #### Java Development
 
 **Traditional Approach:**
+
 ```bash
 # 2-5 minutes every time  
 rnx run 'apt-get update && apt-get install -y openjdk-17-jdk maven && javac HelloWorld.java && java HelloWorld'
 ```
 
 **Runtime Approach:**
+
 ```bash
 # 2-3 seconds total
 rnx run --runtime=java-17 bash -c "javac HelloWorld.java && java HelloWorld"
@@ -356,12 +369,14 @@ rnx run --runtime=java-17 bash -c "javac HelloWorld.java && java HelloWorld"
 #### Node.js Web Development
 
 **Traditional Approach:**
+
 ```bash
 # 5-10 minutes every time
 rnx run 'curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && apt-get install -y nodejs npm && npm install express typescript && node server.js'
 ```
 
 **Runtime Approach:**
+
 ```bash
 # 2-3 seconds total
 rnx run --runtime=nodejs-18 node server.js
@@ -415,7 +430,7 @@ mounts:
   - source: "bin"
     target: "/usr/local/bin"
     readonly: true
-    selective: ["python", "python3", "python3.11", "pip", "pip3"]
+    selective: [ "python", "python3", "python3.11", "pip", "pip3" ]
   - source: "ml-venv/lib/python3.11/site-packages"
     target: "/usr/local/lib/python3.11/site-packages"
     readonly: true
@@ -436,7 +451,7 @@ package_manager:
 requirements:
   min_memory: "512MB"
   recommended_memory: "2GB"
-  architectures: ["x86_64", "amd64"]
+  architectures: [ "x86_64", "amd64" ]
 
 packages:
   - "numpy>=1.24.3,<2.0"
@@ -462,6 +477,7 @@ packages:
 You can create your own runtime environments:
 
 1. **Choose Runtime Directory Structure**:
+
 ```bash
 /opt/joblet/runtimes/<language>/<runtime-name>/
 ├── runtime.yml          # Configuration
@@ -471,6 +487,7 @@ You can create your own runtime environments:
 ```
 
 2. **Create Runtime Configuration (`runtime.yml`)**:
+
 ```yaml
 name: "my-custom-runtime"
 type: "system"
@@ -492,18 +509,18 @@ environment:
 requirements:
   min_memory: "256MB"
   recommended_memory: "1GB"
-  architectures: ["x86_64", "amd64"]
+  architectures: [ "x86_64", "amd64" ]
 ```
 
 3. **Install Language/Packages**:
-   - Compile from source or install packages
-   - Ensure everything is self-contained
-   - Test thoroughly in isolation
+    - Compile from source or install packages
+    - Ensure everything is self-contained
+    - Test thoroughly in isolation
 
 4. **Create Setup Script** (see existing examples):
-   - `/opt/joblet/runtimes/<name>/setup_<name>.sh`
-   - Automated installation and configuration
-   - Host system cleanup
+    - `/opt/joblet/runtimes/<name>/setup_<name>.sh`
+    - Automated installation and configuration
+    - Host system cleanup
 
 ### Custom Runtime Example
 
@@ -598,6 +615,7 @@ EOF
 **Error**: `runtime not found: python-3.11-ml`
 
 **Solution**: Install the runtime on the server
+
 ```bash
 # On Joblet server
 sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
@@ -608,6 +626,7 @@ sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 **Error**: `error while loading shared libraries: libpython3.11.so.1.0: cannot open shared object file`
 
 **Solution**: Runtime installation includes library fixes. Reinstall:
+
 ```bash
 # Remove old installation
 sudo rm -rf /opt/joblet/runtimes/python/python-3.11-ml
@@ -621,6 +640,7 @@ sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 **Error**: Job killed due to memory limit
 
 **Solution**: Increase memory allocation
+
 ```bash
 # ML jobs typically need 1-4GB
 rnx run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
@@ -631,6 +651,7 @@ rnx run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
 **Error**: `numpy.dtype size changed, may indicate binary incompatibility`
 
 **Solution**: Runtime uses compatible package versions. Use runtime packages:
+
 ```bash
 # Don't install additional packages - use what's pre-installed
 rnx run --runtime=python-3.11-ml python -c "import numpy; print(numpy.__version__)"
@@ -659,7 +680,7 @@ sudo journalctl -u joblet.service -f
 
 1. **Check Examples**: `/opt/joblet/examples/python-ml/` contains working examples
 2. **Runtime Info**: `rnx runtime info <runtime>` shows package versions
-3. **Test Command**: `rnx runtime test <runtime>` validates setup  
+3. **Test Command**: `rnx runtime test <runtime>` validates setup
 4. **Server Logs**: Check journalctl for detailed error messages
 5. **GitHub Issues**: Report runtime-specific issues with full error details
 
@@ -673,9 +694,11 @@ sudo journalctl -u joblet.service -f
 ---
 
 **Next Steps:**
+
 - Install runtimes on your Joblet server
 - Experiment with the Python ML runtime for data analysis
-- Try Java runtimes for development workflows  
+- Try Java runtimes for development workflows
 - Create custom runtimes for your specific needs
 
-The Runtime System transforms Joblet from a job execution platform into a **complete development and production environment** with instant access to any language ecosystem! 🚀
+The Runtime System transforms Joblet from a job execution platform into a **complete development and production
+environment** with instant access to any language ecosystem! 🚀

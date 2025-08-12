@@ -187,6 +187,42 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Handle template loading if provided
 	if template != "" {
+		// Parse template spec to separate file and selector
+		templateParts := strings.SplitN(template, ":", 2)
+		templateFile := templateParts[0]
+		var templateSelector string
+		if len(templateParts) > 1 {
+			templateSelector = templateParts[1]
+		}
+
+		// First check if this is a workflow template and no job selector is provided
+		if templateSelector == "" {
+			mode, _, err := tryWorkflowDetection(templateFile)
+			if err == nil && mode != templates.ModeSingleJob {
+				// This is a workflow - handle it differently
+				var cmdArgs []string
+				if commandStartIndex >= 0 && commandStartIndex < len(args) {
+					cmdArgs = args[commandStartIndex:]
+				}
+				return handleWorkflowExecution(templateFile, mode, "", cmdArgs)
+			}
+		} else {
+			// If selector provided, check if it's a workflow selector in a multi-workflow template
+			config, err := templates.LoadWorkflowConfig(templateFile)
+			if err == nil && config.Workflows != nil && len(config.Workflows) > 0 {
+				// Check if selector refers to a workflow name
+				if _, exists := config.Workflows[templateSelector]; exists {
+					var cmdArgs []string
+					if commandStartIndex >= 0 && commandStartIndex < len(args) {
+						cmdArgs = args[commandStartIndex:]
+					}
+					return handleWorkflowExecution(templateFile, templates.ModeNamedWorkflow, templateSelector, cmdArgs)
+				}
+				// If not a workflow name, let it fall through to regular job execution
+			}
+		}
+
+		// Continue with regular single job template handling
 		jobConfig, err := loadTemplateConfig(template)
 		if err != nil {
 			return fmt.Errorf("failed to load template: %w", err)
@@ -575,4 +611,130 @@ func loadTemplateConfig(templateSpec string) (*templates.JobConfig, error) {
 	}
 
 	return nil, fmt.Errorf("job '%s' not found in template %s", jobName, templateFile)
+}
+
+// tryWorkflowDetection attempts to detect if a template contains workflows
+func tryWorkflowDetection(templateFile string) (templates.WorkflowExecutionMode, string, error) {
+
+	// Try to load as workflow template
+	config, err := templates.LoadWorkflowConfig(templateFile)
+	if err != nil {
+		// If it fails to load as workflow, might be regular template
+		return templates.ModeSingleJob, "", err
+	}
+
+	// If we have multiple workflows, return appropriate mode
+	if len(config.Workflows) > 0 {
+		return templates.ModeNamedWorkflow, "", nil
+	}
+
+	// Check for dependencies in jobs
+	hasDependencies := false
+	for _, job := range config.Jobs {
+		if len(job.Requires) > 0 {
+			hasDependencies = true
+			break
+		}
+	}
+
+	// If dependencies exist, it's a workflow
+	if hasDependencies {
+		return templates.ModeWorkflow, "", nil
+	}
+
+	// Otherwise, parallel execution
+	return templates.ModeParallelJobs, "", nil
+}
+
+// handleWorkflowExecution handles workflow-based template execution
+func handleWorkflowExecution(templateFile string, mode templates.WorkflowExecutionMode, selector string, commandArgs []string) error {
+	// Re-check the mode with the selector to determine actual execution path
+	config, err := templates.LoadWorkflowConfig(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to load workflow config: %w", err)
+	}
+
+	// If selector is provided, it should be a workflow name (job selectors are handled in regular path)
+	if selector != "" {
+		// Check if it's a workflow name
+		if config.Workflows != nil {
+			if _, exists := config.Workflows[selector]; exists {
+				return executeWorkflow(templateFile, selector, commandArgs)
+			}
+		}
+
+		return fmt.Errorf("workflow '%s' not found in template", selector)
+	}
+
+	// No selector provided
+	switch mode {
+	case templates.ModeWorkflow:
+		return executeWorkflow(templateFile, "", commandArgs)
+	case templates.ModeParallelJobs:
+		return executeParallelJobs(templateFile, commandArgs)
+	default:
+		// Check if we have multiple workflows and no selector
+		if len(config.Workflows) > 0 {
+			var workflowNames []string
+			for name := range config.Workflows {
+				workflowNames = append(workflowNames, name)
+			}
+			return fmt.Errorf("multiple workflows found: %s. Please specify which to run with template:workflow-name", strings.Join(workflowNames, ", "))
+		}
+		return fmt.Errorf("unsupported workflow mode")
+	}
+}
+
+// executeWorkflow executes a workflow with dependencies
+func executeWorkflow(templatePath string, workflowName string, commandArgs []string) error {
+	config, err := templates.LoadWorkflowConfig(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to load workflow config: %w", err)
+	}
+
+	var jobs map[string]templates.WorkflowJobConfig
+
+	// Select the appropriate jobs based on mode
+	if workflowName != "" {
+		// Named workflow
+		if workflow, exists := config.Workflows[workflowName]; exists {
+			jobs = workflow.Jobs
+		} else {
+			return fmt.Errorf("workflow '%s' not found", workflowName)
+		}
+	} else {
+		// Full template as workflow
+		jobs = config.Jobs
+	}
+
+	// Validate dependencies
+	if err := templates.ValidateDependencies(jobs); err != nil {
+		return fmt.Errorf("invalid workflow dependencies: %w", err)
+	}
+
+	// Build dependency graph to ensure it's valid
+	_, err = templates.BuildDependencyGraph(jobs)
+	if err != nil {
+		return fmt.Errorf("failed to build dependency graph: %w", err)
+	}
+
+	// Workflow execution via templates is deprecated
+	// Direct users to use the workflow command instead
+	return fmt.Errorf("workflow execution via --template is deprecated. Use 'rnx workflow run %s' instead", templatePath)
+}
+
+// executeParallelJobs executes multiple jobs in parallel without dependencies
+func executeParallelJobs(templatePath string, commandArgs []string) error {
+	config, err := templates.LoadWorkflowConfig(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to load template config: %w", err)
+	}
+
+	if len(config.Jobs) == 0 {
+		return fmt.Errorf("no jobs found in template")
+	}
+
+	// Parallel job execution via templates is deprecated
+	// Direct users to use the workflow command instead
+	return fmt.Errorf("parallel job execution via --template is deprecated. Use 'rnx workflow run %s' instead", templatePath)
 }

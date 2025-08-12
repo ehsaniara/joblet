@@ -327,7 +327,7 @@ features:
   - "Virtual Environment Support"
 packages:
   - "requests"
-  - "urllib3" 
+  - "urllib3"
   - "certifi"
 ```
 

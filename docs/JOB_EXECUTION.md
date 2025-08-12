@@ -71,6 +71,7 @@ rnx run --cpu-cores="0-3" make -j4
 ```
 
 CPU limit calculation:
+
 - 100 = 1 full CPU core
 - 50 = 0.5 CPU core (50% of one core)
 - 200 = 2 full CPU cores
@@ -90,6 +91,7 @@ rnx run --max-cpu=150 --max-memory=1024 node app.js
 ```
 
 Memory behavior:
+
 - Process killed if limit exceeded (OOM)
 - Includes all memory types (RSS, cache, etc.)
 - Swap disabled within job
@@ -112,6 +114,7 @@ rnx run \
 ```
 
 I/O limit notes:
+
 - Applies to all block devices
 - Includes read and write operations
 - Value in bytes per second
@@ -196,6 +199,7 @@ rnx run --env="MESSAGE=Hello World" echo '$MESSAGE'
 ### Default Environment
 
 Every job has these variables set:
+
 - `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
 - `HOME=/work`
 - `USER=nobody` (or configured user)
@@ -264,7 +268,7 @@ rnx status <job-id>
 ### Job States
 
 1. **INITIALIZING** - Job accepted, preparing execution
-2. **SCHEDULED** - Job scheduled for future execution  
+2. **SCHEDULED** - Job scheduled for future execution
 3. **RUNNING** - Job actively executing
 4. **COMPLETED** - Job finished successfully (exit code 0)
 5. **FAILED** - Job finished with error (non-zero exit code)
@@ -518,23 +522,23 @@ rnx run --env=API_TOKEN=secret123 \
 Common issues and solutions:
 
 1. **Job Fails Immediately**
-   - Check command syntax
-   - Verify uploaded files exist
-   - Check resource limits
+    - Check command syntax
+    - Verify uploaded files exist
+    - Check resource limits
 
 2. **Out of Memory**
-   - Increase --max-memory
-   - Optimize memory usage
-   - Use streaming processing
+    - Increase --max-memory
+    - Optimize memory usage
+    - Use streaming processing
 
 3. **Job Hangs**
-   - Check CPU limits
-   - Monitor with `rnx log <job-id>`
-   - Set appropriate timeout
+    - Check CPU limits
+    - Monitor with `rnx log <job-id>`
+    - Set appropriate timeout
 
 4. **File Not Found**
-   - Verify upload succeeded
-   - Check working directory
-   - Use absolute paths
+    - Verify upload succeeded
+    - Check working directory
+    - Use absolute paths
 
 See [Troubleshooting Guide](./TROUBLESHOOTING.md) for more solutions.

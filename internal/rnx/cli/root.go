@@ -7,6 +7,7 @@ import (
 	"joblet/internal/rnx/common"
 	"joblet/internal/rnx/jobs"
 	"joblet/internal/rnx/resources"
+	"joblet/internal/rnx/workflow"
 	"joblet/pkg/config"
 
 	"github.com/spf13/cobra"
@@ -57,4 +58,5 @@ func init() {
 	rootCmd.AddCommand(resources.NewVolumeCmd())
 	rootCmd.AddCommand(jobs.NewMonitorCmd())
 	rootCmd.AddCommand(resources.NewRuntimeCmd())
+	rootCmd.AddCommand(workflow.NewWorkflowCmd())
 }

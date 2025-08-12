@@ -17,6 +17,7 @@ Complete guide to managing persistent and temporary storage volumes in Joblet.
 ## Volume Overview
 
 Joblet volumes provide persistent and temporary storage for jobs, enabling:
+
 - Data persistence across job runs
 - Shared storage between jobs
 - High-performance temporary storage
@@ -37,6 +38,7 @@ Joblet volumes provide persistent and temporary storage for jobs, enabling:
 Persistent disk-based storage that survives job restarts and system reboots.
 
 **Characteristics:**
+
 - Data persists indefinitely
 - Backed by disk storage (ext4 by default)
 - Suitable for databases, file storage, results
@@ -44,6 +46,7 @@ Persistent disk-based storage that survives job restarts and system reboots.
 - Can be backed up
 
 **Use cases:**
+
 - Database storage
 - ML model checkpoints
 - Processing results
@@ -55,6 +58,7 @@ Persistent disk-based storage that survives job restarts and system reboots.
 Temporary RAM-based storage (tmpfs) cleared when the volume is removed.
 
 **Characteristics:**
+
 - Extremely fast read/write
 - Data lost on system restart
 - Limited by available RAM
@@ -62,6 +66,7 @@ Temporary RAM-based storage (tmpfs) cleared when the volume is removed.
 - Cannot be backed up
 
 **Use cases:**
+
 - Temporary processing space
 - Cache storage
 - Inter-job communication
@@ -98,6 +103,7 @@ rnx volume create exact --size=1073741824  # Bytes (1GB)
 ### Naming Conventions
 
 Volume names must:
+
 - Start with a letter
 - Contain only letters, numbers, hyphens, underscores
 - Be unique within the Joblet instance
@@ -477,6 +483,7 @@ rnx run --volume=secrets --env=ENCRYPTION_KEY=xxx bash -c '
 ### Common Issues
 
 **1. Volume Creation Fails**
+
 ```bash
 # Error: "failed to create volume: operation not permitted"
 # Solution: Check server has proper permissions
@@ -484,6 +491,7 @@ rnx run --volume=secrets --env=ENCRYPTION_KEY=xxx bash -c '
 ```
 
 **2. Volume Not Found**
+
 ```bash
 # Error: "volume mydata not found"
 # Check volume exists
@@ -494,6 +502,7 @@ rnx volume create mydata --size=1GB
 ```
 
 **3. Out of Space**
+
 ```bash
 # Error: "No space left on device"
 # Check volume usage
@@ -504,6 +513,7 @@ rnx volume create full-vol-v2 --size=20GB
 ```
 
 **4. Permission Denied**
+
 ```bash
 # Error: "Permission denied"
 # Volumes are owned by job user (usually 'nobody')
@@ -512,6 +522,7 @@ rnx run --volume=data chmod -R 777 /volumes/data
 ```
 
 **5. Memory Volume Full**
+
 ```bash
 # Memory volumes limited by available RAM
 # Check system memory

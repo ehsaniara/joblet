@@ -7,6 +7,7 @@ This document provides practical examples of using the Joblet runtime system acr
 ### Python Examples
 
 #### Data Analysis with ML Runtime
+
 ```bash
 # Upload data file and run analysis
 rnx run --runtime=python:3.11+ml \
@@ -23,6 +24,7 @@ data.to_json('/volumes/analysis-results/summary.json')
 ```
 
 #### Modern Python Features
+
 ```bash
 # Using Python 3.12 modern syntax
 rnx run --runtime=python:3.12 \
@@ -31,6 +33,7 @@ rnx run --runtime=python:3.12 \
 ```
 
 #### Web API Development
+
 ```bash
 # Flask web application with external access
 rnx run --runtime=python:3.11+ml \
@@ -43,6 +46,7 @@ rnx run --runtime=python:3.11+ml \
 ### Java Examples
 
 #### Enterprise Application (Java 17)
+
 ```bash
 # Compile and run Java application
 rnx run --runtime=java:17 \
@@ -52,6 +56,7 @@ rnx run --runtime=java:17 \
 ```
 
 #### Modern Java with Virtual Threads (Java 21)
+
 ```bash
 # High-concurrency application using Virtual Threads
 rnx run --runtime=java:21 \
@@ -61,6 +66,7 @@ rnx run --runtime=java:21 \
 ```
 
 #### Maven Project Build
+
 ```bash
 # Build entire Maven project
 rnx run --runtime=java:17 \
@@ -73,6 +79,7 @@ rnx run --runtime=java:17 \
 ### Node.js Examples
 
 #### Express Web Application
+
 ```bash
 # Run Express server with external access
 rnx run --runtime=node:18 \
@@ -84,6 +91,7 @@ rnx run --runtime=node:18 \
 ```
 
 #### TypeScript Development
+
 ```bash
 # Compile and run TypeScript
 rnx run --runtime=node:18 \
@@ -97,6 +105,7 @@ rnx run --runtime=node:18 \
 ### Multi-Stage Processing Pipeline
 
 #### Stage 1: Data Preparation (Python)
+
 ```bash
 # Prepare and clean data
 rnx run --runtime=python:3.11+ml \
@@ -112,6 +121,7 @@ print(f'Cleaned dataset: {len(cleaned)} rows')
 ```
 
 #### Stage 2: Analysis (Python ML)
+
 ```bash
 # Run machine learning analysis
 rnx run --runtime=python:3.11+ml \
@@ -129,6 +139,7 @@ joblib.dump(model, '/volumes/pipeline-data/model.pkl')
 ```
 
 #### Stage 3: Report Generation (Java)
+
 ```bash
 # Generate PDF reports
 rnx run --runtime=java:17 \
@@ -143,6 +154,7 @@ java ReportGenerator /volumes/pipeline-data/model.pkl
 ### Development Workflows
 
 #### Python Package Development
+
 ```bash
 # Test package in isolated environment
 rnx run --runtime=python:3.12 \
@@ -157,6 +169,7 @@ python setup.py sdist
 ```
 
 #### Java Library Testing
+
 ```bash
 # Multi-version compatibility testing
 # Test on Java 17
@@ -183,6 +196,7 @@ cp target/surefire-reports/* /volumes/test-results/java21-
 ### Web Development Examples
 
 #### Full-Stack Development Server
+
 ```bash
 # Frontend build (Node.js)
 rnx run --runtime=node:18 \
@@ -219,6 +233,7 @@ app.run(host='0.0.0.0', port=8080)
 ### Database Integration Examples
 
 #### Python Database Analysis
+
 ```bash
 # Connect to database and analyze
 rnx run --runtime=python:3.11+ml \
@@ -239,6 +254,7 @@ summary.to_csv('/volumes/db-cache/region_summary.csv')
 ### Batch Processing Examples
 
 #### Large File Processing
+
 ```bash
 # Process large CSV files in chunks
 rnx run --runtime=python:3.11+ml \
@@ -264,6 +280,7 @@ for chunk in pd.read_csv('large_dataset.csv', chunksize=chunk_size):
 ### Cross-Runtime Communication
 
 #### Message Queue Processing
+
 ```bash
 # Producer (Python)
 rnx run --runtime=python:3.11+ml \
@@ -289,6 +306,7 @@ rnx run --runtime=node:18 \
 ## Performance Optimization Examples
 
 ### Memory-Optimized Processing
+
 ```bash
 # Large dataset processing with memory constraints
 rnx run --runtime=python:3.11+ml \
@@ -319,6 +337,7 @@ process_large_file('big_data.csv')
 ```
 
 ### CPU-Intensive Processing
+
 ```bash
 # Multi-core processing
 rnx run --runtime=python:3.11+ml \
@@ -348,6 +367,7 @@ if __name__ == '__main__':
 ## Testing and Validation Examples
 
 ### Runtime Compatibility Testing
+
 ```bash
 # Test script across multiple Python versions
 for runtime in python:3.11+ml python:3.12; do
@@ -359,6 +379,7 @@ done
 ```
 
 ### Integration Testing
+
 ```bash
 # Test complete application stack
 # Database setup
@@ -383,6 +404,7 @@ rnx run --runtime=node:18 \
 ## Monitoring and Debugging Examples
 
 ### Performance Monitoring
+
 ```bash
 # Monitor resource usage during job execution
 rnx run --runtime=python:3.11+ml \
@@ -393,6 +415,7 @@ rnx run --runtime=python:3.11+ml \
 ```
 
 ### Debug Mode Execution
+
 ```bash
 # Run with debug logging and extended timeout
 rnx run --runtime=java:21 \
@@ -408,6 +431,7 @@ java -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 Debug
 ## Migration Examples
 
 ### Legacy Python to Runtime
+
 ```bash
 # Before (host-dependent)
 python3 my_script.py
@@ -419,6 +443,7 @@ rnx run --runtime=python:3.11+ml \
 ```
 
 ### Complex Application Migration
+
 ```bash
 # Legacy complex deployment
 # sudo apt install python3.11 python3-pip
@@ -437,6 +462,7 @@ rnx run --runtime=python:3.11+ml \
 ## Best Practices Examples
 
 ### Resource Management
+
 ```bash
 # Appropriate resource allocation
 rnx run --runtime=python:3.11+ml \
@@ -448,6 +474,7 @@ rnx run --runtime=python:3.11+ml \
 ```
 
 ### Volume Usage
+
 ```bash
 # Persistent data and cache management
 rnx run --runtime=node:18 \
@@ -462,6 +489,7 @@ npm start
 ```
 
 ### Network Isolation
+
 ```bash
 # Secure network access patterns
 rnx run --runtime=python:3.11+ml \

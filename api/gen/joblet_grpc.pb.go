@@ -281,6 +281,302 @@ var JobletService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	JobService_RunJob_FullMethodName            = "/joblet.JobService/RunJob"
+	JobService_CreateWorkflow_FullMethodName    = "/joblet.JobService/CreateWorkflow"
+	JobService_GetWorkflowStatus_FullMethodName = "/joblet.JobService/GetWorkflowStatus"
+	JobService_ListWorkflows_FullMethodName     = "/joblet.JobService/ListWorkflows"
+	JobService_GetWorkflowJobs_FullMethodName   = "/joblet.JobService/GetWorkflowJobs"
+	JobService_CancelWorkflow_FullMethodName    = "/joblet.JobService/CancelWorkflow"
+)
+
+// JobServiceClient is the client API for JobService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Workflow management service
+type JobServiceClient interface {
+	RunJob(ctx context.Context, in *RunJobRequest, opts ...grpc.CallOption) (*RunJobResponse, error)
+	CreateWorkflow(ctx context.Context, in *CreateWorkflowRequest, opts ...grpc.CallOption) (*CreateWorkflowResponse, error)
+	GetWorkflowStatus(ctx context.Context, in *GetWorkflowStatusRequest, opts ...grpc.CallOption) (*GetWorkflowStatusResponse, error)
+	ListWorkflows(ctx context.Context, in *ListWorkflowsRequest, opts ...grpc.CallOption) (*ListWorkflowsResponse, error)
+	GetWorkflowJobs(ctx context.Context, in *GetWorkflowJobsRequest, opts ...grpc.CallOption) (*GetWorkflowJobsResponse, error)
+	CancelWorkflow(ctx context.Context, in *CancelWorkflowRequest, opts ...grpc.CallOption) (*CancelWorkflowResponse, error)
+}
+
+type jobServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewJobServiceClient(cc grpc.ClientConnInterface) JobServiceClient {
+	return &jobServiceClient{cc}
+}
+
+func (c *jobServiceClient) RunJob(ctx context.Context, in *RunJobRequest, opts ...grpc.CallOption) (*RunJobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunJobResponse)
+	err := c.cc.Invoke(ctx, JobService_RunJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) CreateWorkflow(ctx context.Context, in *CreateWorkflowRequest, opts ...grpc.CallOption) (*CreateWorkflowResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateWorkflowResponse)
+	err := c.cc.Invoke(ctx, JobService_CreateWorkflow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) GetWorkflowStatus(ctx context.Context, in *GetWorkflowStatusRequest, opts ...grpc.CallOption) (*GetWorkflowStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWorkflowStatusResponse)
+	err := c.cc.Invoke(ctx, JobService_GetWorkflowStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) ListWorkflows(ctx context.Context, in *ListWorkflowsRequest, opts ...grpc.CallOption) (*ListWorkflowsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkflowsResponse)
+	err := c.cc.Invoke(ctx, JobService_ListWorkflows_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) GetWorkflowJobs(ctx context.Context, in *GetWorkflowJobsRequest, opts ...grpc.CallOption) (*GetWorkflowJobsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWorkflowJobsResponse)
+	err := c.cc.Invoke(ctx, JobService_GetWorkflowJobs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) CancelWorkflow(ctx context.Context, in *CancelWorkflowRequest, opts ...grpc.CallOption) (*CancelWorkflowResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelWorkflowResponse)
+	err := c.cc.Invoke(ctx, JobService_CancelWorkflow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// JobServiceServer is the server API for JobService service.
+// All implementations must embed UnimplementedJobServiceServer
+// for forward compatibility.
+//
+// Workflow management service
+type JobServiceServer interface {
+	RunJob(context.Context, *RunJobRequest) (*RunJobResponse, error)
+	CreateWorkflow(context.Context, *CreateWorkflowRequest) (*CreateWorkflowResponse, error)
+	GetWorkflowStatus(context.Context, *GetWorkflowStatusRequest) (*GetWorkflowStatusResponse, error)
+	ListWorkflows(context.Context, *ListWorkflowsRequest) (*ListWorkflowsResponse, error)
+	GetWorkflowJobs(context.Context, *GetWorkflowJobsRequest) (*GetWorkflowJobsResponse, error)
+	CancelWorkflow(context.Context, *CancelWorkflowRequest) (*CancelWorkflowResponse, error)
+	mustEmbedUnimplementedJobServiceServer()
+}
+
+// UnimplementedJobServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedJobServiceServer struct{}
+
+func (UnimplementedJobServiceServer) RunJob(context.Context, *RunJobRequest) (*RunJobResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RunJob not implemented")
+}
+func (UnimplementedJobServiceServer) CreateWorkflow(context.Context, *CreateWorkflowRequest) (*CreateWorkflowResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateWorkflow not implemented")
+}
+func (UnimplementedJobServiceServer) GetWorkflowStatus(context.Context, *GetWorkflowStatusRequest) (*GetWorkflowStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetWorkflowStatus not implemented")
+}
+func (UnimplementedJobServiceServer) ListWorkflows(context.Context, *ListWorkflowsRequest) (*ListWorkflowsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListWorkflows not implemented")
+}
+func (UnimplementedJobServiceServer) GetWorkflowJobs(context.Context, *GetWorkflowJobsRequest) (*GetWorkflowJobsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetWorkflowJobs not implemented")
+}
+func (UnimplementedJobServiceServer) CancelWorkflow(context.Context, *CancelWorkflowRequest) (*CancelWorkflowResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelWorkflow not implemented")
+}
+func (UnimplementedJobServiceServer) mustEmbedUnimplementedJobServiceServer() {}
+func (UnimplementedJobServiceServer) testEmbeddedByValue()                    {}
+
+// UnsafeJobServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to JobServiceServer will
+// result in compilation errors.
+type UnsafeJobServiceServer interface {
+	mustEmbedUnimplementedJobServiceServer()
+}
+
+func RegisterJobServiceServer(s grpc.ServiceRegistrar, srv JobServiceServer) {
+	// If the following call pancis, it indicates UnimplementedJobServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&JobService_ServiceDesc, srv)
+}
+
+func _JobService_RunJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunJobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).RunJob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_RunJob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).RunJob(ctx, req.(*RunJobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_CreateWorkflow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWorkflowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).CreateWorkflow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_CreateWorkflow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).CreateWorkflow(ctx, req.(*CreateWorkflowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_GetWorkflowStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkflowStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).GetWorkflowStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_GetWorkflowStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).GetWorkflowStatus(ctx, req.(*GetWorkflowStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_ListWorkflows_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkflowsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).ListWorkflows(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_ListWorkflows_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).ListWorkflows(ctx, req.(*ListWorkflowsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_GetWorkflowJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkflowJobsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).GetWorkflowJobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_GetWorkflowJobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).GetWorkflowJobs(ctx, req.(*GetWorkflowJobsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_CancelWorkflow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelWorkflowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).CancelWorkflow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_CancelWorkflow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).CancelWorkflow(ctx, req.(*CancelWorkflowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// JobService_ServiceDesc is the grpc.ServiceDesc for JobService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var JobService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "joblet.JobService",
+	HandlerType: (*JobServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RunJob",
+			Handler:    _JobService_RunJob_Handler,
+		},
+		{
+			MethodName: "CreateWorkflow",
+			Handler:    _JobService_CreateWorkflow_Handler,
+		},
+		{
+			MethodName: "GetWorkflowStatus",
+			Handler:    _JobService_GetWorkflowStatus_Handler,
+		},
+		{
+			MethodName: "ListWorkflows",
+			Handler:    _JobService_ListWorkflows_Handler,
+		},
+		{
+			MethodName: "GetWorkflowJobs",
+			Handler:    _JobService_GetWorkflowJobs_Handler,
+		},
+		{
+			MethodName: "CancelWorkflow",
+			Handler:    _JobService_CancelWorkflow_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "joblet.proto",
+}
+
+const (
 	NetworkService_CreateNetwork_FullMethodName = "/joblet.NetworkService/CreateNetwork"
 	NetworkService_ListNetworks_FullMethodName  = "/joblet.NetworkService/ListNetworks"
 	NetworkService_RemoveNetwork_FullMethodName = "/joblet.NetworkService/RemoveNetwork"

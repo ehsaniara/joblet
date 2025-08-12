@@ -9,6 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewStopCmd creates a new cobra command for stopping jobs.
+// The command requires exactly one argument: the job ID to stop.
+// Sends a stop request to the Joblet server for the specified job.
 func NewStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop <job-id>",
@@ -20,6 +23,9 @@ func NewStopCmd() *cobra.Command {
 	return cmd
 }
 
+// runStop executes the job stop command.
+// Takes the job ID from command arguments, connects to the server,
+// and sends a stop request. Displays confirmation upon success.
 func runStop(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 

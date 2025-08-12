@@ -47,6 +47,9 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	b.logger.Debug("building job", "jobID", jobID, "command", req.GetCommand())
 
 	// Create job
+	volumes := b.copyStrings(req.GetVolumes())
+	b.logger.Debug("building job with volumes", "jobID", jobID, "volumes", volumes, "volumeCount", len(volumes))
+
 	job := &domain.Job{
 		Id:         jobID,
 		Command:    req.GetCommand(),
@@ -55,7 +58,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		CgroupPath: b.generateCgroupPath(jobID),
 		StartTime:  time.Now(),
 		Network:    req.GetNetwork(),
-		Volumes:    b.copyStrings(req.GetVolumes()),
+		Volumes:    volumes,
 		Runtime:    req.GetRuntime(),
 	}
 

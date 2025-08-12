@@ -48,6 +48,7 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make deploy REMOTE_HOST=prod.example.com"
+	@echo "  make deploy-with-examples         - Deploy with workflow examples for testing"
 	@echo "  make config-download"
 	@echo "  make setup-remote-passwordless"
 
@@ -65,6 +66,14 @@ deploy: joblet
 	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "⚠️  Note: This requires passwordless sudo to be configured"
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service && sudo cp /tmp/joblet/build/* $(REMOTE_DIR)/ && sudo chmod +x $(REMOTE_DIR)/* && sudo systemctl start joblet.service && echo "✅ Deployed successfully"'
+
+deploy-with-examples: joblet
+	@echo "🚀 Development deployment with examples to $(REMOTE_USER)@$(REMOTE_HOST)..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
+	scp bin/joblet $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
+	scp -r examples $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/
+	@echo "⚠️  Note: This requires passwordless sudo to be configured"
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service && sudo cp /tmp/joblet/build/* $(REMOTE_DIR)/ && sudo chmod +x $(REMOTE_DIR)/* && sudo mkdir -p $(REMOTE_DIR)/examples && sudo cp -r /tmp/joblet/examples/* $(REMOTE_DIR)/examples/ && sudo systemctl start joblet.service && echo "✅ Development deployment with examples completed"'
 
 live-log:
 	@echo "📊 Viewing live logs from $(REMOTE_USER)@$(REMOTE_HOST)..."

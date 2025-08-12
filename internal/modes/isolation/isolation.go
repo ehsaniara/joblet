@@ -107,16 +107,20 @@ func (i *Isolator) setupFilesystemIsolation() error {
 	}
 
 	// Create isolated filesystem for this job
+	i.logger.Debug("creating job filesystem", "jobID", jobID)
 	jobFS, e := i.filesystem.CreateJobFilesystem(jobID)
 	if e != nil {
 		return fmt.Errorf("failed to create job filesystem: %w", e)
 	}
+	i.logger.Debug("job filesystem created successfully", "jobID", jobID)
 
 	// Set up the filesystem isolation (chroot, mounts, etc.)
 	// Note: jobFS.Setup() handles runtime mounting internally before chroot
+	i.logger.Debug("calling jobFS.Setup()", "jobID", jobID)
 	if err := jobFS.Setup(); err != nil {
 		return fmt.Errorf("failed to setup filesystem isolation: %w", err)
 	}
+	i.logger.Debug("jobFS.Setup() completed successfully", "jobID", jobID)
 
 	i.logger.Debug("filesystem isolation setup completed successfully", "jobID", jobID)
 	return nil

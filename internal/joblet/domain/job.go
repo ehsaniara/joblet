@@ -16,6 +16,7 @@ const (
 	StatusStopped      JobStatus = "STOPPED"
 	StatusScheduled    JobStatus = "SCHEDULED"
 	StatusInitializing JobStatus = "INITIALIZING"
+	StatusCanceled     JobStatus = "CANCELED"
 )
 
 var (
