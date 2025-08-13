@@ -59,4 +59,5 @@ func init() {
 	rootCmd.AddCommand(jobs.NewMonitorCmd())
 	rootCmd.AddCommand(resources.NewRuntimeCmd())
 	rootCmd.AddCommand(workflow.NewWorkflowCmd())
+	rootCmd.AddCommand(NewAdminCmd())
 }

@@ -1,0 +1,203 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.21'
+  NODE_VERSION: '18'
+
+jobs:
+  build-matrix:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+            runs-on: ubuntu-latest
+            platform: linux-amd64
+          - goos: linux
+            goarch: arm64
+            runs-on: ubuntu-latest
+            platform: linux-arm64
+          - goos: linux
+            goarch: 386
+            runs-on: ubuntu-latest
+            platform: linux-386
+          
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            runs-on: macos-latest
+            platform: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            runs-on: macos-latest
+            platform: darwin-arm64
+          
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            runs-on: windows-latest
+            platform: windows-amd64
+            ext: .exe
+          - goos: windows
+            goarch: 386
+            runs-on: windows-latest
+            platform: windows-386
+            ext: .exe
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: 'admin/*/package-lock.json'
+
+    - name: Install Node.js dependencies
+      run: |
+        cd admin/ui && npm ci
+        cd ../server && npm ci
+
+    - name: Build Admin UI
+      run: |
+        cd admin/ui && npm run build
+
+    - name: Build Go binaries
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        # Create dist directory
+        mkdir -p dist
+        
+        # Build rnx CLI
+        go build -ldflags="-s -w" -o dist/rnx${{ matrix.ext }} ./cmd/rnx
+        
+        # Build joblet server (Linux only for now)
+        if [ "${{ matrix.goos }}" = "linux" ]; then
+          go build -ldflags="-s -w" -o dist/joblet${{ matrix.ext }} ./cmd/joblet
+        fi
+
+    - name: Create release package
+      shell: bash
+      run: |
+        # Create platform-specific directory
+        mkdir -p release/rnx-${{ matrix.platform }}
+        
+        # Copy binaries
+        mkdir -p release/rnx-${{ matrix.platform }}/bin
+        cp dist/rnx${{ matrix.ext }} release/rnx-${{ matrix.platform }}/bin/
+        
+        # Copy joblet for Linux only
+        if [ "${{ matrix.goos }}" = "linux" ]; then
+          cp dist/joblet${{ matrix.ext }} release/rnx-${{ matrix.platform }}/bin/
+          
+          # Copy admin files for Linux releases only
+          cp -r admin release/rnx-${{ matrix.platform }}/
+          
+          # Use template for Linux installation script
+          cp scripts/install.sh.template release/rnx-${{ matrix.platform }}/install.sh
+          chmod +x release/rnx-${{ matrix.platform }}/install.sh
+        else
+          # Create simple install script for non-Linux platforms
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            cp scripts/install.bat.template release/rnx-${{ matrix.platform }}/install.bat
+          else
+            cp scripts/install-client.sh.template release/rnx-${{ matrix.platform }}/install.sh
+            chmod +x release/rnx-${{ matrix.platform }}/install.sh
+          fi
+        fi
+        
+        # Create README using script
+        ./scripts/release/generate-readme.sh "${{ matrix.platform }}" "${{ matrix.goos }}" "${{ matrix.goarch }}" release/rnx-${{ matrix.platform }}/README.md
+
+    - name: Create archive
+      shell: bash
+      run: |
+        cd release
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          # Create zip for Windows
+          7z a rnx-${{ matrix.platform }}.zip rnx-${{ matrix.platform }}/
+        else
+          # Create tar.gz for Unix-like systems
+          tar -czf rnx-${{ matrix.platform }}.tar.gz rnx-${{ matrix.platform }}/
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: rnx-${{ matrix.platform }}
+        path: release/rnx-${{ matrix.platform }}.*
+
+  create-release:
+    name: Create Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release-artifacts/**/*
+        draft: false
+        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+        generate_release_notes: true
+        body: |
+          ## Multi-Platform Release
+          
+          ### Supported Platforms
+          
+          #### Full Installation (Linux)
+          - `linux-amd64` - Complete Joblet with server and admin UI
+          - `linux-arm64` - Complete Joblet with server and admin UI  
+          - `linux-386` - Complete Joblet with server and admin UI
+          
+          #### Client Only (Cross-Platform)
+          - `darwin-amd64` - RNX CLI for macOS Intel
+          - `darwin-arm64` - RNX CLI for macOS Apple Silicon
+          - `windows-amd64` - RNX CLI for Windows 64-bit
+          - `windows-386` - RNX CLI for Windows 32-bit
+          
+          ### Installation
+          
+          1. **Linux (Full Server)**: Download `linux-*` for complete installation
+          2. **macOS/Windows (Client)**: Download platform-specific archive for RNX CLI only
+          
+          ### Quick Start
+          
+          ```bash
+          # Linux full installation
+          tar -xzf rnx-linux-amd64.tar.gz
+          cd rnx-linux-amd64
+          ./install.sh
+          
+          # Start admin UI
+          /opt/joblet/bin/rnx admin --bind-address=0.0.0.0
+          ```
+          
+          For detailed instructions, see the README.md in each platform archive.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

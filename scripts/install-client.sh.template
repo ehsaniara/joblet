@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+INSTALL_DIR=${1:-/usr/local/bin}
+echo "🚀 Installing Joblet RNX CLI to $INSTALL_DIR..."
+
+# Copy binaries
+sudo mkdir -p $INSTALL_DIR
+sudo cp bin/rnx $INSTALL_DIR/
+sudo chmod +x $INSTALL_DIR/rnx
+
+echo "✅ Installation complete!"
+echo "📍 RNX CLI: $INSTALL_DIR/rnx"
+echo "💡 Note: Full joblet server requires Linux"

@@ -3,18 +3,23 @@ REMOTE_USER ?= jay
 REMOTE_DIR ?= /opt/joblet
 REMOTE_ARCH ?= amd64
 
-.PHONY: all clean rnx joblet deploy config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces test-user-namespace-job
+.PHONY: all clean rnx joblet admin-ui deploy config-generate config-remote-generate config-download config-view help setup-remote-passwordless setup-dev service-status live-log test-connection validate-user-namespaces setup-user-namespaces check-kernel-support setup-subuid-subgid test-user-namespace-isolation debug-user-namespaces test-user-namespace-job release release-clean
 
-all: rnx joblet
+all: rnx joblet admin-ui
 
 help:
 	@echo "Joblet Makefile - Embedded Certificates Version"
 	@echo ""
 	@echo "Build targets:"
-	@echo "  make all               - Build all binaries (rnx, joblet)"
+	@echo "  make all               - Build all binaries (rnx, joblet, admin-ui)"
 	@echo "  make rnx               - Build RNX CLI for local development"
 	@echo "  make joblet            - Build joblet binary for Linux"
+	@echo "  make admin-ui          - Build admin UI (requires Node.js)"
 	@echo "  make clean             - Remove build artifacts"
+	@echo ""
+	@echo "Release targets:"
+	@echo "  make release           - Create production release package"
+	@echo "  make release-clean     - Clean release directory"
 	@echo ""
 	@echo "Configuration targets (Embedded Certificates):"
 	@echo "  make config-generate   - Generate local configs with embedded certs"
@@ -54,11 +59,26 @@ help:
 
 rnx:
 	@echo "Building RNX CLI..."
-	GOOS=$(GOOS) GOARCH=$(REMOTE_ARCH) go build -o bin/rnx ./cmd/rnx
+	GOTMPDIR=/var/tmp GOOS=$(GOOS) GOARCH=$(REMOTE_ARCH) go build -o bin/rnx ./cmd/rnx
+
+admin-server: admin-ui
+	@echo "Installing Admin Server dependencies..."
+	cd admin/server && npm install
+	@echo "✅ Admin Server ready"
 
 joblet:
 	@echo "Building Joblet..."
 	GOOS=linux GOARCH=$(REMOTE_ARCH) go build -o bin/joblet ./cmd/joblet
+
+admin-ui:
+	@echo "Building Admin UI..."
+	@if [ ! -d "admin/ui/node_modules" ]; then \
+		echo "Installing Node.js dependencies..."; \
+		cd admin/ui && npm install; \
+	fi
+	@echo "Building React application..."
+	cd admin/ui && npm run build
+	@echo "✅ Admin UI built to admin/ui/dist/"
 
 deploy: joblet
 	@echo "🚀 Passwordless deployment to $(REMOTE_USER)@$(REMOTE_HOST)..."
@@ -83,6 +103,9 @@ clean:
 	@echo "🧹 Cleaning build artifacts..."
 	rm -rf bin/
 	rm -rf config/
+	rm -rf web/ui/dist/
+	rm -rf web/ui/node_modules/
+	rm -rf internal/rnx/admin/static/
 
 config-generate:
 	@echo "🔐 Generating local configuration with embedded certificates..."
@@ -164,13 +187,9 @@ setup-dev: config-generate all
 	@echo "   ./bin/rnx list  # Connect as client (uses config/rnx-config.yml)"
 
 config-check-remote:
-	@echo "🔍 Checking configuration status on $(REMOTE_USER)@$(REMOTE_HOST)..."
-	@echo "📁 Checking directory structure..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/joblet/ || echo 'Directory /opt/joblet/ not found'"
-	@echo "📋 Checking configuration files..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo ls -la /opt/joblet/config/ || echo 'Configuration directory not found'"
-	@echo "🔐 Checking embedded certificates in server config..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo grep -c 'BEGIN CERTIFICATE' /opt/joblet/config/joblet-config.yml 2>/dev/null | xargs echo 'Certificates found:' || echo 'No embedded certificates found'"
+	@echo "📤 Uploading config check script to $(REMOTE_HOST)..."
+	@scp scripts/config-check-remote.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'chmod +x /tmp/config-check-remote.sh && /tmp/config-check-remote.sh && rm /tmp/config-check-remote.sh'
 
 service-status:
 	@echo "📊 Checking service status on $(REMOTE_USER)@$(REMOTE_HOST)..."
@@ -183,105 +202,19 @@ test-connection:
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "systemctl list-units --type=service | grep joblet || echo '❌ joblet service not found'"
 
 validate-user-namespaces:
-	@echo "🔍 Validating user namespace support on $(REMOTE_HOST)..."
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		echo "📋 Checking kernel support..."; \
-		if [ ! -f /proc/self/ns/user ]; then \
-			echo "❌ User namespaces not supported by kernel"; \
-			exit 1; \
-		else \
-			echo "✅ User namespace kernel support detected"; \
-		fi; \
-		echo "📋 Checking user namespace limits..."; \
-		if [ -f /proc/sys/user/max_user_namespaces ]; then \
-			MAX_NS=$$(cat /proc/sys/user/max_user_namespaces); \
-			if [ "$$MAX_NS" = "0" ]; then \
-				echo "❌ User namespaces disabled (max_user_namespaces=0)"; \
-				exit 1; \
-			else \
-				echo "✅ User namespaces enabled (max: $$MAX_NS)"; \
-			fi; \
-		fi; \
-		echo "📋 Checking cgroup namespace support..."; \
-		if [ ! -f /proc/self/ns/cgroup ]; then \
-			echo "❌ Cgroup namespaces not supported by kernel"; \
-			exit 1; \
-		else \
-			echo "✅ Cgroup namespace kernel support detected"; \
-		fi; \
-		echo "📋 Checking cgroups v2..."; \
-		if [ ! -f /sys/fs/cgroup/cgroup.controllers ]; then \
-			echo "❌ Cgroups v2 not available"; \
-			exit 1; \
-		else \
-			echo "✅ Cgroups v2 detected"; \
-		fi; \
-		echo "📋 Checking subuid/subgid files..."; \
-		if [ ! -f /etc/subuid ]; then \
-			echo "❌ /etc/subuid not found"; \
-			exit 1; \
-		fi; \
-		if [ ! -f /etc/subgid ]; then \
-			echo "❌ /etc/subgid not found"; \
-			exit 1; \
-		fi; \
-		echo "📋 Checking joblet user configuration..."; \
-		if ! grep -q "joblet:" /etc/subuid; then \
-			echo "❌ joblet not configured in /etc/subuid"; \
-			exit 1; \
-		fi; \
-		if ! grep -q "joblet:" /etc/subgid; then \
-			echo "❌ joblet not configured in /etc/subgid"; \
-			exit 1; \
-		fi; \
-		echo "✅ All user namespace requirements validated successfully!"'
+	@echo "📤 Uploading validation script to $(REMOTE_HOST)..."
+	@scp scripts/validate-user-namespaces.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'chmod +x /tmp/validate-user-namespaces.sh && /tmp/validate-user-namespaces.sh && rm /tmp/validate-user-namespaces.sh'
 
 setup-user-namespaces:
-	@echo "🚀 Setting up user namespace environment on $(REMOTE_HOST)..."
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		echo "📋 Creating joblet user if not exists..."; \
-		if ! id joblet >/dev/null 2>&1; then \
-			echo "Creating joblet user..."; \
-			sudo useradd -r -s /bin/false joblet; \
-			echo "✅ joblet user created"; \
-		else \
-			echo "✅ joblet user already exists"; \
-		fi; \
-		echo "📋 Creating subuid/subgid files if needed..."; \
-		sudo touch /etc/subuid /etc/subgid; \
-		echo "📋 Setting up subuid/subgid ranges..."; \
-		if ! grep -q "^joblet:" /etc/subuid 2>/dev/null; then \
-			echo "joblet:100000:6553600" | sudo tee -a /etc/subuid; \
-			echo "✅ Added subuid entry for joblet"; \
-		else \
-			echo "✅ subuid entry already exists for joblet"; \
-		fi; \
-		if ! grep -q "^joblet:" /etc/subgid 2>/dev/null; then \
-			echo "joblet:100000:6553600" | sudo tee -a /etc/subgid; \
-			echo "✅ Added subgid entry for joblet"; \
-		else \
-			echo "✅ subgid entry already exists for joblet"; \
-		fi; \
-		echo "📋 Setting up cgroup permissions..."; \
-		sudo mkdir -p /sys/fs/cgroup; \
-		sudo chown joblet:joblet /sys/fs/cgroup 2>/dev/null || echo "Note: Could not change cgroup ownership (may be read-only)"; \
-		echo "✅ User namespace environment setup completed!"'
+	@echo "📤 Uploading setup script to $(REMOTE_HOST)..."
+	@scp scripts/setup-user-namespaces.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'chmod +x /tmp/setup-user-namespaces.sh && /tmp/setup-user-namespaces.sh && rm /tmp/setup-user-namespaces.sh'
 
 debug-user-namespaces:
-	@echo "🔍 Debugging user namespace configuration on $(REMOTE_HOST)..."
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) '\
-		echo "📋 Kernel configuration:"; \
-		echo "  /proc/sys/user/max_user_namespaces: $$(cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo \"not found\")"; \
-		echo "  /proc/sys/kernel/unprivileged_userns_clone: $$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo \"not found\")"; \
-		echo "📋 SubUID/SubGID configuration:"; \
-		echo "  /etc/subuid entries:"; \
-		cat /etc/subuid 2>/dev/null || echo "  File not found"; \
-		echo "  /etc/subgid entries:"; \
-		cat /etc/subgid 2>/dev/null || echo "  File not found"; \
-		echo "📋 Joblet user info:"; \
-		id joblet 2>/dev/null || echo "  joblet user not found"; \
-		echo "📋 Service status:"; \
-		sudo systemctl status joblet.service --no-pager --lines=5 2>/dev/null || echo "  Service not found"'
+	@echo "📤 Uploading debug script to $(REMOTE_HOST)..."
+	@scp scripts/debug-user-namespaces.sh $(REMOTE_USER)@$(REMOTE_HOST):/tmp/
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'chmod +x /tmp/debug-user-namespaces.sh && /tmp/debug-user-namespaces.sh && rm /tmp/debug-user-namespaces.sh'
 
 test-user-namespace-job: config-download
 	@echo "🧪 Testing job execution with user namespace isolation..."
@@ -295,3 +228,43 @@ test-user-namespace-job: config-download
 	@echo "   Expected: Each job should run as different UID (100000+)"
 	@echo "   Expected: Jobs should not see each other's processes"
 	@echo "💡 View logs with: make live-log"
+
+# Release packaging targets
+release: all
+	@echo "📦 Creating production release package..."
+	@rm -rf release/
+	@mkdir -p release/rnx-release/bin
+	@mkdir -p release/rnx-release/admin/server
+	@mkdir -p release/rnx-release/admin/ui
+	
+	@echo "📋 Copying binaries..."
+	@cp bin/rnx release/rnx-release/bin/
+	@cp bin/joblet release/rnx-release/bin/
+	@chmod +x release/rnx-release/bin/*
+	
+	@echo "📋 Copying admin server..."
+	@cp admin/server/package.json release/rnx-release/admin/server/
+	@cp admin/server/server.js release/rnx-release/admin/server/
+	
+	@echo "📋 Copying admin UI..."
+	@cp -r admin/ui/dist/* release/rnx-release/admin/ui/
+	
+	@echo "📋 Creating installation script..."
+	@cp scripts/install.sh.template release/rnx-release/install.sh
+	@chmod +x release/rnx-release/install.sh
+	
+	@echo "📋 Creating README..."
+	@./scripts/release/generate-readme.sh "linux-amd64" "linux" "amd64" release/rnx-release/README.md
+	
+	@echo "📋 Creating release archive..."
+	@cd release && tar -czf rnx-release.tar.gz rnx-release/
+	
+	@echo "✅ Release package created:"
+	@echo "   📦 Archive: release/rnx-release.tar.gz"
+	@echo "   📁 Directory: release/rnx-release/"
+	@echo "   📄 Size: $$(du -h release/rnx-release.tar.gz | cut -f1)"
+
+release-clean:
+	@echo "🧹 Cleaning release directory..."
+	@rm -rf release/
+	@echo "✅ Release directory cleaned"

@@ -37,3 +37,6 @@ config
 # Runtime packages (store in releases instead)
 examples/packages/*.tar.gz
 
+# Release build artifacts
+/release
+

@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+
+INSTALL_DIR=${1:-/opt/joblet}
+echo "🚀 Installing Joblet to $INSTALL_DIR..."
+
+# Create directories
+sudo mkdir -p $INSTALL_DIR/bin
+sudo mkdir -p $INSTALL_DIR/admin/server
+sudo mkdir -p $INSTALL_DIR/admin/ui
+
+# Copy binaries
+sudo cp bin/* $INSTALL_DIR/bin/
+sudo chmod +x $INSTALL_DIR/bin/*
+
+# Copy admin files
+sudo cp -r admin/* $INSTALL_DIR/admin/
+
+# Install Node.js dependencies
+echo "📦 Installing Node.js dependencies..."
+cd $INSTALL_DIR/admin/server
+sudo npm install --production
+
+# Set permissions
+sudo chown -R root:root $INSTALL_DIR
+sudo chmod -R 755 $INSTALL_DIR
+
+echo "✅ Installation complete!"
+echo "📍 Binaries: $INSTALL_DIR/bin/"
+echo "🌐 Admin UI: Run '$INSTALL_DIR/bin/rnx admin' to start"
+echo "💡 Next: Configure certificates and start joblet service"

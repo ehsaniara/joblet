@@ -1,0 +1,11 @@
+@echo off
+set INSTALL_DIR=%1
+if "%INSTALL_DIR%"=="" set INSTALL_DIR=C:\joblet
+
+echo Installing Joblet to %INSTALL_DIR%...
+mkdir "%INSTALL_DIR%\bin" 2>nul
+copy bin\* "%INSTALL_DIR%\bin\"
+
+echo Installation complete!
+echo Binaries: %INSTALL_DIR%\bin\
+echo Note: Admin UI requires Linux server
