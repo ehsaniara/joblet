@@ -10,7 +10,6 @@ defaults:
 jobs:
   # Data analysis example
   data-analysis:
-    name: "Data Analysis"
     description: "Comprehensive data analysis with pandas and numpy"
     command: python3
     args:
@@ -26,7 +25,6 @@ jobs:
 
   # Machine learning model training
   train-model:
-    name: "ML Model Training"
     description: "Train a scikit-learn model"
     command: bash
     args:
@@ -100,7 +98,6 @@ jobs:
 
   # Deep learning with TensorFlow/PyTorch
   deep-learning:
-    name: "Deep Learning Example"
     description: "Neural network training example"
     command: bash
     args:
@@ -174,7 +171,6 @@ jobs:
 
   # Data visualization
   visualization:
-    name: "Data Visualization"
     description: "Create data visualizations with matplotlib"
     command: bash
     args:
@@ -255,7 +251,6 @@ jobs:
 
   # Feature engineering pipeline
   feature-engineering:
-    name: "Feature Engineering"
     description: "Advanced feature engineering for ML"
     command: bash
     args:
@@ -344,7 +339,6 @@ jobs:
 
   # Setup ML environment
   setup-ml:
-    name: "Setup ML Environment"
     description: "Install additional ML packages"
     command: bash
     args:

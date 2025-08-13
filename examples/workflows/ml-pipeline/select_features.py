@@ -10,11 +10,11 @@ def main():
     print("Starting feature selection...")
     
     # Read prepared data
-    if not os.path.exists("ml_data/prepared_dataset.json"):
+    if not os.path.exists("/volumes/ml-pipeline/prepared_dataset.json"):
         print("Error: prepared_dataset.json not found!")
         sys.exit(1)
     
-    with open("ml_data/prepared_dataset.json", "r") as f:
+    with open("/volumes/ml-pipeline/prepared_dataset.json", "r") as f:
         dataset = json.load(f)
     
     # Simple feature selection - select best features based on variance
@@ -43,7 +43,7 @@ def main():
         }
     }
     
-    with open("ml_data/selected_features.json", "w") as f:
+    with open("/volumes/ml-pipeline/selected_features.json", "w") as f:
         json.dump(selected_dataset, f, indent=2)
     
     print(f"Selected 2 features from {len(dataset['metadata']['features'])} original features")

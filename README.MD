@@ -100,6 +100,10 @@ rnx run --template=jobs.yaml:hello-joblet     # Java application
 rnx run --template=jobs.yaml:hello-world      # Basic demo
 rnx run --template=jobs.yaml:sales-analysis   # Python analytics
 
+# Run workflows with consolidated commands
+rnx run --template=ml-pipeline.yaml           # Full ML workflow
+rnx status <workflow-id>                      # Unified status for jobs/workflows
+
 # Discover available jobs in any example directory
 cat jobs.yaml                                 # Shows all configured jobs
 ```
@@ -231,8 +235,9 @@ rnx monitor status
 
 ```bash
 rnx run <command>           # Execute jobs with isolation  
+rnx run --template=<yaml>   # Execute workflows from templates
 rnx list                    # List all jobs
-rnx status <job-id>         # Job details and status
+rnx status <id>            # Job/workflow details and status (unified)
 rnx log <job-id>           # Stream job logs
 rnx stop <job-id>          # Stop running job
 rnx monitor status         # System metrics
@@ -335,13 +340,14 @@ The [Workflow Examples](examples/workflows/) demonstrate advanced job orchestrat
 - **Deployment Pipeline**: Build → test → package → deploy → verify workflow
 
 ```bash
-# Individual job execution (currently supported)
+# Individual job execution
 cd examples/workflows/ml-pipeline
 rnx run --template=ml-pipeline.yaml:data-validation
 
-# Full workflow orchestration (pending integration)  
+# Full workflow orchestration with consolidated commands
 cd examples/workflows/ml-pipeline
-rnx run --template=ml-pipeline.yaml
+rnx run --template=ml-pipeline.yaml                    # ✅ Unified workflow execution
+rnx status <workflow-id>                               # ✅ Unified status checking
 ```
 
 **Features Demonstrated:**

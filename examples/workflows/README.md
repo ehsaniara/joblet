@@ -90,12 +90,19 @@ cd examples/workflows/ml-pipeline
 rnx run --template=ml-pipeline.yaml:data-validation
 ```
 
-**Workflow Orchestration**: 🔄 **Pending Integration**
+**Workflow Orchestration**: ✅ **Fully Working** (NEW - Consolidated Commands)
 
 ```bash
 cd examples/workflows/ml-pipeline  
-rnx run --template=ml-pipeline.yaml
-# Returns: "workflow execution is not yet fully integrated"
+rnx run --template=ml-pipeline.yaml     # ✅ Unified workflow execution
+rnx status <workflow-id>                # ✅ Unified status checking
+```
+
+**Legacy Commands** (Deprecated):
+
+```bash
+rnx workflow run ml-pipeline.yaml       # ⚠️ Deprecated - use rnx run --template instead
+rnx workflow status <id>                # ⚠️ Deprecated - use rnx status instead
 ```
 
 ## No Docker/Container References

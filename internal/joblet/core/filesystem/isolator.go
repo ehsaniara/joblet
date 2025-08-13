@@ -270,7 +270,7 @@ func (f *JobFilesystem) Setup() error {
 	workDirHasFiles := false
 	if files, err := f.platform.ReadDir(workPath); err == nil && len(files) > 0 {
 		workDirHasFiles = true
-		log.Info("work directory contains uploaded files, skipping tmpfs mount", "fileCount", len(files))
+		log.Debug("work directory contains uploaded files, skipping tmpfs mount", "fileCount", len(files))
 	}
 
 	if len(f.Volumes) == 0 && !workDirHasFiles {
@@ -870,7 +870,7 @@ func (f *JobFilesystem) loadRuntimeFromEnvironment() {
 	f.RuntimePath = f.platform.Getenv("JOB_RUNTIME_PATH")
 	f.logger.Debug("attempting to load runtime from environment", "JOB_RUNTIME", f.Runtime, "JOB_RUNTIME_PATH", f.RuntimePath)
 	if f.Runtime != "" {
-		f.logger.Info("loaded runtime from environment", "runtime", f.Runtime, "path", f.RuntimePath)
+		f.logger.Debug("loaded runtime from environment", "runtime", f.Runtime, "path", f.RuntimePath)
 	} else {
 		f.logger.Debug("no runtime specified in environment")
 	}

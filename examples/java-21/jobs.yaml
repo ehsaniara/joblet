@@ -10,7 +10,6 @@ defaults:
 jobs:
   # Virtual threads demonstration
   virtual-threads:
-    name: "Virtual Threads Demo"
     description: "Demonstrate Java 21 virtual threads for massive concurrency"
     command: bash
     args:
@@ -29,7 +28,6 @@ jobs:
 
   # Pattern matching and record patterns (Java 21)
   java21-features:
-    name: "Java 21 Features"
     description: "Showcase Java 21 language enhancements"
     command: bash
     args:
@@ -95,7 +93,6 @@ jobs:
 
   # High concurrency web server with virtual threads
   virtual-server:
-    name: "Virtual Thread Server"
     description: "Simple HTTP server using virtual threads"
     command: bash
     args:
@@ -142,7 +139,6 @@ jobs:
 
   # Performance comparison: Platform threads vs Virtual threads
   thread-comparison:
-    name: "Thread Performance Comparison"
     description: "Compare platform threads vs virtual threads performance"
     command: bash
     args:
@@ -212,7 +208,6 @@ jobs:
 
   # Structured concurrency example
   structured-concurrency:
-    name: "Structured Concurrency"
     description: "Demonstrate structured concurrency patterns"
     command: bash
     args:
@@ -268,7 +263,6 @@ jobs:
 
   # GraalVM native image preparation (if using GraalVM JDK)
   graalvm-ready:
-    name: "GraalVM Ready App"
     description: "Application optimized for GraalVM native compilation"
     command: bash
     args:

@@ -11,7 +11,6 @@ import (
 
 // JobConfig represents a job configuration from YAML
 type JobConfig struct {
-	Name        string            `yaml:"name"`
 	Description string            `yaml:"description"`
 	Command     string            `yaml:"command"`
 	Args        []string          `yaml:"args"`
@@ -160,9 +159,6 @@ func (j *JobConfig) GetCommandString() string {
 func mergeConfigs(parent, child JobConfig) JobConfig {
 	result := parent
 
-	if child.Name != "" {
-		result.Name = child.Name
-	}
 	if child.Description != "" {
 		result.Description = child.Description
 	}

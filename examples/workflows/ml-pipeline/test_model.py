@@ -9,17 +9,12 @@ import os
 def main():
     print("Starting model testing for deployment...")
     
-    # Check if model package exists (created by tar command)
-    if not os.path.exists("model.tar.gz"):
-        print("Error: model.tar.gz package not found!")
-        sys.exit(1)
-    
     # Check if evaluation results exist (to verify model quality)
-    if not os.path.exists("ml_data/evaluation_results.json"):
+    if not os.path.exists("/volumes/ml-pipeline/evaluation_results.json"):
         print("Error: evaluation_results.json not found!")
         sys.exit(1)
     
-    with open("ml_data/evaluation_results.json", "r") as f:
+    with open("/volumes/ml-pipeline/evaluation_results.json", "r") as f:
         evaluation = json.load(f)
     
     # Validate model is ready for deployment
@@ -46,7 +41,7 @@ def main():
         "test_timestamp": "2025-08-11T18:04:00Z"
     }
     
-    with open("deployment_test_results.json", "w") as f:
+    with open("/volumes/ml-pipeline/deployment_test_results.json", "w") as f:
         json.dump(test_results, f, indent=2)
     
     print("All deployment tests passed!")

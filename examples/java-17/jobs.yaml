@@ -10,7 +10,6 @@ defaults:
 jobs:
   # Compile and run HelloJoblet
   hello-joblet:
-    name: "Hello Joblet Java"
     description: "Compile and run a simple Java application"
     command: bash
     args:
@@ -28,7 +27,6 @@ jobs:
 
   # Run with JVM tuning
   optimized-jvm:
-    name: "JVM Optimized Run"
     description: "Run Java with optimized JVM settings"
     command: bash
     args:
@@ -45,7 +43,6 @@ jobs:
 
   # Text blocks and pattern matching demo (Java 17 features)
   java17-features:
-    name: "Java 17 Features Demo"
     description: "Demonstrate Java 17 language features"
     command: bash
     args:
@@ -63,7 +60,6 @@ jobs:
 
   # JAR packaging and execution
   jar-package:
-    name: "JAR Packaging"
     description: "Package Java application as JAR and run"
     command: bash
     args:
@@ -88,7 +84,6 @@ jobs:
 
   # Memory and performance testing using HelloJoblet with arguments
   performance-test:
-    name: "Performance Test"
     description: "Test Java application performance with resource limits"
     command: bash
     args:
@@ -107,7 +102,6 @@ jobs:
 
   # Simple compilation test
   compile-test:
-    name: "Compilation Test"
     description: "Test compilation of multiple Java files"
     command: bash
     args:

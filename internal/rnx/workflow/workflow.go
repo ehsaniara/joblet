@@ -89,10 +89,11 @@ func NewWorkflowStatusCmd() *cobra.Command {
 	var statusJSON bool
 
 	cmd := &cobra.Command{
-		Use:   "status <workflow-id>",
-		Short: "Get workflow status",
-		Long:  "Get the current status and progress of a workflow",
-		Args:  cobra.ExactArgs(1),
+		Use:        "status <workflow-id>",
+		Short:      "Get workflow status (deprecated)",
+		Long:       "Get the current status and progress of a workflow\n\nDEPRECATED: Use 'rnx status <workflow-id>' instead for unified job/workflow status.",
+		Args:       cobra.ExactArgs(1),
+		Deprecated: "Use 'rnx status <workflow-id>' instead",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := common.NewJobClient()
 			if err != nil {
@@ -156,9 +157,10 @@ func NewWorkflowListCmd() *cobra.Command {
 	var listJSON bool
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List workflows",
-		Long:  "List all workflows in the system",
+		Use:        "list",
+		Short:      "List workflows (deprecated)",
+		Long:       "List all workflows in the system\n\nDEPRECATED: This command will be consolidated in future versions.",
+		Deprecated: "This command will be consolidated in future versions",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := common.NewJobClient()
 			if err != nil {
@@ -222,10 +224,11 @@ func NewWorkflowListCmd() *cobra.Command {
 // - Automatic dependency resolution and job orchestration
 func NewWorkflowRunCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "run <yaml-file>",
-		Short: "Run a workflow from YAML file",
-		Long:  "Parse and execute a workflow from a YAML file",
-		Args:  cobra.ExactArgs(1),
+		Use:        "run <yaml-file>",
+		Short:      "Run a workflow from YAML file (deprecated)",
+		Long:       "Parse and execute a workflow from a YAML file\n\nDEPRECATED: Use 'rnx run --template=<yaml-file>' instead for unified job/workflow execution.",
+		Args:       cobra.ExactArgs(1),
+		Deprecated: "Use 'rnx run --template=<yaml-file>' instead",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Load client configuration manually since workflow run needs config
 			var err error

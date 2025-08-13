@@ -10,7 +10,6 @@ defaults:
 jobs:
   # Simple hello world job
   hello:
-    name: "Hello World"
     description: "Simple greeting job"
     command: echo
     args:
@@ -20,7 +19,6 @@ jobs:
 
   # Python analytics job with uploads and volumes
   analytics:
-    name: "Python Analytics"
     description: "Data analysis with Python"
     command: python3
     args:
@@ -38,7 +36,6 @@ jobs:
 
   # Long-running server job
   webserver:
-    name: "Web Server"
     description: "Nginx web server"
     command: nginx
     args:
@@ -53,7 +50,6 @@ jobs:
 
   # Scheduled backup job
   backup:
-    name: "Backup Job"
     description: "Scheduled backup task"
     command: bash
     args:

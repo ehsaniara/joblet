@@ -70,7 +70,7 @@ rnx run [flags] <command> [args...]
 | `--upload`     | Upload file to workspace (can be specified multiple times) | none           |
 | `--upload-dir` | Upload directory to workspace                              | none           |
 | `--schedule`   | Schedule job execution (duration or RFC3339 time)          | immediate      |
-| `--name`       | Job name for identification                                | auto-generated |
+| `--template`   | YAML template file for workflow execution                  | none           |
 
 #### Examples
 
@@ -107,6 +107,10 @@ rnx run --schedule="2025-08-03T15:00:00" maintenance.sh
 
 # Custom network
 rnx run --network=isolated ping google.com
+
+# Workflow execution with templates
+rnx run --template=ml-pipeline.yaml           # Execute full workflow
+rnx run --template=jobs.yaml:ml-analysis      # Execute specific job from template
 
 # Complex example
 rnx run \
@@ -196,11 +200,16 @@ rnx list --json | jq '.[] | select(.max_memory > 1024)'
 
 ### `rnx status`
 
-Get detailed status of a specific job.
+Get detailed status of a specific job or workflow (unified command).
 
 ```bash
-rnx status [flags] <job-id>
+rnx status [flags] <id>
 ```
+
+The status command automatically detects whether the ID refers to a job or workflow:
+
+- **Job IDs**: String identifiers (e.g., "42", "abc-123")
+- **Workflow IDs**: Numeric identifiers (e.g., 1, 2, 3)
 
 #### Flags
 
@@ -214,15 +223,19 @@ rnx status [flags] <job-id>
 # Get job status (human-readable format)
 rnx status 42
 
-# Get job status in JSON format
-rnx status --json 42
+# Get workflow status (automatic detection)
+rnx status 1
 
-# Check multiple jobs
+# Get status in JSON format (works for both jobs and workflows)
+rnx status --json 42    # Job JSON output
+rnx status --json 1     # Workflow JSON output
+
+# Check multiple jobs/workflows
 for id in 1 2 3; do rnx status $id; done
 
 # JSON output for scripting
-rnx status --json 42 | jq .status
-rnx status --json 42 | jq .exit_code
+rnx status --json 42 | jq .status      # Job status
+rnx status --json 1 | jq .total_jobs   # Workflow progress
 
 # Example JSON output:
 # {

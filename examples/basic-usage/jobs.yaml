@@ -9,7 +9,6 @@ defaults:
 jobs:
   # Simple command execution
   hello-world:
-    name: "Hello World"
     description: "Basic command execution example"
     command: echo
     args:
@@ -19,7 +18,6 @@ jobs:
 
   # File operations demo
   file-ops:
-    name: "File Operations"
     description: "Demonstrate file upload and workspace usage"
     command: bash
     args:
@@ -33,7 +31,6 @@ jobs:
 
   # Resource limits testing
   resource-test:
-    name: "Resource Limits Test"
     description: "Test CPU and memory limits"
     command: bash
     args:
@@ -47,7 +44,6 @@ jobs:
 
   # Volume storage demo
   volume-demo:
-    name: "Volume Storage"
     description: "Demonstrate persistent volume usage"
     command: bash
     args:
@@ -62,7 +58,6 @@ jobs:
 
   # Job monitoring demo
   long-runner:
-    name: "Long Running Job"
     description: "Job for demonstrating monitoring features"
     command: bash
     args:
@@ -76,7 +71,6 @@ jobs:
 
   # Network isolation demo
   network-test:
-    name: "Network Test"
     description: "Test network isolation and connectivity"
     command: bash
     args:
@@ -89,7 +83,6 @@ jobs:
 
   # Multi-step workflow
   workflow:
-    name: "Multi-Step Workflow"
     description: "Complex job with multiple steps"
     command: bash
     args:
@@ -105,7 +98,6 @@ jobs:
 
   # Run all basic demos
   run-all-demos:
-    name: "Run All Basic Demos"
     description: "Execute all basic usage demos"
     command: bash
     args:

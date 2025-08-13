@@ -25,9 +25,10 @@ def main():
         }
     }
     
-    # Write prepared data
-    os.makedirs("ml_data", exist_ok=True)
-    with open("ml_data/prepared_dataset.json", "w") as f:
+    # Write prepared data to shared volume
+    volume_path = "/volumes/ml-pipeline"
+    os.makedirs(volume_path, exist_ok=True)
+    with open(f"{volume_path}/prepared_dataset.json", "w") as f:
         json.dump(dataset, f, indent=2)
     
     print(f"Prepared {len(dataset['features'])} samples")

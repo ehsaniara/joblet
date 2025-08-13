@@ -12,10 +12,12 @@ import (
 	"time"
 
 	pb "joblet/api/gen"
+	"joblet/internal/joblet/workflow/types"
 	"joblet/internal/rnx/templates"
 	pkgconfig "joblet/pkg/config"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 func NewRunCmd() *cobra.Command {
@@ -718,9 +720,8 @@ func executeWorkflow(templatePath string, workflowName string, commandArgs []str
 		return fmt.Errorf("failed to build dependency graph: %w", err)
 	}
 
-	// Workflow execution via templates is deprecated
-	// Direct users to use the workflow command instead
-	return fmt.Errorf("workflow execution via --template is deprecated. Use 'rnx workflow run %s' instead", templatePath)
+	// Execute the workflow using the workflow service
+	return executeWorkflowViaService(templatePath, workflowName)
 }
 
 // executeParallelJobs executes multiple jobs in parallel without dependencies
@@ -734,7 +735,112 @@ func executeParallelJobs(templatePath string, commandArgs []string) error {
 		return fmt.Errorf("no jobs found in template")
 	}
 
-	// Parallel job execution via templates is deprecated
-	// Direct users to use the workflow command instead
-	return fmt.Errorf("parallel job execution via --template is deprecated. Use 'rnx workflow run %s' instead", templatePath)
+	// Execute parallel jobs as a workflow
+	return executeWorkflowViaService(templatePath, "")
+}
+
+// executeWorkflowViaService executes a workflow using the workflow service
+func executeWorkflowViaService(templatePath string, workflowName string) error {
+	// Read and parse YAML file
+	yamlContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to read YAML file %s: %w", templatePath, err)
+	}
+
+	var workflow types.WorkflowYAML
+	if err := yaml.Unmarshal(yamlContent, &workflow); err != nil {
+		return fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Extract and upload all files referenced in jobs
+	workflowFiles, err := extractWorkflowFiles(templatePath, workflow)
+	if err != nil {
+		return fmt.Errorf("failed to extract workflow files: %w", err)
+	}
+
+	fmt.Printf("Starting workflow from: %s\n", templatePath)
+	fmt.Printf("Found %d files to upload\n", len(workflowFiles))
+
+	// Create client and workflow service
+	client, err := common.NewJobClient()
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
+	workflowClient := pb.NewJobServiceClient(client.GetConn())
+
+	// Create workflow with YAML content and files
+	workflowNameGen := fmt.Sprintf("client-workflow-%d", time.Now().Unix())
+	createReq := &pb.CreateWorkflowRequest{
+		Name:          workflowNameGen,
+		Template:      filepath.Base(templatePath),
+		YamlContent:   string(yamlContent),
+		WorkflowFiles: workflowFiles,
+		TotalJobs:     int32(len(workflow.Jobs)),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	createRes, err := workflowClient.CreateWorkflow(ctx, createReq)
+	if err != nil {
+		return fmt.Errorf("failed to create workflow: %w", err)
+	}
+
+	fmt.Printf("Workflow created with ID: %d\n", createRes.WorkflowId)
+	fmt.Printf("Use 'rnx status %d' to monitor progress\n", createRes.WorkflowId)
+
+	return nil
+}
+
+// extractWorkflowFiles extracts and reads all files referenced in workflow jobs
+func extractWorkflowFiles(yamlPath string, workflow types.WorkflowYAML) ([]*pb.FileUpload, error) {
+	var uploads []*pb.FileUpload
+	yamlDir := filepath.Dir(yamlPath)
+	uploadedFiles := make(map[string]bool)
+
+	// Collect all file uploads from all jobs
+	for jobName, job := range workflow.Jobs {
+		if job.Uploads != nil {
+			for _, fileName := range job.Uploads.Files {
+				if uploadedFiles[fileName] {
+					continue // Skip duplicates
+				}
+
+				// Try relative to YAML file first, then absolute path
+				filePath := filepath.Join(yamlDir, fileName)
+				if _, err := os.Stat(filePath); os.IsNotExist(err) {
+					// Try absolute path
+					filePath = fileName
+					if _, err := os.Stat(filePath); os.IsNotExist(err) {
+						return nil, fmt.Errorf("file %s referenced in job %s not found", fileName, jobName)
+					}
+				}
+
+				// Read file content
+				content, err := os.ReadFile(filePath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+				}
+
+				// Get file info
+				fileInfo, err := os.Stat(filePath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
+				}
+
+				uploads = append(uploads, &pb.FileUpload{
+					Path:        fileName,
+					Content:     content,
+					Mode:        uint32(fileInfo.Mode()),
+					IsDirectory: false,
+				})
+
+				uploadedFiles[fileName] = true
+			}
+		}
+	}
+
+	return uploads, nil
 }

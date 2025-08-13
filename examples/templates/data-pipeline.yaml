@@ -11,7 +11,6 @@ defaults:
 jobs:
   # ETL Job with multiple steps
   etl:
-    name: "ETL Pipeline"
     description: "Extract, Transform, Load data pipeline"
     command: bash
     args:
@@ -49,7 +48,6 @@ jobs:
 
   # Data validation job
   validate:
-    name: "Data Validator"
     description: "Validate data quality and integrity"
     command: python3
     args:
@@ -68,7 +66,6 @@ jobs:
 
   # Data compression job
   compress:
-    name: "Data Compressor"
     description: "Compress old data for archival"
     command: bash
     args:
@@ -86,7 +83,6 @@ jobs:
 
   # Database backup job
   db-backup:
-    name: "Database Backup"
     description: "Backup PostgreSQL database"
     command: bash
     args:
@@ -106,7 +102,6 @@ jobs:
 
   # Report generator
   report:
-    name: "Report Generator"
     description: "Generate daily reports from processed data"
     command: python3
     args:
@@ -128,7 +123,6 @@ jobs:
 
   # Data sync job
   sync:
-    name: "Data Synchronizer"
     description: "Sync data between storage systems"
     command: rsync
     args:
@@ -147,7 +141,6 @@ jobs:
 
   # Cleanup job
   cleanup:
-    name: "Cleanup Job"
     description: "Remove old temporary files and logs"
     command: bash
     args:

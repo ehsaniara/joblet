@@ -5,7 +5,7 @@ jobs:
   data-validation:
     command: "python3"
     args: [ "prepare_data.py" ]
-    runtime: "python:3.11"
+    runtime: "python:3.11-ml"
     uploads:
       files: [ "prepare_data.py" ]
     volumes: [ "ml-pipeline" ]
@@ -13,7 +13,7 @@ jobs:
   feature-engineering:
     command: "python3"
     args: [ "select_features.py" ]
-    runtime: "python:3.11"
+    runtime: "python:3.11-ml"
     uploads:
       files: [ "select_features.py" ]
     volumes: [ "ml-pipeline" ]
@@ -23,7 +23,7 @@ jobs:
   model-training:
     command: "python3"
     args: [ "train.py" ]
-    runtime: "python:3.11"
+    runtime: "python:3.11-ml"
     uploads:
       files: [ "train.py" ]
     volumes: [ "ml-pipeline" ]
@@ -33,7 +33,7 @@ jobs:
   model-evaluation:
     command: "python3"
     args: [ "evaluate.py" ]
-    runtime: "python:3.11"
+    runtime: "python:3.11-ml"
     uploads:
       files: [ "evaluate.py" ]
     volumes: [ "ml-pipeline" ]
@@ -43,9 +43,9 @@ jobs:
   deployment:
     command: "python3"
     args: [ "test_model.py" ]
-    runtime: "python:3.11"
+    runtime: "python:3.11-ml"
     uploads:
       files: [ "test_model.py" ]
     volumes: [ "ml-pipeline" ]
     requires:
-      - expression: "(model-evaluation=COMPLETED AND model-training=COMPLETED)"
+      - model-evaluation: "COMPLETED"

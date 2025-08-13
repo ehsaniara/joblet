@@ -11,7 +11,6 @@ defaults:
 jobs:
   # Data preprocessing job
   preprocess:
-    name: "Data Preprocessing"
     description: "Clean and prepare data for training"
     command: python3
     args:
@@ -29,7 +28,6 @@ jobs:
 
   # Model training job with GPU support
   train:
-    name: "Model Training"
     description: "Train ML model with processed data"
     command: python3
     args:
@@ -53,7 +51,6 @@ jobs:
 
   # Model evaluation job
   evaluate:
-    name: "Model Evaluation"
     description: "Evaluate trained model performance"
     command: python3
     args:
@@ -74,7 +71,6 @@ jobs:
 
   # Inference server
   inference:
-    name: "Inference Server"
     description: "Serve model for predictions"
     command: python3
     args:
@@ -93,7 +89,6 @@ jobs:
 
   # Full pipeline orchestration
   pipeline:
-    name: "Full ML Pipeline"
     description: "Run complete ML pipeline"
     command: bash
     args:

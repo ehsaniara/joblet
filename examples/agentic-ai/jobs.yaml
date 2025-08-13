@@ -10,7 +10,6 @@ defaults:
 jobs:
   # Multi-agent system for collaborative problem solving
   multi-agent:
-    name: "Multi-Agent System"
     description: "Run collaborative AI agents for problem solving"
     command: python3
     args:
@@ -29,7 +28,6 @@ jobs:
 
   # LLM inference server
   llm-inference:
-    name: "LLM Inference Server"
     description: "Run local LLM inference with optimized settings"
     command: python3
     args:
@@ -50,7 +48,6 @@ jobs:
 
   # RAG (Retrieval-Augmented Generation) system
   rag-system:
-    name: "RAG System"
     description: "Document Q&A with retrieval-augmented generation"
     command: python3
     args:
@@ -72,7 +69,6 @@ jobs:
 
   # Distributed training across multiple jobs
   distributed-training:
-    name: "Distributed ML Training"
     description: "Train models using distributed computing"
     command: python3
     args:
@@ -94,7 +90,6 @@ jobs:
 
   # Install dependencies for all demos
   setup-deps:
-    name: "Setup Dependencies"
     description: "Install required Python packages for AI demos"
     command: bash
     args:
@@ -115,7 +110,6 @@ jobs:
 
   # Run all demos in sequence
   run-all:
-    name: "Run All AI Demos"
     description: "Execute all AI demos sequentially"
     command: bash
     args:

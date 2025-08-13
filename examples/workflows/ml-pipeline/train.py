@@ -10,11 +10,11 @@ def main():
     print("Starting model training...")
     
     # Read selected features
-    if not os.path.exists("ml_data/selected_features.json"):
+    if not os.path.exists("/volumes/ml-pipeline/selected_features.json"):
         print("Error: selected_features.json not found!")
         sys.exit(1)
     
-    with open("ml_data/selected_features.json", "r") as f:
+    with open("/volumes/ml-pipeline/selected_features.json", "r") as f:
         dataset = json.load(f)
     
     features = dataset["features"]
@@ -47,7 +47,7 @@ def main():
         "training_accuracy": 0.95  # Simulated
     }
     
-    with open("ml_data/trained_model.json", "w") as f:
+    with open("/volumes/ml-pipeline/trained_model.json", "w") as f:
         json.dump(model, f, indent=2)
     
     print(f"Trained model on {len(features)} samples")

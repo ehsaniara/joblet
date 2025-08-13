@@ -10,7 +10,6 @@ defaults:
 jobs:
   # Simple analytics with standard library
   simple-analytics:
-    name: "Simple Analytics"
     description: "Data analytics using only Python standard library"
     command: python3
     args:
@@ -28,7 +27,6 @@ jobs:
 
   # Sales analysis
   sales-analysis:
-    name: "Sales Data Analysis"
     description: "Analyze sales data and generate reports"
     command: python3
     args:
@@ -44,7 +42,6 @@ jobs:
 
   # Customer segmentation
   customer-segmentation:
-    name: "Customer Segmentation"
     description: "Segment customers based on behavior"
     command: python3
     args:
@@ -60,7 +57,6 @@ jobs:
 
   # Time series analysis
   time-series:
-    name: "Time Series Analysis"
     description: "Analyze time-based patterns in data"
     command: python3
     args:
@@ -72,7 +68,6 @@ jobs:
 
   # Report generation
   generate-report:
-    name: "Generate Analytics Report"
     description: "Combine all analytics into a comprehensive report"
     command: python3
     args:
@@ -87,7 +82,6 @@ jobs:
 
   # Setup volumes for analytics
   setup-volumes:
-    name: "Setup Analytics Volumes"
     description: "Create required volumes for analytics processing"
     command: echo
     args:
@@ -97,7 +91,6 @@ jobs:
 
   # Complete analytics workflow
   complete-analytics:
-    name: "Complete Analytics Workflow"
     description: "Run sales analysis, customer segmentation, and time series analysis"
     command: bash
     args:
@@ -119,7 +112,6 @@ jobs:
 
   # Run all analytics
   run-all:
-    name: "Run All Analytics"
     description: "Execute all analytics jobs in sequence"
     command: bash
     args:

@@ -11,19 +11,19 @@ def main():
     print("Starting model evaluation...")
     
     # Read trained model
-    if not os.path.exists("ml_data/trained_model.json"):
+    if not os.path.exists("/volumes/ml-pipeline/trained_model.json"):
         print("Error: trained_model.json not found!")
         sys.exit(1)
     
     # Read test data (use selected features as test set)
-    if not os.path.exists("ml_data/selected_features.json"):
+    if not os.path.exists("/volumes/ml-pipeline/selected_features.json"):
         print("Error: selected_features.json not found!")
         sys.exit(1)
     
-    with open("ml_data/trained_model.json", "r") as f:
+    with open("/volumes/ml-pipeline/trained_model.json", "r") as f:
         model = json.load(f)
     
-    with open("ml_data/selected_features.json", "r") as f:
+    with open("/volumes/ml-pipeline/selected_features.json", "r") as f:
         test_data = json.load(f)
     
     # Evaluate model on test data
@@ -74,7 +74,7 @@ def main():
         "model_ready_for_deployment": accuracy > 0.8
     }
     
-    with open("ml_data/evaluation_results.json", "w") as f:
+    with open("/volumes/ml-pipeline/evaluation_results.json", "w") as f:
         json.dump(evaluation, f, indent=2)
     
     print(f"Evaluated model on {len(features)} samples")

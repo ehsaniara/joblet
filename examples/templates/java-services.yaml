@@ -11,7 +11,6 @@ defaults:
 jobs:
   # API Gateway Service
   api-gateway:
-    name: "API Gateway"
     description: "Spring Cloud Gateway service"
     command: java
     args:
@@ -32,7 +31,6 @@ jobs:
 
   # User Service
   user-service:
-    name: "User Service"
     description: "User management microservice"
     command: java
     args:
@@ -50,7 +48,6 @@ jobs:
 
   # Order Service
   order-service:
-    name: "Order Service"
     description: "Order processing microservice"
     command: java
     args:
@@ -68,7 +65,6 @@ jobs:
 
   # Payment Service with higher resources
   payment-service:
-    name: "Payment Service"
     description: "Payment processing microservice"
     command: java
     args:
@@ -91,7 +87,6 @@ jobs:
 
   # Database migration job
   db-migration:
-    name: "Database Migration"
     description: "Run Flyway database migrations"
     command: java
     args:
@@ -110,7 +105,6 @@ jobs:
 
   # Batch processing job
   batch-processor:
-    name: "Batch Processor"
     description: "Spring Batch job for data processing"
     command: java
     args:

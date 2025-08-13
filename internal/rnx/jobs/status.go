@@ -7,6 +7,7 @@ import (
 	pb "joblet/api/gen"
 	"joblet/internal/rnx/common"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,8 +20,9 @@ var (
 
 func NewStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <job-id>",
-		Short: "Get the status of a job by ID",
+		Use:   "status <id>",
+		Short: "Get the status of a job or workflow by ID",
+		Long:  "Get the status of a job (string ID) or workflow (numeric ID)",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runStatus,
 	}
@@ -31,8 +33,29 @@ func NewStatusCmd() *cobra.Command {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	jobID := args[0]
+	id := args[0]
 
+	// First, try as job ID
+	jobErr := getJobStatus(id)
+	if jobErr == nil {
+		return nil
+	}
+
+	// If job lookup fails and ID is numeric, try as workflow ID
+	if workflowID, parseErr := strconv.Atoi(id); parseErr == nil {
+		workflowErr := getWorkflowStatus(workflowID)
+		if workflowErr == nil {
+			return nil
+		}
+		// If both fail, return workflow error for numeric IDs
+		return workflowErr
+	}
+
+	// For non-numeric IDs, return job error
+	return jobErr
+}
+
+func getJobStatus(jobID string) error {
 	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
@@ -178,4 +201,87 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(response)
+}
+
+// getWorkflowStatus retrieves and displays workflow status
+func getWorkflowStatus(workflowID int) error {
+	client, err := common.NewJobClient()
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
+	// Create workflow service client
+	workflowClient := pb.NewJobServiceClient(client.GetConn())
+
+	req := &pb.GetWorkflowStatusRequest{
+		WorkflowId: int32(workflowID),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := workflowClient.GetWorkflowStatus(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to get workflow status: %w", err)
+	}
+
+	if statusJSON {
+		return outputWorkflowStatusJSON(res)
+	}
+
+	workflow := res.Workflow
+	fmt.Printf("Workflow Status:\n")
+	fmt.Printf("  ID: %d\n", workflow.Id)
+	fmt.Printf("  Name: %s\n", workflow.Name)
+	fmt.Printf("  Template: %s\n", workflow.Template)
+	fmt.Printf("  Status: %s\n", workflow.Status)
+	fmt.Printf("  Progress: %d/%d jobs completed\n", workflow.CompletedJobs, workflow.TotalJobs)
+	fmt.Printf("  Failed: %d\n", workflow.FailedJobs)
+
+	if len(res.Jobs) > 0 {
+		fmt.Printf("\nJobs:\n")
+		for _, job := range res.Jobs {
+			fmt.Printf("  - %s: %s\n", job.Name, job.Status)
+			if len(job.Dependencies) > 0 {
+				fmt.Printf("    Dependencies: %v\n", job.Dependencies)
+			}
+		}
+	}
+
+	return nil
+}
+
+// outputWorkflowStatusJSON outputs workflow status in JSON format
+func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse) error {
+	// Convert protobuf workflow status to JSON structure
+	statusData := map[string]interface{}{
+		"id":             res.Workflow.Id,
+		"name":           res.Workflow.Name,
+		"template":       res.Workflow.Template,
+		"status":         res.Workflow.Status,
+		"total_jobs":     res.Workflow.TotalJobs,
+		"completed_jobs": res.Workflow.CompletedJobs,
+		"failed_jobs":    res.Workflow.FailedJobs,
+		"created_at":     res.Workflow.CreatedAt,
+		"started_at":     res.Workflow.StartedAt,
+		"completed_at":   res.Workflow.CompletedAt,
+		"jobs":           make([]map[string]interface{}, 0, len(res.Jobs)),
+	}
+
+	// Add job details
+	for _, job := range res.Jobs {
+		jobData := map[string]interface{}{
+			"name":   job.Name,
+			"status": job.Status,
+		}
+		if len(job.Dependencies) > 0 {
+			jobData["dependencies"] = job.Dependencies
+		}
+		statusData["jobs"] = append(statusData["jobs"].([]map[string]interface{}), jobData)
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(statusData)
 }
