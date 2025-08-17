@@ -2,10 +2,21 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Link} from 'react-router-dom';
 import {useJobs} from '../hooks/useJobs';
 import {useLogStream} from '../hooks/useLogStream';
-import {FileText, Play, Plus, RotateCcw, Square, X} from 'lucide-react';
+import {ChevronLeft, ChevronRight, FileText, Play, Plus, RotateCcw, Square, X} from 'lucide-react';
 
 const Jobs: React.FC = () => {
-    const {jobs, loading, error, refreshJobs} = useJobs();
+    const {
+        loading,
+        error,
+        refreshJobs,
+        currentPage,
+        pageSize,
+        totalJobs,
+        totalPages,
+        paginatedJobs,
+        setCurrentPage,
+        setPageSize
+    } = useJobs();
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [autoScroll, setAutoScroll] = useState<boolean>(true);
     const {logs, connected, error: logError, clearLogs} = useLogStream(selectedJobId);
@@ -92,93 +103,178 @@ const Jobs: React.FC = () => {
             ) : (
                 <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200">
-                        <h3 className="text-lg font-medium text-white">
-                            All Jobs ({jobs.length})
-                        </h3>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-medium text-white">
+                                All Jobs ({totalJobs})
+                            </h3>
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-2">
+                                    <label className="text-sm text-gray-300">Show:</label>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => setPageSize(Number(e.target.value))}
+                                        className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm"
+                                    >
+                                        <option value={5}>5</option>
+                                        <option value={10}>10</option>
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                    </select>
+                                    <span className="text-sm text-gray-300">per page</span>
+                                </div>
+                                <div className="text-sm text-gray-300">
+                                    Showing {totalJobs === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalJobs)} of {totalJobs}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {jobs.length === 0 ? (
+                    {totalJobs === 0 ? (
                         <div className="p-6 text-center">
                             <p className="text-gray-500">No jobs found</p>
                             <p className="text-sm text-gray-400 mt-1">Create your first job to get started</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-auto">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                                        Job
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                                        Command
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                                        Duration
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                                        Started
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                                </thead>
-                                <tbody className="bg-auto divide-y divide-gray-200">
-                                {jobs.map((job) => (
-                                    <tr key={job.id} className="hover:bg-gray-700">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div>
-                                                <div className="text-sm text-white">
-                                                    {job.id}
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-auto">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            Job
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            Command
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            Duration
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            Started
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                    </thead>
+                                    <tbody className="bg-auto divide-y divide-gray-200">
+                                    {paginatedJobs.map((job) => (
+                                        <tr key={job.id} className="hover:bg-gray-700">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div>
+                                                    <div className="text-sm text-white">
+                                                        {job.id}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
                         <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
                           {job.status}
                         </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-white max-w-xs truncate">
-                                                {job.command} {job.args.join(' ')}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                            {formatDuration(job.duration)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                            {job.startTime ? new Date(job.startTime).toLocaleString() : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <div className="flex space-x-2">
-                                                <button
-                                                    onClick={() => setSelectedJobId(job.id)}
-                                                    className="text-green-600 hover:text-green-300"
-                                                    title="View Logs"
-                                                >
-                                                    <FileText className="h-4 w-4"/>
-                                                </button>
-                                                {job.status === 'RUNNING' ? (
-                                                    <button className="text-red-600 hover:text-red-900">
-                                                        <Square className="h-4 w-4"/>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-white max-w-xs truncate">
+                                                    {job.command} {job.args.join(' ')}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                {((job as any).start_time && (job as any).end_time) ? 
+                                                   formatDuration(new Date((job as any).end_time).getTime() - new Date((job as any).start_time).getTime()) : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                {(job as any).start_time ? new Date((job as any).start_time).toLocaleString() : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => setSelectedJobId(job.id)}
+                                                        className="text-green-600 hover:text-green-300"
+                                                        title="View Logs"
+                                                    >
+                                                        <FileText className="h-4 w-4"/>
                                                     </button>
-                                                ) : (
-                                                    <button className="text-blue-600 hover:text-blue-300">
-                                                        <Play className="h-4 w-4"/>
-                                                    </button>
-                                                )}
+                                                    {job.status === 'RUNNING' ? (
+                                                        <button className="text-red-600 hover:text-red-900">
+                                                            <Square className="h-4 w-4"/>
+                                                        </button>
+                                                    ) : (
+                                                        <button className="text-blue-600 hover:text-blue-300">
+                                                            <Play className="h-4 w-4"/>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div className="px-6 py-4 border-t border-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm text-gray-300">
+                                            Page {currentPage} of {totalPages}
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                            <button
+                                                onClick={() => setCurrentPage(currentPage - 1)}
+                                                disabled={currentPage === 1}
+                                                className="px-3 py-1 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                            >
+                                                <ChevronLeft className="h-4 w-4 mr-1"/>
+                                                Previous
+                                            </button>
+                                            
+                                            {/* Page Numbers */}
+                                            <div className="flex items-center space-x-1">
+                                                {Array.from({length: Math.min(totalPages, 5)}, (_, i) => {
+                                                    let pageNum;
+                                                    if (totalPages <= 5) {
+                                                        pageNum = i + 1;
+                                                    } else if (currentPage <= 3) {
+                                                        pageNum = i + 1;
+                                                    } else if (currentPage >= totalPages - 2) {
+                                                        pageNum = totalPages - 4 + i;
+                                                    } else {
+                                                        pageNum = currentPage - 2 + i;
+                                                    }
+                                                    
+                                                    return (
+                                                        <button
+                                                            key={pageNum}
+                                                            onClick={() => setCurrentPage(pageNum)}
+                                                            className={`px-3 py-1 border rounded text-sm ${
+                                                                currentPage === pageNum
+                                                                    ? 'bg-blue-600 text-white border-blue-600'
+                                                                    : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                                                            }`}
+                                                        >
+                                                            {pageNum}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            
+                                            <button
+                                                onClick={() => setCurrentPage(currentPage + 1)}
+                                                disabled={currentPage === totalPages}
+                                                className="px-3 py-1 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                            >
+                                                Next
+                                                <ChevronRight className="h-4 w-4 ml-1"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             )}

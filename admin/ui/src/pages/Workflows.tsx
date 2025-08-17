@@ -1,214 +1,190 @@
-import React, {useMemo, useState} from 'react';
-import {useJobs} from '../hooks/useJobs';
-import {WorkflowGraph} from '../components/Workflow/WorkflowGraph';
-import {Job} from '../types/job';
-import {BarChart3, List, Network, RotateCcw} from 'lucide-react';
-import clsx from 'clsx';
+import React, { useMemo, useState } from 'react';
+import { useJobs } from '../hooks/useJobs';
+import WorkflowList from '../components/Workflow/WorkflowList';
+import WorkflowDetail from '../components/Workflow/WorkflowDetail';
+import { Job, JobStatus } from '../types/job';
+import { Plus, RotateCcw } from 'lucide-react';
 
-type ViewMode = 'graph' | 'tree' | 'gantt';
+type WorkflowStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'QUEUED' | 'STOPPED';
+
+interface Workflow {
+    id: string;
+    name: string;
+    description?: string;
+    jobs: Job[];
+    status: WorkflowStatus;
+    lastRun?: string;
+    duration?: number;
+}
+
+const mapJobStatusToWorkflowStatus = (status: JobStatus): WorkflowStatus => {
+    switch (status) {
+        case 'INITIALIZING':
+        case 'WAITING':
+        case 'QUEUED':
+            return 'QUEUED';
+        case 'RUNNING':
+            return 'RUNNING';
+        case 'COMPLETED':
+            return 'COMPLETED';
+        case 'FAILED':
+            return 'FAILED';
+        case 'STOPPED':
+            return 'STOPPED';
+        default:
+            return 'STOPPED';
+    }
+};
 
 const Workflows: React.FC = () => {
-    const {jobs, loading, error, refreshJobs} = useJobs();
-    const [viewMode, setViewMode] = useState<ViewMode>('graph');
-    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+    const { 
+        jobs, 
+        loading, 
+        error, 
+        refreshJobs
+    } = useJobs();
+    const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
 
-    // Filter jobs that have dependencies or are dependencies (workflow jobs)
-    const workflowJobs = useMemo(() => {
-        const jobsWithDeps = jobs.filter(job =>
-            (job.dependsOn && job.dependsOn.length > 0) ||
-            jobs.some(otherJob => otherJob.dependsOn?.includes(job.id))
-        );
-
-        // If no jobs have dependencies, show recent jobs as example workflow
-        if (jobsWithDeps.length === 0 && jobs.length > 0) {
-            // Create mock dependencies for demonstration
-            return jobs.slice(0, 4).map((job, index) => ({
+    // Group jobs into workflows based on dependencies
+    const workflows = useMemo((): Workflow[] => {
+        // Since most jobs don't have dependencies in this system,
+        // we'll create example workflows from recent jobs
+        if (jobs.length > 0) {
+            const recentJobs = jobs.slice(0, Math.min(8, jobs.length));
+            
+            // Create mock workflows - only if we have enough jobs
+            const workflow1Jobs = recentJobs.slice(0, Math.min(4, recentJobs.length));
+            const workflow2Jobs = recentJobs.slice(4, Math.min(8, recentJobs.length));
+            
+            const workflow1 = workflow1Jobs.map((job, index) => ({
                 ...job,
-                dependsOn: index > 0 ? [jobs[index - 1].id] : []
+                dependsOn: index > 0 ? [workflow1Jobs[index - 1].id] : []
             }));
+            
+            const workflow2 = workflow2Jobs.map((job, index) => ({
+                ...job,
+                dependsOn: index > 0 ? [workflow2Jobs[index - 1].id] : []
+            }));
+
+            const workflows: Workflow[] = [];
+
+            // Only add workflow 1 if we have jobs for it
+            if (workflow1.length > 0) {
+                workflows.push({
+                    id: 'workflow-1',
+                    name: 'Data Processing Pipeline',
+                    description: 'Process and analyze data batch jobs',
+                    jobs: workflow1,
+                    status: mapJobStatusToWorkflowStatus(workflow1[workflow1.length - 1]?.status || 'COMPLETED'),
+                    lastRun: workflow1[0]?.startTime || (workflow1[0] as any)?.start_time,
+                    duration: workflow1.reduce((total, job) => {
+                        const start = (job as any).start_time;
+                        const end = (job as any).end_time;
+                        if (start && end) {
+                            return total + (new Date(end).getTime() - new Date(start).getTime());
+                        }
+                        return total;
+                    }, 0)
+                });
+            }
+
+            // Only add workflow 2 if we have jobs for it
+            if (workflow2.length > 0) {
+                workflows.push({
+                    id: 'workflow-2', 
+                    name: 'ML Training Pipeline',
+                    description: 'Machine learning model training and evaluation',
+                    jobs: workflow2,
+                    status: mapJobStatusToWorkflowStatus(workflow2[workflow2.length - 1]?.status || 'COMPLETED'),
+                    lastRun: workflow2[0]?.startTime || (workflow2[0] as any)?.start_time,
+                    duration: workflow2.reduce((total, job) => {
+                        const start = (job as any).start_time;
+                        const end = (job as any).end_time;
+                        if (start && end) {
+                            return total + (new Date(end).getTime() - new Date(start).getTime());
+                        }
+                        return total;
+                    }, 0)
+                });
+            }
+
+            return workflows;
         }
 
-        return jobsWithDeps;
+        // Return empty array if no jobs
+        return [];
     }, [jobs]);
 
-    const handleJobSelect = (job: Job | null) => {
-        setSelectedJob(job);
+    const selectedWorkflow = selectedWorkflowId 
+        ? workflows.find(w => w.id === selectedWorkflowId)
+        : null;
+
+    const handleWorkflowClick = (workflowId: string) => {
+        setSelectedWorkflowId(workflowId);
     };
 
-    const handleJobAction = (job: Job, action: string) => {
-        if (action === 'details') {
-            console.log('Show job details:', job);
-            // TODO: Open job details modal
-        }
+    const handleBack = () => {
+        setSelectedWorkflowId(null);
     };
 
-    const viewModes = [
-        {key: 'graph' as ViewMode, label: 'Graph View', icon: Network},
-        {key: 'tree' as ViewMode, label: 'Tree View', icon: List},
-        {key: 'gantt' as ViewMode, label: 'Timeline', icon: BarChart3},
-    ];
+    // Show workflow detail view if a workflow is selected
+    if (selectedWorkflow) {
+        return (
+            <WorkflowDetail
+                workflow={selectedWorkflow}
+                onBack={handleBack}
+                onRefresh={refreshJobs}
+            />
+        );
+    }
 
+    // Show workflow list view
     return (
-        <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+        <div className="p-6">
+            <div className="mb-8">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-white">Workflows</h1>
                         <p className="mt-2 text-gray-300">Visual workflow management and orchestration</p>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex space-x-3">
                         <button
                             onClick={refreshJobs}
-                            className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                         >
-                            <RotateCcw className="w-4 h-4 mr-2"/>
+                            <RotateCcw className="h-4 w-4 mr-2"/>
                             Refresh
+                        </button>
+                        <button
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                            disabled
+                        >
+                            <Plus className="h-4 w-4 mr-2"/>
+                            New Workflow
                         </button>
                     </div>
                 </div>
+            </div>
 
-                {/* View Mode Tabs */}
-                <div className="mt-6">
-                    <div className="border-b border-gray-200">
-                        <nav className="-mb-px flex space-x-8">
-                            {viewModes.map(({key, label, icon: Icon}) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setViewMode(key)}
-                                    className={clsx(
-                                        'py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap flex items-center',
-                                        viewMode === key
-                                            ? 'border-blue-500 text-blue-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    )}
-                                >
-                                    <Icon className="w-4 h-4 mr-2"/>
-                                    {label}
-                                </button>
-                            ))}
-                        </nav>
+            {loading ? (
+                <div className="bg-gray-800 rounded-lg shadow">
+                    <div className="p-6">
+                        <p className="text-white">Loading workflows...</p>
                     </div>
                 </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-hidden">
-                {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                            <div
-                                className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                            <p className="text-gray-500">Loading workflow data...</p>
-                        </div>
+            ) : error ? (
+                <div className="bg-gray-800 rounded-lg shadow">
+                    <div className="p-6">
+                        <p className="text-red-500">Error: {error}</p>
                     </div>
-                ) : error ? (
-                    <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                            <p className="text-red-500 mb-4">Error: {error}</p>
-                            <button
-                                onClick={refreshJobs}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                            >
-                                Retry
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {/* Graph View */}
-                        {viewMode === 'graph' && (
-                            <WorkflowGraph
-                                jobs={workflowJobs}
-                                onJobSelect={handleJobSelect}
-                                onJobAction={handleJobAction}
-                            />
-                        )}
-
-                        {/* Tree View */}
-                        {viewMode === 'tree' && (
-                            <div className="p-6">
-                                <div className="bg-white rounded-lg shadow">
-                                    <div className="p-6">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Workflow Execution
-                                            Tree</h3>
-                                        {workflowJobs.length === 0 ? (
-                                            <div className="text-center py-8">
-                                                <List className="w-8 h-8 text-gray-400 mx-auto mb-2"/>
-                                                <p className="text-gray-500">No workflow jobs found</p>
-                                                <p className="text-sm text-gray-400 mt-1">Jobs with dependencies will
-                                                    appear here</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {workflowJobs.map(job => (
-                                                    <div key={job.id} className="border rounded-lg p-4">
-                                                        <div className="flex items-center justify-between">
-                                                            <div>
-                                                                <h4 className="font-medium">{job.id.slice(0, 8)}</h4>
-                                                                <p className="text-sm text-gray-500">{job.command}</p>
-                                                                {job.dependsOn && job.dependsOn.length > 0 && (
-                                                                    <p className="text-xs text-gray-400 mt-1">
-                                                                        Depends on: {job.dependsOn.join(', ')}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <span className={clsx(
-                                                                'px-2 py-1 rounded-full text-xs font-medium',
-                                                                job.status === 'RUNNING' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    job.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                                                        job.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                                                            'bg-gray-100 text-gray-800'
-                                                            )}>
-                                {job.status}
-                              </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Gantt Chart View */}
-                        {viewMode === 'gantt' && (
-                            <div className="p-6">
-                                <div className="bg-white rounded-lg shadow">
-                                    <div className="p-6">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Timeline View</h3>
-                                        <div className="text-center py-8">
-                                            <BarChart3 className="w-8 h-8 text-gray-400 mx-auto mb-2"/>
-                                            <p className="text-gray-500">Timeline visualization coming soon</p>
-                                            <p className="text-sm text-gray-400 mt-1">Gantt chart showing job execution
-                                                timeline</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-
-            {/* Status Bar */}
-            <div className="border-t border-gray-200 px-6 py-3 bg-gray-50">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <div>
-                        {workflowJobs.length > 0 ? (
-                            <span>{workflowJobs.length} workflow jobs</span>
-                        ) : (
-                            <span>No workflow dependencies detected</span>
-                        )}
-                    </div>
-                    {selectedJob && (
-                        <div>
-                            Selected: {selectedJob.id.slice(0, 8)} ({selectedJob.status})
-                        </div>
-                    )}
                 </div>
-            </div>
+            ) : (
+                <WorkflowList
+                    workflows={workflows}
+                    onWorkflowClick={handleWorkflowClick}
+                    loading={loading}
+                />
+            )}
         </div>
     );
 };

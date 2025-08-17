@@ -1,4 +1,4 @@
-import {Job, JobExecuteRequest, SystemMetrics, WorkflowTemplate} from '../types';
+import {Job, JobExecuteRequest, SystemMetrics, DetailedSystemInfo, WorkflowTemplate} from '../types';
 
 interface Volume {
     id?: string;
@@ -80,6 +80,10 @@ class APIService {
     // System monitoring
     async getSystemMetrics(): Promise<SystemMetrics> {
         return this.request<SystemMetrics>('/monitor');
+    }
+
+    async getDetailedSystemInfo(): Promise<DetailedSystemInfo> {
+        return this.request<DetailedSystemInfo>('/system-info');
     }
 
     // Volume operations

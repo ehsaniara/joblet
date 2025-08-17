@@ -9,6 +9,14 @@ interface UseJobsReturn {
     refreshJobs: () => Promise<void>;
     executeJob: (request: JobExecuteRequest) => Promise<string>;
     stopJob: (jobId: string) => Promise<void>;
+    // Pagination
+    currentPage: number;
+    pageSize: number;
+    totalJobs: number;
+    totalPages: number;
+    paginatedJobs: Job[];
+    setCurrentPage: (page: number) => void;
+    setPageSize: (size: number) => void;
 }
 
 // Helper function to extract numeric ID from job ID string
@@ -17,13 +25,15 @@ const getNumericId = (id: string): number => {
     return match ? parseInt(match[0], 10) : 0;
 };
 
-// Sort jobs by startTime (newest first), then by numeric ID for consistent ordering
+// Sort jobs by startTime (newest first), then by numeric ID in descending order
 const sortJobs = (jobs: Job[]): Job[] => {
     return [...jobs].sort((a, b) => {
-        // Primary sort: by startTime (newer jobs first)
-        if (a.startTime && b.startTime) {
-            const timeA = new Date(a.startTime).getTime();
-            const timeB = new Date(b.startTime).getTime();
+        // Primary sort: by startTime (newer jobs first) - check both field name variations
+        const aTime = (a as any).start_time || a.startTime;
+        const bTime = (b as any).start_time || b.startTime;
+        if (aTime && bTime) {
+            const timeA = new Date(aTime).getTime();
+            const timeB = new Date(bTime).getTime();
             if (timeA !== timeB) {
                 return timeB - timeA; // Descending order (newest first)
             }
@@ -34,7 +44,7 @@ const sortJobs = (jobs: Job[]): Job[] => {
         const numB = getNumericId(b.id);
 
         if (numA !== numB) {
-            return numA - numB; // Ascending order by numeric ID
+            return numB - numA; // Descending order by numeric ID
         }
 
         // Fallback: string comparison if numeric parts are equal
@@ -46,6 +56,10 @@ export const useJobs = (): UseJobsReturn => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [pageSize, setPageSize] = useState<number>(10);
 
     const refreshJobs = useCallback(async (): Promise<void> => {
         try {
@@ -79,6 +93,26 @@ export const useJobs = (): UseJobsReturn => {
         }
     }, [refreshJobs]);
 
+    // Calculate pagination values
+    const totalJobs = jobs.length;
+    const totalPages = Math.ceil(totalJobs / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedJobs = jobs.slice(startIndex, endIndex);
+
+    // Reset to page 1 if current page is beyond available pages
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(1);
+        }
+    }, [currentPage, totalPages]);
+
+    // Handle page size changes
+    const handleSetPageSize = useCallback((size: number) => {
+        setPageSize(size);
+        setCurrentPage(1); // Reset to first page when changing page size
+    }, []);
+
     useEffect(() => {
         refreshJobs();
 
@@ -87,5 +121,19 @@ export const useJobs = (): UseJobsReturn => {
         return () => clearInterval(interval);
     }, [refreshJobs]);
 
-    return {jobs, loading, error, refreshJobs, executeJob, stopJob};
+    return {
+        jobs,
+        loading,
+        error,
+        refreshJobs,
+        executeJob,
+        stopJob,
+        currentPage,
+        pageSize,
+        totalJobs,
+        totalPages,
+        paginatedJobs,
+        setCurrentPage,
+        setPageSize: handleSetPageSize
+    };
 };

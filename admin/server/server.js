@@ -221,11 +221,131 @@ app.get('/api/jobs/:jobId', async (req, res) => {
   }
 });
 
+// Get comprehensive system information
+app.get('/api/system-info', async (req, res) => {
+  try {
+    const node = req.query.node;
+    
+    // Get comprehensive system information using monitor status command
+    const output = await execRnx(['monitor', 'status', '--json'], { 
+      node,
+      maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+    });
+    
+    const monitorData = JSON.parse(output);
+    
+    // Transform the data to match the frontend DetailedSystemInfo interface
+    const systemInfo = {
+      hostInfo: {
+        hostname: monitorData.host?.hostname,
+        platform: monitorData.host?.os,
+        arch: monitorData.host?.architecture,
+        release: monitorData.host?.kernelVersion,
+        uptime: monitorData.host?.uptime,
+        cloudProvider: monitorData.cloud?.provider,
+        instanceType: monitorData.cloud?.instanceType,
+        region: monitorData.cloud?.region
+      },
+      cpuInfo: {
+        cores: monitorData.cpu?.cores,
+        model: 'N/A', // Not provided by monitor status
+        frequency: null, // Not provided by monitor status
+        usage: monitorData.cpu?.usagePercent,
+        loadAverage: monitorData.cpu?.loadAverage,
+        perCoreUsage: monitorData.cpu?.perCoreUsage,
+        temperature: null // Not provided by monitor status
+      },
+      memoryInfo: {
+        total: monitorData.memory?.totalBytes,
+        used: monitorData.memory?.usedBytes,
+        available: monitorData.memory?.availableBytes,
+        percent: monitorData.memory?.usagePercent,
+        buffers: monitorData.memory?.bufferedBytes,
+        cached: monitorData.memory?.cachedBytes,
+        swap: {
+          total: monitorData.memory?.swapTotal || 0,
+          used: (monitorData.memory?.swapTotal || 0) - (monitorData.memory?.swapFree || 0),
+          percent: monitorData.memory?.swapTotal > 0 
+            ? ((monitorData.memory.swapTotal - monitorData.memory.swapFree) / monitorData.memory.swapTotal) * 100 
+            : 0
+        }
+      },
+      disksInfo: {
+        disks: monitorData.disks?.map(disk => ({
+          name: disk.device,
+          mountpoint: disk.mountPoint,
+          filesystem: disk.filesystem,
+          size: disk.totalBytes,
+          used: disk.usedBytes,
+          available: disk.freeBytes,
+          percent: disk.usagePercent,
+          readBps: null, // Not provided by monitor status
+          writeBps: null, // Not provided by monitor status
+          iops: null // Not provided by monitor status
+        })) || [],
+        totalSpace: monitorData.disks?.reduce((total, disk) => total + (disk.totalBytes || 0), 0),
+        usedSpace: monitorData.disks?.reduce((total, disk) => total + (disk.usedBytes || 0), 0)
+      },
+      networkInfo: {
+        interfaces: monitorData.networks?.map(net => ({
+          name: net.interface,
+          type: 'ethernet', // Default, not provided by monitor status
+          status: 'up', // Default, not provided by monitor status
+          speed: null, // Not provided by monitor status
+          mtu: null, // Not provided by monitor status
+          ipAddresses: [], // Not provided by monitor status
+          macAddress: null, // Not provided by monitor status
+          rxBytes: net.bytesReceived,
+          txBytes: net.bytesSent,
+          rxPackets: net.packetsReceived,
+          txPackets: net.packetsSent,
+          rxErrors: net.dropsIn || 0,
+          txErrors: 0 // Not provided by monitor status
+        })) || [],
+        totalRxBytes: monitorData.networks?.reduce((total, net) => total + (net.bytesReceived || 0), 0),
+        totalTxBytes: monitorData.networks?.reduce((total, net) => total + (net.bytesSent || 0), 0)
+      },
+      processesInfo: {
+        processes: [
+          ...(monitorData.processes?.topByCPU || []),
+          ...(monitorData.processes?.topByMemory || [])
+        ].map(proc => ({
+          pid: proc.pid,
+          name: proc.name,
+          command: proc.command,
+          user: 'N/A', // Not provided by monitor status
+          cpu: proc.cpuPercent || 0,
+          memory: proc.memoryPercent || 0,
+          memoryBytes: proc.memoryBytes || 0,
+          status: proc.status || 'unknown',
+          startTime: proc.startTime,
+          threads: null // Not provided by monitor status
+        })).filter((proc, index, self) => 
+          // Remove duplicates based on PID
+          index === self.findIndex(p => p.pid === proc.pid)
+        ),
+        totalProcesses: monitorData.processes?.totalProcesses
+      }
+    };
+
+    res.json(systemInfo);
+  } catch (error) {
+    console.error('Failed to get system info:', error);
+    res.status(500).json({ 
+      error: 'Failed to get system info', 
+      message: error.message 
+    });
+  }
+});
+
 // Monitor system metrics
 app.get('/api/monitor', async (req, res) => {
   try {
     const node = req.query.node;
-    const output = await execRnx(['monitor', 'status', '--json'], { node });
+    const output = await execRnx(['monitor', 'status', '--json'], { 
+      node,
+      maxBuffer: 1024 * 1024 * 10 // 10MB buffer instead of default 1MB
+    });
     
     let metrics;
     try {
@@ -273,7 +393,21 @@ app.get('/api/monitor', async (req, res) => {
     res.json(metrics);
   } catch (error) {
     console.error('Failed to get monitor data:', error);
-    res.status(500).json({ error: 'Failed to get monitor data', message: error.message });
+    
+    // Return fallback metrics if monitoring fails
+    const fallbackMetrics = {
+      timestamp: new Date().toISOString(),
+      cpu: { cores: 0, usage: 0, loadAverage: [0, 0, 0] },
+      memory: { total: 0, used: 0, available: 0, percent: 0 },
+      disk: { readBps: 0, writeBps: 0, iops: 0 },
+      jobs: { total: 0, running: 0, completed: 0, failed: 0 }
+    };
+    
+    res.status(500).json({ 
+      error: 'Failed to get monitor data', 
+      message: error.message,
+      fallback: fallbackMetrics
+    });
   }
 });
 
