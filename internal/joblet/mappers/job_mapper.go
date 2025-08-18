@@ -22,17 +22,19 @@ func NewJobMapper() *JobMapper {
 // DomainToProtobuf converts domain Job to protobuf Job
 func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 	pbJob := &pb.Job{
-		Id:        job.Id,
-		Command:   job.Command,
-		Args:      job.Args,
-		MaxCPU:    job.Limits.CPU.Value(),
-		CpuCores:  job.Limits.CPUCores.String(),
-		MaxMemory: job.Limits.Memory.Megabytes(),
-		MaxIOBPS:  int32(job.Limits.IOBandwidth.BytesPerSecond()),
-		Status:    string(job.Status),
-		StartTime: job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
-		ExitCode:  job.ExitCode,
-		Runtime:   job.Runtime,
+		Id:                job.Id,
+		Command:           job.Command,
+		Args:              job.Args,
+		MaxCPU:            job.Limits.CPU.Value(),
+		CpuCores:          job.Limits.CPUCores.String(),
+		MaxMemory:         job.Limits.Memory.Megabytes(),
+		MaxIOBPS:          int32(job.Limits.IOBandwidth.BytesPerSecond()),
+		Status:            string(job.Status),
+		StartTime:         job.StartTime.Format("2006-01-02T15:04:05Z07:00"),
+		ExitCode:          job.ExitCode,
+		Runtime:           job.Runtime,
+		Environment:       job.Environment,
+		SecretEnvironment: job.SecretEnvironment,
 	}
 
 	if job.EndTime != nil {
@@ -57,15 +59,17 @@ func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
 	)
 
 	job := &domain.Job{
-		Id:         pbJob.Id,
-		Command:    pbJob.Command,
-		Args:       pbJob.Args,
-		Limits:     *limits,
-		Status:     domain.JobStatus(pbJob.Status),
-		ExitCode:   pbJob.ExitCode,
-		Runtime:    pbJob.Runtime,
-		CgroupPath: "", // Not in protobuf
-		Pid:        0,  // Not in protobuf
+		Id:                pbJob.Id,
+		Command:           pbJob.Command,
+		Args:              pbJob.Args,
+		Limits:            *limits,
+		Status:            domain.JobStatus(pbJob.Status),
+		ExitCode:          pbJob.ExitCode,
+		Runtime:           pbJob.Runtime,
+		Environment:       pbJob.Environment,
+		SecretEnvironment: pbJob.SecretEnvironment,
+		CgroupPath:        "", // Not in protobuf
+		Pid:               0,  // Not in protobuf
 	}
 
 	// Parse times
@@ -226,10 +230,12 @@ func (m *JobMapper) ProtobufToStartJobRequest(req *pb.RunJobRequest) (*interface
 			MaxIOBPS:  int32(resourceLimits.IOBandwidth.BytesPerSecond()),
 			CPUCores:  resourceLimits.CPUCores.String(),
 		},
-		Uploads:  domainUploads,
-		Schedule: req.Schedule,
-		Network:  network,
-		Volumes:  req.Volumes,
+		Uploads:           domainUploads,
+		Schedule:          req.Schedule,
+		Network:           network,
+		Volumes:           req.Volumes,
+		Environment:       req.Environment,
+		SecretEnvironment: req.SecretEnvironment,
 	}, nil
 }
 
@@ -247,16 +253,18 @@ func (m *JobMapper) StartJobRequestToProtobuf(req *interfaces.StartJobRequest) *
 	}
 
 	return &pb.RunJobRequest{
-		Command:   req.Command,
-		Args:      req.Args,
-		MaxCpu:    req.Resources.MaxCPU,
-		MaxMemory: req.Resources.MaxMemory,
-		MaxIobps:  req.Resources.MaxIOBPS,
-		CpuCores:  req.Resources.CPUCores,
-		Uploads:   pbUploads,
-		Schedule:  req.Schedule,
-		Network:   req.Network,
-		Volumes:   req.Volumes,
+		Command:           req.Command,
+		Args:              req.Args,
+		MaxCpu:            req.Resources.MaxCPU,
+		MaxMemory:         req.Resources.MaxMemory,
+		MaxIobps:          req.Resources.MaxIOBPS,
+		CpuCores:          req.Resources.CPUCores,
+		Uploads:           pbUploads,
+		Schedule:          req.Schedule,
+		Network:           req.Network,
+		Volumes:           req.Volumes,
+		Environment:       req.Environment,
+		SecretEnvironment: req.SecretEnvironment,
 	}
 }
 

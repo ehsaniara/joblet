@@ -239,12 +239,67 @@ jobs:
           name: rnx-binary-amd64
           path: ./
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la ./
+          echo "Looking for binaries:"
+          find . -name "*joblet*" -o -name "*rnx*" | head -10
+          echo "All files in current directory tree:"
+          find . -type f | head -20
+
       - name: Make binaries executable
         run: |
-          chmod +x joblet-amd64
-          chmod +x rnx-amd64
-          mv joblet-amd64 joblet
-          mv rnx-amd64 rnx
+          echo "Making binaries executable..."
+          
+          # Find and handle joblet binary
+          if [ -f "./joblet-amd64" ]; then
+            echo "Found joblet-amd64, making it executable and renaming..."
+            chmod +x joblet-amd64
+            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+            mv joblet-amd64 joblet
+          else
+            echo "joblet-amd64 not found, searching for alternatives..."
+            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
+            if [ -n "$JOBLET_FILE" ]; then
+              echo "Found joblet binary at: $JOBLET_FILE"
+              chmod +x "$JOBLET_FILE"
+              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+              mv "$JOBLET_FILE" joblet
+            else
+              echo "ERROR: No joblet binary found!"
+              exit 1
+            fi
+          fi
+          
+          # Find and handle rnx binary
+          if [ -f "./rnx-amd64" ]; then
+            echo "Found rnx-amd64, making it executable and renaming..."
+            chmod +x rnx-amd64
+            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+            mv rnx-amd64 rnx
+          else
+            echo "rnx-amd64 not found, searching for alternatives..."
+            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
+            if [ -n "$RNX_FILE" ]; then
+              echo "Found rnx binary at: $RNX_FILE"
+              chmod +x "$RNX_FILE"
+              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+              mv "$RNX_FILE" rnx
+            else
+              echo "ERROR: No rnx binary found!"
+              exit 1
+            fi
+          fi
+          
+          echo "Final verification:"
+          ls -la joblet rnx
+          echo "Joblet binary info:"
+          file joblet
+          echo "RNX binary info:"
+          file rnx
 
       - name: Install packaging dependencies
         run: |
@@ -287,12 +342,67 @@ jobs:
           name: rnx-binary-arm64
           path: ./
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la ./
+          echo "Looking for binaries:"
+          find . -name "*joblet*" -o -name "*rnx*" | head -10
+          echo "All files in current directory tree:"
+          find . -type f | head -20
+
       - name: Make binaries executable
         run: |
-          chmod +x joblet-arm64
-          chmod +x rnx-arm64
-          mv joblet-arm64 joblet
-          mv rnx-arm64 rnx
+          echo "Making binaries executable..."
+          
+          # Find and handle joblet binary
+          if [ -f "./joblet-arm64" ]; then
+            echo "Found joblet-arm64, making it executable and renaming..."
+            chmod +x joblet-arm64
+            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+            mv joblet-arm64 joblet
+          else
+            echo "joblet-arm64 not found, searching for alternatives..."
+            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
+            if [ -n "$JOBLET_FILE" ]; then
+              echo "Found joblet binary at: $JOBLET_FILE"
+              chmod +x "$JOBLET_FILE"
+              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+              mv "$JOBLET_FILE" joblet
+            else
+              echo "ERROR: No joblet binary found!"
+              exit 1
+            fi
+          fi
+          
+          # Find and handle rnx binary
+          if [ -f "./rnx-arm64" ]; then
+            echo "Found rnx-arm64, making it executable and renaming..."
+            chmod +x rnx-arm64
+            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+            mv rnx-arm64 rnx
+          else
+            echo "rnx-arm64 not found, searching for alternatives..."
+            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
+            if [ -n "$RNX_FILE" ]; then
+              echo "Found rnx binary at: $RNX_FILE"
+              chmod +x "$RNX_FILE"
+              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+              mv "$RNX_FILE" rnx
+            else
+              echo "ERROR: No rnx binary found!"
+              exit 1
+            fi
+          fi
+          
+          echo "Final verification:"
+          ls -la joblet rnx
+          echo "Joblet binary info:"
+          file joblet
+          echo "RNX binary info:"
+          file rnx
 
       - name: Install packaging dependencies
         run: |
@@ -335,12 +445,61 @@ jobs:
           name: rnx-binary-amd64
           path: ./
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la ./
+          echo "Looking for binaries:"
+          find . -name "*joblet*" -o -name "*rnx*" | head -10
+
       - name: Make binaries executable
         run: |
-          chmod +x joblet-amd64
-          chmod +x rnx-amd64
-          mv joblet-amd64 joblet
-          mv rnx-amd64 rnx
+          echo "Making binaries executable..."
+          
+          # Find and handle joblet binary
+          if [ -f "./joblet-amd64" ]; then
+            echo "Found joblet-amd64, making it executable and renaming..."
+            chmod +x joblet-amd64
+            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+            mv joblet-amd64 joblet
+          else
+            echo "joblet-amd64 not found, searching for alternatives..."
+            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
+            if [ -n "$JOBLET_FILE" ]; then
+              echo "Found joblet binary at: $JOBLET_FILE"
+              chmod +x "$JOBLET_FILE"
+              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+              mv "$JOBLET_FILE" joblet
+            else
+              echo "ERROR: No joblet binary found!"
+              exit 1
+            fi
+          fi
+          
+          # Find and handle rnx binary
+          if [ -f "./rnx-amd64" ]; then
+            echo "Found rnx-amd64, making it executable and renaming..."
+            chmod +x rnx-amd64
+            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+            mv rnx-amd64 rnx
+          else
+            echo "rnx-amd64 not found, searching for alternatives..."
+            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
+            if [ -n "$RNX_FILE" ]; then
+              echo "Found rnx binary at: $RNX_FILE"
+              chmod +x "$RNX_FILE"
+              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+              mv "$RNX_FILE" rnx
+            else
+              echo "ERROR: No rnx binary found!"
+              exit 1
+            fi
+          fi
+          
+          echo "Final verification:"
+          ls -la joblet rnx
 
       - name: Install RPM build tools
         run: |
@@ -383,12 +542,61 @@ jobs:
           name: rnx-binary-arm64
           path: ./
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la ./
+          echo "Looking for binaries:"
+          find . -name "*joblet*" -o -name "*rnx*" | head -10
+
       - name: Make binaries executable
         run: |
-          chmod +x joblet-arm64
-          chmod +x rnx-arm64
-          mv joblet-arm64 joblet
-          mv rnx-arm64 rnx
+          echo "Making binaries executable..."
+          
+          # Find and handle joblet binary
+          if [ -f "./joblet-arm64" ]; then
+            echo "Found joblet-arm64, making it executable and renaming..."
+            chmod +x joblet-arm64
+            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+            mv joblet-arm64 joblet
+          else
+            echo "joblet-arm64 not found, searching for alternatives..."
+            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
+            if [ -n "$JOBLET_FILE" ]; then
+              echo "Found joblet binary at: $JOBLET_FILE"
+              chmod +x "$JOBLET_FILE"
+              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
+              mv "$JOBLET_FILE" joblet
+            else
+              echo "ERROR: No joblet binary found!"
+              exit 1
+            fi
+          fi
+          
+          # Find and handle rnx binary
+          if [ -f "./rnx-arm64" ]; then
+            echo "Found rnx-arm64, making it executable and renaming..."
+            chmod +x rnx-arm64
+            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+            mv rnx-arm64 rnx
+          else
+            echo "rnx-arm64 not found, searching for alternatives..."
+            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
+            if [ -n "$RNX_FILE" ]; then
+              echo "Found rnx binary at: $RNX_FILE"
+              chmod +x "$RNX_FILE"
+              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
+              mv "$RNX_FILE" rnx
+            else
+              echo "ERROR: No rnx binary found!"
+              exit 1
+            fi
+          fi
+          
+          echo "Final verification:"
+          ls -la joblet rnx
 
       - name: Install RPM build tools with enhanced cross-compilation support
         run: |

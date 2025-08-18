@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"joblet/internal/joblet/workflow/types"
 	"joblet/pkg/logger"
@@ -85,6 +87,13 @@ func (wv *WorkflowValidator) ValidateWorkflow(workflow types.WorkflowYAML) error
 		return fmt.Errorf("job dependency validation failed: %w", err)
 	}
 	wv.logger.Debug("✅ All job dependencies are valid")
+
+	// 6. Validate environment variables
+	if err := wv.validateEnvironmentVariables(workflow); err != nil {
+		wv.logger.Error("environment variable validation failed", "error", err)
+		return fmt.Errorf("environment variable validation failed: %w", err)
+	}
+	wv.logger.Debug("✅ All environment variables are valid")
 
 	wv.logger.Info("workflow validation completed successfully")
 	return nil
@@ -314,27 +323,29 @@ func normalizeRuntimeName(runtimeName string) string {
 
 // ValidationSummary provides a summary of validation results
 type ValidationSummary struct {
-	Valid                bool
-	CircularDependencies bool
-	VolumesValid         bool
-	NetworksValid        bool
-	RuntimesValid        bool
-	DependenciesValid    bool
-	Errors               []string
-	Warnings             []string
+	Valid                     bool
+	CircularDependencies      bool
+	VolumesValid              bool
+	NetworksValid             bool
+	RuntimesValid             bool
+	DependenciesValid         bool
+	EnvironmentVariablesValid bool
+	Errors                    []string
+	Warnings                  []string
 }
 
 // ValidateWorkflowWithSummary performs validation and returns detailed summary
 func (wv *WorkflowValidator) ValidateWorkflowWithSummary(workflow types.WorkflowYAML) *ValidationSummary {
 	summary := &ValidationSummary{
-		Valid:                true,
-		CircularDependencies: true,
-		VolumesValid:         true,
-		NetworksValid:        true,
-		RuntimesValid:        true,
-		DependenciesValid:    true,
-		Errors:               []string{},
-		Warnings:             []string{},
+		Valid:                     true,
+		CircularDependencies:      true,
+		VolumesValid:              true,
+		NetworksValid:             true,
+		RuntimesValid:             true,
+		DependenciesValid:         true,
+		EnvironmentVariablesValid: true,
+		Errors:                    []string{},
+		Warnings:                  []string{},
 	}
 
 	// Check circular dependencies
@@ -372,5 +383,154 @@ func (wv *WorkflowValidator) ValidateWorkflowWithSummary(workflow types.Workflow
 		summary.Errors = append(summary.Errors, fmt.Sprintf("Job dependencies: %v", err))
 	}
 
+	// Check environment variables
+	if err := wv.validateEnvironmentVariables(workflow); err != nil {
+		summary.Valid = false
+		summary.EnvironmentVariablesValid = false
+		summary.Errors = append(summary.Errors, fmt.Sprintf("Environment variables: %v", err))
+	}
+
 	return summary
+}
+
+// validateEnvironmentVariables performs comprehensive validation of environment variables
+func (wv *WorkflowValidator) validateEnvironmentVariables(workflow types.WorkflowYAML) error {
+	for jobName, job := range workflow.Jobs {
+		jobLog := wv.logger.WithField("job", jobName)
+
+		// Validate regular environment variables
+		if err := wv.validateEnvironmentVariableMap(job.Environment, jobName, "environment", jobLog); err != nil {
+			return err
+		}
+
+		// Validate secret environment variables
+		if err := wv.validateEnvironmentVariableMap(job.SecretEnvironment, jobName, "secret_environment", jobLog); err != nil {
+			return err
+		}
+
+		// Check for conflicts between regular and secret environment variables
+		if err := wv.validateEnvironmentVariableConflicts(job.Environment, job.SecretEnvironment, jobName, jobLog); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateEnvironmentVariableMap validates a map of environment variables
+func (wv *WorkflowValidator) validateEnvironmentVariableMap(envVars map[string]string, jobName, envType string, jobLog *logger.Logger) error {
+	if len(envVars) == 0 {
+		return nil
+	}
+
+	// Environment variable name validation regex
+	// Valid names: letters, digits, underscore, must start with letter or underscore
+	validNameRegex := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+	for key, value := range envVars {
+		// Validate environment variable name
+		if !validNameRegex.MatchString(key) {
+			jobLog.Error("invalid environment variable name", "type", envType, "key", key)
+			return fmt.Errorf("job '%s': invalid %s variable name '%s' - must start with letter or underscore and contain only letters, numbers, and underscores", jobName, envType, key)
+		}
+
+		// Check for reserved environment variable names
+		if wv.isReservedEnvironmentVariable(key) {
+			jobLog.Warn("reserved environment variable used", "type", envType, "key", key)
+			// For now, just warn - don't fail validation
+		}
+
+		// Validate environment variable value length
+		if len(value) > 32768 { // 32KB limit
+			jobLog.Error("environment variable value too long", "type", envType, "key", key, "length", len(value))
+			return fmt.Errorf("job '%s': %s variable '%s' value is too long (%d bytes, max 32768)", jobName, envType, key, len(value))
+		}
+
+		// Check for potentially dangerous values (basic security check)
+		if wv.containsDangerousPatterns(value) {
+			jobLog.Warn("potentially dangerous environment variable value", "type", envType, "key", key)
+			// For now, just warn - don't fail validation
+		}
+
+		jobLog.Debug("environment variable validated", "type", envType, "key", key, "valueLength", len(value))
+	}
+
+	return nil
+}
+
+// validateEnvironmentVariableConflicts checks for conflicts between regular and secret environment variables
+func (wv *WorkflowValidator) validateEnvironmentVariableConflicts(regularEnv, secretEnv map[string]string, jobName string, jobLog *logger.Logger) error {
+	if regularEnv == nil || secretEnv == nil {
+		return nil
+	}
+
+	// Check for duplicate keys between regular and secret environment variables
+	var conflicts []string
+	for key := range regularEnv {
+		if _, exists := secretEnv[key]; exists {
+			conflicts = append(conflicts, key)
+		}
+	}
+
+	if len(conflicts) > 0 {
+		jobLog.Error("environment variable conflicts detected", "conflicts", conflicts)
+		return fmt.Errorf("job '%s': environment variable conflicts detected - the following variables are defined in both environment and secret_environment: %v", jobName, conflicts)
+	}
+
+	return nil
+}
+
+// isReservedEnvironmentVariable checks if an environment variable name is reserved by the system
+func (wv *WorkflowValidator) isReservedEnvironmentVariable(name string) bool {
+	// List of common reserved environment variables
+	reserved := map[string]bool{
+		// System variables
+		"PATH":     true,
+		"HOME":     true,
+		"USER":     true,
+		"SHELL":    true,
+		"TERM":     true,
+		"PWD":      true,
+		"OLDPWD":   true,
+		"HOSTNAME": true,
+		"LANG":     true,
+		"LC_ALL":   true,
+
+		// Docker/Container variables
+		"DOCKER_HOST":       true,
+		"DOCKER_TLS_VERIFY": true,
+		"DOCKER_CERT_PATH":  true,
+
+		// Joblet-specific variables (that might be set by the system)
+		"JOBLET_JOB_ID":      true,
+		"JOBLET_WORKFLOW_ID": true,
+		"JOBLET_RUNTIME":     true,
+		"JOBLET_VOLUME_PATH": true,
+	}
+
+	return reserved[name]
+}
+
+// containsDangerousPatterns performs basic security checks on environment variable values
+func (wv *WorkflowValidator) containsDangerousPatterns(value string) bool {
+	// Check for potentially dangerous patterns
+	dangerousPatterns := []string{
+		"$(",          // Command substitution
+		"`",           // Backtick command substitution
+		"rm -rf",      // Dangerous delete commands
+		"format C:",   // Windows format command
+		"del /f",      // Windows delete command
+		"../",         // Path traversal attempt
+		"passwd",      // Password file access
+		"/etc/shadow", // Shadow file access
+	}
+
+	lowerValue := strings.ToLower(value)
+	for _, pattern := range dangerousPatterns {
+		if strings.Contains(lowerValue, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+
+	return false
 }

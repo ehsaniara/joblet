@@ -79,6 +79,18 @@ Runtime Examples:
   rnx run --runtime=python:3.11+ml+gpu python train_model.py
   rnx run --runtime=node:18 --upload=app.js node app.js
 
+Environment Variable Examples:
+  # Pass regular environment variables (visible in logs)
+  rnx run --env=NODE_ENV=production --env=PORT=8080 node app.js
+  rnx run -e DEBUG=true python app.py
+  
+  # Pass secret environment variables (hidden from logs)
+  rnx run --secret-env=API_KEY=secret123 --secret-env=DB_PASSWORD=pass123 python app.py
+  rnx run -s JWT_SECRET=mysecret node server.js
+  
+  # Combine different types
+  rnx run --env=NODE_ENV=prod --secret-env=API_KEY=secret node app.js
+
 Scheduling Formats:
   # Relative time
   --schedule="1hour"      # 1 hour from now
@@ -102,7 +114,11 @@ Flags:
   --upload-dir=DIR    Upload entire directory to the job workspace
   --runtime=SPEC      Use pre-built runtime (e.g., python:3.11, java:17)
   --volume=NAME       Mount persistent volume
-  --network=NAME      Use network configuration`,
+  --network=NAME      Use network configuration
+  --env=KEY=VALUE         Set environment variable (visible in logs)
+  -e KEY=VALUE            Short form of --env
+  --secret-env=KEY=VALUE  Set secret environment variable (hidden from logs)
+  -s KEY=VALUE            Short form of --secret-env`,
 		Args:               cobra.MinimumNArgs(1),
 		RunE:               runRun,
 		DisableFlagParsing: true,
@@ -113,17 +129,19 @@ Flags:
 
 func runRun(cmd *cobra.Command, args []string) error {
 	var (
-		maxCPU     int32
-		cpuCores   string
-		maxMemory  int32
-		maxIOBPS   int32
-		uploads    []string
-		uploadDirs []string
-		schedule   string
-		network    string
-		volumes    []string
-		runtime    string
-		workflow   string
+		maxCPU        int32
+		cpuCores      string
+		maxMemory     int32
+		maxIOBPS      int32
+		uploads       []string
+		uploadDirs    []string
+		schedule      string
+		network       string
+		volumes       []string
+		runtime       string
+		workflow      string
+		envVars       []string
+		secretEnvVars []string
 	)
 
 	commandStartIndex := -1
@@ -176,6 +194,28 @@ func runRun(cmd *cobra.Command, args []string) error {
 			volumes = append(volumes, volumeName)
 		} else if strings.HasPrefix(arg, "--runtime=") {
 			runtime = strings.TrimPrefix(arg, "--runtime=")
+		} else if strings.HasPrefix(arg, "--env=") || strings.HasPrefix(arg, "-e=") {
+			envVar := strings.TrimPrefix(arg, "--env=")
+			if strings.HasPrefix(arg, "-e=") {
+				envVar = strings.TrimPrefix(arg, "-e=")
+			}
+			envVars = append(envVars, envVar)
+		} else if arg == "--env" || arg == "-e" {
+			if i+1 < len(args) {
+				envVars = append(envVars, args[i+1])
+				i++ // Skip the next argument
+			}
+		} else if strings.HasPrefix(arg, "--secret-env=") || strings.HasPrefix(arg, "-s=") {
+			secretEnvVar := strings.TrimPrefix(arg, "--secret-env=")
+			if strings.HasPrefix(arg, "-s=") {
+				secretEnvVar = strings.TrimPrefix(arg, "-s=")
+			}
+			secretEnvVars = append(secretEnvVars, secretEnvVar)
+		} else if arg == "--secret-env" || arg == "-s" {
+			if i+1 < len(args) {
+				secretEnvVars = append(secretEnvVars, args[i+1])
+				i++ // Skip the next argument
+			}
 		} else if arg == "--" {
 			// -- separator found, command starts at next position
 			if i+1 < len(args) {
@@ -303,6 +343,18 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("file upload processing failed: %w", err)
 	}
 
+	// Process environment variables
+	environment, err := processEnvironmentVariables(envVars)
+	if err != nil {
+		return fmt.Errorf("environment variable processing failed: %w", err)
+	}
+
+	// Process secret environment variables
+	secretEnvironment, err := processEnvironmentVariables(secretEnvVars)
+	if err != nil {
+		return fmt.Errorf("secret environment variable processing failed: %w", err)
+	}
+
 	// Display upload summary if files are being uploaded
 	if len(fileUploads) > 0 {
 		totalSize := int64(0)
@@ -328,17 +380,19 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Create job request with RFC3339 formatted schedule
 	request := &pb.RunJobRequest{
-		Command:   command,
-		Args:      cmdArgs,
-		MaxCpu:    maxCPU,
-		CpuCores:  cpuCores,
-		MaxMemory: maxMemory,
-		MaxIobps:  maxIOBPS,
-		Uploads:   fileUploads,
-		Schedule:  scheduledTimeRFC3339,
-		Network:   network,
-		Volumes:   volumes,
-		Runtime:   runtime,
+		Command:           command,
+		Args:              cmdArgs,
+		MaxCpu:            maxCPU,
+		CpuCores:          cpuCores,
+		MaxMemory:         maxMemory,
+		MaxIobps:          maxIOBPS,
+		Uploads:           fileUploads,
+		Schedule:          scheduledTimeRFC3339,
+		Network:           network,
+		Volumes:           volumes,
+		Runtime:           runtime,
+		Environment:       environment,
+		SecretEnvironment: secretEnvironment,
 	}
 
 	// Submit job
@@ -362,6 +416,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	if len(fileUploads) > 0 {
 		fmt.Printf("Files: %d uploaded successfully\n", len(fileUploads))
+	}
+
+	if len(environment) > 0 {
+		fmt.Printf("Environment: %d variables set\n", len(environment))
+	}
+
+	if len(secretEnvironment) > 0 {
+		fmt.Printf("Secret Environment: %d variables set\n", len(secretEnvironment))
 	}
 
 	return nil
@@ -1157,6 +1219,126 @@ func validateRuntimesExist(workflow types.WorkflowYAML) error {
 	}
 
 	return nil
+}
+
+// processEnvironmentVariables processes environment variables from command line
+func processEnvironmentVariables(envVars []string) (map[string]string, error) {
+	environment := make(map[string]string)
+
+	// Process individual environment variables (KEY=VALUE format)
+	for _, envVar := range envVars {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid environment variable format: %s (expected KEY=VALUE)", envVar)
+		}
+		key := strings.TrimSpace(parts[0])
+		value := parts[1] // Don't trim value as spaces might be intentional
+		if key == "" {
+			return nil, fmt.Errorf("environment variable key cannot be empty")
+		}
+
+		// Validate environment variable name
+		if err := validateEnvironmentVariableName(key); err != nil {
+			return nil, fmt.Errorf("invalid environment variable name '%s': %w", key, err)
+		}
+
+		// Validate environment variable value
+		if err := validateEnvironmentVariableValue(key, value); err != nil {
+			return nil, fmt.Errorf("invalid environment variable value for '%s': %w", key, err)
+		}
+
+		environment[key] = value
+	}
+
+	return environment, nil
+}
+
+// validateEnvironmentVariableName validates an environment variable name
+func validateEnvironmentVariableName(name string) error {
+	// Environment variable name validation regex
+	// Valid names: letters, digits, underscore, must start with letter or underscore
+	validNameRegex := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+	if !validNameRegex.MatchString(name) {
+		return fmt.Errorf("must start with letter or underscore and contain only letters, numbers, and underscores")
+	}
+
+	// Check for reserved environment variable names (warn only)
+	if isReservedEnvironmentVariable(name) {
+		fmt.Printf("Warning: '%s' is a reserved environment variable name\n", name)
+	}
+
+	return nil
+}
+
+// validateEnvironmentVariableValue validates an environment variable value
+func validateEnvironmentVariableValue(name, value string) error {
+	// Validate environment variable value length
+	if len(value) > 32768 { // 32KB limit
+		return fmt.Errorf("value is too long (%d bytes, max 32768)", len(value))
+	}
+
+	// Check for potentially dangerous values (warn only)
+	if containsDangerousPatterns(value) {
+		fmt.Printf("Warning: environment variable '%s' contains potentially dangerous patterns\n", name)
+	}
+
+	return nil
+}
+
+// isReservedEnvironmentVariable checks if an environment variable name is reserved by the system
+func isReservedEnvironmentVariable(name string) bool {
+	// List of common reserved environment variables
+	reserved := map[string]bool{
+		// System variables
+		"PATH":     true,
+		"HOME":     true,
+		"USER":     true,
+		"SHELL":    true,
+		"TERM":     true,
+		"PWD":      true,
+		"OLDPWD":   true,
+		"HOSTNAME": true,
+		"LANG":     true,
+		"LC_ALL":   true,
+
+		// Docker/Container variables
+		"DOCKER_HOST":       true,
+		"DOCKER_TLS_VERIFY": true,
+		"DOCKER_CERT_PATH":  true,
+
+		// Joblet-specific variables (that might be set by the system)
+		"JOBLET_JOB_ID":      true,
+		"JOBLET_WORKFLOW_ID": true,
+		"JOBLET_RUNTIME":     true,
+		"JOBLET_VOLUME_PATH": true,
+	}
+
+	return reserved[name]
+}
+
+// containsDangerousPatterns performs basic security checks on environment variable values
+func containsDangerousPatterns(value string) bool {
+	// Check for potentially dangerous patterns
+	dangerousPatterns := []string{
+		"$(",          // Command substitution
+		"`",           // Backtick command substitution
+		"rm -rf",      // Dangerous delete commands
+		"format C:",   // Windows format command
+		"del /f",      // Windows delete command
+		"../",         // Path traversal attempt
+		"passwd",      // Password file access
+		"/etc/shadow", // Shadow file access
+	}
+
+	lowerValue := strings.ToLower(value)
+	for _, pattern := range dangerousPatterns {
+		if strings.Contains(lowerValue, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // validateJobDependencies checks that all job dependencies reference existing jobs

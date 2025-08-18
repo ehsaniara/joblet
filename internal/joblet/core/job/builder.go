@@ -37,6 +37,8 @@ type BuildRequest interface {
 	GetNetwork() string
 	GetVolumes() []string
 	GetRuntime() string
+	GetEnvironment() map[string]string
+	GetSecretEnvironment() map[string]string
 }
 
 // Build creates a new job from the request
@@ -51,15 +53,17 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	b.logger.Debug("building job with volumes", "jobID", jobID, "volumes", volumes, "volumeCount", len(volumes))
 
 	job := &domain.Job{
-		Id:         jobID,
-		Command:    req.GetCommand(),
-		Args:       b.copyStrings(req.GetArgs()),
-		Status:     domain.StatusInitializing,
-		CgroupPath: b.generateCgroupPath(jobID),
-		StartTime:  time.Now(),
-		Network:    req.GetNetwork(),
-		Volumes:    volumes,
-		Runtime:    req.GetRuntime(),
+		Id:                jobID,
+		Command:           req.GetCommand(),
+		Args:              b.copyStrings(req.GetArgs()),
+		Status:            domain.StatusInitializing,
+		CgroupPath:        b.generateCgroupPath(jobID),
+		StartTime:         time.Now(),
+		Network:           req.GetNetwork(),
+		Volumes:           volumes,
+		Runtime:           req.GetRuntime(),
+		Environment:       b.copyEnvironment(req.GetEnvironment()),
+		SecretEnvironment: b.copyEnvironment(req.GetSecretEnvironment()),
 	}
 
 	// Apply resource limits with defaults
@@ -128,23 +132,39 @@ func (b *Builder) copyStrings(src []string) []string {
 	return dst
 }
 
+// copyEnvironment creates a copy of environment map
+func (b *Builder) copyEnvironment(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string)
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
 // BuildParams can be used as an alternative to the interface approach
 type BuildParams struct {
-	Command string
-	Network string
-	Args    []string
-	Limits  domain.ResourceLimits
-	Volumes []string
-	Runtime string
+	Command           string
+	Network           string
+	Args              []string
+	Limits            domain.ResourceLimits
+	Volumes           []string
+	Runtime           string
+	Environment       map[string]string
+	SecretEnvironment map[string]string
 }
 
 // Implement BuildRequest interface for BuildParams
-func (p BuildParams) GetCommand() string               { return p.Command }
-func (p BuildParams) GetArgs() []string                { return p.Args }
-func (p BuildParams) GetLimits() domain.ResourceLimits { return p.Limits }
-func (p BuildParams) GetNetwork() string               { return p.Network }
-func (p BuildParams) GetVolumes() []string             { return p.Volumes }
-func (p BuildParams) GetRuntime() string               { return p.Runtime }
+func (p BuildParams) GetCommand() string                      { return p.Command }
+func (p BuildParams) GetArgs() []string                       { return p.Args }
+func (p BuildParams) GetLimits() domain.ResourceLimits        { return p.Limits }
+func (p BuildParams) GetNetwork() string                      { return p.Network }
+func (p BuildParams) GetVolumes() []string                    { return p.Volumes }
+func (p BuildParams) GetRuntime() string                      { return p.Runtime }
+func (p BuildParams) GetEnvironment() map[string]string       { return p.Environment }
+func (p BuildParams) GetSecretEnvironment() map[string]string { return p.SecretEnvironment }
 
 // BuildFromParams builds a job from BuildParams (convenience method)
 func (b *Builder) BuildFromParams(params BuildParams) (*domain.Job, error) {

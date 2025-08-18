@@ -1,0 +1,138 @@
+version: "3.0"
+
+# Microservices Deployment with Environment Variables
+# Shows how to deploy multiple services with shared configuration and service discovery
+
+jobs:
+  # Setup shared configuration
+  setup-config:
+    command: "bash"
+    args: ["-c", "echo 'Setting up configuration for environment: $DEPLOY_ENV'; mkdir -p /volumes/config/services; echo 'ENVIRONMENT=$DEPLOY_ENV' > /volumes/config/shared.env; echo 'DATABASE_URL=$DATABASE_URL' >> /volumes/config/shared.env; echo 'REDIS_URL=$REDIS_URL' >> /volumes/config/shared.env; echo 'LOG_LEVEL=$LOG_LEVEL' >> /volumes/config/shared.env; echo 'Configuration setup completed'"]
+    environment:
+      DEPLOY_ENV: "staging"
+      DATABASE_URL: "postgresql://db:5432/microservices"
+      REDIS_URL: "redis://cache:6379/0"
+      LOG_LEVEL: "debug"
+      CONFIG_VERSION: "1.2.0"
+    volumes: ["config", "logs"]
+    resources:
+      max_memory: 128
+
+  # Deploy API Gateway
+  deploy-api-gateway:
+    command: "bash"
+    args: ["-c", "source /volumes/config/shared.env; echo 'Deploying API Gateway'; echo 'Environment: $ENVIRONMENT'; echo 'Port: $GATEWAY_PORT'; echo 'Upstream services: $UPSTREAM_SERVICES'; echo 'Rate limit: $RATE_LIMIT'; echo 'service=api-gateway' > /volumes/config/services/gateway.info; echo 'API Gateway deployed successfully'"]
+    environment:
+      GATEWAY_PORT: "8080"
+      UPSTREAM_SERVICES: "user-service:8081,order-service:8082,payment-service:8083"
+      RATE_LIMIT: "1000"
+      CORS_ENABLED: "true"
+      JWT_SECRET: "super-secret-jwt-key"
+    volumes: ["config", "logs"]
+    requires:
+      - setup-config: "COMPLETED"
+    resources:
+      max_memory: 512
+      max_cpu: 50
+
+  # Deploy User Service
+  deploy-user-service:
+    command: "bash"
+    args: ["-c", "source /volumes/config/shared.env; echo 'Deploying User Service'; echo 'Database: $DATABASE_URL'; echo 'Service port: $SERVICE_PORT'; echo 'Auth mode: $AUTH_MODE'; echo 'Cache TTL: $CACHE_TTL'; echo 'service=user-service' > /volumes/config/services/user.info; echo 'User Service deployed successfully'"]
+    environment:
+      SERVICE_PORT: "8081"
+      AUTH_MODE: "jwt"
+      CACHE_TTL: "3600"
+      MAX_CONNECTIONS: "100"
+      BCRYPT_ROUNDS: "12"
+    volumes: ["config", "logs"]
+    requires:
+      - setup-config: "COMPLETED"
+    resources:
+      max_memory: 1024
+      max_cpu: 40
+
+  # Deploy Order Service  
+  deploy-order-service:
+    command: "bash"
+    args: ["-c", "source /volumes/config/shared.env; echo 'Deploying Order Service'; echo 'Database: $DATABASE_URL'; echo 'Queue URL: $QUEUE_URL'; echo 'Service port: $SERVICE_PORT'; echo 'Payment timeout: $PAYMENT_TIMEOUT'; echo 'service=order-service' > /volumes/config/services/order.info; echo 'Order Service deployed successfully'"]
+    environment:
+      SERVICE_PORT: "8082"
+      QUEUE_URL: "amqp://queue:5672/orders"
+      PAYMENT_TIMEOUT: "30"
+      ORDER_RETENTION_DAYS: "90"
+      NOTIFICATION_ENABLED: "true"
+    volumes: ["config", "logs"]
+    requires:
+      - setup-config: "COMPLETED"
+      - deploy-user-service: "COMPLETED"
+    resources:
+      max_memory: 1024
+      max_cpu: 40
+
+  # Deploy Payment Service
+  deploy-payment-service:
+    command: "bash"
+    args: ["-c", "source /volumes/config/shared.env; echo 'Deploying Payment Service'; echo 'Provider: $PAYMENT_PROVIDER'; echo 'Service port: $SERVICE_PORT'; echo 'Encryption key: [REDACTED]'; echo 'PCI compliance: $PCI_COMPLIANT'; echo 'service=payment-service' > /volumes/config/services/payment.info; echo 'Payment Service deployed successfully'"]
+    environment:
+      SERVICE_PORT: "8083"
+      PAYMENT_PROVIDER: "stripe"
+      STRIPE_API_KEY: "test_stripe_key_for_demo_only"
+      ENCRYPTION_KEY: "32-char-encryption-key-here-xyz"
+      PCI_COMPLIANT: "true"
+      WEBHOOK_SECRET: "whsec_webhook_secret_here"
+    volumes: ["config", "logs"]
+    requires:
+      - setup-config: "COMPLETED"
+    resources:
+      max_memory: 1024
+      max_cpu: 30
+
+  # Setup Service Discovery
+  setup-service-discovery:
+    command: "bash"
+    args: ["-c", "echo 'Setting up service discovery'; echo 'Registry type: $REGISTRY_TYPE'; echo 'Health check interval: $HEALTH_CHECK_INTERVAL'; ls /volumes/config/services/; echo 'Discovered services:'; cat /volumes/config/services/*.info; echo 'discovery_url=$DISCOVERY_URL' > /volumes/config/discovery.env; echo 'Service discovery configured'"]
+    environment:
+      REGISTRY_TYPE: "consul"
+      DISCOVERY_URL: "consul://consul:8500"
+      HEALTH_CHECK_INTERVAL: "30"
+      RETRY_ATTEMPTS: "3"
+    volumes: ["config", "logs"]
+    requires:
+      - deploy-api-gateway: "COMPLETED"
+      - deploy-user-service: "COMPLETED"
+      - deploy-order-service: "COMPLETED"
+      - deploy-payment-service: "COMPLETED"
+    resources:
+      max_memory: 256
+
+  # Run Integration Tests
+  run-integration-tests:
+    command: "bash"
+    args: ["-c", "source /volumes/config/shared.env; source /volumes/config/discovery.env; echo 'Running integration tests'; echo 'Environment: $ENVIRONMENT'; echo 'Test suite: $TEST_SUITE'; echo 'API Gateway: Available'; echo 'User Service: Available'; echo 'Order Service: Available'; echo 'Payment Service: Available'; echo 'Test results: $TEST_RESULT'"]
+    environment:
+      TEST_SUITE: "microservices-integration"
+      TEST_RESULT: "PASSED"
+      TEST_TIMEOUT: "300"
+      PARALLEL_TESTS: "true"
+    volumes: ["config", "logs"]
+    requires:
+      - setup-service-discovery: "COMPLETED"
+    resources:
+      max_memory: 512
+      max_cpu: 50
+
+  # Generate Deployment Report
+  generate-deployment-report:
+    command: "bash"
+    args: ["-c", "source /volumes/config/shared.env; echo 'Generating deployment report'; echo 'Deployment ID: $DEPLOYMENT_ID'; echo 'Environment: $ENVIRONMENT'; echo 'Services deployed: 4'; echo 'Tests passed: $TESTS_PASSED'; echo 'Deployment time: $DEPLOYMENT_TIME'; echo 'Status: SUCCESS' > /volumes/logs/deployment-report.txt; echo 'Report saved to deployment-report.txt'"]
+    environment:
+      DEPLOYMENT_ID: "deploy-001-staging"
+      TESTS_PASSED: "15"
+      DEPLOYMENT_TIME: "5m 30s"
+      NOTIFICATION_WEBHOOK: "https://slack.com/webhook/deployment"
+    volumes: ["config", "logs"]
+    requires:
+      - run-integration-tests: "COMPLETED"
+    resources:
+      max_memory: 256

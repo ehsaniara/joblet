@@ -61,18 +61,20 @@ rnx run [flags] <command> [args...]
 
 #### Flags
 
-| Flag           | Description                                                | Default        |
-|----------------|------------------------------------------------------------|----------------|
-| `--max-cpu`    | Maximum CPU usage percentage (0-10000)                     | 0 (unlimited)  |
-| `--max-memory` | Maximum memory in MB                                       | 0 (unlimited)  |
-| `--max-iobps`  | Maximum I/O bytes per second                               | 0 (unlimited)  |
-| `--cpu-cores`  | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
-| `--network`    | Network mode: bridge, isolated, none, or custom            | "bridge"       |
-| `--volume`     | Volume to mount (can be specified multiple times)          | none           |
-| `--upload`     | Upload file to workspace (can be specified multiple times) | none           |
-| `--upload-dir` | Upload directory to workspace                              | none           |
-| `--schedule`   | Schedule job execution (duration or RFC3339 time)          | immediate      |
-| `--workflow`   | YAML workflow file for workflow execution                  | none           |
+| Flag              | Description                                                | Default        |
+|-------------------|------------------------------------------------------------|----------------|
+| `--max-cpu`       | Maximum CPU usage percentage (0-10000)                     | 0 (unlimited)  |
+| `--max-memory`    | Maximum memory in MB                                       | 0 (unlimited)  |
+| `--max-iobps`     | Maximum I/O bytes per second                               | 0 (unlimited)  |
+| `--cpu-cores`     | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
+| `--network`       | Network mode: bridge, isolated, none, or custom            | "bridge"       |
+| `--volume`        | Volume to mount (can be specified multiple times)          | none           |
+| `--upload`        | Upload file to workspace (can be specified multiple times) | none           |
+| `--upload-dir`    | Upload directory to workspace                              | none           |
+| `--env, -e`       | Environment variable (KEY=VALUE, visible in logs)          | none           |
+| `--secret-env, -s`| Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
+| `--schedule`      | Schedule job execution (duration or RFC3339 time)          | immediate      |
+| `--workflow`      | YAML workflow file for workflow execution                  | none           |
 
 #### Examples
 
@@ -91,9 +93,18 @@ rnx run --cpu-cores="0-3" stress-ng --cpu 4 --timeout 60s
 rnx run --volume=data --volume=config \
   python3 process.py
 
-# Environment variables
-rnx run --env=DEBUG=true --env=API_KEY=secret \
+# Environment variables (regular - visible in logs)
+rnx run --env="NODE_ENV=production" --env="PORT=8080" \
   node app.js
+
+# Secret environment variables (hidden from logs)
+rnx run --secret-env="API_KEY=dummy_api_key_123" --secret-env="DB_PASSWORD=secret" \
+  python app.py
+
+# Mixed environment variables
+rnx run --env="DEBUG=true" --secret-env="SECRET_KEY=mysecret" \
+  python app.py
+
 
 # File upload
 rnx run --upload=script.py --upload=data.csv \

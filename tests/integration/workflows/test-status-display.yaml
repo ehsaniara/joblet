@@ -1,0 +1,19 @@
+# Test comprehensive status display with various environment variable scenarios
+environment:
+  WORKFLOW_GLOBAL: "global-status-test"
+  SHARED_VAR: "workflow-value"
+
+secret_environment:
+  WORKFLOW_SECRET: "workflow-secret-value"
+
+jobs:
+  status-display-test:
+    command: "sleep"
+    args: ["2"]  # Sleep briefly so we can check status while running
+    environment:
+      JOB_SPECIFIC: "job-status-value"
+      SHARED_VAR: "job-override-value"  # Override global
+      TEMPLATED_VAR: "${WORKFLOW_GLOBAL}-templated"
+    secret_environment:
+      JOB_SECRET: "job-secret-value"
+      TEMPLATED_SECRET: "${WORKFLOW_SECRET}-templated"

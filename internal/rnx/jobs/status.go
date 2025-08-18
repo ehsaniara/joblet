@@ -183,6 +183,22 @@ func getJobStatus(jobID string) error {
 		}
 	}
 
+	// Display environment variables (if any)
+	hasEnvVars := len(response.Environment) > 0 || len(response.SecretEnvironment) > 0
+	if hasEnvVars {
+		fmt.Printf("\nEnvironment Variables:\n")
+
+		// Display regular environment variables
+		for key, value := range response.Environment {
+			fmt.Printf("  %s=%s\n", key, value)
+		}
+
+		// Display secret environment variables (masked)
+		for key, maskedValue := range response.SecretEnvironment {
+			fmt.Printf("  %s=%s (secret)\n", key, maskedValue)
+		}
+	}
+
 	// Display exit code for completed jobs
 	if response.Status != "RUNNING" && response.Status != "SCHEDULED" && response.Status != "INITIALIZING" {
 		fmt.Printf("\nResult:\n")

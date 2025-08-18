@@ -85,13 +85,16 @@ func (j *JobletImplementation) StartJob(ctx context.Context, req interfaces.Star
 
 	// 4. Create the job using value objects
 	job := &domain.Job{
-		Id:      jobID,
-		Command: req.Command,
-		Args:    req.Args,
-		Limits:  *resourceLimits, // Use the built ResourceLimits directly
-		Status:  domain.StatusInitializing,
-		Network: req.Network,
-		Volumes: req.Volumes,
+		Id:                jobID,
+		Command:           req.Command,
+		Args:              req.Args,
+		Limits:            *resourceLimits, // Use the built ResourceLimits directly
+		Status:            domain.StatusInitializing,
+		Network:           req.Network,
+		Volumes:           req.Volumes,
+		Runtime:           req.Runtime,
+		Environment:       req.Environment,       // Pass through regular environment variables
+		SecretEnvironment: req.SecretEnvironment, // Pass through secret environment variables
 		// Note: UploadSession field doesn't exist in current Job struct
 	}
 

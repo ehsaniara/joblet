@@ -23,6 +23,7 @@ execution - protecting your host system from malicious or resource-hungry proces
 - **Resource Control**: CPU, memory, I/O bandwidth limits with specific core binding
 - **Network Isolation**: Custom networks with traffic segmentation (none/bridge/isolated/custom)
 - **Volume Management**: Persistent storage with filesystem and memory-based volumes
+- **Environment Variables**: Secure configuration with regular and secret variable support
 - **Job Scheduling**: Future execution with flexible time specifications
 - **Real-time Monitoring**: Live logs, system metrics, and job status tracking
 - **mTLS Security**: Certificate-based authentication with role-based access control
@@ -285,6 +286,11 @@ rnx run --runtime=nodejs:18 node server.js                  # 2-3 seconds vs 60-
 rnx run --upload=data.csv --upload=script.py python3 script.py
 rnx run --runtime=python:3.11-ml --upload=analysis.py python analysis.py
 
+# Environment variables (regular and secret)
+rnx run --env=NODE_ENV=production --env=PORT=8080 node app.js
+rnx run --secret-env=API_KEY=secret123 --secret-env=DB_PASSWORD=pass123 python app.py
+rnx run --env=NODE_ENV=prod --secret-env=API_KEY=secret node app.js
+
 # Network isolation modes
 rnx run --network=none secure_task.sh           # No network access
 rnx run --network=isolated wget https://api.com # External access only  
@@ -312,6 +318,7 @@ sudo unzip python:3.11-ml-runtime.zip -d /opt/joblet/runtimes/
 >
 > - **[Quick Start Guide](docs/QUICKSTART.md)** - Get running in 5 minutes
 > - **[Job Execution Guide](docs/JOB_EXECUTION.md)** - Complete job management with examples
+> - **[Environment Variables](docs/ENVIRONMENT_VARIABLES.md)** - Configuration, secrets, and workflow integration
 > - **[Network Management](docs/NETWORK_MANAGEMENT.md)** - Custom networks and isolation
 > - **[Volume Management](docs/VOLUME_MANAGEMENT.md)** - Persistent and temporary storage
 > - **[RNX CLI Reference](docs/RNX_CLI_REFERENCE.md)** - Complete command reference
@@ -415,6 +422,10 @@ rnx monitor status         # System metrics
 --volume=data             # Mount volume
 --upload=file.py          # Upload files
 --schedule="1hour"        # Schedule execution
+--env=KEY=VALUE           # Set environment variable (visible in logs)
+-e KEY=VALUE              # Short form of --env
+--secret-env=KEY=VALUE    # Set secret environment variable (hidden from logs)
+-s KEY=VALUE              # Short form of --secret-env
 
 ```
 

@@ -1,0 +1,40 @@
+# Example workflow demonstrating environment variable inheritance and templating
+environment:
+  PIPELINE_VERSION: "1.2.0"
+  LOG_LEVEL: "INFO"
+  DATA_PATH: "/opt/data"
+  API_URL: "https://api.example.com"
+
+secret_environment:
+  API_TOKEN: "super-secret-token-123"
+  DB_PASSWORD: "database-password-456"
+
+jobs:
+  setup:
+    command: "echo"
+    args: ["Setting up pipeline ${PIPELINE_VERSION} with data at ${DATA_PATH}"]
+    environment:
+      STAGE: "setup"
+      # This job inherits all global variables + adds STAGE
+    
+  process-data:
+    command: "echo"
+    args: ["Processing data with ${LOG_LEVEL} logging, stage: ${STAGE}, API: ${API_URL}"]
+    requires:
+      - setup: "COMPLETED"
+    environment:
+      STAGE: "processing"
+      LOG_LEVEL: "DEBUG"  # Override global LOG_LEVEL for this job
+      OUTPUT_DIR: "${DATA_PATH}/processed"  # Template using global variable
+    secret_environment:
+      # This job inherits global secrets + adds its own
+      PROCESSING_KEY: "processing-secret-789"
+      
+  finalize:
+    command: "echo"
+    args: ["Finalizing pipeline ${PIPELINE_VERSION} in ${STAGE} stage"]
+    requires:
+      - process-data: "COMPLETED"
+    environment:
+      STAGE: "finalize"
+      FINAL_OUTPUT: "${OUTPUT_DIR}/final"  # This will reference process-data's OUTPUT_DIR

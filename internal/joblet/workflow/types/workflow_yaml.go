@@ -6,12 +6,23 @@ package types
 // allowing for named job definitions that can reference each other in dependencies.
 // Example YAML:
 //
+//	environment:
+//	  PIPELINE_VERSION: "1.0.0"
+//	  LOG_LEVEL: "INFO"
+//	secret_environment:
+//	  API_TOKEN: "secret-token"
 //	jobs:
 //	  extract-data:
 //	    command: "python3"
 //	    args: ["extract.py"]
 //	    volumes: ["data-pipeline"]
+//	    environment:
+//	      NODE_ENV: "production"  # Inherits global vars + this override
 type WorkflowYAML struct {
+	// Environment defines global environment variables inherited by all jobs (visible in logs)
+	Environment map[string]string `yaml:"environment,omitempty"`
+	// SecretEnvironment defines global secret environment variables inherited by all jobs (hidden from logs)
+	SecretEnvironment map[string]string `yaml:"secret_environment,omitempty"`
 	// Jobs maps job names to their specifications
 	// Key: job name (used for dependency references)
 	// Value: complete job specification
@@ -43,6 +54,10 @@ type JobSpec struct {
 	Requires []map[string]string `yaml:"requires"`
 	// Resources specifies computational limits for the job
 	Resources JobResources `yaml:"resources"`
+	// Environment defines regular environment variables for the job (visible in logs)
+	Environment map[string]string `yaml:"environment,omitempty"`
+	// SecretEnvironment defines secret environment variables for the job (hidden from logs)
+	SecretEnvironment map[string]string `yaml:"secret_environment,omitempty"`
 }
 
 // JobUploads specifies which files should be uploaded to the job's execution environment.

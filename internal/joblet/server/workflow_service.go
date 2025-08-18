@@ -296,11 +296,13 @@ func (s *WorkflowServiceServer) convertToWorkflowJobRequest(req *pb.RunJobReques
 			MaxIOBPS:  req.MaxIobps,
 			CPUCores:  req.CpuCores,
 		},
-		Uploads:  domainUploads,
-		Schedule: req.Schedule,
-		Network:  network,
-		Volumes:  req.Volumes,
-		Runtime:  req.Runtime,
+		Uploads:           domainUploads,
+		Schedule:          req.Schedule,
+		Network:           network,
+		Volumes:           req.Volumes,
+		Runtime:           req.Runtime,
+		Environment:       req.Environment,       // Regular environment variables
+		SecretEnvironment: req.SecretEnvironment, // Secret environment variables
 	}
 
 	return jobRequest, nil
@@ -451,7 +453,7 @@ func (s *WorkflowServiceServer) orchestrateWorkflow(ctx context.Context, workflo
 
 			for _, jobName := range readyJobs {
 				if jobSpec, exists := workflowYAML.Jobs[jobName]; exists {
-					err := s.executeWorkflowJob(ctx, workflowID, jobName, jobSpec, uploadedFiles)
+					err := s.executeWorkflowJob(ctx, workflowID, jobName, jobSpec, workflowYAML, uploadedFiles)
 					if err != nil {
 						log.Error("failed to execute workflow job", "jobName", jobName, "error", err)
 						s.workflowManager.OnJobStateChange(jobName, domain.StatusFailed)
@@ -462,7 +464,7 @@ func (s *WorkflowServiceServer) orchestrateWorkflow(ctx context.Context, workflo
 	}
 }
 
-func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflowID int, jobName string, jobSpec JobSpec, uploadedFiles map[string][]byte) error {
+func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflowID int, jobName string, jobSpec JobSpec, workflowYAML *WorkflowYAML, uploadedFiles map[string][]byte) error {
 	log := s.logger.WithFields("workflowId", workflowID, "jobName", jobName)
 	log.Info("executing workflow job")
 
@@ -496,6 +498,9 @@ func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflow
 		network = defaultNetworkName
 	}
 
+	// Merge environment variables: global workflow vars + job-specific vars (job overrides global)
+	mergedEnvironment, mergedSecretEnvironment := s.mergeEnvironmentVariables(workflowYAML, jobSpec)
+
 	jobRequest := interfaces.StartJobRequest{
 		Command: jobSpec.Command,
 		Args:    jobSpec.Args,
@@ -505,10 +510,12 @@ func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflow
 			MaxIOBPS:  int32(jobSpec.Resources.MaxIOBPS),
 			CPUCores:  jobSpec.Resources.CPUCores,
 		},
-		Uploads: uploads,
-		Network: network,
-		Volumes: jobSpec.Volumes,
-		Runtime: jobSpec.Runtime,
+		Uploads:           uploads,
+		Network:           network,
+		Volumes:           jobSpec.Volumes,
+		Runtime:           jobSpec.Runtime,
+		Environment:       mergedEnvironment,       // Merged global + job-specific environment variables
+		SecretEnvironment: mergedSecretEnvironment, // Merged global + job-specific secret environment variables
 	}
 
 	job, err := s.joblet.StartJob(ctx, jobRequest)
@@ -778,19 +785,28 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 	pbJob := mapper.DomainToProtobuf(job)
 
 	log.Debug("job status retrieved successfully", "status", job.Status)
+
+	// Mask secret environment variables for status display
+	maskedSecretEnv := make(map[string]string)
+	for key := range pbJob.SecretEnvironment {
+		maskedSecretEnv[key] = "***"
+	}
+
 	return &pb.GetJobStatusRes{
-		Id:            pbJob.Id,
-		Command:       pbJob.Command,
-		Args:          pbJob.Args,
-		MaxCPU:        pbJob.MaxCPU,
-		CpuCores:      pbJob.CpuCores,
-		MaxMemory:     pbJob.MaxMemory,
-		MaxIOBPS:      pbJob.MaxIOBPS,
-		Status:        pbJob.Status,
-		StartTime:     pbJob.StartTime,
-		EndTime:       pbJob.EndTime,
-		ExitCode:      pbJob.ExitCode,
-		ScheduledTime: pbJob.ScheduledTime,
+		Id:                pbJob.Id,
+		Command:           pbJob.Command,
+		Args:              pbJob.Args,
+		MaxCPU:            pbJob.MaxCPU,
+		CpuCores:          pbJob.CpuCores,
+		MaxMemory:         pbJob.MaxMemory,
+		MaxIOBPS:          pbJob.MaxIOBPS,
+		Status:            pbJob.Status,
+		StartTime:         pbJob.StartTime,
+		EndTime:           pbJob.EndTime,
+		ExitCode:          pbJob.ExitCode,
+		ScheduledTime:     pbJob.ScheduledTime,
+		Environment:       pbJob.Environment,
+		SecretEnvironment: maskedSecretEnv,
 	}, nil
 }
 
@@ -874,4 +890,88 @@ func (g *workflowGrpcToDomainStreamer) SendKeepalive() error {
 
 func (g *workflowGrpcToDomainStreamer) Context() context.Context {
 	return g.stream.Context()
+}
+
+// mergeEnvironmentVariables combines global workflow environment variables with job-specific ones.
+// Job-specific variables take precedence over global workflow variables.
+// Supports basic templating for referencing workflow-level variables.
+func (s *WorkflowServiceServer) mergeEnvironmentVariables(workflowYAML *WorkflowYAML, jobSpec JobSpec) (map[string]string, map[string]string) {
+	log := s.logger.WithField("operation", "merge-environment-variables")
+
+	// Start with global workflow environment variables
+	mergedEnvironment := make(map[string]string)
+	mergedSecretEnvironment := make(map[string]string)
+
+	// Copy global workflow environment variables
+	if workflowYAML.Environment != nil {
+		for key, value := range workflowYAML.Environment {
+			// Apply basic templating to global variables
+			processedValue := s.processEnvironmentTemplating(value, workflowYAML.Environment, workflowYAML.SecretEnvironment)
+			mergedEnvironment[key] = processedValue
+			log.Debug("inherited global environment variable", "key", key, "value", processedValue)
+		}
+	}
+
+	// Copy global workflow secret environment variables
+	if workflowYAML.SecretEnvironment != nil {
+		for key, value := range workflowYAML.SecretEnvironment {
+			// Apply basic templating to global secret variables
+			processedValue := s.processEnvironmentTemplating(value, workflowYAML.Environment, workflowYAML.SecretEnvironment)
+			mergedSecretEnvironment[key] = processedValue
+			log.Debug("inherited global secret environment variable", "key", key)
+		}
+	}
+
+	// Override with job-specific environment variables
+	if jobSpec.Environment != nil {
+		for key, value := range jobSpec.Environment {
+			// Apply templating to job-specific variables (can reference global vars)
+			processedValue := s.processEnvironmentTemplating(value, mergedEnvironment, mergedSecretEnvironment)
+			mergedEnvironment[key] = processedValue
+			log.Debug("job-specific environment variable", "key", key, "value", processedValue, "overrode_global", workflowYAML.Environment != nil && workflowYAML.Environment[key] != "")
+		}
+	}
+
+	// Override with job-specific secret environment variables
+	if jobSpec.SecretEnvironment != nil {
+		for key, value := range jobSpec.SecretEnvironment {
+			// Apply templating to job-specific secret variables
+			processedValue := s.processEnvironmentTemplating(value, mergedEnvironment, mergedSecretEnvironment)
+			mergedSecretEnvironment[key] = processedValue
+			log.Debug("job-specific secret environment variable", "key", key, "overrode_global", workflowYAML.SecretEnvironment != nil && workflowYAML.SecretEnvironment[key] != "")
+		}
+	}
+
+	log.Info("environment variables merged", "total_env_vars", len(mergedEnvironment), "total_secret_vars", len(mergedSecretEnvironment))
+	return mergedEnvironment, mergedSecretEnvironment
+}
+
+// processEnvironmentTemplating processes basic environment variable templating.
+// Supports ${VAR_NAME} syntax for referencing other environment variables.
+// This provides a simple templating system for workflow environment variable inheritance.
+func (s *WorkflowServiceServer) processEnvironmentTemplating(value string, envVars map[string]string, secretEnvVars map[string]string) string {
+	// Simple templating: replace ${VAR_NAME} with the value of VAR_NAME
+	// This is a basic implementation - could be enhanced with more sophisticated templating later
+
+	processedValue := value
+
+	// Process regular environment variable references
+	for refKey, refValue := range envVars {
+		placeholder := fmt.Sprintf("${%s}", refKey)
+		if strings.Contains(processedValue, placeholder) {
+			processedValue = strings.ReplaceAll(processedValue, placeholder, refValue)
+			s.logger.Debug("templating: replaced environment variable reference", "placeholder", placeholder, "value", refValue)
+		}
+	}
+
+	// Process secret environment variable references
+	for refKey, refValue := range secretEnvVars {
+		placeholder := fmt.Sprintf("${%s}", refKey)
+		if strings.Contains(processedValue, placeholder) {
+			processedValue = strings.ReplaceAll(processedValue, placeholder, refValue)
+			s.logger.Debug("templating: replaced secret environment variable reference", "placeholder", placeholder)
+		}
+	}
+
+	return processedValue
 }

@@ -1,0 +1,12 @@
+# Test environment variable templating
+environment:
+  BASE_PATH: "/opt/data"
+  VERSION: "1.0.0"
+
+jobs:
+  test-templating:
+    command: "printenv"
+    args: ["BASE_PATH", "VERSION", "FULL_PATH", "VERSIONED_PATH"]
+    environment:
+      FULL_PATH: "${BASE_PATH}/processing"
+      VERSIONED_PATH: "${BASE_PATH}/v${VERSION}/output"

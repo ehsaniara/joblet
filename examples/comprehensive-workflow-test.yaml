@@ -1,0 +1,57 @@
+# Comprehensive end-to-end workflow test
+# Tests: inheritance, templating, dependencies, regular + secret env vars, multiple jobs
+
+environment:
+  PROJECT_NAME: "joblet-pipeline"
+  VERSION: "1.0.0"
+  BASE_DIR: "/tmp/test-data"
+  LOG_LEVEL: "INFO"
+
+secret_environment:
+  API_KEY: "secret-api-key-123"
+  DB_TOKEN: "secret-db-token-456"
+
+jobs:
+  # Job 1: Initialize the pipeline
+  initialize:
+    command: "sh"
+    args: ["-c", "echo 'Initializing ${PROJECT_NAME} v${VERSION}' && echo 'Project: ${PROJECT_NAME}' && echo 'Base dir: ${BASE_DIR}' && echo 'API key present: ${API_KEY}' | sed 's/secret-api-key-123/***/g'"]
+    environment:
+      STAGE: "init"
+      INIT_DIR: "${BASE_DIR}/init"
+
+  # Job 2: Process data (depends on initialize, overrides LOG_LEVEL)
+  process:
+    command: "sh"
+    args: ["-c", "echo 'Processing in stage: ${STAGE}' && echo 'Log level: ${LOG_LEVEL}' && echo 'Working in: ${WORK_DIR}' && echo 'Previous stage: ${PREV_STAGE}'"]
+    requires:
+      - initialize: "COMPLETED"
+    environment:
+      STAGE: "processing"
+      LOG_LEVEL: "DEBUG"  # Override global LOG_LEVEL
+      WORK_DIR: "${BASE_DIR}/process"
+      PREV_STAGE: "${STAGE}"  # This should reference the job's own STAGE after processing
+    secret_environment:
+      PROCESS_SECRET: "processing-secret-789"
+
+  # Job 3: Validate results (depends on process)
+  validate:
+    command: "sh"
+    args: ["-c", "echo 'Validating ${PROJECT_NAME} v${VERSION}' && echo 'Final stage: ${STAGE}' && echo 'Process dir: ${PROCESS_DIR}' && echo 'Using DB token: ${DB_TOKEN}' | sed 's/secret-db-token-456/***/g'"]
+    requires:
+      - process: "COMPLETED"
+    environment:
+      STAGE: "validation"
+      PROCESS_DIR: "${BASE_DIR}/process"  # Reference the processing directory
+    secret_environment:
+      VALIDATION_KEY: "validation-secret-abc"
+
+  # Job 4: Generate report (depends on validate)
+  report:
+    command: "sh"
+    args: ["-c", "echo 'Final report for ${PROJECT_NAME}' && echo 'Version: ${VERSION}' && echo 'All secrets used: API_KEY, DB_TOKEN, PROCESS_SECRET, VALIDATION_KEY' && echo 'Report complete'"]
+    requires:
+      - validate: "COMPLETED"
+    environment:
+      STAGE: "reporting"
+      REPORT_DIR: "${BASE_DIR}/reports"

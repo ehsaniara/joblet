@@ -48,23 +48,27 @@ type Joblet struct {
 
 // StartJobRequest contains all parameters for starting a job
 type StartJobRequest struct {
-	Command  string
-	Args     []string
-	Limits   domain.ResourceLimits
-	Uploads  []domain.FileUpload
-	Schedule string
-	Network  string
-	Volumes  []string
-	Runtime  string
+	Command           string
+	Args              []string
+	Limits            domain.ResourceLimits
+	Uploads           []domain.FileUpload
+	Schedule          string
+	Network           string
+	Volumes           []string
+	Runtime           string
+	Environment       map[string]string
+	SecretEnvironment map[string]string
 }
 
-func (r StartJobRequest) GetCommand() string               { return r.Command }
-func (r StartJobRequest) GetArgs() []string                { return r.Args }
-func (r StartJobRequest) GetSchedule() string              { return r.Schedule }
-func (r StartJobRequest) GetLimits() domain.ResourceLimits { return r.Limits }
-func (r StartJobRequest) GetNetwork() string               { return r.Network }
-func (r StartJobRequest) GetVolumes() []string             { return r.Volumes }
-func (r StartJobRequest) GetRuntime() string               { return r.Runtime }
+func (r StartJobRequest) GetCommand() string                      { return r.Command }
+func (r StartJobRequest) GetArgs() []string                       { return r.Args }
+func (r StartJobRequest) GetSchedule() string                     { return r.Schedule }
+func (r StartJobRequest) GetLimits() domain.ResourceLimits        { return r.Limits }
+func (r StartJobRequest) GetNetwork() string                      { return r.Network }
+func (r StartJobRequest) GetVolumes() []string                    { return r.Volumes }
+func (r StartJobRequest) GetRuntime() string                      { return r.Runtime }
+func (r StartJobRequest) GetEnvironment() map[string]string       { return r.Environment }
+func (r StartJobRequest) GetSecretEnvironment() map[string]string { return r.SecretEnvironment }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components
 func NewPlatformJoblet(store adapters.JobStoreAdapter, cfg *config.Config, networkStore adapters.NetworkStoreAdapter) interfaces.Joblet {
@@ -128,14 +132,16 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 
 	// Build internal request
 	internalReq := StartJobRequest{
-		Command:  req.Command,
-		Args:     req.Args,
-		Limits:   *limits,
-		Uploads:  req.Uploads,
-		Schedule: req.Schedule,
-		Network:  req.Network,
-		Volumes:  req.Volumes,
-		Runtime:  req.Runtime,
+		Command:           req.Command,
+		Args:              req.Args,
+		Limits:            *limits,
+		Uploads:           req.Uploads,
+		Schedule:          req.Schedule,
+		Network:           req.Network,
+		Volumes:           req.Volumes,
+		Runtime:           req.Runtime,
+		Environment:       req.Environment,
+		SecretEnvironment: req.SecretEnvironment,
 	}
 
 	log := j.logger.WithFields(

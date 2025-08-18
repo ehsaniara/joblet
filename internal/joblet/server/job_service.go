@@ -74,7 +74,11 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 		}
 	}
 
-	// Log the cleaned request structure
+	// Log the cleaned request structure (excluding sensitive environment variables)
+	envCount := 0
+	if jobRequest.Environment != nil {
+		envCount = len(jobRequest.Environment)
+	}
 	log.Info("starting job with request object",
 		"command", jobRequest.Command,
 		"resourceLimits", fmt.Sprintf("CPU=%d%%, Memory=%dMB, IO=%d BPS, Cores=%s",
@@ -85,7 +89,9 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 		"network", jobRequest.Network,
 		"volumes", jobRequest.Volumes,
 		"runtime", jobRequest.Runtime,
-		"uploadCount", len(jobRequest.Uploads))
+		"uploadCount", len(jobRequest.Uploads),
+		"envVarsCount", envCount,
+		"secretEnvVarsCount", len(jobRequest.SecretEnvironment)) // Only log counts, not actual values
 
 	// Use the new interface with request object
 	newJob, err := s.joblet.StartJob(ctx, *jobRequest)
@@ -166,9 +172,38 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 
 	log.Debug("job status retrieved", "jobId", job.Id, "status", job.Status)
 
+	// Mask secret environment variables
+	maskedSecretEnv := make(map[string]string)
+	for key := range job.SecretEnvironment {
+		maskedSecretEnv[key] = "***"
+	}
+
+	// Convert time fields to strings
+	startTimeStr := job.StartTime.Format("2006-01-02T15:04:05Z07:00")
+	var endTimeStr string
+	if job.EndTime != nil {
+		endTimeStr = job.EndTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+	var scheduledTimeStr string
+	if job.ScheduledTime != nil {
+		scheduledTimeStr = job.ScheduledTime.Format("2006-01-02T15:04:05Z07:00")
+	}
+
 	return &pb.GetJobStatusRes{
-		Id:     job.Id,
-		Status: string(job.Status),
+		Id:                job.Id,
+		Status:            string(job.Status),
+		Command:           job.Command,
+		Args:              job.Args,
+		MaxCPU:            job.Limits.CPU.Value(),
+		CpuCores:          job.Limits.CPUCores.String(),
+		MaxMemory:         job.Limits.Memory.Megabytes(),
+		MaxIOBPS:          int32(job.Limits.IOBandwidth.BytesPerSecond()),
+		StartTime:         startTimeStr,
+		EndTime:           endTimeStr,
+		ExitCode:          job.ExitCode,
+		ScheduledTime:     scheduledTimeStr,
+		Environment:       job.Environment,
+		SecretEnvironment: maskedSecretEnv,
 	}, nil
 }
 
@@ -216,11 +251,13 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 			MaxIOBPS:  req.MaxIobps,
 			CPUCores:  req.CpuCores,
 		},
-		Uploads:  domainUploads,
-		Schedule: req.Schedule,
-		Network:  network,
-		Volumes:  req.Volumes,
-		Runtime:  req.Runtime,
+		Uploads:           domainUploads,
+		Schedule:          req.Schedule,
+		Network:           network,
+		Volumes:           req.Volumes,
+		Runtime:           req.Runtime,
+		Environment:       req.Environment,       // Regular environment variables (logged)
+		SecretEnvironment: req.SecretEnvironment, // Secret environment variables (not logged)
 	}
 
 	// Validate the request

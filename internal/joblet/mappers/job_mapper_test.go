@@ -361,3 +361,143 @@ func BenchmarkDomainToRunJobResponse(b *testing.B) {
 		mapper.DomainToRunJobResponse(job)
 	}
 }
+
+// Test environment variables mapping
+func TestDomainToProtobuf_WithEnvironmentVariables(t *testing.T) {
+	limits := domain.NewResourceLimits()
+
+	job := &domain.Job{
+		Id:        "env-test-job",
+		Command:   "printenv",
+		Args:      []string{"TEST_VAR"},
+		Limits:    *limits,
+		Status:    domain.StatusCompleted,
+		StartTime: time.Now(),
+		Environment: map[string]string{
+			"TEST_VAR":      "test-value",
+			"ANOTHER_VAR":   "another-value",
+			"EMPTY_VAR":     "",
+			"SPECIAL_CHARS": "value with spaces & symbols!",
+		},
+		SecretEnvironment: map[string]string{
+			"SECRET_KEY": "secret-value",
+			"API_TOKEN":  "very-secret-token",
+		},
+	}
+
+	mapper := NewJobMapper()
+	pbJob := mapper.DomainToProtobuf(job)
+
+	// Verify regular environment variables are mapped correctly
+	if pbJob.Environment == nil {
+		t.Error("Expected environment variables to be present")
+	}
+	if len(pbJob.Environment) != len(job.Environment) {
+		t.Errorf("Expected %d environment variables, got %d", len(job.Environment), len(pbJob.Environment))
+	}
+	for key, expectedValue := range job.Environment {
+		if actualValue, exists := pbJob.Environment[key]; !exists {
+			t.Errorf("Expected environment variable %s to exist", key)
+		} else if actualValue != expectedValue {
+			t.Errorf("Expected environment variable %s=%s, got %s", key, expectedValue, actualValue)
+		}
+	}
+
+	// Verify secret environment variables are mapped correctly
+	if pbJob.SecretEnvironment == nil {
+		t.Error("Expected secret environment variables to be present")
+	}
+	if len(pbJob.SecretEnvironment) != len(job.SecretEnvironment) {
+		t.Errorf("Expected %d secret environment variables, got %d", len(job.SecretEnvironment), len(pbJob.SecretEnvironment))
+	}
+	for key, expectedValue := range job.SecretEnvironment {
+		if actualValue, exists := pbJob.SecretEnvironment[key]; !exists {
+			t.Errorf("Expected secret environment variable %s to exist", key)
+		} else if actualValue != expectedValue {
+			t.Errorf("Expected secret environment variable %s=%s, got %s", key, expectedValue, actualValue)
+		}
+	}
+}
+
+func TestDomainToProtobuf_EmptyEnvironmentVariables(t *testing.T) {
+	limits := domain.NewResourceLimits()
+
+	job := &domain.Job{
+		Id:                "no-env-job",
+		Command:           "echo",
+		Status:            domain.StatusCompleted,
+		StartTime:         time.Now(),
+		Limits:            *limits,
+		Environment:       nil,
+		SecretEnvironment: nil,
+	}
+
+	mapper := NewJobMapper()
+	pbJob := mapper.DomainToProtobuf(job)
+
+	// Should handle nil environment variables gracefully
+	if len(pbJob.Environment) > 0 {
+		t.Errorf("Expected empty environment variables, got %v", pbJob.Environment)
+	}
+	if len(pbJob.SecretEnvironment) > 0 {
+		t.Errorf("Expected empty secret environment variables, got %v", pbJob.SecretEnvironment)
+	}
+}
+
+func TestProtobufToDomain_WithEnvironmentVariables(t *testing.T) {
+	// This would test the reverse mapping, but first let's check if this method handles environment variables
+	mapper := NewJobMapper()
+
+	// Create a mock protobuf job with environment variables
+	// Note: This test assumes the protobuf job type supports environment variables
+	// If not implemented yet, this test documents the expected behavior
+
+	envVars := map[string]string{
+		"TEST_VAR": "test-value",
+		"PATH":     "/usr/bin:/bin",
+	}
+	secretEnvVars := map[string]string{
+		"SECRET_KEY": "secret-value",
+	}
+
+	job := &domain.Job{
+		Id:                "reverse-test",
+		Command:           "echo",
+		Status:            domain.StatusRunning,
+		StartTime:         time.Now(),
+		Limits:            *domain.NewResourceLimits(),
+		Environment:       envVars,
+		SecretEnvironment: secretEnvVars,
+	}
+
+	// Test round-trip: Domain -> Protobuf -> Domain
+	pbJob := mapper.DomainToProtobuf(job)
+	roundTripJob, err := mapper.ProtobufToDomain(pbJob)
+
+	if err != nil {
+		t.Fatalf("ProtobufToDomain failed: %v", err)
+	}
+
+	// Verify environment variables survived the round trip
+	if len(roundTripJob.Environment) != len(envVars) {
+		t.Errorf("Expected %d environment variables after round trip, got %d", len(envVars), len(roundTripJob.Environment))
+	}
+	for key, expectedValue := range envVars {
+		if actualValue, exists := roundTripJob.Environment[key]; !exists {
+			t.Errorf("Environment variable %s missing after round trip", key)
+		} else if actualValue != expectedValue {
+			t.Errorf("Environment variable %s changed during round trip: expected %s, got %s", key, expectedValue, actualValue)
+		}
+	}
+
+	if len(roundTripJob.SecretEnvironment) != len(secretEnvVars) {
+		t.Errorf("Expected %d secret environment variables after round trip, got %d", len(secretEnvVars), len(roundTripJob.SecretEnvironment))
+	}
+	for key, expectedValue := range secretEnvVars {
+		if actualValue, exists := roundTripJob.SecretEnvironment[key]; !exists {
+			t.Errorf("Secret environment variable %s missing after round trip", key)
+		} else if actualValue != expectedValue {
+			t.Errorf("Secret environment variable %s changed during round trip: expected %s, got %s", key, expectedValue, actualValue)
+		}
+	}
+}

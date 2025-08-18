@@ -1,0 +1,10 @@
+# Simple verification that environment variables are properly set
+environment:
+  GLOBAL_TEST: "global-works"
+
+jobs:
+  verify:
+    command: "printenv"
+    args: ["GLOBAL_TEST", "JOB_TEST"]
+    environment:
+      JOB_TEST: "job-works"

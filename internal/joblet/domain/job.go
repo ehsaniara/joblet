@@ -26,20 +26,22 @@ var (
 
 // Job represents a job with improved resource limits using value objects
 type Job struct {
-	Id            string         // Unique identifier for job tracking
-	Command       string         // Executable command path
-	Args          []string       // Command line arguments
-	Limits        ResourceLimits // CPU/memory/IO constraints using value objects
-	Status        JobStatus      // Current execution state
-	Pid           int32          // Process ID when running
-	CgroupPath    string         // Filesystem path for resource limits
-	StartTime     time.Time      // Job creation timestamp
-	EndTime       *time.Time     // Completion timestamp (nil if running)
-	ExitCode      int32          // Process exit status
-	ScheduledTime *time.Time     // When the job should start (nil for immediate execution)
-	Network       string         // Network name
-	Volumes       []string       // Volume names to mount
-	Runtime       string         // Runtime specification (e.g., "python:3.11+ml")
+	Id                string            // Unique identifier for job tracking
+	Command           string            // Executable command path
+	Args              []string          // Command line arguments
+	Limits            ResourceLimits    // CPU/memory/IO constraints using value objects
+	Status            JobStatus         // Current execution state
+	Pid               int32             // Process ID when running
+	CgroupPath        string            // Filesystem path for resource limits
+	StartTime         time.Time         // Job creation timestamp
+	EndTime           *time.Time        // Completion timestamp (nil if running)
+	ExitCode          int32             // Process exit status
+	ScheduledTime     *time.Time        // When the job should start (nil for immediate execution)
+	Network           string            // Network name
+	Volumes           []string          // Volume names to mount
+	Runtime           string            // Runtime specification (e.g., "python:3.11+ml")
+	Environment       map[string]string // Environment variables (visible in logs)
+	SecretEnvironment map[string]string // Secret environment variables (hidden from logs)
 }
 
 // IsRunning returns true if the job is currently running
@@ -107,22 +109,33 @@ func (j *Job) DeepCopy() *Job {
 	}
 
 	jobCopy := &Job{
-		Id:         j.Id,
-		Command:    j.Command,
-		Args:       make([]string, len(j.Args)),
-		Limits:     j.Limits, // Value objects are safe to copy
-		Status:     j.Status,
-		Pid:        j.Pid,
-		CgroupPath: j.CgroupPath,
-		StartTime:  j.StartTime,
-		ExitCode:   j.ExitCode,
-		Network:    j.Network,
-		Volumes:    make([]string, len(j.Volumes)),
+		Id:                j.Id,
+		Command:           j.Command,
+		Args:              make([]string, len(j.Args)),
+		Limits:            j.Limits, // Value objects are safe to copy
+		Status:            j.Status,
+		Pid:               j.Pid,
+		CgroupPath:        j.CgroupPath,
+		StartTime:         j.StartTime,
+		ExitCode:          j.ExitCode,
+		Network:           j.Network,
+		Volumes:           make([]string, len(j.Volumes)),
+		Runtime:           j.Runtime,
+		Environment:       make(map[string]string),
+		SecretEnvironment: make(map[string]string),
 	}
 
 	// Copy slices
 	copy(jobCopy.Args, j.Args)
 	copy(jobCopy.Volumes, j.Volumes)
+
+	// Deep copy environment maps
+	for k, v := range j.Environment {
+		jobCopy.Environment[k] = v
+	}
+	for k, v := range j.SecretEnvironment {
+		jobCopy.SecretEnvironment[k] = v
+	}
 
 	// Copy pointers
 	if j.EndTime != nil {

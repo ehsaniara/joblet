@@ -1,0 +1,15 @@
+# Simple test to verify environment variable inheritance
+environment:
+  GLOBAL_VAR: "global-value"
+  PIPELINE_VERSION: "1.2.0"
+
+secret_environment:
+  GLOBAL_SECRET: "global-secret-value"
+
+jobs:
+  test-env:
+    command: "printenv"
+    args: ["GLOBAL_VAR", "PIPELINE_VERSION", "GLOBAL_SECRET", "JOB_SPECIFIC_VAR"]
+    environment:
+      JOB_SPECIFIC_VAR: "job-specific-value"
+      PIPELINE_VERSION: "2.0.0"  # Override global version

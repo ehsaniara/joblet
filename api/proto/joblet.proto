@@ -67,6 +67,8 @@ message Job{
   int32 exitCode = 11;
   string scheduledTime = 12;    // When the job should execute (RFC3339 format, empty if immediate)
   string runtime = 13;          // Runtime specification used for the job
+  map<string, string> environment = 14;       // Regular environment variables (visible)
+  map<string, string> secret_environment = 15; // Secret environment variables (masked)
 }
 
 message EmptyRequest {}
@@ -98,6 +100,8 @@ message GetJobStatusRes{
   string endTime = 10;
   int32 exitCode = 11;
   string scheduledTime = 12;    // When the job should execute (empty if immediate)
+  map<string, string> environment = 13;       // Regular environment variables (visible)
+  map<string, string> secret_environment = 14; // Secret environment variables (masked)
 }
 
 // StopJob
@@ -403,6 +407,7 @@ message RunJobRequest {
   string runtime = 11;
   string workDir = 12;
   map<string, string> environment = 13;
+  map<string, string> secret_environment = 17; // Secret environment variables (not logged)
 
   // Workflow fields (optional - only used for workflow jobs)
   int32 workflowId = 14;

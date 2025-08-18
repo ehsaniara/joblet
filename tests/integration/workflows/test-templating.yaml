@@ -1,0 +1,19 @@
+# Test environment variable templating
+environment:
+  BASE_PATH: "/opt/test-data"
+  VERSION: "2.1.0"
+  PROJECT: "templating-test"
+
+secret_environment:
+  SECRET_KEY: "template-secret-key"
+
+jobs:
+  templating-test:
+    command: "printenv"
+    args: ["BASE_PATH", "VERSION", "PROJECT", "FULL_PATH", "VERSIONED_DIR", "PROJECT_CONF", "SECRET_FILE", "SECRET_KEY"]
+    environment:
+      FULL_PATH: "${BASE_PATH}/projects/${PROJECT}"
+      VERSIONED_DIR: "${BASE_PATH}/v${VERSION}/output"
+      PROJECT_CONF: "${PROJECT}-config.yaml"
+    secret_environment:
+      SECRET_FILE: "${BASE_PATH}/secrets/${SECRET_KEY}.key"

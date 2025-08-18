@@ -421,7 +421,35 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 		}
 	}
 
-	return append(baseEnv, jobEnv...)
+	// Combine all environment variables
+	env := append(baseEnv, jobEnv...)
+
+	// Add regular environment variables from the job (visible in logs)
+	if len(job.Environment) > 0 {
+		ee.logger.Debug("adding regular environment variables", "jobID", job.Id, "variables", getEnvKeys(job.Environment))
+		for key, value := range job.Environment {
+			env = append(env, fmt.Sprintf("%s=%s", key, value))
+		}
+	}
+
+	// Add secret environment variables from the job (hidden from logs)
+	if len(job.SecretEnvironment) > 0 {
+		ee.logger.Debug("adding secret environment variables", "jobID", job.Id, "count", len(job.SecretEnvironment))
+		for key, value := range job.SecretEnvironment {
+			env = append(env, fmt.Sprintf("%s=%s", key, value))
+		}
+	}
+
+	return env
+}
+
+// getEnvKeys returns the keys of an environment map for safe logging
+func getEnvKeys(env map[string]string) []string {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 // processUploadsDirectly processes file uploads directly to the work directory

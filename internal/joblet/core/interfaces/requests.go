@@ -27,6 +27,10 @@ type StartJobRequest struct {
 
 	// Runtime specification
 	Runtime string // runtime specification (e.g., "python:3.11+ml")
+
+	// Environment variables
+	Environment       map[string]string // Regular environment variables (visible in logs)
+	SecretEnvironment map[string]string // Secret environment variables (hidden from logs)
 }
 
 // ResourceLimits encapsulates resource constraints for a job
