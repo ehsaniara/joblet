@@ -7,7 +7,6 @@ import (
 	pb "joblet/api/gen"
 	"joblet/internal/rnx/common"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,22 +17,23 @@ var workflowFlag bool
 
 func NewStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <id>",
-		Short: "Get the status of a job or workflow by ID",
-		Long: `Get the status of a job or workflow by ID.
+		Use:   "status <uuid>",
+		Short: "Get the status of a job or workflow by UUID",
+		Long: `Get the status of a job or workflow by UUID.
 
-By default, the command tries to detect the type automatically.
+Both jobs and workflows use UUIDs (36-character identifiers).
 Use --workflow flag to explicitly request workflow status.
 
 Examples:
-  # Get job status
-  rnx status job-123
+  # Get job status (using UUID)
+  rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
   
-  # Get workflow status (automatic detection for numeric IDs)
-  rnx status 5
+  # Get workflow status (using UUID)
+  rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
   
-  # Explicitly get workflow status
-  rnx status --workflow 5`,
+  # JSON output
+  rnx status --json f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef`,
 		Args: cobra.ExactArgs(1),
 		RunE: runStatus,
 	}
@@ -48,11 +48,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// If workflow flag is set, try workflow status directly
 	if workflowFlag {
-		workflowID, err := strconv.Atoi(id)
-		if err != nil {
-			return fmt.Errorf("workflow ID must be numeric: %w", err)
-		}
-		return getWorkflowStatus(workflowID)
+		// Workflow UUID can be passed directly
+		return getWorkflowStatus(id)
 	}
 
 	// Try job ID first (for backward compatibility)
@@ -61,26 +58,24 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// If job lookup fails and ID is numeric, try as workflow ID
-	if workflowID, parseErr := strconv.Atoi(id); parseErr == nil {
-		workflowErr := getWorkflowStatus(workflowID)
-		if workflowErr == nil {
-			return nil
-		}
-		// If both fail, show a helpful error message
-		if strings.Contains(jobErr.Error(), "not found") && strings.Contains(workflowErr.Error(), "not found") {
-			return fmt.Errorf("no job or workflow found with ID '%s'\n\nHint: Use 'rnx list' to see jobs or 'rnx list --workflow' to see workflows", id)
-		}
-		// If workflow exists but job also exists with same ID, suggest using --workflow flag
-		if !strings.Contains(workflowErr.Error(), "not found") {
-			fmt.Fprintf(os.Stderr, "\nNote: Both job and workflow exist with ID '%s'. Showing job status.\nUse 'rnx status --workflow %s' to see workflow status.\n\n", id, id)
-			return nil
-		}
-		return workflowErr
+	// If job lookup fails, try as workflow UUID
+	workflowErr := getWorkflowStatus(id)
+	if workflowErr == nil {
+		return nil
 	}
 
-	// For non-numeric IDs, return job error
-	return jobErr
+	// If both fail, show a helpful error message
+	if strings.Contains(jobErr.Error(), "not found") && strings.Contains(workflowErr.Error(), "not found") {
+		return fmt.Errorf("no job or workflow found with ID '%s'\n\nHint: Use 'rnx list' to see jobs or 'rnx list --workflow' to see workflows", id)
+	}
+
+	// If workflow exists but job also exists with same ID, suggest using --workflow flag
+	if !strings.Contains(workflowErr.Error(), "not found") {
+		fmt.Fprintf(os.Stderr, "\nNote: Both job and workflow exist with ID '%s'. Showing job status.\nUse 'rnx status --workflow %s' to see workflow status.\n\n", id, id)
+		return nil
+	}
+
+	return workflowErr
 }
 
 func getJobStatus(jobID string) error {
@@ -103,7 +98,7 @@ func getJobStatus(jobID string) error {
 	}
 
 	// Display basic job information
-	fmt.Printf("Job ID: %s\n", response.Id)
+	fmt.Printf("Job ID: %s\n", response.Uuid)
 	if response.Name != "" {
 		fmt.Printf("Job Name: %s\n", response.Name)
 	}
@@ -212,16 +207,16 @@ func getJobStatus(jobID string) error {
 	fmt.Printf("\nAvailable Actions:\n")
 	switch response.Status {
 	case "SCHEDULED":
-		fmt.Printf("  • rnx stop %s     # Cancel scheduled job\n", response.Id)
-		fmt.Printf("  • rnx status %s   # Check status again\n", response.Id)
+		fmt.Printf("  • rnx stop %s     # Cancel scheduled job\n", response.Uuid)
+		fmt.Printf("  • rnx status %s   # Check status again\n", response.Uuid)
 	case "RUNNING":
-		fmt.Printf("  • rnx log %s      # Stream live logs\n", response.Id)
-		fmt.Printf("  • rnx stop %s     # Stop running job\n", response.Id)
+		fmt.Printf("  • rnx log %s      # Stream live logs\n", response.Uuid)
+		fmt.Printf("  • rnx stop %s     # Stop running job\n", response.Uuid)
 	case "COMPLETED", "FAILED", "STOPPED":
-		fmt.Printf("  • rnx log %s      # View job logs\n", response.Id)
+		fmt.Printf("  • rnx log %s      # View job logs\n", response.Uuid)
 	default:
-		fmt.Printf("  • rnx log %s      # View job logs\n", response.Id)
-		fmt.Printf("  • rnx stop %s     # Stop job if running\n", response.Id)
+		fmt.Printf("  • rnx log %s      # View job logs\n", response.Uuid)
+		fmt.Printf("  • rnx stop %s     # Stop job if running\n", response.Uuid)
 	}
 
 	return nil
@@ -311,7 +306,7 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 //
 // RETURNS:
 // - error: If client creation fails, request fails, or formatting errors occur
-func getWorkflowStatus(workflowID int) error {
+func getWorkflowStatus(workflowID string) error {
 	client, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
@@ -322,7 +317,7 @@ func getWorkflowStatus(workflowID int) error {
 	workflowClient := pb.NewJobServiceClient(client.GetConn())
 
 	req := &pb.GetWorkflowStatusRequest{
-		WorkflowId: int32(workflowID),
+		WorkflowUuid: workflowID,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -340,7 +335,7 @@ func getWorkflowStatus(workflowID int) error {
 	workflow := res.Workflow
 
 	// Display workflow summary
-	fmt.Printf("Workflow ID: %d\n", workflow.Id)
+	fmt.Printf("Workflow UUID: %s\n", workflow.Uuid)
 	fmt.Printf("Workflow: %s\n", workflow.Workflow)
 	fmt.Printf("\n")
 
@@ -408,7 +403,7 @@ func getWorkflowStatus(workflowID int) error {
 			}
 
 			// Truncate job ID for display
-			jobID := job.JobId
+			jobID := job.JobUuid
 			if len(jobID) > 15 {
 				jobID = jobID[:12] + "..."
 			}
@@ -439,11 +434,11 @@ func getWorkflowStatus(workflowID int) error {
 	fmt.Printf("\nAvailable Actions:\n")
 	fmt.Printf("  • rnx list --workflow    # List all workflows\n")
 	if workflow.Status == "RUNNING" {
-		fmt.Printf("  • rnx status %d          # Refresh workflow status\n", workflow.Id)
+		fmt.Printf("  • rnx status %s          # Refresh workflow status\n", workflow.Uuid)
 	}
 	for _, job := range res.Jobs {
 		if job.Status == "COMPLETED" || job.Status == "FAILED" {
-			fmt.Printf("  • rnx log %s             # View logs for job %s\n", job.JobId, job.JobId)
+			fmt.Printf("  • rnx log %s             # View logs for job %s\n", job.JobUuid, job.JobUuid)
 			break
 		}
 	}
@@ -455,7 +450,7 @@ func getWorkflowStatus(workflowID int) error {
 func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse) error {
 	// Convert protobuf workflow status to JSON structure
 	statusData := map[string]interface{}{
-		"id":             res.Workflow.Id,
+		"uuid":           res.Workflow.Uuid,
 		"workflow":       res.Workflow.Workflow,
 		"status":         res.Workflow.Status,
 		"total_jobs":     res.Workflow.TotalJobs,
@@ -470,7 +465,7 @@ func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse) error {
 	// Add job details
 	for _, job := range res.Jobs {
 		jobData := map[string]interface{}{
-			"id":     job.JobId,
+			"id":     job.JobUuid,
 			"name":   job.JobName,
 			"status": job.Status,
 		}

@@ -103,11 +103,11 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 	// Log success
 	if req.Schedule != "" {
 		log.Info("job scheduled successfully",
-			"jobId", newJob.Id,
+			"jobUuid", newJob.Uuid,
 			"scheduledTime", req.Schedule)
 	} else {
 		log.Info("job started successfully",
-			"jobId", newJob.Id,
+			"jobUuid", newJob.Uuid,
 			"status", newJob.Status)
 	}
 
@@ -118,7 +118,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 
 // StopJob implements the gRPC service using the new request object pattern
 func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb.StopJobRes, error) {
-	log := s.logger.WithFields("operation", "StopJob", "jobId", req.GetId())
+	log := s.logger.WithFields("operation", "StopJob", "jobUuid", req.GetUuid())
 	log.Debug("stop job request received (using new interface)")
 
 	// Authorization check
@@ -129,13 +129,13 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 
 	// Create stop request object
 	stopRequest := interfaces.StopJobRequest{
-		JobID: req.GetId(),
+		JobID: req.GetUuid(),
 		// Force and Reason fields would need to be added to protobuf if needed
 		// Force:  false,
 		// Reason: "",
 	}
 
-	log.Info("stopping job", "jobId", stopRequest.JobID)
+	log.Info("stopping job", "jobUuid", stopRequest.JobID)
 
 	// Use the new interface with request object
 	err := s.joblet.StopJob(ctx, stopRequest)
@@ -144,17 +144,17 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 		return nil, status.Errorf(codes.Internal, "job stop failed: %v", err)
 	}
 
-	log.Info("job stopped successfully", "jobId", stopRequest.JobID)
+	log.Info("job stopped successfully", "jobUuid", stopRequest.JobID)
 
 	return &pb.StopJobRes{
 		// Success and Message fields would need to be added to protobuf if needed
-		Id: stopRequest.JobID,
+		Uuid: stopRequest.JobID,
 	}, nil
 }
 
 // GetJobStatus remains the same as it doesn't need request objects
 func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatusReq) (*pb.GetJobStatusRes, error) {
-	log := s.logger.WithFields("operation", "GetJobStatus", "jobId", req.GetId())
+	log := s.logger.WithFields("operation", "GetJobStatus", "jobUuid", req.GetUuid())
 	log.Debug("get job status request received")
 
 	// Authorization check
@@ -164,13 +164,13 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 	}
 
 	// Retrieve job from store
-	job, exists := s.jobStore.GetJob(req.GetId())
+	job, exists := s.jobStore.GetJob(req.GetUuid())
 	if !exists {
-		log.Error("job not found", "jobId", req.GetId())
-		return nil, status.Errorf(codes.NotFound, "job not found: %s", req.GetId())
+		log.Error("job not found", "jobUuid", req.GetUuid())
+		return nil, status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
 	}
 
-	log.Debug("job status retrieved", "jobId", job.Id, "status", job.Status)
+	log.Debug("job status retrieved", "jobUuid", job.Uuid, "status", job.Status)
 
 	// Mask secret environment variables
 	maskedSecretEnv := make(map[string]string)
@@ -190,7 +190,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 	}
 
 	return &pb.GetJobStatusRes{
-		Id:                job.Id,
+		Uuid:              job.Uuid,
 		Status:            string(job.Status),
 		Command:           job.Command,
 		Args:              job.Args,
@@ -431,7 +431,7 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, req *pb.EmptyRequest) (
 
 // GetJobLogs streams job logs to the client
 func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
-	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetId())
+	log := s.logger.WithFields("operation", "GetJobLogs", "jobUuid", req.GetUuid())
 	log.Debug("get job logs request received")
 
 	// Authorization check
@@ -444,15 +444,15 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 	domainStream := &grpcToDomainStreamer{stream: stream}
 
 	// Use the store's SendUpdatesToClient method
-	if err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetId(), domainStream); err != nil {
+	if err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetUuid(), domainStream); err != nil {
 		log.Error("failed to stream logs", "error", err)
 		if err.Error() == "job not found" {
-			return status.Errorf(codes.NotFound, "job not found: %s", req.GetId())
+			return status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
 		}
 		return status.Errorf(codes.Internal, "failed to stream logs: %v", err)
 	}
 
-	log.Debug("log streaming completed", "jobId", req.GetId())
+	log.Debug("log streaming completed", "jobUuid", req.GetUuid())
 	return nil
 }
 

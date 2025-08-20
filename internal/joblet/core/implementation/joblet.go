@@ -85,7 +85,7 @@ func (j *JobletImplementation) StartJob(ctx context.Context, req interfaces.Star
 
 	// 4. Create the job using value objects
 	job := &domain.Job{
-		Id:                jobID,
+		Uuid:              jobID,
 		Name:              req.Name,
 		Command:           req.Command,
 		Args:              req.Args,
@@ -152,7 +152,7 @@ func (j *JobletImplementation) StopJob(ctx context.Context, req interfaces.StopJ
 
 // ExecuteScheduledJob implements the new interface for scheduled job execution
 func (j *JobletImplementation) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
-	j.logger.Info("executing scheduled job", "jobID", req.Job.Id)
+	j.logger.Info("executing scheduled job", "jobID", req.Job.Uuid)
 
 	// Implementation would execute the scheduled job
 	// This is a placeholder for the actual execution logic

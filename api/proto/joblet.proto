@@ -54,7 +54,7 @@ message Jobs{
 }
 
 message Job{
-  string id = 1;
+  string uuid = 1;                         // Unique UUID identifier (replaces sequential id)
   string name = 2;                         // Human-readable job name (for workflows, empty for individual jobs)
   string command = 3;
   repeated string args = 4;
@@ -85,11 +85,11 @@ message FileUpload {
 
 // GetJobStatus
 message GetJobStatusReq{
-  string id = 1;
+  string uuid = 1;                         // Job UUID identifier
 }
 
 message GetJobStatusRes{
-  string id = 1;
+  string uuid = 1;                         // Job UUID identifier
   string name = 2;                         // Human-readable job name (for workflows, empty for individual jobs)
   string command = 3;
   repeated string args = 4;
@@ -108,11 +108,11 @@ message GetJobStatusRes{
 
 // StopJob
 message StopJobReq{
-  string id = 1;
+  string uuid = 1;                         // Job UUID identifier
 }
 
 message StopJobRes{
-  string id = 1;
+  string uuid = 1;                         // Job UUID identifier
   string status = 2;
   string endTime = 3;
   int32 exitCode = 4;
@@ -120,7 +120,7 @@ message StopJobRes{
 
 // GetJobLogs
 message GetJobLogsReq{
-  string id = 1;
+  string uuid = 1;                         // Job UUID identifier
 }
 
 message DataChunk {
@@ -413,13 +413,13 @@ message RunJobRequest {
   map<string, string> secret_environment = 18; // Secret environment variables (not logged)
 
   // Workflow fields (optional - only used for workflow jobs)
-  int32 workflowId = 15;
-  string jobId = 16;
+  string workflowUuid = 15;         // Workflow UUID identifier (for workflow jobs)
+  string jobUuid = 16;              // Job UUID identifier (for workflow jobs)
   repeated JobRequirement requirements = 17;
 }
 
 message RunJobResponse {
-  string jobId = 1;
+  string jobUuid = 1;               // Job UUID identifier
   string status = 2;
   string command = 3;
   repeated string args = 4;
@@ -434,7 +434,7 @@ message RunJobResponse {
 }
 
 message JobRequirement {
-  string jobId = 1;
+  string jobUuid = 1;               // Job UUID identifier  
   string status = 2;
   string expression = 3;
 }
@@ -448,12 +448,12 @@ message RunWorkflowRequest {
 }
 
 message RunWorkflowResponse {
-  int32 workflowId = 1;
+  string workflowUuid = 1;                 // Workflow UUID identifier
   string status = 2;
 }
 
 message GetWorkflowStatusRequest {
-  int32 workflowId = 1;
+  string workflowUuid = 1;                 // Workflow UUID identifier
 }
 
 message GetWorkflowStatusResponse {
@@ -470,7 +470,7 @@ message ListWorkflowsResponse {
 }
 
 message GetWorkflowJobsRequest {
-  int32 workflowId = 1;
+  string workflowUuid = 1;                 // Workflow UUID identifier
 }
 
 message GetWorkflowJobsResponse {
@@ -479,7 +479,7 @@ message GetWorkflowJobsResponse {
 
 
 message WorkflowInfo {
-  int32 id = 1;
+  string uuid = 1;                         // Workflow UUID identifier
   string workflow = 2;
   string status = 3;
   int32 totalJobs = 4;
@@ -492,7 +492,7 @@ message WorkflowInfo {
 }
 
 message WorkflowJob {
-  string jobId = 1;
+  string jobUuid = 1;                      // Job UUID identifier
   string jobName = 2;                      // Human-readable job name from workflow
   string status = 3;
   repeated string dependencies = 4;

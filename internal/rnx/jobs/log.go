@@ -16,7 +16,7 @@ import (
 
 func NewLogCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log <job-id>",
+		Use:   "log <job-uuid>",
 		Short: "Stream job logs",
 		Long: `Stream logs from a running or completed job in real-time.
 
@@ -25,10 +25,10 @@ all output for completed jobs. Use Ctrl+C to stop following a log stream.
 
 Examples:
   # Stream logs from a running job
-  rnx log job-123
+  rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
   
-  # View logs from a completed job
-  rnx log job-456
+  # View logs from a completed job  
+  rnx log a1b2c3d4-5678-90ab-cdef-1234567890ab
   
   # Stop following with Ctrl+C for running jobs`,
 		Args: cobra.ExactArgs(1),

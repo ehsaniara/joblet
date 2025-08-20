@@ -110,31 +110,31 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 	a.closeMutex.RLock()
 	if a.closed {
 		a.closeMutex.RUnlock()
-		a.logger.Warn("attempted to create job on closed store", "jobId", job.Id)
+		a.logger.Warn("attempted to create job on closed store", "jobId", job.Uuid)
 		return
 	}
 	a.closeMutex.RUnlock()
 
 	// Store the job
 	ctx := context.Background()
-	if err := a.jobStore.Create(ctx, job.Id, job); err != nil {
+	if err := a.jobStore.Create(ctx, job.Uuid, job); err != nil {
 		if IsConflictError(err) {
-			a.logger.Warn("job already exists, not creating new task", "jobId", job.Id)
+			a.logger.Warn("job already exists, not creating new task", "jobId", job.Uuid)
 			return
 		}
-		a.logger.Error("failed to create job in store", "jobId", job.Id, "error", err)
+		a.logger.Error("failed to create job in store", "jobId", job.Uuid, "error", err)
 		return
 	}
 
 	// Create buffer for job logs using configuration from factory
 	bufferConfig := a.getBufferConfig()
 
-	jobBuffer, err := a.bufferMgr.CreateBuffer(ctx, job.Id, *bufferConfig)
+	jobBuffer, err := a.bufferMgr.CreateBuffer(ctx, job.Uuid, *bufferConfig)
 	if err != nil {
-		a.logger.Error("failed to create buffer for job - log streaming will not work", "jobId", job.Id, "error", err, "bufferConfig", *bufferConfig)
+		a.logger.Error("failed to create buffer for job - log streaming will not work", "jobId", job.Uuid, "error", err, "bufferConfig", *bufferConfig)
 		// Continue without buffer - logs won't be stored but job will work
 	} else {
-		a.logger.Debug("buffer created successfully for job", "jobId", job.Id, "bufferType", bufferConfig.Type)
+		a.logger.Debug("buffer created successfully for job", "jobId", job.Uuid, "bufferType", bufferConfig.Type)
 	}
 
 	// Create task wrapper
@@ -142,26 +142,26 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 		job:         job.DeepCopy(),
 		buffer:      jobBuffer,
 		subscribers: make(map[string]*subscriptionContext),
-		logger:      a.logger.WithField("jobId", job.Id),
+		logger:      a.logger.WithField("jobId", job.Uuid),
 		pubsub:      a.pubsub,
 	}
 
 	// Store task wrapper
 	a.tasksMutex.Lock()
-	a.tasks[job.Id] = task
+	a.tasks[job.Uuid] = task
 	a.tasksMutex.Unlock()
 
 	// Publish creation event
 	if err := a.publishEvent(JobEvent{
 		Type:      "CREATED",
-		JobID:     job.Id,
+		JobID:     job.Uuid,
 		Status:    string(job.Status),
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
-		a.logger.Warn("failed to publish job creation event", "jobId", job.Id, "error", err)
+		a.logger.Warn("failed to publish job creation event", "jobId", job.Uuid, "error", err)
 	}
 
-	a.logger.Debug("job created successfully", "jobId", job.Id, "status", string(job.Status))
+	a.logger.Debug("job created successfully", "jobId", job.Uuid, "status", string(job.Status))
 }
 
 // UpdateJob updates an existing job's state and publishes changes.
@@ -170,18 +170,18 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	a.closeMutex.RLock()
 	if a.closed {
 		a.closeMutex.RUnlock()
-		a.logger.Warn("attempted to update job on closed store", "jobId", job.Id)
+		a.logger.Warn("attempted to update job on closed store", "jobId", job.Uuid)
 		return
 	}
 	a.closeMutex.RUnlock()
 
 	// Get existing job for status comparison
 	a.tasksMutex.RLock()
-	task, exists := a.tasks[job.Id]
+	task, exists := a.tasks[job.Uuid]
 	a.tasksMutex.RUnlock()
 
 	if !exists {
-		a.logger.Warn("attempted to update non-existent job", "jobId", job.Id)
+		a.logger.Warn("attempted to update non-existent job", "jobId", job.Uuid)
 		return
 	}
 
@@ -190,8 +190,8 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 
 	// Update in store
 	ctx := context.Background()
-	if err := a.jobStore.Update(ctx, job.Id, job); err != nil {
-		a.logger.Error("failed to update job in store", "jobId", job.Id, "error", err)
+	if err := a.jobStore.Update(ctx, job.Uuid, job); err != nil {
+		a.logger.Error("failed to update job in store", "jobId", job.Uuid, "error", err)
 		return
 	}
 
@@ -201,20 +201,20 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	// Publish update event
 	if err := a.publishEvent(JobEvent{
 		Type:      "UPDATED",
-		JobID:     job.Id,
+		JobID:     job.Uuid,
 		Status:    newStatus,
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
-		a.logger.Warn("failed to publish job update event", "jobId", job.Id, "error", err)
+		a.logger.Warn("failed to publish job update event", "jobId", job.Uuid, "error", err)
 	}
 
 	// Clean up completed jobs
 	if job.IsCompleted() {
-		a.logger.Debug("job completed, cleaning up subscribers", "jobId", job.Id, "finalStatus", newStatus)
+		a.logger.Debug("job completed, cleaning up subscribers", "jobId", job.Uuid, "finalStatus", newStatus)
 		task.cleanupSubscribers()
 	}
 
-	a.logger.Debug("job updated successfully", "jobId", job.Id, "oldStatus", oldStatus, "newStatus", newStatus)
+	a.logger.Debug("job updated successfully", "jobId", job.Uuid, "oldStatus", oldStatus, "newStatus", newStatus)
 }
 
 // GetJob retrieves a job by its ID from the store.

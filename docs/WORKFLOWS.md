@@ -57,7 +57,7 @@ jobs:
 - Job names are the keys in the `jobs` section (e.g., `job-name`, `previous-job`)
 - Names should be descriptive and unique within the workflow
 - Used for dependency references and monitoring displays
-- Displayed in `rnx status --workflow` and `rnx list` commands
+- Displayed in `rnx status --workflow` and `rnx list --workflow` commands
 
 ### Job Specification Fields
 
@@ -299,10 +299,10 @@ rnx run --workflow=ml-workflow.yaml  # Automatically uploads files specified in 
 rnx list --workflow
 
 # Check specific workflow status (enhanced with job names and dependencies)
-rnx status --workflow <workflow-id>
+rnx status --workflow <workflow-uuid>
 
 # Monitor job logs
-rnx log <job-id>
+rnx log <job-uuid>
 ```
 
 ### Workflow Status
@@ -318,24 +318,24 @@ ID   NAME                 STATUS      PROGRESS
 
 **Detailed Workflow Status:**
 ```bash
-# rnx status --workflow 1
-Workflow ID: 1
+# rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
 Workflow: data-pipeline.yaml
 Status: RUNNING
 Progress: 2/4 jobs completed
 
 Jobs in Workflow:
 -----------------------------------------------------------------------------------------
-JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
+JOB UUID                             JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
 -----------------------------------------------------------------------------------------
-42              setup-data           COMPLETED    0          -                   
-43              process-data         RUNNING      -          setup-data          
-0               validate-results     PENDING      -          process-data        
-0               generate-report      PENDING      -          validate-results    
+f47ac10b-58cc-4372-a567-0e02b2c3d479 setup-data           COMPLETED    0          -                   
+a1b2c3d4-e5f6-7890-abcd-ef1234567890 process-data         RUNNING      -          setup-data          
+00000000-0000-0000-0000-000000000000 validate-results     PENDING      -          process-data        
+00000000-0000-0000-0000-000000000000 generate-report      PENDING      -          validate-results    
 ```
 
 **Features:**
-- **Job ID Display**: Started jobs show actual job IDs (e.g., "42", "43"), non-started jobs show "0"
+- **Job UUID Display**: Started jobs show actual job UUIDs (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479"), non-started jobs show "00000000-0000-0000-0000-000000000000"
 - Job names clearly displayed for easy identification
 - Dependency relationships shown (e.g., process-data depends on setup-data)
 - Real-time status updates with color coding
@@ -534,7 +534,7 @@ rnx monitor status
 
 ### Getting Help
 
-- Check logs: `rnx log <job-id>`
+- Check logs: `rnx log <job-uuid>`
 - Validate workflows: Run without execution to see validation results
 - Review examples: See `/examples/workflows/` directory
 - Check documentation: Review relevant docs for specific features

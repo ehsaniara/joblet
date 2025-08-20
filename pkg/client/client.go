@@ -72,14 +72,14 @@ func (c *JobClient) RunJob(ctx context.Context, job *pb.RunJobRequest) (*pb.RunJ
 }
 
 func (c *JobClient) GetJobStatus(ctx context.Context, id string) (*pb.GetJobStatusRes, error) {
-	return c.jobClient.GetJobStatus(ctx, &pb.GetJobStatusReq{Id: id})
+	return c.jobClient.GetJobStatus(ctx, &pb.GetJobStatusReq{Uuid: id})
 }
 
 func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	resp, err := c.jobClient.StopJob(ctx, &pb.StopJobReq{Id: id})
+	resp, err := c.jobClient.StopJob(ctx, &pb.StopJobReq{Uuid: id})
 	if err != nil {
 		if s, ok := status.FromError(err); ok {
 			if s.Code() == codes.DeadlineExceeded {
@@ -96,7 +96,7 @@ func (c *JobClient) ListJobs(ctx context.Context) (*pb.Jobs, error) {
 }
 
 func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_GetJobLogsClient, error) {
-	stream, err := c.jobClient.GetJobLogs(ctx, &pb.GetJobLogsReq{Id: id})
+	stream, err := c.jobClient.GetJobLogs(ctx, &pb.GetJobLogsReq{Uuid: id})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start log stream: %v", err)
 	}

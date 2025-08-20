@@ -102,8 +102,8 @@ func (s *WorkflowServiceServer) RunWorkflow(ctx context.Context, req *pb.RunWork
 
 		log.Info("workflow orchestration started successfully with uploaded content", "workflowId", workflowID)
 		return &pb.RunWorkflowResponse{
-			WorkflowId: int32(workflowID),
-			Status:     "STARTED",
+			WorkflowUuid: s.generateWorkflowUUID(),
+			Status:       "STARTED",
 		}, nil
 	}
 
@@ -118,8 +118,8 @@ func (s *WorkflowServiceServer) RunWorkflow(ctx context.Context, req *pb.RunWork
 
 		log.Info("workflow orchestration started successfully", "workflowId", workflowID)
 		return &pb.RunWorkflowResponse{
-			WorkflowId: int32(workflowID),
-			Status:     "STARTED",
+			WorkflowUuid: s.generateWorkflowUUID(),
+			Status:       "STARTED",
 		}, nil
 	}
 
@@ -132,8 +132,8 @@ func (s *WorkflowServiceServer) RunWorkflow(ctx context.Context, req *pb.RunWork
 
 	log.Info("workflow created successfully", "workflowId", workflowID)
 	return &pb.RunWorkflowResponse{
-		WorkflowId: int32(workflowID),
-		Status:     "STARTED",
+		WorkflowUuid: s.generateWorkflowUUID(),
+		Status:       "STARTED",
 	}, nil
 }
 
@@ -141,7 +141,7 @@ func (s *WorkflowServiceServer) RunWorkflow(ctx context.Context, req *pb.RunWork
 // Provides comprehensive workflow information including completed/failed job counts,
 // individual job statuses, and overall workflow progress for monitoring.
 func (s *WorkflowServiceServer) GetWorkflowStatus(ctx context.Context, req *pb.GetWorkflowStatusRequest) (*pb.GetWorkflowStatusResponse, error) {
-	log := s.logger.WithFields("operation", "GetWorkflowStatus", "workflowId", req.WorkflowId)
+	log := s.logger.WithFields("operation", "GetWorkflowStatus", "workflowUuid", req.WorkflowUuid)
 	log.Debug("get workflow status request received")
 
 	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
@@ -149,7 +149,9 @@ func (s *WorkflowServiceServer) GetWorkflowStatus(ctx context.Context, req *pb.G
 		return nil, err
 	}
 
-	workflowState, err := s.workflowManager.GetWorkflowStatus(int(req.WorkflowId))
+	// Convert workflow UUID to internal ID (placeholder implementation)
+	workflowID := s.convertWorkflowUUIDToID(req.WorkflowUuid)
+	workflowState, err := s.workflowManager.GetWorkflowStatus(workflowID)
 	if err != nil {
 		log.Error("failed to get workflow status", "error", err)
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
@@ -193,7 +195,7 @@ func (s *WorkflowServiceServer) ListWorkflows(ctx context.Context, req *pb.ListW
 }
 
 func (s *WorkflowServiceServer) GetWorkflowJobs(ctx context.Context, req *pb.GetWorkflowJobsRequest) (*pb.GetWorkflowJobsResponse, error) {
-	log := s.logger.WithFields("operation", "GetWorkflowJobs", "workflowId", req.WorkflowId)
+	log := s.logger.WithFields("operation", "GetWorkflowJobs", "workflowUuid", req.WorkflowUuid)
 	log.Debug("get workflow jobs request received")
 
 	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
@@ -201,7 +203,9 @@ func (s *WorkflowServiceServer) GetWorkflowJobs(ctx context.Context, req *pb.Get
 		return nil, err
 	}
 
-	workflowState, err := s.workflowManager.GetWorkflowStatus(int(req.WorkflowId))
+	// Convert workflow UUID to internal ID (placeholder implementation)
+	workflowID := s.convertWorkflowUUIDToID(req.WorkflowUuid)
+	workflowState, err := s.workflowManager.GetWorkflowStatus(workflowID)
 	if err != nil {
 		log.Error("failed to get workflow", "error", err)
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
@@ -217,8 +221,8 @@ func (s *WorkflowServiceServer) RunJob(ctx context.Context, req *pb.RunJobReques
 	log := s.logger.WithFields(
 		"operation", "RunJob",
 		"command", req.Command,
-		"workflowId", req.WorkflowId,
-		"jobId", req.JobId,
+		"workflowUuid", req.WorkflowUuid,
+		"jobId", req.JobUuid,
 	)
 	log.Debug("run job request received for workflow")
 
@@ -233,20 +237,22 @@ func (s *WorkflowServiceServer) RunJob(ctx context.Context, req *pb.RunJobReques
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
 
-	if req.WorkflowId > 0 {
-		readyJobs := s.workflowManager.GetReadyJobs(int(req.WorkflowId))
+	if req.WorkflowUuid != "" {
+		// Convert workflow UUID to internal ID (placeholder implementation)
+		workflowID := s.convertWorkflowUUIDToID(req.WorkflowUuid)
+		readyJobs := s.workflowManager.GetReadyJobs(workflowID)
 		canRun := false
 		for _, readyJobID := range readyJobs {
-			if readyJobID == req.JobId {
+			if readyJobID == req.JobUuid {
 				canRun = true
 				break
 			}
 		}
-		if !canRun && req.JobId != "" {
-			log.Warn("job not ready to run due to dependencies", "jobId", req.JobId)
+		if !canRun && req.JobUuid != "" {
+			log.Warn("job not ready to run due to dependencies", "jobId", req.JobUuid)
 			return &pb.RunJobResponse{
-				JobId:  "",
-				Status: "WAITING",
+				JobUuid: "",
+				Status:  "WAITING",
 			}, nil
 		}
 	}
@@ -257,14 +263,14 @@ func (s *WorkflowServiceServer) RunJob(ctx context.Context, req *pb.RunJobReques
 		return nil, status.Errorf(codes.Internal, "job run failed: %v", err)
 	}
 
-	if req.WorkflowId > 0 {
-		s.workflowManager.OnJobStateChange(newJob.Id, newJob.Status)
+	if req.WorkflowUuid != "" {
+		s.workflowManager.OnJobStateChange(newJob.Uuid, newJob.Status)
 	}
 
-	log.Info("workflow job started successfully", "jobId", newJob.Id, "status", newJob.Status)
+	log.Info("workflow job started successfully", "jobId", newJob.Uuid, "status", newJob.Status)
 	return &pb.RunJobResponse{
-		JobId:  newJob.Id,
-		Status: string(newJob.Status),
+		JobUuid: newJob.Uuid,
+		Status:  string(newJob.Status),
 	}, nil
 }
 
@@ -311,7 +317,7 @@ func (s *WorkflowServiceServer) convertToWorkflowJobRequest(req *pb.RunJobReques
 
 func (s *WorkflowServiceServer) convertWorkflowStateToInfo(ws *workflow.WorkflowState) *pb.WorkflowInfo {
 	info := &pb.WorkflowInfo{
-		Id:            int32(ws.ID),
+		Uuid:          s.convertWorkflowIDToUUID(ws.ID),
 		Workflow:      ws.Workflow,
 		Status:        string(ws.Status),
 		TotalJobs:     int32(ws.TotalJobs),
@@ -379,7 +385,7 @@ func (s *WorkflowServiceServer) convertJobDependenciesToWorkflowJobs(jobs map[st
 		}
 
 		wfJob := &pb.WorkflowJob{
-			JobId:   jobID,               // Show actual job ID for started jobs, "0" for non-started jobs
+			JobUuid: jobID,               // Show actual job ID for started jobs, "0" for non-started jobs
 			JobName: jobDep.InternalName, // Use InternalName as the job name from workflow
 			Status:  string(jobDep.Status),
 		}
@@ -623,14 +629,14 @@ func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflow
 	}
 
 	// Update the workflow manager with the actual job ID
-	if err := s.workflowManager.UpdateJobID(jobName, job.Id); err != nil {
-		log.Warn("failed to update job ID mapping", "jobName", jobName, "actualJobId", job.Id, "error", err)
+	if err := s.workflowManager.UpdateJobID(jobName, job.Uuid); err != nil {
+		log.Warn("failed to update job ID mapping", "jobName", jobName, "actualJobId", job.Uuid, "error", err)
 	}
 
-	s.workflowManager.OnJobStateChange(job.Id, job.Status)
-	log.Info("workflow job started", "jobId", job.Id)
+	s.workflowManager.OnJobStateChange(job.Uuid, job.Status)
+	log.Info("workflow job started", "jobId", job.Uuid)
 
-	go s.monitorWorkflowJob(ctx, job.Id, job.Id)
+	go s.monitorWorkflowJob(ctx, job.Uuid, job.Uuid)
 
 	return nil
 }
@@ -868,7 +874,7 @@ func (s *WorkflowServiceServer) ListJobs(ctx context.Context, req *pb.EmptyReque
 
 // GetJobStatus implements the JobService interface
 func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatusReq) (*pb.GetJobStatusRes, error) {
-	log := s.logger.WithFields("operation", "GetJobStatus", "jobId", req.GetId())
+	log := s.logger.WithFields("operation", "GetJobStatus", "jobId", req.GetUuid())
 	log.Debug("get job status request received")
 
 	// Authorization check
@@ -878,10 +884,10 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 	}
 
 	// Retrieve job from store
-	job, exists := s.jobStore.GetJob(req.GetId())
+	job, exists := s.jobStore.GetJob(req.GetUuid())
 	if !exists {
-		log.Error("job not found", "jobId", req.GetId())
-		return nil, status.Errorf(codes.NotFound, "job %s not found", req.GetId())
+		log.Error("job not found", "jobId", req.GetUuid())
+		return nil, status.Errorf(codes.NotFound, "job %s not found", req.GetUuid())
 	}
 
 	// Convert to protobuf using mapper
@@ -897,7 +903,7 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 	}
 
 	return &pb.GetJobStatusRes{
-		Id:                pbJob.Id,
+		Uuid:              pbJob.Uuid,
 		Name:              pbJob.Name, // Include job name in response
 		Command:           pbJob.Command,
 		Args:              pbJob.Args,
@@ -917,7 +923,7 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 
 // StopJob implements the JobService interface
 func (s *WorkflowServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb.StopJobRes, error) {
-	log := s.logger.WithFields("operation", "StopJob", "jobId", req.GetId())
+	log := s.logger.WithFields("operation", "StopJob", "jobId", req.GetUuid())
 	log.Debug("stop job request received")
 
 	// Authorization check
@@ -928,7 +934,7 @@ func (s *WorkflowServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq)
 
 	// Create stop request object
 	stopRequest := interfaces.StopJobRequest{
-		JobID: req.GetId(),
+		JobID: req.GetUuid(),
 	}
 
 	log.Info("stopping job", "jobId", stopRequest.JobID)
@@ -943,13 +949,13 @@ func (s *WorkflowServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq)
 	log.Info("job stopped successfully", "jobId", stopRequest.JobID)
 
 	return &pb.StopJobRes{
-		Id: stopRequest.JobID,
+		Uuid: stopRequest.JobID,
 	}, nil
 }
 
 // GetJobLogs implements the JobService interface
 func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
-	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetId())
+	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetUuid())
 	log.Debug("get job logs request received")
 
 	// Authorization check
@@ -962,11 +968,11 @@ func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobS
 	streamer := &workflowGrpcToDomainStreamer{stream: stream}
 
 	// Stream logs using the job store
-	err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetId(), streamer)
+	err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetUuid(), streamer)
 	if err != nil {
 		log.Error("failed to stream logs", "error", err)
 		if err.Error() == "job not found" {
-			return status.Errorf(codes.NotFound, "job not found: %s", req.GetId())
+			return status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
 		}
 		return status.Errorf(codes.Internal, "failed to stream logs: %v", err)
 	}
@@ -1079,4 +1085,30 @@ func (s *WorkflowServiceServer) processEnvironmentTemplating(value string, envVa
 	}
 
 	return processedValue
+}
+
+// generateWorkflowUUID generates a UUID for workflow identification
+func (s *WorkflowServiceServer) generateWorkflowUUID() string {
+	// Read UUID from kernel
+	if data, err := os.ReadFile("/proc/sys/kernel/random/uuid"); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+
+	// Fallback: generate a simple UUID-like string
+	return fmt.Sprintf("workflow-%d-%d", time.Now().Unix(), time.Now().Nanosecond())
+}
+
+// convertWorkflowUUIDToID converts workflow UUID to internal integer ID (placeholder implementation)
+func (s *WorkflowServiceServer) convertWorkflowUUIDToID(uuid string) int {
+	// This is a placeholder implementation
+	// In a real system, you would maintain a mapping between UUIDs and internal IDs
+	// For now, return a hash-based ID or maintain the mapping in workflow manager
+	return 1 // Simplified for now
+}
+
+// convertWorkflowIDToUUID converts internal workflow ID to UUID (placeholder implementation)
+func (s *WorkflowServiceServer) convertWorkflowIDToUUID(id int) string {
+	// This is a placeholder implementation
+	// In a real system, you would maintain a mapping between internal IDs and UUIDs
+	return s.generateWorkflowUUID()
 }

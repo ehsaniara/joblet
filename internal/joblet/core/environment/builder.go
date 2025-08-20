@@ -61,7 +61,7 @@ func (b *Builder) BuildJobEnvironment(config *JobEnvironmentConfig) ([]string, d
 func (b *Builder) buildCoreEnvironment(job *domain.Job, execPath string) []string {
 	env := []string{
 		"JOBLET_MODE=init",
-		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_ID=%s", job.Uuid),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
@@ -92,7 +92,7 @@ func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileU
 	var env []string
 
 	// Prepare upload session
-	session, err := b.uploadManager.PrepareUploadSession(job.Id, uploads, job.Limits.Memory.Megabytes())
+	session, err := b.uploadManager.PrepareUploadSession(job.Uuid, uploads, job.Limits.Memory.Megabytes())
 	if err != nil {
 		b.logger.Error("failed to prepare upload session", "error", err)
 		return env, nil
@@ -107,7 +107,7 @@ func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileU
 
 	// Create streaming context if files are present
 	if len(session.Files) > 0 {
-		transport, err := b.uploadManager.CreateTransport(job.Id)
+		transport, err := b.uploadManager.CreateTransport(job.Uuid)
 		if err != nil {
 			b.logger.Error("failed to create upload transport", "error", err)
 			return env, nil

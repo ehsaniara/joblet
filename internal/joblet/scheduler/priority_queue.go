@@ -113,7 +113,7 @@ func (pq *PriorityQueue) Remove(jobID string) bool {
 	defer pq.mutex.Unlock()
 
 	for i, item := range pq.items {
-		if item.Job.Id == jobID {
+		if item.Job.Uuid == jobID {
 			heap.Remove(pq, i)
 			return true
 		}
@@ -127,7 +127,7 @@ func (pq *PriorityQueue) Update(jobID string, newScheduledTime time.Time) bool {
 	defer pq.mutex.Unlock()
 
 	for _, item := range pq.items {
-		if item.Job.Id == jobID {
+		if item.Job.Uuid == jobID {
 			item.ScheduledTime = newScheduledTime
 			item.Job.ScheduledTime = &newScheduledTime
 			heap.Fix(pq, item.Index)

@@ -90,8 +90,8 @@ func formatJobList(jobs []*pb.Job) {
 
 	// find the maximum width needed for each column
 	for _, job := range jobs {
-		if len(job.Id) > maxIDWidth {
-			maxIDWidth = len(job.Id)
+		if len(job.Uuid) > maxIDWidth {
+			maxIDWidth = len(job.Uuid)
 		}
 		jobName := job.Name
 		if jobName == "" {
@@ -147,7 +147,7 @@ func formatJobList(jobs []*pb.Job) {
 		statusColor, resetColor := getStatusColor(job.Status)
 
 		fmt.Printf("%-*s %-*s %s%-*s%s %-19s %s\n",
-			maxIDWidth, job.Id,
+			maxIDWidth, job.Uuid,
 			maxNameWidth, jobName,
 			statusColor, maxStatusWidth, job.Status, resetColor,
 			startTime,
@@ -215,7 +215,7 @@ func outputJobsJSON(jobs []*pb.Job) error {
 	jsonJobs := make([]jsonJob, len(jobs))
 	for i, job := range jobs {
 		jsonJobs[i] = jsonJob{
-			ID:            job.Id,
+			ID:            job.Uuid,
 			Name:          job.Name,
 			Status:        job.Status,
 			StartTime:     job.StartTime,
@@ -278,14 +278,14 @@ func listWorkflows() error {
 
 // formatWorkflowList formats and displays workflows in a table
 func formatWorkflowList(workflows []*pb.WorkflowInfo) {
-	fmt.Printf("ID   WORKFLOW             STATUS      PROGRESS\n")
-	fmt.Printf("---- -------------------- ----------- ---------\n")
+	fmt.Printf("UUID                                 WORKFLOW             STATUS      PROGRESS\n")
+	fmt.Printf("------------------------------------ -------------------- ----------- ---------\n")
 	for _, workflow := range workflows {
 		// Get status color
 		statusColor, resetColor := getStatusColor(workflow.Status)
 
-		fmt.Printf("%-4d %-20s %s%-11s%s %d/%d\n",
-			workflow.Id,
+		fmt.Printf("%-36s %-20s %s%-11s%s %d/%d\n",
+			workflow.Uuid,
 			truncateString(workflow.Workflow, 20),
 			statusColor, workflow.Status, resetColor,
 			workflow.CompletedJobs,
@@ -297,7 +297,7 @@ func formatWorkflowList(workflows []*pb.WorkflowInfo) {
 func outputWorkflowsJSON(workflows []*pb.WorkflowInfo) error {
 	// Convert protobuf workflows to a simpler structure for JSON output
 	type jsonWorkflow struct {
-		ID            int32  `json:"id"`
+		UUID          string `json:"uuid"`
 		Workflow      string `json:"workflow"`
 		Status        string `json:"status"`
 		TotalJobs     int32  `json:"total_jobs"`
@@ -311,7 +311,7 @@ func outputWorkflowsJSON(workflows []*pb.WorkflowInfo) error {
 	var jsonWorkflows []jsonWorkflow
 	for _, workflow := range workflows {
 		jsonWf := jsonWorkflow{
-			ID:            workflow.Id,
+			UUID:          workflow.Uuid,
 			Workflow:      workflow.Workflow,
 			Status:        workflow.Status,
 			TotalJobs:     workflow.TotalJobs,

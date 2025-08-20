@@ -73,7 +73,7 @@ func TestListJobs_WithJobs(t *testing.T) {
 
 	// Create a test job
 	testJob := &domain.Job{
-		Id:      "test-job-1",
+		Uuid:    "test-job-1",
 		Command: "echo",
 		Args:    []string{"hello"},
 		Status:  domain.StatusCompleted,
@@ -103,8 +103,8 @@ func TestListJobs_WithJobs(t *testing.T) {
 
 	if len(resp.Jobs) > 0 {
 		job := resp.Jobs[0]
-		if job.Id != "test-job-1" {
-			t.Errorf("Expected job ID 'test-job-1', got '%s'", job.Id)
+		if job.Uuid != "test-job-1" {
+			t.Errorf("Expected job ID 'test-job-1', got '%s'", job.Uuid)
 		}
 		if job.Command != "echo" {
 			t.Errorf("Expected command 'echo', got '%s'", job.Command)

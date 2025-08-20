@@ -125,7 +125,7 @@ rpc RunJob(RunJobReq) returns (RunJobRes);
 
 **Response**:
 
-- Complete job metadata including ID, status, resource limits, and timestamps
+- Complete job metadata including UUID, status, resource limits, and timestamps
 
 **Example**:
 
@@ -135,7 +135,7 @@ rnx run --max-cpu=50 --max-memory=512 python3 script.py
 
 # Expected Response
 Job started:
-ID: 1
+ID: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Command: python3 script.py
 Status: INITIALIZING
 StartTime: 2024-01-15T10:30:00Z
@@ -156,7 +156,7 @@ rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
 
 **Request Parameters**:
 
-- `id` (string): Job ID (required)
+- `id` (string): Job UUID (required)
 
 **Response**:
 
@@ -166,10 +166,10 @@ rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
 
 ```bash
 # CLI
-rnx status 1
+rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response
-Id: 1
+Id: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Command: python3 script.py
 Status: RUNNING
 Started At: 2024-01-15T10:30:00Z
@@ -192,7 +192,7 @@ rpc StopJob(StopJobReq) returns (StopJobRes);
 
 **Request Parameters**:
 
-- `id` (string): Job ID (required)
+- `id` (string): Job UUID (required)
 
 **Termination Process**:
 
@@ -204,17 +204,17 @@ rpc StopJob(StopJobReq) returns (StopJobRes);
 
 **Response**:
 
-- Job ID, final status, end time, and exit code
+- Job UUID, final status, end time, and exit code
 
 **Example**:
 
 ```bash
 # CLI
-rnx stop 1
+rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response
 Job stopped successfully:
-ID: 1
+ID: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Status: STOPPED
 ExitCode: -1
 EndTime: 2024-01-15T10:45:00Z
@@ -243,9 +243,9 @@ rpc ListJobs(EmptyRequest) returns (Jobs);
 rnx list
 
 # Expected Response
-1 COMPLETED StartTime: 2024-01-15T10:30:00Z Command: echo hello
-2 RUNNING StartTime: 2024-01-15T10:35:00Z Command: python3 script.py
-3 FAILED StartTime: 2024-01-15T10:40:00Z Command: invalid-command
+f47ac10b-58cc-4372-a567-0e02b2c3d479 COMPLETED StartTime: 2024-01-15T10:30:00Z Command: echo hello
+6ba7b810-9dad-11d1-80b4-00c04fd430c8 RUNNING StartTime: 2024-01-15T10:35:00Z Command: python3 script.py
+6ba7b811-9dad-11d1-80b4-00c04fd430c8 FAILED StartTime: 2024-01-15T10:40:00Z Command: invalid-command
 ```
 
 ### GetJobLogs
@@ -261,7 +261,7 @@ rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
 
 **Request Parameters**:
 
-- `id` (string): Job ID (required)
+- `id` (string): Job UUID (required)
 
 **Streaming Behavior**:
 
@@ -279,10 +279,10 @@ rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
 
 ```bash
 # CLI
-rnx log -f 1
+rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response (streaming)
-Logs for job 1 (Press Ctrl+C to exit if streaming):
+Logs for job f47ac10b-58cc-4372-a567-0e02b2c3d479 (Press Ctrl+C to exit if streaming):
 Starting script...
 Processing item 1
 Processing item 2
@@ -298,7 +298,7 @@ Core job representation used across all API responses.
 
 ```protobuf
 message Job {
-  string id = 1;                    // Unique job identifier
+  string id = 1;                    // Unique job UUID identifier
   string name = 2;                  // Human-readable job name (from workflows, empty for individual jobs)
   string command = 3;               // Command being executed
   repeated string args = 4;         // Command arguments
@@ -367,7 +367,7 @@ message DataChunk {
 |---------------------|---------------------------------------|-----------------------------------|
 | `UNAUTHENTICATED`   | Invalid or missing client certificate | Certificate expired, wrong CA     |
 | `PERMISSION_DENIED` | Insufficient role permissions         | Viewer trying admin operation     |
-| `NOT_FOUND`         | Job not found                         | Invalid job ID                    |
+| `NOT_FOUND`         | Job not found                         | Invalid job UUID                  |
 | `INTERNAL`          | Server-side error                     | Job creation failed, system error |
 | `CANCELED`          | Operation canceled                    | Client disconnected during stream |
 | `INVALID_ARGUMENT`  | Invalid request parameters            | Empty command, invalid limits     |
@@ -377,7 +377,7 @@ message DataChunk {
 ```json
 {
   "code": "NOT_FOUND",
-  "message": "job not found: 999",
+  "message": "job not found: f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "details": []
 }
 ```
@@ -401,10 +401,10 @@ Error: certificate verify failed: certificate has expired
 
 ```text
 # Job not found
-Error: job not found: 999
+Error: job not found: f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Job not running (for stop operation)
-Error: job is not running: 123 (current status: COMPLETED)
+Error: job is not running: 6ba7b810-9dad-11d1-80b4-00c04fd430c8 (current status: COMPLETED)
 
 # Command validation failed
 Error: invalid command: command contains dangerous characters
@@ -460,13 +460,13 @@ Examples:
 
 #### status
 
-Get detailed information about a job by ID.
+Get detailed information about a job by UUID.
 
 ```bash
-rnx status <job-id>
+rnx status <job-uuid>
 
 Example:
-  rnx status 1
+  rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 #### list
@@ -485,10 +485,10 @@ Example:
 Stop a running job gracefully (SIGTERM) or forcefully (SIGKILL).
 
 ```bash
-rnx stop <job-id>
+rnx stop <job-uuid>
 
 Example:
-  rnx stop 1
+  rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 #### log
@@ -496,15 +496,15 @@ Example:
 Stream job output in real-time or view historical logs.
 
 ```bash
-rnx log [flags] <job-id>
+rnx log [flags] <job-uuid>
 
 Flags:
   --follow, -f   Follow the log stream (default true)
 
 Examples:
-  rnx log 1              # View all logs
-  rnx log -f 1           # Follow live output
-  rnx log --follow=false 1  # Historical logs only
+  rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479              # View all logs
+  rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479           # Follow live output
+  rnx log --follow=false f47ac10b-58cc-4372-a567-0e02b2c3d479  # Historical logs only
 ```
 
 ### Configuration Examples
@@ -579,7 +579,7 @@ WARN  - Resource limit violations, slow clients, recoverable errors
 ERROR - Job failures, system errors, authentication failures
 
 # Example log entry
-[2024-01-15T10:30:00Z] [INFO] job started successfully | jobId=1 pid=12345 command="python3 script.py" duration=50ms
+[2024-01-15T10:30:00Z] [INFO] job started successfully | jobId=f47ac10b-58cc-4372-a567-0e02b2c3d479 pid=12345 command="python3 script.py" duration=50ms
 ```
 
 ### Health Checks
@@ -638,7 +638,7 @@ Represents a job within a workflow with dependency information.
 
 ```protobuf
 message WorkflowJob {
-  string jobId = 1;                      // Actual job ID for started jobs, "0" for non-started jobs
+  string jobId = 1;                      // Actual job UUID for started jobs, "0" for non-started jobs
   string jobName = 2;                    // Human-readable job name from workflow YAML
   string status = 3;                     // Current job status
   repeated string dependencies = 4;       // List of job names this job depends on
@@ -649,7 +649,7 @@ message WorkflowJob {
 ```
 
 **Job ID Behavior:**
-- **Started jobs**: `jobId` contains actual job ID assigned by joblet (e.g., "42", "43")
+- **Started jobs**: `jobId` contains actual job UUID assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 - **Non-started jobs**: `jobId` shows "0" to indicate the job hasn't been started yet
 
 #### GetWorkflowStatusResponse
@@ -681,15 +681,15 @@ jobs:
 ```
 
 **Job ID vs Job Name:**
-- **Job ID**: Unique identifier assigned by joblet (e.g., "42", "43", "44")
+- **Job ID**: Unique UUID identifier assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 - **Job Name**: Human-readable name from workflow YAML (e.g., "setup-data", "process-data")
 
 **Status Display:**
 ```
-JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
------------------------------------------------------------------------------------------
-42              setup-data           COMPLETED    0          -                   
-43              process-data         RUNNING      -          setup-data          
+JOB ID                                   JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
+---------------------------------------------------------------------------------------------------------------------
+f47ac10b-58cc-4372-a567-0e02b2c3d479     setup-data           COMPLETED    0          -                   
+6ba7b810-9dad-11d1-80b4-00c04fd430c8     process-data         RUNNING      -          setup-data          
 ```
 
 ### CLI Integration
@@ -698,7 +698,7 @@ Workflow status commands automatically display job names for better visibility:
 
 ```bash
 # Get workflow status with job names and dependencies
-rnx status --workflow 1
+rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # List workflows
 rnx list --workflow

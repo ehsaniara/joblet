@@ -47,24 +47,24 @@ func NewResourceManager(
 
 // SetupJobResources sets up all resources for a job (cgroup, filesystem)
 func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
-	log := rm.logger.WithField("jobID", job.Id)
+	log := rm.logger.WithField("jobID", job.Uuid)
 	log.Debug("setting up job resources")
 
 	// Create workspace directory
-	if err := rm.createWorkspace(job.Id); err != nil {
+	if err := rm.createWorkspace(job.Uuid); err != nil {
 		return err
 	}
 
 	// Create cgroup with resource limits
 	if err := rm.createCgroup(job); err != nil {
-		rm.cleanupWorkspace(job.Id)
+		rm.cleanupWorkspace(job.Uuid)
 		return err
 	}
 
 	// Apply CPU core restrictions if specified
 	if !job.Limits.CPUCores.IsEmpty() {
 		if err := rm.applyCPUCoreRestrictions(job); err != nil {
-			rm.cleanupAll(job.Id)
+			rm.cleanupAll(job.Uuid)
 			return fmt.Errorf("CPU core setup failed: %w", err)
 		}
 	}
@@ -79,11 +79,11 @@ func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *
 		return nil
 	}
 
-	log := rm.logger.WithField("jobID", job.Id)
+	log := rm.logger.WithField("jobID", job.Uuid)
 	log.Debug("preparing uploads for scheduled job", "count", len(uploads))
 
 	// Create workspace
-	workspaceDir := rm.getWorkspaceDir(job.Id)
+	workspaceDir := rm.getWorkspaceDir(job.Uuid)
 	if err := rm.platform.MkdirAll(workspaceDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workspace: %w", err)
 	}
@@ -96,7 +96,7 @@ func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *
 
 	// Process uploads
 	streamConfig := &upload.StreamConfig{
-		JobID:        job.Id,
+		JobID:        job.Uuid,
 		Uploads:      uploads,
 		MemoryLimit:  job.Limits.Memory.Megabytes(),
 		WorkspaceDir: workspaceDir,
@@ -142,7 +142,7 @@ func (rm *ResourceManager) createCgroup(job *domain.Job) error {
 // It configures CPU core limitations on both the main cgroup and process subgroup,
 // ensuring that the job runs only on the specified CPU cores for performance isolation.
 func (rm *ResourceManager) applyCPUCoreRestrictions(job *domain.Job) error {
-	log := rm.logger.WithFields("jobID", job.Id, "cores", job.Limits.CPUCores)
+	log := rm.logger.WithFields("jobID", job.Uuid, "cores", job.Limits.CPUCores)
 	log.Debug("applying CPU core restrictions")
 
 	// Apply CPU core restrictions to both the main cgroup and process subgroup

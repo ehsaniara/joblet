@@ -181,7 +181,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 // preparing uploads, and queuing the job for future execution. It validates
 // the schedule format and coordinates with the scheduler for timing management.
 func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
-	log := j.logger.WithField("jobID", job.Id)
+	log := j.logger.WithField("jobID", job.Uuid)
 
 	// Parse and set scheduled time
 	scheduledTime, err := time.Parse(time.RFC3339, req.Schedule)
@@ -205,7 +205,7 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobR
 	j.store.CreateNewJob(job)
 
 	if e := j.scheduler.AddJob(job); e != nil {
-		_ = j.cleanup.CleanupJob(job.Id)
+		_ = j.cleanup.CleanupJob(job.Uuid)
 		return nil, fmt.Errorf("scheduling failed: %w", e)
 	}
 
@@ -216,7 +216,7 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobR
 // coordinating with the execution engine, and starting monitoring.
 // It manages the complete lifecycle from resource allocation to process start.
 func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
-	log := j.logger.WithField("jobID", job.Id)
+	log := j.logger.WithField("jobID", job.Uuid)
 	log.Debug("executing job immediately")
 
 	// Setup resources
@@ -228,7 +228,7 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 	j.store.CreateNewJob(job)
 
 	// Start execution
-	log.Debug("calling execution engine with job volumes", "jobId", job.Id, "volumes", job.Volumes, "volumeCount", len(job.Volumes))
+	log.Debug("calling execution engine with job volumes", "jobId", job.Uuid, "volumes", job.Volumes, "volumeCount", len(job.Volumes))
 	cmd, err := j.executionEngine.StartProcessWithUploads(ctx, job, req.Uploads)
 	if err != nil {
 		j.handleExecutionFailure(job)
@@ -248,7 +248,7 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 // ExecuteScheduledJob implements the interfaces.Joblet interface for scheduled job execution
 func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
 	jobObj := req.Job
-	log := j.logger.WithField("jobID", jobObj.Id)
+	log := j.logger.WithField("jobID", jobObj.Uuid)
 	log.Info("executing scheduled job")
 
 	// Transition state
@@ -320,7 +320,7 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 // coordinating cleanup operations, and managing state transitions.
 // It runs asynchronously and ensures proper resource cleanup regardless of job outcome.
 func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
-	log := j.logger.WithField("jobID", job.Id)
+	log := j.logger.WithField("jobID", job.Uuid)
 	log.Debug("starting job monitoring")
 
 	// Wait for completion
@@ -349,7 +349,7 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 	j.store.UpdateJob(job)
 
 	// Cleanup resources
-	if err := j.cleanup.CleanupJob(job.Id); err != nil {
+	if err := j.cleanup.CleanupJob(job.Uuid); err != nil {
 		log.Error("cleanup failed during monitoring", "error", err)
 	}
 
@@ -371,9 +371,9 @@ func (j *Joblet) handleExecutionFailure(job *domain.Job) {
 	job.ExitCode = -1
 	job.EndTime = &[]time.Time{time.Now()}[0]
 	j.store.UpdateJob(job)
-	if err := j.cleanup.CleanupJob(job.Id); err != nil {
+	if err := j.cleanup.CleanupJob(job.Uuid); err != nil {
 		j.logger.Error("cleanup failed after execution failure",
-			"jobID", job.Id, "error", err)
+			"jobID", job.Uuid, "error", err)
 	}
 }
 
@@ -382,7 +382,7 @@ func (j *Joblet) getActiveJobIDs() map[string]bool {
 
 	activeIDs := make(map[string]bool)
 	for _, jb := range jobs {
-		activeIDs[jb.Id] = true
+		activeIDs[jb.Uuid] = true
 	}
 	return activeIDs
 }
@@ -405,9 +405,9 @@ func initializeComponents(store adapters.JobStoreAdapter, cfg *config.Config, pl
 		validation.NewResourceValidator(),
 	)
 
-	// Create job builder
-	idGenerator := job.NewIDGenerator("job", "node")
-	jobBuilder := job.NewBuilder(cfg, idGenerator, validator.ResourceValidator())
+	// Create UUID generator for job identification
+	uuidGenerator := job.NewUUIDGenerator("job", "node")
+	jobBuilder := job.NewBuilder(cfg, uuidGenerator, validator.ResourceValidator())
 
 	// Create runtime manager if runtime support is enabled
 	var runtimeManager *runtime.Manager

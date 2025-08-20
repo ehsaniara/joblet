@@ -257,13 +257,25 @@ rnx run --schedule="$TOMORROW_NOON" lunch_reminder.sh
 rnx list --json | jq '.[] | select(.status == "SCHEDULED")'
 
 # Cancel scheduled job
-rnx stop <job-id>
+rnx stop <job-uuid>
+
+# Example with actual UUID:
+rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Check when job will run
-rnx status <job-id>
+rnx status <job-uuid>
 ```
 
 ## Job Lifecycle
+
+### Job Identification
+
+Each job is assigned a unique UUID (Universally Unique Identifier) when created. Job UUIDs are in the format: `f47ac10b-58cc-4372-a567-0e02b2c3d479`
+
+Use job UUIDs to:
+- Check job status: `rnx status <job-uuid>`
+- View job logs: `rnx log <job-uuid>`
+- Stop running jobs: `rnx stop <job-uuid>`
 
 ### Job States
 
@@ -278,13 +290,19 @@ rnx status <job-id>
 
 ```bash
 # Real-time status (shows job name for workflow jobs)
-watch -n 1 rnx status <job-id>
+watch -n 1 rnx status <job-uuid>
+
+# Example with actual UUID:
+watch -n 1 rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Workflow status with job names and dependencies
 rnx status --workflow <workflow-id>
 
 # Follow logs
-rnx log -f <job-id>
+rnx log -f <job-uuid>
+
+# Example with actual UUID:
+rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # List running jobs (shows names and status)
 rnx list --json | jq '.[] | select(.status == "RUNNING")'
@@ -297,17 +315,18 @@ rnx list --json | jq '.[] | select(.name == "process-data")'
 
 ```bash
 # Check exit code
-rnx status <job-id> | grep "Exit Code"
+rnx status <job-uuid> | grep "Exit Code"
 
 # Get final output
-rnx log <job-id> | tail -20
+rnx log <job-uuid> | tail -20
 
 # Script to wait for completion
-JOB_ID=$(rnx run --json long_task.sh | jq -r .id)
-while [[ $(rnx status --json $JOB_ID | jq -r .status) == "RUNNING" ]]; do
+JOB_UUID=$(rnx run --json long_task.sh | jq -r .id)
+# JOB_UUID will be something like: f47ac10b-58cc-4372-a567-0e02b2c3d479
+while [[ $(rnx status --json $JOB_UUID | jq -r .status) == "RUNNING" ]]; do
   sleep 5
 done
-echo "Job completed with exit code: $(rnx status --json $JOB_ID | jq .exit_code)"
+echo "Job completed with exit code: $(rnx status --json $JOB_UUID | jq .exit_code)"
 ```
 
 ## Output and Logging
@@ -316,29 +335,32 @@ echo "Job completed with exit code: $(rnx status --json $JOB_ID | jq .exit_code)
 
 ```bash
 # Save logs to file
-rnx log <job-id> > output.log
+rnx log <job-uuid> > output.log
+
+# Example with actual UUID:
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
 
 # Stream to file
-rnx log -f <job-id> | tee running.log
+rnx log -f <job-uuid> | tee running.log
 
 # Parse JSON output
 rnx run --json echo "test" | jq .
 
 # Get only stdout
-rnx log <job-id> 2>/dev/null
+rnx log <job-uuid> 2>/dev/null
 ```
 
 ### Log Formatting
 
 ```bash
 # With timestamps
-rnx log --timestamps <job-id>
+rnx log --timestamps <job-uuid>
 
 # Last N lines
-rnx log --tail=100 <job-id>
+rnx log --tail=100 <job-uuid>
 
 # Follow with grep
-rnx log -f <job-id> | grep ERROR
+rnx log -f <job-uuid> | grep ERROR
 ```
 
 ### Persistent Output
@@ -365,6 +387,7 @@ PREP_JOB=$(rnx run --json \
   --volume=pipeline-data \
   --upload=prepare_data.py \
   python3 prepare_data.py | jq -r .id)
+# PREP_JOB will be something like: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 # Wait for completion
 while [[ $(rnx status --json $PREP_JOB | jq -r .status) == "RUNNING" ]]; do
@@ -393,6 +416,7 @@ rnx run \
 ```bash
 # Simple dependency chain
 JOB1=$(rnx run --json setup.sh | jq -r .id)
+# JOB1 will be something like: 12345678-abcd-ef12-3456-7890abcdef12
 # Wait for job1
 while [[ $(rnx status --json $JOB1 | jq -r .status) == "RUNNING" ]]; do
   sleep 1
@@ -471,10 +495,10 @@ submit_job() {
   local retry=0
   
   while [ $retry -lt $max_retries ]; do
-    JOB_ID=$(rnx run --json $cmd | jq -r .id)
+    JOB_UUID=$(rnx run --json $cmd | jq -r .id)
     
     if [ $? -eq 0 ]; then
-      echo "Job submitted: $JOB_ID"
+      echo "Job submitted: $JOB_UUID"  # e.g., f47ac10b-58cc-4372-a567-0e02b2c3d479
       return 0
     fi
     
@@ -501,14 +525,15 @@ rnx run --volume=temp-vol process_data.sh
 
 ```bash
 # Comprehensive logging
-JOB_ID=$(rnx run --json \
+JOB_UUID=$(rnx run --json \
   --name="daily-backup-$(date +%Y%m%d)" \
   backup.sh | jq -r .id)
+# JOB_UUID will be something like: f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Save all job info
-mkdir -p logs/$JOB_ID
-rnx status $JOB_ID > logs/$JOB_ID/status.txt
-rnx log $JOB_ID > logs/$JOB_ID/output.log
+mkdir -p logs/$JOB_UUID
+rnx status $JOB_UUID > logs/$JOB_UUID/status.txt
+rnx log $JOB_UUID > logs/$JOB_UUID/output.log
 ```
 
 ### 5. Security
@@ -539,7 +564,7 @@ Common issues and solutions:
 
 3. **Job Hangs**
     - Check CPU limits
-    - Monitor with `rnx log <job-id>`
+    - Monitor with `rnx log <job-uuid>`
     - Set appropriate timeout
 
 4. **File Not Found**

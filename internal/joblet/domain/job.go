@@ -32,7 +32,7 @@ var (
 // - For individual jobs: Empty string (only Id is used for identification)
 // This enables better workflow visibility and dependency tracking in CLI tools.
 type Job struct {
-	Id                string            // Unique identifier for job tracking (always populated)
+	Uuid              string            // Unique UUID identifier for job tracking (replaces sequential Id)
 	Name              string            // Human-readable job name (workflow jobs only, empty for individual jobs)
 	Command           string            // Executable command path
 	Args              []string          // Command line arguments
@@ -142,7 +142,7 @@ func (j *Job) DeepCopy() *Job {
 	}
 
 	jobCopy := &Job{
-		Id:                j.Id,
+		Uuid:              j.Uuid,
 		Name:              j.Name,
 		Command:           j.Command,
 		Args:              make([]string, len(j.Args)),

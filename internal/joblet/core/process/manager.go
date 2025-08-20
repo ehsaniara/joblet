@@ -464,7 +464,7 @@ func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string
 	// Job-specific environment with mode indicator
 	jobEnv := []string{
 		"JOBLET_MODE=init", // This tells the binary to run in init mode
-		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_ID=%s", job.Uuid),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),

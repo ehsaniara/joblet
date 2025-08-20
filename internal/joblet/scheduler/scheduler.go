@@ -92,7 +92,7 @@ func (s *Scheduler) AddJob(job *domain.Job) error {
 	}
 
 	s.logger.Debug("adding scheduled job",
-		"jobId", job.Id,
+		"jobId", job.Uuid,
 		"scheduledTime", job.ScheduledTime.Format(time.RFC3339),
 		"command", job.Command)
 
@@ -106,7 +106,7 @@ func (s *Scheduler) AddJob(job *domain.Job) error {
 	}
 
 	s.logger.Debug("scheduled job added successfully",
-		"jobId", job.Id,
+		"jobId", job.Uuid,
 		"queueSize", s.queue.Size())
 
 	return nil
@@ -177,14 +177,14 @@ func (s *Scheduler) run() {
 			// Job is not due yet, sleep until it's time
 			sleepDuration := scheduledTime.Sub(now)
 			s.logger.Debug("sleeping until next job",
-				"jobId", nextJob.Id,
+				"jobId", nextJob.Uuid,
 				"sleepDuration", sleepDuration,
 				"scheduledTime", scheduledTime.Format(time.RFC3339))
 
 			select {
 			case <-time.After(sleepDuration):
 				// Time to execute the job
-				s.logger.Debug("sleep completed, job is due", "jobId", nextJob.Id)
+				s.logger.Debug("sleep completed, job is due", "jobId", nextJob.Uuid)
 			case <-s.newJobSignal:
 				// New job added, might be earlier than current job
 				s.logger.Debug("received new job signal during sleep, rechecking queue")
@@ -212,17 +212,17 @@ func (s *Scheduler) run() {
 // executeJob handles the execution of a single scheduled job
 func (s *Scheduler) executeJob(job *domain.Job) {
 	s.logger.Info("executing scheduled job",
-		"jobId", job.Id,
+		"jobId", job.Uuid,
 		"command", job.Command,
 		"originalScheduledTime", job.ScheduledTime.Format(time.RFC3339))
 
 	// Execute the job using the provided executor
 	if err := s.executor.ExecuteScheduledJob(s.ctx, job); err != nil {
 		s.logger.Error("failed to execute scheduled job",
-			"jobId", job.Id,
+			"jobId", job.Uuid,
 			"error", err)
 	} else {
-		s.logger.Debug("scheduled job execution initiated successfully", "jobId", job.Id)
+		s.logger.Debug("scheduled job execution initiated successfully", "jobId", job.Uuid)
 	}
 }
 

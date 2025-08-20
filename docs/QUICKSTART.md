@@ -94,7 +94,7 @@ Output:
 
 ```
 Job started:
-ID: 1
+UUID: 550e8400-e29b-41d4-a716-446655440000
 Command: echo Hello, Joblet!
 Status: RUNNING
 StartTime: 2025-08-03T10:00:00Z
@@ -103,13 +103,13 @@ StartTime: 2025-08-03T10:00:00Z
 ### Check Job Status
 
 ```bash
-rnx status 1
+rnx status 550e8400-e29b-41d4-a716-446655440000
 ```
 
 ### View Job Logs
 
 ```bash
-rnx log 1
+rnx log 550e8400-e29b-41d4-a716-446655440000
 ```
 
 ## 📊 Resource Limits Example
@@ -198,7 +198,7 @@ rnx monitor
 rnx monitor status
 
 # Stream job logs in real-time
-rnx log <job-id> --follow
+rnx log <job-uuid> --follow
 ```
 
 ## 🎉 Next Steps
@@ -224,9 +224,9 @@ Congratulations! You've successfully:
 # Job Management
 rnx run <command>           # Run a job
 rnx list                    # List all jobs
-rnx status <job-id>         # Check job status
-rnx log <job-id>            # View job logs
-rnx stop <job-id>           # Stop running job
+rnx status <job-uuid>       # Check job status
+rnx log <job-uuid>          # View job logs
+rnx stop <job-uuid>         # Stop running job
 
 # Volume Management
 rnx volume create <name>    # Create volume

@@ -131,9 +131,9 @@ type StartProcessOptions struct {
 //
 // Returns: Command interface for process control, or error if startup fails
 func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
-	log := ee.logger.WithField("jobID", opts.Job.Id)
+	log := ee.logger.WithField("jobID", opts.Job.Uuid)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
-	log.Debug("execution engine StartProcess called with volumes", "jobID", opts.Job.Id, "volumes", opts.Job.Volumes, "volumeCount", len(opts.Job.Volumes))
+	log.Debug("execution engine StartProcess called with volumes", "jobID", opts.Job.Uuid, "volumes", opts.Job.Volumes, "volumeCount", len(opts.Job.Volumes))
 
 	// Check if we're in CI mode - if so, use lightweight isolation
 	if ee.platform.Getenv("JOBLET_CI_MODE") == "true" {
@@ -147,7 +147,7 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 	}
 
 	// Create job base directory
-	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id)
+	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Uuid)
 	if e := ee.platform.MkdirAll(filepath.Join(jobDir, "sbin"), 0755); e != nil {
 		return nil, fmt.Errorf("failed to create job directory: %w", e)
 	}
@@ -204,7 +204,7 @@ func (ee *ExecutionEngine) StartProcess(ctx context.Context, opts *StartProcessO
 //
 // Returns: Running command interface, or error if execution setup fails
 func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProcessOptions, initPath string) (platform.Command, error) {
-	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("phase", "execute")
+	log := ee.logger.WithField("jobID", opts.Job.Uuid).WithField("phase", "execute")
 
 	// Build environment for execution phase
 	env := ee.buildPhaseEnvironment(opts.Job, "execute")
@@ -234,7 +234,7 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 	}
 
 	// Create output writer
-	outputWriter := NewWrite(ee.store, opts.Job.Id)
+	outputWriter := NewWrite(ee.store, opts.Job.Uuid)
 
 	// Launch execution phase process
 	launchConfig := &process.LaunchConfig{
@@ -243,7 +243,7 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 		SysProcAttr: ee.createIsolatedSysProcAttr(),
 		Stdout:      outputWriter,
 		Stderr:      outputWriter,
-		JobID:       opts.Job.Id,
+		JobID:       opts.Job.Uuid,
 		Command:     opts.Job.Command,
 		Args:        opts.Job.Args,
 		ExtraFiles:  extraFiles,
@@ -265,7 +265,7 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 		if opts.Job.Network == "isolated" {
 			// Create minimal allocation for isolated network
 			alloc = &network.JobAllocation{
-				JobID:   opts.Job.Id,
+				JobID:   opts.Job.Uuid,
 				Network: "isolated",
 			}
 		} else if ee.networkStore != nil {
@@ -277,15 +277,15 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 				return nil, fmt.Errorf("failed to allocate IP: %w", ipErr)
 			}
 
-			hostname := fmt.Sprintf("job_%s", opts.Job.Id)
+			hostname := fmt.Sprintf("job_%s", opts.Job.Uuid)
 			adapterAlloc := &adapters.JobNetworkAllocation{
-				JobID:       opts.Job.Id,
+				JobID:       opts.Job.Uuid,
 				NetworkName: opts.Job.Network,
 				IPAddress:   ipAddress,
 				Hostname:    hostname,
 				AssignedAt:  time.Now().Unix(),
 			}
-			allocErr = ee.networkStore.AssignJobToNetwork(opts.Job.Id, opts.Job.Network, adapterAlloc)
+			allocErr = ee.networkStore.AssignJobToNetwork(opts.Job.Uuid, opts.Job.Network, adapterAlloc)
 			if allocErr != nil {
 				// Release the allocated IP on error
 				if releaseErr := ee.networkStore.ReleaseIP(opts.Job.Network, ipAddress); releaseErr != nil {
@@ -320,7 +320,7 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 			// Generate veth names based on PID for consistency
 			pid := int(result.PID)
 			alloc = &network.JobAllocation{
-				JobID:    opts.Job.Id,
+				JobID:    opts.Job.Uuid,
 				Network:  opts.Job.Network,
 				VethHost: fmt.Sprintf("vjob%d", pid%10000),
 				VethPeer: fmt.Sprintf("vjob%dp", pid%10000),
@@ -331,10 +331,10 @@ func (ee *ExecutionEngine) executeJobPhase(ctx context.Context, opts *StartProce
 		if ee.networkSetup != nil {
 			if setupErr := ee.networkSetup.SetupJobNetwork(alloc, int(result.PID)); setupErr != nil {
 				if opts.Job.Network != "isolated" && ee.networkStore != nil {
-					if removeErr := ee.networkStore.RemoveJobFromNetwork(opts.Job.Id); removeErr != nil {
+					if removeErr := ee.networkStore.RemoveJobFromNetwork(opts.Job.Uuid); removeErr != nil {
 						// Log the error but continue with cleanup
 						ee.logger.Warn("failed to remove job from network during cleanup",
-							"JobId", opts.Job.Id,
+							"JobId", opts.Job.Uuid,
 							"error", removeErr)
 					}
 				}
@@ -374,7 +374,7 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 	jobEnv := []string{
 		"JOBLET_MODE=init",
 		fmt.Sprintf("JOB_PHASE=%s", phase),
-		fmt.Sprintf("JOB_ID=%s", job.Id),
+		fmt.Sprintf("JOB_ID=%s", job.Uuid),
 		fmt.Sprintf("JOB_CGROUP_PATH=%s", "/sys/fs/cgroup"),
 		fmt.Sprintf("JOB_CGROUP_HOST_PATH=%s", job.CgroupPath),
 		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.CPU.Value()),
@@ -392,9 +392,9 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 		for i, volume := range job.Volumes {
 			jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUME_%d=%s", i, volume))
 		}
-		ee.logger.Debug("volume environment variables set successfully", "jobID", job.Id, "volumeCount", len(job.Volumes))
+		ee.logger.Debug("volume environment variables set successfully", "jobID", job.Uuid, "volumeCount", len(job.Volumes))
 	} else {
-		ee.logger.Debug("no volumes to set for job", "jobID", job.Id)
+		ee.logger.Debug("no volumes to set for job", "jobID", job.Uuid)
 	}
 
 	// Add runtime information
@@ -426,7 +426,7 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 
 	// Add regular environment variables from the job (visible in logs)
 	if len(job.Environment) > 0 {
-		ee.logger.Debug("adding regular environment variables", "jobID", job.Id, "variables", getEnvKeys(job.Environment))
+		ee.logger.Debug("adding regular environment variables", "jobID", job.Uuid, "variables", getEnvKeys(job.Environment))
 		for key, value := range job.Environment {
 			env = append(env, fmt.Sprintf("%s=%s", key, value))
 		}
@@ -434,7 +434,7 @@ func (ee *ExecutionEngine) buildPhaseEnvironment(job *domain.Job, phase string) 
 
 	// Add secret environment variables from the job (hidden from logs)
 	if len(job.SecretEnvironment) > 0 {
-		ee.logger.Debug("adding secret environment variables", "jobID", job.Id, "count", len(job.SecretEnvironment))
+		ee.logger.Debug("adding secret environment variables", "jobID", job.Uuid, "count", len(job.SecretEnvironment))
 		for key, value := range job.SecretEnvironment {
 			env = append(env, fmt.Sprintf("%s=%s", key, value))
 		}
@@ -527,7 +527,7 @@ func (ee *ExecutionEngine) StartProcessWithUploads(ctx context.Context, job *dom
 		Job:             job,
 		Uploads:         uploads,
 		EnableStreaming: true,
-		WorkspaceDir:    filepath.Join(ee.config.Filesystem.BaseDir, job.Id, "work"),
+		WorkspaceDir:    filepath.Join(ee.config.Filesystem.BaseDir, job.Uuid, "work"),
 	}
 	return ee.StartProcess(ctx, opts)
 }
@@ -675,10 +675,10 @@ func (ee *ExecutionEngine) resolveCommandPath(command string) (string, error) {
 //
 // Returns: Command interface for CI-compatible job execution, or error if setup fails
 func (ee *ExecutionEngine) executeCICommand(_ context.Context, opts *StartProcessOptions) (platform.Command, error) {
-	log := ee.logger.WithField("jobID", opts.Job.Id).WithField("mode", "ci-isolated")
+	log := ee.logger.WithField("jobID", opts.Job.Uuid).WithField("mode", "ci-isolated")
 
 	// Create job directory for workspace
-	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Id)
+	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Uuid)
 	workDir := filepath.Join(jobDir, "work")
 
 	if err := ee.platform.MkdirAll(workDir, 0755); err != nil {
@@ -727,7 +727,7 @@ func (ee *ExecutionEngine) executeCICommand(_ context.Context, opts *StartProces
 	}
 
 	// Set up output capture
-	outputWriter := NewWrite(ee.store, opts.Job.Id)
+	outputWriter := NewWrite(ee.store, opts.Job.Uuid)
 	cmd.SetStdout(outputWriter)
 	cmd.SetStderr(outputWriter)
 
@@ -736,7 +736,7 @@ func (ee *ExecutionEngine) executeCICommand(_ context.Context, opts *StartProces
 		"PATH=/usr/local/bin:/usr/bin:/bin",
 		"HOME=/tmp",
 		"USER=joblet",
-		fmt.Sprintf("JOB_ID=%s", opts.Job.Id),
+		fmt.Sprintf("JOB_ID=%s", opts.Job.Uuid),
 		"JOBLET_CI_MODE=true",
 	}
 	cmd.SetEnv(env)

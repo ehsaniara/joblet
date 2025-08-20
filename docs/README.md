@@ -87,13 +87,13 @@ jobs:
 ```bash
 # Execute and monitor workflow with job names
 rnx run --workflow=ml-pipeline.yaml
-rnx status --workflow 1
+rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Output shows human-readable job names and dependencies:
-# JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
+# JOB UUID        JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
 # -----------------------------------------------------------------------------------------
-# 42              data-extraction      COMPLETED    0          -                   
-# 43              model-training       RUNNING      -          data-extraction     
+# f47ac10b-...    data-extraction      COMPLETED    0          -                   
+# a1b2c3d4-...    model-training       RUNNING      -          data-extraction     
 ```
 
 ### **SRE & Reliability Engineering**

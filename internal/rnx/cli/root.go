@@ -31,8 +31,8 @@ Quick Examples:
   rnx run python script.py                    # Run a simple job
   rnx run --workflow=pipeline.yaml            # Execute a workflow
   rnx list --workflow                         # List all workflows
-  rnx status <job-id>                         # Check job status
-  rnx log <job-id>                            # Stream job logs
+  rnx status <job-uuid>                       # Check job status
+  rnx log <job-uuid>                          # Stream job logs
   rnx monitor status                          # View system metrics
 
 Use 'rnx <command> --help' for detailed information about any command.`,

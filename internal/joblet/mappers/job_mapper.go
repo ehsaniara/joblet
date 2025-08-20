@@ -22,7 +22,7 @@ func NewJobMapper() *JobMapper {
 // DomainToProtobuf converts domain Job to protobuf Job
 func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 	pbJob := &pb.Job{
-		Id:                job.Id,
+		Uuid:              job.Uuid,
 		Name:              job.Name, // Include job name
 		Command:           job.Command,
 		Args:              job.Args,
@@ -60,7 +60,7 @@ func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
 	)
 
 	job := &domain.Job{
-		Id:                pbJob.Id,
+		Uuid:              pbJob.Uuid,
 		Name:              pbJob.Name, // Include job name
 		Command:           pbJob.Command,
 		Args:              pbJob.Args,
@@ -102,7 +102,7 @@ func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
 // DomainToRunJobResponse converts domain Job to RunJobResponse
 func (m *JobMapper) DomainToRunJobResponse(job *domain.Job) *pb.RunJobResponse {
 	response := &pb.RunJobResponse{
-		JobId:     job.Id,
+		JobUuid:   job.Uuid,
 		Command:   job.Command,
 		Args:      job.Args,
 		MaxCpu:    job.Limits.CPU.Value(),

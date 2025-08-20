@@ -402,7 +402,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Job started:\n")
-	fmt.Printf("ID: %s\n", response.JobId)
+	fmt.Printf("ID: %s\n", response.JobUuid)
 	fmt.Printf("Command: %s %s\n", response.Command, strings.Join(response.Args, " "))
 	// Display status with color coding
 	statusColor, resetColor := getStatusColor(response.Status)
@@ -865,8 +865,8 @@ func executeWorkflowViaService(workflowPath string, workflowName string) error {
 		return fmt.Errorf("failed to create workflow: %w", err)
 	}
 
-	fmt.Printf("Workflow created with WorkflowId: %d\n", createRes.WorkflowId)
-	fmt.Printf("Use 'rnx status --workflow %d' to monitor progress\n", createRes.WorkflowId)
+	fmt.Printf("Workflow created with UUID: %s\n", createRes.WorkflowUuid)
+	fmt.Printf("Use 'rnx status --workflow %s' to monitor progress\n", createRes.WorkflowUuid)
 
 	return nil
 }

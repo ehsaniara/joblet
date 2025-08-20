@@ -167,23 +167,25 @@ Error: workflow validation failed: network validation failed: missing networks: 
 
 ### `rnx list`
 
-List all jobs on the server.
+List all jobs or workflows on the server.
 
 ```bash
-rnx list [flags]
+rnx list [flags]              # List all jobs
+rnx list --workflow [flags]   # List all workflows
 ```
 
 #### Flags
 
-| Flag     | Description           | Default |
-|----------|-----------------------|---------|
-| `--json` | Output in JSON format | false   |
+| Flag         | Description                    | Default |
+|--------------|--------------------------------|---------|
+| `--json`     | Output in JSON format          | false   |
+| `--workflow` | List workflows instead of jobs | false   |
 
 #### Output Format
 
 **Table Format (default):**
 
-- **ID**: Job identifier
+- **ID**: Job UUID (36-character identifier)
 - **NAME**: Job name (from workflows, "-" for individual jobs)
 - **STATUS**: Current job status (RUNNING, COMPLETED, FAILED, STOPPED, SCHEDULED)
 - **START TIME**: When the job started (format: YYYY-MM-DD HH:MM:SS)
@@ -200,12 +202,21 @@ information.
 rnx list
 
 # Example output:
-# ID   NAME         STATUS      START TIME           COMMAND
-# ---- ------------ ----------  -------------------  -------
-# 1    setup-data   COMPLETED   2025-08-03 10:15:32  echo "Hello World"
-# 2    process-data RUNNING     2025-08-03 10:16:45  python3 script.py
-# 3    -            FAILED      2025-08-03 10:17:20  invalid_command
-# 4    -            SCHEDULED   N/A                  backup.sh
+# UUID                                 NAME         STATUS      START TIME           COMMAND
+# ------------------------------------  ------------ ----------  -------------------  -------
+# f47ac10b-58cc-4372-a567-0e02b2c3d479  setup-data   COMPLETED   2025-08-03 10:15:32  echo "Hello World"
+# a1b2c3d4-e5f6-7890-abcd-ef1234567890  process-data RUNNING     2025-08-03 10:16:45  python3 script.py
+# b2c3d4e5-f6a7-8901-bcde-f23456789012  -            FAILED      2025-08-03 10:17:20  invalid_command
+# c3d4e5f6-a7b8-9012-cdef-345678901234  -            SCHEDULED   N/A                  backup.sh
+
+# List all workflows (table format)
+rnx list --workflow
+
+# Example output:
+# UUID                                 WORKFLOW             STATUS      PROGRESS
+# ------------------------------------ -------------------- ----------- ---------
+# a1b2c3d4-e5f6-7890-1234-567890abcdef data-pipeline.yaml   RUNNING     3/5
+# b2c3d4e5-f6a7-8901-2345-678901bcdefg ml-pipeline.yaml     COMPLETED   5/5
 
 # JSON output for scripting
 rnx list --json
@@ -213,7 +224,7 @@ rnx list --json
 # Example JSON output:
 # [
 #   {
-#     "id": "1",
+#     "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 #     "name": "setup-data",
 #     "status": "COMPLETED",
 #     "start_time": "2025-08-03T10:15:32Z",
@@ -223,7 +234,7 @@ rnx list --json
 #     "exit_code": 0
 #   },
 #   {
-#     "id": "2",
+#     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 #     "name": "process-data",
 #     "status": "RUNNING",
 #     "start_time": "2025-08-03T10:16:45Z",
@@ -243,15 +254,20 @@ rnx list --json | jq '.[] | select(.max_memory > 1024)'
 
 ### `rnx status`
 
-Get detailed status of a specific job or workflow (unified command).
+Get detailed status of a specific job or workflow.
 
 ```bash
-rnx status [flags] <id>
+rnx status [flags] <job-uuid>              # Get job status
+rnx status --workflow <workflow-uuid>      # Get workflow status
 ```
 
-The status command automatically detects whether the ID refers to a job or workflow:
+#### Job Status
 
-- **Job IDs**: String identifiers (e.g., "42", "abc-123")  
+- **Job UUIDs**: 36-character UUID identifiers (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479")
+
+#### Workflow Status
+
+- **Workflow UUIDs**: 36-character UUID identifiers (e.g., "a1b2c3d4-e5f6-7890-1234-567890abcdef")  
 - **Workflow IDs**: Numeric identifiers (e.g., 1, 2, 3)
 
 **Workflow Status Features:**
@@ -259,7 +275,7 @@ The status command automatically detects whether the ID refers to a job or workf
 - Shows dependency relationships between workflow jobs  
 - Real-time progress tracking with job-level details
 - Color-coded status indicators (RUNNING, COMPLETED, FAILED, etc.)
-- **Job ID Display**: Started jobs show actual job IDs (e.g., "42", "43"), non-started jobs show "0"
+- **Job ID Display**: Started jobs show actual job UUIDs (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "a1b2c3d4-e5f6-7890-abcd-ef1234567890"), non-started jobs show "0"
 
 #### Flags
 
@@ -272,43 +288,40 @@ The status command automatically detects whether the ID refers to a job or workf
 
 ```bash
 # Get job status (human-readable format)
-rnx status 42
+rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
-# Get workflow status (automatic detection)
-rnx status 1
+# Get workflow status
+rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 
-# Explicitly get workflow status  
-rnx status --workflow 5
-
-# Get status in JSON format (works for both jobs and workflows)
-rnx status --json 42    # Job JSON output
-rnx status --json 1     # Workflow JSON output
+# Get status in JSON format
+rnx status --json f47ac10b-58cc-4372-a567-0e02b2c3d479    # Job JSON output
+rnx status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef     # Workflow JSON output
 
 # Check multiple jobs/workflows
-for id in 1 2 3; do rnx status $id; done
+for uuid in f47ac10b-58cc-4372-a567-0e02b2c3d479 a1b2c3d4-e5f6-7890-1234-567890abcdef; do rnx status $uuid; done
 
 # JSON output for scripting
-rnx status --json 42 | jq .status      # Job status
-rnx status --json 1 | jq .total_jobs   # Workflow progress
+rnx status --json f47ac10b-58cc-4372-a567-0e02b2c3d479 | jq .status      # Job status
+rnx status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .total_jobs   # Workflow progress
 
 # Example workflow status output:
-# Workflow ID: 1
+# Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
 # Workflow: data-pipeline.yaml
 # Status: RUNNING
 # Progress: 2/4 jobs completed
 # 
 # Jobs in Workflow:
 # -----------------------------------------------------------------------------------------
-# JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
-# -----------------------------------------------------------------------------------------
-# 42              setup-data           COMPLETED    0          -                   
-# 43              process-data         COMPLETED    0          setup-data          
-# 0               validate-results     PENDING      -          process-data        
-# 0               generate-report      PENDING      -          validate-results    
+# JOB ID                                  JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
+# -------------------------------------------------------------------------------------------------------------
+# f47ac10b-58cc-4372-a567-0e02b2c3d479    setup-data           COMPLETED    0          -                   
+# a1b2c3d4-e5f6-7890-abcd-ef1234567890    process-data         COMPLETED    0          setup-data          
+# 0                                       validate-results     PENDING      -          process-data        
+# 0                                       generate-report      PENDING      -          validate-results    
 
 # Example JSON output for individual job:
 # {
-#   "id": "42",
+#   "uuid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 #   "name": "process-data",
 #   "command": "python3",
 #   "args": ["process_data.py"],
@@ -338,7 +351,7 @@ rnx status --json 1 | jq .total_jobs   # Workflow progress
 View or stream job logs.
 
 ```bash
-rnx log [flags] <job-id>
+rnx log [flags] <job-uuid>
 ```
 
 #### Flags
@@ -353,16 +366,16 @@ rnx log [flags] <job-id>
 
 ```bash
 # View complete logs
-rnx log 42
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Stream logs in real-time
-rnx log -f 42
+rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Show last 100 lines
-rnx log --tail=100 42
+rnx log --tail=100 f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # With timestamps
-rnx log --timestamps 42
+rnx log --timestamps f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 ### `rnx stop`
@@ -370,14 +383,14 @@ rnx log --timestamps 42
 Stop a running or scheduled job.
 
 ```bash
-rnx stop <job-id>
+rnx stop <job-uuid>
 ```
 
 #### Examples
 
 ```bash
 # Stop a running job
-rnx stop 42
+rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Stop multiple jobs
 rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | xargs -I {} rnx stop {}
@@ -701,8 +714,8 @@ wait
 
 # Collect results
 rnx list --json | jq -r '.[] | select(.status == "COMPLETED") | .id' | \
-while read job_id; do
-  rnx log "$job_id" > "result-$job_id.txt"
+while read job_uuid; do
+  rnx log "$job_uuid" > "result-$(echo $job_uuid | cut -c1-8).txt"
 done
 ```
 
@@ -721,8 +734,8 @@ done
       npm test
 
     # Check job status
-    JOB_ID=$(rnx list --json | jq -r '.[-1].id')
-    rnx status $JOB_ID
+    JOB_UUID=$(rnx list --json | jq -r '.[-1].uuid')
+    rnx status $JOB_UUID
 
     # Get test results
     rnx run --volume=test-results cat /volumes/test-results/report.xml

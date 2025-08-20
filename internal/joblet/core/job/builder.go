@@ -43,21 +43,21 @@ type BuildRequest interface {
 
 // Build creates a new job from the request
 func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
-	// Generate ID
-	jobID := b.idGenerator.Next()
+	// Generate UUID
+	jobUuid := b.idGenerator.Next()
 
-	b.logger.Debug("building job", "jobID", jobID, "command", req.GetCommand())
+	b.logger.Debug("building job", "jobUuid", jobUuid, "command", req.GetCommand())
 
 	// Create job
 	volumes := b.copyStrings(req.GetVolumes())
-	b.logger.Debug("building job with volumes", "jobID", jobID, "volumes", volumes, "volumeCount", len(volumes))
+	b.logger.Debug("building job with volumes", "jobUuid", jobUuid, "volumes", volumes, "volumeCount", len(volumes))
 
 	job := &domain.Job{
-		Id:                jobID,
+		Uuid:              jobUuid,
 		Command:           req.GetCommand(),
 		Args:              b.copyStrings(req.GetArgs()),
 		Status:            domain.StatusInitializing,
-		CgroupPath:        b.generateCgroupPath(jobID),
+		CgroupPath:        b.generateCgroupPath(jobUuid),
 		StartTime:         time.Now(),
 		Network:           req.GetNetwork(),
 		Volumes:           volumes,
@@ -80,7 +80,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	}
 
 	b.logger.Debug("job built successfully",
-		"jobID", jobID,
+		"jobUuid", jobUuid,
 		"cpu", job.Limits.CPU.Value(),
 		"memory", job.Limits.Memory.Megabytes(),
 		"io", job.Limits.IOBandwidth.BytesPerSecond())
@@ -118,8 +118,8 @@ func (b *Builder) applyResourceDefaults(limits domain.ResourceLimits) domain.Res
 }
 
 // generateCgroupPath generates the cgroup path for a job
-func (b *Builder) generateCgroupPath(jobID string) string {
-	return filepath.Join(b.config.Cgroup.BaseDir, "job-"+jobID)
+func (b *Builder) generateCgroupPath(jobUuid string) string {
+	return filepath.Join(b.config.Cgroup.BaseDir, "job-"+jobUuid)
 }
 
 // copyStrings creates a copy of string slice

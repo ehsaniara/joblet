@@ -10,11 +10,11 @@ import (
 )
 
 // NewStopCmd creates a new cobra command for stopping jobs.
-// The command requires exactly one argument: the job ID to stop.
+// The command requires exactly one argument: the job UUID to stop.
 // Sends a stop request to the Joblet server for the specified job.
 func NewStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "stop <job-id>",
+		Use:   "stop <job-uuid>",
 		Short: "Stop a running job",
 		Long: `Stop a running or scheduled job immediately.
 
@@ -24,10 +24,10 @@ For scheduled jobs, it will cancel the scheduled execution.
 
 Examples:
   # Stop a running job
-  rnx stop job-123
+  rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
   
   # Cancel a scheduled job before it starts
-  rnx stop job-456`,
+  rnx stop a1b2c3d4-5678-90ab-cdef-1234567890ab`,
 		Args: cobra.ExactArgs(1),
 		RunE: runStop,
 	}
@@ -56,7 +56,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Job stopped successfully:\n")
-	fmt.Printf("ID: %s\n", response.Id)
+	fmt.Printf("ID: %s\n", response.Uuid)
 	// Display status with color coding
 	statusColor, resetColor := getStatusColor(response.Status)
 	fmt.Printf("Status: %s%s%s\n", statusColor, response.Status, resetColor)

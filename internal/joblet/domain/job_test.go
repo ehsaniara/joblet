@@ -7,7 +7,7 @@ import (
 
 func TestJobStateTransitions(t *testing.T) {
 	job := &Job{
-		Id:      "test-1",
+		Uuid:    "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 		Command: "echo",
 		Args:    []string{"hello"},
 		Status:  StatusInitializing,
@@ -65,7 +65,7 @@ func TestJobFailTransitions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			job := &Job{
-				Id:     "test-fail",
+				Uuid:   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 				Status: tt.initialStatus,
 			}
 
@@ -90,7 +90,7 @@ func TestJobFailTransitions(t *testing.T) {
 
 func TestJobStopTransition(t *testing.T) {
 	job := &Job{
-		Id:     "test-stop",
+		Uuid:   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 		Status: StatusRunning,
 		Pid:    1234,
 	}
@@ -119,7 +119,7 @@ func TestJobDeepCopy(t *testing.T) {
 	limits := NewResourceLimitsFromParams(100, "", 512, 1000)
 
 	original := &Job{
-		Id:         "test-1",
+		Uuid:       "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 		Command:    "echo",
 		Args:       []string{"hello", "world"},
 		Status:     StatusRunning,
@@ -134,8 +134,8 @@ func TestJobDeepCopy(t *testing.T) {
 	cp := original.DeepCopy()
 
 	// Verify all fields are copied
-	if cp.Id != original.Id {
-		t.Errorf("ID not copied correctly: expected %v, got %v", original.Id, cp.Id)
+	if cp.Uuid != original.Uuid {
+		t.Errorf("UUID not copied correctly: expected %v, got %v", original.Uuid, cp.Uuid)
 	}
 	if cp.Command != original.Command {
 		t.Errorf("Command not copied correctly")

@@ -87,7 +87,7 @@ func TestSecretEnvironmentVariableMasking(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock job with secret environment variables
 			job := &domain.Job{
-				Id:                "test-job-id",
+				Uuid:              "test-job-id",
 				Command:           "echo",
 				Args:              []string{"test"},
 				Status:            domain.StatusCompleted,

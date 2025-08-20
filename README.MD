@@ -211,7 +211,7 @@ The optional Web Admin UI provides a comprehensive visual interface for managing
 - **Process Monitor**: Top processes by CPU/memory usage with search and sorting capabilities
 
 #### **💼 Job Management**
-- **Job List**: Paginated view with sortable columns (ID, status, duration, start time)
+- **Job List**: Paginated view with sortable columns (UUID, status, duration, start time)
 - **Job Details**: Real-time logs, execution status, resource usage, scheduling info
 - **Bulk Operations**: Start, stop, and manage multiple jobs simultaneously
 - **Advanced Filtering**: Filter by status, runtime, network, date range
@@ -252,7 +252,8 @@ rnx run --workflow=jobs.yaml:sales-analysis   # Python analytics
 
 # Run workflows with consolidated commands
 rnx run --workflow=ml-pipeline.yaml           # Full ML workflow
-rnx status <workflow-id>                      # Unified status for jobs/workflows
+rnx status <job-uuid>                        # Check job status
+rnx status --workflow <workflow-uuid>        # Check workflow status
 
 # Discover available jobs in any example directory
 cat jobs.yaml                                 # Shows all configured jobs
@@ -404,9 +405,11 @@ rnx monitor status
 rnx run <command>           # Execute jobs with isolation  
 rnx run --workflow=<yaml>   # Execute workflows from templates
 rnx list                    # List all jobs
-rnx status <id>            # Job/workflow details and status (unified)
-rnx log <job-id>           # Stream job logs
-rnx stop <job-id>          # Stop running job
+rnx list --workflow         # List all workflows
+rnx status <job-uuid>       # Job details and status
+rnx status --workflow <workflow-uuid> # Workflow details and status
+rnx log <job-uuid>         # Stream job logs
+rnx stop <job-uuid>        # Stop running job
 rnx monitor status         # System metrics
 ```
 
@@ -518,7 +521,7 @@ rnx run --workflow=ml-pipeline.yaml:data-validation
 # Full workflow orchestration with consolidated commands
 cd examples/workflows/ml-pipeline
 rnx run --workflow=ml-pipeline.yaml                    
-rnx status <workflow-id>                               
+rnx status --workflow <workflow-uuid>                               
 ```
 
 **Features Demonstrated:**

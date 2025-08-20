@@ -362,7 +362,7 @@ rnx monitor status
 rnx list --json | jq '.[] | select(.max_memory > 8192)'
 
 # 3. Stop problematic jobs
-rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | head -5 | xargs rnx stop
+rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .uuid' | head -5 | xargs rnx stop
 
 # 4. Adjust default limits
 # Edit /opt/joblet/config/joblet-config.yml

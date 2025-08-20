@@ -67,7 +67,7 @@ func (x *Jobs) GetJobs() []*Job {
 
 type Job struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid              string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Unique UUID identifier (replaces sequential id)
 	Name              string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"` // Human-readable job name (for workflows, empty for individual jobs)
 	Command           string                 `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
 	Args              []string               `protobuf:"bytes,4,rep,name=args,proto3" json:"args,omitempty"`
@@ -117,9 +117,9 @@ func (*Job) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Job) GetId() string {
+func (x *Job) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
 	return ""
 }
@@ -336,7 +336,7 @@ func (x *FileUpload) GetIsDirectory() bool {
 // GetJobStatus
 type GetJobStatusReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid          string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Job UUID identifier
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -371,16 +371,16 @@ func (*GetJobStatusReq) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetJobStatusReq) GetId() string {
+func (x *GetJobStatusReq) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
 	return ""
 }
 
 type GetJobStatusRes struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid              string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Job UUID identifier
 	Name              string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"` // Human-readable job name (for workflows, empty for individual jobs)
 	Command           string                 `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
 	Args              []string               `protobuf:"bytes,4,rep,name=args,proto3" json:"args,omitempty"`
@@ -429,9 +429,9 @@ func (*GetJobStatusRes) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GetJobStatusRes) GetId() string {
+func (x *GetJobStatusRes) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
 	return ""
 }
@@ -537,7 +537,7 @@ func (x *GetJobStatusRes) GetSecretEnvironment() map[string]string {
 // StopJob
 type StopJobReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid          string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Job UUID identifier
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -572,16 +572,16 @@ func (*StopJobReq) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *StopJobReq) GetId() string {
+func (x *StopJobReq) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
 	return ""
 }
 
 type StopJobRes struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid          string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Job UUID identifier
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	EndTime       string                 `protobuf:"bytes,3,opt,name=endTime,proto3" json:"endTime,omitempty"`
 	ExitCode      int32                  `protobuf:"varint,4,opt,name=exitCode,proto3" json:"exitCode,omitempty"`
@@ -619,9 +619,9 @@ func (*StopJobRes) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *StopJobRes) GetId() string {
+func (x *StopJobRes) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
 	return ""
 }
@@ -650,7 +650,7 @@ func (x *StopJobRes) GetExitCode() int32 {
 // GetJobLogs
 type GetJobLogsReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid          string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Job UUID identifier
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -685,9 +685,9 @@ func (*GetJobLogsReq) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetJobLogsReq) GetId() string {
+func (x *GetJobLogsReq) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
 	return ""
 }
@@ -3219,8 +3219,8 @@ type RunJobRequest struct {
 	Environment       map[string]string      `protobuf:"bytes,14,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	SecretEnvironment map[string]string      `protobuf:"bytes,18,rep,name=secret_environment,json=secretEnvironment,proto3" json:"secret_environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Secret environment variables (not logged)
 	// Workflow fields (optional - only used for workflow jobs)
-	WorkflowId    int32             `protobuf:"varint,15,opt,name=workflowId,proto3" json:"workflowId,omitempty"`
-	JobId         string            `protobuf:"bytes,16,opt,name=jobId,proto3" json:"jobId,omitempty"`
+	WorkflowUuid  string            `protobuf:"bytes,15,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"` // Workflow UUID identifier (for workflow jobs)
+	JobUuid       string            `protobuf:"bytes,16,opt,name=jobUuid,proto3" json:"jobUuid,omitempty"`           // Job UUID identifier (for workflow jobs)
 	Requirements  []*JobRequirement `protobuf:"bytes,17,rep,name=requirements,proto3" json:"requirements,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3361,16 +3361,16 @@ func (x *RunJobRequest) GetSecretEnvironment() map[string]string {
 	return nil
 }
 
-func (x *RunJobRequest) GetWorkflowId() int32 {
+func (x *RunJobRequest) GetWorkflowUuid() string {
 	if x != nil {
-		return x.WorkflowId
+		return x.WorkflowUuid
 	}
-	return 0
+	return ""
 }
 
-func (x *RunJobRequest) GetJobId() string {
+func (x *RunJobRequest) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -3384,7 +3384,7 @@ func (x *RunJobRequest) GetRequirements() []*JobRequirement {
 
 type RunJobResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=jobId,proto3" json:"jobId,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=jobUuid,proto3" json:"jobUuid,omitempty"` // Job UUID identifier
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	Command       string                 `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
 	Args          []string               `protobuf:"bytes,4,rep,name=args,proto3" json:"args,omitempty"`
@@ -3430,9 +3430,9 @@ func (*RunJobResponse) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{43}
 }
 
-func (x *RunJobResponse) GetJobId() string {
+func (x *RunJobResponse) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -3516,7 +3516,7 @@ func (x *RunJobResponse) GetScheduledTime() string {
 
 type JobRequirement struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=jobId,proto3" json:"jobId,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=jobUuid,proto3" json:"jobUuid,omitempty"` // Job UUID identifier
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	Expression    string                 `protobuf:"bytes,3,opt,name=expression,proto3" json:"expression,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -3553,9 +3553,9 @@ func (*JobRequirement) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{44}
 }
 
-func (x *JobRequirement) GetJobId() string {
+func (x *JobRequirement) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -3652,7 +3652,7 @@ func (x *RunWorkflowRequest) GetWorkflowFiles() []*FileUpload {
 
 type RunWorkflowResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkflowId    int32                  `protobuf:"varint,1,opt,name=workflowId,proto3" json:"workflowId,omitempty"`
+	WorkflowUuid  string                 `protobuf:"bytes,1,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"` // Workflow UUID identifier
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3688,11 +3688,11 @@ func (*RunWorkflowResponse) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{46}
 }
 
-func (x *RunWorkflowResponse) GetWorkflowId() int32 {
+func (x *RunWorkflowResponse) GetWorkflowUuid() string {
 	if x != nil {
-		return x.WorkflowId
+		return x.WorkflowUuid
 	}
-	return 0
+	return ""
 }
 
 func (x *RunWorkflowResponse) GetStatus() string {
@@ -3704,7 +3704,7 @@ func (x *RunWorkflowResponse) GetStatus() string {
 
 type GetWorkflowStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkflowId    int32                  `protobuf:"varint,1,opt,name=workflowId,proto3" json:"workflowId,omitempty"`
+	WorkflowUuid  string                 `protobuf:"bytes,1,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"` // Workflow UUID identifier
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3739,11 +3739,11 @@ func (*GetWorkflowStatusRequest) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{47}
 }
 
-func (x *GetWorkflowStatusRequest) GetWorkflowId() int32 {
+func (x *GetWorkflowStatusRequest) GetWorkflowUuid() string {
 	if x != nil {
-		return x.WorkflowId
+		return x.WorkflowUuid
 	}
-	return 0
+	return ""
 }
 
 type GetWorkflowStatusResponse struct {
@@ -3888,7 +3888,7 @@ func (x *ListWorkflowsResponse) GetWorkflows() []*WorkflowInfo {
 
 type GetWorkflowJobsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkflowId    int32                  `protobuf:"varint,1,opt,name=workflowId,proto3" json:"workflowId,omitempty"`
+	WorkflowUuid  string                 `protobuf:"bytes,1,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"` // Workflow UUID identifier
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3923,11 +3923,11 @@ func (*GetWorkflowJobsRequest) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{51}
 }
 
-func (x *GetWorkflowJobsRequest) GetWorkflowId() int32 {
+func (x *GetWorkflowJobsRequest) GetWorkflowUuid() string {
 	if x != nil {
-		return x.WorkflowId
+		return x.WorkflowUuid
 	}
-	return 0
+	return ""
 }
 
 type GetWorkflowJobsResponse struct {
@@ -3976,7 +3976,7 @@ func (x *GetWorkflowJobsResponse) GetJobs() []*WorkflowJob {
 
 type WorkflowInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uuid          string                 `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"` // Workflow UUID identifier
 	Workflow      string                 `protobuf:"bytes,2,opt,name=workflow,proto3" json:"workflow,omitempty"`
 	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	TotalJobs     int32                  `protobuf:"varint,4,opt,name=totalJobs,proto3" json:"totalJobs,omitempty"`
@@ -4020,11 +4020,11 @@ func (*WorkflowInfo) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{53}
 }
 
-func (x *WorkflowInfo) GetId() int32 {
+func (x *WorkflowInfo) GetUuid() string {
 	if x != nil {
-		return x.Id
+		return x.Uuid
 	}
-	return 0
+	return ""
 }
 
 func (x *WorkflowInfo) GetWorkflow() string {
@@ -4092,7 +4092,7 @@ func (x *WorkflowInfo) GetCompletedAt() *Timestamp {
 
 type WorkflowJob struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=jobId,proto3" json:"jobId,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=jobUuid,proto3" json:"jobUuid,omitempty"` // Job UUID identifier
 	JobName       string                 `protobuf:"bytes,2,opt,name=jobName,proto3" json:"jobName,omitempty"` // Human-readable job name from workflow
 	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	Dependencies  []string               `protobuf:"bytes,4,rep,name=dependencies,proto3" json:"dependencies,omitempty"`
@@ -4133,9 +4133,9 @@ func (*WorkflowJob) Descriptor() ([]byte, []int) {
 	return file_joblet_proto_rawDescGZIP(), []int{54}
 }
 
-func (x *WorkflowJob) GetJobId() string {
+func (x *WorkflowJob) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -4240,9 +4240,9 @@ const file_joblet_proto_rawDesc = "" +
 	"\n" +
 	"\fjoblet.proto\x12\x06joblet\"'\n" +
 	"\x04Jobs\x12\x1f\n" +
-	"\x04jobs\x18\x01 \x03(\v2\v.joblet.JobR\x04jobs\"\x8a\x05\n" +
-	"\x03Job\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04jobs\x18\x01 \x03(\v2\v.joblet.JobR\x04jobs\"\x8e\x05\n" +
+	"\x03Job\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x03 \x01(\tR\acommand\x12\x12\n" +
 	"\x04args\x18\x04 \x03(\tR\x04args\x12\x16\n" +
@@ -4271,11 +4271,11 @@ const file_joblet_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\fR\acontent\x12\x12\n" +
 	"\x04mode\x18\x03 \x01(\rR\x04mode\x12 \n" +
-	"\visDirectory\x18\x04 \x01(\bR\visDirectory\"!\n" +
-	"\x0fGetJobStatusReq\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x94\x05\n" +
-	"\x0fGetJobStatusRes\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\visDirectory\x18\x04 \x01(\bR\visDirectory\"%\n" +
+	"\x0fGetJobStatusReq\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\"\x98\x05\n" +
+	"\x0fGetJobStatusRes\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x03 \x01(\tR\acommand\x12\x12\n" +
 	"\x04args\x18\x04 \x03(\tR\x04args\x12\x16\n" +
@@ -4296,18 +4296,18 @@ const file_joblet_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aD\n" +
 	"\x16SecretEnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x1c\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\" \n" +
 	"\n" +
-	"StopJobReq\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"j\n" +
+	"StopJobReq\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\"n\n" +
 	"\n" +
-	"StopJobRes\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"StopJobRes\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
 	"\aendTime\x18\x03 \x01(\tR\aendTime\x12\x1a\n" +
-	"\bexitCode\x18\x04 \x01(\x05R\bexitCode\"\x1f\n" +
-	"\rGetJobLogsReq\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"%\n" +
+	"\bexitCode\x18\x04 \x01(\x05R\bexitCode\"#\n" +
+	"\rGetJobLogsReq\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\"%\n" +
 	"\tDataChunk\x12\x18\n" +
 	"\apayload\x18\x01 \x01(\fR\apayload\":\n" +
 	"\x10CreateNetworkReq\x12\x12\n" +
@@ -4543,7 +4543,7 @@ const file_joblet_proto_rawDesc = "" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06output\x18\x03 \x01(\tR\x06output\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12\x1a\n" +
-	"\bexitCode\x18\x05 \x01(\x05R\bexitCode\"\x90\x06\n" +
+	"\bexitCode\x18\x05 \x01(\x05R\bexitCode\"\x98\x06\n" +
 	"\rRunJobRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12\x12\n" +
@@ -4560,20 +4560,18 @@ const file_joblet_proto_rawDesc = "" +
 	"\aruntime\x18\f \x01(\tR\aruntime\x12\x18\n" +
 	"\aworkDir\x18\r \x01(\tR\aworkDir\x12H\n" +
 	"\venvironment\x18\x0e \x03(\v2&.joblet.RunJobRequest.EnvironmentEntryR\venvironment\x12[\n" +
-	"\x12secret_environment\x18\x12 \x03(\v2,.joblet.RunJobRequest.SecretEnvironmentEntryR\x11secretEnvironment\x12\x1e\n" +
-	"\n" +
-	"workflowId\x18\x0f \x01(\x05R\n" +
-	"workflowId\x12\x14\n" +
-	"\x05jobId\x18\x10 \x01(\tR\x05jobId\x12:\n" +
+	"\x12secret_environment\x18\x12 \x03(\v2,.joblet.RunJobRequest.SecretEnvironmentEntryR\x11secretEnvironment\x12\"\n" +
+	"\fworkflowUuid\x18\x0f \x01(\tR\fworkflowUuid\x12\x18\n" +
+	"\ajobUuid\x18\x10 \x01(\tR\ajobUuid\x12:\n" +
 	"\frequirements\x18\x11 \x03(\v2\x16.joblet.JobRequirementR\frequirements\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aD\n" +
 	"\x16SecretEnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd4\x02\n" +
-	"\x0eRunJobResponse\x12\x14\n" +
-	"\x05jobId\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd8\x02\n" +
+	"\x0eRunJobResponse\x12\x18\n" +
+	"\ajobUuid\x18\x01 \x01(\tR\ajobUuid\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
 	"\acommand\x18\x03 \x01(\tR\acommand\x12\x12\n" +
 	"\x04args\x18\x04 \x03(\tR\x04args\x12\x16\n" +
@@ -4585,9 +4583,9 @@ const file_joblet_proto_rawDesc = "" +
 	"\aendTime\x18\n" +
 	" \x01(\tR\aendTime\x12\x1a\n" +
 	"\bexitCode\x18\v \x01(\x05R\bexitCode\x12$\n" +
-	"\rscheduledTime\x18\f \x01(\tR\rscheduledTime\"^\n" +
-	"\x0eJobRequirement\x12\x14\n" +
-	"\x05jobId\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
+	"\rscheduledTime\x18\f \x01(\tR\rscheduledTime\"b\n" +
+	"\x0eJobRequirement\x12\x18\n" +
+	"\ajobUuid\x18\x01 \x01(\tR\ajobUuid\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1e\n" +
 	"\n" +
 	"expression\x18\x03 \x01(\tR\n" +
@@ -4597,31 +4595,25 @@ const file_joblet_proto_rawDesc = "" +
 	"\ttotalJobs\x18\x02 \x01(\x05R\ttotalJobs\x12\x1a\n" +
 	"\bjobOrder\x18\x03 \x03(\tR\bjobOrder\x12 \n" +
 	"\vyamlContent\x18\x04 \x01(\tR\vyamlContent\x128\n" +
-	"\rworkflowFiles\x18\x05 \x03(\v2\x12.joblet.FileUploadR\rworkflowFiles\"M\n" +
-	"\x13RunWorkflowResponse\x12\x1e\n" +
-	"\n" +
-	"workflowId\x18\x01 \x01(\x05R\n" +
-	"workflowId\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\":\n" +
-	"\x18GetWorkflowStatusRequest\x12\x1e\n" +
-	"\n" +
-	"workflowId\x18\x01 \x01(\x05R\n" +
-	"workflowId\"v\n" +
+	"\rworkflowFiles\x18\x05 \x03(\v2\x12.joblet.FileUploadR\rworkflowFiles\"Q\n" +
+	"\x13RunWorkflowResponse\x12\"\n" +
+	"\fworkflowUuid\x18\x01 \x01(\tR\fworkflowUuid\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\">\n" +
+	"\x18GetWorkflowStatusRequest\x12\"\n" +
+	"\fworkflowUuid\x18\x01 \x01(\tR\fworkflowUuid\"v\n" +
 	"\x19GetWorkflowStatusResponse\x120\n" +
 	"\bworkflow\x18\x01 \x01(\v2\x14.joblet.WorkflowInfoR\bworkflow\x12'\n" +
 	"\x04jobs\x18\x02 \x03(\v2\x13.joblet.WorkflowJobR\x04jobs\"B\n" +
 	"\x14ListWorkflowsRequest\x12*\n" +
 	"\x10includeCompleted\x18\x01 \x01(\bR\x10includeCompleted\"K\n" +
 	"\x15ListWorkflowsResponse\x122\n" +
-	"\tworkflows\x18\x01 \x03(\v2\x14.joblet.WorkflowInfoR\tworkflows\"8\n" +
-	"\x16GetWorkflowJobsRequest\x12\x1e\n" +
-	"\n" +
-	"workflowId\x18\x01 \x01(\x05R\n" +
-	"workflowId\"B\n" +
+	"\tworkflows\x18\x01 \x03(\v2\x14.joblet.WorkflowInfoR\tworkflows\"<\n" +
+	"\x16GetWorkflowJobsRequest\x12\"\n" +
+	"\fworkflowUuid\x18\x01 \x01(\tR\fworkflowUuid\"B\n" +
 	"\x17GetWorkflowJobsResponse\x12'\n" +
-	"\x04jobs\x18\x01 \x03(\v2\x13.joblet.WorkflowJobR\x04jobs\"\xf1\x02\n" +
-	"\fWorkflowInfo\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x1a\n" +
+	"\x04jobs\x18\x01 \x03(\v2\x13.joblet.WorkflowJobR\x04jobs\"\xf5\x02\n" +
+	"\fWorkflowInfo\x12\x12\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x1a\n" +
 	"\bworkflow\x18\x02 \x01(\tR\bworkflow\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x1c\n" +
 	"\ttotalJobs\x18\x04 \x01(\x05R\ttotalJobs\x12$\n" +
@@ -4633,9 +4625,9 @@ const file_joblet_proto_rawDesc = "" +
 	"\tcreatedAt\x18\b \x01(\v2\x11.joblet.TimestampR\tcreatedAt\x12/\n" +
 	"\tstartedAt\x18\t \x01(\v2\x11.joblet.TimestampR\tstartedAt\x123\n" +
 	"\vcompletedAt\x18\n" +
-	" \x01(\v2\x11.joblet.TimestampR\vcompletedAt\"\xf3\x01\n" +
-	"\vWorkflowJob\x12\x14\n" +
-	"\x05jobId\x18\x01 \x01(\tR\x05jobId\x12\x18\n" +
+	" \x01(\v2\x11.joblet.TimestampR\vcompletedAt\"\xf7\x01\n" +
+	"\vWorkflowJob\x12\x18\n" +
+	"\ajobUuid\x18\x01 \x01(\tR\ajobUuid\x12\x18\n" +
 	"\ajobName\x18\x02 \x01(\tR\ajobName\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\"\n" +
 	"\fdependencies\x18\x04 \x03(\tR\fdependencies\x12/\n" +
