@@ -624,7 +624,7 @@ func (a *jobStoreAdapter) cleanupTaskWrapper(jobId string) error {
 
 	// Remove buffer
 	if task.buffer != nil {
-		a.bufferMgr.RemoveBuffer(jobId)
+		_ = a.bufferMgr.RemoveBuffer(jobId)
 	}
 
 	// Remove from map
@@ -710,7 +710,7 @@ func (a *jobStoreAdapter) DeleteJob(jobId string) error {
 	}
 
 	// Publish event
-	a.publishJobEvent("DELETED", resolvedUuid, map[string]string{"reason": "user_requested"})
+	_ = a.publishJobEvent("DELETED", resolvedUuid, map[string]string{"reason": "user_requested"})
 
 	a.logger.Info("job deletion completed successfully", "jobId", resolvedUuid)
 	return nil

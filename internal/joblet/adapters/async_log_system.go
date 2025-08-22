@@ -45,7 +45,6 @@ type AsyncLogSystem struct {
 	// Overflow protection
 	config       *config.LogPersistenceConfig
 	memoryLimit  int64
-	currentMem   int64
 	overflowMode OverflowStrategy
 
 	// Compressed storage for overflow
@@ -160,7 +159,7 @@ func NewAsyncLogSystem(config *config.LogPersistenceConfig, logger *logger.Logge
 	}
 
 	// Create spill directory
-	os.MkdirAll(system.spillDir, 0755)
+	_ = os.MkdirAll(system.spillDir, 0755)
 
 	// Create disk writer
 	system.diskWriter = &DiskWriter{
@@ -314,8 +313,8 @@ func (als *AsyncLogSystem) spillToDisk(chunk LogChunk) {
 		atomic.AddInt32(&als.metrics.SpillFilesCount, 1)
 	}
 
-	spillFile.Write(chunk.Data)
-	spillFile.Sync() // Ensure durability
+	_, _ = spillFile.Write(chunk.Data)
+	_ = spillFile.Sync() // Ensure durability
 }
 
 // sampleChunk implements sampling strategy (keep every Nth chunk)
@@ -444,9 +443,9 @@ func (als *AsyncLogSystem) flushBatch(batch []LogChunk) {
 		logFile := als.diskWriter.getLogFile(jobID)
 		if logFile != nil {
 			for _, chunk := range chunks {
-				logFile.Write(chunk.Data)
+				_, _ = logFile.Write(chunk.Data)
 			}
-			logFile.Sync() // Ensure durability
+			_ = logFile.Sync() // Ensure durability
 		}
 	}
 }
@@ -550,7 +549,7 @@ func (als *AsyncLogSystem) Close() error {
 	// Close spill files
 	als.spillMutex.Lock()
 	for _, file := range als.spillFiles {
-		file.Close()
+		_ = file.Close()
 	}
 	als.spillMutex.Unlock()
 
