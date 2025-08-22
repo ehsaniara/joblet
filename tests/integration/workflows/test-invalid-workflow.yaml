@@ -6,4 +6,4 @@ environment:
 jobs:
   test:
     command: "echo"
-    args: ["test"]
+    args: [ "test" ]

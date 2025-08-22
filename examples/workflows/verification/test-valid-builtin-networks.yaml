@@ -1,13 +1,13 @@
 jobs:
   network-test-bridge:
     command: "python3"
-    args: ["-c", "print('Testing bridge network')"]
+    args: [ "-c", "print('Testing bridge network')" ]
     runtime: "python:3.11-ml"
     network: "bridge"
   
   network-test-isolated:
     command: "python3"
-    args: ["-c", "print('Testing isolated network')"]
+    args: [ "-c", "print('Testing isolated network')" ]
     runtime: "python:3.11-ml"
     network: "isolated"
     requires:
@@ -15,7 +15,7 @@ jobs:
   
   network-test-none:
     command: "python3"
-    args: ["-c", "print('Testing none network')"]
+    args: [ "-c", "print('Testing none network')" ]
     runtime: "python:3.11-ml"
     network: "none"
     requires:

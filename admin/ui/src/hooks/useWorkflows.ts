@@ -47,14 +47,14 @@ export const useWorkflows = (): UseWorkflowsReturn => {
             }
             setError(null);
             const response = await apiService.getWorkflows();
-            
+
             // Transform API response: map 'uuid' to 'id' and add name field
             const transformedWorkflows = response.map(workflow => ({
                 ...workflow,
                 id: workflow.uuid || workflow.id, // Map uuid to id for consistency
                 name: workflow.workflow || `Workflow ${workflow.uuid ? workflow.uuid.substring(0, 8) : workflow.id}` // Use workflow filename as name
             }));
-            
+
             // Sort workflows by creation date (newest first), fallback to ID comparison
             const sortedWorkflows = transformedWorkflows.sort((a, b) => {
                 // First try to sort by created_at timestamp

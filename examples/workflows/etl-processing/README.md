@@ -5,6 +5,7 @@ This directory contains examples for Extract, Transform, Load (ETL) data process
 ## Files
 
 ### `etl-pipeline.yaml`
+
 Contains a complete ETL pipeline with job dependencies:
 
 1. **etl** - Multi-step ETL process (extract → transform → load)
@@ -38,6 +39,7 @@ rnx run --workflow=etl-pipeline.yaml:db-backup
 ## Prerequisites
 
 ### Required Volumes
+
 ```bash
 rnx volume create raw-data
 rnx volume create processed-data
@@ -51,7 +53,9 @@ rnx volume create logs
 ```
 
 ### Required Files
+
 Create these Python scripts in a `scripts/` directory:
+
 - `extract.py` - Data extraction script
 - `transform.py` - Data transformation script
 - `load.py` - Data loading script

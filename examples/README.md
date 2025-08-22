@@ -434,7 +434,7 @@ Advanced multi-job workflows with dependency management and job names feature:
 ### 📁 [Workflow Templates](./workflows/)
 
 - **[ML Pipeline](./workflows/ml-pipeline/)** - Complete machine learning workflow
-- **[Data Pipeline](./workflows/data-pipeline/)** - ETL processing with volume sharing  
+- **[Data Pipeline](./workflows/data-pipeline/)** - ETL processing with volume sharing
 - **[Parallel Jobs](./workflows/parallel-jobs/)** - Independent batch processing
 - **[Test Workflows](./workflows/tests/)** - Job names feature validation 🧪
 
@@ -454,6 +454,7 @@ rnx status --workflow <workflow-id>
 ```
 
 **Expected Output Format:**
+
 ```
 JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
 -----------------------------------------------------------------------------------------

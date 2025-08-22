@@ -5,11 +5,12 @@ This directory contains workflow examples for Java-based microservices architect
 ## Files
 
 ### `java-services.yaml`
+
 Contains six Java service examples:
 
 1. **api-gateway** - Spring Cloud Gateway service
 2. **user-service** - User management microservice
-3. **order-service** - Order processing microservice  
+3. **order-service** - Order processing microservice
 4. **payment-service** - Payment processing with high resources
 5. **db-migration** - Flyway database migration job
 6. **batch-processor** - Spring Batch job for data processing
@@ -33,6 +34,7 @@ rnx run --workflow=java-services.yaml:batch-processor
 ## Prerequisites
 
 ### Required Volumes
+
 ```bash
 rnx volume create config
 rnx volume create logs
@@ -45,7 +47,9 @@ rnx volume create batch-output
 ```
 
 ### Required JAR Files
+
 Ensure these JAR files are available in the current directory:
+
 - `api-gateway.jar`
 - `user-service.jar`
 - `order-service.jar`
@@ -54,6 +58,7 @@ Ensure these JAR files are available in the current directory:
 - `batch-processor.jar`
 
 ### Configuration Files
+
 - `application.yml` - Spring configuration
 - `payment-config.properties` - Payment service configuration
 - `migrations/` - Database migration scripts

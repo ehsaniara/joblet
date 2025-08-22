@@ -2,7 +2,9 @@
 
 This guide provides detailed instructions for installing Joblet on various operating systems and architectures.
 
-> **🚀 Docker Alternative**: Joblet is a modern replacement for Docker and Docker Compose, providing superior performance, security, and resource control through Linux namespaces and cgroups v2. Install Joblet directly on Linux hosts for optimal performance - no containers required!
+> **🚀 Docker Alternative**: Joblet is a modern replacement for Docker and Docker Compose, providing superior
+> performance, security, and resource control through Linux namespaces and cgroups v2. Install Joblet directly on Linux
+> hosts for optimal performance - no containers required!
 
 ## 📋 System Requirements
 
@@ -308,7 +310,8 @@ sudo journalctl -u joblet -f
 
 ### Local Development
 
-Joblet is designed as a **Docker and Kubernetes alternative** providing superior isolation, performance, and resource control through Linux namespaces and cgroups v2.
+Joblet is designed as a **Docker and Kubernetes alternative** providing superior isolation, performance, and resource
+control through Linux namespaces and cgroups v2.
 
 ```bash
 # Set up development environment on Linux
@@ -336,13 +339,14 @@ Joblet **replaces** containerization technologies by providing:
 
 - **Better Performance**: Direct Linux namespace execution (no container overhead)
 - **Superior Resource Control**: cgroups v2 with precise CPU, memory, and I/O limits
-- **Enhanced Security**: Process isolation without container escape vulnerabilities  
+- **Enhanced Security**: Process isolation without container escape vulnerabilities
 - **Simplified Deployment**: Single binary installation vs container orchestration complexity
 - **Instant Startup**: 2-3 second job execution vs container pull/start overhead
 
 **Use Joblet Instead Of:**
+
 - `docker run` → `rnx run`
-- `docker-compose` → `rnx run --workflow=workflow.yaml`  
+- `docker-compose` → `rnx run --workflow=workflow.yaml`
 - Kubernetes Jobs → Joblet workflows with dependencies
 
 ## ✅ Post-Installation Verification

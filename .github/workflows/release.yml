@@ -59,107 +59,107 @@ jobs:
             ext: .exe
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: false
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: 'admin/*/package-lock.json'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'admin/*/package-lock.json'
 
-    - name: Install Node.js dependencies
-      run: |
-        cd admin/ui && npm ci
-        cd ../server && npm ci
+      - name: Install Node.js dependencies
+        run: |
+          cd admin/ui && npm ci
+          cd ../server && npm ci
 
-    - name: Build Admin UI
-      run: |
-        cd admin/ui && npm run build
+      - name: Build Admin UI
+        run: |
+          cd admin/ui && npm run build
 
-    - name: Build Go binaries
-      shell: bash
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 0
-      run: |
-        # Create dist directory
-        mkdir -p dist
-        
-        # Build rnx CLI with build timestamp and unique build ID
-        BUILD_TIME=$(date -u +%Y%m%d%H%M%S)
-        BUILD_ID="${{ github.sha }}-${BUILD_TIME}"
-        go build -a -ldflags="-s -w -X main.buildTime=${BUILD_TIME} -X main.buildID=${BUILD_ID}" -o dist/rnx${{ matrix.ext }} ./cmd/rnx
-        
-        # Build joblet server (Linux only for now)
-        if [ "${{ matrix.goos }}" = "linux" ]; then
-          go build -a -ldflags="-s -w -X main.buildTime=${BUILD_TIME} -X main.buildID=${BUILD_ID}" -o dist/joblet${{ matrix.ext }} ./cmd/joblet
-        fi
-        
-        # Verify volume command is built into the binary (on Linux only for testing)
-        if [ "${{ matrix.goos }}" = "linux" ]; then
-          ./dist/rnx${{ matrix.ext }} volume --help > /dev/null || echo "WARNING: volume command not found in binary"
-        fi
-
-    - name: Create release package
-      shell: bash
-      run: |
-        # Create platform-specific directory
-        mkdir -p release/rnx-${{ matrix.platform }}
-        
-        # Copy binaries
-        mkdir -p release/rnx-${{ matrix.platform }}/bin
-        cp dist/rnx${{ matrix.ext }} release/rnx-${{ matrix.platform }}/bin/
-        
-        # Copy joblet for Linux only
-        if [ "${{ matrix.goos }}" = "linux" ]; then
-          cp dist/joblet${{ matrix.ext }} release/rnx-${{ matrix.platform }}/bin/
+      - name: Build Go binaries
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          # Create dist directory
+          mkdir -p dist
           
-          # Copy admin files for Linux releases only
-          cp -r admin release/rnx-${{ matrix.platform }}/
+          # Build rnx CLI with build timestamp and unique build ID
+          BUILD_TIME=$(date -u +%Y%m%d%H%M%S)
+          BUILD_ID="${{ github.sha }}-${BUILD_TIME}"
+          go build -a -ldflags="-s -w -X main.buildTime=${BUILD_TIME} -X main.buildID=${BUILD_ID}" -o dist/rnx${{ matrix.ext }} ./cmd/rnx
           
-          # Use template for Linux installation script
-          cp scripts/install.sh.template release/rnx-${{ matrix.platform }}/install.sh
-          chmod +x release/rnx-${{ matrix.platform }}/install.sh
-        else
-          # Create simple install script for non-Linux platforms
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            cp scripts/install.bat.template release/rnx-${{ matrix.platform }}/install.bat
-          else
-            cp scripts/install-client.sh.template release/rnx-${{ matrix.platform }}/install.sh
-            chmod +x release/rnx-${{ matrix.platform }}/install.sh
+          # Build joblet server (Linux only for now)
+          if [ "${{ matrix.goos }}" = "linux" ]; then
+            go build -a -ldflags="-s -w -X main.buildTime=${BUILD_TIME} -X main.buildID=${BUILD_ID}" -o dist/joblet${{ matrix.ext }} ./cmd/joblet
           fi
-        fi
-        
-        # Create README using script
-        ./scripts/release/generate-readme.sh "${{ matrix.platform }}" "${{ matrix.goos }}" "${{ matrix.goarch }}" release/rnx-${{ matrix.platform }}/README.md
+          
+          # Verify volume command is built into the binary (on Linux only for testing)
+          if [ "${{ matrix.goos }}" = "linux" ]; then
+            ./dist/rnx${{ matrix.ext }} volume --help > /dev/null || echo "WARNING: volume command not found in binary"
+          fi
 
-    - name: Create archive
-      shell: bash
-      run: |
-        cd release
-        if [ "${{ matrix.goos }}" = "windows" ]; then
-          # Create zip for Windows
-          7z a rnx-${{ matrix.platform }}.zip rnx-${{ matrix.platform }}/
-        else
-          # Create tar.gz for Unix-like systems with version
-          tar -czf rnx-${{ matrix.platform }}.tar.gz rnx-${{ matrix.platform }}/
-        fi
+      - name: Create release package
+        shell: bash
+        run: |
+          # Create platform-specific directory
+          mkdir -p release/rnx-${{ matrix.platform }}
+          
+          # Copy binaries
+          mkdir -p release/rnx-${{ matrix.platform }}/bin
+          cp dist/rnx${{ matrix.ext }} release/rnx-${{ matrix.platform }}/bin/
+          
+          # Copy joblet for Linux only
+          if [ "${{ matrix.goos }}" = "linux" ]; then
+            cp dist/joblet${{ matrix.ext }} release/rnx-${{ matrix.platform }}/bin/
+          
+            # Copy admin files for Linux releases only
+            cp -r admin release/rnx-${{ matrix.platform }}/
+          
+            # Use template for Linux installation script
+            cp scripts/install.sh.template release/rnx-${{ matrix.platform }}/install.sh
+            chmod +x release/rnx-${{ matrix.platform }}/install.sh
+          else
+            # Create simple install script for non-Linux platforms
+            if [ "${{ matrix.goos }}" = "windows" ]; then
+              cp scripts/install.bat.template release/rnx-${{ matrix.platform }}/install.bat
+            else
+              cp scripts/install-client.sh.template release/rnx-${{ matrix.platform }}/install.sh
+              chmod +x release/rnx-${{ matrix.platform }}/install.sh
+            fi
+          fi
+          
+          # Create README using script
+          ./scripts/release/generate-readme.sh "${{ matrix.platform }}" "${{ matrix.goos }}" "${{ matrix.goarch }}" release/rnx-${{ matrix.platform }}/README.md
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: rnx-${{ matrix.platform }}-${{ github.sha }}
-        path: release/rnx-${{ matrix.platform }}.*
-        retention-days: 1
+      - name: Create archive
+        shell: bash
+        run: |
+          cd release
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            # Create zip for Windows
+            7z a rnx-${{ matrix.platform }}.zip rnx-${{ matrix.platform }}/
+          else
+            # Create tar.gz for Unix-like systems with version
+            tar -czf rnx-${{ matrix.platform }}.tar.gz rnx-${{ matrix.platform }}/
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rnx-${{ matrix.platform }}-${{ github.sha }}
+          path: release/rnx-${{ matrix.platform }}.*
+          retention-days: 1
 
   create-release:
     name: Create Release
@@ -168,112 +168,112 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: release-artifacts
-        pattern: rnx-*-${{ github.sha }}
-        merge-multiple: true
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: rnx-*-${{ github.sha }}
+          merge-multiple: true
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release-artifacts/**/*
-        draft: false
-        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-        generate_release_notes: true
-        body: |
-          # Joblet Server & RNX Client Release
-          
-          ## 🖥️ A. Joblet Server (Linux Only)
-          
-          The Joblet daemon runs on Linux servers and executes jobs in isolated environments.
-          
-          ### Server Downloads
-          - `linux-amd64` - Joblet server + RNX client for x86_64 Linux
-          - `linux-arm64` - Joblet server + RNX client for ARM64 Linux  
-          - `linux-386` - Joblet server + RNX client for 32-bit Linux
-          
-          ### Server Installation
-          ```bash
-          # 1. Download and extract the Linux package
-          tar -xzf rnx-linux-amd64.tar.gz
-          cd rnx-linux-amd64
-          
-          # 2. Install Joblet server
-          sudo ./install.sh
-          
-          # 3. Start the Joblet service
-          sudo systemctl start joblet
-          sudo systemctl enable joblet
-          
-          # 4. Install Admin UI dependencies (for web dashboard)
-          cd /opt/joblet/admin/server
-          npm install
-          
-          # 5. Start Admin UI (optional)
-          /opt/joblet/bin/rnx admin --bind-address=0.0.0.0
-          ```
-          
-          The Joblet server will run on port 50051 (gRPC) and Admin UI on port 5173 (HTTP).
-          
-          ---
-          
-          ## 💻 B. RNX Client (All Platforms)
-          
-          The RNX CLI connects to Joblet servers from any platform.
-          
-          ### Client Downloads
-          - `darwin-amd64` - RNX client for macOS Intel
-          - `darwin-arm64` - RNX client for macOS Apple Silicon
-          - `windows-amd64` - RNX client for Windows 64-bit
-          - `windows-386` - RNX client for Windows 32-bit
-          - `linux-*` - Also includes RNX client (see server section above)
-          
-          ### macOS Client Installation
-          ```bash
-          # 1. Download and extract for your architecture
-          curl -L https://github.com/ehsaniara/joblet/releases/latest/download/rnx-darwin-arm64.tar.gz | tar xz  # or darwin-amd64
-          
-          # 2. Install the binary
-          chmod +x rnx-darwin-arm64/bin/rnx
-          sudo mv rnx-darwin-arm64/bin/rnx /usr/local/bin/
-          
-          # 3. Copy configuration from your Joblet server
-          mkdir -p ~/.rnx
-          scp user@your-joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
-          ```
-          
-          ### Windows Client Installation
-          ```powershell
-          # 1. Extract the Windows package
-          # 2. Add rnx.exe to your PATH
-          # 3. Copy configuration from Joblet server to %USERPROFILE%\.rnx\rnx-config.yml
-          ```
-          
-          ### Admin UI on Client (Optional)
-          ```bash
-          # Clone repository for Admin UI files
-          git clone https://github.com/ehsaniara/joblet.git
-          cd joblet/admin/server
-          npm install
-          
-          # Start Admin UI (connects to remote Joblet server)
-          rnx admin
-          ```
-          
-          ---
-          
-          ## 📋 Important Notes
-          
-          - **Joblet Server**: Linux only, requires root/sudo for installation
-          - **RNX Client**: Works on Linux, macOS, and Windows
-          - **Configuration**: Clients need `rnx-config.yml` from server (contains mTLS certificates)
-          - **Admin UI**: Requires Node.js 18+ and npm dependencies
-          - **Network**: Ensure port 50051 (gRPC) is accessible from clients to server
-          
-          ⚠️ **Admin UI Error Prevention**: Always run `npm install` in admin/server directory before using `rnx admin`, otherwise you'll get `ERR_MODULE_NOT_FOUND` errors.
-          
-          For detailed instructions, see the [Installation Guide](https://github.com/ehsaniara/joblet/blob/main/docs/INSTALLATION.md).
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-artifacts/**/*
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          generate_release_notes: true
+          body: |
+            # Joblet Server & RNX Client Release
+            
+            ## 🖥️ A. Joblet Server (Linux Only)
+            
+            The Joblet daemon runs on Linux servers and executes jobs in isolated environments.
+            
+            ### Server Downloads
+            - `linux-amd64` - Joblet server + RNX client for x86_64 Linux
+            - `linux-arm64` - Joblet server + RNX client for ARM64 Linux  
+            - `linux-386` - Joblet server + RNX client for 32-bit Linux
+            
+            ### Server Installation
+            ```bash
+            # 1. Download and extract the Linux package
+            tar -xzf rnx-linux-amd64.tar.gz
+            cd rnx-linux-amd64
+            
+            # 2. Install Joblet server
+            sudo ./install.sh
+            
+            # 3. Start the Joblet service
+            sudo systemctl start joblet
+            sudo systemctl enable joblet
+            
+            # 4. Install Admin UI dependencies (for web dashboard)
+            cd /opt/joblet/admin/server
+            npm install
+            
+            # 5. Start Admin UI (optional)
+            /opt/joblet/bin/rnx admin --bind-address=0.0.0.0
+            ```
+            
+            The Joblet server will run on port 50051 (gRPC) and Admin UI on port 5173 (HTTP).
+            
+            ---
+            
+            ## 💻 B. RNX Client (All Platforms)
+            
+            The RNX CLI connects to Joblet servers from any platform.
+            
+            ### Client Downloads
+            - `darwin-amd64` - RNX client for macOS Intel
+            - `darwin-arm64` - RNX client for macOS Apple Silicon
+            - `windows-amd64` - RNX client for Windows 64-bit
+            - `windows-386` - RNX client for Windows 32-bit
+            - `linux-*` - Also includes RNX client (see server section above)
+            
+            ### macOS Client Installation
+            ```bash
+            # 1. Download and extract for your architecture
+            curl -L https://github.com/ehsaniara/joblet/releases/latest/download/rnx-darwin-arm64.tar.gz | tar xz  # or darwin-amd64
+            
+            # 2. Install the binary
+            chmod +x rnx-darwin-arm64/bin/rnx
+            sudo mv rnx-darwin-arm64/bin/rnx /usr/local/bin/
+            
+            # 3. Copy configuration from your Joblet server
+            mkdir -p ~/.rnx
+            scp user@your-joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+            ```
+            
+            ### Windows Client Installation
+            ```powershell
+            # 1. Extract the Windows package
+            # 2. Add rnx.exe to your PATH
+            # 3. Copy configuration from Joblet server to %USERPROFILE%\.rnx\rnx-config.yml
+            ```
+            
+            ### Admin UI on Client (Optional)
+            ```bash
+            # Clone repository for Admin UI files
+            git clone https://github.com/ehsaniara/joblet.git
+            cd joblet/admin/server
+            npm install
+            
+            # Start Admin UI (connects to remote Joblet server)
+            rnx admin
+            ```
+            
+            ---
+            
+            ## 📋 Important Notes
+            
+            - **Joblet Server**: Linux only, requires root/sudo for installation
+            - **RNX Client**: Works on Linux, macOS, and Windows
+            - **Configuration**: Clients need `rnx-config.yml` from server (contains mTLS certificates)
+            - **Admin UI**: Requires Node.js 18+ and npm dependencies
+            - **Network**: Ensure port 50051 (gRPC) is accessible from clients to server
+            
+            ⚠️ **Admin UI Error Prevention**: Always run `npm install` in admin/server directory before using `rnx admin`, otherwise you'll get `ERR_MODULE_NOT_FOUND` errors.
+            
+            For detailed instructions, see the [Installation Guide](https://github.com/ehsaniara/joblet/blob/main/docs/INSTALLATION.md).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

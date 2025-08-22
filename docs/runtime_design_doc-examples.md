@@ -76,28 +76,28 @@ rnx run --runtime=java:17 \
         mvn clean package
 ```
 
-### Node.js Examples
+### Java Examples
 
-#### Express Web Application
+#### Spring Boot Web Application
 
 ```bash
-# Run Express server with external access
-rnx run --runtime=node:18 \
-        --upload=server.js \
-        --upload=package.json \
+# Run Spring Boot application with external access
+rnx run --runtime=java:17 \
+        --upload=application.jar \
+        --upload=application.properties \
         --network=web \
-        --volume=npm-cache \
-        bash -c "npm install && node server.js"
+        --volume=app-data \
+        java -jar application.jar
 ```
 
-#### TypeScript Development
+#### Java Compilation and Execution
 
 ```bash
-# Compile and run TypeScript
-rnx run --runtime=node:18 \
-        --upload=app.ts \
-        --upload=tsconfig.json \
-        bash -c "tsc app.ts && node app.js"
+# Compile and run Java application
+rnx run --runtime=java:17 \
+        --upload=Main.java \
+        --upload=pom.xml \
+        bash -c "javac -cp . Main.java && java Main"
 ```
 
 ## Advanced Runtime Scenarios
@@ -198,15 +198,14 @@ cp target/surefire-reports/* /volumes/test-results/java21-
 #### Full-Stack Development Server
 
 ```bash
-# Frontend build (Node.js)
-rnx run --runtime=node:18 \
+# Frontend build (Java-based)
+rnx run --runtime=java:17 \
         --upload-dir=frontend \
         --volume=frontend-dist \
         bash -c "
 cd frontend
-npm install
-npm run build
-cp -r dist/* /volumes/frontend-dist/
+mvn clean package
+cp -r target/* /volumes/frontend-dist/
 "
 
 # Backend API (Python)
@@ -296,11 +295,11 @@ for i in range(100):
     time.sleep(0.1)
 "
 
-# Consumer (Node.js)
-rnx run --runtime=node:18 \
+# Consumer (Java)
+rnx run --runtime=java:17 \
         --network=message-queue \
-        --upload=consumer.js \
-        node consumer.js
+        --upload=Consumer.java \
+        java Consumer
 ```
 
 ## Performance Optimization Examples
@@ -394,11 +393,11 @@ rnx run --runtime=python:3.11+ml \
         --upload=test_api.py \
         python test_api.py
 
-# Frontend testing
-rnx run --runtime=node:18 \
+# Frontend testing (Java-based)
+rnx run --runtime=java:17 \
         --network=test-net \
         --upload-dir=frontend-tests \
-        bash -c "cd frontend-tests && npm test"
+        bash -c "cd frontend-tests && mvn test"
 ```
 
 ## Monitoring and Debugging Examples
@@ -477,14 +476,14 @@ rnx run --runtime=python:3.11+ml \
 
 ```bash
 # Persistent data and cache management
-rnx run --runtime=node:18 \
-        --volume=npm-cache \     # Persistent npm cache
-        --volume=project-data \  # Persistent project data
-        --upload-dir=node-app \
+rnx run --runtime=java:17 \
+        --volume=maven-cache \     # Persistent Maven cache
+        --volume=project-data \    # Persistent project data
+        --upload-dir=java-app \
         bash -c "
-cd node-app
-npm install  # Uses cached packages
-npm start
+cd java-app
+mvn install  # Uses cached dependencies
+mvn exec:java
 "
 ```
 
@@ -498,8 +497,8 @@ rnx run --runtime=python:3.11+ml \
         python data_processor.py
 
 # Web service with controlled access
-rnx run --runtime=node:18 \
+rnx run --runtime=java:17 \
         --network=web \          # External web access
-        --upload=api_server.js \
-        node api_server.js
+        --upload=ApiServer.java \
+        java ApiServer
 ```

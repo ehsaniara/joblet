@@ -91,28 +91,6 @@ rnx run --runtime=java:17 --upload=HelloWorld.java javac HelloWorld.java && java
 rnx run --runtime=java:17 --upload=pom.xml --upload=src/ mvn compile exec:java
 ```
 
-### Node.js 18 LTS (`nodejs-18`)
-
-**Complete isolated Node.js environment with development tools**
-
-- **Node.js**: 18.20.4 LTS (compiled from source for optimal performance)
-- **Pre-installed Packages**:
-    - Express 4.19.2 (web framework)
-    - TypeScript 5.5.4 (TypeScript compiler and types)
-    - @types/node 18.19.42 (Node.js TypeScript types)
-    - Nodemon 3.1.4 (development auto-restart)
-    - ESLint 8.57.0 (code linting)
-    - Prettier 3.3.3 (code formatting)
-- **Setup Time**: ~2-3 seconds vs 60-300 seconds traditional
-- **Use Cases**: Web APIs, microservices, real-time applications, TypeScript development
-
-```bash
-# Usage examples
-rnx run --runtime=nodejs:18 node --version
-rnx run --runtime=nodejs:18 --upload=server.js node server.js
-rnx run --runtime=nodejs:18 --upload=app.ts --upload=tsconfig.json tsc app.ts && node app.js
-rnx runtime info nodejs-18  # See all packages and details
-```
 
 ### Java 21 Modern (`java-21`)
 
@@ -165,9 +143,8 @@ RUNTIME         VERSION  TYPE    SIZE     DESCRIPTION
 python:3.11-ml  3.11     system  724.8MB  Completely isolated Python 3.11 with ML packages
 java:17         17.0.12  system  445.2MB  OpenJDK 17 LTS with Maven - completely isolated runtime
 java:21         21.0.4   system  467.1MB  OpenJDK 21 with modern features - completely isolated runtime
-nodejs:18       18.20.4  system  451.3MB  Node.js 18 LTS with development tools - completely isolated runtime
 
-Total runtimes: 4
+Total runtimes: 3
 ```
 
 ### 3. Get Runtime Information
@@ -312,13 +289,11 @@ Runtime names support multiple formats:
 --runtime=python:3.11-ml
 --runtime=java:17
 --runtime=java:21
---runtime=nodejs:18
 
 # Colon-separated format (legacy)
 --runtime=python:3.11+ml
 --runtime=java:17
 --runtime=java:21
---runtime=nodejs:18
 ```
 
 ## ⚡ Performance Comparison
@@ -372,14 +347,14 @@ rnx run --runtime=java:17 bash -c "javac HelloWorld.java && java HelloWorld"
 
 ```bash
 # 5-10 minutes every time
-rnx run 'curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && apt-get install -y nodejs npm && npm install express typescript && node server.js'
+rnx run 'apt-get update && apt-get install -y default-jdk maven && mvn compile exec:java'
 ```
 
 **Runtime Approach:**
 
 ```bash
-# 2-3 seconds total
-rnx run --runtime=nodejs:18 node server.js
+# 2-3 seconds total  
+rnx run --runtime=java:17 java Application
 ```
 
 ## 🏗️ Architecture
@@ -524,39 +499,39 @@ requirements:
 
 ### Custom Runtime Example
 
-Here's a basic Node.js runtime structure:
+Here's a basic Python runtime structure:
 
 ```bash
 # 1. Create directory structure
-sudo mkdir -p /opt/joblet/runtimes/nodejs/nodejs-18-full
-cd /opt/joblet/runtimes/nodejs/nodejs-18-full
+sudo mkdir -p /opt/joblet/runtimes/python/python-3.12-custom
+cd /opt/joblet/runtimes/python/python-3.12-custom
 
-# 2. Install Node.js from source or binaries
+# 2. Install Python from source or binaries
 # ... installation steps ...
 
 # 3. Create runtime.yml
 sudo tee runtime.yml << EOF
-name: "nodejs-18-full"
+name: "python-3.12-custom"
 type: "managed"
-version: "18.17.0"
-description: "Node.js 18 with common packages"
+version: "3.12.0"
+description: "Python 3.12 with custom packages"
 
 mounts:
   - source: "bin"
     target: "/usr/local/bin"
     readonly: true
-    selective: ["node", "npm", "npx"]
+    selective: ["python3", "pip", "pip3"]
   - source: "lib"
     target: "/usr/local/lib"
     readonly: true
 
 environment:
-  NODE_HOME: "/usr/local"
+  PYTHON_HOME: "/usr/local"
   PATH_PREPEND: "/usr/local/bin"
 
 package_manager:
-  type: "npm"
-  cache_volume: "npm-cache"
+  type: "pip"
+  cache_volume: "pip-cache"
 EOF
 ```
 

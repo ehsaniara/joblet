@@ -98,7 +98,6 @@ Runtimes that provide complete language environments with interpreters/compilers
 - `python:3.12` - Python 3.12 with modern features
 - `java:17` - OpenJDK 17 LTS with Maven
 - `java:21` - OpenJDK 21 with Virtual Threads
-- `node:18` - Node.js 18 LTS with npm
 
 ## Implementation Details
 

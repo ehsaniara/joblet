@@ -1,6 +1,7 @@
 # Joblet Web Admin UI
 
-The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs, monitoring system performance, and visualizing workflows. Available on macOS via Homebrew installation with the `--with-admin` option.
+The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs, monitoring system performance,
+and visualizing workflows. Available on macOS via Homebrew installation with the `--with-admin` option.
 
 ## Table of Contents
 
@@ -74,27 +75,32 @@ The admin UI will be available at `http://localhost:5173` by default.
 The admin UI consists of several main sections accessible via the navigation sidebar:
 
 ### 🏠 Dashboard
+
 - **System Health Overview**: Quick status of server, jobs, and resources
 - **Recent Activity**: Latest job executions and status changes
 - **Quick Stats**: Active jobs, total jobs, system uptime
 - **Resource Usage Summary**: CPU, memory, and disk usage at a glance
 
 ### 📊 System Monitoring
+
 - **Real-time Metrics**: Live system performance data
 - **Historical Trends**: Performance graphs over time
 - **Alert Status**: System alerts and warnings
 
 ### 💼 Jobs
+
 - **Job List**: All jobs with pagination and filtering
 - **Job Details**: Individual job information and logs
 - **Job Actions**: Start, stop, delete operations
 
 ### 🔄 Workflows
+
 - **Workflow List**: Overview of all workflow definitions
 - **Workflow Visualization**: Graph, tree, and timeline views
 - **Workflow Execution**: Status and progress tracking
 
 ### ⚙️ Administration
+
 - **Volume Management**: Create and manage persistent storage
 - **Network Configuration**: Custom network setup
 - **Runtime Management**: Available runtime environments
@@ -196,16 +202,16 @@ The Jobs page provides a comprehensive overview of all job executions:
 
 #### Job Information Displayed
 
-| Column | Description |
-|--------|-------------|
-| **Job ID** | Unique identifier for the job |
-| **Status** | Current execution status (running, completed, failed, etc.) |
-| **Command** | The command or script being executed |
-| **Runtime** | Runtime environment (if specified) |
-| **Network** | Network configuration |
-| **Started** | Job start timestamp |
-| **Duration** | Execution time (for completed jobs) |
-| **Actions** | Quick action buttons (stop, logs, delete) |
+| Column       | Description                                                 |
+|--------------|-------------------------------------------------------------|
+| **Job ID**   | Unique identifier for the job                               |
+| **Status**   | Current execution status (running, completed, failed, etc.) |
+| **Command**  | The command or script being executed                        |
+| **Runtime**  | Runtime environment (if specified)                          |
+| **Network**  | Network configuration                                       |
+| **Started**  | Job start timestamp                                         |
+| **Duration** | Execution time (for completed jobs)                         |
+| **Actions**  | Quick action buttons (stop, logs, delete)                   |
 
 #### Job Status Indicators
 
@@ -220,18 +226,21 @@ The Jobs page provides a comprehensive overview of all job executions:
 Click on any job ID to view detailed information:
 
 #### Job Information
+
 - **Execution Details**: Start time, duration, exit code
 - **Resource Usage**: CPU, memory, and disk utilization
 - **Configuration**: Runtime, network, volumes, resource limits
 - **Scheduling**: Schedule information (if applicable)
 
 #### Real-time Logs
+
 - **Live Log Stream**: Real-time output from the job
 - **Log History**: Complete log history with timestamps
 - **Search and Filter**: Find specific log entries
 - **Auto-scroll**: Automatically follow new log entries
 
 #### Job Actions
+
 - **Stop Job**: Terminate a running job
 - **Restart Job**: Re-execute a completed job
 - **Download Logs**: Export logs to a file
@@ -257,12 +266,14 @@ The Workflows section provides powerful tools for managing complex job orchestra
 ### Workflow List View
 
 #### Overview Display
+
 - **Workflow Summary**: Name, description, and job count
 - **Status Indicators**: Overall workflow status
 - **Execution History**: Recent workflow runs
 - **Quick Actions**: Execute, edit, or delete workflows
 
 #### Workflow Information
+
 - **Job Count**: Total number of jobs in the workflow
 - **Dependencies**: Number of job dependencies
 - **Estimated Duration**: Expected execution time
@@ -273,18 +284,21 @@ The Workflows section provides powerful tools for managing complex job orchestra
 Click on any workflow to access detailed visualization options:
 
 #### Graph View
+
 - **Dependency Graph**: Visual representation of job dependencies
 - **Interactive Nodes**: Click nodes to view job details
 - **Status Overlay**: Real-time execution status on graph
 - **Zoom and Pan**: Navigate large workflows easily
 
 #### Tree View
+
 - **Hierarchical Display**: Tree structure showing job relationships
 - **Expandable Nodes**: Drill down into job groups
 - **Status Indicators**: Visual status for each job
 - **Dependency Lines**: Clear dependency relationships
 
 #### Timeline View
+
 - **Execution Timeline**: Chronological view of job execution
 - **Duration Bars**: Visual representation of job duration
 - **Parallel Execution**: Show concurrent job execution
@@ -293,18 +307,21 @@ Click on any workflow to access detailed visualization options:
 ### Workflow Execution
 
 #### Starting Workflows
+
 - **Execute Button**: Start workflow from the workflow list
 - **Parameter Input**: Provide runtime parameters (if required)
 - **Validation**: Pre-execution validation of dependencies
 - **Confirmation**: Review execution plan before starting
 
 #### Monitoring Execution
+
 - **Real-time Updates**: Live status updates as jobs execute
 - **Progress Tracking**: Overall workflow progress percentage
 - **Job Status**: Individual job status within the workflow
 - **Error Handling**: Failed job indicators and error messages
 
 #### Workflow Actions
+
 - **Stop Workflow**: Halt all running jobs in the workflow
 - **Retry Failed**: Re-execute only failed jobs
 - **View Logs**: Access logs for all jobs in the workflow
@@ -317,12 +334,14 @@ Click on any workflow to access detailed visualization options:
 Create and manage persistent storage volumes:
 
 #### Volume Operations
+
 - **Create Volume**: Specify name, size, and type
 - **Mount Volumes**: Attach volumes to jobs
 - **Delete Volumes**: Remove unused volumes
 - **Usage Monitoring**: Track volume space utilization
 
 #### Volume Information
+
 - **Size and Usage**: Current space utilization
 - **Mount Points**: Where volumes are currently mounted
 - **Access Permissions**: Volume access controls
@@ -333,12 +352,14 @@ Create and manage persistent storage volumes:
 Manage custom networks for job isolation:
 
 #### Network Features
+
 - **Create Networks**: Define custom network configurations
 - **CIDR Configuration**: Specify IP address ranges
 - **Network Isolation**: Isolate job groups
 - **Bridge Configuration**: Inter-network communication
 
 #### Network Monitoring
+
 - **Active Connections**: Current network usage
 - **Traffic Statistics**: Network throughput monitoring
 - **Security Policies**: Applied network security rules
@@ -348,12 +369,14 @@ Manage custom networks for job isolation:
 Monitor and manage runtime environments:
 
 #### Runtime Information
+
 - **Available Runtimes**: List of installed runtime environments
 - **Package Lists**: Installed packages in each runtime
 - **Health Checks**: Runtime availability and status
 - **Usage Statistics**: Runtime utilization metrics
 
 #### Runtime Actions
+
 - **Test Runtime**: Verify runtime functionality
 - **Runtime Details**: View detailed runtime information
 - **Update Status**: Check for runtime updates
@@ -361,12 +384,14 @@ Monitor and manage runtime environments:
 ### System Configuration
 
 #### User Preferences
+
 - **Theme Selection**: Light/dark theme options
 - **Refresh Intervals**: Configure auto-refresh rates
 - **Page Sizes**: Default pagination settings
 - **Notification Settings**: Alert and notification preferences
 
 #### Server Configuration
+
 - **Connection Settings**: Server endpoint configuration
 - **Authentication**: mTLS certificate management
 - **Security Settings**: Access control and permissions
@@ -411,6 +436,7 @@ rnx monitor status
 ### Logs and Debugging
 
 #### Admin UI Logs
+
 ```bash
 # View admin UI logs
 rnx admin --verbose
@@ -421,6 +447,7 @@ rnx admin --verbose
 ```
 
 #### Server-side Logs
+
 ```bash
 # Check Joblet server logs
 sudo journalctl -u joblet -f
@@ -447,20 +474,24 @@ The admin UI is actively developed. To request new features:
 ## Security Considerations
 
 ### Authentication
+
 - **mTLS Certificates**: Uses same certificates as RNX CLI
 - **No Separate Login**: Authentication handled by client certificates
 - **Secure by Default**: All communication encrypted
 
 ### Network Security
+
 - **Local Access**: Admin UI binds to localhost by default
 - **Firewall**: Configure firewall rules for remote access
 - **HTTPS**: Consider reverse proxy with HTTPS for remote access
 
 ### Data Protection
+
 - **No Persistent Storage**: Admin UI doesn't store sensitive data
 - **Session Management**: Uses stateless authentication
 - **Audit Trail**: All actions logged by Joblet server
 
 ---
 
-For more information, see the [main documentation](README.md) or visit the [GitHub repository](https://github.com/ehsaniara/joblet).
+For more information, see the [main documentation](README.md) or visit
+the [GitHub repository](https://github.com/ehsaniara/joblet).

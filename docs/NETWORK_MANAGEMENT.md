@@ -289,18 +289,19 @@ jobs:
     requires:
       - database: "COMPLETED"
     
-  web-frontend:
-    command: "node"
-    args: ["server.js"]
-    runtime: "nodejs:18"
+  web-service:
+    command: "java"
+    args: ["-jar", "web-service.jar"]
+    runtime: "java:17"
     network: "frontend"
     uploads:
-      files: ["server.js", "package.json"]
+      files: ["web-service.jar", "application.properties"]
     requires:
       - api-service: "COMPLETED"
 ```
 
 **Workflow Network Validation:**
+
 ```bash
 $ rnx run --workflow=microservices-workflow.yaml
 🔍 Validating workflow prerequisites...
@@ -308,6 +309,7 @@ $ rnx run --workflow=microservices-workflow.yaml
 ```
 
 **Benefits:**
+
 - **Network Validation**: Confirms all networks exist before execution
 - **Per-Job Networks**: Each job can use different networks
 - **Dependency Coordination**: Network setup happens before job dependencies

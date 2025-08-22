@@ -9,7 +9,7 @@ secret_environment:
 jobs:
   status-display-test:
     command: "sleep"
-    args: ["2"]  # Sleep briefly so we can check status while running
+    args: [ "2" ]  # Sleep briefly so we can check status while running
     environment:
       JOB_SPECIFIC: "job-status-value"
       SHARED_VAR: "job-override-value"  # Override global

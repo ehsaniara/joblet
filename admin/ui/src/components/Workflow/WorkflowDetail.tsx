@@ -413,7 +413,9 @@ const WorkflowDetail: React.FC<WorkflowDetailProps> = ({
                                         {workflow.jobs.map(job => (
                                             <div key={job.id}
                                                  className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
-                                                 onClick={() => { void handleViewJob(job.id); }}>
+                                                 onClick={() => {
+                                                     void handleViewJob(job.id);
+                                                 }}>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex-1">
                                                         <div className="flex items-center space-x-3">
@@ -488,7 +490,9 @@ const WorkflowDetail: React.FC<WorkflowDetailProps> = ({
                                                 return (
                                                     <div key={job.id}
                                                          className="flex items-center space-x-4 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                                                         onClick={() => { void handleViewJob(job.id); }}>
+                                                         onClick={() => {
+                                                             void handleViewJob(job.id);
+                                                         }}>
                                                         <div className="w-8 text-center text-sm text-gray-500">
                                                             {index + 1}
                                                         </div>

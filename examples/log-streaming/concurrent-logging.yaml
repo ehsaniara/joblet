@@ -16,9 +16,9 @@ jobs:
   # Logger 1 - Standard rate, range 0-500
   logger-alpha:
     command: "python3"
-    args: ["high_frequency_logger.py"]
+    args: [ "high_frequency_logger.py" ]
     uploads:
-      files: ["high_frequency_logger.py"]
+      files: [ "high_frequency_logger.py" ]
     environment:
       START_NUM: "0"
       END_NUM: "500"
@@ -29,9 +29,9 @@ jobs:
   # Logger 2 - Higher rate, range 1000-1300  
   logger-beta:
     command: "python3"
-    args: ["high_frequency_logger.py"]
+    args: [ "high_frequency_logger.py" ]
     uploads:
-      files: ["high_frequency_logger.py"]
+      files: [ "high_frequency_logger.py" ]
     environment:
       START_NUM: "1000"
       END_NUM: "1300"
@@ -42,9 +42,9 @@ jobs:
   # Logger 3 - Burst pattern, range 2000-2200
   logger-gamma:
     command: "python3"
-    args: ["high_frequency_logger.py"]
+    args: [ "high_frequency_logger.py" ]
     uploads:
-      files: ["high_frequency_logger.py"]
+      files: [ "high_frequency_logger.py" ]
     environment:
       START_NUM: "2000"
       END_NUM: "2200"
@@ -55,9 +55,9 @@ jobs:
   # Logger 4 - Standard rate, range 3000-3500
   logger-delta:
     command: "python3"
-    args: ["high_frequency_logger.py"]
+    args: [ "high_frequency_logger.py" ]
     uploads:
-      files: ["high_frequency_logger.py"]
+      files: [ "high_frequency_logger.py" ]
     environment:
       START_NUM: "3000"
       END_NUM: "3500"

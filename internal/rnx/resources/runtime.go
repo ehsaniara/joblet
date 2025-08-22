@@ -32,10 +32,7 @@ Examples:
   rnx runtime info python:3.11+ml
   
   # Test a runtime
-  rnx runtime test java:17
-  
-  # Install a new runtime (admin only)
-  rnx runtime install python:3.11 --packages="numpy pandas scikit-learn"`,
+  rnx runtime test java:17`,
 	}
 
 	cmd.AddCommand(NewRuntimeListCmd())

@@ -370,7 +370,10 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                                     <input
                                         ref={dirInputRef}
                                         type="file"
-                                        {...{webkitdirectory: "true", directory: "true"} as React.InputHTMLAttributes<HTMLInputElement>}
+                                        {...{
+                                            webkitdirectory: "true",
+                                            directory: "true"
+                                        } as React.InputHTMLAttributes<HTMLInputElement>}
                                         multiple
                                         onChange={(e) => handleDirectoryUpload(e.target.files)}
                                         className="hidden"

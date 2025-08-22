@@ -5,6 +5,7 @@ This directory contains simple workflow examples demonstrating basic Joblet func
 ## Files
 
 ### `basic-jobs.yaml`
+
 Contains four basic job examples:
 
 1. **hello** - Simple echo command demonstration
@@ -13,6 +14,7 @@ Contains four basic job examples:
 4. **backup** - Scheduled backup task with volume operations
 
 ### Supporting Files
+
 - `analyze.py` - Python script for the analytics job
 - `data.csv` - Sample data file for analysis
 
@@ -32,12 +34,14 @@ rnx run --workflow=basic-jobs.yaml
 ## Prerequisites
 
 Ensure these volumes exist before running:
+
 - `analytics-data` - For analytics job data storage
 - `web-content` - For webserver content
-- `backups` - For backup storage  
+- `backups` - For backup storage
 - `data` - For source data to backup
 
 Create volumes with:
+
 ```bash
 rnx volume create analytics-data
 rnx volume create web-content

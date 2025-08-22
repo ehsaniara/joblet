@@ -1,8 +1,8 @@
 jobs:
   test-job:
     command: "python3"
-    args: ["extract.py"]
+    args: [ "extract.py" ]
     runtime: "python:3.11-ml"
-    volumes: ["nonexistent-volume"]  # This volume doesn't exist
+    volumes: [ "nonexistent-volume" ]  # This volume doesn't exist
     uploads:
-      files: ["extract.py"]
+      files: [ "extract.py" ]

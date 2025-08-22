@@ -221,6 +221,7 @@ type LogChunk struct {
 ```
 
 **Key Benefits:**
+
 - **Microsecond Writes**: Jobs write to channel instantly, never waiting for disk I/O
 - **Rate Decoupling**: Handles any mismatch between log production and disk write speed
 - **Overflow Protection**: Multiple strategies prevent data loss under extreme load
@@ -238,6 +239,7 @@ const (
 ```
 
 **Configuration:**
+
 ```yaml
 log_persistence:
   queue_size: 100000              # Large queue for burst handling

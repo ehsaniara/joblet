@@ -31,6 +31,7 @@ Admin UI ↔ Admin Server ↔ rnx CLI ↔ joblet server
 ## Development
 
 ### Start Admin Server
+
 ```bash
 cd admin/server
 npm start
@@ -39,11 +40,13 @@ npm run dev
 ```
 
 ### Build Admin UI
+
 ```bash
 make admin-ui
 ```
 
 ### Build Everything
+
 ```bash
 make admin-server
 ```

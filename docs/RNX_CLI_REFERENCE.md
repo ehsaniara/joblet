@@ -10,7 +10,9 @@ Complete reference for the RNX command-line interface, including all commands, o
     - [list](#rnx-list)
     - [status](#rnx-status)
     - [log](#rnx-log)
+    - [logs](#rnx-logs)
     - [stop](#rnx-stop)
+    - [delete](#rnx-delete)
 - [Volume Commands](#volume-commands)
     - [volume create](#rnx-volume-create)
     - [volume list](#rnx-volume-list)
@@ -26,6 +28,9 @@ Complete reference for the RNX command-line interface, including all commands, o
 - [System Commands](#system-commands)
     - [monitor](#rnx-monitor)
     - [nodes](#rnx-nodes)
+    - [admin](#rnx-admin)
+    - [completion](#rnx-completion)
+    - [config-help](#rnx-config-help)
     - [help](#rnx-help)
 
 ## Global Options
@@ -36,7 +41,6 @@ Options available for all commands:
 --config <path>    # Path to configuration file (default: searches standard locations)
 --node <name>      # Node name from configuration (default: "default")
 --help, -h         # Show help for command
---version, -v      # Show version information
 ```
 
 ### Configuration File Locations
@@ -61,20 +65,20 @@ rnx run [flags] <command> [args...]
 
 #### Flags
 
-| Flag              | Description                                                | Default        |
-|-------------------|------------------------------------------------------------|----------------|
-| `--max-cpu`       | Maximum CPU usage percentage (0-10000)                     | 0 (unlimited)  |
-| `--max-memory`    | Maximum memory in MB                                       | 0 (unlimited)  |
-| `--max-iobps`     | Maximum I/O bytes per second                               | 0 (unlimited)  |
-| `--cpu-cores`     | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
-| `--network`       | Network mode: bridge, isolated, none, or custom            | "bridge"       |
-| `--volume`        | Volume to mount (can be specified multiple times)          | none           |
-| `--upload`        | Upload file to workspace (can be specified multiple times) | none           |
-| `--upload-dir`    | Upload directory to workspace                              | none           |
-| `--env, -e`       | Environment variable (KEY=VALUE, visible in logs)          | none           |
-| `--secret-env, -s`| Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
-| `--schedule`      | Schedule job execution (duration or RFC3339 time)          | immediate      |
-| `--workflow`      | YAML workflow file for workflow execution                  | none           |
+| Flag               | Description                                                | Default        |
+|--------------------|------------------------------------------------------------|----------------|
+| `--max-cpu`        | Maximum CPU usage percentage (0-10000)                     | 0 (unlimited)  |
+| `--max-memory`     | Maximum memory in MB                                       | 0 (unlimited)  |
+| `--max-iobps`      | Maximum I/O bytes per second                               | 0 (unlimited)  |
+| `--cpu-cores`      | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
+| `--network`        | Network mode: bridge, isolated, none, or custom            | "bridge"       |
+| `--volume`         | Volume to mount (can be specified multiple times)          | none           |
+| `--upload`         | Upload file to workspace (can be specified multiple times) | none           |
+| `--upload-dir`     | Upload directory to workspace                              | none           |
+| `--env, -e`        | Environment variable (KEY=VALUE, visible in logs)          | none           |
+| `--secret-env, -s` | Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
+| `--schedule`       | Schedule job execution (duration or RFC3339 time)          | immediate      |
+| `--workflow`       | YAML workflow file for workflow execution                  | none           |
 
 #### Examples
 
@@ -154,6 +158,7 @@ $ rnx run --workflow=my-workflow.yaml
 ```
 
 **Validation Checks:**
+
 - **Circular Dependencies**: Prevents infinite dependency loops
 - **Network Validation**: Confirms all specified networks exist (built-in: none, isolated, bridge + custom networks)
 - **Volume Validation**: Verifies all referenced volumes are available
@@ -161,6 +166,7 @@ $ rnx run --workflow=my-workflow.yaml
 - **Job Dependencies**: Ensures all dependencies reference existing jobs
 
 **Error Example:**
+
 ```bash
 Error: workflow validation failed: network validation failed: missing networks: [non-existent-network]. Available networks: [bridge isolated none custom-net]
 ```
@@ -267,15 +273,17 @@ rnx status --workflow <workflow-uuid>      # Get workflow status
 
 #### Workflow Status
 
-- **Workflow UUIDs**: 36-character UUID identifiers (e.g., "a1b2c3d4-e5f6-7890-1234-567890abcdef")  
+- **Workflow UUIDs**: 36-character UUID identifiers (e.g., "a1b2c3d4-e5f6-7890-1234-567890abcdef")
 - **Workflow IDs**: Numeric identifiers (e.g., 1, 2, 3)
 
 **Workflow Status Features:**
+
 - Displays job names, dependencies, status, and exit codes in a tabular format
-- Shows dependency relationships between workflow jobs  
+- Shows dependency relationships between workflow jobs
 - Real-time progress tracking with job-level details
 - Color-coded status indicators (RUNNING, COMPLETED, FAILED, etc.)
-- **Job ID Display**: Started jobs show actual job UUIDs (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "a1b2c3d4-e5f6-7890-abcd-ef1234567890"), non-started jobs show "0"
+- **Job ID Display**: Started jobs show actual job UUIDs (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "
+  a1b2c3d4-e5f6-7890-abcd-ef1234567890"), non-started jobs show "0"
 
 #### Flags
 
@@ -394,6 +402,50 @@ rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Stop multiple jobs
 rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | xargs -I {} rnx stop {}
+```
+
+### `rnx logs`
+
+Manage persisted job logs on the server.
+
+```bash
+rnx logs [command]
+```
+
+#### Available Commands
+
+- `delete` - Delete logs for specific jobs
+- `cleanup` - Clean up old log files
+
+#### Examples
+
+```bash
+# Delete logs for a specific job
+rnx logs delete f47ac10b
+
+# Delete logs for multiple jobs
+rnx logs delete f47ac10b a1b2c3d4
+
+# Clean up logs older than retention period
+rnx logs cleanup
+```
+
+### `rnx delete`
+
+Delete a job completely from the system.
+
+```bash
+rnx delete <job-uuid>
+```
+
+#### Examples
+
+```bash
+# Delete a completed job
+rnx delete f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+# Delete multiple jobs
+rnx delete f47ac10b a1b2c3d4 e5f6g7h8
 ```
 
 ## Volume Commands
@@ -582,7 +634,6 @@ rnx runtime info <runtime-spec>
 # Get runtime details
 rnx runtime info python:3.11-ml
 rnx runtime info java:17
-rnx runtime info nodejs:18
 ```
 
 ### `rnx runtime test`
@@ -668,6 +719,78 @@ rnx nodes --json
 # Use specific node for commands
 rnx --node=production list
 rnx --node=staging run echo "test"
+```
+
+### `rnx admin`
+
+Launch the Joblet Admin UI server.
+
+```bash
+rnx admin [flags]
+```
+
+#### Flags
+
+| Flag              | Description                    | Default   |
+|-------------------|--------------------------------|-----------|
+| `--port, -p`      | Port to run the admin server  | 5173      |
+| `--bind-address`  | Address to bind the server to  | "0.0.0.0" |
+
+#### Examples
+
+```bash
+# Start admin UI with default settings
+rnx admin
+
+# Use custom port
+rnx admin --port 8080
+
+# Bind to all interfaces
+rnx admin --bind-address 0.0.0.0 --port 5173
+```
+
+### `rnx completion`
+
+Generate the autocompletion script for the specified shell.
+
+```bash
+rnx completion [shell]
+```
+
+#### Available Shells
+
+- `bash` - Generate bash autocompletion
+- `zsh` - Generate zsh autocompletion  
+- `fish` - Generate fish autocompletion
+- `powershell` - Generate PowerShell autocompletion
+
+#### Examples
+
+```bash
+# Generate bash completion
+rnx completion bash
+
+# Install bash completion (Linux)
+rnx completion bash > /etc/bash_completion.d/rnx
+
+# Install zsh completion
+rnx completion zsh > ~/.rnx-completion.zsh
+echo 'source ~/.rnx-completion.zsh' >> ~/.zshrc
+```
+
+### `rnx config-help`
+
+Show configuration file examples with embedded certificates.
+
+```bash
+rnx config-help
+```
+
+#### Examples
+
+```bash
+# Show configuration examples
+rnx config-help
 ```
 
 ### `rnx help`

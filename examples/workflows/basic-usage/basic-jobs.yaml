@@ -2,7 +2,7 @@ jobs:
   # Simple hello world job
   hello:
     command: "echo"
-    args: ["Hello, World!"]
+    args: [ "Hello, World!" ]
     runtime: "python:3.11-ml"
     resources:
       max_memory: 64
@@ -10,11 +10,11 @@ jobs:
   # Python analytics job with uploads and volumes  
   analytics:
     command: "python3"
-    args: ["analyze.py"]
+    args: [ "analyze.py" ]
     runtime: "python:3.11-ml"
     uploads:
-      files: ["analyze.py", "data.csv"]
-    volumes: ["analytics-data"]
+      files: [ "analyze.py", "data.csv" ]
+    volumes: [ "analytics-data" ]
     resources:
       max_memory: 512
       max_cpu: 75
@@ -22,9 +22,9 @@ jobs:
   # Long-running server job
   webserver:
     command: "nginx"
-    args: ["-g", "daemon off;"]
+    args: [ "-g", "daemon off;" ]
     runtime: "python:3.11-ml"
-    volumes: ["web-content"]
+    volumes: [ "web-content" ]
     resources:
       max_memory: 128
       max_cpu: 25
@@ -32,9 +32,9 @@ jobs:
   # Scheduled backup job
   backup:
     command: "bash"
-    args: ["-c", "tar -czf /volumes/backups/backup-$(date +%Y%m%d).tar.gz /data"]
+    args: [ "-c", "tar -czf /volumes/backups/backup-$(date +%Y%m%d).tar.gz /data" ]
     runtime: "python:3.11-ml"
-    volumes: ["backups", "data"]
+    volumes: [ "backups", "data" ]
     resources:
       max_memory: 512
       max_io_bps: 1048576

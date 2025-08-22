@@ -56,20 +56,12 @@ joblet:
   # Job execution settings
   maxConcurrentJobs: 100          # Maximum concurrent jobs
   jobTimeout: "24h"               # Maximum job runtime
-  scheduleTimeout: "168h"         # Maximum schedule ahead time (7 days)
 
   # Command validation
   validateCommands: true          # Validate commands before execution
-  allowedCommands: # Whitelist specific commands (optional)
-    - python
-    - python3
-    - node
-    - bash
-    - sh
 
   # Cleanup settings
   cleanupTimeout: "30s"          # Timeout for cleanup operations
-  preserveFailedJobs: true       # Keep failed job data for debugging
 ```
 
 ### Network Configuration

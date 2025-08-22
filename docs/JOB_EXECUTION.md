@@ -183,14 +183,14 @@ with open('/volumes/output/result.txt', 'w') as f:
 
 ```bash
 # Single variable
-rnx run --env=DEBUG=true node app.js
+rnx run --env=DEBUG=true --runtime=java:17 java App
 
 # Multiple variables
 rnx run \
   --env=DATABASE_URL=postgres://localhost/db \
   --env=API_KEY=secret123 \
-  --env=NODE_ENV=production \
-  node server.js
+  --env=JAVA_ENV=production \
+  --runtime=java:17 java Application
 
 # Variables with spaces
 rnx run --env="MESSAGE=Hello World" echo '$MESSAGE'
@@ -270,9 +270,11 @@ rnx status <job-uuid>
 
 ### Job Identification
 
-Each job is assigned a unique UUID (Universally Unique Identifier) when created. Job UUIDs are in the format: `f47ac10b-58cc-4372-a567-0e02b2c3d479`
+Each job is assigned a unique UUID (Universally Unique Identifier) when created. Job UUIDs are in the format:
+`f47ac10b-58cc-4372-a567-0e02b2c3d479`
 
 Use job UUIDs to:
+
 - Check job status: `rnx status <job-uuid>`
 - View job logs: `rnx log <job-uuid>`
 - Stop running jobs: `rnx stop <job-uuid>`

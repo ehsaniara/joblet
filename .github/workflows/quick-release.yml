@@ -218,17 +218,17 @@ jobs:
             echo "📦 Creating macOS $arch package with admin UI..."
             mkdir -p "rnx-darwin-$arch-release"
             cp "rnx-darwin-$arch" "rnx-darwin-$arch-release/rnx"
-            
+          
             # Copy admin UI files (built UI and server dependencies)
             echo "📁 Copying admin directory..."
             cp -r admin "rnx-darwin-$arch-release/"
-            
+          
             # Debug: Check what was actually copied
             echo "🔍 Verifying copied files..."
             ls -la "rnx-darwin-$arch-release/admin/" || echo "❌ No admin directory copied"
             ls -la "rnx-darwin-$arch-release/admin/ui/" || echo "❌ No admin/ui directory copied"
             ls -la "rnx-darwin-$arch-release/admin/ui/dist/" || echo "❌ No admin/ui/dist directory copied"
-            
+          
             # Verify admin files were copied
             if [ ! -f "rnx-darwin-$arch-release/admin/ui/dist/index.html" ]; then
               echo "❌ Admin UI files not found in package for $arch"
@@ -241,20 +241,20 @@ jobs:
               exit 1
             fi
             echo "✅ Admin UI files copied successfully for $arch"
-            
+          
             # Remove dev dependencies but keep built assets
             rm -rf "rnx-darwin-$arch-release/admin/ui/node_modules"
-            
+          
             # Create Homebrew-compatible archive
             echo "📦 Creating tar archive for $arch..."
             echo "🔍 Contents to be archived:"
             find "rnx-darwin-$arch-release" -type f | head -20
             echo "🔍 Full directory structure:"
             ls -laR "rnx-darwin-$arch-release/"
-            
+          
             tar -czf "rnx-v${{ steps.version.outputs.version }}-darwin-$arch.tar.gz" \
               -C "rnx-darwin-$arch-release" .
-            
+          
             # Verify archive was created correctly
             echo "🔍 Verifying archive contents:"
             tar -tzf "rnx-v${{ steps.version.outputs.version }}-darwin-$arch.tar.gz" | head -20

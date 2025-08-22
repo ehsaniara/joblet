@@ -1,8 +1,8 @@
 jobs:
   test-job:
     command: "python3"
-    args: ["extract.py"]
+    args: [ "extract.py" ]
     runtime: "nonexistent:runtime"  # This runtime doesn't exist
-    volumes: ["data-pipeline"]
+    volumes: [ "data-pipeline" ]
     uploads:
-      files: ["extract.py"]
+      files: [ "extract.py" ]

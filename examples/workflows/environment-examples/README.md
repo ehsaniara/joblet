@@ -5,11 +5,13 @@ This directory contains comprehensive examples demonstrating Joblet's environmen
 ## Files Overview
 
 ### Basic Examples
+
 - **`basic-env.yaml`** - Simple environment variable usage with regular and secret variables
 - **`corrected-test.yaml`** - Corrected workflow showing proper variable expansion in bash
 - **`simple-test.yaml`** - Minimal test for environment variable functionality
 
 ### Real-World Use Cases
+
 - **`data-pipeline-env.yaml`** - Data processing pipeline with environment configuration
 - **`microservices-env.yaml`** - Microservices deployment with service-specific variables
 - **`cicd-env.yaml`** - CI/CD pipeline with build and deployment variables
@@ -17,6 +19,7 @@ This directory contains comprehensive examples demonstrating Joblet's environmen
 - **`secrets-demo.yaml`** - Demonstration of secret vs regular environment variables
 
 ### Validation Examples
+
 - **`validation-test.yaml`** - Contains conflicts to demonstrate validation (will fail)
 - **`invalid-env-test.yaml`** - Contains invalid variable names (will fail)
 - **`valid-validation-test.yaml`** - Valid environment variables that pass validation
@@ -64,6 +67,7 @@ jobs:
 ## Running Examples
 
 ### Test Basic Functionality
+
 ```bash
 # Run a working example
 ./bin/rnx run --workflow=examples/workflows/environment-examples/basic-env.yaml
@@ -76,6 +80,7 @@ jobs:
 ```
 
 ### Check Logs to See Environment Variables
+
 ```bash
 # Check workflow status
 ./bin/rnx status 1 --workflow
@@ -89,18 +94,21 @@ jobs:
 Joblet validates environment variables at submission time:
 
 ### ✅ Valid Variable Names
+
 - `VALID_VAR`
 - `_UNDERSCORE_START`
 - `VAR_123`
 - `myApp_Config`
 
 ### ❌ Invalid Variable Names
+
 - `123INVALID` (starts with number)
 - `INVALID-VAR` (contains hyphen)
 - `INVALID VAR` (contains space)
 - `INVALID.VAR` (contains dot)
 
 ### Security Features
+
 - **Conflict detection**: Same variable cannot be in both regular and secret environments
 - **Reserved variable warnings**: Warns about system variables (PATH, HOME, etc.)
 - **Value size limits**: Maximum 32KB per variable value
@@ -117,7 +125,9 @@ Joblet validates environment variables at submission time:
 ## Integration with Other Features
 
 ### With Volumes
+
 Environment variables can reference volume paths:
+
 ```yaml
 environment:
   CONFIG_PATH: "/volumes/config/app.yml"
@@ -125,7 +135,9 @@ environment:
 ```
 
 ### With Networks
+
 Configure service discovery and networking:
+
 ```yaml
 environment:
   SERVICE_HOST: "api-service"
@@ -134,7 +146,9 @@ network: "microservices"
 ```
 
 ### With Dependencies
+
 Pass data between jobs using environment variables and volumes:
+
 ```yaml
 jobs:
   producer:

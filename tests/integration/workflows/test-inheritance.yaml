@@ -9,7 +9,7 @@ secret_environment:
 jobs:
   inheritance-test:
     command: "printenv"
-    args: ["GLOBAL_VAR", "OVERRIDABLE_VAR", "GLOBAL_SECRET", "JOB_ONLY_VAR"]
+    args: [ "GLOBAL_VAR", "OVERRIDABLE_VAR", "GLOBAL_SECRET", "JOB_ONLY_VAR" ]
     environment:
       OVERRIDABLE_VAR: "job-override-value"  # Override global
       JOB_ONLY_VAR: "job-specific-value"     # Job-only variable

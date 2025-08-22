@@ -7,7 +7,7 @@ jobs:
   # Invalid environment variable names
   invalid-names:
     command: "bash"
-    args: ["-c", "echo 'This should fail'"]
+    args: [ "-c", "echo 'This should fail'" ]
     environment:
       123INVALID: "starts-with-number"  # Invalid: starts with number
       "INVALID-VAR": "contains-hyphen"  # Invalid: contains hyphen

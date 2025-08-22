@@ -1,19 +1,23 @@
 # Joblet: Enterprise-Grade Job Execution Platform
 
 > **A Docker Alternative Built for Production Workloads**
-> 
-> Joblet is a native Linux job execution platform that provides secure process isolation, comprehensive resource management, and enterprise-ready orchestration without the overhead of containers.
+>
+> Joblet is a native Linux job execution platform that provides secure process isolation, comprehensive resource
+> management, and enterprise-ready orchestration without the overhead of containers.
 
 ## 🚀 Why Joblet?
 
 ### **Docker Alternative for Modern Infrastructure**
+
 Unlike traditional containerization solutions, Joblet leverages Linux namespaces and cgroups directly, providing:
+
 - **🔒 Better Security**: Process-level isolation without container escape vulnerabilities
 - **⚡ Superior Performance**: Direct syscall execution without container runtime overhead
 - **💰 Cost Efficiency**: Lower resource consumption and faster startup times
 - **🎯 Simpler Operations**: No image management, registries, or container complexity
 
 ### **Enterprise Production Ready**
+
 - **🏢 mTLS Authentication**: Certificate-based security with role-based access control
 - **📊 Advanced Monitoring**: Real-time metrics with comprehensive system observability
 - **🌐 Network Isolation**: Custom networks with traffic control and bandwidth limiting
@@ -21,6 +25,7 @@ Unlike traditional containerization solutions, Joblet leverages Linux namespaces
 - **🔄 Workflow Orchestration**: YAML-based job dependencies with validation
 
 ### **Developer Experience First**
+
 - **🖥️ Cross-Platform CLI**: Works seamlessly on Linux, macOS, and Windows
 - **🎨 Modern Web UI**: React-based interface for visual workflow management
 - **📱 Real-Time Logs**: Live log streaming with filtering and search
@@ -29,22 +34,25 @@ Unlike traditional containerization solutions, Joblet leverages Linux namespaces
 ## 🎨 Visual Interface
 
 ### **Comprehensive System Monitoring**
+
 ![System Monitoring](./AdminUI-SystemMonitoring1.png)
 
-### **Advanced Workflow Management**  
+### **Advanced Workflow Management**
+
 ![Workflow Management](./AdminUI-Workflow1.png)
 
 ## 🎯 Industry Use Cases
 
 ### **CI/CD & DevOps**
+
 ```bash
 # Replace Docker in CI pipelines
 rnx run --runtime=python:3.11-ml pytest tests/
 rnx run --runtime=java:21 mvn clean install
-rnx run --runtime=node:18 npm run build
 ```
 
 ### **Data Engineering & Analytics**
+
 ```bash
 # Isolated data processing with resource limits
 rnx run --max-memory=8192 --max-cpu=400 \
@@ -54,6 +62,7 @@ rnx run --max-memory=8192 --max-cpu=400 \
 ```
 
 ### **Microservices & Testing**
+
 ```bash
 # Network-isolated service testing
 rnx network create test-env --cidr=10.10.0.0/24
@@ -62,6 +71,7 @@ rnx run --network=test-env --runtime=python:3.11 ./service-b
 ```
 
 ### **Workflow Orchestration**
+
 ```yaml
 # ml-pipeline.yaml
 jobs:
@@ -97,6 +107,7 @@ rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 ```
 
 ### **SRE & Reliability Engineering**
+
 ```bash
 # Resource-bounded health checks with timeout
 rnx run --max-cpu=10 --max-memory=64 \
@@ -110,6 +121,7 @@ rnx run --network=isolated \
 ```
 
 ### **AI Agent Development**
+
 ```bash
 # Multi-agent system with isolation
 rnx run --max-memory=4096 --runtime=python:3.11-ml \
@@ -126,30 +138,33 @@ rnx run --max-memory=1024 --runtime=python:3.11-ml \
 
 ## 📊 Performance Advantages
 
-| Feature | Docker | Joblet |
-|---------|--------|--------|
-| **Startup Time** | 2-5 seconds | 50-200ms |
-| **Memory Overhead** | 50-100MB per container | 5-10MB per job |
-| **Security** | Container escape risks | Direct process isolation |
-| **Networking** | Complex bridge setup | Native Linux networking |
-| **Storage** | Image layers & volumes | Direct filesystem access |
-| **Monitoring** | External tools required | Built-in comprehensive metrics |
+| Feature             | Docker                  | Joblet                         |
+|---------------------|-------------------------|--------------------------------|
+| **Startup Time**    | 2-5 seconds             | 50-200ms                       |
+| **Memory Overhead** | 50-100MB per container  | 5-10MB per job                 |
+| **Security**        | Container escape risks  | Direct process isolation       |
+| **Networking**      | Complex bridge setup    | Native Linux networking        |
+| **Storage**         | Image layers & volumes  | Direct filesystem access       |
+| **Monitoring**      | External tools required | Built-in comprehensive metrics |
 
 ## 🏗️ Architecture Benefits
 
 ### **Native Linux Integration**
+
 - **Cgroups v2**: Advanced resource control and accounting
 - **Namespaces**: PID, network, mount, IPC, UTS isolation
 - **No Virtualization**: Direct hardware access for maximum performance
 - **System Integration**: Seamless integration with existing infrastructure
 
 ### **Enterprise Security Model**
+
 - **mTLS Everywhere**: Certificate-based authentication for all communications
 - **Role-Based Access**: Granular permissions (admin, operator, viewer)
 - **Process Isolation**: Each job runs in isolated namespace
 - **Resource Boundaries**: Hard limits prevent resource exhaustion
 
 ### **Scalable Design**
+
 - **Stateless Architecture**: Easy horizontal scaling
 - **Event-Driven**: Real-time job state management
 - **API-First**: Full gRPC API for integrations
@@ -158,11 +173,13 @@ rnx run --max-memory=1024 --runtime=python:3.11-ml \
 ## 📚 Complete Documentation
 
 ### Getting Started
+
 - [**Quick Start Guide**](./QUICKSTART.md) - Get up and running in 5 minutes
 - [**Installation Guide**](./INSTALLATION.md) - Detailed installation for all platforms
 - [**Configuration**](./CONFIGURATION.md) - Complete configuration reference
 
 ### User Guides
+
 - [**RNX CLI Reference**](./RNX_CLI_REFERENCE.md) - Complete command reference with examples
 - [**Job Execution Guide**](./JOB_EXECUTION.md) - Running jobs with resource limits and isolation
 - [**Workflows Guide**](./WORKFLOWS.md) - YAML workflows with dependencies and orchestration
@@ -172,6 +189,7 @@ rnx run --max-memory=1024 --runtime=python:3.11-ml \
 - [**Web Admin UI**](./ADMIN_UI.md) - React-based interface for visual management
 
 ### Advanced Topics
+
 - [**Security Guide**](./SECURITY.md) - mTLS, authentication, and best practices
 - [**Runtime Deployment**](./RUNTIME_DEPLOYMENT.md) - Zero-contamination runtime deployment
 - [**Runtime Advanced Scenarios**](./RUNTIME_ADVANCED_SCENARIOS.md) - Enterprise patterns and CI/CD
@@ -179,6 +197,7 @@ rnx run --max-memory=1024 --runtime=python:3.11-ml \
 - [**Troubleshooting**](./TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
+
 - [**API Reference**](./API.md) - Complete gRPC API documentation
 - [**Architecture**](./DESIGN.md) - System design and architecture deep-dive
 - [**Storage Guide**](./STORAGE.md) - Data persistence and storage management
@@ -209,30 +228,35 @@ rnx run --workflow=ml-pipeline.yaml
 ## 🎯 Value Proposition
 
 ### **For DevOps Teams**
+
 - **Simplified Infrastructure**: No container registry or image management
 - **Better Security**: Process isolation without container escape risks
 - **Cost Savings**: Lower resource overhead and operational complexity
 - **Native Integration**: Works with existing Linux infrastructure
 
 ### **For Development Teams**
+
 - **Faster Iteration**: Instant job startup without image builds
 - **Better Debugging**: Direct access to processes and filesystems
 - **Flexible Environments**: Runtime system with pre-built environments
 - **Modern Tooling**: CLI and web UI designed for developer productivity
 
 ### **For Operations Teams**
+
 - **Comprehensive Monitoring**: Built-in metrics and real-time observability
 - **Enterprise Security**: mTLS and role-based access control
 - **Workflow Management**: Visual interface for complex job orchestration
 - **Production Ready**: Designed for enterprise scale and reliability
 
 ### **For SRE Teams**
+
 - **Reliability Engineering**: Process isolation prevents cascading failures
 - **Resource Governance**: Hard limits prevent resource exhaustion incidents
 - **Observability**: Built-in metrics and alerting for proactive monitoring
 - **Incident Response**: Direct process access for faster debugging and resolution
 
 ### **For AI Agent Developers**
+
 - **Agent Isolation**: Run multiple AI agents safely with process boundaries
 - **Resource Control**: Prevent AI workloads from consuming excessive resources
 - **Model Execution**: Pre-built ML runtimes with GPU support and package management
@@ -240,4 +264,5 @@ rnx run --workflow=ml-pipeline.yaml
 
 ---
 
-**Ready to modernize your job execution infrastructure?** Start with our [Quick Start Guide](./QUICKSTART.md) and experience the Joblet difference.
+**Ready to modernize your job execution infrastructure?** Start with our [Quick Start Guide](./QUICKSTART.md) and
+experience the Joblet difference.

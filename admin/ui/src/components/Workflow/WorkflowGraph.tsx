@@ -57,7 +57,7 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({
         // Filter and ensure unique IDs for jobs to prevent overlapping
         const seenIds = new Set<string>();
         const validJobs: WorkflowJob[] = [];
-        
+
         jobs.forEach((job, index) => {
             if (job.id && job.id.toString().length > 0) {
                 const jobIdStr = job.id.toString();
@@ -83,7 +83,7 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({
                 });
             }
         });
-        
+
         if (validJobs.length !== jobs.length) {
             console.warn(`Processed ${jobs.length} jobs, resulted in ${validJobs.length} valid jobs`);
         }

@@ -2,11 +2,11 @@ jobs:
   # API Gateway Service
   api-gateway:
     command: "java"
-    args: ["-jar", "api-gateway.jar", "--spring.profiles.active=production"]
+    args: [ "-jar", "api-gateway.jar", "--spring.profiles.active=production" ]
     runtime: "java:17"
     uploads:
-      files: ["api-gateway.jar", "application.yml"]
-    volumes: ["config", "logs"]
+      files: [ "api-gateway.jar", "application.yml" ]
+    volumes: [ "config", "logs" ]
     resources:
       max_memory: 512
       max_cpu: 40
@@ -14,33 +14,33 @@ jobs:
   # User Service
   user-service:
     command: "java"
-    args: ["-Xmx768m", "-jar", "user-service.jar"]
+    args: [ "-Xmx768m", "-jar", "user-service.jar" ]
     runtime: "java:17"
     uploads:
-      files: ["user-service.jar"]
-    volumes: ["user-data", "logs"]
+      files: [ "user-service.jar" ]
+    volumes: [ "user-data", "logs" ]
     resources:
       max_memory: 1024
 
   # Order Service
   order-service:
     command: "java"
-    args: ["-Xmx768m", "-jar", "order-service.jar"]
+    args: [ "-Xmx768m", "-jar", "order-service.jar" ]
     runtime: "java:17"
     uploads:
-      files: ["order-service.jar"]
-    volumes: ["order-data", "logs"]
+      files: [ "order-service.jar" ]
+    volumes: [ "order-data", "logs" ]
     resources:
       max_memory: 1024
 
   # Payment Service with higher resources
   payment-service:
     command: "java"
-    args: ["-Xmx1536m", "-XX:+UseG1GC", "-jar", "payment-service.jar"]
+    args: [ "-Xmx1536m", "-XX:+UseG1GC", "-jar", "payment-service.jar" ]
     runtime: "java:17"
     uploads:
-      files: ["payment-service.jar", "payment-config.properties"]
-    volumes: ["payment-data", "logs", "secure-keys"]
+      files: [ "payment-service.jar", "payment-config.properties" ]
+    volumes: [ "payment-data", "logs", "secure-keys" ]
     resources:
       max_memory: 2048
       max_cpu: 75
@@ -49,21 +49,21 @@ jobs:
   # Database migration job
   db-migration:
     command: "java"
-    args: ["-jar", "flyway.jar", "migrate", "-url=jdbc:postgresql://db:5432/myapp", "-schemas=public"]
+    args: [ "-jar", "flyway.jar", "migrate", "-url=jdbc:postgresql://db:5432/myapp", "-schemas=public" ]
     runtime: "java:17"
     uploads:
-      files: ["flyway.jar", "migrations/"]
+      files: [ "flyway.jar", "migrations/" ]
     resources:
       max_memory: 256
 
   # Batch processing job
   batch-processor:
     command: "java"
-    args: ["-Xmx2g", "-jar", "batch-processor.jar", "--job.name=dailyReport"]
+    args: [ "-Xmx2g", "-jar", "batch-processor.jar", "--job.name=dailyReport" ]
     runtime: "java:21"
     uploads:
-      files: ["batch-processor.jar"]
-    volumes: ["batch-input", "batch-output", "logs"]
+      files: [ "batch-processor.jar" ]
+    volumes: [ "batch-input", "batch-output", "logs" ]
     resources:
       max_memory: 3072
       max_cpu: 90

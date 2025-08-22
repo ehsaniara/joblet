@@ -9,7 +9,7 @@ secret_environment:
 jobs:
   setup:
     command: "sh"
-    args: ["-c", "echo 'Setup completed for ${PIPELINE_ID}' && echo 'Config: ${SHARED_CONFIG}' && echo 'Setup stage: ${STAGE}'"]
+    args: [ "-c", "echo 'Setup completed for ${PIPELINE_ID}' && echo 'Config: ${SHARED_CONFIG}' && echo 'Setup stage: ${STAGE}'" ]
     environment:
       STAGE: "setup"
       SETUP_DIR: "/tmp/${PIPELINE_ID}/setup"
@@ -18,7 +18,7 @@ jobs:
 
   process:
     command: "sh"
-    args: ["-c", "echo 'Processing ${PIPELINE_ID}' && echo 'Previous stage was: ${PREV_STAGE}' && echo 'Current stage: ${STAGE}' && echo 'Work dir: ${WORK_DIR}'"]
+    args: [ "-c", "echo 'Processing ${PIPELINE_ID}' && echo 'Previous stage was: ${PREV_STAGE}' && echo 'Current stage: ${STAGE}' && echo 'Work dir: ${WORK_DIR}'" ]
     requires:
       - setup: "COMPLETED"
     environment:
@@ -31,7 +31,7 @@ jobs:
 
   finalize:
     command: "sh"
-    args: ["-c", "echo 'Finalizing ${PIPELINE_ID}' && echo 'Final stage: ${STAGE}' && echo 'Output dir: ${OUTPUT_DIR}' && echo 'All secrets available'"]
+    args: [ "-c", "echo 'Finalizing ${PIPELINE_ID}' && echo 'Final stage: ${STAGE}' && echo 'Output dir: ${OUTPUT_DIR}' && echo 'All secrets available'" ]
     requires:
       - process: "COMPLETED"
     environment:

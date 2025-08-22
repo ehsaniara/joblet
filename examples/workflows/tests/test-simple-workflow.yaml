@@ -4,7 +4,7 @@ version: "3.0"
 jobs:
   job-one:
     command: "bash"
-    args: ["-c", "echo 'Job one completed' && sleep 1"]
+    args: [ "-c", "echo 'Job one completed' && sleep 1" ]
     environment:
       TASK: "one"
     resources:
@@ -12,7 +12,7 @@ jobs:
 
   job-two:
     command: "bash"
-    args: ["-c", "echo 'Job two completed' && sleep 1"]
+    args: [ "-c", "echo 'Job two completed' && sleep 1" ]
     environment:
       TASK: "two"
     requires:

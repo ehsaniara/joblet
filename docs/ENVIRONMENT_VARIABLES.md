@@ -1,6 +1,7 @@
 # Environment Variables
 
-Joblet provides comprehensive support for environment variables in both CLI jobs and workflow-based jobs. Environment variables allow you to pass configuration, secrets, and runtime parameters to your jobs in a secure and flexible manner.
+Joblet provides comprehensive support for environment variables in both CLI jobs and workflow-based jobs. Environment
+variables allow you to pass configuration, secrets, and runtime parameters to your jobs in a secure and flexible manner.
 
 ## Table of Contents
 
@@ -56,12 +57,11 @@ rnx run --env="PUBLIC_VAR=public" --secret-env="SECRET_KEY=secret" command
 rnx run -e "VAR=value" -s "SECRET=secret" command
 ```
 
-
 ### CLI Examples
 
 ```bash
 # Simple web application
-rnx run --env="PORT=8080" --secret-env="DB_PASSWORD=secret123" node server.js
+rnx run --env="PORT=8080" --secret-env="DB_PASSWORD=secret123" --runtime=java:17 java WebServer
 
 # Data processing job
 rnx run --env="INPUT_FILE=data.csv" --env="OUTPUT_DIR=/results" python process.py
@@ -136,7 +136,8 @@ jobs:
 
 ## Workflow Environment Variable Inheritance
 
-Joblet supports global environment variables that are inherited by all jobs in a workflow, with job-specific variables taking precedence.
+Joblet supports global environment variables that are inherited by all jobs in a workflow, with job-specific variables
+taking precedence.
 
 ### Global Workflow Variables
 
@@ -177,7 +178,8 @@ jobs:
 
 ### Inheritance Rules
 
-1. **Job variables override global variables** - If the same variable is defined globally and at the job level, the job value takes precedence
+1. **Job variables override global variables** - If the same variable is defined globally and at the job level, the job
+   value takes precedence
 2. **Both regular and secret variables are inherited** - Global environment and secret_environment are both inherited
 3. **Independent inheritance** - Regular and secret environments are inherited separately
 
@@ -231,7 +233,8 @@ jobs:
 
 ## Environment Variable Templating
 
-Environment variables support `${VAR_NAME}` templating syntax for referencing other environment variables within the same job.
+Environment variables support `${VAR_NAME}` templating syntax for referencing other environment variables within the
+same job.
 
 ### Templating Syntax
 
@@ -395,6 +398,7 @@ Joblet performs security checks on environment variable values:
 Environment variable names must follow POSIX standards:
 
 ✅ **Valid names:**
+
 ```bash
 --env="VALID_VAR=value"
 --env="_UNDERSCORE_START=value"
@@ -403,6 +407,7 @@ Environment variable names must follow POSIX standards:
 ```
 
 ❌ **Invalid names:**
+
 ```bash
 --env="123INVALID=value"        # Cannot start with number
 --env="INVALID-VAR=value"       # Cannot contain hyphens
@@ -421,6 +426,7 @@ Environment variable names must follow POSIX standards:
 Variables cannot be defined in both regular and secret environments:
 
 ❌ **Invalid (will fail validation):**
+
 ```yaml
 jobs:
   conflict-job:
@@ -440,6 +446,7 @@ rnx run --env="PATH=/custom/path" command
 ```
 
 **Reserved variables include:**
+
 - System: `PATH`, `HOME`, `USER`, `SHELL`, `TERM`, `PWD`, `HOSTNAME`
 - Docker: `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, `DOCKER_CERT_PATH`
 - Joblet: `JOBLET_JOB_ID`, `JOBLET_WORKFLOW_ID`, `JOBLET_RUNTIME`
@@ -775,6 +782,7 @@ jobs:
 Create different configurations for different environments:
 
 **development.yaml:**
+
 ```yaml
 version: "3.0"
 jobs:
@@ -791,6 +799,7 @@ jobs:
 ```
 
 **production.yaml:**
+
 ```yaml
 version: "3.0"
 jobs:
@@ -856,10 +865,12 @@ Error: environment variable value too long (40000 bytes, max 32768)
 ### Getting Help
 
 For more assistance:
+
 - Check the [Joblet Documentation](README.md)
 - Review [Workflow Examples](../examples/workflows/)
 - See [API Reference](API.md)
 
 ---
 
-*This documentation covers Joblet's comprehensive environment variable support. For additional features and updates, refer to the main Joblet documentation.*
+*This documentation covers Joblet's comprehensive environment variable support. For additional features and updates,
+refer to the main Joblet documentation.*

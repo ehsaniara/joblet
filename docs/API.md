@@ -608,7 +608,8 @@ sudo journalctl -u joblet -f
 
 ### Overview
 
-Joblet provides comprehensive workflow orchestration through YAML-defined job dependencies. Workflows enable complex multi-job execution with dependency management, resource isolation, and comprehensive monitoring.
+Joblet provides comprehensive workflow orchestration through YAML-defined job dependencies. Workflows enable complex
+multi-job execution with dependency management, resource isolation, and comprehensive monitoring.
 
 ### Key Workflow Features
 
@@ -635,6 +636,7 @@ service JobService {
 ### Workflow Messages
 
 #### WorkflowJob
+
 Represents a job within a workflow with dependency information.
 
 ```protobuf
@@ -650,10 +652,13 @@ message WorkflowJob {
 ```
 
 **Job ID Behavior:**
-- **Started jobs**: `jobId` contains actual job UUID assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+- **Started jobs**: `jobId` contains actual job UUID assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "
+  6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 - **Non-started jobs**: `jobId` shows "0" to indicate the job hasn't been started yet
 
 #### GetWorkflowStatusResponse
+
 Provides comprehensive workflow status with job details.
 
 ```protobuf
@@ -682,10 +687,13 @@ jobs:
 ```
 
 **Job ID vs Job Name:**
-- **Job ID**: Unique UUID identifier assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+- **Job ID**: Unique UUID identifier assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "
+  6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 - **Job Name**: Human-readable name from workflow YAML (e.g., "setup-data", "process-data")
 
 **Status Display:**
+
 ```
 JOB ID                                   JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
 ---------------------------------------------------------------------------------------------------------------------
@@ -724,7 +732,7 @@ rnx run --workflow=pipeline.yaml
 - **Adapter Architecture**: Comprehensive documentation added for all adapter methods
     - AsyncLogSystem with overflow protection and metrics
     - JobStoreAdapter with UUID prefix resolution and real-time streaming
-    - NetworkStoreAdapter with IP pool management and allocation tracking  
+    - NetworkStoreAdapter with IP pool management and allocation tracking
     - VolumeStoreAdapter with usage tracking and validation
     - Factory methods with configuration validation and resource management
 

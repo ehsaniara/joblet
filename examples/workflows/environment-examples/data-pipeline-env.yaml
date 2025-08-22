@@ -7,28 +7,28 @@ jobs:
   # Initialize pipeline configuration
   init-pipeline:
     command: "python3"
-    args: ["-c", "import os; print(f'Initializing {os.environ[\"PIPELINE_NAME\"]} v{os.environ[\"PIPELINE_VERSION\"]}'); print(f'Input: {os.environ[\"INPUT_PATH\"]}'); print(f'Output: {os.environ[\"OUTPUT_PATH\"]}')"]
+    args: [ "-c", "import os; print(f'Initializing {os.environ[\"PIPELINE_NAME\"]} v{os.environ[\"PIPELINE_VERSION\"]}'); print(f'Input: {os.environ[\"INPUT_PATH\"]}'); print(f'Output: {os.environ[\"OUTPUT_PATH\"]}')" ]
     environment:
       PIPELINE_NAME: "customer-analytics"
       PIPELINE_VERSION: "2.1.0"
       INPUT_PATH: "/volumes/data/raw"
       OUTPUT_PATH: "/volumes/data/processed"
       LOG_LEVEL: "INFO"
-    volumes: ["data"]
+    volumes: [ "data" ]
     resources:
       max_memory: 256
 
   # Extract data with configuration
   extract-data:
     command: "python3"
-    args: ["-c", "import os, json; config={'source': os.environ['DATA_SOURCE'], 'batch_size': int(os.environ['BATCH_SIZE']), 'timeout': int(os.environ['TIMEOUT_SECONDS'])}; print(f'Extracting from {config[\"source\"]} with batch size {config[\"batch_size\"]}'); open('/volumes/data/extract_config.json', 'w').write(json.dumps(config)); print('Extract completed')"]
+    args: [ "-c", "import os, json; config={'source': os.environ['DATA_SOURCE'], 'batch_size': int(os.environ['BATCH_SIZE']), 'timeout': int(os.environ['TIMEOUT_SECONDS'])}; print(f'Extracting from {config[\"source\"]} with batch size {config[\"batch_size\"]}'); open('/volumes/data/extract_config.json', 'w').write(json.dumps(config)); print('Extract completed')" ]
     environment:
       DATA_SOURCE: "s3://mybucket/raw-data"
       BATCH_SIZE: "1000"
       TIMEOUT_SECONDS: "300"
       AWS_REGION: "us-west-2"
       EXTRACT_MODE: "incremental"
-    volumes: ["data"]
+    volumes: [ "data" ]
     requires:
       - init-pipeline: "COMPLETED"
     resources:
@@ -38,13 +38,13 @@ jobs:
   # Transform data using extracted config
   transform-data:
     command: "python3"
-    args: ["-c", "import os, json; config = json.load(open('/volumes/data/extract_config.json')); print(f'Transform mode: {os.environ[\"TRANSFORM_MODE\"]}'); print(f'Processing data from {config[\"source\"]}'); result = {'input_batches': config['batch_size'], 'transform_type': os.environ['TRANSFORM_MODE'], 'output_format': os.environ['OUTPUT_FORMAT']}; json.dump(result, open('/volumes/data/transform_result.json', 'w')); print('Transform completed')"]
+    args: [ "-c", "import os, json; config = json.load(open('/volumes/data/extract_config.json')); print(f'Transform mode: {os.environ[\"TRANSFORM_MODE\"]}'); print(f'Processing data from {config[\"source\"]}'); result = {'input_batches': config['batch_size'], 'transform_type': os.environ['TRANSFORM_MODE'], 'output_format': os.environ['OUTPUT_FORMAT']}; json.dump(result, open('/volumes/data/transform_result.json', 'w')); print('Transform completed')" ]
     environment:
       TRANSFORM_MODE: "aggregation"
       OUTPUT_FORMAT: "parquet"
       MEMORY_LIMIT: "2GB"
       PARALLEL_WORKERS: "4"
-    volumes: ["data"]
+    volumes: [ "data" ]
     requires:
       - extract-data: "COMPLETED"
     resources:
@@ -54,13 +54,13 @@ jobs:
   # Validate transformed data
   validate-data:
     command: "python3"
-    args: ["-c", "import os, json; result = json.load(open('/volumes/data/transform_result.json')); print(f'Validation mode: {os.environ[\"VALIDATION_MODE\"]}'); print(f'Checking {result[\"output_format\"]} format with {result[\"input_batches\"]} batches'); quality_score = 98.5; validation = {'quality_score': quality_score, 'threshold': float(os.environ['QUALITY_THRESHOLD']), 'passed': quality_score >= float(os.environ['QUALITY_THRESHOLD'])}; json.dump(validation, open('/volumes/data/validation_result.json', 'w')); print(f'Validation passed: {validation[\"passed\"]}')"]
+    args: [ "-c", "import os, json; result = json.load(open('/volumes/data/transform_result.json')); print(f'Validation mode: {os.environ[\"VALIDATION_MODE\"]}'); print(f'Checking {result[\"output_format\"]} format with {result[\"input_batches\"]} batches'); quality_score = 98.5; validation = {'quality_score': quality_score, 'threshold': float(os.environ['QUALITY_THRESHOLD']), 'passed': quality_score >= float(os.environ['QUALITY_THRESHOLD'])}; json.dump(validation, open('/volumes/data/validation_result.json', 'w')); print(f'Validation passed: {validation[\"passed\"]}')" ]
     environment:
       VALIDATION_MODE: "comprehensive"
       QUALITY_THRESHOLD: "95.0"
       CHECK_SCHEMA: "true"
       CHECK_DUPLICATES: "true"
-    volumes: ["data"]
+    volumes: [ "data" ]
     requires:
       - transform-data: "COMPLETED"
     resources:
@@ -69,14 +69,14 @@ jobs:
   # Load data to warehouse
   load-data:
     command: "python3"
-    args: ["-c", "import os, json; validation = json.load(open('/volumes/data/validation_result.json')); print(f'Loading to {os.environ[\"WAREHOUSE_URL\"]}'); print(f'Table: {os.environ[\"TARGET_TABLE\"]}'); print(f'Mode: {os.environ[\"LOAD_MODE\"]}'); print(f'Validation passed: {validation[\"passed\"]}'); if validation['passed']: print('Data loaded successfully'); else: print('Load skipped due to validation failure')"]
+    args: [ "-c", "import os, json; validation = json.load(open('/volumes/data/validation_result.json')); print(f'Loading to {os.environ[\"WAREHOUSE_URL\"]}'); print(f'Table: {os.environ[\"TARGET_TABLE\"]}'); print(f'Mode: {os.environ[\"LOAD_MODE\"]}'); print(f'Validation passed: {validation[\"passed\"]}'); if validation['passed']: print('Data loaded successfully'); else: print('Load skipped due to validation failure')" ]
     environment:
       WAREHOUSE_URL: "postgresql://warehouse:5432/analytics"
       TARGET_TABLE: "customer_metrics"
       LOAD_MODE: "upsert"
       BATCH_SIZE: "5000"
       TIMEOUT_MINUTES: "30"
-    volumes: ["data"]
+    volumes: [ "data" ]
     requires:
       - validate-data: "COMPLETED"
     resources:
@@ -85,13 +85,13 @@ jobs:
   # Generate report
   generate-report:
     command: "python3"
-    args: ["-c", "import os, json; validation = json.load(open('/volumes/data/validation_result.json')); transform = json.load(open('/volumes/data/transform_result.json')); report = {'pipeline': os.environ['PIPELINE_ID'], 'status': 'success' if validation['passed'] else 'failed', 'quality_score': validation['quality_score'], 'records_processed': transform['input_batches'], 'report_format': os.environ['REPORT_FORMAT']}; json.dump(report, open('/volumes/data/final_report.json', 'w')); print(f'Report generated: {os.environ[\"REPORT_FORMAT\"]} format'); print(f'Status: {report[\"status\"]}')"]
+    args: [ "-c", "import os, json; validation = json.load(open('/volumes/data/validation_result.json')); transform = json.load(open('/volumes/data/transform_result.json')); report = {'pipeline': os.environ['PIPELINE_ID'], 'status': 'success' if validation['passed'] else 'failed', 'quality_score': validation['quality_score'], 'records_processed': transform['input_batches'], 'report_format': os.environ['REPORT_FORMAT']}; json.dump(report, open('/volumes/data/final_report.json', 'w')); print(f'Report generated: {os.environ[\"REPORT_FORMAT\"]} format'); print(f'Status: {report[\"status\"]}')" ]
     environment:
       PIPELINE_ID: "customer-analytics-001"
       REPORT_FORMAT: "json"
       NOTIFICATION_EMAIL: "data-team@company.com"
       SEND_ALERTS: "true"
-    volumes: ["data"]
+    volumes: [ "data" ]
     requires:
       - load-data: "COMPLETED"
     resources:
@@ -100,11 +100,11 @@ jobs:
   # Cleanup temporary files
   cleanup-pipeline:
     command: "bash"
-    args: ["-c", "echo 'Cleanup mode: $CLEANUP_MODE'; if [ '$CLEANUP_MODE' = 'full' ]; then echo 'Removing temporary files'; rm -f /volumes/data/extract_config.json /volumes/data/transform_result.json /volumes/data/validation_result.json; else echo 'Keeping files for debugging'; fi; echo 'Cleanup completed'"]
+    args: [ "-c", "echo 'Cleanup mode: $CLEANUP_MODE'; if [ '$CLEANUP_MODE' = 'full' ]; then echo 'Removing temporary files'; rm -f /volumes/data/extract_config.json /volumes/data/transform_result.json /volumes/data/validation_result.json; else echo 'Keeping files for debugging'; fi; echo 'Cleanup completed'" ]
     environment:
       CLEANUP_MODE: "full"
       RETENTION_DAYS: "7"
-    volumes: ["data"]
+    volumes: [ "data" ]
     requires:
       - generate-report: "COMPLETED"
     resources:

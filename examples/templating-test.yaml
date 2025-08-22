@@ -6,7 +6,7 @@ environment:
 jobs:
   test-templating:
     command: "printenv"
-    args: ["BASE_PATH", "VERSION", "FULL_PATH", "VERSIONED_PATH"]
+    args: [ "BASE_PATH", "VERSION", "FULL_PATH", "VERSIONED_PATH" ]
     environment:
       FULL_PATH: "${BASE_PATH}/processing"
       VERSIONED_PATH: "${BASE_PATH}/v${VERSION}/output"

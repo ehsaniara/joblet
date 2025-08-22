@@ -10,7 +10,7 @@ secret_environment:
 jobs:
   templating-test:
     command: "printenv"
-    args: ["BASE_PATH", "VERSION", "PROJECT", "FULL_PATH", "VERSIONED_DIR", "PROJECT_CONF", "SECRET_FILE", "SECRET_KEY"]
+    args: [ "BASE_PATH", "VERSION", "PROJECT", "FULL_PATH", "VERSIONED_DIR", "PROJECT_CONF", "SECRET_FILE", "SECRET_KEY" ]
     environment:
       FULL_PATH: "${BASE_PATH}/projects/${PROJECT}"
       VERSIONED_DIR: "${BASE_PATH}/v${VERSION}/output"

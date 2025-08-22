@@ -7,7 +7,7 @@ jobs:
   # Initialize CI/CD Pipeline
   init-pipeline:
     command: "bash"
-    args: ["-c", "echo 'Initializing CI/CD Pipeline'; echo 'Project: $PROJECT_NAME'; echo 'Branch: $GIT_BRANCH'; echo 'Commit: $GIT_COMMIT'; echo 'Build number: $BUILD_NUMBER'; mkdir -p /volumes/cicd/{source,artifacts,reports}; echo 'pipeline_id=$PIPELINE_ID' > /volumes/cicd/pipeline.env; echo 'Pipeline initialized'"]
+    args: [ "-c", "echo 'Initializing CI/CD Pipeline'; echo 'Project: $PROJECT_NAME'; echo 'Branch: $GIT_BRANCH'; echo 'Commit: $GIT_COMMIT'; echo 'Build number: $BUILD_NUMBER'; mkdir -p /volumes/cicd/{source,artifacts,reports}; echo 'pipeline_id=$PIPELINE_ID' > /volumes/cicd/pipeline.env; echo 'Pipeline initialized'" ]
     environment:
       PROJECT_NAME: "my-web-app"
       GIT_BRANCH: "main"
@@ -15,21 +15,21 @@ jobs:
       BUILD_NUMBER: "142"
       PIPELINE_ID: "build-142-main"
       BUILD_ENVIRONMENT: "ci"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     resources:
       max_memory: 256
 
   # Checkout Source Code
   checkout-source:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Checking out source code'; echo 'Repository: $GIT_REPOSITORY'; echo 'Branch: $GIT_BRANCH'; echo 'Commit: $GIT_COMMIT'; echo 'Clone depth: $CLONE_DEPTH'; echo 'Source checked out to /volumes/cicd/source/'; echo 'checkout_timestamp='$(date) >> /volumes/cicd/pipeline.env; echo 'Checkout completed'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Checking out source code'; echo 'Repository: $GIT_REPOSITORY'; echo 'Branch: $GIT_BRANCH'; echo 'Commit: $GIT_COMMIT'; echo 'Clone depth: $CLONE_DEPTH'; echo 'Source checked out to /volumes/cicd/source/'; echo 'checkout_timestamp='$(date) >> /volumes/cicd/pipeline.env; echo 'Checkout completed'" ]
     environment:
       GIT_REPOSITORY: "https://github.com/company/my-web-app.git"
       GIT_BRANCH: "main"
       GIT_COMMIT: "a1b2c3d4e5f6"
       CLONE_DEPTH: "1"
       GIT_TOKEN: "ghp_xxxxxxxxxxxxxxxxxxxx"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - init-pipeline: "COMPLETED"
     resources:
@@ -38,14 +38,14 @@ jobs:
   # Install Dependencies
   install-dependencies:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Installing dependencies'; echo 'Package manager: $PACKAGE_MANAGER'; echo 'Node version: $NODE_VERSION'; echo 'Cache strategy: $CACHE_STRATEGY'; echo 'Registry: $NPM_REGISTRY'; echo 'Dependencies installed in /volumes/cicd/source/node_modules'; echo 'dependency_install_time='$(date) >> /volumes/cicd/pipeline.env; echo 'Dependencies installed successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Installing dependencies'; echo 'Package manager: $PACKAGE_MANAGER'; echo 'Node version: $NODE_VERSION'; echo 'Cache strategy: $CACHE_STRATEGY'; echo 'Registry: $NPM_REGISTRY'; echo 'Dependencies installed in /volumes/cicd/source/node_modules'; echo 'dependency_install_time='$(date) >> /volumes/cicd/pipeline.env; echo 'Dependencies installed successfully'" ]
     environment:
       PACKAGE_MANAGER: "npm"
       NODE_VERSION: "18.17.0"
       NPM_REGISTRY: "https://registry.npmjs.org/"
       CACHE_STRATEGY: "cache-dependencies"
       INSTALL_TIMEOUT: "300"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - checkout-source: "COMPLETED"
     resources:
@@ -55,14 +55,14 @@ jobs:
   # Run Unit Tests
   run-unit-tests:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Running unit tests'; echo 'Test framework: $TEST_FRAMEWORK'; echo 'Coverage threshold: $COVERAGE_THRESHOLD'; echo 'Parallel workers: $TEST_WORKERS'; echo 'Tests passed: 45/45'; echo 'Coverage: 92.5%'; echo 'test_results=PASSED' >> /volumes/cicd/pipeline.env; echo 'coverage=92.5' >> /volumes/cicd/pipeline.env; echo 'Unit tests completed successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Running unit tests'; echo 'Test framework: $TEST_FRAMEWORK'; echo 'Coverage threshold: $COVERAGE_THRESHOLD'; echo 'Parallel workers: $TEST_WORKERS'; echo 'Tests passed: 45/45'; echo 'Coverage: 92.5%'; echo 'test_results=PASSED' >> /volumes/cicd/pipeline.env; echo 'coverage=92.5' >> /volumes/cicd/pipeline.env; echo 'Unit tests completed successfully'" ]
     environment:
       TEST_FRAMEWORK: "jest"
       COVERAGE_THRESHOLD: "80"
       TEST_WORKERS: "4"
       TEST_TIMEOUT: "300"
       GENERATE_REPORTS: "true"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - install-dependencies: "COMPLETED"
     resources:
@@ -72,14 +72,14 @@ jobs:
   # Run Integration Tests
   run-integration-tests:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Running integration tests'; echo 'Database URL: $TEST_DATABASE_URL'; echo 'API base URL: $API_BASE_URL'; echo 'Test environment: $TEST_ENV'; echo 'Integration tests passed: 12/12'; echo 'API tests passed: 8/8'; echo 'integration_results=PASSED' >> /volumes/cicd/pipeline.env; echo 'Integration tests completed successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Running integration tests'; echo 'Database URL: $TEST_DATABASE_URL'; echo 'API base URL: $API_BASE_URL'; echo 'Test environment: $TEST_ENV'; echo 'Integration tests passed: 12/12'; echo 'API tests passed: 8/8'; echo 'integration_results=PASSED' >> /volumes/cicd/pipeline.env; echo 'Integration tests completed successfully'" ]
     environment:
       TEST_DATABASE_URL: "postgresql://test:test@testdb:5432/test_db"
       API_BASE_URL: "http://localhost:3000"
       TEST_ENV: "integration"
       HEADLESS_BROWSER: "true"
       SELENIUM_HUB: "http://selenium:4444"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - run-unit-tests: "COMPLETED"
     resources:
@@ -89,14 +89,14 @@ jobs:
   # Security Scan
   security-scan:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Running security scan'; echo 'Scanner: $SECURITY_SCANNER'; echo 'Scan type: $SCAN_TYPE'; echo 'Severity threshold: $SEVERITY_THRESHOLD'; echo 'Vulnerabilities found: 0 critical, 2 medium, 5 low'; echo 'Security gate: PASSED'; echo 'security_scan=PASSED' >> /volumes/cicd/pipeline.env; echo 'Security scan completed'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Running security scan'; echo 'Scanner: $SECURITY_SCANNER'; echo 'Scan type: $SCAN_TYPE'; echo 'Severity threshold: $SEVERITY_THRESHOLD'; echo 'Vulnerabilities found: 0 critical, 2 medium, 5 low'; echo 'Security gate: PASSED'; echo 'security_scan=PASSED' >> /volumes/cicd/pipeline.env; echo 'Security scan completed'" ]
     environment:
       SECURITY_SCANNER: "snyk"
       SCAN_TYPE: "comprehensive"
       SEVERITY_THRESHOLD: "high"
       SNYK_TOKEN: "xxxxxxxxxxxxxxxxxxxx"
       FAIL_ON_ISSUES: "true"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - run-integration-tests: "COMPLETED"
     resources:
@@ -105,7 +105,7 @@ jobs:
   # Build Application
   build-application:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Building application'; echo 'Build type: $BUILD_TYPE'; echo 'Target environment: $TARGET_ENV'; echo 'Optimization level: $OPTIMIZATION_LEVEL'; echo 'Source maps: $GENERATE_SOURCEMAPS'; echo 'Build output: /volumes/cicd/artifacts/'; echo 'build_timestamp='$(date) >> /volumes/cicd/pipeline.env; echo 'Build completed successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Building application'; echo 'Build type: $BUILD_TYPE'; echo 'Target environment: $TARGET_ENV'; echo 'Optimization level: $OPTIMIZATION_LEVEL'; echo 'Source maps: $GENERATE_SOURCEMAPS'; echo 'Build output: /volumes/cicd/artifacts/'; echo 'build_timestamp='$(date) >> /volumes/cicd/pipeline.env; echo 'Build completed successfully'" ]
     environment:
       BUILD_TYPE: "production"
       TARGET_ENV: "production"
@@ -113,7 +113,7 @@ jobs:
       GENERATE_SOURCEMAPS: "true"
       MINIFY_CODE: "true"
       BUNDLE_ANALYZER: "false"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - security-scan: "COMPLETED"
     resources:
@@ -123,7 +123,7 @@ jobs:
   # Create Docker Image
   create-docker-image:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Creating Docker image'; echo 'Registry: $DOCKER_REGISTRY'; echo 'Image name: $IMAGE_NAME'; echo 'Tag: $IMAGE_TAG'; echo 'Base image: $BASE_IMAGE'; echo 'Multi-stage build: $MULTI_STAGE'; echo 'Image created: $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG'; echo 'docker_image_tag=$IMAGE_TAG' >> /volumes/cicd/pipeline.env; echo 'Docker image created successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Creating Docker image'; echo 'Registry: $DOCKER_REGISTRY'; echo 'Image name: $IMAGE_NAME'; echo 'Tag: $IMAGE_TAG'; echo 'Base image: $BASE_IMAGE'; echo 'Multi-stage build: $MULTI_STAGE'; echo 'Image created: $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG'; echo 'docker_image_tag=$IMAGE_TAG' >> /volumes/cicd/pipeline.env; echo 'Docker image created successfully'" ]
     environment:
       DOCKER_REGISTRY: "registry.company.com"
       IMAGE_NAME: "my-web-app"
@@ -131,7 +131,7 @@ jobs:
       BASE_IMAGE: "node:18-alpine"
       MULTI_STAGE: "true"
       DOCKER_BUILDKIT: "1"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - build-application: "COMPLETED"
     resources:
@@ -141,7 +141,7 @@ jobs:
   # Deploy to Staging
   deploy-staging:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Deploying to staging'; echo 'Environment: $DEPLOY_ENV'; echo 'Kubernetes cluster: $K8S_CLUSTER'; echo 'Namespace: $K8S_NAMESPACE'; echo 'Replicas: $REPLICA_COUNT'; echo 'Health check URL: $HEALTH_CHECK_URL'; echo 'staging_deployment_url=$STAGING_URL' >> /volumes/cicd/pipeline.env; echo 'Deployed to staging successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Deploying to staging'; echo 'Environment: $DEPLOY_ENV'; echo 'Kubernetes cluster: $K8S_CLUSTER'; echo 'Namespace: $K8S_NAMESPACE'; echo 'Replicas: $REPLICA_COUNT'; echo 'Health check URL: $HEALTH_CHECK_URL'; echo 'staging_deployment_url=$STAGING_URL' >> /volumes/cicd/pipeline.env; echo 'Deployed to staging successfully'" ]
     environment:
       DEPLOY_ENV: "staging"
       K8S_CLUSTER: "staging-cluster"
@@ -150,7 +150,7 @@ jobs:
       HEALTH_CHECK_URL: "https://staging.my-web-app.com/health"
       STAGING_URL: "https://staging.my-web-app.com"
       DEPLOYMENT_TIMEOUT: "600"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - create-docker-image: "COMPLETED"
     resources:
@@ -159,7 +159,7 @@ jobs:
   # Run E2E Tests
   run-e2e-tests:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Running E2E tests'; echo 'Target URL: $E2E_TARGET_URL'; echo 'Browser: $E2E_BROWSER'; echo 'Test suite: $E2E_SUITE'; echo 'Parallel sessions: $E2E_PARALLEL'; echo 'E2E tests passed: 25/25'; echo 'Screenshots saved: 15'; echo 'e2e_results=PASSED' >> /volumes/cicd/pipeline.env; echo 'E2E tests completed successfully'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Running E2E tests'; echo 'Target URL: $E2E_TARGET_URL'; echo 'Browser: $E2E_BROWSER'; echo 'Test suite: $E2E_SUITE'; echo 'Parallel sessions: $E2E_PARALLEL'; echo 'E2E tests passed: 25/25'; echo 'Screenshots saved: 15'; echo 'e2e_results=PASSED' >> /volumes/cicd/pipeline.env; echo 'E2E tests completed successfully'" ]
     environment:
       E2E_TARGET_URL: "https://staging.my-web-app.com"
       E2E_BROWSER: "chrome"
@@ -167,7 +167,7 @@ jobs:
       E2E_PARALLEL: "3"
       E2E_TIMEOUT: "900"
       SCREENSHOT_ON_FAILURE: "true"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - deploy-staging: "COMPLETED"
     resources:
@@ -177,14 +177,14 @@ jobs:
   # Generate Pipeline Report
   generate-pipeline-report:
     command: "bash"
-    args: ["-c", "source /volumes/cicd/pipeline.env; echo 'Generating pipeline report'; echo 'Pipeline ID: $PIPELINE_ID'; echo 'Total duration: $TOTAL_DURATION'; echo 'Status: SUCCESS'; echo 'All stages completed successfully'; echo 'Report saved to /volumes/cicd/reports/pipeline-report.json'; echo 'Notifications sent to: $NOTIFICATION_CHANNELS'; echo 'Pipeline report generated'"]
+    args: [ "-c", "source /volumes/cicd/pipeline.env; echo 'Generating pipeline report'; echo 'Pipeline ID: $PIPELINE_ID'; echo 'Total duration: $TOTAL_DURATION'; echo 'Status: SUCCESS'; echo 'All stages completed successfully'; echo 'Report saved to /volumes/cicd/reports/pipeline-report.json'; echo 'Notifications sent to: $NOTIFICATION_CHANNELS'; echo 'Pipeline report generated'" ]
     environment:
       TOTAL_DURATION: "12m 45s"
       NOTIFICATION_CHANNELS: "slack,email"
       SLACK_WEBHOOK: "https://hooks.slack.com/services/xxx/yyy/zzz"
       EMAIL_RECIPIENTS: "dev-team@company.com,qa-team@company.com"
       REPORT_FORMAT: "json"
-    volumes: ["cicd"]
+    volumes: [ "cicd" ]
     requires:
       - run-e2e-tests: "COMPLETED"
     resources:

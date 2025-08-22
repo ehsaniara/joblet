@@ -575,8 +575,9 @@ rnx volume create build-cache --size=10GB --type=memory
 rnx run \
   --volume=build-cache \
   --upload-dir=./src \
-  --env=NPM_CACHE_DIR=/volumes/build-cache/npm \
-  npm install && npm build
+  --env=MAVEN_CACHE_DIR=/volumes/build-cache/maven \
+  --runtime=java:17 \
+  bash -c "mvn install && mvn package"
 ```
 
 ### Data Pipeline

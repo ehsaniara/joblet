@@ -5,6 +5,6 @@ environment:
 jobs:
   verify:
     command: "printenv"
-    args: ["GLOBAL_TEST", "JOB_TEST"]
+    args: [ "GLOBAL_TEST", "JOB_TEST" ]
     environment:
       JOB_TEST: "job-works"

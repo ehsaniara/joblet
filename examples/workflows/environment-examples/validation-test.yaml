@@ -7,7 +7,7 @@ jobs:
   # Valid environment variables
   valid-env:
     command: "bash"
-    args: ["-c", "echo 'Valid variables: $VALID_VAR, $ANOTHER_VAR'"]
+    args: [ "-c", "echo 'Valid variables: $VALID_VAR, $ANOTHER_VAR'" ]
     environment:
       VALID_VAR: "this-is-valid"
       ANOTHER_VAR: "123_test"
@@ -20,7 +20,7 @@ jobs:
   # Test for conflict detection (this should fail validation)
   conflict-test:
     command: "bash"
-    args: ["-c", "echo 'This should fail validation'"]
+    args: [ "-c", "echo 'This should fail validation'" ]
     environment:
       CONFLICTED_VAR: "regular-value"
     secret_environment:
@@ -31,7 +31,7 @@ jobs:
   # Test reserved variable names (should warn but not fail)
   reserved-vars:
     command: "bash"
-    args: ["-c", "echo 'Testing reserved variables'"]
+    args: [ "-c", "echo 'Testing reserved variables'" ]
     environment:
       PATH: "/custom/path"  # Reserved variable - should warn
       CUSTOM_VAR: "ok"

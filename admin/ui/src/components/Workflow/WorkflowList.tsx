@@ -131,7 +131,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
                                     <p className="text-sm text-gray-300 mt-1">
                                         {workflow.workflow}
                                     </p>
-                                    
+
 
                                     <div className="flex items-center space-x-6 mt-3">
                                         <div className="flex items-center text-sm text-gray-400">

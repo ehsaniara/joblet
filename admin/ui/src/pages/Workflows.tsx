@@ -57,7 +57,6 @@ const Workflows: React.FC = () => {
     });
 
 
-
     // Update URL when workflow selection changes
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);

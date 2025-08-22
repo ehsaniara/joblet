@@ -4,7 +4,7 @@ version: "3.0"
 jobs:
   setup-data:
     command: "bash"
-    args: ["-c", "echo 'Setting up data...' && sleep 2 && echo 'Data setup complete'"]
+    args: [ "-c", "echo 'Setting up data...' && sleep 2 && echo 'Data setup complete'" ]
     environment:
       TASK: "setup"
     resources:
@@ -12,7 +12,7 @@ jobs:
 
   process-data:
     command: "bash"
-    args: ["-c", "echo 'Processing data from setup...' && sleep 3 && echo 'Processing complete'"]
+    args: [ "-c", "echo 'Processing data from setup...' && sleep 3 && echo 'Processing complete'" ]
     environment:
       TASK: "process"
     requires:
@@ -22,7 +22,7 @@ jobs:
 
   validate-results:
     command: "bash"
-    args: ["-c", "echo 'Validating processed results...' && sleep 1 && echo 'Validation successful'"]
+    args: [ "-c", "echo 'Validating processed results...' && sleep 1 && echo 'Validation successful'" ]
     environment:
       TASK: "validate"
     requires:
@@ -32,7 +32,7 @@ jobs:
 
   generate-report:
     command: "bash"
-    args: ["-c", "echo 'Generating final report...' && sleep 2 && echo 'Report generated successfully'"]
+    args: [ "-c", "echo 'Generating final report...' && sleep 2 && echo 'Report generated successfully'" ]
     environment:
       TASK: "report"
     secret_environment:

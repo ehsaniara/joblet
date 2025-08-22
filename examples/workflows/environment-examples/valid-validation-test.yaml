@@ -7,7 +7,7 @@ jobs:
   # Valid environment variables only
   valid-env:
     command: "bash"
-    args: ["-c", "echo 'Valid variables: $VALID_VAR, $ANOTHER_VAR, Secret exists: ${SECRET_VALID:+yes}'"]
+    args: [ "-c", "echo 'Valid variables: $VALID_VAR, $ANOTHER_VAR, Secret exists: ${SECRET_VALID:+yes}'" ]
     environment:
       VALID_VAR: "this-is-valid"
       ANOTHER_VAR: "123_test"

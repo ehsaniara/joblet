@@ -18,12 +18,13 @@ Complete guide to creating and managing workflows in Joblet using YAML workflow 
 
 ## Overview
 
-Workflows allow you to define complex job orchestration with dependencies, resource requirements, and network isolation in YAML format. Joblet provides comprehensive workflow validation and execution capabilities.
+Workflows allow you to define complex job orchestration with dependencies, resource requirements, and network isolation
+in YAML format. Joblet provides comprehensive workflow validation and execution capabilities.
 
 ### Key Features
 
 - **Job Names**: Human-readable job names for better workflow visibility
-- **Job Dependencies**: Define execution order with `requires` clauses  
+- **Job Dependencies**: Define execution order with `requires` clauses
 - **Network Isolation**: Specify network for each job (bridge, isolated, none, custom)
 - **File Uploads**: Automatically upload required files for each job
 - **Resource Limits**: Set CPU, memory, and I/O limits per job
@@ -54,6 +55,7 @@ jobs:
 ```
 
 **Job Names:**
+
 - Job names are the keys in the `jobs` section (e.g., `job-name`, `previous-job`)
 - Names should be descriptive and unique within the workflow
 - Used for dependency references and monitoring displays
@@ -61,16 +63,16 @@ jobs:
 
 ### Job Specification Fields
 
-| Field | Description | Required | Example |
-|-------|-------------|----------|---------|
-| `command` | Executable to run | Yes | `"python3"`, `"java"`, `"node"` |
-| `args` | Command arguments | No | `["script.py", "--verbose"]` |
-| `runtime` | Runtime environment | No | `"python:3.11-ml"`, `"java:17"` |
-| `network` | Network configuration | No | `"bridge"`, `"isolated"`, `"none"`, `"custom-net"` |
-| `uploads` | Files to upload | No | See [File Uploads](#file-uploads) |
-| `volumes` | Persistent volumes | No | `["data-volume", "logs"]` |
-| `requires` | Job dependencies | No | See [Job Dependencies](#job-dependencies) |
-| `resources` | Resource limits | No | See [Resource Management](#resource-management) |
+| Field       | Description           | Required | Example                                            |
+|-------------|-----------------------|----------|----------------------------------------------------|
+| `command`   | Executable to run     | Yes      | `"python3"`, `"java"`, `"node"`                    |
+| `args`      | Command arguments     | No       | `["script.py", "--verbose"]`                       |
+| `runtime`   | Runtime environment   | No       | `"python:3.11-ml"`, `"java:17"`                    |
+| `network`   | Network configuration | No       | `"bridge"`, `"isolated"`, `"none"`, `"custom-net"` |
+| `uploads`   | Files to upload       | No       | See [File Uploads](#file-uploads)                  |
+| `volumes`   | Persistent volumes    | No       | `["data-volume", "logs"]`                          |
+| `requires`  | Job dependencies      | No       | See [Job Dependencies](#job-dependencies)          |
+| `resources` | Resource limits       | No       | See [Resource Management](#resource-management)    |
 
 ## Job Dependencies
 
@@ -241,12 +243,12 @@ jobs:
 
 ### Resource Fields
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| `max_cpu` | CPU percentage limit (0-100) | `50` |
-| `max_memory` | Memory limit in MB | `2048` |
-| `max_io_bps` | I/O bandwidth limit in bytes/sec | `10485760` |
-| `cpu_cores` | CPU core binding | `"0-3"` or `"0,2,4"` |
+| Field        | Description                      | Example              |
+|--------------|----------------------------------|----------------------|
+| `max_cpu`    | CPU percentage limit (0-100)     | `50`                 |
+| `max_memory` | Memory limit in MB               | `2048`               |
+| `max_io_bps` | I/O bandwidth limit in bytes/sec | `10485760`           |
+| `cpu_cores`  | CPU core binding                 | `"0-3"` or `"0,2,4"` |
 
 ## Workflow Validation
 
@@ -308,6 +310,7 @@ rnx log <job-uuid>
 ### Workflow Status
 
 **List View:**
+
 ```bash
 ID   NAME                 STATUS      PROGRESS
 ---- -------------------- ----------- ---------
@@ -317,6 +320,7 @@ ID   NAME                 STATUS      PROGRESS
 ```
 
 **Detailed Workflow Status:**
+
 ```bash
 # rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
@@ -335,7 +339,9 @@ a1b2c3d4-e5f6-7890-abcd-ef1234567890 process-data         RUNNING      -        
 ```
 
 **Features:**
-- **Job UUID Display**: Started jobs show actual job UUIDs (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479"), non-started jobs show "00000000-0000-0000-0000-000000000000"
+
+- **Job UUID Display**: Started jobs show actual job UUIDs (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479"), non-started
+  jobs show "00000000-0000-0000-0000-000000000000"
 - Job names clearly displayed for easy identification
 - Dependency relationships shown (e.g., process-data depends on setup-data)
 - Real-time status updates with color coding
@@ -430,13 +436,13 @@ jobs:
     requires:
       - database: "COMPLETED"
     
-  web-frontend:
-    command: "node"
-    args: ["server.js"]
-    runtime: "nodejs:18"
+  web-service:
+    command: "java"
+    args: ["-jar", "web-service.jar"]
+    runtime: "java:17"
     network: "frontend"
     uploads:
-      files: ["server.js", "package.json"]
+      files: ["web-service.jar", "application.properties"]
     requires:
       - api-service: "COMPLETED"
 ```

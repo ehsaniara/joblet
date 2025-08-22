@@ -5,9 +5,9 @@ jobs:
   # 5-second demo (20 counts)
   micro-demo:
     command: "python3"
-    args: ["simple_logger.py"]
+    args: [ "simple_logger.py" ]
     uploads:
-      files: ["simple_logger.py"]
+      files: [ "simple_logger.py" ]
     environment:
       START_NUM: "0"
       END_NUM: "20"
@@ -18,9 +18,9 @@ jobs:
   # 10-second demo (25 counts) 
   quick-demo:
     command: "python3"
-    args: ["simple_logger.py"]
+    args: [ "simple_logger.py" ]
     uploads:
-      files: ["simple_logger.py"]
+      files: [ "simple_logger.py" ]
     environment:
       START_NUM: "0"
       END_NUM: "25"
@@ -31,9 +31,9 @@ jobs:
   # Fast demo (50 counts in 10 seconds)
   fast-demo:
     command: "python3"
-    args: ["simple_logger.py"]
+    args: [ "simple_logger.py" ]
     uploads:
-      files: ["simple_logger.py"]
+      files: [ "simple_logger.py" ]
     environment:
       START_NUM: "0"
       END_NUM: "50"

@@ -310,7 +310,7 @@ app.get('/api/workflows/:workflowId', async (req, res) => {
                 workflows = JSON.parse(workflowsOutput);
             }
 
-            const workflow = workflows.find(w => 
+            const workflow = workflows.find(w =>
                 (w.uuid && w.uuid.toString() === workflowId) ||
                 (w.workflowUuid && w.workflowUuid.toString() === workflowId) ||
                 (w.id && w.id.toString() === workflowId)

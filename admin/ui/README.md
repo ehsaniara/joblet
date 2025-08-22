@@ -36,11 +36,11 @@ make clean              # Clean build artifacts
 
 The project catches errors at multiple stages:
 
-| Stage | When | Time | What It Checks |
-|-------|------|------|----------------|
-| **Local** | `make check` | 5-10s | TypeScript + ESLint |
-| **Build** | `make build` | 30s | Production build |
-| **CI** | PR/Push | 2-5min | Full validation suite |
+| Stage     | When         | Time   | What It Checks        |
+|-----------|--------------|--------|-----------------------|
+| **Local** | `make check` | 5-10s  | TypeScript + ESLint   |
+| **Build** | `make build` | 30s    | Production build      |
+| **CI**    | PR/Push      | 2-5min | Full validation suite |
 
 ## 🏗️ Project Structure
 
@@ -63,7 +63,7 @@ src/
 ## 🤝 Contributing
 
 1. Run `make check` before committing
-2. Ensure `make build` succeeds  
+2. Ensure `make build` succeeds
 3. Create PR - CI will run full validation
 
 ## 📦 Build & Deployment

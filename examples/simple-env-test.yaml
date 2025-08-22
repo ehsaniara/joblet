@@ -9,7 +9,7 @@ secret_environment:
 jobs:
   test-env:
     command: "printenv"
-    args: ["GLOBAL_VAR", "PIPELINE_VERSION", "GLOBAL_SECRET", "JOB_SPECIFIC_VAR"]
+    args: [ "GLOBAL_VAR", "PIPELINE_VERSION", "GLOBAL_SECRET", "JOB_SPECIFIC_VAR" ]
     environment:
       JOB_SPECIFIC_VAR: "job-specific-value"
       PIPELINE_VERSION: "2.0.0"  # Override global version
