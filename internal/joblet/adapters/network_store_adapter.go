@@ -46,6 +46,7 @@ type ipPool struct {
 }
 
 // NewNetworkStoreAdapter creates a new network store adapter with the specified backends.
+// Initializes network configuration storage, job allocation tracking, and IP pool management.
 func NewNetworkStoreAdapter(
 	networkStore networkStore[string, *NetworkConfig],
 	allocationStore networkStore[string, *JobNetworkAllocation],
@@ -64,6 +65,8 @@ func NewNetworkStoreAdapter(
 }
 
 // CreateNetwork creates a new network configuration.
+// Validates network settings, initializes IP pools for CIDR-based networks,
+// and stores the configuration. Cleans up on failure.
 func (a *networkStoreAdapter) CreateNetwork(config *NetworkConfig) error {
 
 	a.closeMutex.RLock()
@@ -119,6 +122,8 @@ func (a *networkStoreAdapter) CreateNetwork(config *NetworkConfig) error {
 }
 
 // GetNetwork retrieves a network configuration by name.
+// Returns a deep copy to prevent external modification.
+// Returns nil and false if network not found.
 func (a *networkStoreAdapter) GetNetwork(name string) (*NetworkConfig, bool) {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -161,6 +166,8 @@ func (a *networkStoreAdapter) GetNetwork(name string) (*NetworkConfig, bool) {
 }
 
 // ListNetworks returns all network configurations.
+// Creates deep copies of all configurations to prevent external modification.
+// Returns empty slice on error or when adapter is closed.
 func (a *networkStoreAdapter) ListNetworks() []*NetworkConfig {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -198,6 +205,8 @@ func (a *networkStoreAdapter) ListNetworks() []*NetworkConfig {
 }
 
 // RemoveNetwork removes a network configuration.
+// Checks for active job assignments before deletion and cleans up IP pools.
+// Returns error if network is still in use by active jobs.
 func (a *networkStoreAdapter) RemoveNetwork(name string) error {
 
 	a.closeMutex.RLock()
@@ -251,6 +260,8 @@ func (a *networkStoreAdapter) RemoveNetwork(name string) error {
 }
 
 // AssignJobToNetwork assigns a job to a network with IP allocation.
+// Validates network existence, sets allocation timestamps, and stores the assignment.
+// Returns error if job is already assigned to a network.
 func (a *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allocation *JobNetworkAllocation) error {
 
 	a.closeMutex.RLock()
@@ -302,6 +313,8 @@ func (a *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allo
 }
 
 // GetJobNetworkAllocation retrieves the network allocation for a job.
+// Returns a deep copy to prevent external modification.
+// Returns nil and false if job has no network assignment.
 func (a *networkStoreAdapter) GetJobNetworkAllocation(jobID string) (*JobNetworkAllocation, bool) {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -340,6 +353,8 @@ func (a *networkStoreAdapter) GetJobNetworkAllocation(jobID string) (*JobNetwork
 }
 
 // RemoveJobFromNetwork removes a job's network assignment.
+// Releases allocated IP address and removes the assignment record.
+// Continues with removal even if IP release fails (logs warning).
 func (a *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -384,6 +399,8 @@ func (a *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
 }
 
 // ListJobsInNetwork returns all jobs assigned to a specific network.
+// Filters all allocations by network name and returns deep copies.
+// Returns empty slice on error or when adapter is closed.
 func (a *networkStoreAdapter) ListJobsInNetwork(networkName string) []*JobNetworkAllocation {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -419,6 +436,8 @@ func (a *networkStoreAdapter) ListJobsInNetwork(networkName string) []*JobNetwor
 }
 
 // AllocateIP allocates an IP address from the network's pool.
+// Returns first available IP and marks it as allocated.
+// Returns error if no IPs available or network has no IP pool.
 func (a *networkStoreAdapter) AllocateIP(networkName string) (string, error) {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -456,6 +475,8 @@ func (a *networkStoreAdapter) AllocateIP(networkName string) (string, error) {
 }
 
 // ReleaseIP releases an IP address back to the network's pool.
+// Marks IP as available and adds it back to the available pool.
+// Returns error if IP was not previously allocated.
 func (a *networkStoreAdapter) ReleaseIP(networkName, ip string) error {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -496,6 +517,8 @@ func (a *networkStoreAdapter) ReleaseIP(networkName, ip string) error {
 }
 
 // Close gracefully shuts down the adapter and releases resources.
+// Clears IP pools and closes all backend stores.
+// Safe to call multiple times.
 func (a *networkStoreAdapter) Close() error {
 	a.closeMutex.Lock()
 	defer a.closeMutex.Unlock()
@@ -525,6 +548,8 @@ func (a *networkStoreAdapter) Close() error {
 
 // Helper methods
 
+// validateNetworkConfig validates network configuration parameters.
+// Checks network type, CIDR format, gateway IP, and DNS server IPs.
 func (a *networkStoreAdapter) validateNetworkConfig(config *NetworkConfig) error {
 	if config.Name == "" {
 		return fmt.Errorf("network name is required")
@@ -572,6 +597,8 @@ func (a *networkStoreAdapter) validateNetworkConfig(config *NetworkConfig) error
 	return nil
 }
 
+// initializeIPPool creates and populates an IP pool for a network.
+// Generates available IP addresses from CIDR, excluding network and broadcast addresses.
 func (a *networkStoreAdapter) initializeIPPool(networkName, cidr string) error {
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
@@ -602,6 +629,8 @@ func (a *networkStoreAdapter) initializeIPPool(networkName, cidr string) error {
 	return nil
 }
 
+// nextIP calculates the next IP address in sequence.
+// Used for iterating through IP ranges when building pools.
 func (a *networkStoreAdapter) nextIP(ip net.IP) net.IP {
 	next := make(net.IP, len(ip))
 	copy(next, ip)
@@ -614,6 +643,8 @@ func (a *networkStoreAdapter) nextIP(ip net.IP) net.IP {
 	return next
 }
 
+// getBroadcastAddress calculates the broadcast address for a network.
+// Used to exclude broadcast address from available IP pool.
 func (a *networkStoreAdapter) getBroadcastAddress(ipNet *net.IPNet) net.IP {
 	ip := make(net.IP, len(ipNet.IP))
 	for i := range ip {

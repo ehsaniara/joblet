@@ -15,6 +15,9 @@ type Joblet interface {
 	// StopJob stops a running job or removes a scheduled job
 	StopJob(ctx context.Context, req StopJobRequest) error
 
+	// DeleteJob completely removes a job including logs and metadata
+	DeleteJob(ctx context.Context, req DeleteJobRequest) error
+
 	// ExecuteScheduledJob transitions a scheduled job to execution (used by scheduler)
 	ExecuteScheduledJob(ctx context.Context, req ExecuteScheduledJobRequest) error
 

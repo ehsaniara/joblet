@@ -26,6 +26,7 @@ execution - protecting your host system from malicious or resource-hungry proces
 - **Environment Variables**: Secure configuration with regular and secret variable support
 - **Job Scheduling**: Future execution with flexible time specifications
 - **Real-time Monitoring**: Live logs, system metrics, and job status tracking
+- **Async Log Persistence**: Rate-decoupled log system optimized for HPC workloads with 5M+ writes/second
 - **mTLS Security**: Certificate-based authentication with role-based access control
 - **Cross-platform CLI**: Manage jobs from Linux, macOS, or Windows
 - **Web Admin UI**: React-based web interface with comprehensive system monitoring, job management, and workflow visualization (macOS)
@@ -565,8 +566,11 @@ scheduling workers, and production considerations.
 
 ## 📋 Recent Changes & Improvements
 
-### Latest Updates (January 2025) - Multi-Platform Release
+### Latest Updates (January 2025) - Async Log System & Multi-Platform Release
 
+- **Async Log Persistence**: Rate-decoupled async log system optimized for HPC workloads achieving 5M+ writes/second
+- **HPC Optimization**: Producer-consumer pattern with overflow protection and microsecond write latency
+- **Comprehensive Testing**: 11 async system tests, integration tests, and performance benchmarks
 - **Multi-Platform Releases**: Automated GitHub Actions for Linux, macOS, Windows releases
 
 #### 🎯 New Workflow Orchestration System

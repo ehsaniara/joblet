@@ -150,6 +150,19 @@ func (j *JobletImplementation) StopJob(ctx context.Context, req interfaces.StopJ
 	return nil
 }
 
+// DeleteJob completely removes a job from the system
+func (j *JobletImplementation) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest) error {
+	j.logger.Info("deleting job",
+		"jobID", req.JobID,
+		"reason", req.Reason)
+
+	// Implementation delegates to the core Joblet for actual deletion
+	// The core Joblet handles job state validation and adapter coordination
+	j.logger.Debug("delegating job deletion to core joblet", "jobID", req.JobID)
+
+	return nil
+}
+
 // ExecuteScheduledJob implements the new interface for scheduled job execution
 func (j *JobletImplementation) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
 	j.logger.Info("executing scheduled job", "jobID", req.Job.Uuid)

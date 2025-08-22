@@ -1,0 +1,124 @@
+---
+# Log Streaming Example - Async Log System Performance Demo
+# 
+# This workflow demonstrates Joblet's rate-decoupled async log system
+# with high-frequency logging patterns optimized for HPC workloads.
+#
+# Features demonstrated:
+# - Real-time log streaming with microsecond write latency
+# - Rate-decoupled async persistence (5M+ writes/second capability)
+# - Overflow protection strategies during burst logging
+# - Sustained high-frequency logging (10 logs/second default)
+# - Multiple logging patterns (counting, bursts, HPC simulation)
+
+jobs:
+  # Quick demo - 100 counts in 10 seconds (fast demo)
+  quick-demo:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "100"
+      INTERVAL: "0.1"    # 10 logs/second
+    max_cpu: 25
+    max_memory: 128
+    
+  # Standard demo - 1000 counts in ~100 seconds
+  standard-demo:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "1000"
+      INTERVAL: "0.1"    # 10 logs/second
+    max_cpu: 50
+    max_memory: 256
+
+  # High-frequency demo - 1000 counts in ~50 seconds
+  high-frequency:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "1000"
+      INTERVAL: "0.05"   # 20 logs/second
+    max_cpu: 50
+    max_memory: 256
+
+  # Burst test - designed to test async overflow strategies
+  burst-test:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "500"
+      INTERVAL: "0.02"   # 50 logs/second - tests async system
+    max_cpu: 75
+    max_memory: 512
+
+  # HPC simulation - large count range with sustained logging
+  hpc-simulation:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "10000"
+      INTERVAL: "0.1"    # 10 logs/second for ~16 minutes
+    max_cpu: 50
+    max_memory: 512
+
+  # Stress test - very high frequency for async system validation
+  stress-test:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "2000"
+      INTERVAL: "0.01"   # 100 logs/second - stress test async system
+    max_cpu: 80
+    max_memory: 512
+
+  # Custom range demo - configurable via environment
+  custom-range:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "${START_NUM:-0}"
+      END_NUM: "${END_NUM:-500}"
+      INTERVAL: "${INTERVAL:-0.1}"
+    max_cpu: 50
+    max_memory: 256
+
+# Example multi-job workflow demonstrating concurrent logging
+workflows:
+  concurrent-logging:
+    jobs:
+      logger-1:
+        command: "python3"
+        args: ["high_frequency_logger.py"]
+        environment:
+          START_NUM: "1"
+          END_NUM: "500"
+          INTERVAL: "0.1"
+        max_cpu: 25
+        max_memory: 128
+
+      logger-2:
+        command: "python3"
+        args: ["high_frequency_logger.py"]
+        environment:
+          START_NUM: "1000"
+          END_NUM: "1500"
+          INTERVAL: "0.1"
+        max_cpu: 25
+        max_memory: 128
+
+      logger-3:
+        command: "python3"
+        args: ["high_frequency_logger.py"]
+        environment:
+          START_NUM: "2000"
+          END_NUM: "2500"
+          INTERVAL: "0.1"
+        max_cpu: 25
+        max_memory: 128

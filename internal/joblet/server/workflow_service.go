@@ -597,29 +597,40 @@ func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflow
 	log := s.logger.WithFields("workflowId", workflowID, "jobName", jobName)
 	log.Info("executing workflow job")
 
+	// RACE CONDITION FIX: Process ALL file uploads BEFORE starting the job
+	uploadCount := 0
+	if jobSpec.Uploads != nil {
+		uploadCount = len(jobSpec.Uploads.Files)
+	}
+	log.Debug("processing file uploads for job", "uploadCount", uploadCount)
 	uploads := []domain.FileUpload{}
 	if jobSpec.Uploads != nil {
+		// Validate that ALL required files are available BEFORE proceeding
 		for _, file := range jobSpec.Uploads.Files {
-			var content []byte
-			if uploadedFiles != nil {
-				// Use uploaded files from client
-				if fileContent, exists := uploadedFiles[file]; exists {
-					content = fileContent
-				} else {
-					return fmt.Errorf("file %s not found in uploaded files", file)
-				}
-			} else {
-				// For server-side workflows, we can't read files without knowing the path
-				// This is a limitation - server-side workflows should use client-side upload
+			if uploadedFiles == nil {
 				return fmt.Errorf("server-side workflow file reading not supported. Use 'rnx run --workflow' with client-side file upload")
 			}
+
+			// Check file availability first (fail fast if missing)
+			if _, exists := uploadedFiles[file]; !exists {
+				log.Error("required file not found in uploaded files", "file", file, "availableFiles", getFileKeys(uploadedFiles))
+				return fmt.Errorf("file %s not found in uploaded files", file)
+			}
+		}
+
+		// Now process all files (we know they're all available)
+		for _, file := range jobSpec.Uploads.Files {
+			fileContent := uploadedFiles[file] // We already validated this exists
 			uploads = append(uploads, domain.FileUpload{
 				Path:    file,
-				Content: content,
-				Size:    int64(len(content)),
+				Content: fileContent,
+				Size:    int64(len(fileContent)),
 			})
+			log.Debug("prepared file upload for job", "file", file, "size", len(fileContent))
 		}
 	}
+
+	log.Info("all file uploads prepared successfully", "uploadCount", len(uploads))
 
 	// Determine network to use
 	network := jobSpec.Network
@@ -983,6 +994,44 @@ func (s *WorkflowServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq)
 	}, nil
 }
 
+// DeleteJob implements the JobService interface
+func (s *WorkflowServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReq) (*pb.DeleteJobRes, error) {
+	log := s.logger.WithFields("operation", "DeleteJob", "jobId", req.GetUuid())
+	log.Debug("delete job request received")
+
+	// Authorization check
+	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	// Create delete request
+	deleteRequest := interfaces.DeleteJobRequest{
+		JobID:  req.GetUuid(),
+		Reason: "user_requested",
+	}
+
+	log.Debug("processing job deletion", "jobId", deleteRequest.JobID)
+
+	// Call core joblet to delete the job
+	err := s.joblet.DeleteJob(ctx, deleteRequest)
+	if err != nil {
+		log.Error("job deletion failed", "error", err)
+		return &pb.DeleteJobRes{
+			Uuid:    deleteRequest.JobID,
+			Success: false,
+			Message: err.Error(),
+		}, status.Errorf(codes.Internal, "job deletion failed: %v", err)
+	}
+
+	log.Info("job deletion completed successfully", "jobId", deleteRequest.JobID)
+	return &pb.DeleteJobRes{
+		Uuid:    deleteRequest.JobID,
+		Success: true,
+		Message: "Job deleted successfully",
+	}, nil
+}
+
 // GetJobLogs implements the JobService interface
 func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
 	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetUuid())
@@ -1192,4 +1241,16 @@ func (s *WorkflowServiceServer) convertWorkflowUUIDToID(uuid string) int {
 	// In a real system, you would maintain a mapping between UUIDs and internal IDs
 	// For now, return a hash-based ID or maintain the mapping in workflow manager
 	return 1 // Simplified for now
+}
+
+// getFileKeys returns a list of available file keys for debugging
+func getFileKeys(files map[string][]byte) []string {
+	if files == nil {
+		return []string{}
+	}
+	keys := make([]string, 0, len(files))
+	for key := range files {
+		keys = append(keys, key)
+	}
+	return keys
 }

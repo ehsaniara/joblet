@@ -52,5 +52,8 @@ Environment="JOBLET_CONFIG_PATH=/opt/joblet/config/server-config.yml"
 # Cleanup job cgroups on service stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/joblet.slice/joblet.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'
 
+# Note: Log files in /opt/joblet/logs are preserved across service restarts
+# Use 'rnx logs cleanup' or manual cleanup if needed
+
 [Install]
 WantedBy=multi-user.target

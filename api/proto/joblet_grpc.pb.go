@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.12.4
-// source: joblet.proto
+// source: proto/joblet.proto
 
 package gen
 
@@ -475,7 +475,7 @@ var JobService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "joblet.proto",
+	Metadata: "proto/joblet.proto",
 }
 
 const (
@@ -657,7 +657,7 @@ var NetworkService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "joblet.proto",
+	Metadata: "proto/joblet.proto",
 }
 
 const (
@@ -839,7 +839,7 @@ var VolumeService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "joblet.proto",
+	Metadata: "proto/joblet.proto",
 }
 
 const (
@@ -987,7 +987,7 @@ var MonitoringService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "joblet.proto",
+	Metadata: "proto/joblet.proto",
 }
 
 const (
@@ -1169,5 +1169,5 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "joblet.proto",
+	Metadata: "proto/joblet.proto",
 }

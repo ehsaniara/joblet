@@ -12,6 +12,7 @@ service JobService {
   rpc RunJob(RunJobRequest) returns (RunJobResponse){}
   rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes){}
   rpc StopJob(StopJobReq) returns (StopJobRes){}
+  rpc DeleteJob(DeleteJobReq) returns (DeleteJobRes){}
   rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
   rpc ListJobs(EmptyRequest) returns (Jobs){}
 
@@ -116,6 +117,17 @@ message StopJobRes{
   string status = 2;
   string endTime = 3;
   int32 exitCode = 4;
+}
+
+// DeleteJob
+message DeleteJobReq{
+  string uuid = 1;                         // Job UUID identifier
+}
+
+message DeleteJobRes{
+  string uuid = 1;                         // Job UUID identifier
+  bool success = 2;
+  string message = 3;
 }
 
 // GetJobLogs

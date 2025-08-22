@@ -35,6 +35,12 @@ type JobStoreAdapter interface {
 	GetOutput(id string) ([]byte, bool, error)
 	SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error
 
+	// Log management
+	DeleteJobLogs(jobId string) error
+
+	// Job cleanup - complete job deletion including logs and metadata
+	DeleteJob(jobId string) error
+
 	// Lifecycle management
 	Close() error
 }

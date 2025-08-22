@@ -51,6 +51,12 @@ type StopJobRequest struct {
 	Reason string // Optional reason for audit
 }
 
+// DeleteJobRequest encapsulates parameters for deleting a job
+type DeleteJobRequest struct {
+	JobID  string
+	Reason string // Optional reason for audit/logging
+}
+
 // ExecuteScheduledJobRequest for executing a scheduled job
 type ExecuteScheduledJobRequest struct {
 	Job *domain.Job

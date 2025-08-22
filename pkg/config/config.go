@@ -149,7 +149,8 @@ type Node struct {
 
 // BuffersConfig holds consolidated buffer and pub-sub configuration
 type BuffersConfig struct {
-	DefaultConfig BufferDefaultConfig `yaml:"default_config" json:"default_config"`
+	DefaultConfig  BufferDefaultConfig  `yaml:"default_config" json:"default_config"`
+	LogPersistence LogPersistenceConfig `yaml:"log_persistence" json:"log_persistence"`
 }
 
 // BufferDefaultConfig holds default buffer configuration (consolidated with pub-sub settings)
@@ -163,6 +164,20 @@ type BufferDefaultConfig struct {
 	EnableMetrics        bool          `yaml:"enable_metrics" json:"enable_metrics"`
 	UploadTimeout        time.Duration `yaml:"upload_timeout" json:"upload_timeout"`
 	ChunkSize            int           `yaml:"chunk_size" json:"chunk_size"`
+}
+
+// LogPersistenceConfig holds configuration for job log persistence to disk
+type LogPersistenceConfig struct {
+	Directory         string `yaml:"directory" json:"directory"`
+	RetentionDays     int    `yaml:"retention_days" json:"retention_days"`
+	RotationSizeBytes int64  `yaml:"rotation_size_bytes" json:"rotation_size_bytes"`
+
+	// Async log system configuration
+	QueueSize        int           `yaml:"queue_size" json:"queue_size"`               // Async queue size
+	MemoryLimit      int64         `yaml:"memory_limit" json:"memory_limit"`           // Memory limit for overflow protection
+	BatchSize        int           `yaml:"batch_size" json:"batch_size"`               // Batch size for disk writes
+	FlushInterval    time.Duration `yaml:"flush_interval" json:"flush_interval"`       // Periodic flush interval
+	OverflowStrategy string        `yaml:"overflow_strategy" json:"overflow_strategy"` // compress, spill, sample, alert
 }
 
 // VolumesConfig holds volume management configuration
@@ -273,6 +288,18 @@ var DefaultConfig = Config{
 			EnableMetrics:        false,            // Disabled for maximum performance
 			UploadTimeout:        10 * time.Minute, // Extended timeout for large uploads
 			ChunkSize:            1048576,          // 1MB chunks for optimal streaming
+		},
+		LogPersistence: LogPersistenceConfig{
+			Directory:         "/opt/joblet/logs",
+			RetentionDays:     7,
+			RotationSizeBytes: 2097152, // 2MB per file before rotation
+
+			// HPC-optimized async system defaults
+			QueueSize:        100000,                 // Large queue for high throughput
+			MemoryLimit:      1073741824,             // 1GB memory limit
+			BatchSize:        100,                    // 100 chunks per batch
+			FlushInterval:    100 * time.Millisecond, // Fast flush for low latency
+			OverflowStrategy: "compress",             // Compress by default
 		},
 	},
 	Volumes: VolumesConfig{

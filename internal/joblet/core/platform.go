@@ -32,6 +32,11 @@ func (w *linuxJoblet) StopJob(ctx context.Context, req interfaces.StopJobRequest
 	return w.platformJoblet.StopJob(ctx, req)
 }
 
+// DeleteJob delegates to the platform joblet
+func (w *linuxJoblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest) error {
+	return w.platformJoblet.DeleteJob(ctx, req)
+}
+
 // ExecuteScheduledJob delegates to the platform joblet
 func (w *linuxJoblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
 	return w.platformJoblet.ExecuteScheduledJob(ctx, req)

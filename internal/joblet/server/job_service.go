@@ -152,6 +152,44 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 	}, nil
 }
 
+// DeleteJob implements the gRPC service for complete job deletion
+func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReq) (*pb.DeleteJobRes, error) {
+	log := s.logger.WithFields("operation", "DeleteJob", "jobUuid", req.GetUuid())
+	log.Debug("delete job request received")
+
+	// Authorization check
+	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	// Create delete request
+	deleteRequest := interfaces.DeleteJobRequest{
+		JobID:  req.GetUuid(),
+		Reason: "user_requested",
+	}
+
+	log.Debug("processing job deletion", "jobId", deleteRequest.JobID)
+
+	// Call core joblet to delete the job
+	err := s.joblet.DeleteJob(ctx, deleteRequest)
+	if err != nil {
+		log.Error("job deletion failed", "error", err)
+		return &pb.DeleteJobRes{
+			Uuid:    deleteRequest.JobID,
+			Success: false,
+			Message: err.Error(),
+		}, status.Errorf(codes.Internal, "job deletion failed: %v", err)
+	}
+
+	log.Info("job deletion completed successfully", "jobId", deleteRequest.JobID)
+	return &pb.DeleteJobRes{
+		Uuid:    deleteRequest.JobID,
+		Success: true,
+		Message: "Job deleted successfully",
+	}, nil
+}
+
 // GetJobStatus remains the same as it doesn't need request objects
 func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatusReq) (*pb.GetJobStatusRes, error) {
 	log := s.logger.WithFields("operation", "GetJobStatus", "jobUuid", req.GetUuid())

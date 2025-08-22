@@ -1,0 +1,66 @@
+---
+# Concurrent Logging Workflow - Async Log System Stress Test
+#
+# This workflow demonstrates Joblet's async log system handling multiple
+# concurrent high-frequency loggers simultaneously. Perfect for testing
+# the system's ability to handle HPC-style workloads with many parallel jobs.
+
+name: "concurrent-logging-demo"
+description: "Stress test async log system with concurrent high-frequency loggers"
+
+environment:
+  DEMO_TYPE: "concurrent"
+  LOG_RATE: "10"  # logs per second per job
+
+jobs:
+  # Logger 1 - Standard rate, range 0-500
+  logger-alpha:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    uploads:
+      files: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "500"
+      INTERVAL: "0.1"    # 10 logs/second
+    max_cpu: 25
+    max_memory: 128
+
+  # Logger 2 - Higher rate, range 1000-1300  
+  logger-beta:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    uploads:
+      files: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "1000"
+      END_NUM: "1300"
+      INTERVAL: "0.05"   # 20 logs/second
+    max_cpu: 25
+    max_memory: 128
+
+  # Logger 3 - Burst pattern, range 2000-2200
+  logger-gamma:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    uploads:
+      files: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "2000"
+      END_NUM: "2200"
+      INTERVAL: "0.02"   # 50 logs/second - tests async overflow
+    max_cpu: 35
+    max_memory: 256
+
+  # Logger 4 - Standard rate, range 3000-3500
+  logger-delta:
+    command: "python3"
+    args: ["high_frequency_logger.py"]
+    uploads:
+      files: ["high_frequency_logger.py"]
+    environment:
+      START_NUM: "3000"
+      END_NUM: "3500"
+      INTERVAL: "0.1"    # 10 logs/second
+    max_cpu: 25
+    max_memory: 128

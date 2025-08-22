@@ -8,6 +8,7 @@ import (
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/pubsub"
 	"joblet/pkg/buffer"
+	"joblet/pkg/config"
 	"joblet/pkg/logger"
 )
 
@@ -19,6 +20,7 @@ type AdapterFactory struct {
 }
 
 // NewAdapterFactory creates a new adapter factory.
+// Initializes with logging support for tracking adapter creation operations.
 func NewAdapterFactory(logger *logger.Logger) *AdapterFactory {
 	if logger == nil {
 		logger = logger.WithField("component", "adapter-factory")
@@ -30,6 +32,8 @@ func NewAdapterFactory(logger *logger.Logger) *AdapterFactory {
 }
 
 // CreateJobStoreAdapter creates a job store adapter with the specified configuration.
+// Sets up job storage, pub-sub system, buffer management, and optional log persistence.
+// Currently supports memory backend only to avoid import cycles.
 func (f *AdapterFactory) CreateJobStoreAdapter(config *JobStoreConfig) (JobStoreAdapter, error) {
 	if config == nil {
 		return nil, fmt.Errorf("job store config is required")
@@ -69,17 +73,27 @@ func (f *AdapterFactory) CreateJobStoreAdapter(config *JobStoreConfig) (JobStore
 		EnableMetrics:        config.BufferManager.DefaultBufferConfig.EnableMetrics,
 	}
 
-	// Create adapter
-	adapter := NewJobStoreAdapter(jobStore, bufferMgr, pubsubSystem, bufferConfig, f.logger)
-
-	f.logger.Info("job store adapter created successfully",
-		"storeBackend", config.Store.Backend,
-		"pubsubBackend", "memory")
+	// Create adapter with log persistence if configured
+	var adapter JobStoreAdapter
+	if config.LogPersistence != nil {
+		adapter = NewJobStoreAdapterWithLogPersistence(jobStore, bufferMgr, pubsubSystem, bufferConfig, config.LogPersistence, f.logger)
+		f.logger.Info("job store adapter created with log persistence",
+			"storeBackend", config.Store.Backend,
+			"pubsubBackend", "memory",
+			"logDir", config.LogPersistence.Directory)
+	} else {
+		adapter = NewJobStoreAdapter(jobStore, bufferMgr, pubsubSystem, bufferConfig, f.logger)
+		f.logger.Info("job store adapter created without log persistence",
+			"storeBackend", config.Store.Backend,
+			"pubsubBackend", "memory")
+	}
 
 	return adapter, nil
 }
 
 // CreateVolumeStoreAdapter creates a volume store adapter with the specified configuration.
+// Provides volume management capabilities with configurable storage backend.
+// Currently supports memory backend only to avoid import cycles.
 func (f *AdapterFactory) CreateVolumeStoreAdapter(config *VolumeStoreConfig) (VolumeStoreAdapter, error) {
 	if config == nil {
 		return nil, fmt.Errorf("volume store config is required")
@@ -110,6 +124,8 @@ func (f *AdapterFactory) CreateVolumeStoreAdapter(config *VolumeStoreConfig) (Vo
 }
 
 // CreateNetworkStoreAdapter creates a network store adapter with the specified configuration.
+// Handles network configuration and job IP allocation management.
+// Supports both memory and file backends for flexible deployment scenarios.
 func (f *AdapterFactory) CreateNetworkStoreAdapter(config *NetworkStoreConfig) (NetworkStoreAdapter, error) {
 	if config == nil {
 		return nil, fmt.Errorf("network store config is required")
@@ -223,9 +239,10 @@ type MemoryConfig struct {
 
 // JobStoreConfig contains configuration for creating a job store adapter.
 type JobStoreConfig struct {
-	Store         *StoreConfig         `yaml:"store" json:"store"`
-	PubSub        *pubsub.PubSubConfig `yaml:"pubsub" json:"pubsub"`
-	BufferManager *BufferManagerConfig `yaml:"buffer_manager,omitempty" json:"buffer_manager,omitempty"`
+	Store          *StoreConfig                 `yaml:"store" json:"store"`
+	PubSub         *pubsub.PubSubConfig         `yaml:"pubsub" json:"pubsub"`
+	BufferManager  *BufferManagerConfig         `yaml:"buffer_manager,omitempty" json:"buffer_manager,omitempty"`
+	LogPersistence *config.LogPersistenceConfig `yaml:"log_persistence,omitempty" json:"log_persistence,omitempty"`
 }
 
 // VolumeStoreConfig contains configuration for creating a volume store adapter.
@@ -252,12 +269,16 @@ type SimpleBufferManager struct {
 	mutex   sync.RWMutex
 }
 
+// NewSimpleBufferManager creates a basic buffer manager for development.
+// Provides in-memory buffer management without persistence or advanced features.
 func NewSimpleBufferManager() *SimpleBufferManager {
 	return &SimpleBufferManager{
 		buffers: make(map[string]buffer.Buffer),
 	}
 }
 
+// CreateBuffer creates a new buffer with the specified configuration.
+// Returns error if buffer with same ID already exists.
 func (s *SimpleBufferManager) CreateBuffer(ctx context.Context, id string, config buffer.BufferConfig) (buffer.Buffer, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -277,6 +298,8 @@ func (s *SimpleBufferManager) CreateBuffer(ctx context.Context, id string, confi
 	return buf, nil
 }
 
+// GetBuffer retrieves a buffer by ID.
+// Returns buffer and true if found, nil and false otherwise.
 func (s *SimpleBufferManager) GetBuffer(id string) (buffer.Buffer, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -285,6 +308,8 @@ func (s *SimpleBufferManager) GetBuffer(id string) (buffer.Buffer, bool) {
 	return buf, exists
 }
 
+// RemoveBuffer closes and removes a buffer by ID.
+// Returns error if buffer close operation fails.
 func (s *SimpleBufferManager) RemoveBuffer(id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -298,6 +323,8 @@ func (s *SimpleBufferManager) RemoveBuffer(id string) error {
 	return nil
 }
 
+// ListBuffers returns IDs of all active buffers.
+// Used for monitoring and debugging buffer usage.
 func (s *SimpleBufferManager) ListBuffers() []string {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -309,6 +336,8 @@ func (s *SimpleBufferManager) ListBuffers() []string {
 	return ids
 }
 
+// Close shuts down buffer manager and closes all active buffers.
+// Continues closing remaining buffers even if some fail.
 func (s *SimpleBufferManager) Close() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -325,6 +354,8 @@ func (s *SimpleBufferManager) Close() error {
 	return nil
 }
 
+// Stats returns buffer manager statistics.
+// Simplified implementation for development - some metrics not tracked.
 func (s *SimpleBufferManager) Stats() *buffer.BufferManagerStats {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -338,11 +369,15 @@ func (s *SimpleBufferManager) Stats() *buffer.BufferManagerStats {
 	}
 }
 
+// CreatePersistentBuffer creates a buffer with disk persistence.
+// Not supported in simple buffer manager - returns error.
 func (s *SimpleBufferManager) CreatePersistentBuffer(ctx context.Context, id string, path string, config buffer.BufferConfig) (buffer.PersistentBuffer, error) {
 	// For development, persistent buffers aren't supported in simple buffer manager
 	return nil, fmt.Errorf("persistent buffers not supported in simple buffer manager")
 }
 
+// CreateRingBuffer creates a circular buffer with fixed size.
+// Not supported in simple buffer manager - returns error.
 func (s *SimpleBufferManager) CreateRingBuffer(ctx context.Context, id string, size int, config buffer.BufferConfig) (buffer.RingBuffer, error) {
 	// For development, ring buffers aren't supported in simple buffer manager
 	return nil, fmt.Errorf("ring buffers not supported in simple buffer manager")

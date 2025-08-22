@@ -1,0 +1,42 @@
+---
+# Quick demo jobs for testing rnx log streaming
+
+jobs:
+  # 5-second demo (20 counts)
+  micro-demo:
+    command: "python3"
+    args: ["simple_logger.py"]
+    uploads:
+      files: ["simple_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "20"
+      INTERVAL: "0.2"    # 5 logs/second for 4 seconds
+    max_cpu: 25
+    max_memory: 64
+
+  # 10-second demo (25 counts) 
+  quick-demo:
+    command: "python3"
+    args: ["simple_logger.py"]
+    uploads:
+      files: ["simple_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "25"
+      INTERVAL: "0.4"    # 2.5 logs/second for 10 seconds
+    max_cpu: 25
+    max_memory: 64
+
+  # Fast demo (50 counts in 10 seconds)
+  fast-demo:
+    command: "python3"
+    args: ["simple_logger.py"]
+    uploads:
+      files: ["simple_logger.py"]
+    environment:
+      START_NUM: "0"
+      END_NUM: "50"
+      INTERVAL: "0.2"    # 5 logs/second
+    max_cpu: 25
+    max_memory: 64

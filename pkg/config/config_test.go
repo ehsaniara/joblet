@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -456,4 +457,86 @@ func containsMiddle(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// Tests for the new async log persistence configuration
+func TestLogPersistenceConfig_Defaults(t *testing.T) {
+	config := DefaultConfig
+	logConfig := config.Buffers.LogPersistence
+
+	// Test basic log persistence settings
+	if logConfig.Directory != "/opt/joblet/logs" {
+		t.Errorf("Expected default directory '/opt/joblet/logs', got '%s'", logConfig.Directory)
+	}
+
+	if logConfig.RetentionDays != 7 {
+		t.Errorf("Expected default retention 7 days, got %d", logConfig.RetentionDays)
+	}
+
+	if logConfig.RotationSizeBytes != 2097152 {
+		t.Errorf("Expected default rotation size 2MB, got %d", logConfig.RotationSizeBytes)
+	}
+
+	// Test async system defaults
+	if logConfig.QueueSize != 100000 {
+		t.Errorf("Expected default queue size 100000, got %d", logConfig.QueueSize)
+	}
+
+	if logConfig.MemoryLimit != 1073741824 {
+		t.Errorf("Expected default memory limit 1GB, got %d", logConfig.MemoryLimit)
+	}
+
+	if logConfig.BatchSize != 100 {
+		t.Errorf("Expected default batch size 100, got %d", logConfig.BatchSize)
+	}
+
+	if logConfig.FlushInterval != 100*time.Millisecond {
+		t.Errorf("Expected default flush interval 100ms, got %v", logConfig.FlushInterval)
+	}
+
+	if logConfig.OverflowStrategy != "compress" {
+		t.Errorf("Expected default overflow strategy 'compress', got '%s'", logConfig.OverflowStrategy)
+	}
+}
+
+func TestLogPersistenceConfig_Structure(t *testing.T) {
+	// Test that the structure has all the expected fields
+	config := DefaultConfig
+	logConfig := config.Buffers.LogPersistence
+
+	// Verify structure fields exist (this will compile if they exist)
+	_ = logConfig.Directory
+	_ = logConfig.RetentionDays
+	_ = logConfig.RotationSizeBytes
+	_ = logConfig.QueueSize
+	_ = logConfig.MemoryLimit
+	_ = logConfig.BatchSize
+	_ = logConfig.FlushInterval
+	_ = logConfig.OverflowStrategy
+}
+
+func TestLogPersistenceConfig_ValidValues(t *testing.T) {
+	// Test that default values are reasonable
+	config := DefaultConfig
+	logConfig := config.Buffers.LogPersistence
+
+	if logConfig.QueueSize <= 0 {
+		t.Error("Queue size should be positive")
+	}
+
+	if logConfig.MemoryLimit <= 0 {
+		t.Error("Memory limit should be positive")
+	}
+
+	if logConfig.BatchSize <= 0 {
+		t.Error("Batch size should be positive")
+	}
+
+	if logConfig.FlushInterval <= 0 {
+		t.Error("Flush interval should be positive")
+	}
+
+	if logConfig.OverflowStrategy == "" {
+		t.Error("Overflow strategy should not be empty")
+	}
 }

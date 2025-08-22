@@ -24,6 +24,28 @@ type FakeJobStoreAdapter struct {
 	createNewJobArgsForCall []struct {
 		arg1 *domain.Job
 	}
+	DeleteJobStub        func(string) error
+	deleteJobMutex       sync.RWMutex
+	deleteJobArgsForCall []struct {
+		arg1 string
+	}
+	deleteJobReturns struct {
+		result1 error
+	}
+	deleteJobReturnsOnCall map[int]struct {
+		result1 error
+	}
+	DeleteJobLogsStub        func(string) error
+	deleteJobLogsMutex       sync.RWMutex
+	deleteJobLogsArgsForCall []struct {
+		arg1 string
+	}
+	deleteJobLogsReturns struct {
+		result1 error
+	}
+	deleteJobLogsReturnsOnCall map[int]struct {
+		result1 error
+	}
 	GetJobStub        func(string) (*domain.Job, bool)
 	getJobMutex       sync.RWMutex
 	getJobArgsForCall []struct {
@@ -186,6 +208,128 @@ func (fake *FakeJobStoreAdapter) CreateNewJobArgsForCall(i int) *domain.Job {
 	defer fake.createNewJobMutex.RUnlock()
 	argsForCall := fake.createNewJobArgsForCall[i]
 	return argsForCall.arg1
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJob(arg1 string) error {
+	fake.deleteJobMutex.Lock()
+	ret, specificReturn := fake.deleteJobReturnsOnCall[len(fake.deleteJobArgsForCall)]
+	fake.deleteJobArgsForCall = append(fake.deleteJobArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.DeleteJobStub
+	fakeReturns := fake.deleteJobReturns
+	fake.recordInvocation("DeleteJob", []interface{}{arg1})
+	fake.deleteJobMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobCallCount() int {
+	fake.deleteJobMutex.RLock()
+	defer fake.deleteJobMutex.RUnlock()
+	return len(fake.deleteJobArgsForCall)
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobCalls(stub func(string) error) {
+	fake.deleteJobMutex.Lock()
+	defer fake.deleteJobMutex.Unlock()
+	fake.DeleteJobStub = stub
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobArgsForCall(i int) string {
+	fake.deleteJobMutex.RLock()
+	defer fake.deleteJobMutex.RUnlock()
+	argsForCall := fake.deleteJobArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobReturns(result1 error) {
+	fake.deleteJobMutex.Lock()
+	defer fake.deleteJobMutex.Unlock()
+	fake.DeleteJobStub = nil
+	fake.deleteJobReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobReturnsOnCall(i int, result1 error) {
+	fake.deleteJobMutex.Lock()
+	defer fake.deleteJobMutex.Unlock()
+	fake.DeleteJobStub = nil
+	if fake.deleteJobReturnsOnCall == nil {
+		fake.deleteJobReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteJobReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobLogs(arg1 string) error {
+	fake.deleteJobLogsMutex.Lock()
+	ret, specificReturn := fake.deleteJobLogsReturnsOnCall[len(fake.deleteJobLogsArgsForCall)]
+	fake.deleteJobLogsArgsForCall = append(fake.deleteJobLogsArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.DeleteJobLogsStub
+	fakeReturns := fake.deleteJobLogsReturns
+	fake.recordInvocation("DeleteJobLogs", []interface{}{arg1})
+	fake.deleteJobLogsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobLogsCallCount() int {
+	fake.deleteJobLogsMutex.RLock()
+	defer fake.deleteJobLogsMutex.RUnlock()
+	return len(fake.deleteJobLogsArgsForCall)
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobLogsCalls(stub func(string) error) {
+	fake.deleteJobLogsMutex.Lock()
+	defer fake.deleteJobLogsMutex.Unlock()
+	fake.DeleteJobLogsStub = stub
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobLogsArgsForCall(i int) string {
+	fake.deleteJobLogsMutex.RLock()
+	defer fake.deleteJobLogsMutex.RUnlock()
+	argsForCall := fake.deleteJobLogsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobLogsReturns(result1 error) {
+	fake.deleteJobLogsMutex.Lock()
+	defer fake.deleteJobLogsMutex.Unlock()
+	fake.DeleteJobLogsStub = nil
+	fake.deleteJobLogsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStoreAdapter) DeleteJobLogsReturnsOnCall(i int, result1 error) {
+	fake.deleteJobLogsMutex.Lock()
+	defer fake.deleteJobLogsMutex.Unlock()
+	fake.DeleteJobLogsStub = nil
+	if fake.deleteJobLogsReturnsOnCall == nil {
+		fake.deleteJobLogsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteJobLogsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeJobStoreAdapter) GetJob(arg1 string) (*domain.Job, bool) {

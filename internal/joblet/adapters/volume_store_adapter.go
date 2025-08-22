@@ -37,6 +37,7 @@ type volumeStoreAdapter struct {
 }
 
 // NewVolumeStoreAdapter creates a new volume store adapter with the specified backend.
+// Initializes volume storage, job usage tracking, and logging for volume management.
 func NewVolumeStoreAdapter(
 	volumeStore volumeStore[string, *domain.Volume],
 	logger *logger.Logger,
@@ -53,6 +54,8 @@ func NewVolumeStoreAdapter(
 }
 
 // CreateVolume adds a new volume to the store.
+// Validates volume configuration, sets creation timestamp, and initializes usage tracking.
+// Returns error if volume with same name already exists.
 func (a *volumeStoreAdapter) CreateVolume(volume *domain.Volume) error {
 
 	a.closeMutex.RLock()
@@ -103,6 +106,8 @@ func (a *volumeStoreAdapter) CreateVolume(volume *domain.Volume) error {
 }
 
 // GetVolume retrieves a volume by name.
+// Returns a deep copy to prevent external modification.
+// Returns nil and false if volume not found.
 func (a *volumeStoreAdapter) GetVolume(name string) (*domain.Volume, bool) {
 
 	a.closeMutex.RLock()
@@ -136,6 +141,8 @@ func (a *volumeStoreAdapter) GetVolume(name string) (*domain.Volume, bool) {
 }
 
 // ListVolumes returns all volumes currently stored in the system.
+// Creates deep copies of all volumes to prevent external modification.
+// Returns empty slice on error or when adapter is closed.
 func (a *volumeStoreAdapter) ListVolumes() []*domain.Volume {
 
 	a.closeMutex.RLock()
@@ -165,6 +172,8 @@ func (a *volumeStoreAdapter) ListVolumes() []*domain.Volume {
 }
 
 // RemoveVolume removes a volume from the store by name.
+// Checks for active job usage before deletion and cleans up usage tracking.
+// Returns error if volume is currently in use by jobs.
 func (a *volumeStoreAdapter) RemoveVolume(name string) error {
 
 	a.closeMutex.RLock()
@@ -221,6 +230,8 @@ func (a *volumeStoreAdapter) RemoveVolume(name string) error {
 }
 
 // IncrementJobCount increases the usage count for a volume.
+// Validates volume existence before incrementing usage counter.
+// Used to track which volumes are actively used by jobs.
 func (a *volumeStoreAdapter) IncrementJobCount(name string) error {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -252,6 +263,8 @@ func (a *volumeStoreAdapter) IncrementJobCount(name string) error {
 }
 
 // DecrementJobCount decreases the usage count for a volume.
+// Prevents decrementing below zero and logs warnings for invalid operations.
+// Used when jobs finish or release volume usage.
 func (a *volumeStoreAdapter) DecrementJobCount(name string) error {
 	a.closeMutex.RLock()
 	if a.closed {
@@ -288,6 +301,8 @@ func (a *volumeStoreAdapter) DecrementJobCount(name string) error {
 }
 
 // Close gracefully shuts down the adapter and releases resources.
+// Clears job usage tracking and closes backend storage.
+// Safe to call multiple times.
 func (a *volumeStoreAdapter) Close() error {
 	a.closeMutex.Lock()
 	defer a.closeMutex.Unlock()
@@ -314,6 +329,8 @@ func (a *volumeStoreAdapter) Close() error {
 
 // Helper methods
 
+// validateVolume validates volume configuration parameters.
+// Checks volume name, type, size, and type-specific requirements (filesystem path).
 func (a *volumeStoreAdapter) validateVolume(volume *domain.Volume) error {
 	if volume.Name == "" {
 		return fmt.Errorf("volume name is required")

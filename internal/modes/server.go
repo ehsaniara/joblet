@@ -116,6 +116,7 @@ func RunServer(cfg *config.Config) error {
 				EnableMetrics:        cfg.Buffers.DefaultConfig.EnableMetrics,
 			},
 		},
+		LogPersistence: &cfg.Buffers.LogPersistence,
 	}
 	jobStoreAdapter, err := adapterFactory.CreateJobStoreAdapter(jobStoreConfig)
 	if err != nil {

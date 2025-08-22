@@ -289,10 +289,16 @@ case "$1" in
         # Network requirements configured
         setup_network_requirements
 
-        # Create log directory
+        # Create runtime directories
         mkdir -p /var/log/joblet
-        chown root:root /var/log/joblet
-        chmod 755 /var/log/joblet
+        mkdir -p /opt/joblet/logs
+        mkdir -p /opt/joblet/network
+        mkdir -p /opt/joblet/volumes
+        mkdir -p /opt/joblet/jobs
+        
+        # Set ownership and permissions
+        chown root:root /var/log/joblet /opt/joblet/logs /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs
+        chmod 755 /var/log/joblet /opt/joblet/logs /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs
 
         # Setup cgroup delegation
         if [ -d /sys/fs/cgroup ]; then

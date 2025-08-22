@@ -316,6 +316,43 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 	return nil
 }
 
+// DeleteJob completely removes a job including logs and metadata
+func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest) error {
+	log := j.logger.WithField("jobID", req.JobID)
+	log.Debug("deleting job", "reason", req.Reason)
+
+	// Check if job exists
+	jb, exists := j.store.GetJob(req.JobID)
+	if !exists {
+		return fmt.Errorf("job not found: %s", req.JobID)
+	}
+
+	// Prevent deletion of running jobs
+	if jb.IsRunning() || jb.IsScheduled() {
+		return fmt.Errorf("cannot delete job %s (status: %s) - stop the job first", req.JobID, jb.Status)
+	}
+
+	log.Info("deleting job completely", "status", jb.Status, "reason", req.Reason)
+
+	// Use the job store adapter's DeleteJob method which handles:
+	// 1. Task wrapper cleanup
+	// 2. Buffer removal
+	// 3. Log deletion via async system
+	// 4. Job record removal
+	// 5. Event publishing
+	err := j.store.DeleteJob(req.JobID)
+	if err != nil {
+		log.Error("job deletion failed", "error", err)
+		return fmt.Errorf("job deletion failed: %w", err)
+	}
+
+	// Cleanup any remaining resources
+	_ = j.cleanup.CleanupJob(req.JobID)
+
+	log.Info("job deleted successfully")
+	return nil
+}
+
 // monitorJob monitors a running job until completion, handling exit codes,
 // coordinating cleanup operations, and managing state transitions.
 // It runs asynchronously and ensures proper resource cleanup regardless of job outcome.

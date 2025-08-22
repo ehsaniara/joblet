@@ -84,6 +84,19 @@ buffers:
     enable_metrics: true        # Enable metrics for log streaming debugging
     upload_timeout: "10m"       # Extended timeout for large uploads
     chunk_size: 1048576         # 1MB chunks for optimal streaming performance
+  
+  # Job log persistence to disk - provides durable logs that survive server restarts
+  log_persistence:
+    directory: "/opt/joblet/logs" # Directory to store job log files
+    retention_days: 7            # Number of days to keep log files before cleanup
+    rotation_size_bytes: 2097152  # 2MB - rotate log file when it reaches this size
+    
+    # Async log system configuration - HPC-optimized for high throughput
+    queue_size: 100000           # Async queue size for rate decoupling (100k default)
+    memory_limit: 1073741824     # 1GB memory limit for overflow protection
+    batch_size: 100              # Batch size for efficient disk writes
+    flush_interval: "100ms"      # Periodic flush interval for low latency
+    overflow_strategy: "compress" # Options: compress, spill, sample, alert
 
 # Volume management configuration
 volumes:

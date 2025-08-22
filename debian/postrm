@@ -8,7 +8,7 @@ case "$1" in
             find /sys/fs/cgroup/joblet.slice -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true
         fi
 
-        # Remove log directory
+        # Remove systemd log directory
         rm -rf /var/log/joblet
 
         # Remove symlinks
@@ -17,6 +17,13 @@ case "$1" in
 
         # Remove user-accessible certificate symlinks
         rm -rf /etc/joblet
+
+        # Note: Job logs in /opt/joblet/logs are preserved
+        # Use 'apt purge joblet' to remove all data including job logs
+        if [ -d "/opt/joblet/logs" ] && [ "$(ls -A /opt/joblet/logs 2>/dev/null)" ]; then
+            echo "Note: Job logs preserved in /opt/joblet/logs"
+            echo "Use 'apt purge joblet' to remove all data"
+        fi
 
         echo "Joblet service removed successfully!"
         ;;
@@ -27,7 +34,13 @@ case "$1" in
             userdel joblet 2>/dev/null || true
         fi
 
-        # Remove all joblet files including new structure
+        # Count log files before removal
+        LOG_COUNT=0
+        if [ -d "/opt/joblet/logs" ]; then
+            LOG_COUNT=$(find /opt/joblet/logs -name "*.log" -type f 2>/dev/null | wc -l)
+        fi
+
+        # Remove all joblet files including job logs, volumes, and configuration
         rm -rf /opt/joblet
         rm -rf /var/log/joblet
         rm -rf /etc/joblet
@@ -36,6 +49,9 @@ case "$1" in
         rm -f /usr/bin/joblet
         rm -f /usr/bin/rnx
 
+        if [ "$LOG_COUNT" -gt 0 ]; then
+            echo "Removed $LOG_COUNT job log files"
+        fi
         echo "Joblet service purged successfully!"
         ;;
 esac
