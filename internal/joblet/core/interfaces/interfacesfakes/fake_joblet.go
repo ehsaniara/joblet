@@ -9,6 +9,18 @@ import (
 )
 
 type FakeJoblet struct {
+	DeleteJobStub        func(context.Context, interfaces.DeleteJobRequest) error
+	deleteJobMutex       sync.RWMutex
+	deleteJobArgsForCall []struct {
+		arg1 context.Context
+		arg2 interfaces.DeleteJobRequest
+	}
+	deleteJobReturns struct {
+		result1 error
+	}
+	deleteJobReturnsOnCall map[int]struct {
+		result1 error
+	}
 	ExecuteScheduledJobStub        func(context.Context, interfaces.ExecuteScheduledJobRequest) error
 	executeScheduledJobMutex       sync.RWMutex
 	executeScheduledJobArgsForCall []struct {
@@ -49,6 +61,68 @@ type FakeJoblet struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeJoblet) DeleteJob(arg1 context.Context, arg2 interfaces.DeleteJobRequest) error {
+	fake.deleteJobMutex.Lock()
+	ret, specificReturn := fake.deleteJobReturnsOnCall[len(fake.deleteJobArgsForCall)]
+	fake.deleteJobArgsForCall = append(fake.deleteJobArgsForCall, struct {
+		arg1 context.Context
+		arg2 interfaces.DeleteJobRequest
+	}{arg1, arg2})
+	stub := fake.DeleteJobStub
+	fakeReturns := fake.deleteJobReturns
+	fake.recordInvocation("DeleteJob", []interface{}{arg1, arg2})
+	fake.deleteJobMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJoblet) DeleteJobCallCount() int {
+	fake.deleteJobMutex.RLock()
+	defer fake.deleteJobMutex.RUnlock()
+	return len(fake.deleteJobArgsForCall)
+}
+
+func (fake *FakeJoblet) DeleteJobCalls(stub func(context.Context, interfaces.DeleteJobRequest) error) {
+	fake.deleteJobMutex.Lock()
+	defer fake.deleteJobMutex.Unlock()
+	fake.DeleteJobStub = stub
+}
+
+func (fake *FakeJoblet) DeleteJobArgsForCall(i int) (context.Context, interfaces.DeleteJobRequest) {
+	fake.deleteJobMutex.RLock()
+	defer fake.deleteJobMutex.RUnlock()
+	argsForCall := fake.deleteJobArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeJoblet) DeleteJobReturns(result1 error) {
+	fake.deleteJobMutex.Lock()
+	defer fake.deleteJobMutex.Unlock()
+	fake.DeleteJobStub = nil
+	fake.deleteJobReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJoblet) DeleteJobReturnsOnCall(i int, result1 error) {
+	fake.deleteJobMutex.Lock()
+	defer fake.deleteJobMutex.Unlock()
+	fake.DeleteJobStub = nil
+	if fake.deleteJobReturnsOnCall == nil {
+		fake.deleteJobReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteJobReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeJoblet) ExecuteScheduledJob(arg1 context.Context, arg2 interfaces.ExecuteScheduledJobRequest) error {
