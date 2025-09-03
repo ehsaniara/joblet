@@ -271,6 +271,7 @@ rnx runtime install java:21         # Uses builder chroot with host OS access
 ```
 
 **Isolation Routing:**
+
 ```
 JobService API          RuntimeService API
      │                       │
@@ -287,6 +288,7 @@ Minimal Chroot          Builder Chroot
 ### Dual Chroot System
 
 #### Production Jobs (Minimal Chroot)
+
 ```bash
 # Minimal filesystem access
 rnx run ls /                    # Limited directories
@@ -294,7 +296,8 @@ rnx run which apt              # Command not found
 rnx run ls /opt/joblet         # No access to joblet internals
 ```
 
-#### Runtime Builds (Builder Chroot)  
+#### Runtime Builds (Builder Chroot)
+
 ```bash
 # Controlled host OS access (ONLY during runtime building)
 # - Full host filesystem (read-only)
@@ -346,6 +349,7 @@ rnx run --runtime=java:21 find /usr -type f | head -5
 ```
 
 **Runtime Directory Structure:**
+
 ```
 /opt/joblet/runtimes/java/openjdk-21/
 ├── isolated/                    # Self-contained runtime files

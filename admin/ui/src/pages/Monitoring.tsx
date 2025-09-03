@@ -1,5 +1,5 @@
 // React import not needed with modern JSX transform
-import { useTranslation } from 'react-i18next';
+import {useTranslation} from 'react-i18next';
 import {useMonitorStream} from '../hooks/useMonitorStream';
 import {useSystemInfo} from '../hooks/useSystemInfo';
 import {useVolumes} from '../hooks/useVolumes';
@@ -12,7 +12,7 @@ import NetworkCard from '../components/Monitoring/NetworkCard';
 import ProcessesCard from '../components/Monitoring/ProcessesCard';
 
 const Monitoring: React.FC = () => {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const {metrics, connected, error: metricsError} = useMonitorStream();
     const {systemInfo, loading: systemLoading, error: systemError} = useSystemInfo();
     const {volumes, loading: volumesLoading, error: volumesError} = useVolumes();
@@ -28,7 +28,8 @@ const Monitoring: React.FC = () => {
                         <h1 className="text-3xl font-bold text-white">{t('monitoring.title')}</h1>
                         <p className="mt-2 text-gray-300">{t('monitoring.subtitle')}</p>
                         <div className="mt-2 flex items-center text-sm">
-                            <div className={`w-2 h-2 rounded-full mr-2 ${connected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+                            <div
+                                className={`w-2 h-2 rounded-full mr-2 ${connected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
                             <span className="text-gray-400">
                                 {connected ? t('monitoring.liveUpdates') : t('monitoring.connecting')}
                             </span>
@@ -54,7 +55,7 @@ const Monitoring: React.FC = () => {
 
                     {/* CPU Details */}
                     {systemInfo?.cpuInfo && (
-                        <CPUDetailsCard 
+                        <CPUDetailsCard
                             cpuInfo={{
                                 ...systemInfo.cpuInfo,
                                 ...(metrics?.cpu && {
@@ -68,7 +69,7 @@ const Monitoring: React.FC = () => {
 
                     {/* Memory Details */}
                     {systemInfo?.memoryInfo && (
-                        <MemoryDetailsCard 
+                        <MemoryDetailsCard
                             memoryInfo={{
                                 ...systemInfo.memoryInfo,
                                 ...(metrics?.memory && {

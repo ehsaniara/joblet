@@ -13,7 +13,9 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-// Builder creates jobs with validation and defaults
+// Builder creates jobs with validation and defaults.
+// Core job construction service that transforms requests into validated domain objects
+// with proper UUIDs, resource limits, and field population.
 type Builder struct {
 	config       *config.Config
 	logger       *logger.Logger
@@ -21,7 +23,9 @@ type Builder struct {
 	resValidator *validation.ResourceValidator
 }
 
-// NewBuilder creates a new job builder
+// NewBuilder creates a new job builder.
+// Initializes builder with configuration, UUID generator, and resource validator
+// for comprehensive job construction with validation.
 func NewBuilder(cfg *config.Config, idGen *IDGenerator, resValidator *validation.ResourceValidator) *Builder {
 	return &Builder{
 		config:       cfg,
@@ -31,7 +35,9 @@ func NewBuilder(cfg *config.Config, idGen *IDGenerator, resValidator *validation
 	}
 }
 
-// BuildRequest represents a request to build a job
+// BuildRequest represents a request to build a job.
+// Interface defining all parameters needed for job construction,
+// implemented by various request types (individual, workflow, scheduled).
 //
 //counterfeiter:generate . BuildRequest
 type BuildRequest interface {
@@ -44,18 +50,34 @@ type BuildRequest interface {
 	GetEnvironment() map[string]string
 	GetSecretEnvironment() map[string]string
 	GetJobType() domain.JobType
+	GetWorkflowUuid() string
+	GetWorkingDirectory() string
+	GetUploads() []domain.FileUpload
+	GetDependencies() []string
 }
 
-// Build creates a new job from the request
+// Build creates a new job from the request.
+// Main construction method: generates UUID, populates all job fields,
+// applies resource defaults, and validates configuration.
 func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	// Generate UUID
 	jobUuid := b.idGenerator.Next()
 
 	b.logger.Debug("building job", "jobUuid", jobUuid, "command", req.GetCommand())
 
-	// Create job
+	// Create job - debug all field values
 	volumes := b.copyStrings(req.GetVolumes())
-	b.logger.Debug("building job with volumes", "jobUuid", jobUuid, "volumes", volumes, "volumeCount", len(volumes))
+	network := req.GetNetwork()
+	runtime := req.GetRuntime()
+
+	b.logger.Debug("building job with all fields",
+		"jobUuid", jobUuid,
+		"network", network,
+		"volumes", volumes,
+		"runtime", runtime,
+		"hasNetwork", network != "",
+		"volumeCount", len(volumes),
+		"hasRuntime", runtime != "")
 
 	job := &domain.Job{
 		Uuid:              jobUuid,
@@ -70,6 +92,10 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		Runtime:           req.GetRuntime(),
 		Environment:       b.copyEnvironment(req.GetEnvironment()),
 		SecretEnvironment: b.copyEnvironment(req.GetSecretEnvironment()),
+		WorkflowUuid:      req.GetWorkflowUuid(),
+		WorkingDirectory:  req.GetWorkingDirectory(),
+		Uploads:           req.GetUploads(),
+		Dependencies:      b.copyStrings(req.GetDependencies()),
 	}
 
 	// Apply resource limits with defaults
@@ -161,6 +187,10 @@ type BuildParams struct {
 	Environment       map[string]string
 	SecretEnvironment map[string]string
 	JobType           domain.JobType
+	WorkflowUuid      string
+	WorkingDirectory  string
+	Uploads           []domain.FileUpload
+	Dependencies      []string
 }
 
 // Implement BuildRequest interface for BuildParams
@@ -173,6 +203,10 @@ func (p BuildParams) GetRuntime() string                      { return p.Runtime
 func (p BuildParams) GetEnvironment() map[string]string       { return p.Environment }
 func (p BuildParams) GetSecretEnvironment() map[string]string { return p.SecretEnvironment }
 func (p BuildParams) GetJobType() domain.JobType              { return p.JobType }
+func (p BuildParams) GetWorkflowUuid() string                 { return p.WorkflowUuid }
+func (p BuildParams) GetWorkingDirectory() string             { return p.WorkingDirectory }
+func (p BuildParams) GetUploads() []domain.FileUpload         { return p.Uploads }
+func (p BuildParams) GetDependencies() []string               { return p.Dependencies }
 
 // BuildFromParams builds a job from BuildParams (convenience method)
 func (b *Builder) BuildFromParams(params BuildParams) (*domain.Job, error) {

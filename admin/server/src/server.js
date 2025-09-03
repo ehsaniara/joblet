@@ -12,7 +12,7 @@ if (majorVersion < 18) {
 import express from 'express';
 import {createServer} from 'http';
 import {config} from './config.js';
-import {setupMiddleware, setupFallbackRoutes} from './middleware/index.js';
+import {setupFallbackRoutes, setupMiddleware} from './middleware/index.js';
 import {setupRoutes} from './routes/index.js';
 import {setupWebSocket} from './websocket/index.js';
 

@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-This document provides a comprehensive security analysis of the dual chroot isolation system, examining the implementation to ensure complete compartmentalization between production jobs and runtime builds with no security leaks.
+This document provides a comprehensive security analysis of the dual chroot isolation system, examining the
+implementation to ensure complete compartmentalization between production jobs and runtime builds with no security
+leaks.
 
 ## Architecture Overview
 
@@ -22,6 +24,7 @@ Production Isolation    Builder Isolation
 ```
 
 **Key Implementation:**
+
 - **Source**: `/home/jay/joblet/internal/modes/isolation/isolation.go:119-136`
 - **Detection**: `jobType := i.platform.Getenv("JOB_TYPE")`
 - **Routing**: `isBuilderJob := jobType == "runtime-build"`
@@ -35,6 +38,7 @@ Production Isolation    Builder Isolation
 **Implementation:** `jobFS.Setup()` in `filesystem/isolator.go`
 
 **Security Boundaries:**
+
 ```
 Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 ├── bin/          # Minimal binaries (read-only bind mount from host)
@@ -47,8 +51,9 @@ Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 ```
 
 **Key Security Features:**
+
 - **Read-only host mounts**: System directories mounted as read-only
-- **Isolated tmp**: Each job gets `/tmp/job-{JOB_ID}/` 
+- **Isolated tmp**: Each job gets `/tmp/job-{JOB_ID}/`
 - **Minimal attack surface**: Only essential binaries available
 - **No package managers**: Cannot install software
 - **No build tools**: Cannot compile or modify system
@@ -60,6 +65,7 @@ Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 **Implementation:** `jobFS.SetupBuilder()` in `filesystem/isolator.go`
 
 **Security Boundaries:**
+
 ```
 Builder Chroot: /opt/joblet/jobs/{BUILD_ID}/
 ├── bin/          # Full /bin from host (read-only bind mount)
@@ -78,6 +84,7 @@ Builder Chroot: /opt/joblet/jobs/{BUILD_ID}/
 ```
 
 **Key Security Features:**
+
 - **Host filesystem (read-only)**: Full OS environment for compilation
 - **Recursive exclusion prevention**: `/opt/joblet/` completely excluded except `runtimes/`
 - **Controlled write access**: Only `/opt/joblet/runtimes/` is writable
@@ -93,6 +100,7 @@ Builder Chroot: /opt/joblet/jobs/{BUILD_ID}/
 **Solution:** Complete exclusion of `/opt/joblet/` except controlled runtimes directory
 
 **Implementation Analysis:**
+
 ```go
 // Source: filesystem/isolator.go:mountOptDirectory()
 func (f *JobFilesystem) mountOptDirectory(hostOptPath, targetOptPath string) error {
@@ -122,8 +130,9 @@ func (f *JobFilesystem) mountRuntimesDirectory() error {
 ```
 
 **Security Guarantee:** Builder jobs cannot access:
+
 - `/opt/joblet/jobs/` (where other jobs run)
-- `/opt/joblet/config/` (system configuration) 
+- `/opt/joblet/config/` (system configuration)
 - `/opt/joblet/logs/` (system logs)
 - Any other `/opt/joblet/` subdirectories
 
@@ -132,11 +141,13 @@ func (f *JobFilesystem) mountRuntimesDirectory() error {
 **Concern:** Builder jobs could contaminate production job filesystems
 
 **Analysis:**
+
 - **Builder writes limited to**: `/opt/joblet/runtimes/` and `/tmp/job-{BUILD_ID}/`
 - **Production job isolation**: Each job in separate `/opt/joblet/jobs/{JOB_ID}/`
 - **No cross-job access**: Build IDs and Job IDs are different UUID namespaces
 
 **Implementation Verification:**
+
 ```go
 // Builder chroot creation
 func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error) {
@@ -153,12 +164,14 @@ func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error)
 **Concern:** Jobs could be misrouted between isolation levels
 
 **Analysis of Detection Chain:**
+
 1. **Service Layer** (`RuntimeService` vs `JobService`) sets `JobType`
 2. **Core Layer** passes `JobType` to environment: `JOB_TYPE=runtime-build`
 3. **Isolation Layer** reads environment: `jobType := i.platform.Getenv("JOB_TYPE")`
 4. **Routing Decision**: `isBuilderJob := jobType == "runtime-build"`
 
 **Security Properties:**
+
 - **Explicit Service Control**: Only `RuntimeService` can set `runtime-build` type
 - **No User Override**: Users cannot manually specify job type via `rnx run`
 - **Environment Isolation**: Job type passed through secure environment variables
@@ -169,6 +182,7 @@ func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error)
 Both job types use identical process isolation:
 
 **Shared Security Features:**
+
 - **PID Namespace**: Each job is PID 1 in its own namespace
 - **Mount Namespace**: Isolated mount table
 - **Network Namespace**: Controlled networking (bridge mode)
@@ -176,6 +190,7 @@ Both job types use identical process isolation:
 - **User Namespace**: Same unprivileged user context
 
 **Implementation Verification:**
+
 ```go
 // Source: filesystem/isolator.go:validateJobContext()
 func (i *Isolator) validateJobContext() error {
@@ -197,7 +212,8 @@ func (i *Isolator) validateJobContext() error {
 **Concern:** Shared `/tmp` could leak data between job types
 
 **Analysis:**
-- **Production jobs**: `/tmp/job-{JOB_ID}/` 
+
+- **Production jobs**: `/tmp/job-{JOB_ID}/`
 - **Builder jobs**: `/tmp/job-{BUILD_ID}/`
 - **Complete separation**: Different UUID namespaces prevent collisions
 - **Automatic cleanup**: Each job's temp space removed after completion
@@ -209,6 +225,7 @@ func (i *Isolator) validateJobContext() error {
 **Attack:** Malicious production job attempts to access builder chroot
 
 **Mitigation:**
+
 - ✅ **Read-only host mounts**: Cannot modify system binaries
 - ✅ **No package managers**: Cannot install escape tools
 - ✅ **Minimal attack surface**: Limited binaries available
@@ -219,6 +236,7 @@ func (i *Isolator) validateJobContext() error {
 **Attack:** Builder job attempts to gain root access
 
 **Mitigation:**
+
 - ✅ **Same user context**: Runs as same unprivileged user as production jobs
 - ✅ **No setuid binaries**: Host mounts are read-only
 - ✅ **Cgroup limits**: Resource restrictions prevent DoS attacks
@@ -229,8 +247,9 @@ func (i *Isolator) validateJobContext() error {
 **Attack:** Production job attempts to read builder artifacts
 
 **Mitigation:**
+
 - ✅ **Separate filesystem trees**: No shared writable space
-- ✅ **Isolated temp directories**: Different UUID-based paths  
+- ✅ **Isolated temp directories**: Different UUID-based paths
 - ✅ **Read-only runtime access**: Production jobs can only read completed runtimes
 - ✅ **No job directory access**: Cannot access other jobs' workspaces
 
@@ -239,6 +258,7 @@ func (i *Isolator) validateJobContext() error {
 **Attack:** One job type consumes resources affecting the other
 
 **Mitigation:**
+
 - ✅ **Same cgroup limits**: Both job types subject to identical resource controls
 - ✅ **Independent quotas**: Each job gets separate CPU/memory/I/O allocation
 - ✅ **Process limits**: Same process count restrictions
@@ -249,6 +269,7 @@ func (i *Isolator) validateJobContext() error {
 While the current implementation is secure, consider these enhancements:
 
 ### 1. SELinux/AppArmor Integration
+
 ```bash
 # Example SELinux policy for additional MAC
 type joblet_production_t;
@@ -257,6 +278,7 @@ type_transition initrc_t joblet_exec_t:process joblet_production_t;
 ```
 
 ### 2. Seccomp Syscall Filtering
+
 ```go
 // Different syscall profiles for each job type
 productionSeccompProfile := &seccomp.Profile{
@@ -269,6 +291,7 @@ builderSeccompProfile := &seccomp.Profile{
 ```
 
 ### 3. Runtime Verification
+
 ```go
 // Verify runtime integrity before production use
 func (r *RuntimeManager) VerifyRuntime(runtimePath string) error {
@@ -280,9 +303,11 @@ func (r *RuntimeManager) VerifyRuntime(runtimePath string) error {
 
 ### Critical Issue Identified and Resolved
 
-**Previous Security Gap:** Runtime installations performed in builder chroot would mount host OS paths directly to production jobs, potentially exposing the entire host filesystem.
+**Previous Security Gap:** Runtime installations performed in builder chroot would mount host OS paths directly to
+production jobs, potentially exposing the entire host filesystem.
 
 **Example of Previous Risk:**
+
 ```yaml
 # Previous runtime.yml (INSECURE)
 mounts:
@@ -293,7 +318,8 @@ mounts:
 
 ### Enhanced Isolation Solution ✅
 
-**Runtime Cleanup Process:** After successful runtime installation, a cleanup phase creates an isolated, self-contained runtime structure:
+**Runtime Cleanup Process:** After successful runtime installation, a cleanup phase creates an isolated, self-contained
+runtime structure:
 
 ```bash
 # In builder chroot during setup:
@@ -307,6 +333,7 @@ mounts:
 ```
 
 **Updated Runtime Configuration:**
+
 ```yaml
 # New runtime.yml (SECURE)
 mounts:
@@ -338,9 +365,10 @@ mounts:
 The service-based dual chroot implementation provides:
 
 1. **Complete Filesystem Isolation**: No shared writable space between job types
-2. **Precise Mount Controls**: Surgical mounting prevents recursion and contamination  
+2. **Precise Mount Controls**: Surgical mounting prevents recursion and contamination
 3. **Robust Process Boundaries**: Identical namespace and cgroup isolation
 4. **Fail-Safe Routing**: Conservative defaults and explicit service-level controls
 5. **Defense in Depth**: Multiple security layers with no single points of failure
 
-The architecture successfully separates production workload execution from administrative runtime building while maintaining security isolation equivalent to running completely separate container environments.
+The architecture successfully separates production workload execution from administrative runtime building while
+maintaining security isolation equivalent to running completely separate container environments.

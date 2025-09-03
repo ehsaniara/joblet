@@ -37,7 +37,8 @@ rnx run --runtime=python-3.11-ml python analysis.py
 
 **Complete isolated Python environment with machine learning packages**
 
-> **Note**: This runtime has setup scripts available but is not currently installed. Use `rnx runtime install python-3.11-ml` to install it.
+> **Note**: This runtime has setup scripts available but is not currently installed. Use
+`rnx runtime install python-3.11-ml` to install it.
 
 - **Python**: 3.11.9 (system package installation)
 - **Pre-installed Packages**: System-based ML packages for reliability
@@ -101,12 +102,14 @@ rnx runtime install openjdk-21 -f
 ```
 
 **Installation Options:**
+
 - `--force` or `-f`: Force reinstall by deleting existing runtime before installation
-  - Removes `/opt/joblet/runtimes/<runtime-name>` if it exists
-  - Useful for updating runtimes or fixing corrupted installations
-  - Installation continues even if deletion fails (with warning)
+    - Removes `/opt/joblet/runtimes/<runtime-name>` if it exists
+    - Useful for updating runtimes or fixing corrupted installations
+    - Installation continues even if deletion fails (with warning)
 
 **Architecture Benefits:**
+
 - **Service-Based**: Runtime installations automatically use builder chroot via RuntimeService
 - **Zero Host Contamination**: Build tools and packages installed only in isolated environment
 - **Automatic Routing**: No manual specification of build mode required
@@ -379,7 +382,8 @@ rnx run --runtime=java:17 java Application
 
 ### Runtime Structure
 
-Each runtime is **completely self-contained**, including both runtime-specific files AND all necessary system binaries in its `isolated/` directory. This eliminates dependency on host system files during job execution.
+Each runtime is **completely self-contained**, including both runtime-specific files AND all necessary system binaries
+in its `isolated/` directory. This eliminates dependency on host system files during job execution.
 
 ```
 /opt/joblet/runtimes/
@@ -489,21 +493,21 @@ environment:
 Each runtime includes platform-specific setup scripts that handle:
 
 1. **Multi-Platform Support**:
-   - Ubuntu/Debian (APT-based)
-   - Amazon Linux (YUM-based)
-   - RHEL/CentOS (DNF/YUM-based)
+    - Ubuntu/Debian (APT-based)
+    - Amazon Linux (YUM-based)
+    - RHEL/CentOS (DNF/YUM-based)
 
 2. **Architecture Awareness**:
-   - **AMD64/x86_64**: Uses `/lib/x86_64-linux-gnu/` paths
-   - **ARM64/aarch64**: Uses `/lib/aarch64-linux-gnu/` paths
-   - Proper dynamic linker configuration per architecture
-   - Architecture-specific `LD_LIBRARY_PATH` settings
+    - **AMD64/x86_64**: Uses `/lib/x86_64-linux-gnu/` paths
+    - **ARM64/aarch64**: Uses `/lib/aarch64-linux-gnu/` paths
+    - Proper dynamic linker configuration per architecture
+    - Architecture-specific `LD_LIBRARY_PATH` settings
 
 3. **Self-Contained Design**:
-   - Each runtime includes ALL necessary system binaries
-   - No dependency on host system files
-   - Complete isolation from host filesystem
-   - Portable across different Linux distributions
+    - Each runtime includes ALL necessary system binaries
+    - No dependency on host system files
+    - Complete isolation from host filesystem
+    - Portable across different Linux distributions
 
 ## 🛠️ Custom Runtimes
 

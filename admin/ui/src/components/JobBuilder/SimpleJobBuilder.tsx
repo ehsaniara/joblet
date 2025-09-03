@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import { useTranslation } from 'react-i18next';
+import {useTranslation} from 'react-i18next';
 import {JobConfig, JobExecuteRequest} from '../../types/job';
 import {CommandBuilder} from '../../services/commandBuilder';
 import {useJobs} from '../../hooks/useJobs';
@@ -19,15 +19,15 @@ interface Runtime {
 // RNX schedule format validation function
 const isValidScheduleFormat = (schedule: string): boolean => {
     if (!schedule.trim()) return true; // Empty is valid (immediate execution)
-    
+
     const trimmed = schedule.trim();
-    
+
     // Check for duration format (e.g., "30s", "5min", "2h", "1d", "2h30m")
     const durationRegex = /^\d+[smhd]$|^\d+min$|^\d+h\d+m$/;
     if (durationRegex.test(trimmed)) {
         return true;
     }
-    
+
     // Check for RFC3339 timestamp format
     const rfc3339Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)?$/;
     if (rfc3339Regex.test(trimmed)) {
@@ -39,7 +39,7 @@ const isValidScheduleFormat = (schedule: string): boolean => {
             return false;
         }
     }
-    
+
     return false;
 };
 
@@ -55,7 +55,7 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                                                                       onClose,
                                                                       showHeader = true
                                                                   }) => {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const {executeJob, loading} = useJobs();
     const [config, setConfig] = useState<JobConfig>({
         command: '',
@@ -275,7 +275,7 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                 setLoadingRuntimes(false);
             }
         };
-        
+
         fetchRuntimes();
     }, []);
 
@@ -687,23 +687,25 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                                         />
                                         <div className="mt-1 space-y-1">
                                             <p className="text-xs text-gray-500">
-                                                Leave empty to run immediately. Use duration or RFC3339 timestamp format.
+                                                Leave empty to run immediately. Use duration or RFC3339 timestamp
+                                                format.
                                             </p>
                                             {config.schedule && !isValidScheduleFormat(config.schedule) && (
                                                 <p className="text-xs text-red-500">
-                                                    Invalid format. Use duration (e.g., 30min, 2h, 2h30m) or RFC3339 timestamp (e.g., 2025-08-03T15:00:00Z)
+                                                    Invalid format. Use duration (e.g., 30min, 2h, 2h30m) or RFC3339
+                                                    timestamp (e.g., 2025-08-03T15:00:00Z)
                                                 </p>
                                             )}
                                             <div className="text-xs text-gray-400 space-y-1">
                                                 <div>
-                                                    Duration examples: 
-                                                    <span className="font-mono ml-1">30s</span>, 
+                                                    Duration examples:
+                                                    <span className="font-mono ml-1">30s</span>,
                                                     <span className="font-mono ml-1">5min</span>,
                                                     <span className="font-mono ml-1">2h</span>,
                                                     <span className="font-mono ml-1">2h30m</span>
                                                 </div>
                                                 <div>
-                                                    Timestamp examples: 
+                                                    Timestamp examples:
                                                     <span className="font-mono ml-1">2025-08-03T15:00:00Z</span>,
                                                     <span className="font-mono ml-1">2025-08-03T15:00:00-07:00</span>
                                                 </div>

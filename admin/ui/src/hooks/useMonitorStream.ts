@@ -36,7 +36,7 @@ export const useMonitorStream = (): UseMonitorStreamReturn => {
         ws.onmessage = (event: MessageEvent) => {
             try {
                 const message = JSON.parse(event.data);
-                
+
                 if (message.type === 'metrics') {
                     setMetrics(message.data);
                 } else if (message.type === 'error') {

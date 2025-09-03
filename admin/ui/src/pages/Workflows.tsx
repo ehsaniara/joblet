@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import { useTranslation } from 'react-i18next';
+import {useTranslation} from 'react-i18next';
 import {useWorkflows} from '../hooks/useWorkflows';
 import WorkflowList from '../components/Workflow/WorkflowList';
 import WorkflowDetail from '../components/Workflow/WorkflowDetail';
@@ -7,7 +7,7 @@ import {ArrowLeft, FileText, Folder, Plus, X} from 'lucide-react';
 import {apiService} from '../services/apiService';
 
 const Workflows: React.FC = () => {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const {
         paginatedWorkflows,
         loading,
@@ -203,7 +203,8 @@ const Workflows: React.FC = () => {
         return (
             <WorkflowDetail
                 workflowId={selectedWorkflowId}
-                onRefresh={() => {}} // No-op since auto-refresh is enabled
+                onRefresh={() => {
+                }} // No-op since auto-refresh is enabled
             />
         );
     }
@@ -223,7 +224,7 @@ const Workflows: React.FC = () => {
                     </div>
                     <div>
                         <button
-                            onClick={() => setCreateWorkflowModal({show: true, creating: false})}
+                            onClick={() => setCreateWorkflowModal({show: true, creating: false, error: ''})}
                             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                         >
                             <Plus className="h-4 w-4 mr-2"/>
@@ -353,7 +354,8 @@ const Workflows: React.FC = () => {
                                             {/* Right Column: Files */}
                                             <div>
                                                 <h4 className="text-sm font-medium text-gray-300 mb-2">
-                                                    Files ({directoryBrowser.yamlFiles.length + directoryBrowser.otherFiles.length})
+                                                    Files
+                                                    ({directoryBrowser.yamlFiles.length + directoryBrowser.otherFiles.length})
                                                 </h4>
                                                 <div className="border border-gray-600 rounded-lg">
                                                     {(directoryBrowser.yamlFiles.length > 0 || directoryBrowser.otherFiles.length > 0) ? (
@@ -371,7 +373,8 @@ const Workflows: React.FC = () => {
                                                                 >
                                                                     <FileText className="h-4 w-4 text-green-400"/>
                                                                     <span className="truncate flex-1">{file.name}</span>
-                                                                    <span className="text-xs text-green-400 bg-green-900 px-2 py-1 rounded flex-shrink-0">
+                                                                    <span
+                                                                        className="text-xs text-green-400 bg-green-900 px-2 py-1 rounded flex-shrink-0">
                                                                         YAML
                                                                     </span>
                                                                 </button>
@@ -385,7 +388,8 @@ const Workflows: React.FC = () => {
                                                                 >
                                                                     <FileText className="h-4 w-4 text-gray-500"/>
                                                                     <span className="truncate flex-1">{file.name}</span>
-                                                                    <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded flex-shrink-0">
+                                                                    <span
+                                                                        className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded flex-shrink-0">
                                                                         Not selectable
                                                                     </span>
                                                                 </div>
@@ -404,8 +408,10 @@ const Workflows: React.FC = () => {
 
                                                 {/* Help text for YAML selection - moved outside the bordered area */}
                                                 {directoryBrowser.yamlFiles.length === 0 && directoryBrowser.otherFiles.length > 0 && (
-                                                    <div className="mt-3 p-3 bg-yellow-800 bg-opacity-30 border border-yellow-600 rounded text-yellow-300 text-sm">
-                                                        Only YAML files (.yaml/.yml) can be selected for workflow execution.
+                                                    <div
+                                                        className="mt-3 p-3 bg-yellow-800 bg-opacity-30 border border-yellow-600 rounded text-yellow-300 text-sm">
+                                                        Only YAML files (.yaml/.yml) can be selected for workflow
+                                                        execution.
                                                     </div>
                                                 )}
                                             </div>
@@ -489,12 +495,15 @@ const Workflows: React.FC = () => {
                             {createWorkflowModal.error && (
                                 <div className="px-6 py-4 bg-red-900/20 border-t border-gray-600">
                                     <div className="flex items-start space-x-3">
-                                        <div className="w-6 h-6 rounded-full bg-red-500 flex-shrink-0 flex items-center justify-center mt-0.5">
+                                        <div
+                                            className="w-6 h-6 rounded-full bg-red-500 flex-shrink-0 flex items-center justify-center mt-0.5">
                                             <X className="w-4 h-4 text-white"/>
                                         </div>
                                         <div className="flex-1">
-                                            <h4 className="text-sm font-medium text-red-200 mb-2">Failed to Execute Workflow</h4>
-                                            <div className="text-sm text-red-300 bg-red-900/30 p-3 rounded border border-red-700">
+                                            <h4 className="text-sm font-medium text-red-200 mb-2">Failed to Execute
+                                                Workflow</h4>
+                                            <div
+                                                className="text-sm text-red-300 bg-red-900/30 p-3 rounded border border-red-700">
                                                 <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
 {createWorkflowModal.error}
                                                 </pre>

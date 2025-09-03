@@ -137,7 +137,7 @@ func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
 	return nil
 }
 
-// executeCommand uses exec to replace the init process with the job command
+// executeCommand uses fork to create a child process while keeping init as PID 1
 func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	// Resolve command path
 	commandPath, err := je.resolveCommandPath(config.Command)
@@ -159,13 +159,15 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 		}
 	}
 
-	// Prepare arguments for exec - argv[0] should be the command name
-	argv := append([]string{commandPath}, config.Args...)
-
 	// Get current environment (already set up by parent process)
 	envv := je.platform.Environ()
 
 	je.logger.Debug("executing job command", "command", commandPath, "args", je.truncateArgsForLogging(config.Args))
+	// About to exec to replace init process with job command
+
+	// Prepare arguments for exec - argv[0] should be the command name
+	argv := append([]string{commandPath}, config.Args...)
+
 	je.logger.Debug("about to exec to replace init process with job command")
 
 	// Use exec to replace the current process (init) with the job command
@@ -195,14 +197,13 @@ func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
 
 	for _, path := range commonPaths {
 		if _, err := je.platform.Stat(path); err == nil {
-			je.logger.Debug("resolved command at", "command", command, "path", path)
+			// Resolved command at path
 			return path, nil
 		}
 	}
 
 	// Fall back to PATH lookup if not found in common locations
 	if path, err := je.platform.LookPath(command); err == nil {
-		je.logger.Debug("resolved command via PATH", "command", command, "path", path)
 		return path, nil
 	}
 

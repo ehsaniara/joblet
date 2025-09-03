@@ -1,6 +1,6 @@
-import {useEffect, useState, useRef} from 'react';
-import { useTranslation } from 'react-i18next';
-import {Cpu, HardDrive, Info, Network, Plus, RefreshCw, Trash2, X, ExternalLink, Download} from 'lucide-react';
+import {useEffect, useRef, useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {Cpu, Download, ExternalLink, HardDrive, Info, Network, Plus, RefreshCw, Trash2, X} from 'lucide-react';
 import {apiService} from '../services/apiService';
 
 interface Volume {
@@ -53,7 +53,7 @@ interface GitHubRuntime {
 }
 
 const Resources: React.FC = () => {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const [volumes, setVolumes] = useState<Volume[]>([]);
     const [networks, setNetworks] = useState<NetworkResource[]>([]);
     const [runtimes, setRuntimes] = useState<Runtime[]>([]);
@@ -185,16 +185,16 @@ const Resources: React.FC = () => {
             // Parse repository path: "owner/repo/tree/branch/path" 
             const pathParts = repoPath.split('/');
             if (pathParts.length < 5) return false;
-            
+
             const owner = pathParts[0];
             const repo = pathParts[1];
             const branch = pathParts[3]; // skip "tree"
             const path = pathParts.slice(4).join('/');
-            
+
             // Check for runtime-manifest.json in the specified path
             const manifestUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}/runtime-manifest.json?ref=${branch}`;
             const response = await fetch(manifestUrl);
-            
+
             return response.ok;
         } catch {
             return false;
@@ -204,26 +204,26 @@ const Resources: React.FC = () => {
     const fetchGitHubRuntimes = async (customRepo?: string) => {
         const repoPath = customRepo || runtimesDialog.repository;
         setRuntimesDialog(prev => ({...prev, loading: true, error: ''}));
-        
+
         try {
             // First validate that the repository has runtime-manifest.json
             const isValid = await validateRuntimeRepository(repoPath);
             if (!isValid) {
                 throw new Error(t('resources.repositoryNoManifest'));
             }
-            
+
             // Parse repository path: "owner/repo/tree/branch/path"
             const pathParts = repoPath.split('/');
             const owner = pathParts[0];
             const repo = pathParts[1];
             const branch = pathParts[3]; // skip "tree"
             const path = pathParts.slice(4).join('/');
-            
+
             // Try server-side proxy first to avoid rate limits (if using default repo)
             let response;
             if (repoPath === 'ehsaniara/joblet/tree/main/runtimes') {
                 response = await fetch('/api/github/runtimes');
-                
+
                 // Fallback to direct GitHub API if proxy doesn't exist
                 if (!response.ok && response.status === 404) {
                     response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`);
@@ -232,16 +232,16 @@ const Resources: React.FC = () => {
                 // For custom repositories, always use direct GitHub API
                 response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`);
             }
-            
+
             if (!response.ok) {
                 if (response.status === 403) {
                     throw new Error('GitHub API rate limit exceeded. Please try again later or use a personal access token.');
                 }
                 throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
             }
-            
+
             const data = await response.json();
-            
+
             // Handle server proxy response (already processed) vs direct GitHub API response
             let runtimesWithPlatforms;
             if (Array.isArray(data) && data.length > 0 && data[0].platforms) {
@@ -250,24 +250,24 @@ const Resources: React.FC = () => {
             } else if (Array.isArray(data)) {
                 // Direct GitHub API response - need to process
                 const runtimeDirs = data.filter(item => item.type === 'dir');
-                
+
                 runtimesWithPlatforms = await Promise.all(
                     runtimeDirs.map(async (runtime) => {
                         try {
                             const platformResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}/${runtime.name}?ref=${branch}`);
-                            
+
                             if (platformResponse.ok) {
                                 const platformData = await platformResponse.json();
-                                
+
                                 if (Array.isArray(platformData)) {
-                                    const setupFiles = platformData.filter(item => 
-                                        item.type === 'file' && 
-                                        item.name.startsWith('setup-') && 
+                                    const setupFiles = platformData.filter(item =>
+                                        item.type === 'file' &&
+                                        item.name.startsWith('setup-') &&
                                         item.name.endsWith('.sh')
                                     );
-                                    
+
                                     const platforms = new Set<string>();
-                                    
+
                                     setupFiles.forEach(file => {
                                         const match = file.name.match(/setup-([^-]+)-([^.]+)\.sh/);
                                         if (match) {
@@ -275,7 +275,7 @@ const Resources: React.FC = () => {
                                             platforms.add(`${os}/${arch}`);
                                         }
                                     });
-                                    
+
                                     return {
                                         name: runtime.name,
                                         type: 'directory',
@@ -284,7 +284,7 @@ const Resources: React.FC = () => {
                                     };
                                 }
                             }
-                            
+
                             return {
                                 name: runtime.name,
                                 type: 'directory',
@@ -304,25 +304,40 @@ const Resources: React.FC = () => {
             } else {
                 throw new Error('Invalid response format');
             }
-            
+
             // Compare with local runtimes to mark installed status
             const localRuntimeNames = runtimes.map(r => r.name.toLowerCase());
             const runtimesWithInstallStatus = runtimesWithPlatforms.map(runtime => ({
                 ...runtime,
                 isInstalled: localRuntimeNames.includes(runtime.name.toLowerCase())
             }));
-            
+
             setRuntimesDialog(prev => ({
-                ...prev, 
+                ...prev,
                 runtimes: runtimesWithInstallStatus,
                 loading: false
             }));
         } catch (err) {
             // Fallback to known runtimes if GitHub API fails
             const fallbackRuntimes = [
-                { name: 'graalvmjdk-21', type: 'directory', html_url: 'https://github.com/ehsaniara/joblet/tree/main/runtimes/graalvmjdk-21', platforms: ['ubuntu/amd64', 'ubuntu/arm64', 'rhel/amd64', 'rhel/arm64', 'amzn/amd64', 'amzn/arm64'] },
-                { name: 'openjdk-21', type: 'directory', html_url: 'https://github.com/ehsaniara/joblet/tree/main/runtimes/openjdk-21', platforms: ['ubuntu/amd64', 'ubuntu/arm64', 'rhel/amd64', 'rhel/arm64', 'amzn/amd64', 'amzn/arm64'] },
-                { name: 'python-3.11-ml', type: 'directory', html_url: 'https://github.com/ehsaniara/joblet/tree/main/runtimes/python-3.11-ml', platforms: ['ubuntu/amd64', 'ubuntu/arm64', 'rhel/amd64', 'rhel/arm64', 'amzn/amd64', 'amzn/arm64'] }
+                {
+                    name: 'graalvmjdk-21',
+                    type: 'directory',
+                    html_url: 'https://github.com/ehsaniara/joblet/tree/main/runtimes/graalvmjdk-21',
+                    platforms: ['ubuntu/amd64', 'ubuntu/arm64', 'rhel/amd64', 'rhel/arm64', 'amzn/amd64', 'amzn/arm64']
+                },
+                {
+                    name: 'openjdk-21',
+                    type: 'directory',
+                    html_url: 'https://github.com/ehsaniara/joblet/tree/main/runtimes/openjdk-21',
+                    platforms: ['ubuntu/amd64', 'ubuntu/arm64', 'rhel/amd64', 'rhel/arm64', 'amzn/amd64', 'amzn/arm64']
+                },
+                {
+                    name: 'python-3.11-ml',
+                    type: 'directory',
+                    html_url: 'https://github.com/ehsaniara/joblet/tree/main/runtimes/python-3.11-ml',
+                    platforms: ['ubuntu/amd64', 'ubuntu/arm64', 'rhel/amd64', 'rhel/arm64', 'amzn/amd64', 'amzn/arm64']
+                }
             ];
 
             // Compare with local runtimes for install status
@@ -333,7 +348,7 @@ const Resources: React.FC = () => {
             }));
 
             setRuntimesDialog(prev => ({
-                ...prev, 
+                ...prev,
                 runtimes: fallbackWithStatus,
                 error: 'GitHub API temporarily unavailable - showing known runtimes',
                 loading: false
@@ -343,7 +358,7 @@ const Resources: React.FC = () => {
 
     const openRuntimesDialog = async () => {
         setRuntimesDialog(prev => ({...prev, show: true}));
-        
+
         // Fetch both local and GitHub runtimes
         await Promise.all([
             fetchRuntimes(), // Refresh local runtimes
@@ -370,7 +385,7 @@ const Resources: React.FC = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ name: runtimeName, force: force })
+                body: JSON.stringify({name: runtimeName, force: force})
             });
 
             if (!response.ok) {
@@ -378,7 +393,7 @@ const Resources: React.FC = () => {
             }
 
             const result = await response.json();
-            
+
             if (result.buildJobId) {
                 // Open streaming progress dialog
                 setInstallProgress({
@@ -415,10 +430,10 @@ const Resources: React.FC = () => {
 
         ws.onmessage = (event) => {
             const message = JSON.parse(event.data);
-            
+
             setInstallProgress(prev => {
                 const newLogs = [...prev.logs];
-                
+
                 if (message.type === 'log') {
                     newLogs.push(message.message);
                 } else if (message.type === 'error') {
@@ -440,16 +455,16 @@ const Resources: React.FC = () => {
                 } else if (message.type === 'connection') {
                     newLogs.push(message.message);
                 }
-                
+
                 return {
                     ...prev,
                     logs: newLogs
                 };
             });
-            
+
             // Auto-scroll to bottom
             setTimeout(() => {
-                logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                logsEndRef.current?.scrollIntoView({behavior: 'smooth'});
             }, 100);
         };
 
@@ -509,7 +524,7 @@ const Resources: React.FC = () => {
                 const isReinstall = runtimeConfirm.action === 'reinstall';
                 await performInstallRuntime(runtimeConfirm.runtimeName, isReinstall);
             }
-            
+
             setRuntimeConfirm({
                 show: false,
                 action: 'install',
@@ -640,7 +655,7 @@ const Resources: React.FC = () => {
         // Validate all fields
         const nameError = validateVolumeName(volumeForm.name);
         const sizeError = validateVolumeSize(volumeForm.size);
-        
+
         if (nameError || sizeError) {
             setVolumeFormErrors({
                 name: nameError,
@@ -697,10 +712,10 @@ const Resources: React.FC = () => {
         if (typeof size === 'string' && /\d+(\.\d+)?\s*(B|KB|MB|GB|TB)$/i.test(size)) {
             return size;
         }
-        
+
         // Convert string to number if it's just a number
         const numericSize = typeof size === 'string' ? parseInt(size) : size;
-        
+
         if (numericSize === 0 || isNaN(numericSize)) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -980,7 +995,8 @@ const Resources: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Command Preview
                                     </label>
-                                    <pre className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
+                                    <pre
+                                        className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
 {`rnx volume remove ${deleteConfirm.volumeName}`}
                                     </pre>
                                 </div>
@@ -1048,8 +1064,8 @@ const Resources: React.FC = () => {
                                         value={volumeForm.name}
                                         onChange={(e) => handleVolumeNameChange(e.target.value)}
                                         className={`w-full px-3 py-2 border rounded-md bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 ${
-                                            volumeFormErrors.name 
-                                                ? 'border-red-500 focus:ring-red-500' 
+                                            volumeFormErrors.name
+                                                ? 'border-red-500 focus:ring-red-500'
                                                 : 'border-gray-600 focus:ring-blue-500'
                                         }`}
                                         placeholder="e.g., backend, cache, data"
@@ -1070,8 +1086,8 @@ const Resources: React.FC = () => {
                                             value={volumeForm.size}
                                             onChange={(e) => handleVolumeSizeChange(e.target.value)}
                                             className={`w-full px-3 py-2 border rounded-md bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 ${
-                                                volumeFormErrors.size 
-                                                    ? 'border-red-500 focus:ring-red-500' 
+                                                volumeFormErrors.size
+                                                    ? 'border-red-500 focus:ring-red-500'
                                                     : 'border-gray-600 focus:ring-blue-500'
                                             }`}
                                             placeholder="e.g., 1GB, 500MB"
@@ -1103,10 +1119,11 @@ const Resources: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Command Preview
                                     </label>
-                                    <pre className="bg-gray-900 text-green-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
-{volumeForm.name && volumeForm.size 
-  ? `rnx volume create ${volumeForm.name} --size=${volumeForm.size}${volumeForm.type !== 'filesystem' ? ` --type=${volumeForm.type}` : ''}`
-  : '# Enter volume name and size to see command preview'}
+                                    <pre
+                                        className="bg-gray-900 text-green-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
+{volumeForm.name && volumeForm.size
+    ? `rnx volume create ${volumeForm.name} --size=${volumeForm.size}${volumeForm.type !== 'filesystem' ? ` --type=${volumeForm.type}` : ''}`
+    : '# Enter volume name and size to see command preview'}
                                     </pre>
                                 </div>
                             </div>
@@ -1171,7 +1188,8 @@ const Resources: React.FC = () => {
                                         Are you sure you want to delete the network "{deleteNetworkConfirm.networkName}"?
                                     </p>
                                     <p className="text-sm text-red-400">
-                                        This action cannot be undone. Any containers using this network must be stopped first.
+                                        This action cannot be undone. Any containers using this network must be stopped
+                                        first.
                                     </p>
                                 </div>
 
@@ -1180,7 +1198,8 @@ const Resources: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Command Preview
                                     </label>
-                                    <pre className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
+                                    <pre
+                                        className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
 {`rnx network remove ${deleteNetworkConfirm.networkName}`}
                                     </pre>
                                 </div>
@@ -1272,10 +1291,11 @@ const Resources: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Command Preview
                                     </label>
-                                    <pre className="bg-gray-900 text-green-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
-{networkForm.name && networkForm.cidr 
-  ? `rnx network create ${networkForm.name} --cidr=${networkForm.cidr}`
-  : '# Enter network name and CIDR range to see command preview'}
+                                    <pre
+                                        className="bg-gray-900 text-green-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
+{networkForm.name && networkForm.cidr
+    ? `rnx network create ${networkForm.name} --cidr=${networkForm.cidr}`
+    : '# Enter network name and CIDR range to see command preview'}
                                     </pre>
                                 </div>
                             </div>
@@ -1316,7 +1336,8 @@ const Resources: React.FC = () => {
             {runtimesDialog.show && (
                 <div
                     className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                    <div className="relative bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-hidden">
+                    <div
+                        className="relative bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-hidden">
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-medium text-gray-200">
@@ -1340,7 +1361,10 @@ const Resources: React.FC = () => {
                                     <input
                                         type="text"
                                         value={runtimesDialog.repository}
-                                        onChange={(e) => setRuntimesDialog(prev => ({...prev, repository: e.target.value}))}
+                                        onChange={(e) => setRuntimesDialog(prev => ({
+                                            ...prev,
+                                            repository: e.target.value
+                                        }))}
                                         placeholder={t('resources.repositoryPlaceholder')}
                                         className="flex-1 px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         disabled={runtimesDialog.loading}
@@ -1352,7 +1376,8 @@ const Resources: React.FC = () => {
                                     >
                                         {(runtimesDialog.loading || runtimesDialog.validatingRepo) ? (
                                             <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                <div
+                                                    className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                                                 {t('resources.validating')}
                                             </>
                                         ) : (
@@ -1374,7 +1399,10 @@ const Resources: React.FC = () => {
                                     <input
                                         type="text"
                                         value={runtimesDialog.searchQuery}
-                                        onChange={(e) => setRuntimesDialog(prev => ({...prev, searchQuery: e.target.value}))}
+                                        onChange={(e) => setRuntimesDialog(prev => ({
+                                            ...prev,
+                                            searchQuery: e.target.value
+                                        }))}
                                         placeholder={t('resources.searchRuntimes')}
                                         className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
@@ -1389,7 +1417,8 @@ const Resources: React.FC = () => {
                             <div className="overflow-y-auto max-h-[70vh]">
                                 {runtimesDialog.loading ? (
                                     <div className="text-center py-8">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
                                         <p className="text-gray-500">{t('resources.fetchingRuntimes')}</p>
                                     </div>
                                 ) : runtimesDialog.error ? (
@@ -1413,7 +1442,8 @@ const Resources: React.FC = () => {
                                 ) : (
                                     <div className="space-y-3">
                                         {filteredRuntimes.map((runtime, index) => (
-                                            <div key={runtime.name || index} className="border border-gray-600 rounded-lg p-6 hover:bg-gray-700 transition-colors">
+                                            <div key={runtime.name || index}
+                                                 className="border border-gray-600 rounded-lg p-6 hover:bg-gray-700 transition-colors">
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1 pr-6">
                                                         {/* Header */}
@@ -1425,12 +1455,14 @@ const Resources: React.FC = () => {
                                                                         {runtime.displayName || runtime.name}
                                                                     </h4>
                                                                     {runtime.version && (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200">
+                                                                        <span
+                                                                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200">
                                                                             v{runtime.version}
                                                                         </span>
                                                                     )}
                                                                     {runtime.language && (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                                        <span
+                                                                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                                                             {runtime.language}
                                                                         </span>
                                                                     )}
@@ -1441,16 +1473,17 @@ const Resources: React.FC = () => {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        
+
                                                         {/* Details Grid */}
                                                         <div className="ml-9 space-y-3">
                                                             {/* Platforms */}
                                                             {runtime.platforms && runtime.platforms.length > 0 && (
                                                                 <div>
-                                                                    <p className="text-xs font-medium text-gray-400 mb-2">Supported Platforms:</p>
+                                                                    <p className="text-xs font-medium text-gray-400 mb-2">Supported
+                                                                        Platforms:</p>
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {runtime.platforms.map((platform) => (
-                                                                            <span 
+                                                                            <span
                                                                                 key={platform}
                                                                                 className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
                                                                             >
@@ -1460,12 +1493,14 @@ const Resources: React.FC = () => {
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            
+
                                                             {/* Requirements */}
                                                             {runtime.requirements && (
                                                                 <div>
-                                                                    <p className="text-xs font-medium text-gray-400 mb-2">System Requirements:</p>
-                                                                    <div className="flex flex-wrap gap-2 text-xs text-gray-300">
+                                                                    <p className="text-xs font-medium text-gray-400 mb-2">System
+                                                                        Requirements:</p>
+                                                                    <div
+                                                                        className="flex flex-wrap gap-2 text-xs text-gray-300">
                                                                         <span>RAM: {runtime.requirements.min_ram_mb}MB</span>
                                                                         <span>•</span>
                                                                         <span>Disk: {runtime.requirements.min_disk_mb}MB</span>
@@ -1478,14 +1513,14 @@ const Resources: React.FC = () => {
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            
+
                                                             {/* Executables */}
                                                             {runtime.provides?.executables && runtime.provides.executables.length > 0 && (
                                                                 <div>
                                                                     <p className="text-xs font-medium text-gray-400 mb-2">Provides:</p>
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {runtime.provides.executables.slice(0, 6).map((executable) => (
-                                                                            <span 
+                                                                            <span
                                                                                 key={executable}
                                                                                 className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                                                                             >
@@ -1500,14 +1535,14 @@ const Resources: React.FC = () => {
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            
+
                                                             {/* Tags */}
                                                             {runtime.tags && runtime.tags.length > 0 && (
                                                                 <div>
                                                                     <p className="text-xs font-medium text-gray-400 mb-2">Tags:</p>
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {runtime.tags.slice(0, 8).map((tag) => (
-                                                                            <span 
+                                                                            <span
                                                                                 key={tag}
                                                                                 className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                                                                             >
@@ -1524,20 +1559,22 @@ const Resources: React.FC = () => {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    
+
                                                     {/* Action Buttons Column */}
                                                     <div className="flex flex-col items-end space-y-2 min-w-0">
                                                         {/* Install Status Indicator */}
                                                         {runtime.isInstalled ? (
-                                                            <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 w-full justify-center">
+                                                            <span
+                                                                className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 w-full justify-center">
                                                                 ✓ Installed
                                                             </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 w-full justify-center">
+                                                            <span
+                                                                className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 w-full justify-center">
                                                                 Not Installed
                                                             </span>
                                                         )}
-                                                        
+
                                                         {/* Action Buttons */}
                                                         {runtime.html_url && (
                                                             <a
@@ -1550,7 +1587,7 @@ const Resources: React.FC = () => {
                                                                 View
                                                             </a>
                                                         )}
-                                                        
+
                                                         {!runtime.isInstalled ? (
                                                             <button
                                                                 onClick={() => showRuntimeConfirmation('install', runtime.name)}
@@ -1618,7 +1655,8 @@ const Resources: React.FC = () => {
             {installProgress.show && (
                 <div
                     className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                    <div className="relative bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                    <div
+                        className="relative bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <div>
@@ -1629,7 +1667,8 @@ const Resources: React.FC = () => {
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     {installProgress.status === 'building' && (
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
                                     )}
                                     {installProgress.status === 'completed' && (
                                         <span className="text-green-400 text-sm">✅ Complete</span>
@@ -1651,16 +1690,16 @@ const Resources: React.FC = () => {
                                 <div className="font-mono text-sm space-y-1">
                                     {installProgress.logs.map((log, index) => (
                                         <div key={index} className={`
-                                            ${log.startsWith('ERROR:') ? 'text-red-400' : 
-                                              log.startsWith('✅') ? 'text-green-400' :
-                                              log.startsWith('❌') ? 'text-red-400' :
-                                              log.includes('[INFO]') ? 'text-blue-400' :
-                                              'text-gray-300'}
+                                            ${log.startsWith('ERROR:') ? 'text-red-400' :
+                                            log.startsWith('✅') ? 'text-green-400' :
+                                                log.startsWith('❌') ? 'text-red-400' :
+                                                    log.includes('[INFO]') ? 'text-blue-400' :
+                                                        'text-gray-300'}
                                         `}>
                                             {log}
                                         </div>
                                     ))}
-                                    <div ref={logsEndRef} />
+                                    <div ref={logsEndRef}/>
                                 </div>
                             </div>
 
@@ -1721,7 +1760,8 @@ const Resources: React.FC = () => {
                                     )}
                                     {runtimeConfirm.action === 'remove' && (
                                         <p className="text-sm text-red-400">
-                                            This action cannot be undone. The runtime will be completely removed from the system.
+                                            This action cannot be undone. The runtime will be completely removed from
+                                            the system.
                                         </p>
                                     )}
                                 </div>
@@ -1733,14 +1773,14 @@ const Resources: React.FC = () => {
                                     </label>
                                     <pre className={`bg-gray-900 p-4 rounded-md text-sm overflow-x-auto font-mono ${
                                         runtimeConfirm.action === 'install' ? 'text-blue-400' :
-                                        runtimeConfirm.action === 'reinstall' ? 'text-orange-400' :
-                                        'text-red-400'
+                                            runtimeConfirm.action === 'reinstall' ? 'text-orange-400' :
+                                                'text-red-400'
                                     }`}>
-{runtimeConfirm.action === 'install' 
-  ? `rnx runtime install ${runtimeConfirm.runtimeName} --github-repo=ehsaniara/joblet/tree/main/runtimes`
-  : runtimeConfirm.action === 'reinstall'
-  ? `rnx runtime install ${runtimeConfirm.runtimeName} --force --github-repo=ehsaniara/joblet/tree/main/runtimes`
-  : `rnx runtime remove ${runtimeConfirm.runtimeName}`}
+{runtimeConfirm.action === 'install'
+    ? `rnx runtime install ${runtimeConfirm.runtimeName} --github-repo=ehsaniara/joblet/tree/main/runtimes`
+    : runtimeConfirm.action === 'reinstall'
+        ? `rnx runtime install ${runtimeConfirm.runtimeName} --force --github-repo=ehsaniara/joblet/tree/main/runtimes`
+        : `rnx runtime remove ${runtimeConfirm.runtimeName}`}
                                     </pre>
                                 </div>
                             </div>
@@ -1758,19 +1798,23 @@ const Resources: React.FC = () => {
                                     disabled={runtimeConfirm.processing}
                                     className={`px-4 py-2 rounded-md text-sm font-medium disabled:cursor-not-allowed flex items-center
                                         ${runtimeConfirm.action === 'install' ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white' :
-                                          runtimeConfirm.action === 'reinstall' ? 'bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 text-white' :
-                                          'bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white'}`}
+                                        runtimeConfirm.action === 'reinstall' ? 'bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 text-white' :
+                                            'bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white'}`}
                                 >
                                     {runtimeConfirm.processing ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            <div
+                                                className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                                             Processing...
                                         </>
                                     ) : (
                                         <>
-                                            {runtimeConfirm.action === 'install' && <><Download className="h-4 w-4 mr-2"/>Install</>}
-                                            {runtimeConfirm.action === 'reinstall' && <><RefreshCw className="h-4 w-4 mr-2"/>Reinstall</>}
-                                            {runtimeConfirm.action === 'remove' && <><Trash2 className="h-4 w-4 mr-2"/>Remove</>}
+                                            {runtimeConfirm.action === 'install' && <><Download
+                                                className="h-4 w-4 mr-2"/>Install</>}
+                                            {runtimeConfirm.action === 'reinstall' && <><RefreshCw
+                                                className="h-4 w-4 mr-2"/>Reinstall</>}
+                                            {runtimeConfirm.action === 'remove' && <><Trash2
+                                                className="h-4 w-4 mr-2"/>Remove</>}
                                         </>
                                     )}
                                 </button>

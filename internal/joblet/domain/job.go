@@ -75,6 +75,12 @@ type Job struct {
 	Volumes []string // Volume names to mount (kept as string slice for backward compatibility)
 	Runtime string   // Runtime specification (kept as string for backward compatibility)
 
+	// Workflow integration
+	WorkflowUuid     string       // UUID of parent workflow (empty for individual jobs)
+	WorkingDirectory string       // Execution directory path
+	Uploads          []FileUpload // Files uploaded with the job
+	Dependencies     []string     // Job names this job depends on (workflow jobs only)
+
 	// Environment
 	Environment       map[string]string // Environment variables (kept as map for backward compatibility)
 	SecretEnvironment map[string]string // Secret environment variables (kept as map for backward compatibility)

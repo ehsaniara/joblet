@@ -1,12 +1,12 @@
 // React import not needed with modern JSX transform
 import {Link} from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import {useTranslation} from 'react-i18next';
 import {useJobs} from '../hooks/useJobs';
 import {useMonitorStream} from '../hooks/useMonitorStream';
 import {Activity, Cpu, HardDrive, Zap} from 'lucide-react';
 
 const Dashboard: React.FC = () => {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const {jobs, loading: jobsLoading, error: jobsError} = useJobs();
     const {metrics, connected, error: metricsError} = useMonitorStream();
 
@@ -81,7 +81,8 @@ const Dashboard: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="flex justify-between">
                                         <span className="text-sm text-gray-600">CPU ({metrics.cpu.cores} cores)</span>
-                                        <span className="text-sm font-medium">{metrics.cpu.usagePercent.toFixed(1)}%</span>
+                                        <span
+                                            className="text-sm font-medium">{metrics.cpu.usagePercent.toFixed(1)}%</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                         <div

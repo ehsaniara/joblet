@@ -624,6 +624,7 @@ multi-job execution with dependency management, resource isolation, and comprehe
 The API provides multiple services with distinct responsibilities:
 
 #### JobService (Production Operations)
+
 Handles regular user jobs with production isolation:
 
 ```protobuf
@@ -644,6 +645,7 @@ service JobService {
 ```
 
 #### RuntimeService (Administrative Operations)
+
 Handles runtime building with builder chroot access:
 
 ```protobuf
@@ -657,6 +659,7 @@ service RuntimeService {
 ```
 
 **Key Differences:**
+
 - **JobService**: Sets `JobType: "standard"` → minimal chroot with production isolation
 - **RuntimeService**: Sets `JobType: "runtime-build"` → builder chroot with host OS access
 

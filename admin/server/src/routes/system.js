@@ -128,15 +128,15 @@ router.post('/volumes', async (req, res) => {
     try {
         const {name, size, type} = req.body;
         const node = req.query.node;
-        
+
         if (!name) {
             return res.status(400).json({error: 'Volume name is required'});
         }
-        
+
         const args = ['volume', 'create', name];
         if (size) args.push('--size', size);
         if (type) args.push('--type', type);
-        
+
         const output = await execRnx(args, {node});
         res.json({success: true, output});
     } catch (error) {
@@ -150,7 +150,7 @@ router.delete('/volumes/:volumeName', async (req, res) => {
     try {
         const {volumeName} = req.params;
         const node = req.query.node;
-        
+
         const output = await execRnx(['volume', 'remove', volumeName], {node});
         res.json({success: true, output});
     } catch (error) {
@@ -217,19 +217,19 @@ router.post('/networks', async (req, res) => {
     try {
         const {name, cidr, type} = req.body;
         const node = req.query.node;
-        
+
         if (!name) {
             return res.status(400).json({error: 'Network name is required'});
         }
-        
+
         if (!cidr) {
             return res.status(400).json({error: 'CIDR range is required'});
         }
-        
+
         const args = ['network', 'create', name];
         args.push('--cidr', cidr);
         if (type) args.push('--type', type);
-        
+
         const output = await execRnx(args, {node});
         res.json({success: true, output});
     } catch (error) {
@@ -243,7 +243,7 @@ router.delete('/networks/:networkName', async (req, res) => {
     try {
         const {networkName} = req.params;
         const node = req.query.node;
-        
+
         const output = await execRnx(['network', 'remove', networkName], {node});
         res.json({success: true, output});
     } catch (error) {
@@ -257,14 +257,14 @@ router.get('/runtimes', async (req, res) => {
     try {
         const node = req.query.node;
         const output = await execRnx(['runtime', 'list', '--json'], {node});
-        
+
         let runtimes = [];
         if (output && output.trim()) {
             try {
                 const runtimeData = JSON.parse(output);
                 // rnx runtime list returns an array directly, not an object with runtimes property
                 const rawRuntimes = Array.isArray(runtimeData) ? runtimeData : (runtimeData.runtimes || []);
-                
+
                 // Transform to match UI expectations
                 runtimes = rawRuntimes.map(runtime => ({
                     id: runtime.id,
@@ -278,7 +278,7 @@ router.get('/runtimes', async (req, res) => {
                 runtimes = [];
             }
         }
-        
+
         res.json({runtimes});
     } catch (error) {
         console.error('Failed to list runtimes:', error);
@@ -291,18 +291,18 @@ router.post('/runtimes/install', async (req, res) => {
     try {
         const {name, force} = req.body;
         const node = req.query.node;
-        
+
         if (!name) {
             return res.status(400).json({error: 'Runtime name is required'});
         }
-        
+
         const args = ['runtime', 'install', name, '--github-repo=ehsaniara/joblet/tree/main/runtimes'];
         if (force) {
             args.push('--force');
         }
-        
+
         const output = await execRnx(args, {node});
-        
+
         // Extract build job ID from output
         let buildJobId = null;
         const lines = output.split('\n');
@@ -312,9 +312,9 @@ router.post('/runtimes/install', async (req, res) => {
                 break;
             }
         }
-        
+
         res.json({
-            success: true, 
+            success: true,
             output: output,
             buildJobId: buildJobId
         });
@@ -329,7 +329,7 @@ router.delete('/runtimes/:runtimeName', async (req, res) => {
     try {
         const {runtimeName} = req.params;
         const node = req.query.node;
-        
+
         const output = await execRnx(['runtime', 'remove', runtimeName], {node});
         res.json({success: true, output});
     } catch (error) {
@@ -367,7 +367,7 @@ router.get('/github/runtimes', async (req, res) => {
         // Use RNX native GitHub runtime listing
         const node = req.query.node;
         const output = await execRnx(['runtime', 'list', '--github-repo=ehsaniara/joblet/tree/main/runtimes', '--json'], {node});
-        
+
         // Extract JSON from the output (skip status messages)
         const lines = output.split('\n');
         let jsonStart = -1;
@@ -377,10 +377,10 @@ router.get('/github/runtimes', async (req, res) => {
                 break;
             }
         }
-        
+
         const jsonOutput = jsonStart >= 0 ? lines.slice(jsonStart).join('\n') : output;
         const runtimeData = JSON.parse(jsonOutput);
-        
+
         // Transform RNX runtime data to match UI expectations
         const runtimesWithPlatforms = runtimeData.map(runtime => {
             // Extract platform list from the platforms object
@@ -388,7 +388,7 @@ router.get('/github/runtimes', async (req, res) => {
                 .filter(platform => runtime.platforms[platform].supported)
                 .map(platform => platform.replace('-', '/'))
                 .sort();
-            
+
             return {
                 name: runtime.name,
                 type: 'directory',
@@ -404,15 +404,15 @@ router.get('/github/runtimes', async (req, res) => {
                 tags: runtime.tags
             };
         });
-        
+
         // Cache the result
         githubRuntimesCache = runtimesWithPlatforms;
         githubCacheTimestamp = now;
-        
+
         res.json(runtimesWithPlatforms);
     } catch (error) {
         console.error('Failed to fetch GitHub runtimes via RNX:', error);
-        
+
         // Return fallback static data when RNX GitHub listing is unavailable
         const fallbackRuntimes = [
             {
@@ -446,11 +446,11 @@ router.get('/github/runtimes', async (req, res) => {
                 language: 'python'
             }
         ];
-        
+
         // Cache the fallback data
         githubRuntimesCache = fallbackRuntimes;
         githubCacheTimestamp = Date.now();
-        
+
         res.json(fallbackRuntimes);
     }
 });

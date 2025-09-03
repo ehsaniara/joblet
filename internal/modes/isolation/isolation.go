@@ -56,7 +56,7 @@ func (i *Isolator) Setup() error {
 // setupLinux sets up Linux-specific isolation using platform abstraction
 func (i *Isolator) setupLinux() error {
 	pid := i.platform.Getpid()
-	i.logger.Debug("setting up Linux isolation with filesystem isolation", "pid", pid, "approach", "platform-abstraction")
+	// Setting up Linux isolation with filesystem isolation
 
 	// Only PID 1 should set up isolation
 	if pid != 1 {
@@ -88,7 +88,7 @@ func (i *Isolator) setupLinux() error {
 		// Continue - isolation might still be partial
 	}
 
-	i.logger.Debug("Linux isolation setup completed successfully")
+	// Linux isolation setup completed successfully
 	return nil
 }
 
@@ -101,7 +101,7 @@ func (i *Isolator) setupDarwin() error {
 
 // setupFilesystemIsolation sets up filesystem isolation for the job
 func (i *Isolator) setupFilesystemIsolation() error {
-	i.logger.Debug("setting up filesystem isolation")
+	// Setting up filesystem isolation
 
 	jobID := i.platform.Getenv("JOB_ID")
 	if jobID == "" {
@@ -137,7 +137,7 @@ func (i *Isolator) setupFilesystemIsolation() error {
 		i.logger.Debug("jobFS.Setup() completed successfully", "jobID", jobID)
 	}
 
-	i.logger.Debug("filesystem isolation setup completed successfully", "jobID", jobID)
+	// Filesystem isolation setup completed successfully
 	return nil
 }
 
@@ -184,7 +184,7 @@ func (i *Isolator) remountProc() error {
 
 // verifyIsolation checks that isolation worked using platform abstraction
 func (i *Isolator) verifyIsolation() error {
-	i.logger.Debug("verifying isolation effectiveness")
+	// Verifying isolation effectiveness
 
 	// Check PID 1 in our namespace using platform abstraction
 	if comm, err := i.platform.ReadFile("/proc/1/comm"); err == nil {
@@ -226,7 +226,7 @@ func (i *Isolator) verifyIsolation() error {
 		}
 	}
 
-	i.logger.Debug("isolation verification", "visibleProcesses", pidCount)
+	// Isolation verified - process visibility limited
 
 	// If we can only see a few processes, isolation is working
 	if pidCount > 100 {
@@ -252,151 +252,3 @@ func (i *Isolator) readProcDir() ([]string, error) {
 
 	return entries, nil
 }
-
-// mountRuntimeForJob mounts the runtime directories if runtime is specified
-// DEPRECATED: This function is no longer used. Runtime mounting is handled by JobFilesystem.Setup()
-// in isolator.go before chroot, not after. Keeping for reference.
-/*
-func (i *Isolator) mountRuntimeForJob(jobID string, jobFS interface{}) error {
-	runtime := i.platform.Getenv("JOB_RUNTIME")
-	if runtime == "" {
-		i.logger.Debug("no runtime specified, skipping runtime mount")
-		return nil
-	}
-
-	i.logger.Info("mounting runtime for job", "runtime", runtime, "jobID", jobID)
-
-	// Get runtime base path from configuration
-	runtimeBasePath := i.config.Runtime.BasePath
-
-	// Parse runtime spec and find runtime directory
-	parts := strings.Split(runtime, ":")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid runtime specification: %s", runtime)
-	}
-
-	language := parts[0]
-	version := parts[1]
-	runtimeDirName := fmt.Sprintf("%s-%s", language, strings.ReplaceAll(version, "+", "-"))
-	runtimeDir := fmt.Sprintf("%s/%s/%s", runtimeBasePath, language, runtimeDirName)
-
-	// Check if runtime exists
-	if _, err := i.platform.Stat(runtimeDir); err != nil {
-		return fmt.Errorf("runtime directory %s not found: %w", runtimeDir, err)
-	}
-
-	// Load runtime.yml configuration
-	configPath := fmt.Sprintf("%s/runtime.yml", runtimeDir)
-	configData, err := i.platform.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read runtime config: %w", err)
-	}
-
-	// Parse YAML configuration (simple parser)
-	mounts := i.parseRuntimeMounts(string(configData))
-
-	// Mount each directory according to runtime config
-	jobRootDir := fmt.Sprintf("/opt/joblet/jobs/%s", jobID)
-	for _, mount := range mounts {
-		sourcePath := fmt.Sprintf("%s/%s", runtimeDir, mount.Source)
-		targetPath := fmt.Sprintf("%s/%s", jobRootDir, strings.TrimPrefix(mount.Target, "/"))
-
-		// Check if source exists
-		if _, err := i.platform.Stat(sourcePath); err != nil {
-			if i.platform.IsNotExist(err) {
-				i.logger.Debug("skipping non-existent runtime source", "path", sourcePath)
-				continue
-			}
-			return fmt.Errorf("failed to stat runtime source %s: %w", sourcePath, err)
-		}
-
-		// Create target directory
-		if err := i.platform.MkdirAll(targetPath, 0755); err != nil {
-			return fmt.Errorf("failed to create runtime target %s: %w", targetPath, err)
-		}
-
-		// Bind mount
-		if err := i.platform.Mount(sourcePath, targetPath, "", 0x1000, ""); err != nil { // 0x1000 = MS_BIND
-			return fmt.Errorf("failed to mount %s to %s: %w", sourcePath, targetPath, err)
-		}
-
-		// Remount as read-only if specified
-		if mount.ReadOnly {
-			if err := i.platform.Mount("", targetPath, "", 0x1000|0x200000|0x1, ""); err != nil { // MS_BIND | MS_REMOUNT | MS_RDONLY
-				i.logger.Warn("failed to remount as read-only", "target", targetPath, "error", err)
-			}
-		}
-
-		i.logger.Debug("mounted runtime path", "source", sourcePath, "target", targetPath)
-	}
-
-	i.logger.Info("runtime mounted successfully", "runtime", runtime)
-	return nil
-}
-*/
-
-// RuntimeMount represents a runtime mount configuration
-type RuntimeMount struct {
-	Source   string
-	Target   string
-	ReadOnly bool
-}
-
-// parseRuntimeMounts parses YAML mounts configuration
-// DEPRECATED: Only used by deprecated mountRuntimeForJob function
-/*
-func (i *Isolator) parseRuntimeMounts(yamlContent string) []RuntimeMount {
-	var mounts []RuntimeMount
-	lines := strings.Split(yamlContent, "\n")
-	var currentMount *RuntimeMount
-	inMounts := false
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		if strings.HasPrefix(line, "mounts:") {
-			inMounts = true
-			continue
-		}
-
-		if inMounts {
-			if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "  - ") {
-				// New mount entry
-				if currentMount != nil {
-					mounts = append(mounts, *currentMount)
-				}
-				currentMount = &RuntimeMount{}
-				continue
-			} else if currentMount != nil && (strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t")) {
-				// Mount property
-				if strings.Contains(line, "source:") {
-					currentMount.Source = strings.TrimSpace(strings.Split(line, ":")[1])
-					currentMount.Source = strings.Trim(currentMount.Source, "\"'")
-				} else if strings.Contains(line, "target:") {
-					currentMount.Target = strings.TrimSpace(strings.Split(line, ":")[1])
-					currentMount.Target = strings.Trim(currentMount.Target, "\"'")
-				} else if strings.Contains(line, "readonly:") {
-					currentMount.ReadOnly = strings.Contains(line, "true")
-				}
-			} else if !strings.HasPrefix(line, "  ") {
-				// End of mounts section
-				if currentMount != nil {
-					mounts = append(mounts, *currentMount)
-					currentMount = nil
-				}
-				inMounts = false
-			}
-		}
-	}
-
-	// Don't forget the last mount
-	if currentMount != nil {
-		mounts = append(mounts, *currentMount)
-	}
-
-	return mounts
-}
-*/

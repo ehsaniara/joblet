@@ -458,53 +458,53 @@ const WorkflowDetail: React.FC<WorkflowDetailProps> = ({
                                 ) : (
                                     <div className="space-y-4">
                                         {(() => {
-                                                // Topological sort based on dependencies
-                                                const jobs = [...workflow.jobs];
-                                                const sorted: typeof jobs = [];
-                                                const visited = new Set<string>();
-                                                const temp = new Set<string>();
-                                                
-                                                // Helper function to find job by name or id
-                                                const findJob = (nameOrId: string) => 
-                                                    jobs.find(j => j.name === nameOrId || j.id === nameOrId);
-                                                
-                                                // Depth-first search for topological sorting
-                                                const visit = (job: typeof jobs[0]) => {
-                                                    if (temp.has(job.id)) return; // Circular dependency, skip
-                                                    if (visited.has(job.id)) return;
-                                                    
-                                                    temp.add(job.id);
-                                                    
-                                                    // Visit dependencies first
-                                                    if (job.dependsOn) {
-                                                        for (const dep of job.dependsOn) {
-                                                            const depJob = findJob(dep);
-                                                            if (depJob) {
-                                                                visit(depJob);
-                                                            }
+                                            // Topological sort based on dependencies
+                                            const jobs = [...workflow.jobs];
+                                            const sorted: typeof jobs = [];
+                                            const visited = new Set<string>();
+                                            const temp = new Set<string>();
+
+                                            // Helper function to find job by name or id
+                                            const findJob = (nameOrId: string) =>
+                                                jobs.find(j => j.name === nameOrId || j.id === nameOrId);
+
+                                            // Depth-first search for topological sorting
+                                            const visit = (job: typeof jobs[0]) => {
+                                                if (temp.has(job.id)) return; // Circular dependency, skip
+                                                if (visited.has(job.id)) return;
+
+                                                temp.add(job.id);
+
+                                                // Visit dependencies first
+                                                if (job.dependsOn) {
+                                                    for (const dep of job.dependsOn) {
+                                                        const depJob = findJob(dep);
+                                                        if (depJob) {
+                                                            visit(depJob);
                                                         }
                                                     }
-                                                    
-                                                    temp.delete(job.id);
-                                                    visited.add(job.id);
-                                                    sorted.push(job);
-                                                };
-                                                
-                                                // Visit all jobs
-                                                for (const job of jobs) {
-                                                    if (!visited.has(job.id)) {
-                                                        visit(job);
-                                                    }
                                                 }
-                                                
-                                                return sorted;
-                                            })().map(job => (
+
+                                                temp.delete(job.id);
+                                                visited.add(job.id);
+                                                sorted.push(job);
+                                            };
+
+                                            // Visit all jobs
+                                            for (const job of jobs) {
+                                                if (!visited.has(job.id)) {
+                                                    visit(job);
+                                                }
+                                            }
+
+                                            return sorted;
+                                        })().map(job => (
                                             <div key={job.id}
                                                  className="border border-gray-600 rounded-lg p-4 hover:bg-gray-700 cursor-pointer"
                                                  onClick={() => {
                                                      void handleViewJob(job.id);
                                                  }}
-                                                 style={{ marginLeft: `${(job.dependsOn?.length || 0) * 20}px` }}>
+                                                 style={{marginLeft: `${(job.dependsOn?.length || 0) * 20}px`}}>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex-1">
                                                         <div className="flex items-center space-x-3">

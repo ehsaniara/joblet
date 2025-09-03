@@ -9,8 +9,9 @@ import (
 	"joblet/pkg/platform"
 )
 
-// ExecutionCoordinator coordinates different execution services
-// This replaces the monolithic ExecutionEngine with a focused coordinator
+// ExecutionCoordinator coordinates different execution services.
+// Replaces monolithic ExecutionEngine with focused coordinator that orchestrates
+// environment setup, networking, process management, and isolation for job execution.
 type ExecutionCoordinator struct {
 	environmentManager EnvironmentManager
 	networkManager     NetworkManager
@@ -19,7 +20,9 @@ type ExecutionCoordinator struct {
 	logger             *logger.Logger
 }
 
-// NewExecutionCoordinator creates a new execution coordinator
+// NewExecutionCoordinator creates a new execution coordinator.
+// Initializes coordinator with environment, network, process, and isolation managers
+// for comprehensive job execution orchestration.
 func NewExecutionCoordinator(
 	envManager EnvironmentManager,
 	netManager NetworkManager,
@@ -36,7 +39,9 @@ func NewExecutionCoordinator(
 	}
 }
 
-// StartJob implements JobExecutor interface
+// StartJob implements JobExecutor interface.
+// Main execution entry point: creates isolation, prepares workspace, sets up networking,
+// builds environment, and launches process with unified init system for logging.
 func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
 	log := ec.logger.WithField("jobID", opts.Job.Uuid)
 	log.Debug("coordinating job start", "hasUploads", len(opts.Uploads) > 0, "jobType", opts.Job.GetType())

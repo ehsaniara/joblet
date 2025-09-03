@@ -30,7 +30,7 @@ This document describes the implementation of the Simplified Runtime Architectur
     - Provides complete filesystem isolation using self-contained runtime structures
 
 3. **Runtime Types** (`internal/joblet/runtime/types.go`)
-    - Defines data structures for runtime configurations  
+    - Defines data structures for runtime configurations
     - Simplified structure supporting self-contained runtimes
 
 4. **CLI Integration** (`internal/rnx/resources/runtime.go`)
@@ -94,19 +94,19 @@ Runtime installation uses a modular, template-based architecture for maintainabl
 #### Strategy Pattern Components
 
 1. **Runtime Installer Interface** (`internal/joblet/runtime/installers/interfaces.go`)
-   - Unified interface for all runtime installation types
-   - Standardized InstallSpec and InstallResult structures
-   - Support for GitHub, local, and script-based sources
+    - Unified interface for all runtime installation types
+    - Standardized InstallSpec and InstallResult structures
+    - Support for GitHub, local, and script-based sources
 
 2. **Installer Manager** (`internal/joblet/runtime/installers/manager.go`)
-   - Central coordinator that delegates to appropriate installers
-   - Source type detection and routing
-   - Error handling and validation
+    - Central coordinator that delegates to appropriate installers
+    - Source type detection and routing
+    - Error handling and validation
 
 3. **Template Engine** (`internal/joblet/runtime/installers/base.go`)
-   - Go template rendering with embedded template files
-   - Parameterized shell script generation
-   - Runtime-specific variable substitution
+    - Go template rendering with embedded template files
+    - Parameterized shell script generation
+    - Runtime-specific variable substitution
 
 #### Installation Templates
 
@@ -287,7 +287,8 @@ Potential future improvements:
 - `internal/joblet/domain/job.go` - Added Runtime field
 - `internal/joblet/core/execution_engine.go` - Runtime integration
 - `internal/joblet/core/filesystem/isolator.go` - Extended JobFilesystem
-- `internal/joblet/server/runtime_service.go` - Refactored to use template-based installer system (reduced from 1290 to 996 lines)
+- `internal/joblet/server/runtime_service.go` - Refactored to use template-based installer system (reduced from 1290 to
+  996 lines)
 - `internal/rnx/run.go` - Added --runtime flag
 - `internal/rnx/root.go` - Added runtime command
 - `api/proto/joblet.proto` - Updated protocol buffer definitions

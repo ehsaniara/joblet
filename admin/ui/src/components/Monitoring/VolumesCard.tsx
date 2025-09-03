@@ -30,15 +30,19 @@ const VolumesCard: React.FC<VolumesCardProps> = ({volumes}) => {
     const getSizeInBytes = (size: string) => {
         const match = size.match(/(\d+(?:\.\d+)?)\s*(GB|MB|KB|B)/i);
         if (!match) return 0;
-        
+
         const value = parseFloat(match[1]);
         const unit = match[2].toUpperCase();
-        
+
         switch (unit) {
-            case 'GB': return value * 1024 * 1024 * 1024;
-            case 'MB': return value * 1024 * 1024;
-            case 'KB': return value * 1024;
-            default: return value;
+            case 'GB':
+                return value * 1024 * 1024 * 1024;
+            case 'MB':
+                return value * 1024 * 1024;
+            case 'KB':
+                return value * 1024;
+            default:
+                return value;
         }
     };
 
@@ -58,9 +62,12 @@ const VolumesCard: React.FC<VolumesCardProps> = ({volumes}) => {
 
     const getTypeColor = (type: string) => {
         switch (type) {
-            case 'filesystem': return 'text-blue-400';
-            case 'block': return 'text-green-400';
-            default: return 'text-gray-400';
+            case 'filesystem':
+                return 'text-blue-400';
+            case 'block':
+                return 'text-green-400';
+            default:
+                return 'text-gray-400';
         }
     };
 

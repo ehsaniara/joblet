@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { WorkflowJob } from '@/types';
-import { FileText, Clock, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import {useMemo, useState} from 'react';
+import {WorkflowJob} from '@/types';
+import {AlertCircle, CheckCircle, Clock, FileText, Loader2, XCircle} from 'lucide-react';
 import clsx from 'clsx';
 
 interface WorkflowTimelineProps {
@@ -23,7 +23,7 @@ interface TimelineJob {
     level?: number;
 }
 
-const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick }) => {
+const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({jobs, onJobClick}) => {
     const [hoveredJob, setHoveredJob] = useState<string | null>(null);
     const [selectedTimeRange, setSelectedTimeRange] = useState<'all' | '1min' | '5min' | '30min'>('all');
 
@@ -48,7 +48,7 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
         // Calculate relative positions and assign levels for sequential visualization
         // For workflow execution, prefer sequential layout over parallel to show logical flow
         const sortedJobs = [...validJobs].sort((a, b) => a.startTime!.getTime() - b.startTime!.getTime());
-        
+
         return sortedJobs.map((job, index) => {
             // Create artificial sequential spacing for better visualization
             // Distribute jobs evenly across the timeline regardless of actual timing
@@ -56,7 +56,7 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
             const jobWidth = Math.max(15, 80 / totalJobs); // Each job gets at least 15% width
             const relativeStart = index * (100 / totalJobs);
             const relativeEnd = Math.min(100, relativeStart + jobWidth);
-            
+
             // For workflow visualization, assign each job to its own level
             // This provides clear sequential view like a thread profiler
             const level = index;
@@ -93,19 +93,19 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
     const getStatusIcon = (status: string) => {
         switch (status?.toUpperCase()) {
             case 'RUNNING':
-                return <Loader2 className="h-4 w-4 animate-spin" />;
+                return <Loader2 className="h-4 w-4 animate-spin"/>;
             case 'COMPLETED':
-                return <CheckCircle className="h-4 w-4" />;
+                return <CheckCircle className="h-4 w-4"/>;
             case 'FAILED':
-                return <XCircle className="h-4 w-4" />;
+                return <XCircle className="h-4 w-4"/>;
             case 'STOPPED':
             case 'CANCELLED':
-                return <AlertCircle className="h-4 w-4" />;
+                return <AlertCircle className="h-4 w-4"/>;
             case 'QUEUED':
             case 'PENDING':
-                return <Clock className="h-4 w-4" />;
+                return <Clock className="h-4 w-4"/>;
             default:
-                return <Clock className="h-4 w-4" />;
+                return <Clock className="h-4 w-4"/>;
         }
     };
 
@@ -124,11 +124,11 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
     };
 
     const formatTime = (date: Date) => {
-        return date.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit', 
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
             second: '2-digit',
-            hour12: false 
+            hour12: false
         });
     };
 
@@ -141,7 +141,7 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
 
         const minTime = Math.min(...validJobs.map(j => j.startTime!.getTime()));
         const maxTime = Math.max(...validJobs.map(j => j.endTime?.getTime() || j.startTime!.getTime()));
-        
+
         // Apply time range filter
         let filteredMaxTime = maxTime;
         if (selectedTimeRange !== 'all') {
@@ -152,7 +152,7 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
 
         const duration = filteredMaxTime - minTime;
         const markers = [];
-        
+
         // Determine appropriate interval based on duration
         let interval;
         if (duration < 60000) { // Less than 1 minute
@@ -189,12 +189,13 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
                             <h3 className="text-lg font-medium text-white">Workflow Timeline</h3>
                         </div>
                     </div>
-                    
+
                     <div className="flex-1 p-4 flex items-center justify-center">
                         <div className="text-center">
-                            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2"/>
                             <p className="text-gray-400">No timeline data available</p>
-                            <p className="text-sm text-gray-500 mt-1">Jobs will appear here once the workflow starts executing</p>
+                            <p className="text-sm text-gray-500 mt-1">Jobs will appear here once the workflow starts
+                                executing</p>
                         </div>
                     </div>
                 </div>
@@ -227,21 +228,24 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
                         )}
                     </div>
                 </div>
-                
+
                 <div className="flex-1 p-4 overflow-hidden">{/* Changed from p-6 to p-4 and added overflow-hidden */}
 
                     {!hasStartedJobs ? (
                         <div className="text-center py-8">
-                            <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2"/>
                             <p className="text-gray-400">No jobs have started executing yet</p>
                             <p className="text-sm text-gray-500 mt-1">Timeline will be generated once jobs begin</p>
                         </div>
                     ) : (
                         <div className="relative h-full flex flex-col">
                             {/* Timeline Container */}
-                            <div 
+                            <div
                                 className="relative bg-gray-900 rounded-lg p-4 overflow-auto flex-1"
-                                style={{ minHeight: `${Math.max(timelineHeight, 400)}px`, maxHeight: 'calc(100vh - 500px)' }}
+                                style={{
+                                    minHeight: `${Math.max(timelineHeight, 400)}px`,
+                                    maxHeight: 'calc(100vh - 500px)'
+                                }}
                             >
                                 {/* Time markers */}
                                 <div className="absolute inset-x-4 top-0 h-full">
@@ -249,9 +253,10 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
                                         <div
                                             key={index}
                                             className="absolute top-0 h-full border-l border-gray-700"
-                                            style={{ left: `${marker.position}%` }}
+                                            style={{left: `${marker.position}%`}}
                                         >
-                                            <span className="absolute -top-6 -left-12 text-xs text-gray-500 whitespace-nowrap">
+                                            <span
+                                                className="absolute -top-6 -left-12 text-xs text-gray-500 whitespace-nowrap">
                                                 {formatTime(marker.time)}
                                             </span>
                                         </div>
@@ -259,12 +264,12 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
                                 </div>
 
                                 {/* Job bars */}
-                                <div className="relative mt-8" style={{ height: `${timelineHeight - 70}px` }}>
+                                <div className="relative mt-8" style={{height: `${timelineHeight - 70}px`}}>
                                     {processedJobs.map((job) => {
                                         const width = Math.max(5, (job.relativeEnd || 0) - (job.relativeStart || 0));
                                         const isHovered = hoveredJob === job.id;
                                         const topPosition = (job.level || 0) * 60;
-                                        
+
                                         return (
                                             <div
                                                 key={job.id}
@@ -286,7 +291,8 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
                                                         isHovered && 'ring-2 ring-white ring-opacity-50 transform scale-105'
                                                     )}
                                                 >
-                                                    <div className="flex items-center space-x-1 text-white overflow-hidden">
+                                                    <div
+                                                        className="flex items-center space-x-1 text-white overflow-hidden">
                                                         {getStatusIcon(job.status)}
                                                         <span className="text-xs font-medium truncate">
                                                             {job.name || job.id}
@@ -296,9 +302,10 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
 
                                                 {/* Tooltip */}
                                                 {isHovered && (
-                                                    <div className={`absolute left-0 z-20 bg-gray-700 text-white p-3 rounded shadow-lg text-xs whitespace-nowrap ${
-                                                        (job.level || 0) <= 1 ? 'top-full mt-2' : 'bottom-full mb-2'
-                                                    }`}>
+                                                    <div
+                                                        className={`absolute left-0 z-20 bg-gray-700 text-white p-3 rounded shadow-lg text-xs whitespace-nowrap ${
+                                                            (job.level || 0) <= 1 ? 'top-full mt-2' : 'bottom-full mb-2'
+                                                        }`}>
                                                         <div className="font-semibold">{job.name || job.id}</div>
                                                         <div className="mt-1">Status: {job.status}</div>
                                                         {job.startTime && (
@@ -376,14 +383,14 @@ const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ jobs, onJobClick })
                                             {(() => {
                                                 const validJobs = processedJobs.filter(j => j.startTime);
                                                 if (validJobs.length === 0) return '-';
-                                                
+
                                                 // Calculate workflow execution time: first job start to last job end
                                                 const startTimes = validJobs.map(j => new Date(j.startTime!).getTime());
                                                 const endTimes = validJobs.map(j => j.endTime ? new Date(j.endTime).getTime() : new Date(j.startTime!).getTime());
-                                                
+
                                                 const workflowStart = Math.min(...startTimes);
                                                 const workflowEnd = Math.max(...endTimes);
-                                                
+
                                                 return formatDuration(workflowEnd - workflowStart);
                                             })()}
                                         </div>

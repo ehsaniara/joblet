@@ -85,12 +85,12 @@ export const useWorkflowStatusStream = (
             ws.onclose = (event) => {
                 console.log('Workflow status WebSocket closed:', event.code, event.reason);
                 setConnected(false);
-                
+
                 // Attempt to reconnect if not intentionally closed
                 if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
                     reconnectAttemptsRef.current++;
                     console.log(`Attempting to reconnect workflow status WebSocket (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
-                    
+
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connectWebSocket();
                     }, reconnectDelay);

@@ -239,17 +239,93 @@ func (s *WorkflowServiceServer) GetWorkflowJobs(ctx context.Context, req *pb.Get
 
 func (s *WorkflowServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*pb.RunJobResponse, error) {
 	log := s.logger.WithFields(
-		"operation", "RunJob",
+		"operation", "RunJob-Unified",
 		"command", req.Command,
 		"workflowUuid", req.WorkflowUuid,
-		"jobId", req.JobUuid,
 	)
-	log.Debug("run job request received for workflow")
+	log.Debug("run job request received - unified approach")
 
 	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
+
+	// UNIFIED APPROACH: Handle individual jobs using original JobService logic
+	if req.WorkflowUuid == "" {
+		// This is an individual job - use original job processing (bypasses workflow validation)
+		return s.runIndividualJob(ctx, req)
+	}
+
+	// This is part of existing workflow - use current logic
+	return s.runExistingWorkflowJob(ctx, req)
+}
+
+// NEW: Handle individual jobs using original JobService logic (bypasses workflow validation)
+func (s *WorkflowServiceServer) runIndividualJob(ctx context.Context, req *pb.RunJobRequest) (*pb.RunJobResponse, error) {
+	log := s.logger.WithFields(
+		"operation", "RunIndividualJob",
+		"command", req.Command,
+		"args", req.Args,
+		"uploadCount", len(req.Uploads),
+		"schedule", req.Schedule,
+	)
+
+	log.Debug("processing individual job request (original JobService logic)")
+
+	// Convert protobuf request to domain request object (reuse JobService conversion logic)
+	jobRequest, err := s.convertToIndividualJobRequest(req)
+	if err != nil {
+		log.Error("failed to convert request", "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+
+	// Log the request (excluding sensitive environment variables)
+	envCount := 0
+	if jobRequest.Environment != nil {
+		envCount = len(jobRequest.Environment)
+	}
+	log.Info("starting individual job with request object",
+		"command", jobRequest.Command,
+		"resourceLimits", fmt.Sprintf("CPU=%d%%, Memory=%dMB, IO=%d BPS, Cores=%s",
+			jobRequest.Resources.MaxCPU,
+			jobRequest.Resources.MaxMemory,
+			jobRequest.Resources.MaxIOBPS,
+			jobRequest.Resources.CPUCores),
+		"network", jobRequest.Network,
+		"volumes", jobRequest.Volumes,
+		"runtime", jobRequest.Runtime,
+		"uploadCount", len(jobRequest.Uploads),
+		"envVarsCount", envCount,
+		"secretEnvVarsCount", len(jobRequest.SecretEnvironment))
+
+	// Use joblet interface directly (bypasses workflow validation, handles volume creation on-demand)
+	newJob, err := s.joblet.StartJob(ctx, *jobRequest)
+	if err != nil {
+		log.Error("individual job creation failed", "error", err)
+		return nil, status.Errorf(codes.Internal, "job run failed: %v", err)
+	}
+
+	// Log success
+	if req.Schedule != "" {
+		log.Info("individual job scheduled successfully",
+			"jobUuid", newJob.Uuid,
+			"scheduledTime", req.Schedule)
+	} else {
+		log.Info("individual job started successfully",
+			"jobUuid", newJob.Uuid,
+			"status", newJob.Status)
+	}
+
+	// Convert domain job to protobuf response
+	return &pb.RunJobResponse{
+		JobUuid: newJob.Uuid,
+		Status:  string(newJob.Status),
+	}, nil
+}
+
+// runExistingWorkflowJob handles jobs that are part of existing workflows
+func (s *WorkflowServiceServer) runExistingWorkflowJob(ctx context.Context, req *pb.RunJobRequest) (*pb.RunJobResponse, error) {
+	log := s.logger.WithField("workflowUuid", req.WorkflowUuid)
 
 	jobRequest, err := s.convertToWorkflowJobRequest(req)
 	if err != nil {
@@ -257,24 +333,22 @@ func (s *WorkflowServiceServer) RunJob(ctx context.Context, req *pb.RunJobReques
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
 
-	if req.WorkflowUuid != "" {
-		// Convert workflow UUID to internal ID (placeholder implementation)
-		workflowID := s.convertWorkflowUUIDToID(req.WorkflowUuid)
-		readyJobs := s.workflowManager.GetReadyJobs(workflowID)
-		canRun := false
-		for _, readyJobID := range readyJobs {
-			if readyJobID == req.JobUuid {
-				canRun = true
-				break
-			}
+	// Convert workflow UUID to internal ID (placeholder implementation)
+	workflowID := s.convertWorkflowUUIDToID(req.WorkflowUuid)
+	readyJobs := s.workflowManager.GetReadyJobs(workflowID)
+	canRun := false
+	for _, readyJobID := range readyJobs {
+		if readyJobID == req.JobUuid {
+			canRun = true
+			break
 		}
-		if !canRun && req.JobUuid != "" {
-			log.Warn("job not ready to run due to dependencies", "jobId", req.JobUuid)
-			return &pb.RunJobResponse{
-				JobUuid: "",
-				Status:  "WAITING",
-			}, nil
-		}
+	}
+	if !canRun && req.JobUuid != "" {
+		log.Warn("job not ready to run due to dependencies", "jobId", req.JobUuid)
+		return &pb.RunJobResponse{
+			JobUuid: "",
+			Status:  "WAITING",
+		}, nil
 	}
 
 	newJob, err := s.joblet.StartJob(ctx, *jobRequest)
@@ -283,9 +357,7 @@ func (s *WorkflowServiceServer) RunJob(ctx context.Context, req *pb.RunJobReques
 		return nil, status.Errorf(codes.Internal, "job run failed: %v", err)
 	}
 
-	if req.WorkflowUuid != "" {
-		s.workflowManager.OnJobStateChange(newJob.Uuid, newJob.Status)
-	}
+	s.workflowManager.OnJobStateChange(newJob.Uuid, newJob.Status)
 
 	log.Info("workflow job started successfully", "jobId", newJob.Uuid, "status", newJob.Status)
 	return &pb.RunJobResponse{
@@ -343,6 +415,158 @@ func (s *WorkflowServiceServer) convertToWorkflowJobRequest(req *pb.RunJobReques
 	}
 
 	return jobRequest, nil
+}
+
+// convertToIndividualJobRequest converts protobuf request to domain request object (for individual jobs)
+func (s *WorkflowServiceServer) convertToIndividualJobRequest(req *pb.RunJobRequest) (*interfaces.StartJobRequest, error) {
+	// Validate required fields
+	if req.Command == "" {
+		return nil, fmt.Errorf("command is required")
+	}
+
+	// Set default network if not specified
+	network := req.Network
+	if network == "" {
+		network = "bridge"
+	}
+
+	// Convert file uploads
+	var domainUploads []domain.FileUpload
+	for _, upload := range req.Uploads {
+		domainUploads = append(domainUploads, domain.FileUpload{
+			Path:    upload.Path,
+			Content: upload.Content,
+			Size:    int64(len(upload.Content)),
+		})
+	}
+
+	// Log upload processing (no size limits)
+	if len(domainUploads) > 0 {
+		totalSize := int64(0)
+		for _, upload := range domainUploads {
+			totalSize += int64(len(upload.Content))
+		}
+		s.logger.Info("processing file uploads",
+			"fileCount", len(domainUploads),
+			"totalSize", totalSize)
+	}
+
+	// Determine job type from environment variables (same as JobService)
+	jobType := domain.JobTypeStandard // Default to standard production jobs
+	if req.Environment != nil {
+		if envJobType, exists := req.Environment["JOB_TYPE"]; exists && envJobType == "runtime-build" {
+			jobType = domain.JobTypeRuntimeBuild
+			s.logger.Info("detected runtime build job from environment", "envJobType", envJobType)
+		}
+	}
+
+	// Create the request object with validation
+	jobRequest := &interfaces.StartJobRequest{
+		Command: req.Command,
+		Args:    req.Args,
+		Resources: interfaces.ResourceLimits{
+			MaxCPU:    req.MaxCpu,
+			MaxMemory: req.MaxMemory,
+			MaxIOBPS:  req.MaxIobps,
+			CPUCores:  req.CpuCores,
+		},
+		Uploads:           domainUploads,
+		Schedule:          req.Schedule,
+		Network:           network,
+		Volumes:           req.Volumes,
+		Runtime:           req.Runtime,
+		Environment:       req.Environment,       // Regular environment variables (logged)
+		SecretEnvironment: req.SecretEnvironment, // Secret environment variables (not logged)
+		JobType:           jobType,               // Set job type for isolation configuration
+	}
+
+	// Validate the request (reuse validation logic from JobService)
+	if err := s.validateIndividualJobRequest(jobRequest); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
+	return jobRequest, nil
+}
+
+// validateIndividualJobRequest performs validation on the individual job request object
+func (s *WorkflowServiceServer) validateIndividualJobRequest(req *interfaces.StartJobRequest) error {
+	// Validate resource limits
+	if req.Resources.MaxCPU < 0 {
+		return fmt.Errorf("maxCPU cannot be negative")
+	}
+	if req.Resources.MaxMemory < 0 {
+		return fmt.Errorf("maxMemory cannot be negative")
+	}
+	if req.Resources.MaxIOBPS < 0 {
+		return fmt.Errorf("maxIOBPS cannot be negative")
+	}
+
+	// Validate network
+	validNetworks := map[string]bool{
+		"bridge": true,
+		"host":   true,
+		"none":   true,
+	}
+	if req.Network != "" && !validNetworks[req.Network] {
+		// Custom network - would need additional validation
+		s.logger.Debug("using custom network", "network", req.Network)
+	}
+
+	// Validate volumes
+	for _, volume := range req.Volumes {
+		if volume == "" {
+			return fmt.Errorf("empty volume name not allowed")
+		}
+	}
+
+	// Validate runtime specification if provided
+	if req.Runtime != "" {
+		if err := s.validateRuntime(req.Runtime); err != nil {
+			return fmt.Errorf("invalid runtime: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateRuntime validates the runtime specification (reused from JobService)
+func (s *WorkflowServiceServer) validateRuntime(runtimeSpec string) error {
+	// Basic format validation
+	if runtimeSpec == "" {
+		return fmt.Errorf("runtime specification cannot be empty")
+	}
+
+	// Support both formats: hyphen and colon separated
+	if strings.Contains(runtimeSpec, ":") {
+		// Traditional format: language:version (e.g., "python:3.11")
+		parts := strings.Split(runtimeSpec, ":")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid runtime format: expected 'language:version', got '%s'", runtimeSpec)
+		}
+		if parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("runtime language and version cannot be empty")
+		}
+	} else {
+		// Runtime name format: language-version-tags (e.g., "python-3.11-ml")
+		parts := strings.Split(runtimeSpec, "-")
+		if len(parts) < 2 {
+			return fmt.Errorf("invalid runtime format: expected 'language-version[-tags]', got '%s'", runtimeSpec)
+		}
+		if parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("runtime language and version cannot be empty")
+		}
+	}
+
+	return nil
+}
+
+// convertUploadsToStringArray converts FileUpload array to string array of paths
+func (s *WorkflowServiceServer) convertUploadsToStringArray(uploads []domain.FileUpload) []string {
+	var uploadPaths []string
+	for _, upload := range uploads {
+		uploadPaths = append(uploadPaths, upload.Path)
+	}
+	return uploadPaths
 }
 
 func (s *WorkflowServiceServer) convertWorkflowStateToInfo(ws *workflow.WorkflowState) *pb.WorkflowInfo {
@@ -974,6 +1198,13 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 		ScheduledTime:     pbJob.ScheduledTime,
 		Environment:       pbJob.Environment,
 		SecretEnvironment: maskedSecretEnv,
+		Network:           job.Network,
+		Volumes:           job.Volumes,
+		Runtime:           job.Runtime,
+		WorkDir:           job.WorkingDirectory,
+		Uploads:           s.convertUploadsToStringArray(job.Uploads),
+		Dependencies:      job.Dependencies,
+		WorkflowUuid:      job.WorkflowUuid,
 	}, nil
 }
 

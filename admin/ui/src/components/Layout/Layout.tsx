@@ -1,12 +1,12 @@
 // React import not needed with modern JSX transform
 import {Link, useLocation} from 'react-router-dom';
-import {Activity, HardDrive, HelpCircle, Home, List, Settings, Workflow, X, Save} from 'lucide-react';
+import {Activity, HardDrive, HelpCircle, Home, List, Save, Settings, Workflow, X} from 'lucide-react';
 import clsx from 'clsx';
-import {useState, useEffect} from 'react';
-import { useTranslation } from 'react-i18next';
+import {useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import NodeSelector from '../NodeSelector/NodeSelector';
 import {useNode} from '../../contexts/NodeContext';
-import {useSettings, UserSettings} from '../../contexts/SettingsContext';
+import {UserSettings, useSettings} from '../../contexts/SettingsContext';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -16,7 +16,7 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
     const location = useLocation();
     const {selectedNode, setSelectedNode} = useNode();
     const {settings, updateSettings} = useSettings();
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const [showSettings, setShowSettings] = useState(false);
     const [settingsForm, setSettingsForm] = useState<UserSettings>(settings);
     const [savingSettings, setSavingSettings] = useState(false);
@@ -88,16 +88,16 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                 <div className="flex items-center justify-between h-16 px-6 bg-blue-600 dark:bg-blue-700 text-white">
                     <h1 className="text-xl font-bold">Joblet Admin</h1>
                     <div className="flex space-x-2">
-                        <button 
+                        <button
                             onClick={openSettings}
                             className="p-1 rounded hover:bg-blue-700 dark:hover:bg-blue-600"
                             title={t('common.settings')}
                         >
                             <Settings size={18}/>
                         </button>
-                        <button 
+                        <button
                             onClick={() => setShowHelp(true)}
-                            className="p-1 rounded hover:bg-blue-700 dark:hover:bg-blue-600" 
+                            className="p-1 rounded hover:bg-blue-700 dark:hover:bg-blue-600"
                             title={t('common.help')}
                         >
                             <HelpCircle size={18}/>
@@ -161,8 +161,10 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
 
             {/* Help Dialog */}
             {showHelp && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-                    <div className="relative bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+                <div
+                    className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+                    <div
+                        className="relative bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
                         <div className="flex-shrink-0 p-6 border-b border-gray-600">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-xl font-medium text-gray-200">{t('help.title')}</h3>
@@ -180,7 +182,8 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-200 mb-3">Overview</h4>
                                     <p className="mb-2">
-                                        Joblet provides an enterprise-grade job execution platform with a modern React-based web interface for visual workflow management.
+                                        Joblet provides an enterprise-grade job execution platform with a modern
+                                        React-based web interface for visual workflow management.
                                     </p>
                                 </div>
 
@@ -256,7 +259,8 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-200 mb-3">Authentication</h4>
                                     <p>
-                                        Authentication uses mTLS certificates. No separate login is required when properly configured.
+                                        Authentication uses mTLS certificates. No separate login is required when
+                                        properly configured.
                                     </p>
                                 </div>
 
@@ -264,9 +268,11 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-200 mb-3">Need More Help?</h4>
                                     <p>
-                                        Visit the <a href="https://github.com/ehsaniara/joblet/tree/main/docs" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">
+                                        Visit the <a href="https://github.com/ehsaniara/joblet/tree/main/docs"
+                                                     target="_blank" rel="noopener noreferrer"
+                                                     className="text-blue-400 hover:text-blue-300 underline">
                                         full documentation on GitHub
-                                        </a> for detailed guides on configuration, security, monitoring, and more.
+                                    </a> for detailed guides on configuration, security, monitoring, and more.
                                     </p>
                                 </div>
                             </div>
@@ -277,7 +283,8 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
 
             {/* Settings Dialog */}
             {showSettings && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div
+                    className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
                     <div className="relative bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-6">
@@ -299,7 +306,10 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                                     </label>
                                     <select
                                         value={settingsForm.refreshFrequency}
-                                        onChange={(e) => setSettingsForm(prev => ({...prev, refreshFrequency: parseInt(e.target.value)}))}
+                                        onChange={(e) => setSettingsForm(prev => ({
+                                            ...prev,
+                                            refreshFrequency: parseInt(e.target.value)
+                                        }))}
                                         className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         disabled={savingSettings}
                                     >
@@ -380,7 +390,8 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                                 >
                                     {savingSettings ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            <div
+                                                className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                                             {t('settings.saving')}
                                         </>
                                     ) : (

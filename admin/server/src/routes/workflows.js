@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
     try {
         const node = req.query.node;
         const output = await execRnx(['list', '--workflow', '--json'], {node});
-        
+
         let workflows = [];
         if (output && output.trim()) {
             try {
@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
                 workflows = [];
             }
         }
-        
+
         res.json(workflows);
     } catch (error) {
         console.error('Failed to list workflows:', error);
@@ -341,7 +341,7 @@ router.get('/:workflowId', async (req, res) => {
         // First pass: create basic job objects with individual timing data
         const jobsWithBasicInfo = await Promise.all((workflowData.jobs || []).map(async (job, index) => {
             let jobTiming = {};
-            
+
             // Fetch individual job details to get accurate timing information
             if (job.id) {
                 try {
@@ -378,28 +378,28 @@ router.get('/:workflowId', async (req, res) => {
                 endTime: jobTiming.endTime,
                 duration: jobTiming.duration || 0,
                 exitCode: jobTiming.exitCode,
-            maxCPU: 0,
-            maxMemory: 0,
-            maxIOBPS: 0,
-            cpuCores: undefined,
-            runtime: undefined,
-            network: 'default',
-            volumes: [],
-            uploads: [],
-            uploadDirs: [],
-            envVars: {},
-            secretEnvVars: {},
-            dependsOn: [], // Will be populated in second pass
-            
-            // WorkflowJob extended fields
-            name: job.name || `Job ${index + 1}`,
-            rnxJobId: job.id || null,
-            hasStarted: ['RUNNING', 'COMPLETED', 'FAILED', 'STOPPED'].includes(job.status),
-            isWorkflowJob: true,
-            workflowId: workflowData.uuid || workflowData.workflowUuid || workflowData.id,
-            
-            // Keep original dependencies for mapping
-            originalDependencies: job.dependencies || []
+                maxCPU: 0,
+                maxMemory: 0,
+                maxIOBPS: 0,
+                cpuCores: undefined,
+                runtime: undefined,
+                network: 'default',
+                volumes: [],
+                uploads: [],
+                uploadDirs: [],
+                envVars: {},
+                secretEnvVars: {},
+                dependsOn: [], // Will be populated in second pass
+
+                // WorkflowJob extended fields
+                name: job.name || `Job ${index + 1}`,
+                rnxJobId: job.id || null,
+                hasStarted: ['RUNNING', 'COMPLETED', 'FAILED', 'STOPPED'].includes(job.status),
+                isWorkflowJob: true,
+                workflowId: workflowData.uuid || workflowData.workflowUuid || workflowData.id,
+
+                // Keep original dependencies for mapping
+                originalDependencies: job.dependencies || []
             };
         }));
 
@@ -421,7 +421,7 @@ router.get('/:workflowId', async (req, res) => {
             });
 
             // Remove originalDependencies and set proper dependsOn and dependencies
-            const { originalDependencies, ...finalJob } = job;
+            const {originalDependencies, ...finalJob} = job;
             return {
                 ...finalJob,
                 dependsOn: dependsOnIds,

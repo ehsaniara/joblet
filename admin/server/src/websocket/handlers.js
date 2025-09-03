@@ -5,7 +5,7 @@ import {config} from '../config.js';
 export function handleLogStream(ws, jobId) {
     let isAlive = true;
     let followingLogProcess = null;
-    
+
     ws.send(JSON.stringify({
         type: 'connection',
         message: `Connected to log stream for job ${jobId}`,
@@ -21,19 +21,19 @@ export function handleLogStream(ws, jobId) {
     // Get historical logs first
     historicalLogProcess.stdout.on('data', (data) => {
         if (!isAlive) return;
-        
+
         const logLines = data.toString().split('\n').filter(line => line.trim());
         logLines.forEach(line => {
             // Detect if this is a joblet system log and extract log level
             // INFO logs don't have [component], others do: [timestamp] [LEVEL] [component] vs [timestamp] [INFO] message
             const jobletLogMatch = line.match(/^\[.*?\] \[(DEBUG|INFO|WARNING|ERROR)\]/);
-            
+
             let subtype = 'output';
             if (jobletLogMatch) {
                 const logLevel = jobletLogMatch[1];
                 subtype = logLevel === 'INFO' ? 'info' : 'system';
             }
-            
+
             ws.send(JSON.stringify({
                 type: 'log',
                 subtype: subtype,
@@ -46,7 +46,7 @@ export function handleLogStream(ws, jobId) {
 
     historicalLogProcess.stderr.on('data', (data) => {
         if (!isAlive) return;
-        
+
         const errorLines = data.toString().split('\n').filter(line => line.trim());
         errorLines.forEach(line => {
             ws.send(JSON.stringify({
@@ -60,16 +60,16 @@ export function handleLogStream(ws, jobId) {
 
     historicalLogProcess.on('close', (code) => {
         if (!isAlive) return;
-        
+
         // Check if job is still running by trying to get status
         execRnx(['status', jobId, '--json'], {node: 'default'})
             .then(output => {
                 if (!isAlive) return;
-                
+
                 try {
                     const jobData = JSON.parse(output);
                     const isRunning = jobData.status === 'RUNNING';
-                    
+
                     if (isRunning) {
                         // Only start following if job is actually running
                         startFollowingLogs();
@@ -117,13 +117,13 @@ export function handleLogStream(ws, jobId) {
             logLines.forEach(line => {
                 // Detect if this is a joblet system log and extract log level
                 const jobletLogMatch = line.match(/^\[.*?\] \[(DEBUG|INFO|WARNING|ERROR)\]/);
-                
+
                 let subtype = 'output';
                 if (jobletLogMatch) {
                     const logLevel = jobletLogMatch[1];
                     subtype = logLevel === 'INFO' ? 'info' : 'system';
                 }
-                
+
                 ws.send(JSON.stringify({
                     type: 'log',
                     subtype: subtype,
@@ -177,10 +177,10 @@ export function handleWorkflowStatusStream(ws, workflowId, node) {
         try {
             const output = await execRnx(['list', '--json'], {node});
             const jobs = JSON.parse(output);
-            
+
             // Find jobs that belong to this workflow
             const workflowJobs = jobs.filter(job => job.workflowId === workflowId);
-            
+
             ws.send(JSON.stringify({
                 type: 'workflow_status_change',
                 workflowId: workflowId,
@@ -204,7 +204,7 @@ export function handleWorkflowStatusStream(ws, workflowId, node) {
 export function handleRuntimeInstallStream(ws, buildJobId, node) {
     let isAlive = true;
     let followingLogProcess = null;
-    
+
     ws.send(JSON.stringify({
         type: 'connection',
         message: `Connected to runtime build stream for job ${buildJobId}`,
@@ -224,13 +224,13 @@ export function handleRuntimeInstallStream(ws, buildJobId, node) {
         logLines.forEach(line => {
             // Detect if this is a joblet system log and extract log level
             const jobletLogMatch = line.match(/^\[.*?\] \[(DEBUG|INFO|WARNING|ERROR)\]/);
-            
+
             let subtype = 'output';
             if (jobletLogMatch) {
                 const logLevel = jobletLogMatch[1];
                 subtype = logLevel === 'INFO' ? 'info' : 'system';
             }
-            
+
             ws.send(JSON.stringify({
                 type: 'log',
                 subtype: subtype,
@@ -262,12 +262,12 @@ export function handleRuntimeInstallStream(ws, buildJobId, node) {
         execRnx(['status', buildJobId, '--json'], {node})
             .then(output => {
                 if (!isAlive) return;
-                
+
                 try {
                     const jobData = JSON.parse(output);
                     const isCompleted = jobData.status === 'COMPLETED';
                     const isFailed = jobData.status === 'FAILED';
-                    
+
                     ws.send(JSON.stringify({
                         type: isCompleted ? 'completed' : isFailed ? 'failed' : 'ended',
                         buildJobId: buildJobId,

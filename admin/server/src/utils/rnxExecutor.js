@@ -17,11 +17,11 @@ export async function execRnx(args, options = {}) {
 
         const command = `${config.RNX_PATH} ${args.join(' ')}`;
         const {stdout, stderr} = await execAsync(command, options);
-        
+
         if (stderr) {
             console.warn(`Command warning: ${stderr}`);
         }
-        
+
         return stdout.trim();
     } catch (error) {
         console.error(`Command failed: ${error.message}`);

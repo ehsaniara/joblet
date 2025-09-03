@@ -204,6 +204,7 @@ rnx run --max-memory=1024 --runtime=python-3.11-ml \
 - [**API Reference**](./API.md) - Complete gRPC API documentation
 - [**Architecture**](./DESIGN.md) - System design and architecture deep-dive
 - [**Storage Guide**](./STORAGE.md) - Data persistence and storage management
+- [**Process Isolation**](./PROCESS_ISOLATION.md) - Complete guide to process isolation and multi-process jobs
 - [**Security Analysis**](./ISOLATION_SECURITY_ANALYSIS.md) - Service-based isolation security analysis
 - [**Runtime Cleanup**](./RUNTIME_ISOLATION_CLEANUP.md) - Runtime isolation cleanup design and implementation
 
@@ -233,6 +234,7 @@ rnx run --workflow=ml-pipeline.yaml
 ## 🎮 Quick Command Reference
 
 ### Job Execution
+
 ```bash
 # Run basic commands
 rnx run echo "Hello World"
@@ -241,9 +243,14 @@ rnx run --runtime=openjdk-21 java MyApp
 
 # Resource limits
 rnx run --max-memory=2048 --max-cpu=200 intensive-task
+
+# Multi-process jobs (see PROCESS_ISOLATION.md for details)
+rnx run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
+rnx run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
 ```
 
 ### Runtime Management
+
 ```bash
 # List available runtimes (languages, databases, services)
 rnx runtime list
@@ -263,6 +270,7 @@ rnx runtime test openjdk-21
 ```
 
 ### Network & Storage
+
 ```bash
 # Create isolated networks
 rnx network create my-network --cidr=10.0.0.0/24

@@ -1,7 +1,7 @@
 import {useCallback, useMemo, useState} from 'react';
 import {Job, WorkflowJob} from '../../types/job';
 import {JobNode} from './JobNode';
-import {Maximize2, RotateCcw, ZoomIn, ZoomOut, Wifi, WifiOff} from 'lucide-react';
+import {Maximize2, RotateCcw, Wifi, WifiOff, ZoomIn, ZoomOut} from 'lucide-react';
 import clsx from 'clsx';
 import {useWorkflowStatusStream} from '../../hooks/useWorkflowStatusStream';
 
@@ -50,14 +50,14 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({
     // Handle real-time job status updates
     const handleJobStatusUpdate = useCallback((jobId: string, status: string, updatedJob?: WorkflowJob) => {
         console.log(`Real-time update for job ${jobId}: ${status}`);
-        
+
         if (updatedJob) {
             setRealtimeJobs(prev => new Map(prev.set(jobId, updatedJob)));
         }
-        
+
         // TODO: Trigger visual animation for status change
         // setStatusChangeAnimations(prev => new Map(prev.set(jobId, Date.now())));
-        
+
         // TODO: Clear animation after 2 seconds
         // setTimeout(() => {
         //     setStatusChangeAnimations(prev => {
@@ -66,7 +66,7 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({
         //         return newMap;
         //     });
         // }, 2000);
-        
+
         // Call parent callback if provided
         if (onJobStatusUpdate) {
             onJobStatusUpdate(jobId, status, updatedJob);
@@ -367,15 +367,16 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({
 
             {/* WebSocket Connection Status */}
             {workflowId && (
-                <div className="absolute top-16 left-4 z-20 flex items-center gap-2 bg-gray-800 text-white rounded-lg shadow-md px-3 py-2 text-sm">
+                <div
+                    className="absolute top-16 left-4 z-20 flex items-center gap-2 bg-gray-800 text-white rounded-lg shadow-md px-3 py-2 text-sm">
                     {connected ? (
                         <>
-                            <Wifi className="w-4 h-4 text-green-400" />
+                            <Wifi className="w-4 h-4 text-green-400"/>
                             <span className="text-green-400 font-medium">Live Updates</span>
                         </>
                     ) : (
                         <>
-                            <WifiOff className="w-4 h-4 text-red-400" />
+                            <WifiOff className="w-4 h-4 text-red-400"/>
                             <span className="text-red-400 font-medium">
                                 {error ? 'Connection Error' : 'Connecting...'}
                             </span>
@@ -502,7 +503,8 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({
 
             {/* Job Details Panel */}
             {selectedJob && (
-                <div className="absolute bottom-4 left-4 bg-gray-800 rounded-lg shadow-lg p-4 max-w-sm z-20 border border-gray-700">
+                <div
+                    className="absolute bottom-4 left-4 bg-gray-800 rounded-lg shadow-lg p-4 max-w-sm z-20 border border-gray-700">
                     <h4 className="font-medium text-white mb-2 flex items-center gap-2">
                         <span>{selectedJob.name || selectedJob.id}</span>
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

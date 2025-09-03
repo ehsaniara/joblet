@@ -28,6 +28,16 @@ type FakeBuildRequest struct {
 	getCommandReturnsOnCall map[int]struct {
 		result1 string
 	}
+	GetDependenciesStub        func() []string
+	getDependenciesMutex       sync.RWMutex
+	getDependenciesArgsForCall []struct {
+	}
+	getDependenciesReturns struct {
+		result1 []string
+	}
+	getDependenciesReturnsOnCall map[int]struct {
+		result1 []string
+	}
 	GetEnvironmentStub        func() map[string]string
 	getEnvironmentMutex       sync.RWMutex
 	getEnvironmentArgsForCall []struct {
@@ -88,6 +98,16 @@ type FakeBuildRequest struct {
 	getSecretEnvironmentReturnsOnCall map[int]struct {
 		result1 map[string]string
 	}
+	GetUploadsStub        func() []domain.FileUpload
+	getUploadsMutex       sync.RWMutex
+	getUploadsArgsForCall []struct {
+	}
+	getUploadsReturns struct {
+		result1 []domain.FileUpload
+	}
+	getUploadsReturnsOnCall map[int]struct {
+		result1 []domain.FileUpload
+	}
 	GetVolumesStub        func() []string
 	getVolumesMutex       sync.RWMutex
 	getVolumesArgsForCall []struct {
@@ -97,6 +117,26 @@ type FakeBuildRequest struct {
 	}
 	getVolumesReturnsOnCall map[int]struct {
 		result1 []string
+	}
+	GetWorkflowUuidStub        func() string
+	getWorkflowUuidMutex       sync.RWMutex
+	getWorkflowUuidArgsForCall []struct {
+	}
+	getWorkflowUuidReturns struct {
+		result1 string
+	}
+	getWorkflowUuidReturnsOnCall map[int]struct {
+		result1 string
+	}
+	GetWorkingDirectoryStub        func() string
+	getWorkingDirectoryMutex       sync.RWMutex
+	getWorkingDirectoryArgsForCall []struct {
+	}
+	getWorkingDirectoryReturns struct {
+		result1 string
+	}
+	getWorkingDirectoryReturnsOnCall map[int]struct {
+		result1 string
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
@@ -205,6 +245,59 @@ func (fake *FakeBuildRequest) GetCommandReturnsOnCall(i int, result1 string) {
 	}
 	fake.getCommandReturnsOnCall[i] = struct {
 		result1 string
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetDependencies() []string {
+	fake.getDependenciesMutex.Lock()
+	ret, specificReturn := fake.getDependenciesReturnsOnCall[len(fake.getDependenciesArgsForCall)]
+	fake.getDependenciesArgsForCall = append(fake.getDependenciesArgsForCall, struct {
+	}{})
+	stub := fake.GetDependenciesStub
+	fakeReturns := fake.getDependenciesReturns
+	fake.recordInvocation("GetDependencies", []interface{}{})
+	fake.getDependenciesMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBuildRequest) GetDependenciesCallCount() int {
+	fake.getDependenciesMutex.RLock()
+	defer fake.getDependenciesMutex.RUnlock()
+	return len(fake.getDependenciesArgsForCall)
+}
+
+func (fake *FakeBuildRequest) GetDependenciesCalls(stub func() []string) {
+	fake.getDependenciesMutex.Lock()
+	defer fake.getDependenciesMutex.Unlock()
+	fake.GetDependenciesStub = stub
+}
+
+func (fake *FakeBuildRequest) GetDependenciesReturns(result1 []string) {
+	fake.getDependenciesMutex.Lock()
+	defer fake.getDependenciesMutex.Unlock()
+	fake.GetDependenciesStub = nil
+	fake.getDependenciesReturns = struct {
+		result1 []string
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetDependenciesReturnsOnCall(i int, result1 []string) {
+	fake.getDependenciesMutex.Lock()
+	defer fake.getDependenciesMutex.Unlock()
+	fake.GetDependenciesStub = nil
+	if fake.getDependenciesReturnsOnCall == nil {
+		fake.getDependenciesReturnsOnCall = make(map[int]struct {
+			result1 []string
+		})
+	}
+	fake.getDependenciesReturnsOnCall[i] = struct {
+		result1 []string
 	}{result1}
 }
 
@@ -526,6 +619,59 @@ func (fake *FakeBuildRequest) GetSecretEnvironmentReturnsOnCall(i int, result1 m
 	}{result1}
 }
 
+func (fake *FakeBuildRequest) GetUploads() []domain.FileUpload {
+	fake.getUploadsMutex.Lock()
+	ret, specificReturn := fake.getUploadsReturnsOnCall[len(fake.getUploadsArgsForCall)]
+	fake.getUploadsArgsForCall = append(fake.getUploadsArgsForCall, struct {
+	}{})
+	stub := fake.GetUploadsStub
+	fakeReturns := fake.getUploadsReturns
+	fake.recordInvocation("GetUploads", []interface{}{})
+	fake.getUploadsMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBuildRequest) GetUploadsCallCount() int {
+	fake.getUploadsMutex.RLock()
+	defer fake.getUploadsMutex.RUnlock()
+	return len(fake.getUploadsArgsForCall)
+}
+
+func (fake *FakeBuildRequest) GetUploadsCalls(stub func() []domain.FileUpload) {
+	fake.getUploadsMutex.Lock()
+	defer fake.getUploadsMutex.Unlock()
+	fake.GetUploadsStub = stub
+}
+
+func (fake *FakeBuildRequest) GetUploadsReturns(result1 []domain.FileUpload) {
+	fake.getUploadsMutex.Lock()
+	defer fake.getUploadsMutex.Unlock()
+	fake.GetUploadsStub = nil
+	fake.getUploadsReturns = struct {
+		result1 []domain.FileUpload
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetUploadsReturnsOnCall(i int, result1 []domain.FileUpload) {
+	fake.getUploadsMutex.Lock()
+	defer fake.getUploadsMutex.Unlock()
+	fake.GetUploadsStub = nil
+	if fake.getUploadsReturnsOnCall == nil {
+		fake.getUploadsReturnsOnCall = make(map[int]struct {
+			result1 []domain.FileUpload
+		})
+	}
+	fake.getUploadsReturnsOnCall[i] = struct {
+		result1 []domain.FileUpload
+	}{result1}
+}
+
 func (fake *FakeBuildRequest) GetVolumes() []string {
 	fake.getVolumesMutex.Lock()
 	ret, specificReturn := fake.getVolumesReturnsOnCall[len(fake.getVolumesArgsForCall)]
@@ -576,6 +722,112 @@ func (fake *FakeBuildRequest) GetVolumesReturnsOnCall(i int, result1 []string) {
 	}
 	fake.getVolumesReturnsOnCall[i] = struct {
 		result1 []string
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetWorkflowUuid() string {
+	fake.getWorkflowUuidMutex.Lock()
+	ret, specificReturn := fake.getWorkflowUuidReturnsOnCall[len(fake.getWorkflowUuidArgsForCall)]
+	fake.getWorkflowUuidArgsForCall = append(fake.getWorkflowUuidArgsForCall, struct {
+	}{})
+	stub := fake.GetWorkflowUuidStub
+	fakeReturns := fake.getWorkflowUuidReturns
+	fake.recordInvocation("GetWorkflowUuid", []interface{}{})
+	fake.getWorkflowUuidMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBuildRequest) GetWorkflowUuidCallCount() int {
+	fake.getWorkflowUuidMutex.RLock()
+	defer fake.getWorkflowUuidMutex.RUnlock()
+	return len(fake.getWorkflowUuidArgsForCall)
+}
+
+func (fake *FakeBuildRequest) GetWorkflowUuidCalls(stub func() string) {
+	fake.getWorkflowUuidMutex.Lock()
+	defer fake.getWorkflowUuidMutex.Unlock()
+	fake.GetWorkflowUuidStub = stub
+}
+
+func (fake *FakeBuildRequest) GetWorkflowUuidReturns(result1 string) {
+	fake.getWorkflowUuidMutex.Lock()
+	defer fake.getWorkflowUuidMutex.Unlock()
+	fake.GetWorkflowUuidStub = nil
+	fake.getWorkflowUuidReturns = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetWorkflowUuidReturnsOnCall(i int, result1 string) {
+	fake.getWorkflowUuidMutex.Lock()
+	defer fake.getWorkflowUuidMutex.Unlock()
+	fake.GetWorkflowUuidStub = nil
+	if fake.getWorkflowUuidReturnsOnCall == nil {
+		fake.getWorkflowUuidReturnsOnCall = make(map[int]struct {
+			result1 string
+		})
+	}
+	fake.getWorkflowUuidReturnsOnCall[i] = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetWorkingDirectory() string {
+	fake.getWorkingDirectoryMutex.Lock()
+	ret, specificReturn := fake.getWorkingDirectoryReturnsOnCall[len(fake.getWorkingDirectoryArgsForCall)]
+	fake.getWorkingDirectoryArgsForCall = append(fake.getWorkingDirectoryArgsForCall, struct {
+	}{})
+	stub := fake.GetWorkingDirectoryStub
+	fakeReturns := fake.getWorkingDirectoryReturns
+	fake.recordInvocation("GetWorkingDirectory", []interface{}{})
+	fake.getWorkingDirectoryMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBuildRequest) GetWorkingDirectoryCallCount() int {
+	fake.getWorkingDirectoryMutex.RLock()
+	defer fake.getWorkingDirectoryMutex.RUnlock()
+	return len(fake.getWorkingDirectoryArgsForCall)
+}
+
+func (fake *FakeBuildRequest) GetWorkingDirectoryCalls(stub func() string) {
+	fake.getWorkingDirectoryMutex.Lock()
+	defer fake.getWorkingDirectoryMutex.Unlock()
+	fake.GetWorkingDirectoryStub = stub
+}
+
+func (fake *FakeBuildRequest) GetWorkingDirectoryReturns(result1 string) {
+	fake.getWorkingDirectoryMutex.Lock()
+	defer fake.getWorkingDirectoryMutex.Unlock()
+	fake.GetWorkingDirectoryStub = nil
+	fake.getWorkingDirectoryReturns = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeBuildRequest) GetWorkingDirectoryReturnsOnCall(i int, result1 string) {
+	fake.getWorkingDirectoryMutex.Lock()
+	defer fake.getWorkingDirectoryMutex.Unlock()
+	fake.GetWorkingDirectoryStub = nil
+	if fake.getWorkingDirectoryReturnsOnCall == nil {
+		fake.getWorkingDirectoryReturnsOnCall = make(map[int]struct {
+			result1 string
+		})
+	}
+	fake.getWorkingDirectoryReturnsOnCall[i] = struct {
+		result1 string
 	}{result1}
 }
 

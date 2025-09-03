@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import mermaid from 'mermaid';
-import { WorkflowJob } from '@/types';
+import {WorkflowJob} from '@/types';
 
 interface WorkflowMermaidGraphProps {
     jobs: WorkflowJob[];
@@ -8,10 +8,10 @@ interface WorkflowMermaidGraphProps {
     onJobAction?: (jobId: string, action: string) => void;
 }
 
-const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({ 
-    jobs, 
-    onJobSelect
-}) => {
+const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
+                                                                       jobs,
+                                                                       onJobSelect
+                                                                   }) => {
     const mermaidRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -47,13 +47,13 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
         // Generate Mermaid flowchart syntax
         const generateMermaidCode = () => {
             let code = 'flowchart TD\n';
-            
+
             // Add nodes with status styling
             jobs.forEach(job => {
                 const jobName = job.name || job.id;
                 const sanitizedName = jobName.replace(/[^a-zA-Z0-9]/g, '_');
                 const statusClass = getStatusClass(job.status);
-                
+
                 code += `    ${sanitizedName}["${jobName}"]:::${statusClass}\n`;
             });
 
@@ -61,7 +61,7 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
             jobs.forEach(job => {
                 const jobName = job.name || job.id;
                 const sanitizedName = jobName.replace(/[^a-zA-Z0-9]/g, '_');
-                
+
                 if (job.dependsOn && job.dependsOn.length > 0) {
                     job.dependsOn.forEach(dep => {
                         const depJob = jobs.find(j => j.name === dep || j.id === dep);
@@ -92,34 +92,34 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                 // Clean up any existing tooltips before re-rendering
                 const existingTooltips = document.querySelectorAll('.graph-tooltip');
                 existingTooltips.forEach(t => t.remove());
-                
+
                 const code = generateMermaidCode();
                 console.log('Mermaid code:', code);
-                
+
                 // Clear previous content
                 mermaidRef.current!.innerHTML = '';
-                
+
                 // Generate unique ID for this diagram
                 const diagramId = `mermaid-${Date.now()}`;
-                
+
                 // Render the diagram
-                const { svg } = await mermaid.render(diagramId, code);
+                const {svg} = await mermaid.render(diagramId, code);
                 mermaidRef.current!.innerHTML = svg;
-                
+
                 // Add click handlers and hover tooltips to nodes
                 const nodes = mermaidRef.current!.querySelectorAll('.node');
                 nodes.forEach((node, index) => {
                     if (index < jobs.length) {
                         const job = jobs[index];
                         let tooltip: HTMLDivElement | null = null;
-                        
+
                         // Helper function to format time
                         const formatTime = (dateString: string) => {
-                            return new Date(dateString).toLocaleTimeString('en-US', { 
-                                hour: '2-digit', 
-                                minute: '2-digit', 
+                            return new Date(dateString).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
                                 second: '2-digit',
-                                hour12: false 
+                                hour12: false
                             });
                         };
 
@@ -137,7 +137,7 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                                 return `${seconds}s`;
                             }
                         };
-                        
+
                         // Add click handler
                         node.addEventListener('click', () => {
                             console.log('Job clicked:', job.name || job.id);
@@ -145,47 +145,47 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                                 onJobSelect(job);
                             }
                         });
-                        
+
                         // Add hover tooltip
                         node.addEventListener('mouseenter', (e) => {
                             node.setAttribute('style', 'cursor: pointer; opacity: 0.8;');
-                            
+
                             // Remove any existing tooltip first
                             const existingTooltips = document.querySelectorAll('.graph-tooltip');
                             existingTooltips.forEach(t => t.remove());
-                            
+
                             // Create tooltip
                             tooltip = document.createElement('div');
                             tooltip.className = 'graph-tooltip fixed bg-gray-700 text-white p-3 rounded shadow-lg text-xs z-50 pointer-events-none border border-gray-600';
                             tooltip.style.maxWidth = '250px';
                             tooltip.style.minWidth = '200px';
-                            
+
                             // Tooltip content with more information
                             let tooltipContent = `
                                 <div class="font-semibold text-white">${job.name || job.id}</div>
                                 <div class="text-xs text-gray-300 mt-1">UUID: ${job.id}</div>
                                 <div class="mt-2 text-gray-200">Status: <span class="font-medium">${job.status}</span></div>
                             `;
-                            
+
                             if (job.command) {
                                 tooltipContent += `<div class="text-gray-200">Command: <span class="font-mono text-gray-300">${job.command}</span></div>`;
                             }
-                            
+
                             if (job.startTime) {
                                 tooltipContent += `<div class="text-gray-200">Start: <span class="font-mono text-gray-300">${formatTime(job.startTime)}</span></div>`;
                             }
-                            
+
                             if (job.endTime) {
                                 tooltipContent += `<div class="text-gray-200">End: <span class="font-mono text-gray-300">${formatTime(job.endTime)}</span></div>`;
                             }
-                            
+
                             if (job.startTime && job.endTime) {
                                 const duration = new Date(job.endTime).getTime() - new Date(job.startTime).getTime();
                                 if (duration > 0) {
                                     tooltipContent += `<div class="text-gray-200">Duration: <span class="font-mono text-gray-300">${formatDuration(duration)}</span></div>`;
                                 }
                             }
-                            
+
                             if (job.dependsOn && job.dependsOn.length > 0) {
                                 tooltipContent += `
                                     <div class="mt-2 pt-2 border-t border-gray-600">
@@ -194,16 +194,16 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                                     </div>
                                 `;
                             }
-                            
+
                             tooltip.innerHTML = tooltipContent;
-                            
+
                             // Position tooltip with smart positioning to stay within viewport
                             const rect = (e.target as Element).getBoundingClientRect();
-                            const tooltipRect = { width: 250, height: 120 }; // Estimated tooltip size
-                            
+                            const tooltipRect = {width: 250, height: 120}; // Estimated tooltip size
+
                             let left = rect.left + rect.width / 2;
                             let top = rect.top - 10;
-                            
+
                             // Adjust horizontal position to stay within viewport
                             if (left + tooltipRect.width / 2 > window.innerWidth - 20) {
                                 left = window.innerWidth - tooltipRect.width - 20;
@@ -214,24 +214,24 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                             } else {
                                 tooltip.style.transform = 'translateX(-50%) translateY(-100%)';
                             }
-                            
+
                             // Adjust vertical position to stay within viewport
                             if (top - tooltipRect.height < 20) {
                                 // Show below the node instead
                                 top = rect.bottom + 10;
                                 tooltip.style.transform = tooltip.style.transform.replace('translateY(-100%)', 'translateY(0%)');
                             }
-                            
+
                             tooltip.style.left = `${left}px`;
                             tooltip.style.top = `${top}px`;
-                            
+
                             // Add tooltip to body for better positioning control
                             document.body.appendChild(tooltip);
                         });
-                        
+
                         node.addEventListener('mouseleave', () => {
                             node.setAttribute('style', 'cursor: pointer; opacity: 1;');
-                            
+
                             // Remove tooltip with better cleanup
                             if (tooltip) {
                                 if (tooltip.parentNode) {
@@ -239,7 +239,7 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                                 }
                                 tooltip = null;
                             }
-                            
+
                             // Also remove any orphaned tooltips
                             const orphanedTooltips = document.querySelectorAll('.graph-tooltip');
                             orphanedTooltips.forEach(t => {
@@ -248,12 +248,12 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                                 }
                             });
                         });
-                        
+
                         // Initial styling
                         node.setAttribute('style', 'cursor: pointer;');
                     }
                 });
-                
+
             } catch (error) {
                 console.error('Error rendering Mermaid diagram:', error);
                 mermaidRef.current!.innerHTML = `
@@ -268,7 +268,7 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
         };
 
         renderGraph();
-        
+
         // Cleanup function to remove tooltips when component unmounts or jobs change
         return () => {
             const tooltips = document.querySelectorAll('.graph-tooltip');
@@ -304,11 +304,12 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                             <h3 className="text-lg font-medium text-white">Workflow Graph</h3>
                         </div>
                     </div>
-                    
+
                     <div className="flex-1 p-4 flex items-center justify-center">
                         <div className="text-center">
                             <p className="text-gray-400">No workflow jobs to display</p>
-                            <p className="text-sm text-gray-500 mt-1">Jobs will appear here once the workflow is executed</p>
+                            <p className="text-sm text-gray-500 mt-1">Jobs will appear here once the workflow is
+                                executed</p>
                         </div>
                     </div>
                 </div>
@@ -324,12 +325,12 @@ const WorkflowMermaidGraph: React.FC<WorkflowMermaidGraphProps> = ({
                         <h3 className="text-lg font-medium text-white">Workflow Graph</h3>
                     </div>
                 </div>
-                
+
                 <div className="flex-1 p-4">
-                    <div 
-                        ref={mermaidRef} 
+                    <div
+                        ref={mermaidRef}
                         className="w-full h-full bg-gray-900 rounded-lg p-4 overflow-auto"
-                        style={{ minHeight: '500px', height: 'calc(100vh - 400px)' }}
+                        style={{minHeight: '500px', height: 'calc(100vh - 400px)'}}
                     />
                 </div>
             </div>

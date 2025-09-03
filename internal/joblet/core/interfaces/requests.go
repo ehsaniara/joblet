@@ -37,6 +37,11 @@ type StartJobRequest struct {
 
 	// Job type determines isolation level
 	JobType domain.JobType // JobTypeStandard (production isolation) or JobTypeRuntimeBuild (builder chroot)
+
+	// Workflow integration
+	WorkflowUuid     string   // UUID of parent workflow (empty for individual jobs)
+	WorkingDirectory string   // Execution directory path
+	Dependencies     []string // Job names this job depends on (workflow jobs only)
 }
 
 // ResourceLimits encapsulates resource constraints for a job

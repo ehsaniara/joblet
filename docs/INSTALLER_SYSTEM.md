@@ -1,10 +1,13 @@
 # Runtime Installer System
 
-This document describes the template-based runtime installer system that replaced embedded shell scripts in the Joblet runtime service.
+This document describes the template-based runtime installer system that replaced embedded shell scripts in the Joblet
+runtime service.
 
 ## Overview
 
-The installer system uses a **Strategy Pattern** architecture with **template-based script generation** to provide maintainable, testable, and extensible runtime installation capabilities. This system replaced 294 lines of embedded shell scripts in `runtime_service.go` with organized, parameterized template files.
+The installer system uses a **Strategy Pattern** architecture with **template-based script generation** to provide
+maintainable, testable, and extensible runtime installation capabilities. This system replaced 294 lines of embedded
+shell scripts in `runtime_service.go` with organized, parameterized template files.
 
 ## Architecture
 
@@ -58,6 +61,7 @@ func (b *BaseInstaller) RenderTemplate(templateName string, data TemplateData) (
 ```
 
 Uses Go's `text/template` package with embedded template files for:
+
 - Parameterized shell script generation
 - Runtime-specific variable substitution
 - Consistent error handling across installers
@@ -78,6 +82,7 @@ func (m *Manager) Install(ctx context.Context, spec *InstallSpec) (*InstallResul
 ```
 
 Central coordinator that:
+
 - Routes installation requests to appropriate installers
 - Provides unified interface for runtime service
 - Handles installer registration and discovery
@@ -98,6 +103,7 @@ func (g *GitHubInstaller) Install(ctx context.Context, spec *InstallSpec) (*Inst
 ```
 
 Specific implementation for GitHub-based runtimes:
+
 - Repository URL validation and normalization
 - Branch specification with sensible defaults
 - Template-based script generation
@@ -184,24 +190,28 @@ func (s *RuntimeServiceServer) buildCommandFromSource(source *pb.RuntimeSourceCo
 ## Benefits
 
 ### Maintainability
+
 - **Separated Concerns**: Shell scripts in template files, Go logic in installers
 - **Version Control**: Templates tracked separately from Go code
 - **Debugging**: Shell scripts can be debugged independently
 - **Code Reduction**: 294 lines removed from runtime_service.go
 
 ### Testability
+
 - **Unit Testing**: Each installer component individually testable
 - **Template Testing**: Templates can be rendered and validated separately
 - **Mock Support**: Strategy pattern enables easy mocking for tests
 - **Isolated Testing**: Template rendering separated from business logic
 
-### Extensibility  
+### Extensibility
+
 - **New Installers**: Easy to add new runtime source types
 - **Template Variations**: Multiple templates per installer type
 - **Custom Parameters**: Flexible template parameter system
 - **Plugin Architecture**: Clean interfaces for future extensions
 
 ### Reliability
+
 - **Input Validation**: Comprehensive validation at installer level
 - **Error Handling**: Standardized error reporting across installers
 - **Type Safety**: Go structs for all installer interactions
@@ -259,8 +269,9 @@ func TestGitHubInstaller_Install(t *testing.T) {
 ### Removed Components
 
 The following embedded script methods were removed from `runtime_service.go`:
+
 - `buildGithubCommand()` - 80+ lines
-- `buildScriptCommand()` - 60+ lines  
+- `buildScriptCommand()` - 60+ lines
 - `buildLocalCommand()` - 70+ lines
 - `buildLocalRuntimeCommand()` - 84+ lines
 
@@ -269,6 +280,7 @@ The following embedded script methods were removed from `runtime_service.go`:
 ### Preserved Functionality
 
 All existing runtime installation functionality was preserved:
+
 - GitHub repository cloning and installation
 - Branch specification and defaults
 - Build argument passing
@@ -300,11 +312,13 @@ All existing runtime installation functionality was preserved:
 
 ## Conclusion
 
-The template-based installer system successfully replaces embedded shell scripts with a maintainable, testable, and extensible architecture. This refactoring:
+The template-based installer system successfully replaces embedded shell scripts with a maintainable, testable, and
+extensible architecture. This refactoring:
 
 - **Reduces complexity** in runtime_service.go (1290 → 996 lines)
 - **Improves maintainability** with separated template files
 - **Enables comprehensive testing** of installer components
 - **Provides foundation** for future runtime installation features
 
-The system maintains full backward compatibility while enabling future enhancements and easier debugging of runtime installation issues.
+The system maintains full backward compatibility while enabling future enhancements and easier debugging of runtime
+installation issues.

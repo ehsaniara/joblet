@@ -666,7 +666,7 @@ rnx run \
 ### Current Limitations
 
 - **No volume resizing**: Create new volume and migrate data manually
-- **No built-in backup**: Implement backup workflows using job commands  
+- **No built-in backup**: Implement backup workflows using job commands
 - **No volume info command**: Use `rnx volume list` for volume information
 - **No force removal**: Volume removal blocked if jobs are using it
 - **No usage monitoring**: Check usage via job commands using `df` and `du`
@@ -678,6 +678,6 @@ Check the project roadmap for upcoming volume management features.
 ## See Also
 
 - [Job Execution Guide](./JOB_EXECUTION.md)
-- [Network Management](./NETWORK_MANAGEMENT.md)  
+- [Network Management](./NETWORK_MANAGEMENT.md)
 - [Configuration Guide](./CONFIGURATION.md)
 - [Volume Test Suite](../tests/e2e/volume/)

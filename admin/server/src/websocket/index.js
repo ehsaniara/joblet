@@ -1,5 +1,10 @@
 import {WebSocketServer} from 'ws';
-import {handleLogStream, handleWorkflowStatusStream, handleMonitorStream, handleRuntimeInstallStream} from './handlers.js';
+import {
+    handleLogStream,
+    handleMonitorStream,
+    handleRuntimeInstallStream,
+    handleWorkflowStatusStream
+} from './handlers.js';
 
 export function setupWebSocket(server) {
     const wss = new WebSocketServer({server});

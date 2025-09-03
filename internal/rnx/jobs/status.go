@@ -365,10 +365,45 @@ func formatDuration(d time.Duration) string {
 
 // outputJobStatusJSON outputs the job status in JSON format
 func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
-	// Use the protobuf's native JSON marshaling to preserve field names and see the actual data
+	// Create a structured output that includes all fields, even when empty
+	output := map[string]interface{}{
+		"uuid":              response.Uuid,
+		"name":              response.Name,
+		"command":           response.Command,
+		"args":              response.Args,
+		"status":            response.Status,
+		"startTime":         response.StartTime,
+		"endTime":           response.EndTime,
+		"exitCode":          response.ExitCode,
+		"scheduledTime":     response.ScheduledTime,
+		"environment":       response.Environment,
+		"secretEnvironment": response.SecretEnvironment,
+		"network":           response.Network,
+		"volumes":           response.Volumes,
+		"runtime":           response.Runtime,
+		"workDir":           response.WorkDir,
+		"uploads":           response.Uploads,
+		"dependencies":      response.Dependencies,
+		"workflowUuid":      response.WorkflowUuid,
+	}
+
+	// Include resource limits if set
+	if response.MaxCPU > 0 {
+		output["maxCPU"] = response.MaxCPU
+	}
+	if response.MaxMemory > 0 {
+		output["maxMemory"] = response.MaxMemory
+	}
+	if response.MaxIOBPS > 0 {
+		output["maxIOBPS"] = response.MaxIOBPS
+	}
+	if response.CpuCores != "" {
+		output["cpuCores"] = response.CpuCores
+	}
+
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(response)
+	return encoder.Encode(output)
 }
 
 // getWorkflowStatus retrieves and displays comprehensive workflow status with job names.

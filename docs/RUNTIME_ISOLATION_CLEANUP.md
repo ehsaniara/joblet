@@ -2,13 +2,16 @@
 
 ## Executive Summary
 
-This document describes the runtime isolation cleanup system that transforms builder chroot runtime installations into secure, isolated runtime environments for production jobs. The cleanup process ensures that production jobs using runtimes cannot access the host OS filesystem through runtime mounts.
+This document describes the runtime isolation cleanup system that transforms builder chroot runtime installations into
+secure, isolated runtime environments for production jobs. The cleanup process ensures that production jobs using
+runtimes cannot access the host OS filesystem through runtime mounts.
 
 ## Problem Statement
 
 ### Security Issue
 
-When runtimes are built in the builder chroot environment, they have access to the full host OS filesystem. Runtime setup scripts create `runtime.yml` configurations that reference host OS paths:
+When runtimes are built in the builder chroot environment, they have access to the full host OS filesystem. Runtime
+setup scripts create `runtime.yml` configurations that reference host OS paths:
 
 ```yaml
 # INSECURE: Points to actual host OS paths
@@ -24,6 +27,7 @@ mounts:
 ### Security Risk
 
 Production jobs using these runtimes would mount the **actual host OS directories**, potentially exposing:
+
 - Host filesystem structure
 - System binaries and libraries
 - Configuration files
@@ -50,6 +54,7 @@ flowchart TD
 ### Directory Structure Transformation
 
 **Before Cleanup (INSECURE):**
+
 ```
 /opt/joblet/runtimes/java/openjdk-21/
 ├── runtime.yml                # Points to host OS paths
@@ -57,6 +62,7 @@ flowchart TD
 ```
 
 **After Cleanup (SECURE):**
+
 ```
 /opt/joblet/runtimes/java/openjdk-21/
 ├── isolated/                 # NEW: Self-contained runtime files
@@ -134,18 +140,21 @@ mounts:
 Different runtime types require different cleanup strategies:
 
 #### Java Runtimes
+
 - Copy JVM installation (`/usr/lib/jvm/`)
 - Copy Java binaries (`/usr/bin/java`, `/usr/bin/javac`)
 - Copy SSL certificates (`/etc/ssl/certs/java`)
 - Copy shared libraries if needed
 
 #### Python Runtimes
+
 - Copy Python installation if built from source
 - Copy virtual environment (already isolated)
 - Copy system Python libraries if referenced
 - Copy SSL certificates and CA bundles
 
 #### Node.js Runtimes
+
 - Copy Node.js installation
 - Copy npm global packages if referenced
 - Copy shared libraries and dependencies
@@ -155,21 +164,25 @@ Different runtime types require different cleanup strategies:
 ### Attack Vector Mitigation
 
 **Before Cleanup:**
+
 ```yaml
 # Production job using INSECURE runtime
 mounts:
   - source: "usr/bin/java"     # → /usr/bin/java (HOST BINARY!)
     target: "/usr/bin/java"
 ```
+
 *Risk: Production job can access host `/usr/bin/java` and potentially explore host filesystem*
 
 **After Cleanup:**
+
 ```yaml
 # Production job using SECURE runtime  
 mounts:
   - source: "isolated/usr/bin/java"  # → isolated copy within runtime dir
     target: "/usr/bin/java"
 ```
+
 *Secure: Production job only accesses isolated copy within `/opt/joblet/runtimes/`*
 
 ### Defense in Depth
@@ -292,12 +305,16 @@ func (rc *RuntimeCleanup) ValidateRuntimeConfig(configPath string) error {
 
 ## Conclusion
 
-The runtime isolation cleanup system successfully resolves the critical security gap in runtime installations. By copying runtime files to isolated structures and updating mount configurations, production jobs are completely isolated from the host OS filesystem while maintaining full runtime functionality.
+The runtime isolation cleanup system successfully resolves the critical security gap in runtime installations. By
+copying runtime files to isolated structures and updating mount configurations, production jobs are completely isolated
+from the host OS filesystem while maintaining full runtime functionality.
 
 This approach provides:
+
 - **Security:** Complete isolation from host filesystem
-- **Functionality:** Runtimes work identically to before cleanup  
+- **Functionality:** Runtimes work identically to before cleanup
 - **Auditability:** Clear separation of builder vs production environments
 - **Scalability:** Pattern applies to all runtime types (Java, Python, Node.js, etc.)
 
-The cleanup system is a critical security component that ensures the dual chroot architecture maintains its security guarantees while providing full runtime functionality to production workloads.
+The cleanup system is a critical security component that ensures the dual chroot architecture maintains its security
+guarantees while providing full runtime functionality to production workloads.

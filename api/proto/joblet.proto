@@ -49,7 +49,7 @@ service RuntimeService {
   rpc ListRuntimes(EmptyRequest) returns (RuntimesRes){}
   rpc GetRuntimeInfo(RuntimeInfoReq) returns (RuntimeInfoRes){}
   rpc TestRuntime(RuntimeTestReq) returns (RuntimeTestRes){}
-  
+
   // Runtime building operations - uses builder isolation automatically (no env vars needed)
   rpc BuildRuntime(BuildRuntimeRequest) returns (BuildRuntimeResponse){}
   rpc GetBuildStatus(GetBuildStatusRequest) returns (GetBuildStatusResponse){}

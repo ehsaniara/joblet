@@ -47,21 +47,25 @@ Joblet provides comprehensive network management capabilities:
 
 ## Network Implementation: 2-Phase Setup
 
-Joblet uses a sophisticated 2-phase network setup to ensure proper network namespace configuration without race conditions.
+Joblet uses a sophisticated 2-phase network setup to ensure proper network namespace configuration without race
+conditions.
 
 ### The Problem
 
 Network namespace configuration requires:
+
 - A process PID to attach the namespace to
 - Network configuration (IP, routes, interfaces)
 
 However, there's a timing challenge:
+
 - Network namespaces can only be configured after the process exists
 - But the process needs to wait for network configuration before executing
 
 ### The Solution: 2-Phase Network Setup
 
 #### Phase 1: Resource Allocation (Pre-Launch)
+
 Before the job process is created:
 
 ```go
@@ -79,6 +83,7 @@ environment["NETWORK_READY_FILE"] = networkReadyFile
 ```
 
 #### Phase 2: Namespace Configuration (Post-Launch)
+
 After the job process is created with PID:
 
 ```go
@@ -168,8 +173,9 @@ The network test suite verifies this implementation:
 ```
 
 Tests verify:
+
 - Phase 1 allocates IP before launch
-- Phase 2 configures namespace after PID exists  
+- Phase 2 configures namespace after PID exists
 - Job waits for network before continuing
 - "none" network skips both phases
 - Proper cleanup of synchronization files

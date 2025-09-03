@@ -647,6 +647,7 @@ rnx log <build-job-uuid>
 ```
 
 **Solutions:**
+
 ```bash
 # 1. Check if previous build exists
 ls -la /opt/joblet/runtimes/openjdk/
@@ -676,6 +677,7 @@ cat /opt/joblet/runtimes/java/openjdk-21/runtime.yml
 ```
 
 **Solutions:**
+
 ```bash
 # 1. Manually trigger cleanup (if implemented)
 joblet cleanup-runtime /opt/joblet/runtimes/java/openjdk-21
@@ -704,6 +706,7 @@ rnx runtime install test:1.0
 ```
 
 **Solutions:**
+
 ```bash
 # 1. Verify service routing configuration
 cat /opt/joblet/config/joblet-config.yml | grep -A 10 isolation
@@ -725,6 +728,7 @@ rnx run --runtime=openjdk:21 java -version
 ```
 
 **Root Causes and Solutions:**
+
 1. **Missing dynamic linker**: Java binaries need `/lib64/ld-linux-x86-64.so.2`
 2. **Missing shared libraries**: JVM requires `libjli.so`, `libstdc++.so.6`
 3. **Incorrect library paths**: Runtime must be configured for isolated environment
@@ -752,6 +756,7 @@ rnx run --runtime=openjdk:21 --upload=Test.java javac Test.java
 ```
 
 **Solution:** Runtime setup includes complete Java configuration:
+
 ```bash
 # Runtime should include conf/security directory
 # This is automatically handled by the system-based setup approach
@@ -765,6 +770,7 @@ rnx runtime list
 ```
 
 **Solution:** Use system-based setup approach:
+
 ```bash
 # Remove failed runtime and reinstall
 rnx runtime remove openjdk:21 --force
@@ -809,6 +815,7 @@ tail -f /var/log/joblet/server.log | grep -i cleanup
 ```
 
 **Solutions:**
+
 ```bash
 # 1. Increase build timeout in configuration
 # Edit /opt/joblet/config/joblet-config.yml

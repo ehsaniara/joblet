@@ -105,9 +105,9 @@ class APIService {
         availableWorkflows?: string[];
         requiresWorkflowSelection?: boolean;
     }> {
-        return this.request<{ 
-            workflowId: string; 
-            status: string; 
+        return this.request<{
+            workflowId: string;
+            status: string;
             message: string;
             availableWorkflows?: string[];
             requiresWorkflowSelection?: boolean;

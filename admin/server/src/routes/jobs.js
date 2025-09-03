@@ -42,15 +42,15 @@ router.get('/', async (req, res) => {
 router.post('/execute', async (req, res) => {
     try {
         const {
-            command, 
-            schedule, 
-            runtime, 
-            volumes, 
-            uploads, 
+            command,
+            schedule,
+            runtime,
+            volumes,
+            uploads,
             uploadDirs,
-            network, 
-            maxCPU, 
-            maxMemory, 
+            network,
+            maxCPU,
+            maxMemory,
             maxIOBPS,
             cpuCores,
             envVars,
@@ -63,7 +63,7 @@ router.post('/execute', async (req, res) => {
         }
 
         const args = ['run'];
-        
+
         // Add schedule if provided (using = format)
         if (schedule && schedule.trim()) {
             args.push(`--schedule=${schedule.trim()}`);
@@ -121,7 +121,7 @@ router.post('/execute', async (req, res) => {
         args.push(...commandParts);
 
         const output = await execRnx(args, {node});
-        
+
         // Try to parse the output to extract job ID
         let jobId = null;
         const lines = output.split('\n');
@@ -133,7 +133,7 @@ router.post('/execute', async (req, res) => {
         }
 
         res.json({
-            success: true, 
+            success: true,
             output: output,
             jobId: jobId
         });
@@ -226,9 +226,9 @@ router.delete('/:jobId', async (req, res) => {
     try {
         const {jobId} = req.params;
         const node = req.query.node || 'default';
-        
+
         const output = await execRnx(['delete', jobId], {node});
-        
+
         res.json({
             message: `Job ${jobId} deleted successfully`,
             output: output.trim()

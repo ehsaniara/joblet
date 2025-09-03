@@ -1,6 +1,7 @@
 # Remote System Monitoring Guide
 
-Comprehensive guide to monitoring remote joblet server resources and performance using RNX's client-side monitoring capabilities.
+Comprehensive guide to monitoring remote joblet server resources and performance using RNX's client-side monitoring
+capabilities.
 
 ## Table of Contents
 
@@ -8,7 +9,7 @@ Comprehensive guide to monitoring remote joblet server resources and performance
 - [Client-Server Architecture](#client-server-architecture)
 - [Quick Start](#quick-start)
 - [Monitoring Commands](#monitoring-commands)
-- [Metrics Types](#metrics-types)  
+- [Metrics Types](#metrics-types)
 - [JSON Integration](#json-integration)
 - [Dashboard Integration](#dashboard-integration)
 - [Troubleshooting](#troubleshooting)
@@ -16,10 +17,11 @@ Comprehensive guide to monitoring remote joblet server resources and performance
 
 ## Overview
 
-RNX provides comprehensive **remote** monitoring capabilities from your client machine/workstation that track joblet server resources:
+RNX provides comprehensive **remote** monitoring capabilities from your client machine/workstation that track joblet
+server resources:
 
 - **Remote Server Resources**: CPU, memory, disk, and network utilization on the joblet server
-- **Joblet Volumes**: Volume usage and availability across all server volume types  
+- **Joblet Volumes**: Volume usage and availability across all server volume types
 - **Server Process Information**: Running processes, resource consumption, and states on the joblet host
 - **Cloud Environment**: Automatic detection of joblet server's cloud provider and instance details
 - **Performance Metrics**: Real-time throughput, I/O operations, and load averages from the server
@@ -32,7 +34,7 @@ RNX provides comprehensive **remote** monitoring capabilities from your client m
 ✅ **Cloud Detection**: Support for AWS, GCP, Azure, KVM, and bare metal server detection  
 ✅ **JSON Output**: UI-compatible format for dashboards and monitoring tools  
 ✅ **Resource Filtering**: Monitor specific server resources (CPU, memory, disk, network)  
-✅ **Process Analysis**: Top consumers by CPU and memory usage on the server  
+✅ **Process Analysis**: Top consumers by CPU and memory usage on the server
 
 ## Client-Server Architecture
 
@@ -59,11 +61,13 @@ RNX provides comprehensive **remote** monitoring capabilities from your client m
 ### Configuration Requirements
 
 **Client Side (Your Workstation):**
+
 - RNX CLI installed with proper configuration file
 - Network connectivity to joblet server
 - Valid mTLS certificates for authentication
 
 **Server Side (Joblet Host):**
+
 - Joblet server running with monitoring service enabled
 - gRPC port accessible (default: 50051)
 - Monitoring collectors gathering system metrics
@@ -131,13 +135,15 @@ rnx monitor top --json
 Displays comprehensive **remote server** status including all server resources and joblet volumes.
 
 **Features:**
+
 - Complete remote server overview
-- Server cloud environment detection  
+- Server cloud environment detection
 - Server-side volume usage statistics
 - Server process state breakdown
 - Server network interface details
 
 **Usage:**
+
 ```bash
 rnx monitor status                    # Human-readable server status
 rnx monitor status --json            # JSON format (server data)
@@ -149,12 +155,14 @@ rnx --node=production monitor status # Specific server node
 Shows current **remote server** metrics in a condensed format with top resource consumers.
 
 **Features:**
+
 - Top server processes by CPU and memory
 - Server resource utilization summary
 - Server network throughput rates
 - Server disk I/O statistics
 
 **Usage:**
+
 ```bash
 rnx monitor top                          # All server metrics
 rnx monitor top --filter=cpu,memory      # Specific server metrics only
@@ -166,6 +174,7 @@ rnx monitor top --json                   # JSON output (server data)
 Real-time **remote server** monitoring with configurable refresh intervals.
 
 **Features:**
+
 - Live server metric updates from your workstation
 - Configurable refresh rate for server monitoring
 - Server resource filtering
@@ -173,6 +182,7 @@ Real-time **remote server** monitoring with configurable refresh intervals.
 - Compact display mode for server metrics
 
 **Usage:**
+
 ```bash
 rnx monitor watch                            # Default 5s server monitoring
 rnx monitor watch --interval=1               # 1s server refresh
@@ -184,18 +194,21 @@ rnx monitor watch --json --interval=10       # JSON server streaming
 ## Metrics Types
 
 ### CPU Metrics
+
 - **Usage Percentage**: Overall CPU utilization
-- **Load Averages**: 1, 5, and 15-minute load averages  
+- **Load Averages**: 1, 5, and 15-minute load averages
 - **Per-Core Usage**: Individual core utilization
 - **Time Breakdowns**: User, system, idle, I/O wait, steal time
 
-### Memory Metrics  
+### Memory Metrics
+
 - **Total/Used/Available**: Memory allocation details
 - **Cache and Buffers**: System memory optimization
 - **Swap Usage**: Virtual memory utilization
 - **Usage Percentage**: Memory utilization rate
 
 ### Disk Metrics
+
 - **Mount Points**: All filesystem mount points
 - **Joblet Volumes**: Volume usage and availability
 - **Space Usage**: Total, used, available, percentage
@@ -203,18 +216,21 @@ rnx monitor watch --json --interval=10       # JSON server streaming
 - **Inode Usage**: Filesystem metadata utilization
 
 ### Network Metrics
+
 - **Interface Statistics**: All network interfaces
 - **Traffic Throughput**: Real-time RX/TX rates
 - **Packet Counts**: Received/transmitted packets
 - **Error Statistics**: Network errors and drops
 
 ### Process Metrics
+
 - **Process States**: Running, sleeping, stopped, zombie counts
 - **Top Consumers**: Processes by CPU and memory usage
 - **Thread Information**: Total thread counts
 - **Resource Usage**: Per-process CPU and memory consumption
 
 ### Volume Metrics
+
 - **Volume Detection**: Automatic discovery of joblet volumes
 - **Usage Statistics**: Space utilization per volume
 - **Volume Types**: Filesystem and memory volume support
@@ -384,6 +400,7 @@ console.log(`Memory Usage: ${metrics.memoryInfo.percent}%`);
 ### Common Issues
 
 **No Volume Statistics Showing**
+
 ```bash
 # Check if volumes exist
 rnx volume list
@@ -396,6 +413,7 @@ rnx monitor status --json | grep "joblet-volume"
 ```
 
 **High Resource Usage**
+
 ```bash
 # Identify resource-heavy processes
 rnx monitor top --filter=process
@@ -408,6 +426,7 @@ rnx list --json | jq '.[] | select(.status=="running")'
 ```
 
 **Network Monitoring Issues**
+
 ```bash
 # Check active interfaces
 rnx monitor status | grep -A 10 "Network Interfaces"
@@ -419,6 +438,7 @@ rnx monitor watch --filter=network --interval=2
 ### Performance Optimization
 
 **Reduce Monitoring Overhead**
+
 ```bash
 # Use longer intervals for production
 rnx monitor watch --interval=30
@@ -431,6 +451,7 @@ rnx monitor watch --compact
 ```
 
 **Efficient JSON Processing**
+
 ```bash
 # Extract specific metrics only
 rnx monitor status --json | jq '.cpuInfo'
@@ -442,12 +463,14 @@ rnx monitor status --json | jq '.disksInfo.disks[] | select(.filesystem=="joblet
 ## Best Practices
 
 ### 1. Regular Monitoring
+
 ```bash
 # Set up automated monitoring
 */5 * * * * rnx monitor status --json > /var/log/joblet/metrics-$(date +%Y%m%d-%H%M).json
 ```
 
 ### 2. Resource Thresholds
+
 ```bash
 # Create alerting scripts
 #!/bin/bash
@@ -458,6 +481,7 @@ fi
 ```
 
 ### 3. Volume Management
+
 ```bash
 # Monitor volume usage regularly
 rnx monitor status --json | jq '.disksInfo.disks[] | select(.filesystem=="joblet-volume") | {name, percent}'
@@ -467,6 +491,7 @@ rnx volume list | grep -v "in-use"
 ```
 
 ### 4. Performance Monitoring
+
 ```bash
 # Monitor job performance impact
 rnx monitor watch --filter=cpu,memory &
@@ -474,12 +499,14 @@ rnx run --max-cpu=50 heavy-computation.py
 ```
 
 ### 5. Historical Tracking
+
 ```bash
 # Log metrics for trend analysis  
 rnx monitor status --json | jq '{timestamp: now, cpu: .cpuInfo.usage, memory: .memoryInfo.percent}' >> metrics.jsonl
 ```
 
 ### 6. Integration Testing
+
 ```bash
 # Test monitoring integration
 rnx monitor status --json | jq . > /dev/null && echo "JSON valid" || echo "JSON invalid"
@@ -495,7 +522,7 @@ done
 
 - [RNX CLI Reference](./RNX_CLI_REFERENCE.md) - Complete CLI command reference
 - [Volume Management](./VOLUME_MANAGEMENT.md) - Managing persistent volumes
-- [Troubleshooting](./TROUBLESHOOTING.md) - Common issues and solutions  
+- [Troubleshooting](./TROUBLESHOOTING.md) - Common issues and solutions
 - [Admin UI](./ADMIN_UI.md) - Web-based monitoring interface
 
 For additional help, run `rnx monitor --help` or see the [troubleshooting guide](./TROUBLESHOOTING.md).

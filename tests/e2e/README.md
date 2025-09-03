@@ -1,6 +1,7 @@
 # Joblet End-to-End Test Suite
 
-Comprehensive end-to-end test suite for Joblet's isolation, networking, runtime management, and functionality with team-configurable parameters.
+Comprehensive end-to-end test suite for Joblet's isolation, networking, runtime management, and functionality with
+team-configurable parameters.
 
 ## Quick Start
 
@@ -95,7 +96,7 @@ Located in `volume/` directory:
 
 Individual tests: `./volume/test-*.sh`
 
-## Expected Results 
+## Expected Results
 
 - **Isolation**: Jobs see only own processes, isolated filesystem, enforced limits
 - **Networking**: Bridge jobs communicate, isolated jobs properly separated

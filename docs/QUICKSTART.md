@@ -159,6 +159,7 @@ rnx runtime info python-3.11-ml
 ```
 
 **Benefits:**
+
 - ⚡ **Instant startup**: 2-3 seconds vs 5-45 minutes traditional package installation
 - 🔒 **Isolated**: No host contamination, complete dependency isolation
 - 📦 **Pre-configured**: All packages and tools ready to use
@@ -237,6 +238,7 @@ rnx runtime install python-3.11-ml
 ```
 
 **What happens during installation:**
+
 1. Uses **RuntimeService** → automatically applies builder chroot
 2. Downloads and installs runtime in isolated builder environment
 3. **Cleanup phase** creates isolated runtime structure
@@ -256,6 +258,7 @@ rnx runtime list
 ```
 
 **Security Benefits:**
+
 - Production jobs use **isolated runtime copies** (no host OS access)
 - Runtime files copied to `/opt/joblet/runtimes/{runtime}/isolated/`
 - Complete filesystem isolation between runtime building and production use

@@ -15,12 +15,12 @@ const getRnxConfigPath = () => {
 const ensureRnxDirectory = async () => {
     const homeDir = os.homedir();
     const rnxDir = path.join(homeDir, '.rnx');
-    
+
     try {
         await fs.access(rnxDir);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            await fs.mkdir(rnxDir, { recursive: true });
+            await fs.mkdir(rnxDir, {recursive: true});
         } else {
             throw error;
         }
@@ -38,7 +38,7 @@ const defaultSettings = {
 router.get('/', async (req, res) => {
     try {
         const settingsPath = getRnxConfigPath();
-        
+
         try {
             const settingsData = await fs.readFile(settingsPath, 'utf8');
             const settings = JSON.parse(settingsData);
@@ -60,22 +60,22 @@ router.get('/', async (req, res) => {
 // Save user settings
 router.post('/', async (req, res) => {
     try {
-        const { refreshFrequency, language, timezone } = req.body;
-        
+        const {refreshFrequency, language, timezone} = req.body;
+
         // Validate settings
         const settings = {
             refreshFrequency: typeof refreshFrequency === 'number' ? refreshFrequency : defaultSettings.refreshFrequency,
             language: typeof language === 'string' ? language : defaultSettings.language,
             timezone: typeof timezone === 'string' ? timezone : defaultSettings.timezone
         };
-        
+
         // Ensure .rnx directory exists
         await ensureRnxDirectory();
-        
+
         // Save settings to .rnx/admin-settings.json
         const settingsPath = getRnxConfigPath();
         await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
-        
+
         res.json({
             success: true,
             message: 'Settings saved successfully',

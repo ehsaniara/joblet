@@ -1134,7 +1134,7 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 		if err := f.platform.Mount(runtimeDir, targetPath, "", flags, ""); err != nil {
 			return fmt.Errorf("failed to mount runtime dir %s to %s: %w", runtimeDir, targetPath, err)
 		}
-		f.logger.Info("mounted runtime path", "target", targetPath)
+		f.logger.Debug("mounted runtime path", "target", targetPath)
 		return nil
 	}
 
@@ -1246,7 +1246,7 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 			}
 		}
 
-		f.logger.Info("mounted runtime path", "target", targetPath, "readonly", mount.ReadOnly)
+		f.logger.Debug("mounted runtime path", "target", targetPath, "readonly", mount.ReadOnly)
 	}
 
 	return nil

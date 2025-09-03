@@ -28,7 +28,9 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-// Joblet orchestrates job execution using specialized components
+// Joblet orchestrates job execution using specialized components.
+// Main entry point for job management - coordinates validation, building,
+// resource allocation, execution, and cleanup for all job types.
 type Joblet struct {
 	// Core dependencies
 	store    JobStore
@@ -45,7 +47,9 @@ type Joblet struct {
 	cleanup         *cleanup.Coordinator
 }
 
-// StartJobRequest contains all parameters for starting a job
+// StartJobRequest contains all parameters for starting a job.
+// Unified request structure supporting individual jobs, workflows, and scheduled jobs
+// with complete resource configuration and upload capabilities.
 type StartJobRequest struct {
 	Command           string
 	Args              []string
@@ -58,8 +62,14 @@ type StartJobRequest struct {
 	Environment       map[string]string
 	SecretEnvironment map[string]string
 	JobType           domain.JobType
+	WorkflowUuid      string
+	WorkingDirectory  string
+	Dependencies      []string
 }
 
+// Getter methods implementing BuildRequest interface for job builder.
+// These provide type-safe access to all job configuration parameters
+// used during the job construction and validation phase.
 func (r StartJobRequest) GetCommand() string                      { return r.Command }
 func (r StartJobRequest) GetArgs() []string                       { return r.Args }
 func (r StartJobRequest) GetSchedule() string                     { return r.Schedule }
@@ -70,8 +80,14 @@ func (r StartJobRequest) GetRuntime() string                      { return r.Run
 func (r StartJobRequest) GetEnvironment() map[string]string       { return r.Environment }
 func (r StartJobRequest) GetSecretEnvironment() map[string]string { return r.SecretEnvironment }
 func (r StartJobRequest) GetJobType() domain.JobType              { return r.JobType }
+func (r StartJobRequest) GetWorkflowUuid() string                 { return r.WorkflowUuid }
+func (r StartJobRequest) GetWorkingDirectory() string             { return r.WorkingDirectory }
+func (r StartJobRequest) GetUploads() []domain.FileUpload         { return r.Uploads }
+func (r StartJobRequest) GetDependencies() []string               { return r.Dependencies }
 
-// NewPlatformJoblet creates a new Linux platform joblet with specialized components
+// NewPlatformJoblet creates a new Linux platform joblet with specialized components.
+// Initializes all core services, starts the scheduler, and begins periodic cleanup.
+// Returns a fully configured joblet ready for job execution.
 func NewPlatformJoblet(store JobStore, cfg *config.Config, networkStoreAdapter adapters.NetworkStoreAdapter) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
@@ -119,8 +135,15 @@ func NewPlatformJoblet(store JobStore, cfg *config.Config, networkStoreAdapter a
 	return j
 }
 
-// StartJob validates and starts a job (immediate or scheduled)
+// StartJob validates and starts a job (immediate or scheduled).
+// Main job entry point - validates request, builds job domain object,
+// then routes to either immediate execution or scheduler based on schedule field.
 func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
+	j.logger.Debug("CORE JOBLET StartJob called",
+		"command", req.Command,
+		"network", req.Network,
+		"volumes", req.Volumes,
+		"runtime", req.Runtime)
 	j.logger.Debug("StartJob called",
 		"command", req.Command,
 		"network", req.Network,
@@ -183,8 +206,8 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 }
 
 // scheduleJob handles scheduled job execution by parsing the schedule time,
-// preparing uploads, and queuing the job for future execution. It validates
-// the schedule format and coordinates with the scheduler for timing management.
+// preparing uploads, and queuing the job for future execution. Validates
+// schedule format, pre-processes uploads, and registers with scheduler.
 func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
 	log := j.logger.WithField("jobID", job.Uuid)
 
@@ -206,7 +229,16 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobR
 		}
 	}
 
-	// Register and schedule
+	// Register and schedule - Debug the field values before storage
+	log.Debug("storing scheduled job with field values",
+		"jobId", job.Uuid,
+		"network", job.Network,
+		"volumes", job.Volumes,
+		"runtime", job.Runtime,
+		"hasNetwork", job.Network != "",
+		"volumeCount", len(job.Volumes),
+		"hasRuntime", job.Runtime != "")
+
 	j.store.CreateNewJob(job)
 
 	if e := j.scheduler.AddJob(job); e != nil {
@@ -222,7 +254,7 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobR
 
 // executeJob handles immediate job execution by setting up resources,
 // coordinating with the execution engine, and starting monitoring.
-// It manages the complete lifecycle from resource allocation to process start.
+// Manages complete lifecycle: resource setup → execution → monitoring.
 func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
 	log := j.logger.WithField("jobID", job.Uuid)
 	log.Debug("executing job immediately")
@@ -232,7 +264,16 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 		return nil, fmt.Errorf("resource setup failed: %w", err)
 	}
 
-	// Register job
+	// Register job - Debug the field values before storage
+	log.Debug("storing job with field values",
+		"jobId", job.Uuid,
+		"network", job.Network,
+		"volumes", job.Volumes,
+		"runtime", job.Runtime,
+		"hasNetwork", job.Network != "",
+		"volumeCount", len(job.Volumes),
+		"hasRuntime", job.Runtime != "")
+
 	j.store.CreateNewJob(job)
 
 	// Start execution
@@ -253,7 +294,9 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 	return job, nil
 }
 
-// ExecuteScheduledJob implements the interfaces.Joblet interface for scheduled job execution
+// ExecuteScheduledJob implements the interfaces.Joblet interface for scheduled job execution.
+// Called by scheduler when scheduled time arrives - transitions job to running state
+// and delegates to executeJob for actual execution (uploads already processed).
 func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
 	jobObj := req.Job
 	log := j.logger.WithField("jobID", jobObj.Uuid)
@@ -268,7 +311,9 @@ func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.Execute
 	return err
 }
 
-// StopJob stops a running or scheduled job
+// StopJob stops a running or scheduled job.
+// Handles both scheduled (removes from scheduler) and running jobs (terminates process).
+// Special handling for runtime builds to preserve filesystem artifacts.
 func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) error {
 	log := j.logger.WithField("jobID", req.JobID)
 	log.Debug("stopping job", "force", req.Force, "reason", req.Reason)
@@ -336,7 +381,9 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 	return nil
 }
 
-// DeleteJob completely removes a job including logs and metadata
+// DeleteJob completely removes a job including logs and metadata.
+// Prevents deletion of active jobs, delegates to job store for data removal,
+// and performs final resource cleanup (preserves runtime build artifacts).
 func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest) error {
 	log := j.logger.WithField("jobID", req.JobID)
 	log.Debug("deleting job", "reason", req.Reason)
@@ -380,9 +427,9 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 	return nil
 }
 
-// monitorJob monitors a running job until completion, handling exit codes,
-// coordinating cleanup operations, and managing state transitions.
-// It runs asynchronously and ensures proper resource cleanup regardless of job outcome.
+// monitorJob monitors a running job until completion asynchronously.
+// Waits for process completion, determines exit code, updates job status,
+// and triggers cleanup (special handling for runtime builds to preserve artifacts).
 func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
 	log := j.logger.WithField("jobID", job.Uuid)
 	log.Debug("starting job monitoring")
@@ -433,6 +480,8 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 
 // Helper methods
 
+// updateJobRunning transitions job to running state and captures process PID.
+// Called after successful process start to record execution details.
 func (j *Joblet) updateJobRunning(job *domain.Job, cmd platform.Command) {
 	if proc := cmd.Process(); proc != nil {
 		job.Pid = int32(proc.Pid())
@@ -441,6 +490,8 @@ func (j *Joblet) updateJobRunning(job *domain.Job, cmd platform.Command) {
 	j.store.UpdateJob(job)
 }
 
+// handleExecutionFailure handles job execution failures by updating status,
+// setting failure exit code, and triggering appropriate cleanup based on job type.
 func (j *Joblet) handleExecutionFailure(job *domain.Job) {
 	job.Status = domain.StatusFailed
 	job.ExitCode = -1
@@ -464,6 +515,8 @@ func (j *Joblet) handleExecutionFailure(job *domain.Job) {
 	}
 }
 
+// getActiveJobIDs returns a map of all active job IDs for cleanup coordination.
+// Used by periodic cleanup to avoid cleaning up jobs that are still active.
 func (j *Joblet) getActiveJobIDs() map[string]bool {
 	jobs := j.store.ListJobs()
 
@@ -474,7 +527,9 @@ func (j *Joblet) getActiveJobIDs() map[string]bool {
 	return activeIDs
 }
 
-// initializeComponents creates all the specialized components
+// initializeComponents creates all specialized components for job execution.
+// Sets up validation, job building, resource management, execution engine,
+// and cleanup coordinator with proper dependencies and configuration.
 func initializeComponents(store JobStore, cfg *config.Config, platform platform.Platform, logger *logger.Logger, networkStore NetworkStore) *components {
 	// Create core resources
 	cgroupResource := resource.New(cfg.Cgroup)
@@ -538,7 +593,9 @@ func initializeComponents(store JobStore, cfg *config.Config, platform platform.
 	}
 }
 
-// components holds all initialized components
+// components holds all initialized components.
+// Temporary struct to organize component initialization and dependency injection
+// before final joblet assembly.
 type components struct {
 	cgroup          resource.Resource
 	validator       *validation.Service
@@ -548,12 +605,16 @@ type components struct {
 	cleanup         *cleanup.Coordinator
 }
 
-// schedulerAdapter adapts the Joblet to the scheduler.JobExecutor interface
+// schedulerAdapter adapts the Joblet to the scheduler.JobExecutor interface.
+// Bridge pattern to allow scheduler to execute jobs through the joblet
+// while maintaining interface compatibility.
 type schedulerAdapter struct {
 	joblet *Joblet
 }
 
-// ExecuteScheduledJob adapts the old scheduler interface to the new one
+// ExecuteScheduledJob adapts the scheduler interface to joblet's interface.
+// Transforms scheduler's job execution request to joblet's expected format
+// and delegates to the main joblet execution method.
 func (sa *schedulerAdapter) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
 	req := interfaces.ExecuteScheduledJobRequest{
 		Job: job,

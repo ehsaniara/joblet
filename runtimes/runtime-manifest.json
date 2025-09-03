@@ -12,25 +12,82 @@
       "category": "language-runtime",
       "language": "java",
       "platforms": {
-        "ubuntu-amd64": { "supported": true, "archive_url": "graalvmjdk-21.tar.gz", "archive_size": 4946, "checksum": "sha256:auto-generated" },
-        "ubuntu-arm64": { "supported": true, "archive_url": "graalvmjdk-21.tar.gz", "archive_size": 4946, "checksum": "sha256:auto-generated" },
-        "rhel-amd64": { "supported": true, "archive_url": "graalvmjdk-21.tar.gz", "archive_size": 4946, "checksum": "sha256:auto-generated" },
-        "rhel-arm64": { "supported": true, "archive_url": "graalvmjdk-21.tar.gz", "archive_size": 4946, "checksum": "sha256:auto-generated" },
-        "amzn-amd64": { "supported": true, "archive_url": "graalvmjdk-21.tar.gz", "archive_size": 4946, "checksum": "sha256:auto-generated" },
-        "amzn-arm64": { "supported": true, "archive_url": "graalvmjdk-21.tar.gz", "archive_size": 4946, "checksum": "sha256:auto-generated" }
+        "ubuntu-amd64": {
+          "supported": true,
+          "archive_url": "graalvmjdk-21.tar.gz",
+          "archive_size": 4946,
+          "checksum": "sha256:auto-generated"
+        },
+        "ubuntu-arm64": {
+          "supported": true,
+          "archive_url": "graalvmjdk-21.tar.gz",
+          "archive_size": 4946,
+          "checksum": "sha256:auto-generated"
+        },
+        "rhel-amd64": {
+          "supported": true,
+          "archive_url": "graalvmjdk-21.tar.gz",
+          "archive_size": 4946,
+          "checksum": "sha256:auto-generated"
+        },
+        "rhel-arm64": {
+          "supported": true,
+          "archive_url": "graalvmjdk-21.tar.gz",
+          "archive_size": 4946,
+          "checksum": "sha256:auto-generated"
+        },
+        "amzn-amd64": {
+          "supported": true,
+          "archive_url": "graalvmjdk-21.tar.gz",
+          "archive_size": 4946,
+          "checksum": "sha256:auto-generated"
+        },
+        "amzn-arm64": {
+          "supported": true,
+          "archive_url": "graalvmjdk-21.tar.gz",
+          "archive_size": 4946,
+          "checksum": "sha256:auto-generated"
+        }
       },
-      "requirements": { "min_ram_mb": 1024, "min_disk_mb": 200, "gpu_required": false },
+      "requirements": {
+        "min_ram_mb": 1024,
+        "min_disk_mb": 200,
+        "gpu_required": false
+      },
       "provides": {
-        "executables": ["java", "javac", "jar", "native-image", "gu", "js", "node", "npm"],
-        "environment_vars": { "JAVA_HOME": "/usr/lib/jvm/graalvm-21", "GRAALVM_HOME": "/usr/lib/jvm/graalvm-21", "PATH": "/usr/lib/jvm/graalvm-21/bin:$PATH" }
+        "executables": [
+          "java",
+          "javac",
+          "jar",
+          "native-image",
+          "gu",
+          "js",
+          "node",
+          "npm"
+        ],
+        "environment_vars": {
+          "JAVA_HOME": "/usr/lib/jvm/graalvm-21",
+          "GRAALVM_HOME": "/usr/lib/jvm/graalvm-21",
+          "PATH": "/usr/lib/jvm/graalvm-21/bin:$PATH"
+        }
       },
       "documentation": {
         "usage": "Use with: rnx run --runtime=graalvmjdk-21 java MyApp.java or native-image",
-        "examples": ["rnx run --runtime=graalvmjdk-21 java -version", "rnx run --runtime=graalvmjdk-21 native-image --version", "rnx run --runtime=graalvmjdk-21 js --version"]
+        "examples": [
+          "rnx run --runtime=graalvmjdk-21 java -version",
+          "rnx run --runtime=graalvmjdk-21 native-image --version",
+          "rnx run --runtime=graalvmjdk-21 js --version"
+        ]
       },
-      "tags": ["java", "graalvm", "native-image", "polyglot", "performance", "aot"]
-    }
-,
+      "tags": [
+        "java",
+        "graalvm",
+        "native-image",
+        "polyglot",
+        "performance",
+        "aot"
+      ]
+    },
     "openjdk-21": {
       "name": "openjdk-21",
       "display_name": "OpenJDK 21",
@@ -39,25 +96,75 @@
       "category": "language-runtime",
       "language": "java",
       "platforms": {
-        "ubuntu-amd64": { "supported": true, "archive_url": "openjdk-21.tar.gz", "archive_size": 5928, "checksum": "sha256:auto-generated" },
-        "ubuntu-arm64": { "supported": true, "archive_url": "openjdk-21.tar.gz", "archive_size": 5928, "checksum": "sha256:auto-generated" },
-        "rhel-amd64": { "supported": true, "archive_url": "openjdk-21.tar.gz", "archive_size": 5928, "checksum": "sha256:auto-generated" },
-        "rhel-arm64": { "supported": true, "archive_url": "openjdk-21.tar.gz", "archive_size": 5928, "checksum": "sha256:auto-generated" },
-        "amzn-amd64": { "supported": true, "archive_url": "openjdk-21.tar.gz", "archive_size": 5928, "checksum": "sha256:auto-generated" },
-        "amzn-arm64": { "supported": true, "archive_url": "openjdk-21.tar.gz", "archive_size": 5928, "checksum": "sha256:auto-generated" }
+        "ubuntu-amd64": {
+          "supported": true,
+          "archive_url": "openjdk-21.tar.gz",
+          "archive_size": 5928,
+          "checksum": "sha256:auto-generated"
+        },
+        "ubuntu-arm64": {
+          "supported": true,
+          "archive_url": "openjdk-21.tar.gz",
+          "archive_size": 5928,
+          "checksum": "sha256:auto-generated"
+        },
+        "rhel-amd64": {
+          "supported": true,
+          "archive_url": "openjdk-21.tar.gz",
+          "archive_size": 5928,
+          "checksum": "sha256:auto-generated"
+        },
+        "rhel-arm64": {
+          "supported": true,
+          "archive_url": "openjdk-21.tar.gz",
+          "archive_size": 5928,
+          "checksum": "sha256:auto-generated"
+        },
+        "amzn-amd64": {
+          "supported": true,
+          "archive_url": "openjdk-21.tar.gz",
+          "archive_size": 5928,
+          "checksum": "sha256:auto-generated"
+        },
+        "amzn-arm64": {
+          "supported": true,
+          "archive_url": "openjdk-21.tar.gz",
+          "archive_size": 5928,
+          "checksum": "sha256:auto-generated"
+        }
       },
-      "requirements": { "min_ram_mb": 512, "min_disk_mb": 100, "gpu_required": false },
+      "requirements": {
+        "min_ram_mb": 512,
+        "min_disk_mb": 100,
+        "gpu_required": false
+      },
       "provides": {
-        "executables": ["java", "javac", "jar", "jarsigner"],
-        "environment_vars": { "JAVA_HOME": "/usr/lib/jvm/java-21-openjdk", "PATH": "/usr/lib/jvm/java-21-openjdk/bin:$PATH" }
+        "executables": [
+          "java",
+          "javac",
+          "jar",
+          "jarsigner"
+        ],
+        "environment_vars": {
+          "JAVA_HOME": "/usr/lib/jvm/java-21-openjdk",
+          "PATH": "/usr/lib/jvm/java-21-openjdk/bin:$PATH"
+        }
       },
       "documentation": {
         "usage": "Use with: rnx run --runtime=openjdk-21 java MyApp.java",
-        "examples": ["rnx run --runtime=openjdk-21 java -version", "rnx run --runtime=openjdk-21 javac HelloWorld.java && java HelloWorld"]
+        "examples": [
+          "rnx run --runtime=openjdk-21 java -version",
+          "rnx run --runtime=openjdk-21 javac HelloWorld.java && java HelloWorld"
+        ]
       },
-      "tags": ["java", "jdk", "openjdk", "development", "compilation"]
-    }
-,
+      "tags": [
+        "java",
+        "jdk",
+        "openjdk",
+        "development",
+        "compilation"
+      ]
+    },
     "python-3.11-ml": {
       "name": "python-3.11-ml",
       "display_name": "Python 3.11 ML",
@@ -66,25 +173,82 @@
       "category": "language-runtime",
       "language": "python",
       "platforms": {
-        "ubuntu-amd64": { "supported": true, "archive_url": "python-3.11-ml.tar.gz", "archive_size": 11793, "checksum": "sha256:auto-generated" },
-        "ubuntu-arm64": { "supported": true, "archive_url": "python-3.11-ml.tar.gz", "archive_size": 11793, "checksum": "sha256:auto-generated" },
-        "rhel-amd64": { "supported": true, "archive_url": "python-3.11-ml.tar.gz", "archive_size": 11793, "checksum": "sha256:auto-generated" },
-        "rhel-arm64": { "supported": true, "archive_url": "python-3.11-ml.tar.gz", "archive_size": 11793, "checksum": "sha256:auto-generated" },
-        "amzn-amd64": { "supported": true, "archive_url": "python-3.11-ml.tar.gz", "archive_size": 11793, "checksum": "sha256:auto-generated" },
-        "amzn-arm64": { "supported": true, "archive_url": "python-3.11-ml.tar.gz", "archive_size": 11793, "checksum": "sha256:auto-generated" }
+        "ubuntu-amd64": {
+          "supported": true,
+          "archive_url": "python-3.11-ml.tar.gz",
+          "archive_size": 11793,
+          "checksum": "sha256:auto-generated"
+        },
+        "ubuntu-arm64": {
+          "supported": true,
+          "archive_url": "python-3.11-ml.tar.gz",
+          "archive_size": 11793,
+          "checksum": "sha256:auto-generated"
+        },
+        "rhel-amd64": {
+          "supported": true,
+          "archive_url": "python-3.11-ml.tar.gz",
+          "archive_size": 11793,
+          "checksum": "sha256:auto-generated"
+        },
+        "rhel-arm64": {
+          "supported": true,
+          "archive_url": "python-3.11-ml.tar.gz",
+          "archive_size": 11793,
+          "checksum": "sha256:auto-generated"
+        },
+        "amzn-amd64": {
+          "supported": true,
+          "archive_url": "python-3.11-ml.tar.gz",
+          "archive_size": 11793,
+          "checksum": "sha256:auto-generated"
+        },
+        "amzn-arm64": {
+          "supported": true,
+          "archive_url": "python-3.11-ml.tar.gz",
+          "archive_size": 11793,
+          "checksum": "sha256:auto-generated"
+        }
       },
-      "requirements": { "min_ram_mb": 2048, "min_disk_mb": 500, "gpu_required": false },
+      "requirements": {
+        "min_ram_mb": 2048,
+        "min_disk_mb": 500,
+        "gpu_required": false
+      },
       "provides": {
-        "executables": ["python", "python3", "pip", "pip3"],
-        "libraries": ["numpy", "scipy", "pandas", "scikit-learn", "matplotlib"],
-        "environment_vars": { "PYTHON_PATH": "/usr/lib/python3.11", "PATH": "/usr/bin:$PATH" }
+        "executables": [
+          "python",
+          "python3",
+          "pip",
+          "pip3"
+        ],
+        "libraries": [
+          "numpy",
+          "scipy",
+          "pandas",
+          "scikit-learn",
+          "matplotlib"
+        ],
+        "environment_vars": {
+          "PYTHON_PATH": "/usr/lib/python3.11",
+          "PATH": "/usr/bin:$PATH"
+        }
       },
       "documentation": {
         "usage": "Use with: rnx run --runtime=python-3.11-ml python script.py",
-        "examples": ["rnx run --runtime=python-3.11-ml python -c 'import numpy; print(numpy.__version__)'", "rnx run --runtime=python-3.11-ml python -c 'import pandas; print(pandas.__version__)'"]
+        "examples": [
+          "rnx run --runtime=python-3.11-ml python -c 'import numpy; print(numpy.__version__)'",
+          "rnx run --runtime=python-3.11-ml python -c 'import pandas; print(pandas.__version__)'"
+        ]
       },
-      "tags": ["python", "machine-learning", "data-science", "numpy", "pandas", "ml"]
+      "tags": [
+        "python",
+        "machine-learning",
+        "data-science",
+        "numpy",
+        "pandas",
+        "ml"
+      ]
     }
-
   }
 }

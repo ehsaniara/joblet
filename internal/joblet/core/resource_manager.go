@@ -16,7 +16,9 @@ import (
 	"joblet/pkg/platform"
 )
 
-// ResourceManager handles all resource-related operations for jobs
+// ResourceManager handles all resource-related operations for jobs.
+// Coordinates cgroup creation, filesystem isolation, workspace setup,
+// and upload management for both immediate and scheduled jobs.
 type ResourceManager struct {
 	cgroup     resource.Resource
 	filesystem *filesystem.Isolator
@@ -26,7 +28,9 @@ type ResourceManager struct {
 	uploadMgr  *upload.Manager
 }
 
-// NewResourceManager creates a new resource manager
+// NewResourceManager creates a new resource manager.
+// Initializes manager with cgroup resource, filesystem isolator,
+// platform interface, and upload manager for complete resource handling.
 func NewResourceManager(
 	cgroup resource.Resource,
 	filesystem *filesystem.Isolator,
@@ -45,7 +49,9 @@ func NewResourceManager(
 	}
 }
 
-// SetupJobResources sets up all resources for a job (cgroup, filesystem)
+// SetupJobResources sets up all resources for a job (cgroup, filesystem).
+// Creates workspace directory, establishes cgroup with resource limits,
+// and applies CPU core restrictions if specified. Cleans up on failure.
 func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
 	log := rm.logger.WithField("jobID", job.Uuid)
 	log.Debug("setting up job resources")
@@ -73,7 +79,9 @@ func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
 	return nil
 }
 
-// PrepareScheduledJobUploads prepares uploads for a scheduled job
+// PrepareScheduledJobUploads prepares uploads for a scheduled job.
+// Pre-processes file uploads for scheduled jobs to ensure they're ready
+// when the scheduled execution time arrives.
 func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *domain.Job, uploads []domain.FileUpload) error {
 	if len(uploads) == 0 {
 		return nil

@@ -35,8 +35,9 @@ rnx run python3 -c "print('Hello from Python')"
 ```
 
 **Execution Environment:**
+
 - **Service**: JobService (production operations)
-- **Job Type**: `standard` (automatic)  
+- **Job Type**: `standard` (automatic)
 - **Isolation**: Minimal chroot with secure boundaries
 - **Purpose**: Safe execution of user workloads
 

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, {createContext, useContext, useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 
 interface UserSettings {
     refreshFrequency: number; // seconds
@@ -21,16 +21,16 @@ const defaultSettings: UserSettings = {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({children}) => {
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
-    const { i18n } = useTranslation();
+    const {i18n} = useTranslation();
 
     const refreshSettings = async () => {
         try {
             const response = await fetch('/api/settings');
             if (response.ok) {
                 const savedSettings = await response.json();
-                const newSettings = { ...defaultSettings, ...savedSettings };
+                const newSettings = {...defaultSettings, ...savedSettings};
                 setSettings(newSettings);
                 // Update i18n language when settings are loaded
                 if (newSettings.language !== i18n.language) {
@@ -43,9 +43,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const updateSettings = (newSettings: Partial<UserSettings>) => {
-        const updatedSettings = { ...settings, ...newSettings };
+        const updatedSettings = {...settings, ...newSettings};
         setSettings(updatedSettings);
-        
+
         // Update i18n language when language setting changes
         if (newSettings.language && newSettings.language !== i18n.language) {
             i18n.changeLanguage(newSettings.language);
@@ -57,7 +57,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, []);
 
     return (
-        <SettingsContext.Provider value={{ settings, updateSettings, refreshSettings }}>
+        <SettingsContext.Provider value={{settings, updateSettings, refreshSettings}}>
             {children}
         </SettingsContext.Provider>
     );
@@ -71,4 +71,4 @@ export const useSettings = () => {
     return context;
 };
 
-export type { UserSettings };
+export type {UserSettings};

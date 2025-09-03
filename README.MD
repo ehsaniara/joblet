@@ -6,9 +6,13 @@
 
 <img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
-**Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process isolation, resource limits, real-time monitoring, and network isolation - protecting your host system from malicious or resource-hungry processes.
+**Joblet** provides **secure, isolated job execution** on Linux systems. Run commands remotely with complete process
+isolation, resource limits, real-time monitoring, and network isolation - protecting your host system from malicious or
+resource-hungry processes.
 
-> **🤖 Agentic AI Foundation:** Purpose-built for AI agent workloads with sandboxed code execution, resource-controlled tool usage, and secure multi-tenant isolation - enabling AI agents to safely execute arbitrary code without compromising host security.
+> **🤖 Agentic AI Foundation:** Purpose-built for AI agent workloads with sandboxed code execution, resource-controlled
+> tool usage, and secure multi-tenant isolation - enabling AI agents to safely execute arbitrary code without compromising
+> host security.
 
 ## 🎯 Key Features
 
@@ -27,6 +31,7 @@
 ### A. Joblet Server Installation (Linux Only)
 
 #### Option 1: Package Installation (Ubuntu/Debian)
+
 ```bash
 # Download and install the .deb package
 wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
@@ -38,6 +43,7 @@ sudo systemctl enable joblet
 ```
 
 #### Option 2: Manual Installation (Any Linux)
+
 ```bash
 # Download the Linux release
 curl -L -o rnx-linux-amd64.tar.gz $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*linux-amd64.tar.gz" | cut -d '"' -f 4)
@@ -52,6 +58,7 @@ sudo systemctl start joblet
 ### B. RNX Client Installation
 
 #### macOS (Homebrew)
+
 ```bash
 brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
 brew install rnx                                    # Interactive setup
@@ -63,6 +70,7 @@ scp user@joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
 #### Windows
+
 ```powershell
 # Download the Windows binary
 Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/latest/download/rnx-windows-amd64.exe" -OutFile "rnx.exe"
@@ -76,6 +84,7 @@ Move-Item rnx.exe "$env:USERPROFILE\bin\"
 ```
 
 ### C. Quick Test
+
 ```bash
 # From any client machine with RNX installed:
 rnx list                           # List jobs
@@ -89,6 +98,7 @@ rnx admin                          # Launch at http://localhost:5173
 ## 🚀 Basic Usage
 
 ### YAML Workflows (Simplified Execution)
+
 ```bash
 # Run pre-configured jobs with workflows
 rnx run --workflow=jobs.yaml:ml-analysis      # Python ML analysis
@@ -101,6 +111,7 @@ rnx status --workflow <workflow-uuid>
 ```
 
 ### Traditional Commands
+
 ```bash
 # Run commands with isolation
 rnx run echo "Hello World"
@@ -144,12 +155,14 @@ Available on macOS via Homebrew with `--with-admin`:
 ## 📊 System Requirements
 
 ### Joblet Server (Linux)
+
 - Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+)
 - Multi-core CPU, 1GB+ RAM, 5GB+ disk
 - Port 50051 (gRPC), root access for namespaces
 - cgroups v2, iptables, iproute2, bridge-utils
 
 ### RNX Client
+
 - Linux, macOS 10.15+, or Windows 10+
 - 50MB+ RAM, network access to port 50051
 
@@ -176,4 +189,5 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Quick Links:** [Releases](https://github.com/ehsaniara/joblet/releases) | [Examples](examples/) | [Issues](https://github.com/ehsaniara/joblet/issues)
+**Quick Links:
+** [Releases](https://github.com/ehsaniara/joblet/releases) | [Examples](examples/) | [Issues](https://github.com/ehsaniara/joblet/issues)

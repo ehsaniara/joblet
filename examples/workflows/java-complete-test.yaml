@@ -3,13 +3,13 @@ jobs:
   java-compile:
     runtime: openjdk:21
     command: javac
-    args: ["JavaRuntimeTest.java"]
+    args: [ "JavaRuntimeTest.java" ]
     uploads:
-      files: ["JavaRuntimeTest.java"]
+      files: [ "JavaRuntimeTest.java" ]
   
   java-execute:
     runtime: openjdk:21
     command: java
-    args: ["JavaRuntimeTest"]  
+    args: [ "JavaRuntimeTest" ]
     requires:
       - java-compile: "COMPLETED"

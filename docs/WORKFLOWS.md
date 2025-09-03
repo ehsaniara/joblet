@@ -67,7 +67,7 @@ jobs:
 |-------------|-----------------------|----------|----------------------------------------------------|
 | `command`   | Executable to run     | Yes      | `"python3"`, `"java"`, `"node"`                    |
 | `args`      | Command arguments     | No       | `["script.py", "--verbose"]`                       |
-| `runtime`   | Runtime environment   | No       | `"python-3.11-ml"`, `"openjdk:21"`                    |
+| `runtime`   | Runtime environment   | No       | `"python-3.11-ml"`, `"openjdk:21"`                 |
 | `network`   | Network configuration | No       | `"bridge"`, `"isolated"`, `"none"`, `"custom-net"` |
 | `uploads`   | Files to upload       | No       | See [File Uploads](#file-uploads)                  |
 | `volumes`   | Persistent volumes    | No       | `["data-volume", "logs"]`                          |
@@ -370,6 +370,7 @@ rnx status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 - **Team Collaboration**: Any team member can inspect workflow definitions regardless of where it was submitted
 
 **Example Output:**
+
 ```
 Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
 Workflow: data-pipeline.yaml

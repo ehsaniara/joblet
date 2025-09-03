@@ -19,7 +19,9 @@ import (
 	"joblet/pkg/platform"
 )
 
-// Coordinator coordinates all cleanup operations for jobs
+// Coordinator coordinates all cleanup operations for jobs.
+// Manages process termination, cgroup cleanup, filesystem removal,
+// network cleanup, and tracks cleanup status to prevent race conditions.
 type Coordinator struct {
 	processManager *process.Manager
 	cgroup         resource.Resource
@@ -34,7 +36,9 @@ type Coordinator struct {
 	networkStore adapters.NetworkStoreAdapter
 }
 
-// CleanupStatus tracks the status of a cleanup operation
+// CleanupStatus tracks the status of a cleanup operation.
+// Comprehensive status tracking for cleanup progress with error collection,
+// timestamps, and completion flags for each cleanup phase.
 type CleanupStatus struct {
 	JobID         string
 	StartTime     time.Time
@@ -45,7 +49,9 @@ type CleanupStatus struct {
 	Completed     bool
 }
 
-// NewCoordinator creates a new cleanup coordinator
+// NewCoordinator creates a new cleanup coordinator.
+// Initializes coordinator with process manager, cgroup resource, platform interface,
+// and network setup for comprehensive job resource cleanup.
 func NewCoordinator(
 	processManager *process.Manager,
 	cgroup resource.Resource,
@@ -72,7 +78,9 @@ func NewCoordinator(
 	}
 }
 
-// CleanupJob performs all cleanup operations for a job
+// CleanupJob performs all cleanup operations for a job.
+// Main cleanup entry point: handles process termination, cgroup cleanup,
+// filesystem removal, network cleanup with race condition protection.
 func (c *Coordinator) CleanupJob(jobID string) error {
 	log := c.logger.WithField("jobID", jobID)
 	log.Debug("starting job cleanup")

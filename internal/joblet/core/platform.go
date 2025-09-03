@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/domain"
@@ -24,6 +25,8 @@ func NewJoblet(store JobStore, cfg *config.Config, networkStoreAdapter adapters.
 
 // StartJob delegates to the platform joblet
 func (w *linuxJoblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
+	// Add debug logging to see if this wrapper is called
+	fmt.Printf("LINUX JOBLET WRAPPER StartJob called - network: %s, volumes: %v, runtime: %s\n", req.Network, req.Volumes, req.Runtime)
 	return w.platformJoblet.StartJob(ctx, req)
 }
 

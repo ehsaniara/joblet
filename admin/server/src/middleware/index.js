@@ -10,7 +10,7 @@ export function setupMiddleware(app) {
     // Basic middleware
     app.use(cors());
     app.use(express.json());
-    
+
     // Serve static files from React build
     app.use(express.static(path.join(__dirname, '../../../ui/dist')));
 }

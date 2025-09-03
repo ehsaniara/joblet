@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useSettings } from '../contexts/SettingsContext';
+import {useEffect, useRef} from 'react';
+import {useSettings} from '../contexts/SettingsContext';
 
 /**
  * Hook to automatically refresh data at user-defined intervals
@@ -7,7 +7,7 @@ import { useSettings } from '../contexts/SettingsContext';
  * @param dependencies Array of dependencies that should trigger a refresh
  */
 export const useAutoRefresh = (callback: () => void, dependencies: any[] = []) => {
-    const { settings } = useSettings();
+    const {settings} = useSettings();
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const callbackRef = useRef(callback);
 
@@ -45,5 +45,5 @@ export const useAutoRefresh = (callback: () => void, dependencies: any[] = []) =
         callbackRef.current();
     };
 
-    return { refresh };
+    return {refresh};
 };

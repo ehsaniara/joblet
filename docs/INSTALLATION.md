@@ -2,8 +2,9 @@
 
 This guide provides detailed instructions for installing Joblet on various operating systems and architectures.
 
-> **🚀 Native Linux Execution**: Joblet provides superior performance, security, and resource control through Linux 
-> namespaces and cgroups v2. Install Joblet directly on Linux hosts for optimal performance with native process isolation!
+> **🚀 Native Linux Execution**: Joblet provides superior performance, security, and resource control through Linux
+> namespaces and cgroups v2. Install Joblet directly on Linux hosts for optimal performance with native process
+> isolation!
 
 ## 📋 System Requirements
 

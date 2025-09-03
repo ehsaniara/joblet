@@ -1,17 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import mermaid from 'mermaid';
-import { WorkflowJob } from '@/types';
-import { FileText } from 'lucide-react';
+import {WorkflowJob} from '@/types';
+import {FileText} from 'lucide-react';
 
 interface WorkflowGanttChartProps {
     jobs: WorkflowJob[];
     onJobClick?: (jobId: string) => void;
 }
 
-const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({ 
-    jobs, 
-    onJobClick 
-}) => {
+const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
+                                                                   jobs,
+                                                                   onJobClick
+                                                               }) => {
     const ganttRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -60,7 +60,7 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
     No jobs with timing data : milestone, 2024-01-01, 0d`;
             }
 
-            const sortedJobs = [...validJobs].sort((a, b) => 
+            const sortedJobs = [...validJobs].sort((a, b) =>
                 new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime()
             );
 
@@ -70,20 +70,20 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
             code += '    dateFormat YYYY-MM-DD HH:mm:ss\n';
             code += '    axisFormat %H:%M:%S\n';
             code += '    section Jobs\n';
-            
+
             sortedJobs.forEach((job, index) => {
                 const jobName = (job.name || job.id).replace(/[^a-zA-Z0-9\s]/g, ''); // Sanitize job names
-                
+
                 // Force different start times to avoid overlapping by adding index-based offset
                 const baseStartTime = new Date(job.startTime!).getTime();
                 const adjustedStartTime = new Date(baseStartTime + (index * 2000)); // Add 2 seconds per job
-                const adjustedEndTime = job.endTime ? 
-                    new Date(new Date(job.endTime).getTime() + (index * 2000)) : 
+                const adjustedEndTime = job.endTime ?
+                    new Date(new Date(job.endTime).getTime() + (index * 2000)) :
                     new Date(adjustedStartTime.getTime() + 1000); // Default 1 second duration
-                
+
                 const startTime = adjustedStartTime.toISOString().replace('T', ' ').replace('Z', '');
                 const endTime = adjustedEndTime.toISOString().replace('T', ' ').replace('Z', '');
-                
+
                 // Determine task status for styling
                 let taskStatus = '';
                 switch (job.status?.toUpperCase()) {
@@ -99,7 +99,7 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
                     default:
                         taskStatus = '';
                 }
-                
+
                 // Add the task
                 code += `    ${jobName} :${taskStatus}, ${startTime}, ${endTime}\n`;
             });
@@ -111,52 +111,52 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
             try {
                 const code = generateGanttCode();
                 console.log('Gantt code:', code);
-                
+
                 // Clear previous content
                 ganttRef.current!.innerHTML = '';
-                
+
                 // Generate unique ID for this diagram
                 const diagramId = `gantt-${Date.now()}`;
-                
+
                 // Render the diagram
-                const { svg } = await mermaid.render(diagramId, code);
+                const {svg} = await mermaid.render(diagramId, code);
                 ganttRef.current!.innerHTML = svg;
-                
+
                 // Add click handlers to task bars - use a simpler approach
-                const validJobs = jobs.filter(job => job.startTime).sort((a, b) => 
+                const validJobs = jobs.filter(job => job.startTime).sort((a, b) =>
                     new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime()
                 );
-                
+
                 const taskElements = ganttRef.current!.querySelectorAll('.task');
                 taskElements.forEach((task, index) => {
                     if (index < validJobs.length) {
                         const job = validJobs[index];
-                        
+
                         const handleClick = () => {
                             console.log('Gantt task clicked:', job.name || job.id);
                             if (onJobClick) {
                                 onJobClick(job.id);
                             }
                         };
-                        
+
                         // Remove existing listeners to avoid duplicates
                         task.removeEventListener('click', handleClick);
                         task.addEventListener('click', handleClick);
-                        
+
                         // Add hover effects
                         task.addEventListener('mouseenter', () => {
                             task.setAttribute('style', 'cursor: pointer; opacity: 0.8;');
                         });
-                        
+
                         task.addEventListener('mouseleave', () => {
                             task.setAttribute('style', 'cursor: pointer; opacity: 1;');
                         });
-                        
+
                         // Initial styling
                         task.setAttribute('style', 'cursor: pointer;');
                     }
                 });
-                
+
             } catch (error) {
                 console.error('Error rendering Gantt chart:', error);
                 ganttRef.current!.innerHTML = `
@@ -179,9 +179,10 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
                 <div className="bg-gray-800 rounded-lg shadow">
                     <div className="p-6">
                         <div className="text-center py-8">
-                            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2"/>
                             <p className="text-gray-400">No timeline data available</p>
-                            <p className="text-sm text-gray-500 mt-1">Jobs will appear here once the workflow starts executing</p>
+                            <p className="text-sm text-gray-500 mt-1">Jobs will appear here once the workflow starts
+                                executing</p>
                         </div>
                     </div>
                 </div>
@@ -203,17 +204,17 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
                 <div className="flex-1 p-4">
                     {!hasStartedJobs ? (
                         <div className="text-center py-8">
-                            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2"/>
                             <p className="text-gray-400">No jobs have started executing yet</p>
                             <p className="text-sm text-gray-500 mt-1">Timeline will be generated once jobs begin</p>
                         </div>
                     ) : (
                         <div className="relative h-full flex flex-col">
                             {/* Gantt Chart Container */}
-                            <div 
-                                ref={ganttRef} 
+                            <div
+                                ref={ganttRef}
                                 className="flex-1 w-full bg-gray-900 rounded-lg p-4 overflow-auto"
-                                style={{ minHeight: '500px', height: 'calc(100vh - 400px)' }}
+                                style={{minHeight: '500px', height: 'calc(100vh - 400px)'}}
                             />
 
                             {/* Legend */}
@@ -265,14 +266,14 @@ const WorkflowGanttChart: React.FC<WorkflowGanttChartProps> = ({
                                             {(() => {
                                                 const validJobs = jobs.filter(j => j.startTime);
                                                 if (validJobs.length === 0) return '-';
-                                                
+
                                                 // Calculate workflow execution time: first job start to last job end
                                                 const startTimes = validJobs.map(j => new Date(j.startTime!).getTime());
                                                 const endTimes = validJobs.map(j => j.endTime ? new Date(j.endTime).getTime() : new Date(j.startTime!).getTime());
-                                                
+
                                                 const workflowStart = Math.min(...startTimes);
                                                 const workflowEnd = Math.max(...endTimes);
-                                                
+
                                                 const totalMs = workflowEnd - workflowStart;
                                                 const seconds = Math.floor(totalMs / 1000);
                                                 const minutes = Math.floor(seconds / 60);

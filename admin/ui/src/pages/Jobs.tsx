@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import { useTranslation } from 'react-i18next';
+import {useTranslation} from 'react-i18next';
 import {useJobs} from '../hooks/useJobs';
 import {useLogStream} from '../hooks/useLogStream';
 import {apiService} from '../services/apiService';
@@ -8,7 +8,7 @@ import {ChevronLeft, ChevronRight, FileText, Play, Plus, Square, Trash2, X} from
 import {SimpleJobBuilder} from '../components/JobBuilder/SimpleJobBuilder';
 
 const Jobs: React.FC = () => {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
     const {
         loading,
         error,
@@ -105,7 +105,7 @@ const Jobs: React.FC = () => {
         if (!confirm('Are you sure you want to stop this running job?')) {
             return;
         }
-        
+
         setStoppingJobId(jobId);
         try {
             await stopJob(jobId);
@@ -121,7 +121,7 @@ const Jobs: React.FC = () => {
         if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
             return;
         }
-        
+
         setDeletingJobId(jobId);
         try {
             await deleteJob(jobId);
@@ -310,7 +310,7 @@ const Jobs: React.FC = () => {
                                                         <FileText className="h-4 w-4"/>
                                                     </button>
                                                     {job.status === 'RUNNING' && (
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleStopJob(job.id)}
                                                             disabled={stoppingJobId === job.id}
                                                             className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -325,7 +325,7 @@ const Jobs: React.FC = () => {
                                                         </button>
                                                     )}
                                                     {(job.status === 'COMPLETED' || job.status === 'FAILED' || job.status === 'STOPPED') && (
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleDeleteJob(job.id)}
                                                             disabled={deletingJobId === job.id}
                                                             className="text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -410,7 +410,8 @@ const Jobs: React.FC = () => {
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
                                             Run Simple Job
                                         </label>
-                                        <pre className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+                                        <pre
+                                            className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job run "echo Hello World"
                                         </pre>
                                     </div>
@@ -418,7 +419,8 @@ rnx job run "echo Hello World"
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
                                             Run with Runtime
                                         </label>
-                                        <pre className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+                                        <pre
+                                            className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job run "python3 script.py" --runtime=python-3.11
                                         </pre>
                                     </div>
@@ -426,7 +428,8 @@ rnx job run "python3 script.py" --runtime=python-3.11
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
                                             List Jobs
                                         </label>
-                                        <pre className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+                                        <pre
+                                            className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job list
                                         </pre>
                                     </div>
@@ -434,7 +437,8 @@ rnx job list
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
                                             Stop Job
                                         </label>
-                                        <pre className="bg-gray-900 text-red-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+                                        <pre
+                                            className="bg-gray-900 text-red-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job stop &lt;job-id&gt;
                                         </pre>
                                     </div>
@@ -442,7 +446,8 @@ rnx job stop &lt;job-id&gt;
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
                                             View Job Logs
                                         </label>
-                                        <pre className="bg-gray-900 text-blue-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+                                        <pre
+                                            className="bg-gray-900 text-blue-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job logs &lt;job-id&gt;
                                         </pre>
                                     </div>
@@ -450,7 +455,8 @@ rnx job logs &lt;job-id&gt;
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
                                             Run with Resources
                                         </label>
-                                        <pre className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+                                        <pre
+                                            className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job run "npm test" --cpu=50 --memory=512MB
                                         </pre>
                                     </div>
@@ -553,10 +559,10 @@ rnx job run "npm test" --cpu=50 --memory=512MB
                                             logs.map((log, index) => (
                                                 <div key={index} className={`mb-1 whitespace-pre-wrap ${
                                                     log.type === 'system' ? 'text-gray-400 opacity-80' :
-                                                    log.type === 'info' ? 'text-gray-200' :
-                                                    log.type === 'error' ? 'text-red-400' :
-                                                    log.type === 'connection' ? 'text-blue-400' :
-                                                    'text-green-400'
+                                                        log.type === 'info' ? 'text-gray-200' :
+                                                            log.type === 'error' ? 'text-red-400' :
+                                                                log.type === 'connection' ? 'text-blue-400' :
+                                                                    'text-green-400'
                                                 }`}>
                                                     {log.message}
                                                 </div>
@@ -573,7 +579,8 @@ rnx job run "npm test" --cpu=50 --memory=512MB
                                         <div className="flex items-center justify-center py-8">
                                             <div
                                                 className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                                            <span className="ml-3 text-gray-600 dark:text-gray-400">{t('jobs.loadingJobDetails')}</span>
+                                            <span
+                                                className="ml-3 text-gray-600 dark:text-gray-400">{t('jobs.loadingJobDetails')}</span>
                                         </div>
                                     ) : selectedJob ? (
                                         <>
@@ -624,9 +631,11 @@ rnx job run "npm test" --cpu=50 --memory=512MB
                                                             </dt>
                                                             <dd className="mt-1 text-sm text-gray-900 dark:text-white">
                                                                 {new Date(selectedJob.scheduledTime).toLocaleString()}
-                                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                <div
+                                                                    className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                                     {(selectedJob.status === 'QUEUED' || selectedJob.status === 'PENDING') && (
-                                                                        <span className="text-blue-600 dark:text-blue-400">
+                                                                        <span
+                                                                            className="text-blue-600 dark:text-blue-400">
                                                                             {t('jobs.waitingToRun')}
                                                                         </span>
                                                                     )}
@@ -790,8 +799,10 @@ rnx job run "npm test" --cpu=50 --memory=512MB
 
             {/* Create Job Dialog */}
             {showCreateJob && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                    <div className="relative bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                <div
+                    className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div
+                        className="relative bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="flex items-center justify-between p-6 border-b border-gray-600">
                             <h3 className="text-lg font-medium text-gray-200">{t('jobs.createNew')}</h3>
                             <button

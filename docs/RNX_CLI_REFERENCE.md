@@ -290,11 +290,11 @@ rnx status --workflow --detail <workflow-uuid>  # Get workflow status with YAML 
 
 #### Flags
 
-| Flag         | Description                          | Default | Notes                           |
-|--------------|--------------------------------------|---------|---------------------------------|
-| `--workflow` | Explicitly get workflow status       | false   | Required for workflow operations|
-| `--detail`   | Show original YAML content           | false   | Only works with `--workflow`    |
-| `--json`     | Output in JSON format                | false   | Available for jobs and workflows|
+| Flag         | Description                    | Default | Notes                            |
+|--------------|--------------------------------|---------|----------------------------------|
+| `--workflow` | Explicitly get workflow status | false   | Required for workflow operations |
+| `--detail`   | Show original YAML content     | false   | Only works with `--workflow`     |
+| `--json`     | Output in JSON format          | false   | Available for jobs and workflows |
 
 #### Examples
 
@@ -397,6 +397,7 @@ rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq 
 ```
 
 **Key Features:**
+
 - **`yaml_content`** field contains original workflow YAML when `--detail` flag is used
 - **Machine-readable format** for automation and scripting
 - **Complete workflow metadata** including job details and dependencies
@@ -693,15 +694,18 @@ rnx runtime install <runtime-spec> [flags]
 
 #### Flags
 
-| Flag     | Short | Description                                      | Default |
-|----------|-------|--------------------------------------------------|---------|
-| `--force`| `-f`  | Force reinstall by deleting existing runtime    | false   |
+| Flag      | Short | Description                                  | Default |
+|-----------|-------|----------------------------------------------|---------|
+| `--force` | `-f`  | Force reinstall by deleting existing runtime | false   |
 
 #### Description
 
-The install command downloads and executes platform-specific setup scripts in a secure builder chroot environment. It automatically detects the host platform (Ubuntu, Amazon Linux, RHEL) and architecture (AMD64, ARM64) to run the appropriate setup script.
+The install command downloads and executes platform-specific setup scripts in a secure builder chroot environment. It
+automatically detects the host platform (Ubuntu, Amazon Linux, RHEL) and architecture (AMD64, ARM64) to run the
+appropriate setup script.
 
 When using `--force`, the command will:
+
 1. Delete the existing runtime at `/opt/joblet/runtimes/<runtime-name>` if it exists
 2. Proceed with fresh installation
 3. Continue even if deletion fails (with warning)
@@ -751,13 +755,13 @@ rnx monitor <subcommand> [flags]
 #### Subcommands
 
 - `status` - Display comprehensive remote server status with detailed resource information
-- `top` - Show current remote server metrics in condensed format with top processes  
+- `top` - Show current remote server metrics in condensed format with top processes
 - `watch` - Stream real-time remote server metrics with configurable refresh intervals
 
 #### Common Flags
 
-| Flag         | Description                              | Default |
-|--------------|------------------------------------------|---------|
+| Flag         | Description                             | Default |
+|--------------|-----------------------------------------|---------|
 | `--json`     | Output in UI-compatible JSON format     | false   |
 | `--interval` | Update interval in seconds (watch only) | 5       |
 | `--filter`   | Filter metrics by type (top/watch only) | all     |
@@ -775,6 +779,7 @@ rnx monitor <subcommand> [flags]
 #### Monitoring Features
 
 **Enhanced Remote Server Monitoring:**
+
 - Real-time server resource utilization tracking from client
 - Server cloud environment detection (AWS, GCP, Azure, KVM, etc.)
 - Remote joblet volume usage and availability monitoring
@@ -783,6 +788,7 @@ rnx monitor <subcommand> [flags]
 - Server per-core CPU utilization breakdown
 
 **Remote JSON Data Format:**
+
 - UI-compatible JSON structure with server data for dashboards
 - Structured server metrics for monitoring tool integrations
 - Real-time server data streaming for live monitoring systems
@@ -918,10 +924,10 @@ rnx admin [flags]
 
 #### Flags
 
-| Flag              | Description                    | Default   |
-|-------------------|--------------------------------|-----------|
-| `--port, -p`      | Port to run the admin server  | 5173      |
-| `--bind-address`  | Address to bind the server to  | "0.0.0.0" |
+| Flag             | Description                   | Default   |
+|------------------|-------------------------------|-----------|
+| `--port, -p`     | Port to run the admin server  | 5173      |
+| `--bind-address` | Address to bind the server to | "0.0.0.0" |
 
 #### Examples
 
@@ -947,7 +953,7 @@ rnx completion [shell]
 #### Available Shells
 
 - `bash` - Generate bash autocompletion
-- `zsh` - Generate zsh autocompletion  
+- `zsh` - Generate zsh autocompletion
 - `fish` - Generate fish autocompletion
 - `powershell` - Generate PowerShell autocompletion
 

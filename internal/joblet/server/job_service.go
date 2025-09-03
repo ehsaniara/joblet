@@ -16,7 +16,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// JobServiceServer uses the new request object pattern and improved interfaces
+// JobServiceServer is LEGACY - kept only for test compatibility
+// Production uses WorkflowServiceServer which implements the unified architecture
+// where all jobs (individual and workflow) are handled through a single service
+// DO NOT USE FOR NEW CODE - will be removed in future versions
+//
+// Deprecated: Use WorkflowServiceServer for all job operations
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth     auth2.GRPCAuthorization
@@ -226,6 +231,18 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 
 	// TODO: WorkflowUuid would need to be added to Job domain object
 	workflowUuid := ""
+
+	// Debug logging to identify empty fields
+	s.logger.Debug("Job retrieved from store",
+		"uuid", job.Uuid,
+		"network", job.Network,
+		"volumes", job.Volumes,
+		"runtime", job.Runtime,
+		"hasNetwork", job.Network != "",
+		"volumeCount", len(job.Volumes),
+		"hasRuntime", job.Runtime != "",
+		"environment", len(job.Environment),
+		"secretEnv", len(job.SecretEnvironment))
 
 	return &pb.GetJobStatusRes{
 		Uuid:              job.Uuid,
