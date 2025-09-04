@@ -225,12 +225,10 @@ func (cv *CommandValidator) ResolveCommand(command string) (string, error) {
 	// Try common locations from configuration
 	commonPaths := make([]string, 0, len(cv.config.Runtime.CommonPaths)+2)
 
-	// Add configured common paths
 	for _, basePath := range cv.config.Runtime.CommonPaths {
 		commonPaths = append(commonPaths, filepath.Join(basePath, command))
 	}
 
-	// Add essential system paths not typically in config
 	systemPaths := []string{"/bin", "/sbin"}
 	for _, sysPath := range systemPaths {
 		found := false

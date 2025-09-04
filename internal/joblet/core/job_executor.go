@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/environment"
 	"joblet/internal/joblet/core/execution"
 	"joblet/internal/joblet/core/process"
@@ -65,8 +66,8 @@ func NewExecutionEngineV2(
 	// Create network service
 	var netService execution.NetworkManager
 	if networkStore != nil {
-		networkBridge := NewNetworkStoreBridge(networkStore)
-		networkSetup := network.NewNetworkSetup(platform, networkBridge)
+		// NetworkStore already implements network.NetworkStoreInterface via adapter
+		networkSetup := network.NewNetworkSetup(platform, networkStore)
 
 		// Create network store adapter for the execution service
 		networkStoreAdapter := &networkStoreAdapter{store: networkStore}
@@ -96,6 +97,7 @@ func NewExecutionEngineV2(
 		netService,
 		processService,
 		isolationService,
+		platform,
 		logger,
 	)
 
@@ -234,15 +236,15 @@ func (nsa *networkStoreAdapter) ReleaseIP(networkName, ipAddress string) error {
 }
 
 func (nsa *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allocation *execution.JobNetworkAllocation) error {
-	// Convert execution.JobNetworkAllocation to core.JobNetworkAllocation
-	coreAlloc := &JobNetworkAllocation{
+	// Convert execution.JobNetworkAllocation to adapters.JobNetworkAllocation
+	adapterAlloc := &adapters.JobNetworkAllocation{
 		JobID:       allocation.JobID,
 		NetworkName: allocation.NetworkName,
 		IPAddress:   allocation.IPAddress,
 		Hostname:    allocation.Hostname,
 		AssignedAt:  allocation.AssignedAt,
 	}
-	return nsa.store.AssignJobToNetwork(jobID, networkName, coreAlloc)
+	return nsa.store.AssignJobToNetwork(jobID, networkName, adapterAlloc)
 }
 
 func (nsa *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
@@ -251,9 +253,9 @@ func (nsa *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
 
 func (nsa *networkStoreAdapter) GetJobAllocation(jobID string) (*execution.JobNetworkAllocation, error) {
 	// Get the job allocation from the store
-	alloc, err := nsa.store.GetJobNetworkAllocation(jobID)
-	if err != nil {
-		return nil, err
+	alloc, found := nsa.store.JobNetworkAllocation(jobID)
+	if !found {
+		return nil, fmt.Errorf("job network allocation not found: %s", jobID)
 	}
 
 	// Convert to execution package format

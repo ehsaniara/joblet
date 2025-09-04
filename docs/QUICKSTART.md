@@ -274,8 +274,8 @@ rnx monitor
 # Get current system status
 rnx monitor status
 
-# Stream job logs in real-time
-rnx log <job-uuid> --follow
+# Stream job logs (use Ctrl+C to stop)
+rnx log <job-uuid>
 ```
 
 ## 🎉 Next Steps

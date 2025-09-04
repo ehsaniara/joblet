@@ -12,7 +12,6 @@ import (
 	"joblet/pkg/platform"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // JobExecutor handles job execution in init mode with consolidated environment handling
@@ -52,10 +51,7 @@ func (je *JobExecutor) ExecuteInInitMode() error {
 	log := je.logger.WithField("jobID", config.JobID).
 		WithField("totalFiles", config.TotalFiles)
 
-	log.Debug("executing job in init mode",
-		"command", config.Command,
-		"args", je.truncateArgsForLogging(config.Args),
-		"hasUploads", config.HasUploadSession)
+	// Executing job with provided configuration
 
 	// Process uploads if present
 	if config.HasUploadSession && config.UploadPipePath != "" {
@@ -88,8 +84,6 @@ func (je *JobExecutor) ExecuteJob() error {
 		return fmt.Errorf("failed to load job configuration: %w", err)
 	}
 
-	log := je.logger.WithField("jobID", config.JobID)
-
 	// Check which phase we're in
 	phase := je.platform.Getenv("JOB_PHASE")
 
@@ -100,8 +94,7 @@ func (je *JobExecutor) ExecuteJob() error {
 
 	case "execute", "":
 		// Execute phase - just run the command
-		log.Debug("executing job in init mode", "command", config.Command, "args", je.truncateArgsForLogging(config.Args),
-			"hasUploads", je.platform.Getenv("JOB_HAS_UPLOADS") == "true")
+		// Executing job command
 
 		return je.executeCommand(config)
 
@@ -112,15 +105,11 @@ func (je *JobExecutor) ExecuteJob() error {
 
 // processUploads handles upload processing from the pipe
 func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
-	log := je.logger.WithField("operation", "process-uploads")
-
 	workspaceDir := je.config.Filesystem.WorkspaceDir
 	if workspaceDir == "" {
 		return fmt.Errorf("workspace directory not configured")
 	}
-	log.Debug("processing uploads from pipe",
-		"pipePath", config.UploadPipePath,
-		"workspace", workspaceDir)
+	// Processing uploads from pipe
 
 	// Create workspace
 	if err := je.platform.MkdirAll(workspaceDir, 0755); err != nil {
@@ -133,7 +122,7 @@ func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
 		return fmt.Errorf("failed to process files from pipe: %w", err)
 	}
 
-	log.Debug("upload processing completed")
+	// Upload processing completed
 	return nil
 }
 
@@ -155,20 +144,20 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 			if err := os.Chdir(workDir); err != nil {
 				return fmt.Errorf("failed to change to workspace directory: %w", err)
 			}
-			je.logger.Debug("changed working directory", "workDir", workDir)
+			// Changed to workspace directory
 		}
 	}
 
 	// Get current environment (already set up by parent process)
 	envv := je.platform.Environ()
 
-	je.logger.Debug("executing job command", "command", commandPath, "args", je.truncateArgsForLogging(config.Args))
+	// Executing job command
 	// About to exec to replace init process with job command
 
 	// Prepare arguments for exec - argv[0] should be the command name
 	argv := append([]string{commandPath}, config.Args...)
 
-	je.logger.Debug("about to exec to replace init process with job command")
+	// About to exec to replace init process
 
 	// Use exec to replace the current process (init) with the job command
 	// This makes the job command become PID 1 in the namespace, providing proper isolation
@@ -216,38 +205,12 @@ func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
 func (je *JobExecutor) SetupCgroup(cgroupPath string) error {
 	// This is typically called from the joblet before switching to init mode
 	// The init process will already be in the correct cgroup
-	je.logger.Debug("cgroup setup requested", "path", cgroupPath)
+	// Cgroup setup requested
 	return nil
 }
 
 // HandleSignals sets up signal handling for graceful shutdown
 func (je *JobExecutor) HandleSignals(ctx context.Context) {
 	// Signal handling can be added here if needed
-	je.logger.Debug("signal handling setup")
-}
-
-// truncateArgsForLogging truncates long arguments for cleaner log output
-func (je *JobExecutor) truncateArgsForLogging(args []string) []string {
-	const maxArgLength = 100
-	truncated := make([]string, len(args))
-
-	for i, arg := range args {
-		if len(arg) > maxArgLength {
-			// For script content (usually starts with #!/bin/bash), show a summary
-			if strings.HasPrefix(arg, "#!/bin/bash") || strings.HasPrefix(arg, "#!/bin/sh") {
-				lines := strings.Split(arg, "\n")
-				if len(lines) > 0 {
-					truncated[i] = fmt.Sprintf("<script: %d lines, starts with: %s...>", len(lines), lines[0])
-				} else {
-					truncated[i] = "<script content truncated>"
-				}
-			} else {
-				truncated[i] = arg[:maxArgLength] + "..."
-			}
-		} else {
-			truncated[i] = arg
-		}
-	}
-
-	return truncated
+	// Signal handling setup
 }

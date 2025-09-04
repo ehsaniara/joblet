@@ -131,15 +131,6 @@ func NewPubSub[T any](opts ...Option[T]) PubSub[T] {
 	return p
 }
 
-// NewPubSubWithConfig creates a new in-memory pub-sub system with a config.
-// Deprecated: Use NewPubSub with functional options instead.
-func NewPubSubWithConfig[T any](config *PubSubConfig) PubSub[T] {
-	if config != nil && config.BufferSize > 0 {
-		return NewPubSub[T](WithBufferSize[T](config.BufferSize))
-	}
-	return NewPubSub[T]()
-}
-
 // Publish sends a message to the specified topic.
 func (p *memoryPubSub[T]) Publish(ctx context.Context, topicName string, message T) error {
 	select {

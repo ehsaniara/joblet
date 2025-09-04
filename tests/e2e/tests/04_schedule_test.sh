@@ -12,7 +12,15 @@ source "$(dirname "$0")/../lib/test_framework.sh"
 
 test_immediate_job() {
     # Test a job that runs immediately
-    local job_id=$(run_python_job "print('IMMEDIATE_JOB_RAN')")
+    # Use a simple echo command that works without any runtime
+    local job_output=$("$RNX_BINARY" run echo "IMMEDIATE_JOB_RAN" 2>&1)
+    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    
+    if [[ -z "$job_id" ]]; then
+        echo -e "    ${RED}Failed to extract job ID${NC}"
+        return 1
+    fi
+    
     sleep 3
     
     local status=$(check_job_status "$job_id")
@@ -20,67 +28,139 @@ test_immediate_job() {
 }
 
 test_delayed_job() {
-    # Test scheduling a job with a delay
-    local schedule_time=$(date -d "+5 seconds" '+%Y-%m-%d %H:%M:%S')
+    # Test scheduling a job with a delay (now supports seconds!)
+    # Using 10s schedule for quick testing
     
-    # Create a scheduled job (if rnx supports --schedule or --at flag)
-    local job_output=$("$RNX_BINARY" run --runtime="$DEFAULT_RUNTIME" \
-        python3 -c "print('DELAYED_JOB_RAN')" 2>&1)
+    # Create a scheduled job with --schedule flag
+    local job_output=$("$RNX_BINARY" run --schedule="10s" echo "DELAYED_JOB_RAN" 2>&1)
     
     if echo "$job_output" | grep -q "ID:"; then
         local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
         
-        # Check status immediately (should be PENDING or SCHEDULED)
+        # Check status immediately (should be SCHEDULED)
         local initial_status=$(check_job_status "$job_id")
         
-        # Wait for scheduled time
-        sleep 8
-        
-        # Check if job completed
-        local final_status=$(check_job_status "$job_id")
-        
-        if [[ "$final_status" == "COMPLETED" ]]; then
-            return 0
+        if [[ "$initial_status" == "SCHEDULED" ]]; then
+            echo -e "    ${GREEN}Job successfully scheduled (status: SCHEDULED)${NC}"
+            
+            # Wait for the job to execute (10 seconds + small buffer)
+            echo -e "    ${BLUE}Waiting 12 seconds for job to execute...${NC}"
+            sleep 12
+            
+            # Check if job completed
+            local final_status=$(check_job_status "$job_id")
+            if [[ "$final_status" == "COMPLETED" ]]; then
+                local logs=$(get_job_logs "$job_id")
+                if echo "$logs" | grep -q "DELAYED_JOB_RAN"; then
+                    echo -e "    ${GREEN}Scheduled job executed successfully after 10s${NC}"
+                    return 0
+                fi
+            else
+                echo -e "    ${YELLOW}Job status after wait: $final_status${NC}"
+                return 1
+            fi
         else
-            echo -e "    ${YELLOW}Job scheduling may not be supported${NC}"
-            return 0  # Pass anyway if feature not available
+            echo -e "    ${YELLOW}Job not in SCHEDULED state (got: $initial_status)${NC}"
+            return 1
         fi
     else
-        echo -e "    ${YELLOW}Job scheduling not available${NC}"
-        return 0
+        echo -e "    ${RED}Failed to create scheduled job${NC}"
+        return 1
     fi
 }
 
 test_schedule_formats() {
     # Test different schedule format validations
-    # Note: minimum schedule time is 1 minute in the future
-    local formats=("2min" "5min" "1h" "2025-12-31T23:59:59Z")
+    # Now supports seconds! Minimum is 1 second in the future
+    local formats=("5s" "30s" "2min" "1h" "2025-12-31T23:59:59Z")
+    local job_ids=()
     
     for format in "${formats[@]}"; do
         # Test that the format is accepted (job creation succeeds)
-        local job_output=$("$RNX_BINARY" run --runtime="$DEFAULT_RUNTIME" \
-            --schedule="$format" \
-            python3 -c "print('SCHEDULED_FORMAT_TEST')" 2>&1)
+        local job_output=$("$RNX_BINARY" run --schedule="$format" \
+            echo "SCHEDULED_FORMAT_TEST" 2>&1)
         
         if echo "$job_output" | grep -q "ID:"; then
-            echo -e "    ${GREEN}Schedule format '$format' accepted${NC}"
+            local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+            job_ids+=("$job_id")
+            
+            # Verify job is in SCHEDULED state
+            local status=$(check_job_status "$job_id")
+            if [[ "$status" == "SCHEDULED" ]]; then
+                echo -e "    ${GREEN}Schedule format '$format' accepted and job scheduled${NC}"
+            else
+                echo -e "    ${YELLOW}Format '$format' accepted but status is: $status${NC}"
+            fi
         else
             echo -e "    ${RED}Schedule format '$format' rejected${NC}"
             return 1
         fi
     done
     
+    # Clean up scheduled jobs
+    for job_id in "${job_ids[@]}"; do
+        "$RNX_BINARY" delete "$job_id" 2>/dev/null || true
+    done
+    
     return 0
+}
+
+test_scheduled_job_execution() {
+    # Test that a scheduled job actually executes after its scheduled time
+    echo -e "    ${YELLOW}Scheduling job for 15 seconds from now (will wait)...${NC}"
+    
+    # Schedule a job for 15 seconds from now
+    local job_output=$("$RNX_BINARY" run --schedule="15s" echo "SCHEDULED_JOB_EXECUTED" 2>&1)
+    
+    if ! echo "$job_output" | grep -q "ID:"; then
+        echo -e "    ${RED}Failed to create scheduled job${NC}"
+        return 1
+    fi
+    
+    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    
+    # Verify initial status is SCHEDULED
+    local initial_status=$(check_job_status "$job_id")
+    if [[ "$initial_status" != "SCHEDULED" ]]; then
+        echo -e "    ${RED}Job not in SCHEDULED state (got: $initial_status)${NC}"
+        return 1
+    fi
+    
+    echo -e "    ${GREEN}Job scheduled successfully (ID: $job_id)${NC}"
+    echo -e "    ${BLUE}Waiting 20 seconds for job to execute...${NC}"
+    
+    # Wait for the job to execute (15 seconds + buffer)
+    sleep 20
+    
+    # Check if job completed
+    local final_status=$(check_job_status "$job_id")
+    if [[ "$final_status" == "COMPLETED" ]]; then
+        # Verify the output
+        local logs=$(get_job_logs "$job_id")
+        if echo "$logs" | grep -q "SCHEDULED_JOB_EXECUTED"; then
+            echo -e "    ${GREEN}Scheduled job executed successfully at scheduled time${NC}"
+            return 0
+        else
+            echo -e "    ${RED}Job completed but output not as expected${NC}"
+            return 1
+        fi
+    else
+        echo -e "    ${RED}Job did not complete after scheduled time (status: $final_status)${NC}"
+        return 1
+    fi
 }
 
 test_multiple_scheduled_jobs() {
     # Test multiple jobs scheduled at different times
     local job_ids=()
     
-    # Schedule 3 jobs
+    # Schedule 3 jobs using simple echo commands
     for i in 1 2 3; do
-        local job_id=$(run_python_job "import time; print(f'SCHEDULED_JOB_$i'); time.sleep(1)")
-        job_ids+=("$job_id")
+        local job_output=$("$RNX_BINARY" run sh -c "echo 'SCHEDULED_JOB_$i'; sleep 1" 2>&1)
+        local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+        if [[ -n "$job_id" ]]; then
+            job_ids+=("$job_id")
+        fi
     done
     
     # Wait for all to complete
@@ -105,11 +185,16 @@ test_multiple_scheduled_jobs() {
 
 test_job_queue_ordering() {
     # Test that jobs are executed in order
-    local job1=$(run_python_job "print('FIRST')")
+    local job_output1=$("$RNX_BINARY" run echo "FIRST" 2>&1)
+    local job1=$(echo "$job_output1" | grep "ID:" | awk '{print $2}')
     sleep 0.5
-    local job2=$(run_python_job "print('SECOND')")
+    
+    local job_output2=$("$RNX_BINARY" run echo "SECOND" 2>&1)
+    local job2=$(echo "$job_output2" | grep "ID:" | awk '{print $2}')
     sleep 0.5
-    local job3=$(run_python_job "print('THIRD')")
+    
+    local job_output3=$("$RNX_BINARY" run echo "THIRD" 2>&1)
+    local job3=$(echo "$job_output3" | grep "ID:" | awk '{print $2}')
     
     sleep 5
     
@@ -144,7 +229,8 @@ test_recurring_schedule() {
 
 test_schedule_cancellation() {
     # Test cancelling a scheduled job
-    local job_id=$(run_python_job "import time; time.sleep(10); print('SHOULD_NOT_COMPLETE')")
+    local job_output=$("$RNX_BINARY" run sh -c "sleep 10; echo 'SHOULD_NOT_COMPLETE'" 2>&1)
+    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     # Give it a moment to start
     sleep 2
@@ -207,14 +293,15 @@ main() {
         exit 1
     fi
     
-    # Ensure runtime is available
-    ensure_runtime "$DEFAULT_RUNTIME"
+    # No runtime required - using basic shell commands
+    # ensure_runtime "$DEFAULT_RUNTIME"
     
     # Run tests
     test_section "Basic Scheduling"
     run_test "Immediate job execution" test_immediate_job
     run_test "Delayed job execution" test_delayed_job
     run_test "Schedule format validation" test_schedule_formats
+    run_test "Scheduled job execution (15s wait)" test_scheduled_job_execution
     
     test_section "Queue Management"
     run_test "Multiple scheduled jobs" test_multiple_scheduled_jobs

@@ -589,17 +589,14 @@ sudo journalctl -u joblet --since="1 hour ago" > joblet.log
 ### Job Logs
 
 ```bash
-# View job logs with timestamps
-rnx log --timestamps <job-id>
+# Stream job logs (use Ctrl+C to stop)
+rnx log <job-id>
 
 # Search job logs
 rnx log <job-id> | grep ERROR
 
 # Save logs for analysis
 rnx log <job-id> > job-output.log
-
-# Monitor running job
-rnx log -f <job-id>
 ```
 
 ### Audit Logs
@@ -652,10 +649,10 @@ rnx log <build-job-uuid>
 # 1. Check if previous build exists
 ls -la /opt/joblet/runtimes/openjdk/
 
-# 2. Force rebuild if needed
+# 2. Force reinstall if needed
 rnx runtime install openjdk:21 --force
 
-# 3. Check disk space for runtime building
+# 3. Check disk space for runtime installation
 df -h /opt/joblet/runtimes/
 
 # 4. Verify network access for downloads
@@ -700,9 +697,9 @@ rnx runtime install java:21
 rnx run env | grep JOB_TYPE
 # Should show: JOB_TYPE=standard (for production jobs)
 
-# Check if runtime builds use builder chroot
+# Check if runtime installation uses isolated environment
 rnx runtime install test:1.0
-# Should automatically use builder chroot
+# Should automatically use isolated installation environment
 ```
 
 **Solutions:**
@@ -804,8 +801,8 @@ rnx run --runtime=openjdk:21 ls -la /usr/lib/jvm/
 **Problem: Runtime installation takes too long**
 
 ```bash
-# Check runtime build progress
-rnx status <build-job-uuid> --follow
+# Check runtime installation progress
+rnx status <installation-job-uuid> --follow
 
 # Monitor resource usage during build
 rnx monitor

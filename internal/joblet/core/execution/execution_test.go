@@ -28,6 +28,7 @@ func TestExecutionCoordinator_RuntimeInitPathResolution(t *testing.T) {
 		fakeNetworkManager,
 		fakeProcessManager,
 		fakeIsolationManager,
+		&platformfakes.FakePlatform{},
 		testLogger,
 	)
 
@@ -96,6 +97,7 @@ func TestExecutionCoordinator_NoRuntimeFallback(t *testing.T) {
 		fakeNetworkManager,
 		fakeProcessManager,
 		fakeIsolationManager,
+		&platformfakes.FakePlatform{},
 		testLogger,
 	)
 
@@ -154,6 +156,7 @@ func TestExecutionCoordinator_RuntimeJobsSucceedWithoutRuntimeResolution(t *test
 		fakeNetworkManager,
 		fakeProcessManager,
 		fakeIsolationManager,
+		&platformfakes.FakePlatform{},
 		testLogger,
 	)
 
@@ -213,6 +216,7 @@ func TestExecutionCoordinator_StopJob(t *testing.T) {
 		fakeNetworkManager,
 		fakeProcessManager,
 		fakeIsolationManager,
+		&platformfakes.FakePlatform{},
 		testLogger,
 	)
 
@@ -270,6 +274,7 @@ func TestExecutionCoordinator_StopJobWithErrors(t *testing.T) {
 		fakeNetworkManager,
 		fakeProcessManager,
 		fakeIsolationManager,
+		&platformfakes.FakePlatform{},
 		testLogger,
 	)
 

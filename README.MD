@@ -10,9 +10,10 @@
 isolation, resource limits, real-time monitoring, and network isolation - protecting your host system from malicious or
 resource-hungry processes.
 
-> **🤖 Agentic AI Foundation:** Purpose-built for AI agent workloads with sandboxed code execution, resource-controlled
-> tool usage, and secure multi-tenant isolation - enabling AI agents to safely execute arbitrary code without compromising
-> host security.
+> **📚 For comprehensive documentation and detailed features, see [/docs/README.md](docs/README.md)**
+
+> **🤖 AI Agent Support:** Secure sandboxed code execution with resource controls and process isolation - enabling AI agents
+> to safely execute code without compromising host security.
 
 ## 🎯 Key Features
 
@@ -23,7 +24,7 @@ resource-hungry processes.
 - **Job Scheduling**: Future execution with flexible time specifications
 - **Real-time Monitoring**: Live logs, system metrics, and job status tracking
 - **mTLS Security**: Certificate-based authentication with role-based access control
-- **Pre-built Runtimes**: Python ML, Java, Node.js environments with instant startup (2-3 seconds vs 5-45 minutes)
+- **Pre-built Runtimes**: Python, Python ML, Java environments for faster job startup
 - **Web Admin UI**: React-based interface for comprehensive system management (macOS)
 
 ## 📦 Quick Start
@@ -120,7 +121,7 @@ rnx run --max-cpu=50 --max-memory=512 python3 script.py
 # Pre-built runtimes for instant startup
 rnx run --runtime=python-3.11-ml python analysis.py    # 2-3 seconds
 rnx run --runtime=openjdk-21 java App.java
-rnx run --runtime=nodejs-18 node server.js
+rnx run --runtime=graalvmjdk-21 java GraalApp.java
 
 # Upload files and run
 rnx run --upload=data.csv --upload=script.py python3 script.py
@@ -154,14 +155,14 @@ Available on macOS via Homebrew with `--with-admin`:
 
 ## 📊 System Requirements
 
-### Joblet Server (Linux)
+### Joblet Server (Linux Only)
 
 - Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+)
 - Multi-core CPU, 1GB+ RAM, 5GB+ disk
 - Port 50051 (gRPC), root access for namespaces
 - cgroups v2, iptables, iproute2, bridge-utils
 
-### RNX Client
+### RNX Client (Cross-Platform)
 
 - Linux, macOS 10.15+, or Windows 10+
 - 50MB+ RAM, network access to port 50051

@@ -172,12 +172,10 @@ runtime:
     create_isolated_copies: true  # Create isolated runtime structures
     verify_isolation: true        # Verify runtime isolation after cleanup
     
-  # Runtime building
-  builder:
-    timeout: "3600s"             # Maximum runtime build time (1 hour)
-    max_concurrent_builds: 3     # Maximum concurrent runtime builds
-    cleanup_temp_files: true     # Clean up temporary build files
-    verify_after_build: true     # Verify runtime after building
+  # Runtime installation
+  installation:
+    timeout: "3600s"             # Maximum runtime installation time (1 hour)
+    cleanup_temp_files: true     # Clean up temporary installation files
     
   # Runtime security
   security:

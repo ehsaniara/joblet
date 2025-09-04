@@ -241,7 +241,7 @@ go test ./internal/joblet/runtime/...
 
 The runtime system provides significant performance improvements:
 
-- **Job startup time**: Reduced from 5-45 minutes to 2-5 seconds
+- **Job startup time**: Significantly reduced with pre-built runtime environments
 - **Network dependencies**: Eliminated for jobs using pre-built runtimes
 - **Resource utilization**: Higher GPU/CPU utilization due to faster startup
 - **Consistency**: Reproducible environments across jobs

@@ -59,7 +59,6 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
 	}
 
-	// Add individual job arguments
 	for i, arg := range job.Args {
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
@@ -68,7 +67,6 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_CPU_CORES=%s", job.Limits.CPUCores.String()))
 	}
 
-	// Add volume information
 	if len(job.Volumes) > 0 {
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_VOLUMES_COUNT=%d", len(job.Volumes)))
 		for i, volume := range job.Volumes {
@@ -76,7 +74,6 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		}
 	}
 
-	// Add runtime information
 	if job.Runtime != "" {
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_RUNTIME=%s", job.Runtime))
 	}
@@ -84,7 +81,6 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 	// Combine all environment variables
 	env := append(baseEnv, jobEnv...)
 
-	// Add runtime environment variables from runtime.yml after combining base environment
 	if job.Runtime != "" {
 		runtimeEnv, err := es.getRuntimeEnvironment(job.Runtime)
 		if err != nil {
@@ -94,12 +90,10 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		}
 	}
 
-	// Add regular environment variables from the job
 	for key, value := range job.Environment {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	// Add secret environment variables from the job
 	for key, value := range job.SecretEnvironment {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}

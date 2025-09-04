@@ -13,7 +13,7 @@ Unlike traditional containerization solutions, Joblet leverages Linux namespaces
 
 - **🔒 Better Security**: Process-level isolation without container escape vulnerabilities
 - **⚡ Superior Performance**: Direct syscall execution without container runtime overhead
-- **💰 Cost Efficiency**: Lower resource consumption and faster startup times
+- **💰 Cost Efficiency**: Lower resource consumption and faster startup times compared to traditional containers
 - **🎯 Simpler Operations**: No image management, registries, or container complexity
 
 ### **Enterprise Production Ready**
@@ -26,10 +26,10 @@ Unlike traditional containerization solutions, Joblet leverages Linux namespaces
 
 ### **Developer Experience First**
 
-- **🖥️ Cross-Platform CLI**: Works seamlessly on Linux, macOS, and Windows
-- **🎨 Modern Web UI**: React-based interface for visual workflow management
+- **🖥️ Cross-Platform CLI**: RNX client works on Linux, macOS, and Windows (server requires Linux)
+- **🎨 Modern Web UI**: React-based interface for visual workflow management (available via Homebrew on macOS)
 - **📱 Real-Time Logs**: Live log streaming with filtering and search
-- **🛠️ Runtime System**: Pre-built environments (Python ML 475MB, OpenJDK 21 292MB)
+- **🛠️ Runtime System**: Pre-built environments for Python, Python ML, and Java applications
 
 ## 🎨 Visual Interface
 
@@ -46,9 +46,9 @@ Unlike traditional containerization solutions, Joblet leverages Linux namespaces
 ### **CI/CD & DevOps**
 
 ```bash
-# Replace containers in CI pipelines
+# Run jobs with pre-built runtime environments
 rnx run --runtime=python-3.11-ml pytest tests/
-rnx run --runtime=openjdk:21 --upload=pom.xml --upload=src/ mvn clean install
+rnx run --runtime=openjdk-21 --upload=pom.xml --upload=src/ mvn clean install
 ```
 
 ### **Data Engineering & Analytics**
@@ -66,7 +66,7 @@ rnx run --max-memory=8192 --max-cpu=400 \
 ```bash
 # Network-isolated service testing
 rnx network create test-env --cidr=10.10.0.0/24
-rnx run --network=test-env --runtime=openjdk:21 ./service-a
+rnx run --network=test-env --runtime=openjdk-21 ./service-a
 rnx run --network=test-env --runtime=python-3.11-ml ./service-b
 ```
 
@@ -143,8 +143,8 @@ rnx run --max-memory=1024 --runtime=python-3.11-ml \
 
 | Feature             | Traditional Containers  | Joblet                         |
 |---------------------|-------------------------|--------------------------------|
-| **Startup Time**    | 2-5 seconds             | 50-200ms                       |
-| **Memory Overhead** | 50-100MB per container  | 5-10MB per job                 |
+| **Startup Time**    | Image pull + startup    | Faster with pre-built runtimes |
+| **Memory Overhead** | Container runtime layer | Direct process execution       |
 | **Security**        | Container escape risks  | Direct process isolation       |
 | **Networking**      | Complex bridge setup    | Native Linux networking        |
 | **Storage**         | Image layers & volumes  | Direct filesystem access       |
@@ -171,7 +171,7 @@ rnx run --max-memory=1024 --runtime=python-3.11-ml \
 - **Stateless Architecture**: Easy horizontal scaling
 - **Event-Driven**: Real-time job state management
 - **API-First**: Full gRPC API for integrations
-- **Web Management**: Modern React UI for operations teams
+- **Web Management**: Modern React UI for operations teams (macOS via Homebrew)
 
 ## 📚 Complete Documentation
 
@@ -211,8 +211,8 @@ rnx run --max-memory=1024 --runtime=python-3.11-ml \
 ## 🚀 Quick Start Example
 
 ```bash
-# Install Joblet (see Installation Guide for details)
-curl -sSL https://install.joblet.org | bash
+# Install Joblet Server on Linux (see Installation Guide for details)
+# Download from GitHub releases and run installation script
 
 # Run your first job
 rnx run echo "Hello, Joblet!"
@@ -252,7 +252,7 @@ rnx run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
 ### Runtime Management
 
 ```bash
-# List available runtimes (languages, databases, services)
+# List available runtimes (Python, Python ML, Java)
 rnx runtime list
 
 # Get runtime information
@@ -260,7 +260,9 @@ rnx runtime info python-3.11-ml
 
 # Install runtimes
 rnx runtime install python-3.11-ml
+rnx runtime install python-3.11
 rnx runtime install openjdk-21
+rnx runtime install graalvmjdk-21
 
 # Remove runtimes
 rnx runtime remove python-3.11-ml
@@ -316,7 +318,7 @@ rnx run --network=my-network --volume=data-vol app
 
 - **Agent Isolation**: Run multiple AI agents safely with process boundaries
 - **Resource Control**: Prevent AI workloads from consuming excessive resources
-- **Model Execution**: Pre-built ML runtimes with GPU support and package management
+- **Model Execution**: Pre-built ML runtimes with comprehensive package management
 - **Workflow Orchestration**: Chain AI agents with dependencies and data flow control
 
 ---

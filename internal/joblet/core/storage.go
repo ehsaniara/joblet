@@ -8,16 +8,10 @@ import (
 // This allows for interface-based dependency injection
 
 // JobStore is an alias for the job storage interface
-type JobStore = adapters.JobStoreAdapter
+type JobStore = adapters.JobStorer
 
-// NetworkStore interface to avoid direct adapter dependency
-type NetworkStore interface {
-	AllocateIP(networkName string) (string, error)
-	ReleaseIP(networkName, ipAddress string) error
-	AssignJobToNetwork(jobID, networkName string, allocation *JobNetworkAllocation) error
-	RemoveJobFromNetwork(jobID string) error
-	GetJobNetworkAllocation(jobID string) (*JobNetworkAllocation, error)
-}
+// NetworkStore is an alias for the network storage interface (types are identical)
+type NetworkStore = adapters.NetworkStorer
 
 // VolumeStore is an alias for the volume storage interface
-type VolumeStore = adapters.VolumeStoreAdapter
+type VolumeStore = adapters.VolumeStorer

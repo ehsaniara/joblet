@@ -109,12 +109,12 @@ func (i *Isolator) setupFilesystemIsolation() error {
 	}
 
 	// Create isolated filesystem for this job
-	i.logger.Debug("creating job filesystem", "jobID", jobID)
+	// Creating job filesystem
 	jobFS, e := i.filesystem.CreateJobFilesystem(jobID)
 	if e != nil {
 		return fmt.Errorf("failed to create job filesystem: %w", e)
 	}
-	i.logger.Debug("job filesystem created successfully", "jobID", jobID)
+	// Job filesystem created
 
 	// Set up the filesystem isolation (chroot, mounts, etc.)
 	// Check if this is a builder job by looking at job type from service layer
@@ -126,15 +126,15 @@ func (i *Isolator) setupFilesystemIsolation() error {
 		if err := jobFS.SetupBuilder(); err != nil {
 			return fmt.Errorf("failed to setup builder filesystem isolation: %w", err)
 		}
-		i.logger.Debug("jobFS.SetupBuilder() completed successfully", "jobID", jobID)
+		// Builder filesystem setup completed
 	} else {
 		// Standard job setup
 		// Note: jobFS.Setup() handles runtime mounting internally before chroot
-		i.logger.Debug("calling jobFS.Setup()", "jobID", jobID)
+		// Setting up standard job filesystem
 		if err := jobFS.Setup(); err != nil {
 			return fmt.Errorf("failed to setup filesystem isolation: %w", err)
 		}
-		i.logger.Debug("jobFS.Setup() completed successfully", "jobID", jobID)
+		// Filesystem setup completed
 	}
 
 	// Filesystem isolation setup completed successfully
@@ -143,7 +143,7 @@ func (i *Isolator) setupFilesystemIsolation() error {
 
 // makePrivate makes mounts private using platform abstraction
 func (i *Isolator) makePrivate() error {
-	i.logger.Debug("making mounts private using platform abstraction")
+	// Making mounts private
 
 	// Use platform constants and helper method
 	err := i.platform.Mount("", "/", "", 0x40000|0x4000, "") // 0x40000|0x4000 for platform.MountPrivate|platform.MountRecursive
@@ -151,13 +151,13 @@ func (i *Isolator) makePrivate() error {
 		return fmt.Errorf("platform mount syscall failed: %w", err)
 	}
 
-	i.logger.Debug("mounts made private using platform abstraction")
+	// Mounts made private
 	return nil
 }
 
 // remountProc remounts /proc using platform abstraction (now within chroot)
 func (i *Isolator) remountProc() error {
-	i.logger.Debug("remounting /proc within isolated filesystem")
+	// Remounting /proc within isolated filesystem
 
 	// We're now inside the chroot, so /proc refers to the chrooted /proc
 	// Ensure /proc directory exists
@@ -167,10 +167,8 @@ func (i *Isolator) remountProc() error {
 	}
 
 	// Lazy unmount existing /proc using platform helper
-	if err := i.platform.Unmount("/proc", 0x2); err != nil { // 0x2 for platform.UnmountDetach
-		i.logger.Debug("existing /proc unmount (within chroot)", "error", err)
-		// Continue
-	}
+	// This may fail normally if /proc is not mounted, which is acceptable
+	_ = i.platform.Unmount("/proc", 0x2) // 0x2 for platform.UnmountDetach
 
 	// Mount new proc using platform abstraction
 	if err := i.platform.Mount("proc", "/proc", "proc", 0, ""); err != nil {
@@ -178,7 +176,7 @@ func (i *Isolator) remountProc() error {
 		return fmt.Errorf("platform proc mount failed: %w", err)
 	}
 
-	i.logger.Debug("/proc successfully remounted within chrooted environment")
+	// /proc remounted successfully
 	return nil
 }
 
@@ -189,7 +187,7 @@ func (i *Isolator) verifyIsolation() error {
 	// Check PID 1 in our namespace using platform abstraction
 	if comm, err := i.platform.ReadFile("/proc/1/comm"); err == nil {
 		pid1Process := strings.TrimSpace(string(comm))
-		i.logger.Debug("PID 1 in namespace", "process", pid1Process)
+		// PID 1 check passed
 
 		// In isolated namespace, PID 1 should be either:
 		// - "joblet" (original binary name)

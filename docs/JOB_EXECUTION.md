@@ -166,11 +166,11 @@ rnx run --upload-dir=./dataset python3 train_model.py
 ### Working Directory
 
 ```bash
-# Set working directory
-rnx run --workdir=/work/app --upload-dir=./app npm start
-
-# Default is /work
+# Default working directory is /work
 rnx run pwd  # Output: /work
+
+# Files uploaded are available in /work
+rnx run --upload-dir=./app ls -la
 ```
 
 ### File Access in Jobs
@@ -312,11 +312,11 @@ watch -n 1 rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
 # Workflow status with job names and dependencies
 rnx status --workflow <workflow-id>
 
-# Follow logs
-rnx log -f <job-uuid>
+# Stream logs (use Ctrl+C to stop)
+rnx log <job-uuid>
 
 # Example with actual UUID:
-rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # List running jobs (shows names and status)
 rnx list --json | jq '.[] | select(.status == "RUNNING")'
@@ -355,7 +355,7 @@ rnx log <job-uuid> > output.log
 rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
 
 # Stream to file
-rnx log -f <job-uuid> | tee running.log
+rnx log <job-uuid> | tee running.log
 
 # Parse JSON output
 rnx run --json echo "test" | jq .
@@ -367,14 +367,14 @@ rnx log <job-uuid> 2>/dev/null
 ### Log Formatting
 
 ```bash
-# With timestamps
-rnx log --timestamps <job-uuid>
+# Stream logs (use Ctrl+C to stop)
+rnx log <job-uuid>
 
-# Last N lines
-rnx log --tail=100 <job-uuid>
+# Filter logs with grep
+rnx log <job-uuid> | grep ERROR
 
-# Follow with grep
-rnx log -f <job-uuid> | grep ERROR
+# Get last N lines using standard tools
+rnx log <job-uuid> | tail -100
 ```
 
 ### Persistent Output
@@ -540,7 +540,6 @@ rnx run --volume=temp-vol process_data.sh
 ```bash
 # Comprehensive logging
 JOB_UUID=$(rnx run --json \
-  --name="daily-backup-$(date +%Y%m%d)" \
   backup.sh | jq -r .id)
 # JOB_UUID will be something like: f47ac10b-58cc-4372-a567-0e02b2c3d479
 

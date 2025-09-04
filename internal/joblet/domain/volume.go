@@ -175,8 +175,8 @@ func (v *Volume) IsInUse() bool {
 	return v.JobCount > 0
 }
 
-// GetMountPath returns the path where this volume should be mounted inside the job container
-func (v *Volume) GetMountPath() string {
+// MountPath returns the path where this volume should be mounted inside the job container
+func (v *Volume) MountPath() string {
 	return fmt.Sprintf("/volumes/%s", v.Name)
 }
 
@@ -234,7 +234,7 @@ func (v *Volume) ToDTO() *VolumeDTO {
 		Path:        v.Path,
 		CreatedTime: v.CreatedTime,
 		JobCount:    v.JobCount,
-		MountPath:   v.GetMountPath(),
+		MountPath:   v.MountPath(),
 		InUse:       v.IsInUse(),
 	}
 }

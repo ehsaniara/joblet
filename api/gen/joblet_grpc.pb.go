@@ -994,9 +994,6 @@ const (
 	RuntimeService_ListRuntimes_FullMethodName                      = "/joblet.RuntimeService/ListRuntimes"
 	RuntimeService_GetRuntimeInfo_FullMethodName                    = "/joblet.RuntimeService/GetRuntimeInfo"
 	RuntimeService_TestRuntime_FullMethodName                       = "/joblet.RuntimeService/TestRuntime"
-	RuntimeService_BuildRuntime_FullMethodName                      = "/joblet.RuntimeService/BuildRuntime"
-	RuntimeService_GetBuildStatus_FullMethodName                    = "/joblet.RuntimeService/GetBuildStatus"
-	RuntimeService_ListBuildJobs_FullMethodName                     = "/joblet.RuntimeService/ListBuildJobs"
 	RuntimeService_InstallRuntimeFromGithub_FullMethodName          = "/joblet.RuntimeService/InstallRuntimeFromGithub"
 	RuntimeService_InstallRuntimeFromLocal_FullMethodName           = "/joblet.RuntimeService/InstallRuntimeFromLocal"
 	RuntimeService_StreamingInstallRuntimeFromGithub_FullMethodName = "/joblet.RuntimeService/StreamingInstallRuntimeFromGithub"
@@ -1015,10 +1012,6 @@ type RuntimeServiceClient interface {
 	ListRuntimes(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*RuntimesRes, error)
 	GetRuntimeInfo(ctx context.Context, in *RuntimeInfoReq, opts ...grpc.CallOption) (*RuntimeInfoRes, error)
 	TestRuntime(ctx context.Context, in *RuntimeTestReq, opts ...grpc.CallOption) (*RuntimeTestRes, error)
-	// Runtime building operations - uses builder isolation automatically (no env vars needed)
-	BuildRuntime(ctx context.Context, in *BuildRuntimeRequest, opts ...grpc.CallOption) (*BuildRuntimeResponse, error)
-	GetBuildStatus(ctx context.Context, in *GetBuildStatusRequest, opts ...grpc.CallOption) (*GetBuildStatusResponse, error)
-	ListBuildJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*BuildJobsResponse, error)
 	InstallRuntimeFromGithub(ctx context.Context, in *InstallRuntimeRequest, opts ...grpc.CallOption) (*InstallRuntimeResponse, error)
 	InstallRuntimeFromLocal(ctx context.Context, in *InstallRuntimeFromLocalRequest, opts ...grpc.CallOption) (*InstallRuntimeResponse, error)
 	StreamingInstallRuntimeFromGithub(ctx context.Context, in *InstallRuntimeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RuntimeInstallationChunk], error)
@@ -1059,36 +1052,6 @@ func (c *runtimeServiceClient) TestRuntime(ctx context.Context, in *RuntimeTestR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RuntimeTestRes)
 	err := c.cc.Invoke(ctx, RuntimeService_TestRuntime_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *runtimeServiceClient) BuildRuntime(ctx context.Context, in *BuildRuntimeRequest, opts ...grpc.CallOption) (*BuildRuntimeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BuildRuntimeResponse)
-	err := c.cc.Invoke(ctx, RuntimeService_BuildRuntime_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *runtimeServiceClient) GetBuildStatus(ctx context.Context, in *GetBuildStatusRequest, opts ...grpc.CallOption) (*GetBuildStatusResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetBuildStatusResponse)
-	err := c.cc.Invoke(ctx, RuntimeService_GetBuildStatus_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *runtimeServiceClient) ListBuildJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*BuildJobsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BuildJobsResponse)
-	err := c.cc.Invoke(ctx, RuntimeService_ListBuildJobs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1183,10 +1146,6 @@ type RuntimeServiceServer interface {
 	ListRuntimes(context.Context, *EmptyRequest) (*RuntimesRes, error)
 	GetRuntimeInfo(context.Context, *RuntimeInfoReq) (*RuntimeInfoRes, error)
 	TestRuntime(context.Context, *RuntimeTestReq) (*RuntimeTestRes, error)
-	// Runtime building operations - uses builder isolation automatically (no env vars needed)
-	BuildRuntime(context.Context, *BuildRuntimeRequest) (*BuildRuntimeResponse, error)
-	GetBuildStatus(context.Context, *GetBuildStatusRequest) (*GetBuildStatusResponse, error)
-	ListBuildJobs(context.Context, *EmptyRequest) (*BuildJobsResponse, error)
 	InstallRuntimeFromGithub(context.Context, *InstallRuntimeRequest) (*InstallRuntimeResponse, error)
 	InstallRuntimeFromLocal(context.Context, *InstallRuntimeFromLocalRequest) (*InstallRuntimeResponse, error)
 	StreamingInstallRuntimeFromGithub(*InstallRuntimeRequest, grpc.ServerStreamingServer[RuntimeInstallationChunk]) error
@@ -1211,15 +1170,6 @@ func (UnimplementedRuntimeServiceServer) GetRuntimeInfo(context.Context, *Runtim
 }
 func (UnimplementedRuntimeServiceServer) TestRuntime(context.Context, *RuntimeTestReq) (*RuntimeTestRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TestRuntime not implemented")
-}
-func (UnimplementedRuntimeServiceServer) BuildRuntime(context.Context, *BuildRuntimeRequest) (*BuildRuntimeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BuildRuntime not implemented")
-}
-func (UnimplementedRuntimeServiceServer) GetBuildStatus(context.Context, *GetBuildStatusRequest) (*GetBuildStatusResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBuildStatus not implemented")
-}
-func (UnimplementedRuntimeServiceServer) ListBuildJobs(context.Context, *EmptyRequest) (*BuildJobsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListBuildJobs not implemented")
 }
 func (UnimplementedRuntimeServiceServer) InstallRuntimeFromGithub(context.Context, *InstallRuntimeRequest) (*InstallRuntimeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InstallRuntimeFromGithub not implemented")
@@ -1310,60 +1260,6 @@ func _RuntimeService_TestRuntime_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RuntimeServiceServer).TestRuntime(ctx, req.(*RuntimeTestReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RuntimeService_BuildRuntime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BuildRuntimeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RuntimeServiceServer).BuildRuntime(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RuntimeService_BuildRuntime_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RuntimeServiceServer).BuildRuntime(ctx, req.(*BuildRuntimeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RuntimeService_GetBuildStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBuildStatusRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RuntimeServiceServer).GetBuildStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RuntimeService_GetBuildStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RuntimeServiceServer).GetBuildStatus(ctx, req.(*GetBuildStatusRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RuntimeService_ListBuildJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EmptyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RuntimeServiceServer).ListBuildJobs(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RuntimeService_ListBuildJobs_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RuntimeServiceServer).ListBuildJobs(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1480,18 +1376,6 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TestRuntime",
 			Handler:    _RuntimeService_TestRuntime_Handler,
-		},
-		{
-			MethodName: "BuildRuntime",
-			Handler:    _RuntimeService_BuildRuntime_Handler,
-		},
-		{
-			MethodName: "GetBuildStatus",
-			Handler:    _RuntimeService_GetBuildStatus_Handler,
-		},
-		{
-			MethodName: "ListBuildJobs",
-			Handler:    _RuntimeService_ListBuildJobs_Handler,
 		},
 		{
 			MethodName: "InstallRuntimeFromGithub",

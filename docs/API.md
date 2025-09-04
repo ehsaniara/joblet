@@ -280,7 +280,7 @@ rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
 
 ```bash
 # CLI
-rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response (streaming)
 Logs for job f47ac10b-58cc-4372-a567-0e02b2c3d479 (Press Ctrl+C to exit if streaming):
@@ -497,15 +497,13 @@ Example:
 Stream job output in real-time or view historical logs.
 
 ```bash
-rnx log [flags] <job-uuid>
+rnx log <job-uuid>
 
-Flags:
-  --follow, -f   Follow the log stream (default true)
+Streams logs from running or completed jobs. Use Ctrl+C to stop following.
 
 Examples:
-  rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479              # View all logs
-  rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479           # Follow live output
-  rnx log --follow=false f47ac10b-58cc-4372-a567-0e02b2c3d479  # Historical logs only
+  rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479              # Stream logs
+  rnx log f47ac10b | grep ERROR                             # Filter output
 ```
 
 ### Configuration Examples

@@ -19,7 +19,7 @@ type ScheduleValidator struct {
 // NewScheduleValidator creates a new schedule validator
 func NewScheduleValidator() *ScheduleValidator {
 	return &ScheduleValidator{
-		minAdvanceTime:   1 * time.Minute,      // Jobs must be at least 1 minute in future
+		minAdvanceTime:   1 * time.Second,      // Jobs must be at least 1 second in future
 		maxAdvanceTime:   365 * 24 * time.Hour, // Maximum 1 year in advance
 		granularity:      1 * time.Second,      // Second-level precision
 		maxScheduledJobs: 1000,                 // Default max scheduled jobs

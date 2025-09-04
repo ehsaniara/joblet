@@ -27,16 +27,16 @@ func NewIPPoolManager() *IPPoolManager {
 }
 
 // InitializePool initializes an IP pool for a network
-func (ipm *IPPoolManager) InitializePool(networkName, cidr string) error {
+func (ip *IPPoolManager) InitializePool(networkName, cidr string) error {
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return fmt.Errorf("invalid CIDR %s: %w", cidr, err)
 	}
 
-	ipm.mutex.Lock()
-	defer ipm.mutex.Unlock()
+	ip.mutex.Lock()
+	defer ip.mutex.Unlock()
 
-	ipm.pools[networkName] = &networkPool{
+	ip.pools[networkName] = &networkPool{
 		cidr:      ipNet,
 		allocated: make(map[string]bool),
 	}
@@ -45,10 +45,10 @@ func (ipm *IPPoolManager) InitializePool(networkName, cidr string) error {
 }
 
 // AllocateIP allocates an IP from the pool
-func (ipm *IPPoolManager) AllocateIP(networkName string) (net.IP, error) {
-	ipm.mutex.RLock()
-	pool, exists := ipm.pools[networkName]
-	ipm.mutex.RUnlock()
+func (ip *IPPoolManager) AllocateIP(networkName string) (net.IP, error) {
+	ip.mutex.RLock()
+	pool, exists := ip.pools[networkName]
+	ip.mutex.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("no IP pool for network %s", networkName)
@@ -58,19 +58,19 @@ func (ipm *IPPoolManager) AllocateIP(networkName string) (net.IP, error) {
 	defer pool.mutex.Unlock()
 
 	// Find next available IP
-	for ip := pool.cidr.IP.Mask(pool.cidr.Mask); pool.cidr.Contains(ip); ipm.incrementIP(ip) {
-		ipStr := ip.String()
+	for addr := pool.cidr.IP.Mask(pool.cidr.Mask); pool.cidr.Contains(addr); ip.incrementIP(addr) {
+		addrStr := addr.String()
 
 		// Skip network and broadcast addresses
-		if ip.Equal(pool.cidr.IP) || ipm.isBroadcast(ip, pool.cidr) {
+		if addr.Equal(pool.cidr.IP) || ip.isBroadcast(addr, pool.cidr) {
 			continue
 		}
 
-		if !pool.allocated[ipStr] {
-			pool.allocated[ipStr] = true
+		if !pool.allocated[addrStr] {
+			pool.allocated[addrStr] = true
 			// Return a copy of the IP
-			allocatedIP := make(net.IP, len(ip))
-			copy(allocatedIP, ip)
+			allocatedIP := make(net.IP, len(addr))
+			copy(allocatedIP, addr)
 			return allocatedIP, nil
 		}
 	}
@@ -79,10 +79,10 @@ func (ipm *IPPoolManager) AllocateIP(networkName string) (net.IP, error) {
 }
 
 // ReleaseIP releases an IP back to the pool
-func (ipm *IPPoolManager) ReleaseIP(networkName string, ip net.IP) error {
-	ipm.mutex.RLock()
-	pool, exists := ipm.pools[networkName]
-	ipm.mutex.RUnlock()
+func (ip *IPPoolManager) ReleaseIP(networkName string, addr net.IP) error {
+	ip.mutex.RLock()
+	pool, exists := ip.pools[networkName]
+	ip.mutex.RUnlock()
 
 	if !exists {
 		return fmt.Errorf("no IP pool for network %s", networkName)
@@ -91,20 +91,20 @@ func (ipm *IPPoolManager) ReleaseIP(networkName string, ip net.IP) error {
 	pool.mutex.Lock()
 	defer pool.mutex.Unlock()
 
-	ipStr := ip.String()
-	if !pool.allocated[ipStr] {
-		return fmt.Errorf("IP %s is not allocated in network %s", ipStr, networkName)
+	addrStr := addr.String()
+	if !pool.allocated[addrStr] {
+		return fmt.Errorf("IP %s is not allocated in network %s", addrStr, networkName)
 	}
 
-	delete(pool.allocated, ipStr)
+	delete(pool.allocated, addrStr)
 	return nil
 }
 
 // IsIPAvailable checks if an IP is available
-func (ipm *IPPoolManager) IsIPAvailable(networkName string, ip net.IP) bool {
-	ipm.mutex.RLock()
-	pool, exists := ipm.pools[networkName]
-	ipm.mutex.RUnlock()
+func (ip *IPPoolManager) IsIPAvailable(networkName string, addr net.IP) bool {
+	ip.mutex.RLock()
+	pool, exists := ip.pools[networkName]
+	ip.mutex.RUnlock()
 
 	if !exists {
 		return false
@@ -113,23 +113,23 @@ func (ipm *IPPoolManager) IsIPAvailable(networkName string, ip net.IP) bool {
 	pool.mutex.RLock()
 	defer pool.mutex.RUnlock()
 
-	if !pool.cidr.Contains(ip) {
+	if !pool.cidr.Contains(addr) {
 		return false
 	}
 
 	// Skip network and broadcast addresses
-	if ip.Equal(pool.cidr.IP) || ipm.isBroadcast(ip, pool.cidr) {
+	if addr.Equal(pool.cidr.IP) || ip.isBroadcast(addr, pool.cidr) {
 		return false
 	}
 
-	return !pool.allocated[ip.String()]
+	return !pool.allocated[addr.String()]
 }
 
 // GetAvailableIPs returns all available IPs
-func (ipm *IPPoolManager) GetAvailableIPs(networkName string) ([]net.IP, error) {
-	ipm.mutex.RLock()
-	pool, exists := ipm.pools[networkName]
-	ipm.mutex.RUnlock()
+func (ip *IPPoolManager) GetAvailableIPs(networkName string) ([]net.IP, error) {
+	ip.mutex.RLock()
+	pool, exists := ip.pools[networkName]
+	ip.mutex.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("no IP pool for network %s", networkName)
@@ -139,17 +139,17 @@ func (ipm *IPPoolManager) GetAvailableIPs(networkName string) ([]net.IP, error) 
 	defer pool.mutex.RUnlock()
 
 	var available []net.IP
-	for ip := pool.cidr.IP.Mask(pool.cidr.Mask); pool.cidr.Contains(ip); ipm.incrementIP(ip) {
+	for addr := pool.cidr.IP.Mask(pool.cidr.Mask); pool.cidr.Contains(addr); ip.incrementIP(addr) {
 		// Skip network and broadcast addresses
-		if ip.Equal(pool.cidr.IP) || ipm.isBroadcast(ip, pool.cidr) {
+		if addr.Equal(pool.cidr.IP) || ip.isBroadcast(addr, pool.cidr) {
 			continue
 		}
 
-		ipStr := ip.String()
-		if !pool.allocated[ipStr] {
+		addrStr := addr.String()
+		if !pool.allocated[addrStr] {
 			// Add a copy of the IP
-			availableIP := make(net.IP, len(ip))
-			copy(availableIP, ip)
+			availableIP := make(net.IP, len(addr))
+			copy(availableIP, addr)
 			available = append(available, availableIP)
 		}
 	}
@@ -158,10 +158,10 @@ func (ipm *IPPoolManager) GetAvailableIPs(networkName string) ([]net.IP, error) 
 }
 
 // GetAllocatedIPs returns all allocated IPs
-func (ipm *IPPoolManager) GetAllocatedIPs(networkName string) ([]net.IP, error) {
-	ipm.mutex.RLock()
-	pool, exists := ipm.pools[networkName]
-	ipm.mutex.RUnlock()
+func (ip *IPPoolManager) GetAllocatedIPs(networkName string) ([]net.IP, error) {
+	ip.mutex.RLock()
+	pool, exists := ip.pools[networkName]
+	ip.mutex.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("no IP pool for network %s", networkName)
@@ -171,10 +171,10 @@ func (ipm *IPPoolManager) GetAllocatedIPs(networkName string) ([]net.IP, error) 
 	defer pool.mutex.RUnlock()
 
 	var allocated []net.IP
-	for ipStr := range pool.allocated {
-		ip := net.ParseIP(ipStr)
-		if ip != nil {
-			allocated = append(allocated, ip)
+	for addrStr := range pool.allocated {
+		addr := net.ParseIP(addrStr)
+		if addr != nil {
+			allocated = append(allocated, addr)
 		}
 	}
 
@@ -182,30 +182,30 @@ func (ipm *IPPoolManager) GetAllocatedIPs(networkName string) ([]net.IP, error) 
 }
 
 // incrementIP increments an IP address
-func (ipm *IPPoolManager) incrementIP(ip net.IP) {
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-		if ip[j] > 0 {
+func (ip *IPPoolManager) incrementIP(addr net.IP) {
+	for j := len(addr) - 1; j >= 0; j-- {
+		addr[j]++
+		if addr[j] > 0 {
 			break
 		}
 	}
 }
 
 // isBroadcast checks if IP is the broadcast address for the network
-func (ipm *IPPoolManager) isBroadcast(ip net.IP, ipNet *net.IPNet) bool {
+func (ip *IPPoolManager) isBroadcast(addr net.IP, ipNet *net.IPNet) bool {
 	// Convert to 4-byte representation for IPv4
-	if ip4 := ip.To4(); ip4 != nil {
-		ip = ip4
+	if addr4 := addr.To4(); addr4 != nil {
+		addr = addr4
 	}
 
 	// Create broadcast address
-	broadcast := make(net.IP, len(ip))
-	copy(broadcast, ip)
+	broadcast := make(net.IP, len(addr))
+	copy(broadcast, addr)
 
 	// Set host bits to 1
-	for i := 0; i < len(ip); i++ {
-		broadcast[i] = ip[i] | ^ipNet.Mask[i]
+	for i := 0; i < len(addr); i++ {
+		broadcast[i] = addr[i] | ^ipNet.Mask[i]
 	}
 
-	return ip.Equal(broadcast)
+	return addr.Equal(broadcast)
 }

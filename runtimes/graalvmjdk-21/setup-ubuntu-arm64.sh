@@ -2,7 +2,22 @@
 # Self-contained Ubuntu/Debian ARM64 GraalVM JDK 21 Runtime Setup
 # Downloads and installs GraalVM Community Edition JDK 21
 
-set -e
+
+set -e  # Exit on any error
+set -u  # Exit on undefined variables
+set -o pipefail  # Exit on pipe failures
+
+# Error handling function
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    echo "❌ ERROR: Script failed at line $line_number with exit code $exit_code"
+    echo "❌ Installation FAILED - runtime may be in inconsistent state"
+    exit $exit_code
+}
+
+# Set up error trap
+trap 'handle_error ${LINENO}' ERR
 
 # =============================================================================
 # CONFIGURATION
@@ -145,7 +160,7 @@ copy_system_files() {
             
             # Copy essential libraries for Java/GraalVM
             for lib_pattern in "libc.so*" "libdl.so*" "libm.so*" "libpthread.so*" "librt.so*" "libz.so*" "libgcc_s.so*"; do
-                find "$lib_dir" -name "$lib_pattern" -exec cp {} "isolated$lib_dir/" \; 2>/dev/null || true
+                find "$lib_dir" -name "$lib_pattern" -exec cp {} "isolated$lib_dir/" \; 2>/dev/null || echo "  ⚠ Failed to copy {} "isolated$lib_dir/" (non-critical)"
             done
         fi
     done
@@ -158,7 +173,7 @@ copy_system_files() {
         # Copy all library files including the dynamic linker
         for lib_file in "/lib64"/*; do
             if [ -f "$lib_file" ]; then
-                cp "$lib_file" "isolated/lib64/" 2>/dev/null || true
+                if ! cp "$lib_file" "isolated/lib64/" 2>/dev/null; then echo "  ⚠ Failed to copy "$lib_file" "isolated/lib64/" (non-critical)"; fi
             fi
         done
     fi
@@ -170,7 +185,7 @@ copy_system_files() {
         # Copy essential files and directories from /etc
         for item in "resolv.conf" "hosts" "nsswitch.conf" "ssl" "pki" "ca-certificates" "passwd" "group"; do
             if [ -e "/etc/$item" ]; then
-                cp -r "/etc/$item" "isolated/etc/" 2>/dev/null || true
+                if ! cp -r "/etc/$item" "isolated/etc/" 2>/dev/null; then echo "  ⚠ Failed to copy -r "/etc/$item" "isolated/etc/" (non-critical)"; fi
             fi
         done
     fi
@@ -181,7 +196,7 @@ copy_system_files() {
         for item in "ca-certificates" "zoneinfo"; do
             if [ -d "/usr/share/$item" ]; then
                 mkdir -p "isolated/usr/share"
-                cp -r "/usr/share/$item" "isolated/usr/share/" 2>/dev/null || true
+                if ! cp -r "/usr/share/$item" "isolated/usr/share/" 2>/dev/null; then echo "  ⚠ Failed to copy -r "/usr/share/$item" "isolated/usr/share/" (non-critical)"; fi
             fi
         done
     fi

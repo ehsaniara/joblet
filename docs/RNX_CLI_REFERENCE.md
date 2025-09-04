@@ -10,7 +10,6 @@ Complete reference for the RNX command-line interface, including all commands, o
     - [list](#rnx-list)
     - [status](#rnx-status)
     - [log](#rnx-log)
-    - [logs](#rnx-logs)
     - [stop](#rnx-stop)
     - [delete](#rnx-delete)
 - [Volume Commands](#volume-commands)
@@ -24,12 +23,14 @@ Complete reference for the RNX command-line interface, including all commands, o
 - [Runtime Commands](#runtime-commands)
     - [runtime list](#rnx-runtime-list)
     - [runtime info](#rnx-runtime-info)
+    - [runtime install](#rnx-runtime-install)
     - [runtime test](#rnx-runtime-test)
+    - [runtime validate](#rnx-runtime-validate)
+    - [runtime remove](#rnx-runtime-remove)
 - [System Commands](#system-commands)
     - [monitor](#rnx-monitor)
     - [nodes](#rnx-nodes)
     - [admin](#rnx-admin)
-    - [completion](#rnx-completion)
     - [config-help](#rnx-config-help)
     - [help](#rnx-help)
 
@@ -40,6 +41,7 @@ Options available for all commands:
 ```bash
 --config <path>    # Path to configuration file (default: searches standard locations)
 --node <name>      # Node name from configuration (default: "default")
+--json             # Output in JSON format
 --help, -h         # Show help for command
 ```
 
@@ -75,6 +77,7 @@ rnx run [flags] <command> [args...]
 | `--volume`         | Volume to mount (can be specified multiple times)          | none           |
 | `--upload`         | Upload file to workspace (can be specified multiple times) | none           |
 | `--upload-dir`     | Upload directory to workspace                              | none           |
+| `--runtime`         | Use pre-built runtime (e.g., openjdk-21, python-3.11-ml)   | none           |
 | `--env, -e`        | Environment variable (KEY=VALUE, visible in logs)          | none           |
 | `--secret-env, -s` | Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
 | `--schedule`       | Schedule job execution (duration or RFC3339 time)          | immediate      |
@@ -129,6 +132,10 @@ rnx run --network=isolated ping google.com
 rnx run --workflow=ml-pipeline.yaml           # Execute full workflow
 rnx run --workflow=jobs.yaml:ml-analysis      # Execute specific job from workflow
 
+# Using runtime
+rnx run --runtime=python-3.11-ml python -c "import torch; print(torch.__version__)"
+rnx run --runtime=openjdk-21 java -version
+
 # Complex example
 rnx run \
   --max-cpu=200 \
@@ -138,7 +145,7 @@ rnx run \
   --volume=persistent-data \
   --env=PYTHONPATH=/app \
   --upload-dir=./src \
-  --workdir=/work/src \
+  --runtime=python-3.11-ml \
   python3 main.py --process-data
 ```
 
@@ -290,11 +297,11 @@ rnx status --workflow --detail <workflow-uuid>  # Get workflow status with YAML 
 
 #### Flags
 
-| Flag         | Description                    | Default | Notes                            |
-|--------------|--------------------------------|---------|----------------------------------|
-| `--workflow` | Explicitly get workflow status | false   | Required for workflow operations |
-| `--detail`   | Show original YAML content     | false   | Only works with `--workflow`     |
-| `--json`     | Output in JSON format          | false   | Available for jobs and workflows |
+| Flag              | Description                    | Default | Notes                            |
+|-------------------|--------------------------------|---------|----------------------------------|
+| `--workflow`, `-w`| Explicitly get workflow status | false   | Required for workflow operations |
+| `--detail`, `-d`  | Show original YAML content     | false   | Only works with `--workflow`     |
+| `--json`          | Output in JSON format          | false   | Available for jobs and workflows |
 
 #### Examples
 
@@ -404,34 +411,26 @@ rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq 
 
 ### `rnx log`
 
-View or stream job logs.
+Stream job logs in real-time.
 
 ```bash
-rnx log [flags] <job-uuid>
+rnx log <job-uuid>
 ```
 
-#### Flags
-
-| Flag             | Description                      | Default |
-|------------------|----------------------------------|---------|
-| `--follow`, `-f` | Stream logs in real-time         | false   |
-| `--tail`         | Number of lines to show from end | all     |
-| `--timestamps`   | Show timestamps                  | false   |
+Streams logs from running or completed jobs. Use Ctrl+C to stop following the log stream.
 
 #### Examples
 
 ```bash
-# View complete logs
+# Stream logs from a job
 rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
-# Stream logs in real-time
-rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
+# Use standard Unix tools for filtering
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 | tail -100
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 | grep ERROR
 
-# Show last 100 lines
-rnx log --tail=100 f47ac10b-58cc-4372-a567-0e02b2c3d479
-
-# With timestamps
-rnx log --timestamps f47ac10b-58cc-4372-a567-0e02b2c3d479
+# Save logs to file
+rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
 ```
 
 ### `rnx stop`
@@ -452,32 +451,6 @@ rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | xargs -I {} rnx stop {}
 ```
 
-### `rnx logs`
-
-Manage persisted job logs on the server.
-
-```bash
-rnx logs [command]
-```
-
-#### Available Commands
-
-- `delete` - Delete logs for specific jobs
-- `cleanup` - Clean up old log files
-
-#### Examples
-
-```bash
-# Delete logs for a specific job
-rnx logs delete f47ac10b
-
-# Delete logs for multiple jobs
-rnx logs delete f47ac10b a1b2c3d4
-
-# Clean up logs older than retention period
-rnx logs cleanup
-```
-
 ### `rnx delete`
 
 Delete a job completely from the system.
@@ -486,14 +459,16 @@ Delete a job completely from the system.
 rnx delete <job-uuid>
 ```
 
+Permanently removes the specified job including logs, metadata, and all associated resources. The job must be in a completed, failed, or stopped state - running jobs cannot be deleted directly and must be stopped first.
+
 #### Examples
 
 ```bash
 # Delete a completed job
 rnx delete f47ac10b-58cc-4372-a567-0e02b2c3d479
 
-# Delete multiple jobs
-rnx delete f47ac10b a1b2c3d4 e5f6g7h8
+# Delete using short UUID (if unique)
+rnx delete f47ac10b
 ```
 
 ## Volume Commands
@@ -654,15 +629,19 @@ rnx runtime list [flags]
 
 #### Flags
 
-| Flag     | Description           | Default |
-|----------|-----------------------|---------|
-| `--json` | Output in JSON format | false   |
+| Flag               | Description                                                            | Default |
+|--------------------|------------------------------------------------------------------------|---------|
+| `--json`           | Output in JSON format                                                   | false   |
+| `--github-repo`    | List runtimes from GitHub repository (owner/repo/tree/branch/path)     | none    |
 
 #### Examples
 
 ```bash
-# List all runtimes
+# List locally installed runtimes
 rnx runtime list
+
+# List available runtimes from GitHub repository
+rnx runtime list --github-repo=owner/repo/tree/main/runtimes
 
 # JSON output
 rnx runtime list --json
@@ -694,9 +673,10 @@ rnx runtime install <runtime-spec> [flags]
 
 #### Flags
 
-| Flag      | Short | Description                                  | Default |
-|-----------|-------|----------------------------------------------|---------|
-| `--force` | `-f`  | Force reinstall by deleting existing runtime | false   |
+| Flag                | Short | Description                                            | Default |
+|---------------------|-------|--------------------------------------------------------|---------|
+| `--force`           | `-f`  | Force reinstall by deleting existing runtime           | false   |
+| `--github-repo`     |       | Install from GitHub repository (owner/repo/tree/branch/path) | none    |
 
 #### Description
 
@@ -713,17 +693,17 @@ When using `--force`, the command will:
 #### Examples
 
 ```bash
-# Install a runtime
+# Install from local codebase
 rnx runtime install python-3.11-ml
 rnx runtime install openjdk-21
+
+# Install from GitHub repository
+rnx runtime install openjdk-21 --github-repo=ehsaniara/joblet/tree/main/runtimes
+rnx runtime install python-3.11-ml --github-repo=owner/repo/tree/branch/path
 
 # Force reinstall (delete existing runtime first)
 rnx runtime install python-3.11-ml --force
 rnx runtime install openjdk-21 -f
-
-# Install from local development files (auto-detected)
-cd ~/joblet
-rnx runtime install python-3.11-ml  # Uses local runtimes/ directory if found
 ```
 
 ### `rnx runtime test`
@@ -740,6 +720,41 @@ rnx runtime test <runtime-spec>
 # Test runtime functionality
 rnx runtime test python-3.11-ml
 rnx runtime test openjdk:21
+```
+
+
+### `rnx runtime remove`
+
+Remove a runtime environment.
+
+```bash
+rnx runtime remove <runtime-spec>
+```
+
+#### Examples
+
+```bash
+# Remove a runtime
+rnx runtime remove python-3.11-ml
+rnx runtime remove openjdk-21
+```
+
+### `rnx runtime validate`
+
+Validate a runtime specification format and check if it's supported.
+
+```bash
+rnx runtime validate <runtime-spec>
+```
+
+#### Examples
+
+```bash
+# Validate basic spec
+rnx runtime validate python-3.11-ml
+
+# Validate spec with variants
+rnx runtime validate openjdk:21
 ```
 
 ## System Commands
@@ -940,35 +955,6 @@ rnx admin --port 8080
 
 # Bind to all interfaces
 rnx admin --bind-address 0.0.0.0 --port 5173
-```
-
-### `rnx completion`
-
-Generate the autocompletion script for the specified shell.
-
-```bash
-rnx completion [shell]
-```
-
-#### Available Shells
-
-- `bash` - Generate bash autocompletion
-- `zsh` - Generate zsh autocompletion
-- `fish` - Generate fish autocompletion
-- `powershell` - Generate PowerShell autocompletion
-
-#### Examples
-
-```bash
-# Generate bash completion
-rnx completion bash
-
-# Install bash completion (Linux)
-rnx completion bash > /etc/bash_completion.d/rnx
-
-# Install zsh completion
-rnx completion zsh > ~/.rnx-completion.zsh
-echo 'source ~/.rnx-completion.zsh' >> ~/.zshrc
 ```
 
 ### `rnx config-help`

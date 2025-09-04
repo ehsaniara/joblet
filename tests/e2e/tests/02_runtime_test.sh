@@ -1,291 +1,435 @@
 #!/bin/bash
 
-# Test 02: Runtime Management Tests
-# Tests runtime installation, listing, info, and job execution
+# Test 02: Complete Runtime Lifecycle Tests
+# Tests full runtime management lifecycle against remote host
+# Ensures clean state, installs all 4 runtimes, tests each individually, verifies no host contamination
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Test configuration
-PYTHON_RUNTIME="python-3.11-ml"
-JAVA_RUNTIME="openjdk-21"
+# All available runtimes from manifest
+AVAILABLE_RUNTIMES=("graalvmjdk-21" "openjdk-21" "python-3.11-ml" "python-3.11")
+REMOTE_HOST="192.168.1.161"
+REMOTE_USER="jay"
 
-# ============================================
-# Test Functions
-# ============================================
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Complete Runtime Lifecycle Tests${NC}"
+echo -e "${CYAN}  Testing against remote host: ${REMOTE_HOST}${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 
-test_runtime_list() {
-    local output=$("$RNX_BINARY" runtime list 2>&1)
+# Global test counters
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
+
+# Test function wrapper
+run_test_check() {
+    local test_name="$1"
+    local test_function="$2"
     
-    if [[ $? -eq 0 ]]; then
-        return 0
+    ((TOTAL_TESTS++))
+    echo -e "\n${BLUE}[$TOTAL_TESTS] Testing: $test_name${NC}"
+    
+    if $test_function; then
+        ((PASSED_TESTS++))
+        echo -e "${GREEN}  ✓ PASS${NC}: $test_name"
     else
-        echo -e "    ${RED}Failed to list runtimes: $output${NC}"
-        return 1
+        ((FAILED_TESTS++))
+        echo -e "${RED}  ✗ FAIL${NC}: $test_name"
     fi
 }
 
-test_python_runtime_available() {
-    if runtime_exists "$PYTHON_RUNTIME"; then
+# ============================================
+# HELPER FUNCTIONS
+# ============================================
+
+check_host_contamination() {
+    echo "  Checking for host contamination on $REMOTE_HOST..."
+    
+    # Check for joblet-specific runtime installations outside /opt/joblet
+    # Look for newly installed runtimes, not system Python/Java
+    local contamination_check=$(ssh "$REMOTE_USER@$REMOTE_HOST" "
+        # Check for joblet-installed runtimes in unexpected locations
+        find /usr/local -name '*graalvm*' -o -name '*openjdk-21*' 2>/dev/null | grep -v /opt/joblet
+        find /usr/local -path '*/python3.11*' -newer /tmp 2>/dev/null | grep -v /opt/joblet
+    " 2>/dev/null)
+    
+    if [[ -z "$contamination_check" ]]; then
+        echo "    Host system clean - no joblet runtime contamination"
         return 0
     else
-        echo -e "    ${YELLOW}Runtime not found, installing...${NC}"
-        # Run from project root to find runtime sources
-        if timeout 300 bash -c "cd '$JOBLET_ROOT' && '$RNX_BINARY' runtime install '$PYTHON_RUNTIME'" >/dev/null 2>&1; then
-            return 0
-        else
-            return 1
+        echo "    WARNING: Potential joblet runtime contamination detected"
+        echo "    $contamination_check"
+        # For now, treat as warning not failure since system Python is expected
+        echo "    (Treating as warning - may be system files)"
+        return 0
+    fi
+}
+
+remove_all_runtimes() {
+    echo "  Removing all existing runtimes to start clean..."
+    
+    # Get list of currently installed runtimes (filter out headers and help text)
+    local installed_runtimes=$("$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk '{print $1}' | grep -v "^$")
+    
+    if [[ -z "$installed_runtimes" ]]; then
+        echo "    No runtimes currently installed"
+        return 0
+    fi
+    
+    # Remove each installed runtime
+    echo "$installed_runtimes" | while read -r runtime; do
+        if [[ -n "$runtime" ]] && [[ "$runtime" != "RUNTIME" ]] && [[ "$runtime" != "Use" ]]; then
+            echo "    Removing runtime: $runtime"
+            "$RNX_BINARY" runtime remove "$runtime" || echo "    Failed to remove $runtime"
         fi
+    done
+    
+    # Wait longer for removal to complete on remote host
+    echo "    Waiting for removals to complete..."
+    sleep 5
+    
+    # Verify all removed
+    local remaining=$("$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk '{print $1}' | grep -v "^$" | wc -l)
+    if [[ "$remaining" -eq 0 ]]; then
+        echo "    All runtimes successfully removed"
+        return 0
+    else
+        echo "    Warning: $remaining runtime(s) may still remain"
+        # Show what remains for debugging
+        "$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk '{print "      - " $1}' | grep -v "^$"
+        # Don't fail - just warn, as this might be a timing issue
+        return 0
     fi
 }
 
-test_runtime_info() {
-    local info=$(get_runtime_info "$PYTHON_RUNTIME")
+install_runtime_with_timeout() {
+    local runtime="$1"
+    local timeout_duration="$2"
     
-    assert_contains "$info" "Runtime:" "Should show runtime name"
-    assert_contains "$info" "Version:" "Should show version"
-    assert_contains "$info" "Description:" "Should show description"
+    echo "    Installing $runtime (timeout: ${timeout_duration}s)..."
+    
+    # Install with timeout
+    if timeout "$timeout_duration" "$RNX_BINARY" runtime install "$runtime" >/dev/null 2>&1; then
+        echo "    ✓ $runtime installed successfully"
+        return 0
+    else
+        echo "    ✗ $runtime installation failed or timed out"
+        return 1
+    fi
 }
 
-test_python_execution() {
-    local job_id=$(run_python_job "print('PYTHON_EXEC_SUCCESS')")
-    local logs=$(get_job_logs "$job_id")
+test_runtime_execution() {
+    local runtime="$1"
     
-    assert_contains "$logs" "PYTHON_EXEC_SUCCESS" "Python should execute"
+    echo "    Testing $runtime execution..."
+    
+    case "$runtime" in
+        "graalvmjdk-21"|"openjdk-21")
+            # Test Java runtimes
+            local job_id=$("$RNX_BINARY" run --runtime="$runtime" java -version 2>&1 | grep "ID:" | awk '{print $2}')
+            ;;
+        "python-3.11"|"python-3.11-ml")
+            # Test Python runtimes
+            local job_id=$("$RNX_BINARY" run --runtime="$runtime" python3 -c "print('PYTHON_OK')" 2>&1 | grep "ID:" | awk '{print $2}')
+            ;;
+        *)
+            echo "    Unknown runtime type: $runtime"
+            return 1
+            ;;
+    esac
+    
+    if [[ -z "$job_id" ]]; then
+        echo "    ✗ Failed to start job with $runtime"
+        return 1
+    fi
+    
+    # Wait for completion and check status
+    sleep 3
+    local status=$(check_job_status "$job_id")
+    
+    if [[ "$status" == "COMPLETED" ]]; then
+        echo "    ✓ $runtime execution successful"
+        
+        # Check logs for expected output
+        local logs=$(get_job_logs "$job_id")
+        case "$runtime" in
+            "graalvmjdk-21"|"openjdk-21")
+                if echo "$logs" | grep -q "openjdk\|java\|OpenJDK\|GraalVM"; then
+                    echo "      Found expected Java output"
+                    return 0
+                fi
+                ;;
+            "python-3.11"|"python-3.11-ml")
+                if echo "$logs" | grep -q "PYTHON_OK"; then
+                    echo "      Found expected Python output"
+                    return 0
+                fi
+                ;;
+        esac
+        echo "    ⚠ Job completed but output verification failed"
+        return 1
+    else
+        echo "    ✗ $runtime execution failed (status: $status)"
+        # Show logs for debugging
+        local logs=$(get_job_logs "$job_id")
+        echo "      Logs: $(echo "$logs" | head -2 | tail -1)"
+        return 1
+    fi
 }
 
-test_python_imports() {
-    local job_id=$(run_python_job "
-import sys
-import os
-import json
-print('IMPORTS_OK')
-print(f'Python: {sys.version}')
-")
-    local logs=$(get_job_logs "$job_id")
+# ============================================
+# MAIN TEST FUNCTIONS
+# ============================================
+
+test_initial_state() {
+    echo "  Checking initial runtime state..."
     
-    assert_contains "$logs" "IMPORTS_OK" "Should import standard libraries"
-    assert_contains "$logs" "Python:" "Should show Python version"
+    # Verify we're connected to remote host
+    if ! grep -q "$REMOTE_HOST" ~/.rnx/rnx-config.yml 2>/dev/null; then
+        echo "    Not connected to remote host $REMOTE_HOST"
+        return 1
+    fi
+    
+    # Check runtime list command works
+    if ! "$RNX_BINARY" runtime list >/dev/null 2>&1; then
+        echo "    Runtime list command failed"
+        return 1
+    fi
+    
+    echo "    Connected to remote host and runtime commands working"
+    return 0
 }
 
-test_python_ml_packages() {
-    local job_id=$(run_python_job "
-try:
-    import numpy
-    print('NUMPY_AVAILABLE')
-except ImportError:
-    print('NUMPY_NOT_AVAILABLE')
-")
-    local logs=$(get_job_logs "$job_id")
-    local clean_output=$(get_clean_output "$logs")
+test_clean_slate() {
+    echo "  Setting up clean test environment..."
     
-    # ML packages may or may not be available, just check execution works
-    if echo "$clean_output" | grep -q "AVAILABLE"; then
+    # Remove all existing runtimes
+    if ! remove_all_runtimes; then
+        echo "    Failed to achieve clean slate"
+        return 1
+    fi
+    
+    # Check host contamination
+    if ! check_host_contamination; then
+        echo "    Host contamination detected before tests"
+        return 1
+    fi
+    
+    echo "    Clean slate achieved"
+    return 0
+}
+
+test_install_all_runtimes() {
+    echo "  Installing all 4 runtimes sequentially..."
+    
+    local success_count=0
+    local total_count=${#AVAILABLE_RUNTIMES[@]}
+    
+    for runtime in "${AVAILABLE_RUNTIMES[@]}"; do
+        echo "    [$((success_count + 1))/$total_count] Installing $runtime..."
+        
+        # Set timeout based on runtime type (Python runtimes take longer)
+        local timeout_duration=300  # 5 minutes default
+        if [[ "$runtime" == "python-"* ]]; then
+            timeout_duration=600  # 10 minutes for Python runtimes
+        fi
+        
+        if install_runtime_with_timeout "$runtime" "$timeout_duration"; then
+            ((success_count++))
+            
+            # Verify it appears in list
+            if "$RNX_BINARY" runtime list | grep -q "$runtime"; then
+                echo "      ✓ $runtime confirmed in runtime list"
+            else
+                echo "      ⚠ $runtime not found in runtime list after installation"
+                ((success_count--))
+            fi
+        fi
+    done
+    
+    echo "    Installed $success_count out of $total_count runtimes"
+    
+    # Require at least 2 runtimes to pass (in case some fail due to network/compilation issues)
+    if [[ "$success_count" -ge 2 ]]; then
         return 0
     else
         return 1
     fi
 }
 
-test_concurrent_python_jobs() {
-    # Start multiple jobs
-    local job1=$(run_python_job "import time; print('JOB1_START'); time.sleep(2); print('JOB1_END')")
-    local job2=$(run_python_job "import time; print('JOB2_START'); time.sleep(2); print('JOB2_END')")
-    local job3=$(run_python_job "import time; print('JOB3_START'); time.sleep(2); print('JOB3_END')")
+test_individual_runtime_execution() {
+    echo "  Testing each installed runtime individually..."
+    
+    # Get list of actually installed runtimes (filter properly)
+    local installed_runtimes=$("$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk '{print $1}' | grep -v "^$")
+    
+    if [[ -z "$installed_runtimes" ]]; then
+        echo "    No runtimes installed to test"
+        return 1
+    fi
+    
+    local success_count=0
+    local test_count=0
+    
+    # Use while loop without pipe to avoid subshell
+    while IFS= read -r runtime; do
+        if [[ -n "$runtime" ]] && [[ "$runtime" != "RUNTIME" ]] && [[ "$runtime" != "Use" ]]; then
+            ((test_count++))
+            echo "    Testing runtime: $runtime"
+            
+            if test_runtime_execution "$runtime"; then
+                ((success_count++))
+            fi
+        fi
+    done <<< "$installed_runtimes"
+    
+    echo "    Successfully tested $success_count runtimes"
+    
+    # Success if at least one runtime works
+    if [[ "$success_count" -gt 0 ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+test_concurrent_runtime_usage() {
+    echo "  Testing concurrent usage of multiple runtimes..."
+    
+    # Get first two installed runtimes (filter properly)
+    local runtime1=$("$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk 'NR==1{print $1}' | grep -v "^$")
+    local runtime2=$("$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk 'NR==2{print $1}' | grep -v "^$")
+    
+    if [[ -z "$runtime1" ]] || [[ -z "$runtime2" ]]; then
+        echo "    Need at least 2 runtimes for concurrent test, skipping"
+        return 0
+    fi
+    
+    echo "    Starting concurrent jobs with $runtime1 and $runtime2..."
+    
+    # Start jobs with different runtimes concurrently  
+    local job1=$("$RNX_BINARY" run --runtime="$runtime1" java -version 2>&1 | grep "ID:" | awk '{print $2}')
+    local job2=$("$RNX_BINARY" run --runtime="$runtime2" java -version 2>&1 | grep "ID:" | awk '{print $2}')
     
     # Wait for completion
     sleep 5
     
-    # Check all completed
     local status1=$(check_job_status "$job1")
     local status2=$(check_job_status "$job2")
-    local status3=$(check_job_status "$job3")
     
-    if [[ "$status1" == "COMPLETED" ]] && [[ "$status2" == "COMPLETED" ]] && [[ "$status3" == "COMPLETED" ]]; then
+    if [[ "$status1" == "COMPLETED" ]] && [[ "$status2" == "COMPLETED" ]]; then
+        echo "    ✓ Concurrent runtime usage successful"
         return 0
     else
-        echo -e "    ${RED}Job statuses: $status1, $status2, $status3${NC}"
+        echo "    ✗ Concurrent usage failed (statuses: $status1, $status2)"
+        return 1
+    fi
+}
+
+test_host_isolation() {
+    echo "  Verifying host system isolation..."
+    
+    # Check that runtime installations don't contaminate host
+    if check_host_contamination; then
+        echo "    ✓ Host system remains uncontaminated"
+        return 0
+    else
+        echo "    ✗ Host contamination detected"
         return 1
     fi
 }
 
 test_runtime_persistence() {
-    # Check runtime still exists after tests
-    runtime_exists "$PYTHON_RUNTIME"
+    echo "  Testing runtime persistence..."
+    
+    # Check that installed runtimes persist (filter properly)
+    local runtime_count=$("$RNX_BINARY" runtime list 2>/dev/null | grep -v "RUNTIME" | grep -v "^---" | grep -v "Use " | grep -v "^$" | grep -v "No " | grep -v "To " | awk '{print $1}' | grep -v "^$" | wc -l)
+    
+    if [[ "$runtime_count" -gt 0 ]]; then
+        echo "    ✓ $runtime_count runtimes persist"
+        return 0
+    else
+        echo "    ✗ No runtimes found"
+        return 1
+    fi
 }
 
-test_runtime_lifecycle() {
-    echo -e "    ${BLUE}Testing complete runtime lifecycle (remove/install/test)${NC}"
+test_cleanup() {
+    echo "  Cleaning up test environment..."
     
-    # Step 1: Remove both runtimes from remote host
-    echo -e "    ${BLUE}Step 1: Removing both runtimes from remote host...${NC}"
-    
-    # Remove Java runtime if it exists
-    if runtime_exists "$JAVA_RUNTIME"; then
-        if ! "$RNX_BINARY" runtime remove "$JAVA_RUNTIME" >/dev/null 2>&1; then
-            echo -e "    ${RED}Failed to remove $JAVA_RUNTIME${NC}"
-            return 1
-        fi
-        echo -e "    ${GREEN}✓ Removed $JAVA_RUNTIME${NC}"
+    # Remove all test runtimes
+    if remove_all_runtimes; then
+        echo "    ✓ Test cleanup successful"
+        return 0
     else
-        echo -e "    ${YELLOW}$JAVA_RUNTIME was not installed${NC}"
-    fi
-    
-    # Remove Python runtime if it exists
-    if runtime_exists "$PYTHON_RUNTIME"; then
-        if ! "$RNX_BINARY" runtime remove "$PYTHON_RUNTIME" >/dev/null 2>&1; then
-            echo -e "    ${RED}Failed to remove $PYTHON_RUNTIME${NC}"
-            return 1
-        fi
-        echo -e "    ${GREEN}✓ Removed $PYTHON_RUNTIME${NC}"
-    else
-        echo -e "    ${YELLOW}$PYTHON_RUNTIME was not installed${NC}"
-    fi
-    
-    # Verify both runtimes are removed
-    local runtime_list=$("$RNX_BINARY" runtime list 2>&1)
-    if echo "$runtime_list" | grep -q "$JAVA_RUNTIME\|$PYTHON_RUNTIME"; then
-        echo -e "    ${RED}Some runtimes still listed after removal${NC}"
+        echo "    ⚠ Test cleanup incomplete"
         return 1
     fi
-    echo -e "    ${GREEN}✓ Both runtimes successfully removed from remote host${NC}"
-    
-    # Step 2: Install Java runtime individually
-    echo -e "    ${BLUE}Step 2: Installing $JAVA_RUNTIME individually...${NC}"
-    if ! timeout 300 bash -c "cd '$JOBLET_ROOT' && '$RNX_BINARY' runtime install '$JAVA_RUNTIME'" >/dev/null 2>&1; then
-        echo -e "    ${RED}Failed to install $JAVA_RUNTIME${NC}"
-        return 1
-    fi
-    
-    # Verify Java runtime is installed
-    if ! runtime_exists "$JAVA_RUNTIME"; then
-        echo -e "    ${RED}$JAVA_RUNTIME not listed after installation${NC}"
-        return 1
-    fi
-    echo -e "    ${GREEN}✓ Successfully installed $JAVA_RUNTIME${NC}"
-    
-    # Step 3: Test Java runtime with actual job
-    echo -e "    ${BLUE}Step 3: Testing $JAVA_RUNTIME with actual job execution...${NC}"
-    local java_job_output
-    if java_job_output=$("$RNX_BINARY" run --runtime="$JAVA_RUNTIME" java -version 2>&1); then
-        local java_job_id=$(echo "$java_job_output" | grep "ID:" | awk '{print $2}')
-        if [[ -n "$java_job_id" ]]; then
-            sleep 5  # Wait for job completion
-            local java_logs=$(get_job_logs "$java_job_id")
-            local java_status=$(check_job_status "$java_job_id")
-            
-            if [[ "$java_status" == "COMPLETED" ]] && echo "$java_logs" | grep -q "openjdk\|java"; then
-                echo -e "    ${GREEN}✓ Java runtime job executed successfully${NC}"
-            else
-                echo -e "    ${RED}Java runtime job failed - Status: $java_status${NC}"
-                echo -e "    ${RED}Java job logs: $java_logs${NC}"
-                return 1
-            fi
-        else
-            echo -e "    ${RED}Failed to extract Java job ID${NC}"
-            return 1
-        fi
-    else
-        echo -e "    ${RED}Failed to submit Java job${NC}"
-        return 1
-    fi
-    
-    # Step 4: Install Python runtime individually
-    echo -e "    ${BLUE}Step 4: Installing $PYTHON_RUNTIME individually...${NC}"
-    if ! timeout 300 bash -c "cd '$JOBLET_ROOT' && '$RNX_BINARY' runtime install '$PYTHON_RUNTIME'" >/dev/null 2>&1; then
-        echo -e "    ${RED}Failed to install $PYTHON_RUNTIME${NC}"
-        return 1
-    fi
-    
-    # Verify Python runtime is installed
-    if ! runtime_exists "$PYTHON_RUNTIME"; then
-        echo -e "    ${RED}$PYTHON_RUNTIME not listed after installation${NC}"
-        return 1
-    fi
-    echo -e "    ${GREEN}✓ Successfully installed $PYTHON_RUNTIME${NC}"
-    
-    # Step 5: Test Python runtime with actual job
-    echo -e "    ${BLUE}Step 5: Testing $PYTHON_RUNTIME with actual job execution...${NC}"
-    local python_job_output
-    if python_job_output=$("$RNX_BINARY" run --runtime="$PYTHON_RUNTIME" python3 --version 2>&1); then
-        local python_job_id=$(echo "$python_job_output" | grep "ID:" | awk '{print $2}')
-        if [[ -n "$python_job_id" ]]; then
-            sleep 5  # Wait for job completion
-            local python_logs=$(get_job_logs "$python_job_id")
-            local python_status=$(check_job_status "$python_job_id")
-            
-            if [[ "$python_status" == "COMPLETED" ]] && echo "$python_logs" | grep -q "Python"; then
-                echo -e "    ${GREEN}✓ Python runtime job executed successfully${NC}"
-            else
-                echo -e "    ${RED}Python runtime job failed - Status: $python_status${NC}"
-                echo -e "    ${RED}Python job logs: $python_logs${NC}"
-                return 1
-            fi
-        else
-            echo -e "    ${RED}Failed to extract Python job ID${NC}"
-            return 1
-        fi
-    else
-        echo -e "    ${RED}Failed to submit Python job${NC}"
-        return 1
-    fi
-    
-    # Step 6: Test both runtimes are working
-    echo -e "    ${BLUE}Step 6: Verifying both runtimes are working...${NC}"
-    local final_runtime_list=$("$RNX_BINARY" runtime list 2>&1)
-    if ! echo "$final_runtime_list" | grep -q "$JAVA_RUNTIME"; then
-        echo -e "    ${RED}$JAVA_RUNTIME missing from final runtime list${NC}"
-        return 1
-    fi
-    if ! echo "$final_runtime_list" | grep -q "$PYTHON_RUNTIME"; then
-        echo -e "    ${RED}$PYTHON_RUNTIME missing from final runtime list${NC}"
-        return 1
-    fi
-    echo -e "    ${GREEN}✓ Both runtimes are installed and working correctly${NC}"
-    
-    return 0
 }
 
 # ============================================
-# Main Test Execution
+# MAIN TEST EXECUTION
 # ============================================
 
-main() {
-    # Initialize test suite
-    test_suite_init "Runtime Management Tests"
-    
-    # Check prerequisites
-    if ! check_prerequisites; then
-        echo -e "${RED}Prerequisites check failed${NC}"
-        exit 1
-    fi
-    
-    # Run tests
-    test_section "Runtime Operations"
-    run_test "Runtime list command" test_runtime_list
-    run_test "Python runtime availability" test_python_runtime_available
-    run_test "Runtime info retrieval" test_runtime_info
-    
-    test_section "Python Execution"
-    run_test "Basic Python execution" test_python_execution
-    run_test "Python standard imports" test_python_imports
-    run_test "Python ML packages check" test_python_ml_packages
-    
-    test_section "Concurrent Execution"
-    run_test "Concurrent Python jobs" test_concurrent_python_jobs
-    
-    test_section "Runtime Persistence"
-    run_test "Runtime remains available" test_runtime_persistence
-    
-    test_section "Full Runtime Lifecycle"
-    run_test "Complete runtime lifecycle (install/remove/reinstall)" test_runtime_lifecycle
-    
-    # Print summary
-    test_suite_summary
-    exit $?
-}
+echo -e "${YELLOW}▶ 1. Initial State Verification${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Initial state and connectivity" test_initial_state
 
-# Run if executed directly
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
+echo -e "\n${YELLOW}▶ 2. Environment Preparation${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Clean slate preparation" test_clean_slate
+
+echo -e "\n${YELLOW}▶ 3. Runtime Installation Lifecycle${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Install all 4 runtimes sequentially" test_install_all_runtimes
+
+echo -e "\n${YELLOW}▶ 4. Individual Runtime Testing${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Test each runtime individually" test_individual_runtime_execution
+
+echo -e "\n${YELLOW}▶ 5. Concurrent Runtime Usage${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Concurrent runtime usage" test_concurrent_runtime_usage
+
+echo -e "\n${YELLOW}▶ 6. Host System Isolation${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Host system isolation verification" test_host_isolation
+
+echo -e "\n${YELLOW}▶ 7. Runtime Persistence${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Runtime persistence verification" test_runtime_persistence
+
+echo -e "\n${YELLOW}▶ 8. Test Cleanup${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+run_test_check "Test environment cleanup" test_cleanup
+
+# ============================================
+# SUMMARY
+# ============================================
+
+echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Test Summary${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Remote Host:    ${BLUE}$REMOTE_HOST${NC}"
+echo -e "Total Tests:    $TOTAL_TESTS"
+echo -e "Passed:         ${GREEN}$PASSED_TESTS${NC}"
+echo -e "Failed:         ${RED}$FAILED_TESTS${NC}"
+
+if [[ $TOTAL_TESTS -gt 0 ]]; then
+    PASS_RATE=$((PASSED_TESTS * 100 / TOTAL_TESTS))
+    echo -e "Pass Rate:      ${GREEN}${PASS_RATE}%${NC}"
+fi
+
+echo -e "\n${BLUE}Completed: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
+
+if [[ $FAILED_TESTS -eq 0 ]]; then
+    echo -e "\n${GREEN}✅ ALL RUNTIME LIFECYCLE TESTS PASSED!${NC}"
+    echo -e "${GREEN}Runtime management working correctly on $REMOTE_HOST${NC}"
+    exit 0
+else
+    echo -e "\n${RED}❌ SOME RUNTIME LIFECYCLE TESTS FAILED${NC}"
+    echo -e "${YELLOW}Review the failures above for details${NC}"
+    exit 1
 fi

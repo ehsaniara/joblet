@@ -33,12 +33,11 @@ rnx run --runtime=python-3.11-ml python analysis.py
 
 ## 🏃‍♂️ Available Runtimes
 
+Joblet provides curated runtime environments for Python, Java, and machine learning applications:
+
 ### Python 3.11 + ML Stack (`python-3.11-ml`)
 
 **Complete isolated Python environment with machine learning packages**
-
-> **Note**: This runtime has setup scripts available but is not currently installed. Use
-`rnx runtime install python-3.11-ml` to install it.
 
 - **Python**: 3.11.9 (system package installation)
 - **Pre-installed Packages**: System-based ML packages for reliability
@@ -52,14 +51,31 @@ rnx run --runtime=python-3.11-ml python analysis.py
     - OpenPyXL (Excel file support)
 - **Package Size**: ~475MB with 142 packages
 - **Installation**: System package manager for maximum reliability
-- **Setup Time**: ~2-3 seconds vs 5-45 minutes traditional
-- **Use Cases**: Data analysis, machine learning, AI development, research
+- **Setup Time**: Fast startup with pre-built environment
+- **Use Cases**: AI development, machine learning research, data science workflows
 
 ```bash
 # Usage examples
 rnx run --runtime=python-3.11-ml python3 -c "import pandas; print('Ready!')"
 rnx run --runtime=python-3.11-ml --upload=analysis.py python3 analysis.py
 rnx runtime info python-3.11-ml  # See all packages and details
+```
+
+### Python 3.11 Standard (`python-3.11`)
+
+**Lightweight Python runtime for general development**
+
+- **Python**: 3.11.9 (lightweight installation)
+- **Pre-installed Packages**: Essential packages for development
+    - pip, requests, urllib3
+- **Package Size**: ~200MB 
+- **Use Cases**: General scripting, automation, lightweight microservices
+
+```bash
+# Usage examples
+rnx run --runtime=python-3.11 python --version
+rnx run --runtime=python-3.11 pip install requests
+rnx run --runtime=python-3.11 python script.py
 ```
 
 ### OpenJDK 21 (`openjdk-21`)
@@ -75,15 +91,34 @@ rnx runtime info python-3.11-ml  # See all packages and details
     - Record Patterns
     - Foreign Function & Memory API
 - **Package Size**: ~371MB with 1,872 files
-- **System Libraries**: Includes all necessary shared libraries (libjli.so, libstdc++.so.6, dynamic linker)
-- **Environment**: Properly configured JAVA_HOME and library paths
-- **Use Cases**: Modern Java development, microservices, enterprise applications
+- **System Libraries**: Includes all necessary shared libraries
+- **Use Cases**: Enterprise applications, microservices, compute-intensive jobs
 
 ```bash
 # Usage examples
 rnx run --runtime=openjdk-21 java -version
 rnx run --runtime=openjdk-21 --upload=HelloWorld.java javac HelloWorld.java
 rnx run --runtime=openjdk-21 java HelloWorld
+```
+
+### GraalVM JDK 21 (`graalvmjdk-21`)
+
+**High-performance Java with native compilation and polyglot support**
+
+- **GraalVM**: Community Edition JDK 21 with native-image
+- **Advanced Features**:
+    - Native image compilation (AOT)
+    - Polyglot programming (JavaScript, Python, Ruby on JVM)
+    - Superior performance for microservices
+    - Faster startup times
+- **Build Tools**: java, javac, native-image, gu, js, node, npm
+- **Use Cases**: High-performance microservices, native binaries, polyglot applications
+
+```bash
+# Usage examples
+rnx run --runtime=graalvmjdk-21 java -version
+rnx run --runtime=graalvmjdk-21 native-image --version
+rnx run --runtime=graalvmjdk-21 js --version
 
 ## 🚀 Getting Started
 
@@ -94,7 +129,9 @@ Runtimes are installed using the RNX CLI, which automatically uses the RuntimeSe
 ```bash
 # From any RNX client (automatically routes to RuntimeService)
 rnx runtime install python-3.11-ml
+rnx runtime install python-3.11
 rnx runtime install openjdk-21
+rnx runtime install graalvmjdk-21
 
 # Force reinstall if runtime already exists
 rnx runtime install python-3.11-ml --force
@@ -127,11 +164,12 @@ rnx runtime list
 ```
 RUNTIME         VERSION  TYPE    SIZE     DESCRIPTION
 -------         -------  ----    ----     -----------
-python-3.11-ml  3.11     system  724.8MB  Completely isolated Python 3.11 with ML packages
-java:17         17.0.12  system  445.2MB  OpenJDK 17 LTS with Maven - completely isolated runtime
-java:21         21.0.4   system  467.1MB  OpenJDK 21 with modern features - completely isolated runtime
+python-3.11-ml  3.11     system  475MB    Python 3.11 with ML packages for AI development
+python-3.11     3.11     system  200MB    Lightweight Python for general development
+openjdk-21      21.0     system  371MB    OpenJDK 21 LTS for enterprise applications
+graalvmjdk-21   21.0     system  490MB    GraalVM JDK 21 with native-image and polyglot
 
-Total runtimes: 3
+Total runtimes: 4
 ```
 
 ### 3. Get Runtime Information
@@ -275,11 +313,8 @@ rnx runtime info python-3.11-ml
 # Remove runtime when no longer needed
 rnx runtime remove python-3.11-ml
 
-# List build jobs (for runtime building operations)
-rnx runtime builds
-
-# Check specific build status
-rnx runtime status <build-job-uuid>
+# Check runtime installation status
+rnx runtime status
 ```
 
 ### Using Runtimes in Jobs

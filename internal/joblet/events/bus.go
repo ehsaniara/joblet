@@ -56,10 +56,10 @@ func NewInMemoryEventBus() *InMemoryEventBus {
 }
 
 // Publish sends an event to all registered handlers concurrently
-func (bus *InMemoryEventBus) Publish(ctx context.Context, event Event) error {
-	bus.mutex.RLock()
-	handlers, exists := bus.handlers[event.Type]
-	bus.mutex.RUnlock()
+func (b *InMemoryEventBus) Publish(ctx context.Context, event Event) error {
+	b.mutex.RLock()
+	handlers, exists := b.handlers[event.Type]
+	b.mutex.RUnlock()
 
 	if !exists {
 		return nil
@@ -90,31 +90,31 @@ func (bus *InMemoryEventBus) Publish(ctx context.Context, event Event) error {
 }
 
 // Subscribe registers an event handler to receive events of a specific type
-func (bus *InMemoryEventBus) Subscribe(eventType EventType, handler EventHandler) error {
-	bus.mutex.Lock()
-	defer bus.mutex.Unlock()
+func (b *InMemoryEventBus) Subscribe(eventType EventType, handler EventHandler) error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
-	if bus.handlers[eventType] == nil {
-		bus.handlers[eventType] = make([]EventHandler, 0)
+	if b.handlers[eventType] == nil {
+		b.handlers[eventType] = make([]EventHandler, 0)
 	}
 
-	bus.handlers[eventType] = append(bus.handlers[eventType], handler)
+	b.handlers[eventType] = append(b.handlers[eventType], handler)
 	return nil
 }
 
 // Unsubscribe removes an event handler from receiving events of a specific type
-func (bus *InMemoryEventBus) Unsubscribe(eventType EventType, handler EventHandler) error {
-	bus.mutex.Lock()
-	defer bus.mutex.Unlock()
+func (b *InMemoryEventBus) Unsubscribe(eventType EventType, handler EventHandler) error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
-	handlers, exists := bus.handlers[eventType]
+	handlers, exists := b.handlers[eventType]
 	if !exists {
 		return nil
 	}
 
 	for i, h := range handlers {
 		if h == handler {
-			bus.handlers[eventType] = append(handlers[:i], handlers[i+1:]...)
+			b.handlers[eventType] = append(handlers[:i], handlers[i+1:]...)
 			break
 		}
 	}

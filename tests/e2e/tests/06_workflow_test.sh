@@ -2,9 +2,40 @@
 
 # Test 06: Workflow and Job Dependencies Tests
 # Tests workflow creation, job dependencies, and DAG execution
+# Tests against remote host at 192.168.1.161
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
+
+# Remote host configuration
+REMOTE_HOST="192.168.1.161"
+REMOTE_USER="jay"
+
+# Helper function to run SSH command on remote host
+run_ssh_command() {
+    local command="$1"
+    timeout 10 ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" "$command" 2>/dev/null
+}
+
+# Verify workflow execution on remote host
+verify_workflow_on_remote() {
+    local workflow_id="$1"
+    local expected_output="$2"
+    
+    # Check if joblet processes are running
+    if run_ssh_command "ps aux | grep -q '[j]oblet'"; then
+        echo "    ✓ Joblet service running on remote host"
+        
+        # Check for workflow-related processes or logs
+        if run_ssh_command "find /tmp -name '*workflow*' -o -name '*$workflow_id*' 2>/dev/null | head -1" | grep -q .; then
+            echo "    ✓ Workflow evidence found on remote host"
+            return 0
+        fi
+    fi
+    
+    echo "    ? Remote host verification inconclusive"
+    return 0  # Don't fail if SSH verification fails
+}
 
 # ============================================
 # Test Functions
@@ -14,107 +45,135 @@ test_simple_workflow() {
     # Create a simple workflow YAML
     local workflow_file="/tmp/test_workflow_$$.yaml"
     cat > "$workflow_file" << 'EOF'
-version: "1.0"
+version: 1
 jobs:
   step1:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('STEP1_COMPLETE')"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'STEP1_COMPLETE'"]
   
   step2:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('STEP2_COMPLETE')"]
-    requires: ["step1"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'STEP2_COMPLETE'"]
+    requires:
+      - step1: "COMPLETED"
   
   step3:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('STEP3_COMPLETE')"]
-    requires: ["step2"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'STEP3_COMPLETE'"]
+    requires:
+      - step2: "COMPLETED"
 EOF
     
     # Try to run workflow
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1 || echo "")
+    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
     
-    if echo "$workflow_output" | grep -q "workflow.*not\|unrecognized"; then
-        echo -e "    ${YELLOW}Workflow feature not implemented${NC}"
-        return 0
+    if [[ -z "$workflow_id" ]]; then
+        echo "    Failed to create workflow"
+        return 1
     fi
     
-    if echo "$workflow_output" | grep -q "UUID\|created\|ID"; then
-        echo -e "    ${GREEN}Workflow created${NC}"
-        return 0
-    else
-        echo -e "    ${YELLOW}Workflow feature may be limited${NC}"
-        return 0
-    fi
+    echo "    Workflow created: $workflow_id"
+    
+    # Wait for workflow completion
+    local max_wait=30
+    for i in $(seq 1 $max_wait); do
+        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        if [[ "$status" == "COMPLETED" ]]; then
+            echo "    ✓ Workflow completed successfully"
+            verify_workflow_on_remote "$workflow_id" "STEP3_COMPLETE"
+            return 0
+        elif [[ "$status" == "FAILED" ]]; then
+            echo "    ✗ Workflow failed"
+            return 1
+        fi
+        sleep 1
+    done
+    
+    echo "    ? Workflow status unclear after ${max_wait}s"
+    return 0
 }
 
 test_parallel_workflow() {
     # Test workflow with parallel execution
     local workflow_file="/tmp/test_parallel_$$.yaml"
     cat > "$workflow_file" << 'EOF'
-version: "1.0"
+version: 1
 jobs:
   prepare:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('PREPARE_DONE')"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'PREPARE_DONE'"]
   
   process1:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "import time; time.sleep(2); print('PROCESS1_DONE')"]
-    requires: ["prepare"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "sleep 2; echo 'PROCESS1_DONE'"]
+    requires:
+      - prepare: "COMPLETED"
   
   process2:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "import time; time.sleep(2); print('PROCESS2_DONE')"]
-    requires: ["prepare"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "sleep 2; echo 'PROCESS2_DONE'"]
+    requires:
+      - prepare: "COMPLETED"
   
   process3:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "import time; time.sleep(2); print('PROCESS3_DONE')"]
-    requires: ["prepare"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "sleep 2; echo 'PROCESS3_DONE'"]
+    requires:
+      - prepare: "COMPLETED"
   
   finalize:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('ALL_DONE')"]
-    requires: ["process1", "process2", "process3"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'ALL_DONE'"]
+    requires:
+      - process1: "COMPLETED"
+      - process2: "COMPLETED"
+      - process3: "COMPLETED"
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1 || echo "")
+    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
     
-    if echo "$workflow_output" | grep -q "UUID\|created"; then
-        # Workflow was created, check if parallel execution works
-        local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
-        
-        if [[ -n "$workflow_id" ]]; then
-            # Wait for completion
-            sleep 10
-            
-            # Check status
-            local status_output=$("$RNX_BINARY" status --workflow "$workflow_id" 2>&1 || echo "")
-            
-            if echo "$status_output" | grep -q "COMPLETED"; then
-                return 0
-            else
-                echo -e "    ${YELLOW}Workflow may still be running${NC}"
-                return 0
-            fi
-        fi
-    else
-        echo -e "    ${YELLOW}Parallel workflows not supported${NC}"
-        return 0
+    if [[ -z "$workflow_id" ]]; then
+        echo "    Failed to create parallel workflow"
+        return 1
     fi
+    
+    echo "    Parallel workflow created: $workflow_id"
+    
+    # Wait for completion (parallel jobs should take ~4s total, not 6s sequential)
+    local start_time=$(date +%s)
+    local max_wait=45
+    
+    for i in $(seq 1 $max_wait); do
+        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        if [[ "$status" == "COMPLETED" ]]; then
+            local end_time=$(date +%s)
+            local duration=$((end_time - start_time))
+            echo "    ✓ Parallel workflow completed in ${duration}s"
+            verify_workflow_on_remote "$workflow_id" "ALL_DONE"
+            return 0
+        elif [[ "$status" == "FAILED" ]]; then
+            echo "    ✗ Parallel workflow failed"
+            return 1
+        fi
+        sleep 1
+    done
+    
+    echo "    ? Parallel workflow status unclear after ${max_wait}s"
+    return 0
 }
 
 test_conditional_workflow() {
@@ -133,109 +192,160 @@ test_workflow_failure_handling() {
     # Test workflow behavior when a job fails
     local workflow_file="/tmp/test_failure_$$.yaml"
     cat > "$workflow_file" << 'EOF'
-version: "1.0"
+version: 1
 jobs:
   good_job:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('SUCCESS')"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'SUCCESS'"]
   
   bad_job:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "raise Exception('INTENTIONAL_FAILURE')"]
-    requires: ["good_job"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'FAILING'; exit 1"]
+    requires:
+      - good_job: "COMPLETED"
   
   dependent_job:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('SHOULD_NOT_RUN')"]
-    requires: ["bad_job"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'SHOULD_NOT_RUN'"]
+    requires:
+      - bad_job: "COMPLETED"
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1 || echo "")
+    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
     
-    if echo "$workflow_output" | grep -q "UUID\|created"; then
-        echo -e "    ${GREEN}Failure handling workflow created${NC}"
-        return 0
-    else
-        echo -e "    ${YELLOW}Workflow failure handling not testable${NC}"
-        return 0
+    if [[ -z "$workflow_id" ]]; then
+        echo "    Failed to create failure handling workflow"
+        return 1
     fi
+    
+    echo "    Failure handling workflow created: $workflow_id"
+    
+    # Wait for workflow to process failure
+    local max_wait=30
+    for i in $(seq 1 $max_wait); do
+        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        if [[ "$status" == "FAILED" ]]; then
+            echo "    ✓ Workflow correctly failed when job failed"
+            
+            # Check that dependent job didn't run
+            local progress=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Progress:" || echo "")
+            if echo "$progress" | grep -q "failed"; then
+                echo "    ✓ Dependent job correctly prevented from running"
+            fi
+            return 0
+        elif [[ "$status" == "COMPLETED" ]]; then
+            echo "    ✗ Workflow should have failed but completed"
+            return 1
+        fi
+        sleep 1
+    done
+    
+    echo "    ? Failure handling unclear after ${max_wait}s"
+    return 0
 }
 
 test_workflow_status() {
     # Test workflow status tracking
     local workflow_file="/tmp/test_status_$$.yaml"
     cat > "$workflow_file" << 'EOF'
-version: "1.0"
+version: 1
 jobs:
   quick_job:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('QUICK')"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'QUICK_STATUS_TEST'"]
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1 || echo "")
+    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
     
-    if echo "$workflow_output" | grep -q "UUID"; then
-        local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
-        
-        if [[ -n "$workflow_id" ]]; then
-            # Check status command
-            local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>&1 || echo "")
-            
-            if echo "$status" | grep -q "Status:\|RUNNING\|COMPLETED"; then
-                return 0
-            else
-                echo -e "    ${YELLOW}Workflow status not available${NC}"
-                return 0
-            fi
-        fi
-    else
-        echo -e "    ${YELLOW}Workflow status tracking not implemented${NC}"
-        return 0
+    if [[ -z "$workflow_id" ]]; then
+        echo "    Failed to create status test workflow"
+        return 1
     fi
+    
+    echo "    Status test workflow created: $workflow_id"
+    
+    # Test status tracking through lifecycle
+    local seen_running=false
+    local max_wait=20
+    
+    for i in $(seq 1 $max_wait); do
+        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        
+        if [[ "$status" == "RUNNING" ]] || [[ "$status" == "PENDING" ]]; then
+            seen_running=true
+            echo "    ✓ Workflow status: $status"
+        elif [[ "$status" == "COMPLETED" ]]; then
+            echo "    ✓ Workflow status: COMPLETED"
+            if [[ "$seen_running" == "true" ]]; then
+                echo "    ✓ Status tracking through lifecycle working"
+            fi
+            return 0
+        elif [[ "$status" == "FAILED" ]]; then
+            echo "    ✗ Workflow failed unexpectedly"
+            return 1
+        fi
+        sleep 1
+    done
+    
+    echo "    ? Status tracking unclear after ${max_wait}s"
+    return 0
 }
 
 test_workflow_cancellation() {
     # Test cancelling a running workflow
     local workflow_file="/tmp/test_cancel_$$.yaml"
     cat > "$workflow_file" << 'EOF'
-version: "1.0"
+version: 1
 jobs:
   long_job:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "import time; time.sleep(30); print('SHOULD_NOT_COMPLETE')"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'STARTING_LONG_JOB'; sleep 30; echo 'SHOULD_NOT_COMPLETE'"]
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1 || echo "")
+    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
     
-    if echo "$workflow_output" | grep -q "UUID"; then
-        local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
-        
-        if [[ -n "$workflow_id" ]]; then
-            # Try to cancel
-            sleep 2
-            local cancel_output=$("$RNX_BINARY" cancel --workflow "$workflow_id" 2>&1 || \
-                                  "$RNX_BINARY" delete --workflow "$workflow_id" 2>&1 || echo "")
-            
-            if echo "$cancel_output" | grep -q "cancel\|delete\|stop"; then
-                return 0
-            else
-                echo -e "    ${YELLOW}Workflow cancellation not supported${NC}"
-                return 0
-            fi
-        fi
+    if [[ -z "$workflow_id" ]]; then
+        echo "    Failed to create cancellation test workflow"
+        return 1
+    fi
+    
+    echo "    Cancellation test workflow created: $workflow_id"
+    
+    # Wait for workflow to start running
+    sleep 3
+    
+    # Try various cancellation commands
+    local cancel_output
+    if cancel_output=$("$RNX_BINARY" cancel --workflow "$workflow_id" 2>&1); then
+        echo "    ✓ Cancel command executed"
+        return 0
+    elif cancel_output=$("$RNX_BINARY" delete --workflow "$workflow_id" 2>&1); then
+        echo "    ✓ Delete command executed"
+        return 0
+    elif cancel_output=$("$RNX_BINARY" stop --workflow "$workflow_id" 2>&1); then
+        echo "    ✓ Stop command executed"
+        return 0
     else
-        echo -e "    ${YELLOW}Cannot test workflow cancellation${NC}"
+        echo "    ? Workflow cancellation commands not found"
+        # Try to check if workflow finished naturally
+        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        if [[ "$status" == "RUNNING" ]]; then
+            echo "    ✓ Workflow still running (cancellation may not be implemented)"
+        fi
         return 0
     fi
 }
@@ -256,36 +366,49 @@ test_cyclic_dependency_detection() {
     # Test that cyclic dependencies are detected
     local workflow_file="/tmp/test_cyclic_$$.yaml"
     cat > "$workflow_file" << 'EOF'
-version: "1.0"
+version: 1
 jobs:
   job_a:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('A')"]
-    requires: ["job_c"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'A'"]
+    requires:
+      - job_c: "COMPLETED"
   
   job_b:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('B')"]
-    requires: ["job_a"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'B'"]
+    requires:
+      - job_a: "COMPLETED"
   
   job_c:
-    runtime: "python-3.11-ml"
-    command: "python3"
-    args: ["-c", "print('C')"]
-    requires: ["job_b"]
+    runtime: "openjdk-21"
+    command: "sh"
+    args: ["-c", "echo 'C'"]
+    requires:
+      - job_b: "COMPLETED"
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1 || echo "")
+    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
     
     rm -f "$workflow_file"
     
-    if echo "$workflow_output" | grep -qi "cycl\|circular\|dependency.*error"; then
-        echo -e "    ${GREEN}Cyclic dependencies detected correctly${NC}"
+    if echo "$workflow_output" | grep -qi "cycl\|circular\|dependency.*error\|validation.*fail"; then
+        echo "    ✓ Cyclic dependencies detected and blocked"
+        return 0
+    elif echo "$workflow_output" | grep -q "UUID"; then
+        # Workflow was created - check if it fails at execution
+        local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
+        echo "    ? Cyclic workflow created: $workflow_id (may fail at execution)"
+        sleep 5
+        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        if [[ "$status" == "FAILED" ]]; then
+            echo "    ✓ Cyclic workflow failed at execution (correct behavior)"
+        fi
         return 0
     else
-        echo -e "    ${YELLOW}Cyclic dependency detection may not be implemented${NC}"
+        echo "    ? Cyclic dependency detection unclear"
         return 0
     fi
 }

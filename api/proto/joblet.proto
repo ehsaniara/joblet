@@ -50,10 +50,6 @@ service RuntimeService {
   rpc GetRuntimeInfo(RuntimeInfoReq) returns (RuntimeInfoRes){}
   rpc TestRuntime(RuntimeTestReq) returns (RuntimeTestRes){}
 
-  // Runtime building operations - uses builder isolation automatically (no env vars needed)
-  rpc BuildRuntime(BuildRuntimeRequest) returns (BuildRuntimeResponse){}
-  rpc GetBuildStatus(GetBuildStatusRequest) returns (GetBuildStatusResponse){}
-  rpc ListBuildJobs(EmptyRequest) returns (BuildJobsResponse){}
   rpc InstallRuntimeFromGithub(InstallRuntimeRequest) returns (InstallRuntimeResponse){}
   rpc InstallRuntimeFromLocal(InstallRuntimeFromLocalRequest) returns (InstallRuntimeResponse){}
   rpc StreamingInstallRuntimeFromGithub(InstallRuntimeRequest) returns (stream RuntimeInstallationChunk){}
@@ -86,16 +82,12 @@ message Job{
 }
 
 message EmptyRequest {}
-
-
 message FileUpload {
   string path = 1;           // Relative path in job workspace
   bytes content = 2;         // File content
   uint32 mode = 3;           // Unix file permissions (e.g., 0644)
   bool isDirectory = 4;      // True if this represents a directory
 }
-
-
 // GetJobStatus
 message GetJobStatusReq{
   string uuid = 1;                         // Job UUID identifier
@@ -532,8 +524,6 @@ message GetWorkflowJobsRequest {
 message GetWorkflowJobsResponse {
   repeated WorkflowJob jobs = 1;
 }
-
-
 message WorkflowInfo {
   string uuid = 1;                         // Workflow UUID identifier
   string workflow = 2;
@@ -561,86 +551,6 @@ message WorkflowJob {
 message Timestamp {
   int64 seconds = 1;
   int32 nanos = 2;
-}
-
-// Runtime Builder Service Messages
-
-message BuildRuntimeRequest {
-  string runtimeSpec = 1;          // e.g., "python-3.11-ml", "openjdk-21", "golang-1.21"
-  string name = 2;                 // Optional human-readable name for the build job
-  RuntimeSourceConfig source = 3;   // Source configuration for the runtime
-  map<string, string> buildArgs = 4; // Optional build arguments
-  bool forceRebuild = 5;           // Force rebuild even if runtime exists
-}
-
-message RuntimeSourceConfig {
-  oneof source_type {
-    GithubSource github = 1;
-    LocalSource local = 2;
-    ScriptSource script = 3;
-  }
-}
-
-message GithubSource {
-  string repository = 1;           // e.g., "joblet-org/runtimes"
-  string branch = 2;               // Default: "main"
-  string path = 3;                 // Path within repo to runtime definition
-  string commit = 4;               // Optional specific commit SHA
-}
-
-message LocalSource {
-  repeated FileUpload files = 1;   // Local files to upload for building
-  string buildScript = 2;          // Entry point script name
-}
-
-
-message ScriptSource {
-  string setupScript = 1;          // Direct setup script content
-  repeated string dependencies = 2; // System dependencies needed
-}
-
-message BuildRuntimeResponse {
-  string buildJobUuid = 1;         // UUID of the build job
-  string runtimeSpec = 2;          // Runtime spec being built
-  string status = 3;               // "queued", "building", "completed", "failed"
-  string message = 4;              // Status message or error details
-}
-
-message GetBuildStatusRequest {
-  string buildJobUuid = 1;         // UUID of the build job
-}
-
-message GetBuildStatusResponse {
-  string buildJobUuid = 1;         // UUID of the build job
-  string runtimeSpec = 2;          // Runtime spec being built
-  string status = 3;               // Current status
-  string message = 4;              // Status message or error details
-  string startTime = 5;            // Build start time
-  string endTime = 6;              // Build completion time (if finished)
-  int32 exitCode = 7;              // Exit code (if completed)
-  BuildProgress progress = 8;      // Build progress information
-}
-
-message BuildProgress {
-  string currentStep = 1;          // Current build step description
-  int32 stepNumber = 2;            // Current step number
-  int32 totalSteps = 3;            // Total number of steps
-  double percentComplete = 4;      // Percentage complete (0-100)
-  repeated string completedSteps = 5; // List of completed step names
-}
-
-message BuildJob {
-  string buildJobUuid = 1;         // UUID of the build job
-  string runtimeSpec = 2;          // Runtime spec being built
-  string name = 3;                 // Human-readable name
-  string status = 4;               // Current status
-  string startTime = 5;            // Build start time
-  string endTime = 6;              // Build completion time (if finished)
-  RuntimeSourceConfig source = 7;  // Source configuration used
-}
-
-message BuildJobsResponse {
-  repeated BuildJob buildJobs = 1;
 }
 
 message InstallRuntimeRequest {

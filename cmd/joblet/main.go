@@ -28,12 +28,18 @@ func main() {
 	// Create context logger with mode
 	mainLogger := logger.WithField("component", "main")
 
-	mainLogger.Debug("Configuration loaded", "path", path)
+	// Only log config loading in trace mode
+	if cfg.Logging.Level == "TRACE" {
+		mainLogger.Debug("Configuration loaded", "path", path)
+	}
 
-	mainLogger.Debug("joblet starting with configuration",
-		"mode", cfg.Server.Mode,
-		"address", cfg.GetServerAddress(),
-		"logLevel", cfg.Logging.Level)
+	// Only log startup details in trace mode
+	if cfg.Logging.Level == "TRACE" {
+		mainLogger.Debug("joblet starting with configuration",
+			"mode", cfg.Server.Mode,
+			"address", cfg.GetServerAddress(),
+			"logLevel", cfg.Logging.Level)
+	}
 
 	// Run based on configured mode
 	var runErr error

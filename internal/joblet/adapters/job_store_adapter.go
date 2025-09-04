@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/interfaces"
 	"joblet/internal/joblet/pubsub"
-	"joblet/pkg/buffer"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 )
@@ -34,17 +34,16 @@ func IsConflictError(err error) bool {
 	return err != nil && err.Error() == "key already exists"
 }
 
-// jobStoreAdapter implements JobStoreAdapter using the new generic packages.
+// jobStoreAdapter implements JobStorer using the new generic packages.
 // It provides job storage with buffer management and pub-sub capabilities
 // while using pluggable backends internally.
 type jobStoreAdapter struct {
 	// Generic storage backends
-	jobStore  jobStore[string, *domain.Job]
-	bufferMgr buffer.BufferManager
-	pubsub    pubsub.PubSub[JobEvent]
+	jobStore jobStore[string, *domain.Job]
+	logMgr   *SimpleLogManager
+	pubsub   pubsub.PubSub[JobEvent]
 
-	// Configuration for buffer creation
-	bufferConfig         *buffer.BufferConfig
+	// Configuration for log persistence
 	logPersistenceConfig *config.LogPersistenceConfig
 
 	// Async log system for rate-decoupled logging
@@ -60,13 +59,13 @@ type jobStoreAdapter struct {
 }
 
 // Ensure jobStoreAdapter implements the interfaces
-var _ JobStoreAdapter = (*jobStoreAdapter)(nil)
+var _ JobStorer = (*jobStoreAdapter)(nil)
 
 // taskWrapper wraps a job with buffer and subscription management
 // to maintain compatibility with the current Task abstraction.
 type taskWrapper struct {
 	job         *domain.Job
-	buffer      buffer.Buffer
+	logBuffer   *SimpleLogBuffer
 	subscribers map[string]*subscriptionContext
 	subMutex    sync.RWMutex
 	logger      *logger.Logger
@@ -76,7 +75,7 @@ type taskWrapper struct {
 // subscriptionContext manages a single client subscription.
 type subscriptionContext struct {
 	id          string
-	stream      DomainStreamer
+	stream      interfaces.DomainStreamer
 	updates     <-chan pubsub.Message[JobEvent]
 	unsubscribe func()
 	cancel      context.CancelFunc
@@ -92,46 +91,42 @@ type JobEvent struct {
 	Timestamp int64             `json:"timestamp"`
 }
 
-// NewJobStoreAdapter creates a new job store adapter with the specified backends.
-func NewJobStoreAdapter(
+// NewJobStorer creates a new job store adapter with the specified backends.
+func NewJobStorer(
 	store jobStore[string, *domain.Job],
-	bufferMgr buffer.BufferManager,
+	logMgr *SimpleLogManager,
 	pubsub pubsub.PubSub[JobEvent],
-	bufferConfig *buffer.BufferConfig,
 	logger *logger.Logger,
-) JobStoreAdapter {
+) JobStorer {
 	if logger == nil {
 		logger = logger.WithField("component", "job-store-adapter")
 	}
 
 	return &jobStoreAdapter{
-		jobStore:     store,
-		bufferMgr:    bufferMgr,
-		pubsub:       pubsub,
-		bufferConfig: bufferConfig,
-		tasks:        make(map[string]*taskWrapper),
-		logger:       logger,
+		jobStore: store,
+		logMgr:   logMgr,
+		pubsub:   pubsub,
+		tasks:    make(map[string]*taskWrapper),
+		logger:   logger,
 	}
 }
 
-// NewJobStoreAdapterWithLogPersistence creates a new job store adapter with log persistence
-func NewJobStoreAdapterWithLogPersistence(
+// NewJobStorerWithLogPersistence creates a new job store adapter with log persistence
+func NewJobStorerWithLogPersistence(
 	store jobStore[string, *domain.Job],
-	bufferMgr buffer.BufferManager,
+	logMgr *SimpleLogManager,
 	pubsub pubsub.PubSub[JobEvent],
-	bufferConfig *buffer.BufferConfig,
 	logPersistenceConfig *config.LogPersistenceConfig,
 	logger *logger.Logger,
-) JobStoreAdapter {
+) JobStorer {
 	if logger == nil {
 		logger = logger.WithField("component", "job-store-adapter")
 	}
 
 	adapter := &jobStoreAdapter{
 		jobStore:             store,
-		bufferMgr:            bufferMgr,
+		logMgr:               logMgr,
 		pubsub:               pubsub,
-		bufferConfig:         bufferConfig,
 		logPersistenceConfig: logPersistenceConfig,
 		tasks:                make(map[string]*taskWrapper),
 		logger:               logger,
@@ -171,28 +166,12 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 		return
 	}
 
-	// Create buffer for job logs using configuration from factory
-	var jobBuffer buffer.Buffer
-	bufferConfig := a.getBufferConfig()
-	if bufferConfig == nil {
-		a.logger.Warn("buffer configuration not provided - log streaming will not work", "jobId", job.Uuid)
-		// Continue without buffer - logs won't be stored but job will work
-	} else {
-		var err error
-		jobBuffer, err = a.bufferMgr.CreateBuffer(ctx, job.Uuid, *bufferConfig)
-		if err != nil {
-			a.logger.Error("failed to create buffer for job - log streaming will not work", "jobId", job.Uuid, "error", err, "bufferConfig", *bufferConfig)
-			// Continue without buffer - logs won't be stored but job will work
-			jobBuffer = nil
-		} else {
-			a.logger.Debug("buffer created successfully for job", "jobId", job.Uuid, "bufferType", bufferConfig.Type)
-		}
-	}
+	logBuffer := a.logMgr.GetBuffer(job.Uuid)
+	a.logger.Debug("log buffer created successfully for job", "jobId", job.Uuid)
 
-	// Create task wrapper
 	task := &taskWrapper{
 		job:         job.DeepCopy(),
-		buffer:      jobBuffer,
+		logBuffer:   logBuffer,
 		subscribers: make(map[string]*subscriptionContext),
 		logger:      a.logger.WithField("jobId", job.Uuid),
 		pubsub:      a.pubsub,
@@ -229,7 +208,6 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	}
 	a.closeMutex.RUnlock()
 
-	// Get existing job for status comparison
 	a.tasksMutex.RLock()
 	task, exists := a.tasks[job.Uuid]
 	a.tasksMutex.RUnlock()
@@ -274,7 +252,7 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 // GetJob retrieves a job by its ID from the store.
 // Returns a deep copy of the job if found, nil and false otherwise.
 // Handles store access errors and closed adapter states gracefully.
-func (a *jobStoreAdapter) GetJob(id string) (*domain.Job, bool) {
+func (a *jobStoreAdapter) Job(id string) (*domain.Job, bool) {
 
 	a.closeMutex.RLock()
 	if a.closed {
@@ -302,9 +280,9 @@ func (a *jobStoreAdapter) GetJob(id string) (*domain.Job, bool) {
 // GetJobByPrefix retrieves a job by UUID prefix (supports short-form UUID lookup).
 // Returns the job if exactly one match is found, otherwise returns nil and false.
 // If multiple jobs match the prefix, logs a warning and returns nil, false.
-func (a *jobStoreAdapter) GetJobByPrefix(prefix string) (*domain.Job, bool) {
+func (a *jobStoreAdapter) JobByPrefix(prefix string) (*domain.Job, bool) {
 	// First try exact match
-	if job, exists := a.GetJob(prefix); exists {
+	if job, exists := a.Job(prefix); exists {
 		return job, true
 	}
 
@@ -367,7 +345,6 @@ func (a *jobStoreAdapter) ListJobs() []*domain.Job {
 		return []*domain.Job{}
 	}
 
-	// Create deep copies
 	result := make([]*domain.Job, len(jobs))
 	for i, job := range jobs {
 		result[i] = job.DeepCopy()
@@ -379,16 +356,16 @@ func (a *jobStoreAdapter) ListJobs() []*domain.Job {
 // WriteToBuffer appends log data to the specified job's output buffer.
 // Writes to both in-memory buffer (for real-time streaming) and async log system
 // (for persistence). Publishes log chunk events and supports UUID prefix resolution.
-func (a *jobStoreAdapter) WriteToBuffer(jobId string, chunk []byte) {
+func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 	if len(chunk) == 0 {
 		return
 	}
 
-	// For WriteToBuffer, jobId should already be the full UUID since it's called internally
+	// For WriteToBuffer, jobID should already be the full UUID since it's called internally
 	// from job execution, but we still support prefix resolution for consistency
-	resolvedUuid, err := a.resolveUuidByPrefix(jobId)
+	resolvedUuid, err := a.resolveUuidByPrefix(jobID)
 	if err != nil {
-		a.logger.Warn("failed to resolve job UUID for buffer write", "input", jobId, "error", err)
+		a.logger.Warn("failed to resolve job UUID for buffer write", "input", jobID, "error", err)
 		return
 	}
 
@@ -401,10 +378,10 @@ func (a *jobStoreAdapter) WriteToBuffer(jobId string, chunk []byte) {
 		return
 	}
 
-	// Write to buffer
-	if task.buffer != nil {
-		if _, err := task.buffer.Write(chunk); err != nil {
-			a.logger.Error("failed to write to job buffer", "jobId", resolvedUuid, "error", err)
+	// Write to log buffer
+	if task.logBuffer != nil {
+		if err := task.logBuffer.Write(chunk); err != nil {
+			a.logger.Error("failed to write to job log buffer", "jobId", resolvedUuid, "error", err)
 			return
 		}
 		a.logger.Debug("successfully wrote to buffer", "jobId", resolvedUuid, "chunkSize", len(chunk))
@@ -433,7 +410,7 @@ func (a *jobStoreAdapter) WriteToBuffer(jobId string, chunk []byte) {
 // GetOutput retrieves the complete output buffer for a job.
 // Returns the full buffer content, job running status, and any read errors.
 // Supports UUID prefix resolution for convenience.
-func (a *jobStoreAdapter) GetOutput(id string) ([]byte, bool, error) {
+func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 	// Resolve UUID by prefix first
 	resolvedUuid, err := a.resolveUuidByPrefix(id)
 	if err != nil {
@@ -450,14 +427,25 @@ func (a *jobStoreAdapter) GetOutput(id string) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("job not found")
 	}
 
-	if task.buffer == nil {
+	if task.logBuffer == nil {
 		return []byte{}, task.job.IsRunning(), nil
 	}
 
-	data, err := task.buffer.Read()
-	if err != nil {
-		a.logger.Error("failed to read job buffer", "jobId", id, "error", err)
-		return nil, false, err
+	chunks := task.logBuffer.ReadAll()
+	if len(chunks) == 0 {
+		a.logger.Debug("no data available in job log buffer", "jobId", id)
+		return []byte{}, task.job.IsRunning(), nil
+	}
+
+	// Combine all chunks into a single byte slice
+	var totalSize int
+	for _, chunk := range chunks {
+		totalSize += len(chunk)
+	}
+
+	data := make([]byte, 0, totalSize)
+	for _, chunk := range chunks {
+		data = append(data, chunk...)
 	}
 
 	isRunning := task.job.IsRunning()
@@ -469,7 +457,7 @@ func (a *jobStoreAdapter) GetOutput(id string) ([]byte, bool, error) {
 // SendUpdatesToClient streams job logs and status updates to a client.
 // First sends existing buffer content, then subscribes to real-time updates.
 // Handles completed jobs by sending existing logs and terminating immediately.
-func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error {
+func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, stream interfaces.DomainStreamer) error {
 	// Resolve UUID by prefix first
 	resolvedUuid, err := a.resolveUuidByPrefix(id)
 	if err != nil {
@@ -487,19 +475,16 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 	}
 
 	// Send existing buffer content first
-	if task.buffer != nil {
-		data, err := task.buffer.Read()
-		if err != nil {
-			a.logger.Error("failed to read existing buffer", "jobId", id, "error", err)
-			return err
-		}
-
-		if len(data) > 0 {
-			if err := stream.SendData(data); err != nil {
-				a.logger.Warn("failed to send existing logs", "jobId", id, "error", err)
-				return err
+	if task.logBuffer != nil {
+		chunks := task.logBuffer.ReadAll()
+		if len(chunks) > 0 {
+			for _, chunk := range chunks {
+				if err := stream.SendData(chunk); err != nil {
+					a.logger.Warn("failed to send existing log chunk", "jobId", id, "error", err)
+					return err
+				}
 			}
-			a.logger.Debug("sent existing logs", "jobId", id, "logSize", len(data))
+			a.logger.Debug("sent existing logs", "jobId", id, "chunkCount", len(chunks))
 		}
 	}
 
@@ -528,7 +513,6 @@ func (a *jobStoreAdapter) Close() error {
 
 	// No cleanup goroutine to stop - automatic log cleanup has been disabled
 
-	// Close all task subscriptions
 	a.tasksMutex.Lock()
 	for _, task := range a.tasks {
 		task.cleanupSubscribers()
@@ -536,17 +520,14 @@ func (a *jobStoreAdapter) Close() error {
 	a.tasks = make(map[string]*taskWrapper)
 	a.tasksMutex.Unlock()
 
-	// Close async log system
 	if a.asyncLogSystem != nil {
 		if err := a.asyncLogSystem.Close(); err != nil {
 			a.logger.Error("failed to close async log system", "error", err)
 		}
 	}
 
-	// Close backend resources
-	if err := a.bufferMgr.Close(); err != nil {
-		a.logger.Error("failed to close buffer manager", "error", err)
-	}
+	// Simple log manager doesn't need explicit closing - just clear resources
+	// All buffers are cleaned up through job cleanup process
 
 	if err := a.pubsub.Close(); err != nil {
 		a.logger.Error("failed to close pub-sub", "error", err)
@@ -571,23 +552,23 @@ func (a *jobStoreAdapter) ensureNotClosed() error {
 }
 
 // resolveJobUuid resolves a job ID to UUID, used across multiple operations
-func (a *jobStoreAdapter) resolveJobUuid(jobId string, operation string) (string, error) {
-	resolvedUuid, err := a.resolveUuidByPrefix(jobId)
+func (a *jobStoreAdapter) resolveJobUuid(jobID string, operation string) (string, error) {
+	resolvedUuid, err := a.resolveUuidByPrefix(jobID)
 	if err != nil {
-		a.logger.Debug("failed to resolve job UUID", "input", jobId, "operation", operation, "error", err)
-		return "", fmt.Errorf("job not found: %s", jobId)
+		a.logger.Debug("failed to resolve job UUID", "input", jobID, "operation", operation, "error", err)
+		return "", fmt.Errorf("job not found: %s", jobID)
 	}
 	return resolvedUuid, nil
 }
 
 // validateAndResolveJob resolves a job ID to UUID and retrieves the job, used across multiple operations
-func (a *jobStoreAdapter) validateAndResolveJob(jobId string, operation string) (string, *domain.Job, error) {
-	resolvedUuid, err := a.resolveJobUuid(jobId, operation)
+func (a *jobStoreAdapter) validateAndResolveJob(jobID string, operation string) (string, *domain.Job, error) {
+	resolvedUuid, err := a.resolveJobUuid(jobID, operation)
 	if err != nil {
 		return "", nil, err
 	}
 
-	job, exists := a.GetJob(resolvedUuid)
+	job, exists := a.Job(resolvedUuid)
 	if !exists {
 		return "", nil, fmt.Errorf("job not found: %s", resolvedUuid)
 	}
@@ -605,11 +586,11 @@ func (a *jobStoreAdapter) validateJobNotRunning(job *domain.Job) error {
 }
 
 // cleanupTaskWrapper removes subscriptions but preserves buffers for log access
-func (a *jobStoreAdapter) cleanupTaskWrapper(jobId string) error {
+func (a *jobStoreAdapter) cleanupTaskWrapper(jobID string) error {
 	a.tasksMutex.Lock()
 	defer a.tasksMutex.Unlock()
 
-	task, exists := a.tasks[jobId]
+	task, exists := a.tasks[jobID]
 	if !exists {
 		return nil // No task to cleanup
 	}
@@ -623,11 +604,11 @@ func (a *jobStoreAdapter) cleanupTaskWrapper(jobId string) error {
 }
 
 // completeTaskCleanup fully removes task wrapper, buffers, and logs (used only for explicit log deletion)
-func (a *jobStoreAdapter) completeTaskCleanup(jobId string) error {
+func (a *jobStoreAdapter) completeTaskCleanup(jobID string) error {
 	a.tasksMutex.Lock()
 	defer a.tasksMutex.Unlock()
 
-	task, exists := a.tasks[jobId]
+	task, exists := a.tasks[jobID]
 	if !exists {
 		return nil // No task to cleanup
 	}
@@ -635,25 +616,25 @@ func (a *jobStoreAdapter) completeTaskCleanup(jobId string) error {
 	// Cancel subscriptions
 	task.cleanupSubscribers()
 
-	// Remove buffer and task completely (deletes logs)
-	if task.buffer != nil {
-		_ = a.bufferMgr.RemoveBuffer(jobId)
+	// Remove log buffer from manager (deletes logs)
+	if task.logBuffer != nil {
+		a.logMgr.RemoveBuffer(jobID)
 	}
-	delete(a.tasks, jobId)
+	delete(a.tasks, jobID)
 	return nil
 }
 
 // publishJobEvent creates and publishes a job event with consistent structure
-func (a *jobStoreAdapter) publishJobEvent(eventType, jobId string, metadata map[string]string) error {
+func (a *jobStoreAdapter) publishJobEvent(eventType, jobID string, metadata map[string]string) error {
 	event := JobEvent{
 		Type:      eventType,
-		JobID:     jobId,
+		JobID:     jobID,
 		Timestamp: time.Now().Unix(),
 		Metadata:  metadata,
 	}
 
 	if err := a.publishEvent(event); err != nil {
-		a.logger.Warn("failed to publish job event", "type", eventType, "jobId", jobId, "error", err)
+		a.logger.Warn("failed to publish job event", "type", eventType, "jobId", jobID, "error", err)
 		return err
 	}
 	return nil
@@ -661,13 +642,13 @@ func (a *jobStoreAdapter) publishJobEvent(eventType, jobId string, metadata map[
 
 // DeleteJobLogs deletes log files and buffers for a specific job.
 // This method should only be called when user explicitly requests log deletion.
-func (a *jobStoreAdapter) DeleteJobLogs(jobId string) error {
+func (a *jobStoreAdapter) DeleteJobLogs(jobID string) error {
 	if err := a.ensureNotClosed(); err != nil {
 		return err
 	}
 
 	// Resolve UUID by prefix first
-	resolvedUuid, err := a.resolveJobUuid(jobId, "log deletion")
+	resolvedUuid, err := a.resolveJobUuid(jobID, "log deletion")
 	if err != nil {
 		return err
 	}
@@ -680,12 +661,12 @@ func (a *jobStoreAdapter) DeleteJobLogs(jobId string) error {
 }
 
 // DeleteJob performs complete job deletion but preserves logs for user control.
-func (a *jobStoreAdapter) DeleteJob(jobId string) error {
+func (a *jobStoreAdapter) DeleteJob(jobID string) error {
 	if err := a.ensureNotClosed(); err != nil {
 		return err
 	}
 
-	resolvedUuid, job, err := a.validateAndResolveJob(jobId, "deletion")
+	resolvedUuid, job, err := a.validateAndResolveJob(jobID, "deletion")
 	if err != nil {
 		return err
 	}
@@ -767,16 +748,10 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 	return err
 }
 
-// getBufferConfig returns the buffer configuration for creating job buffers.
-// Returns nil if configuration is missing, allowing graceful degradation.
-func (a *jobStoreAdapter) getBufferConfig() *buffer.BufferConfig {
-	return a.bufferConfig
-}
-
 // subscribeToJobUpdates creates a real-time subscription for job events.
 // Handles LOG_CHUNK events by streaming data to client, and UPDATED events by checking
 // for job completion. Manages subscription lifecycle and cleanup automatically.
-func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, task *taskWrapper, stream DomainStreamer) error {
+func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, task *taskWrapper, stream interfaces.DomainStreamer) error {
 	// Subscribe to job-specific events
 	topic := fmt.Sprintf("job.%s", jobID)
 	a.logger.Debug("subscribing to job events for streaming", "jobId", jobID, "topic", topic)

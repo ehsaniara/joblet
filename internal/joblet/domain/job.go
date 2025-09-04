@@ -136,8 +136,8 @@ func (j *Job) HasResourceLimits() bool {
 		j.Limits.HasCoreRestriction()
 }
 
-// GetDuration returns the job execution duration
-func (j *Job) GetDuration() time.Duration {
+// Duration returns the job execution duration
+func (j *Job) Duration() time.Duration {
 	if j.EndTime == nil {
 		if j.IsRunning() {
 			return time.Since(j.StartTime)
@@ -147,8 +147,8 @@ func (j *Job) GetDuration() time.Duration {
 	return j.EndTime.Sub(j.StartTime)
 }
 
-// GetScheduleDelay returns how long until the job is scheduled to run
-func (j *Job) GetScheduleDelay() time.Duration {
+// ScheduleDelay returns how long until the job is scheduled to run
+func (j *Job) ScheduleDelay() time.Duration {
 	if j.ScheduledTime == nil || !j.IsScheduled() {
 		return 0
 	}

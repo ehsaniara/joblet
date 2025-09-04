@@ -47,56 +47,15 @@ type Joblet struct {
 	cleanup         *cleanup.Coordinator
 }
 
-// StartJobRequest contains all parameters for starting a job.
-// Unified request structure supporting individual jobs, workflows, and scheduled jobs
-// with complete resource configuration and upload capabilities.
-type StartJobRequest struct {
-	Command           string
-	Args              []string
-	Limits            domain.ResourceLimits
-	Uploads           []domain.FileUpload
-	Schedule          string
-	Network           string
-	Volumes           []string
-	Runtime           string
-	Environment       map[string]string
-	SecretEnvironment map[string]string
-	JobType           domain.JobType
-	WorkflowUuid      string
-	WorkingDirectory  string
-	Dependencies      []string
-}
-
-// Getter methods implementing BuildRequest interface for job builder.
-// These provide type-safe access to all job configuration parameters
-// used during the job construction and validation phase.
-func (r StartJobRequest) GetCommand() string                      { return r.Command }
-func (r StartJobRequest) GetArgs() []string                       { return r.Args }
-func (r StartJobRequest) GetSchedule() string                     { return r.Schedule }
-func (r StartJobRequest) GetLimits() domain.ResourceLimits        { return r.Limits }
-func (r StartJobRequest) GetNetwork() string                      { return r.Network }
-func (r StartJobRequest) GetVolumes() []string                    { return r.Volumes }
-func (r StartJobRequest) GetRuntime() string                      { return r.Runtime }
-func (r StartJobRequest) GetEnvironment() map[string]string       { return r.Environment }
-func (r StartJobRequest) GetSecretEnvironment() map[string]string { return r.SecretEnvironment }
-func (r StartJobRequest) GetJobType() domain.JobType              { return r.JobType }
-func (r StartJobRequest) GetWorkflowUuid() string                 { return r.WorkflowUuid }
-func (r StartJobRequest) GetWorkingDirectory() string             { return r.WorkingDirectory }
-func (r StartJobRequest) GetUploads() []domain.FileUpload         { return r.Uploads }
-func (r StartJobRequest) GetDependencies() []string               { return r.Dependencies }
-
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components.
 // Initializes all core services, starts the scheduler, and begins periodic cleanup.
 // Returns a fully configured joblet ready for job execution.
-func NewPlatformJoblet(store JobStore, cfg *config.Config, networkStoreAdapter adapters.NetworkStoreAdapter) interfaces.Joblet {
+func NewPlatformJoblet(store JobStore, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
 
-	// Create network store adapter
-	networkStore := NewNetworkStoreAdapter(networkStoreAdapter)
-
-	// Initialize all specialized components
-	c := initializeComponents(store, cfg, platformInterface, jobletLogger, networkStore)
+	// Initialize all specialized components (use adapter directly)
+	c := initializeComponents(store, cfg, platformInterface, jobletLogger, networkStoreAdapter)
 
 	// Create the joblet
 	j := &Joblet{
@@ -111,8 +70,8 @@ func NewPlatformJoblet(store JobStore, cfg *config.Config, networkStoreAdapter a
 		cleanup:         c.cleanup,
 	}
 
-	// Create scheduler with adapter
-	s := scheduler.New(&schedulerAdapter{joblet: j})
+	// Create scheduler with simplified executor
+	s := scheduler.New(&jobletExecutor{j})
 	j.scheduler = s
 
 	// Setup cgroup controllers
@@ -158,18 +117,21 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 	)
 
 	// Build internal request
-	internalReq := StartJobRequest{
+	internalReq := job.BuildRequest{
 		Command:           req.Command,
 		Args:              req.Args,
 		Limits:            *limits,
-		Uploads:           req.Uploads,
 		Schedule:          req.Schedule,
+		Uploads:           req.Uploads,
 		Network:           req.Network,
 		Volumes:           req.Volumes,
 		Runtime:           req.Runtime,
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
-		JobType:           req.JobType, // Pass job type for isolation configuration
+		JobType:           req.JobType,
+		WorkflowUuid:      req.WorkflowUuid,
+		WorkingDirectory:  req.WorkingDirectory,
+		Dependencies:      req.Dependencies,
 	}
 
 	log := j.logger.WithFields(
@@ -208,7 +170,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 // scheduleJob handles scheduled job execution by parsing the schedule time,
 // preparing uploads, and queuing the job for future execution. Validates
 // schedule format, pre-processes uploads, and registers with scheduler.
-func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
+func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req job.BuildRequest) (*domain.Job, error) {
 	log := j.logger.WithField("jobID", job.Uuid)
 
 	// Parse and set scheduled time
@@ -255,7 +217,7 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req StartJobR
 // executeJob handles immediate job execution by setting up resources,
 // coordinating with the execution engine, and starting monitoring.
 // Manages complete lifecycle: resource setup → execution → monitoring.
-func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRequest) (*domain.Job, error) {
+func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildRequest) (*domain.Job, error) {
 	log := j.logger.WithField("jobID", job.Uuid)
 	log.Debug("executing job immediately")
 
@@ -295,10 +257,14 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req StartJobRe
 }
 
 // ExecuteScheduledJob implements the interfaces.Joblet interface for scheduled job execution.
-// Called by scheduler when scheduled time arrives - transitions job to running state
-// and delegates to executeJob for actual execution (uploads already processed).
+// Called by external components that depend on the interface contract.
 func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
-	jobObj := req.Job
+	return j.executeScheduledJob(ctx, req.Job)
+}
+
+// executeScheduledJob implements the actual scheduled job execution logic.
+// Used by both the interface method and scheduler.JobExecutor interface.
+func (j *Joblet) executeScheduledJob(ctx context.Context, jobObj *domain.Job) error {
 	log := j.logger.WithField("jobID", jobObj.Uuid)
 	log.Info("executing scheduled job")
 
@@ -307,7 +273,7 @@ func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.Execute
 	j.store.UpdateJob(jobObj)
 
 	// Execute (uploads already processed during scheduling)
-	_, err := j.executeJob(ctx, jobObj, StartJobRequest{})
+	_, err := j.executeJob(ctx, jobObj, job.BuildRequest{})
 	return err
 }
 
@@ -318,7 +284,7 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 	log := j.logger.WithField("jobID", req.JobID)
 	log.Debug("stopping job", "force", req.Force, "reason", req.Reason)
 
-	jb, exists := j.store.GetJob(req.JobID)
+	jb, exists := j.store.Job(req.JobID)
 	if !exists {
 		return fmt.Errorf("job not found: %s", req.JobID)
 	}
@@ -389,7 +355,7 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 	log.Debug("deleting job", "reason", req.Reason)
 
 	// Check if job exists
-	jb, exists := j.store.GetJob(req.JobID)
+	jb, exists := j.store.Job(req.JobID)
 	if !exists {
 		return fmt.Errorf("job not found: %s", req.JobID)
 	}
@@ -580,7 +546,7 @@ func initializeComponents(store JobStore, cfg *config.Config, platform platform.
 		platform,
 		cfg,
 		logger,
-		networkStore.(*NetworkStoreAdapter).GetUnderlyingStore(),
+		networkStore,
 	)
 
 	return &components{
@@ -605,19 +571,11 @@ type components struct {
 	cleanup         *cleanup.Coordinator
 }
 
-// schedulerAdapter adapts the Joblet to the scheduler.JobExecutor interface.
-// Bridge pattern to allow scheduler to execute jobs through the joblet
-// while maintaining interface compatibility.
-type schedulerAdapter struct {
+// jobletExecutor adapts joblet to scheduler.JobExecutor interface
+type jobletExecutor struct {
 	joblet *Joblet
 }
 
-// ExecuteScheduledJob adapts the scheduler interface to joblet's interface.
-// Transforms scheduler's job execution request to joblet's expected format
-// and delegates to the main joblet execution method.
-func (sa *schedulerAdapter) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
-	req := interfaces.ExecuteScheduledJobRequest{
-		Job: job,
-	}
-	return sa.joblet.ExecuteScheduledJob(ctx, req)
+func (je *jobletExecutor) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
+	return je.joblet.executeScheduledJob(ctx, job)
 }

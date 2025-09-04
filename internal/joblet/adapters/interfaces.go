@@ -4,42 +4,30 @@ import (
 	"context"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/interfaces"
+	"joblet/internal/joblet/network"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-// DomainStreamer defines the interface for streaming data to clients.
-// Provides methods for sending log data and keepalive messages.
-//
-//counterfeiter:generate . DomainStreamer
-type DomainStreamer interface {
-	// SendData sends log data chunk to the client stream.
-	SendData(data []byte) error
-	// SendKeepalive sends a keepalive message to maintain connection.
-	SendKeepalive() error
-	// Context returns the streaming context for cancellation handling.
-	Context() context.Context
-}
-
 // JobStoreAdapter provides job storage with buffer management and pub-sub capabilities.
 //
-//counterfeiter:generate . JobStoreAdapter
-type JobStoreAdapter interface {
+//counterfeiter:generate . JobStorer
+type JobStorer interface {
 	// Core job management operations
 	CreateNewJob(job *domain.Job)
 	UpdateJob(job *domain.Job)
-	GetJob(id string) (*domain.Job, bool)
-	GetJobByPrefix(prefix string) (*domain.Job, bool)
+	Job(id string) (*domain.Job, bool)
+	JobByPrefix(prefix string) (*domain.Job, bool)
 	ListJobs() []*domain.Job
-	WriteToBuffer(jobId string, chunk []byte)
-	GetOutput(id string) ([]byte, bool, error)
-	SendUpdatesToClient(ctx context.Context, id string, stream DomainStreamer) error
+	WriteToBuffer(jobID string, chunk []byte)
+	Output(id string) ([]byte, bool, error)
+	SendUpdatesToClient(ctx context.Context, id string, stream interfaces.DomainStreamer) error
 
 	// Log management
-	DeleteJobLogs(jobId string) error
+	DeleteJobLogs(jobID string) error
 
 	// Job cleanup - complete job deletion including logs and metadata
-	DeleteJob(jobId string) error
+	DeleteJob(jobID string) error
 
 	// Lifecycle management
 	Close() error
@@ -47,8 +35,8 @@ type JobStoreAdapter interface {
 
 // VolumeStoreAdapter provides volume storage.
 //
-//counterfeiter:generate . VolumeStoreAdapter
-type VolumeStoreAdapter interface {
+//counterfeiter:generate . VolumeStorer
+type VolumeStorer interface {
 	// Embed the standard VolumeStore interface
 	interfaces.VolumeStore
 
@@ -58,17 +46,19 @@ type VolumeStoreAdapter interface {
 
 // NetworkStoreAdapter provides network storage.
 //
-//counterfeiter:generate . NetworkStoreAdapter
-type NetworkStoreAdapter interface {
+//counterfeiter:generate . NetworkStorer
+type NetworkStorer interface {
 	// Network configuration management
 	CreateNetwork(config *NetworkConfig) error
-	GetNetwork(name string) (*NetworkConfig, bool)
+	Network(name string) (*NetworkConfig, bool)
+	NetworkConfig(name string) (*network.NetworkConfig, error)    // For network.NetworkSetup compatibility
+	GetNetworkConfig(name string) (*network.NetworkConfig, error) // Deprecated: use NetworkConfig
 	ListNetworks() []*NetworkConfig
 	RemoveNetwork(name string) error
 
 	// Job network assignment
 	AssignJobToNetwork(jobID, networkName string, allocation *JobNetworkAllocation) error
-	GetJobNetworkAllocation(jobID string) (*JobNetworkAllocation, bool)
+	JobNetworkAllocation(jobID string) (*JobNetworkAllocation, bool)
 	RemoveJobFromNetwork(jobID string) error
 	ListJobsInNetwork(networkName string) []*JobNetworkAllocation
 

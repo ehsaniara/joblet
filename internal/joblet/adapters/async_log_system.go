@@ -94,26 +94,8 @@ type DiskWriter struct {
 }
 
 // NewAsyncLogSystem creates a new rate-decoupled async log system optimized for HPC workloads.
-//
-// This function initializes a complete async logging infrastructure that provides:
-// - Non-blocking log writes (jobs never wait for disk I/O)
-// - Configurable overflow protection strategies
-// - Background batched disk writing for optimal performance
-// - Comprehensive metrics and monitoring
-//
-// The system uses a producer-consumer pattern where:
-// - Jobs write to a large in-memory queue instantly (microsecond latency)
-// - Background workers batch writes to disk for efficiency
-// - Overflow strategies handle extreme load without data loss
-//
-// Parameters:
-//   - config: Log persistence configuration including queue size, memory limits, overflow strategy
-//   - logger: Logger instance for system monitoring and debugging
-//
-// Returns:
-//   - *AsyncLogSystem: Fully initialized async log system ready for high-throughput logging
-//
-// The returned system must be closed with Close() to ensure graceful shutdown and data preservation.
+// Provides non-blocking log writes with configurable overflow protection and background batched disk writing.
+// Must be closed with Close() to ensure graceful shutdown and data preservation.
 func NewAsyncLogSystem(config *config.LogPersistenceConfig, logger *logger.Logger) *AsyncLogSystem {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -159,7 +141,10 @@ func NewAsyncLogSystem(config *config.LogPersistenceConfig, logger *logger.Logge
 	}
 
 	// Create spill directory
-	_ = os.MkdirAll(system.spillDir, 0755)
+	if err := os.MkdirAll(system.spillDir, 0755); err != nil {
+		logger.Error("failed to create spill directory", "error", err, "dir", system.spillDir)
+		// Continue anyway - spill to disk might fail but memory buffering will work
+	}
 
 	// Create disk writer
 	system.diskWriter = &DiskWriter{
@@ -198,23 +183,23 @@ func NewAsyncLogSystem(config *config.LogPersistenceConfig, logger *logger.Logge
 //
 // The function returns immediately after queuing - actual disk writing happens
 // asynchronously in background workers.
-func (als *AsyncLogSystem) WriteLog(jobID string, data []byte) {
+func (a *AsyncLogSystem) WriteLog(jobID string, data []byte) {
 	chunk := LogChunk{
 		JobID:     jobID,
 		Data:      make([]byte, len(data)), // Copy to avoid data races
 		Timestamp: time.Now(),
-		Sequence:  atomic.AddInt64(&als.metrics.TotalBytesWritten, int64(len(data))),
+		Sequence:  atomic.AddInt64(&a.metrics.TotalBytesWritten, int64(len(data))),
 	}
 	copy(chunk.Data, data)
 
 	// Non-blocking write - job NEVER waits
 	select {
-	case als.logQueue <- chunk:
+	case a.logQueue <- chunk:
 		// Success: queued for async processing
-		atomic.StoreInt64(&als.metrics.QueueUsage, int64(len(als.logQueue)))
+		atomic.StoreInt64(&a.metrics.QueueUsage, int64(len(a.logQueue)))
 	default:
 		// Queue full: handle overflow WITHOUT blocking job
-		als.handleOverflow(chunk)
+		a.handleOverflow(chunk)
 	}
 }
 
@@ -241,31 +226,31 @@ func (als *AsyncLogSystem) WriteLog(jobID string, data []byte) {
 //
 // The function updates overflow metrics and ensures the chunk is handled
 // according to the configured strategy, never dropping data silently.
-func (als *AsyncLogSystem) handleOverflow(chunk LogChunk) {
-	atomic.AddInt64(&als.metrics.OverflowEvents, 1)
+func (a *AsyncLogSystem) handleOverflow(chunk LogChunk) {
+	atomic.AddInt64(&a.metrics.OverflowEvents, 1)
 
-	switch als.overflowMode {
+	switch a.overflowMode {
 	case OverflowCompress:
-		if als.compressChunk(chunk) {
+		if a.compressChunk(chunk) {
 			return
 		}
 		// Fallback to spill if compression fails
 		fallthrough
 	case OverflowSpill:
-		als.spillToDisk(chunk)
+		a.spillToDisk(chunk)
 	case OverflowSample:
-		als.sampleChunk(chunk)
+		a.sampleChunk(chunk)
 	case OverflowAlert:
-		als.alertAndExpand(chunk)
+		a.alertAndExpand(chunk)
 	}
 }
 
 // compressChunk compresses the chunk to save memory
-func (als *AsyncLogSystem) compressChunk(chunk LogChunk) bool {
-	als.compressMutex.Lock()
-	defer als.compressMutex.Unlock()
+func (a *AsyncLogSystem) compressChunk(chunk LogChunk) bool {
+	a.compressMutex.Lock()
+	defer a.compressMutex.Unlock()
 
-	buffer, exists := als.compressedChunks[chunk.JobID]
+	buffer, exists := a.compressedChunks[chunk.JobID]
 	if !exists {
 		buffer = &CompressedBuffer{
 			buffer: &bytes.Buffer{},
@@ -275,7 +260,7 @@ func (als *AsyncLogSystem) compressChunk(chunk LogChunk) bool {
 		if err != nil {
 			return false
 		}
-		als.compressedChunks[chunk.JobID] = buffer
+		a.compressedChunks[chunk.JobID] = buffer
 	}
 
 	_, err := buffer.writer.Write(chunk.Data)
@@ -289,28 +274,28 @@ func (als *AsyncLogSystem) compressChunk(chunk LogChunk) bool {
 	if buffer.chunkCount > 0 {
 		originalSize := float64(buffer.chunkCount * len(chunk.Data))
 		compressedSize := float64(buffer.buffer.Len())
-		als.metrics.CompressionRatio = compressedSize / originalSize
+		a.metrics.CompressionRatio = compressedSize / originalSize
 	}
 
 	return true
 }
 
 // spillToDisk writes chunk to temporary spill file
-func (als *AsyncLogSystem) spillToDisk(chunk LogChunk) {
-	als.spillMutex.Lock()
-	defer als.spillMutex.Unlock()
+func (a *AsyncLogSystem) spillToDisk(chunk LogChunk) {
+	a.spillMutex.Lock()
+	defer a.spillMutex.Unlock()
 
-	spillFile, exists := als.spillFiles[chunk.JobID]
+	spillFile, exists := a.spillFiles[chunk.JobID]
 	if !exists {
 		var err error
-		spillPath := filepath.Join(als.spillDir, fmt.Sprintf("spill_%s_%d.log", chunk.JobID, time.Now().Unix()))
+		spillPath := filepath.Join(a.spillDir, fmt.Sprintf("spill_%s_%d.log", chunk.JobID, time.Now().Unix()))
 		spillFile, err = os.Create(spillPath)
 		if err != nil {
-			als.logger.Error("failed to create spill file", "error", err)
+			a.logger.Error("failed to create spill file", "error", err)
 			return
 		}
-		als.spillFiles[chunk.JobID] = spillFile
-		atomic.AddInt32(&als.metrics.SpillFilesCount, 1)
+		a.spillFiles[chunk.JobID] = spillFile
+		atomic.AddInt32(&a.metrics.SpillFilesCount, 1)
 	}
 
 	_, _ = spillFile.Write(chunk.Data)
@@ -318,47 +303,47 @@ func (als *AsyncLogSystem) spillToDisk(chunk LogChunk) {
 }
 
 // sampleChunk implements sampling strategy (keep every Nth chunk)
-func (als *AsyncLogSystem) sampleChunk(chunk LogChunk) {
+func (a *AsyncLogSystem) sampleChunk(chunk LogChunk) {
 	// Keep every 10th chunk during overflow
 	if chunk.Sequence%10 == 0 {
 		// Force into queue by removing oldest item
 		select {
-		case <-als.logQueue:
+		case <-a.logQueue:
 			// Removed one item
 		default:
 			// Queue empty
 		}
-		als.logQueue <- chunk
+		a.logQueue <- chunk
 	} else {
-		atomic.AddInt64(&als.metrics.DroppedChunks, 1)
+		atomic.AddInt64(&a.metrics.DroppedChunks, 1)
 	}
 }
 
 // alertAndExpand alerts operators and temporarily increases limits
-func (als *AsyncLogSystem) alertAndExpand(chunk LogChunk) {
-	als.logger.Error("log queue overflow - emergency expansion",
+func (a *AsyncLogSystem) alertAndExpand(chunk LogChunk) {
+	a.logger.Error("log queue overflow - emergency expansion",
 		"jobId", chunk.JobID,
-		"queueUsage", len(als.logQueue),
-		"queueCapacity", als.queueSize)
+		"queueUsage", len(a.logQueue),
+		"queueCapacity", a.queueSize)
 
 	// Try to expand memory limits temporarily
-	als.memoryLimit *= 2
+	a.memoryLimit *= 2
 
 	// Try compression as fallback
-	if !als.compressChunk(chunk) {
-		als.spillToDisk(chunk)
+	if !a.compressChunk(chunk) {
+		a.spillToDisk(chunk)
 	}
 }
 
 // startWorkers starts background processing goroutines
-func (als *AsyncLogSystem) startWorkers() {
+func (a *AsyncLogSystem) startWorkers() {
 	// Start disk writer worker
-	als.wg.Add(1)
-	go als.diskWriterLoop()
+	a.wg.Add(1)
+	go a.diskWriterLoop()
 
 	// Start metrics updater
-	als.wg.Add(1)
-	go als.metricsLoop()
+	a.wg.Add(1)
+	go a.metricsLoop()
 }
 
 // diskWriterLoop processes the log queue in batches for optimal disk I/O performance.
@@ -381,19 +366,19 @@ func (als *AsyncLogSystem) startWorkers() {
 //
 // The loop continues until the system context is cancelled, at which point
 // it flushes any remaining batched data before terminating.
-func (als *AsyncLogSystem) diskWriterLoop() {
-	defer als.wg.Done()
+func (a *AsyncLogSystem) diskWriterLoop() {
+	defer a.wg.Done()
 
 	// Use configurable batch size and flush interval
 	batchSize := 100
 	flushInterval := 100 * time.Millisecond
 
-	if als.config != nil {
-		if als.config.BatchSize > 0 {
-			batchSize = als.config.BatchSize
+	if a.config != nil {
+		if a.config.BatchSize > 0 {
+			batchSize = a.config.BatchSize
 		}
-		if als.config.FlushInterval > 0 {
-			flushInterval = als.config.FlushInterval
+		if a.config.FlushInterval > 0 {
+			flushInterval = a.config.FlushInterval
 		}
 	}
 
@@ -403,27 +388,27 @@ func (als *AsyncLogSystem) diskWriterLoop() {
 
 	for {
 		select {
-		case chunk := <-als.logQueue:
+		case chunk := <-a.logQueue:
 			batch = append(batch, chunk)
-			atomic.StoreInt64(&als.metrics.QueueUsage, int64(len(als.logQueue)))
+			atomic.StoreInt64(&a.metrics.QueueUsage, int64(len(a.logQueue)))
 
 			// Flush when batch is full
 			if len(batch) >= batchSize {
-				als.flushBatch(batch)
+				a.flushBatch(batch)
 				batch = batch[:0]
 			}
 
 		case <-ticker.C:
 			// Periodic flush even if batch not full
 			if len(batch) > 0 {
-				als.flushBatch(batch)
+				a.flushBatch(batch)
 				batch = batch[:0]
 			}
 
-		case <-als.ctx.Done():
+		case <-a.ctx.Done():
 			// Flush remaining batch on shutdown
 			if len(batch) > 0 {
-				als.flushBatch(batch)
+				a.flushBatch(batch)
 			}
 			return
 		}
@@ -431,7 +416,7 @@ func (als *AsyncLogSystem) diskWriterLoop() {
 }
 
 // flushBatch writes a batch of chunks to disk
-func (als *AsyncLogSystem) flushBatch(batch []LogChunk) {
+func (a *AsyncLogSystem) flushBatch(batch []LogChunk) {
 	// Group by job for efficient writing
 	jobBatches := make(map[string][]LogChunk)
 	for _, chunk := range batch {
@@ -440,7 +425,7 @@ func (als *AsyncLogSystem) flushBatch(batch []LogChunk) {
 
 	// Write each job's chunks
 	for jobID, chunks := range jobBatches {
-		logFile := als.diskWriter.getLogFile(jobID)
+		logFile := a.diskWriter.getLogFile(jobID)
 		if logFile != nil {
 			for _, chunk := range chunks {
 				_, _ = logFile.Write(chunk.Data)
@@ -451,8 +436,8 @@ func (als *AsyncLogSystem) flushBatch(batch []LogChunk) {
 }
 
 // metricsLoop updates metrics periodically
-func (als *AsyncLogSystem) metricsLoop() {
-	defer als.wg.Done()
+func (a *AsyncLogSystem) metricsLoop() {
+	defer a.wg.Done()
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -460,30 +445,30 @@ func (als *AsyncLogSystem) metricsLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			als.updateMetrics()
-		case <-als.ctx.Done():
+			a.updateMetrics()
+		case <-a.ctx.Done():
 			return
 		}
 	}
 }
 
 // updateMetrics calculates current system metrics
-func (als *AsyncLogSystem) updateMetrics() {
-	queueUsage := float64(len(als.logQueue)) / float64(als.queueSize)
+func (a *AsyncLogSystem) updateMetrics() {
+	queueUsage := float64(len(a.logQueue)) / float64(a.queueSize)
 
 	if queueUsage > 0.8 {
-		als.logger.Warn("log queue usage high", "usage", queueUsage)
+		a.logger.Warn("log queue usage high", "usage", queueUsage)
 	}
 
 	// Update queue metrics
-	atomic.StoreInt64(&als.metrics.QueueUsage, int64(len(als.logQueue)))
+	atomic.StoreInt64(&a.metrics.QueueUsage, int64(len(a.logQueue)))
 
 	// Log metrics periodically
-	als.logger.Debug("async log system metrics",
-		"queueUsage", atomic.LoadInt64(&als.metrics.QueueUsage),
-		"overflowEvents", atomic.LoadInt64(&als.metrics.OverflowEvents),
-		"spillFiles", atomic.LoadInt32(&als.metrics.SpillFilesCount),
-		"totalBytes", atomic.LoadInt64(&als.metrics.TotalBytesWritten))
+	a.logger.Debug("async log system metrics",
+		"queueUsage", atomic.LoadInt64(&a.metrics.QueueUsage),
+		"overflowEvents", atomic.LoadInt64(&a.metrics.OverflowEvents),
+		"spillFiles", atomic.LoadInt32(&a.metrics.SpillFilesCount),
+		"totalBytes", atomic.LoadInt64(&a.metrics.TotalBytesWritten))
 }
 
 // GetMetrics returns current system metrics for monitoring and operational visibility.
@@ -507,15 +492,15 @@ func (als *AsyncLogSystem) updateMetrics() {
 //
 // Returns:
 //   - *LogSystemMetrics: Current system metrics with atomic consistency
-func (als *AsyncLogSystem) GetMetrics() *LogSystemMetrics {
+func (a *AsyncLogSystem) GetMetrics() *LogSystemMetrics {
 	return &LogSystemMetrics{
-		QueueUsage:        atomic.LoadInt64(&als.metrics.QueueUsage),
-		QueueCapacity:     als.metrics.QueueCapacity,
-		OverflowEvents:    atomic.LoadInt64(&als.metrics.OverflowEvents),
-		SpillFilesCount:   atomic.LoadInt32(&als.metrics.SpillFilesCount),
-		TotalBytesWritten: atomic.LoadInt64(&als.metrics.TotalBytesWritten),
-		DroppedChunks:     atomic.LoadInt64(&als.metrics.DroppedChunks),
-		CompressionRatio:  als.metrics.CompressionRatio,
+		QueueUsage:        atomic.LoadInt64(&a.metrics.QueueUsage),
+		QueueCapacity:     a.metrics.QueueCapacity,
+		OverflowEvents:    atomic.LoadInt64(&a.metrics.OverflowEvents),
+		SpillFilesCount:   atomic.LoadInt32(&a.metrics.SpillFilesCount),
+		TotalBytesWritten: atomic.LoadInt64(&a.metrics.TotalBytesWritten),
+		DroppedChunks:     atomic.LoadInt64(&a.metrics.DroppedChunks),
+		CompressionRatio:  a.metrics.CompressionRatio,
 	}
 }
 
@@ -542,19 +527,19 @@ func (als *AsyncLogSystem) GetMetrics() *LogSystemMetrics {
 //
 // Returns:
 //   - error: Any error encountered during cleanup (logged but not fatal)
-func (als *AsyncLogSystem) Close() error {
-	als.cancel()
-	als.wg.Wait()
+func (a *AsyncLogSystem) Close() error {
+	a.cancel()
+	a.wg.Wait()
 
 	// Close spill files
-	als.spillMutex.Lock()
-	for _, file := range als.spillFiles {
+	a.spillMutex.Lock()
+	for _, file := range a.spillFiles {
 		_ = file.Close()
 	}
-	als.spillMutex.Unlock()
+	a.spillMutex.Unlock()
 
 	// Close disk writer
-	return als.diskWriter.Close()
+	return a.diskWriter.Close()
 }
 
 // DiskWriter methods

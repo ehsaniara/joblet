@@ -26,7 +26,7 @@ type Store interface {
 	ListJobs() []*domain.Job
 	// WriteToBuffer appends log data to a job's output buffer.
 	// Notifies subscribers of new log chunks for real-time streaming.
-	WriteToBuffer(jobId string, chunk []byte)
+	WriteToBuffer(jobID string, chunk []byte)
 	// GetOutput retrieves the complete output buffer for a job.
 	// Returns the buffer data, whether job is still running, and any error.
 	GetOutput(id string) ([]byte, bool, error)

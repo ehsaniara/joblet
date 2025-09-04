@@ -8,15 +8,15 @@ import (
 
 // ServiceRegistry centralizes service dependencies to avoid circular imports
 type ServiceRegistry interface {
-	GetJobService() JobServiceInterface
-	GetVolumeService() VolumeServiceInterface
-	GetNetworkService() NetworkServiceInterface
-	GetMonitoringService() MonitoringServiceInterface
-	GetRuntimeService() RuntimeServiceInterface
+	GetJobService() JobService
+	GetVolumeService() VolumeService
+	GetNetworkService() NetworkService
+	GetMonitoringService() MonitoringService
+	GetRuntimeService() RuntimeService
 }
 
 // JobServiceInterface defines core job operations for lifecycle management
-type JobServiceInterface interface {
+type JobService interface {
 	// StartJob initiates a new job execution with the given configuration
 	StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error)
 	// StopJob terminates a running job gracefully or forcefully
@@ -32,7 +32,7 @@ type JobServiceInterface interface {
 }
 
 // VolumeServiceInterface defines volume operations for persistent storage management
-type VolumeServiceInterface interface {
+type VolumeService interface {
 	// CreateVolume creates a new persistent volume with specified name and size
 	CreateVolume(ctx context.Context, name string, size int64) error
 	// DeleteVolume removes a volume and all its data permanently
@@ -44,7 +44,7 @@ type VolumeServiceInterface interface {
 }
 
 // NetworkServiceInterface defines network operations for job isolation and connectivity
-type NetworkServiceInterface interface {
+type NetworkService interface {
 	// CreateNetwork creates a new isolated network with the given configuration
 	CreateNetwork(ctx context.Context, name string, config interface{}) error
 	// DeleteNetwork removes a network and cleans up all associated resources
@@ -56,7 +56,7 @@ type NetworkServiceInterface interface {
 }
 
 // MonitoringServiceInterface defines monitoring operations for system and job observability
-type MonitoringServiceInterface interface {
+type MonitoringService interface {
 	// CollectSystemMetrics gathers current system resource usage and health data
 	CollectSystemMetrics(ctx context.Context) (map[string]interface{}, error)
 	// GetJobMetrics retrieves performance and resource metrics for a specific job
@@ -67,8 +67,8 @@ type MonitoringServiceInterface interface {
 	StopMonitoring(ctx context.Context, jobID string) error
 }
 
-// RuntimeServiceInterface defines runtime operations for execution environment management
-type RuntimeServiceInterface interface {
+// RuntimeService defines runtime operations for execution environment management
+type RuntimeService interface {
 	// ListRuntimes returns all available runtime environments in the system
 	ListRuntimes(ctx context.Context) ([]string, error)
 	// InstallRuntime downloads and installs a new runtime environment by specification

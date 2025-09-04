@@ -18,7 +18,7 @@ type WorkflowJobConfig struct {
 
 // JobRequirement represents a dependency on another job
 type JobRequirement struct {
-	JobId      string `yaml:"-"`
+	JobID      string `yaml:"-"`
 	Status     string `yaml:"-"`
 	Expression string `yaml:"expression"`
 }
@@ -32,7 +32,7 @@ func (jr *JobRequirement) UnmarshalYAML(unmarshal func(interface{}) error) error
 			if k == "expression" {
 				jr.Expression = v
 			} else {
-				jr.JobId = k
+				jr.JobID = k
 				jr.Status = v
 			}
 		}
@@ -223,8 +223,8 @@ func ValidateDependencies(jobs map[string]WorkflowJobConfig) error {
 	for name, job := range jobs {
 		var deps []string
 		for _, req := range job.Requires {
-			if req.JobId != "" {
-				deps = append(deps, req.JobId)
+			if req.JobID != "" {
+				deps = append(deps, req.JobID)
 			} else if req.Expression != "" {
 				// Parse expression to extract job names
 				jobNames := extractJobNamesFromExpression(req.Expression)
@@ -317,8 +317,8 @@ func BuildDependencyGraph(jobs map[string]WorkflowJobConfig) ([]string, error) {
 	// Build the graph
 	for name, job := range jobs {
 		for _, req := range job.Requires {
-			if req.JobId != "" {
-				graph[req.JobId] = append(graph[req.JobId], name)
+			if req.JobID != "" {
+				graph[req.JobID] = append(graph[req.JobID], name)
 				inDegree[name]++
 			} else if req.Expression != "" {
 				// Parse expression to extract job names

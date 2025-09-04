@@ -78,7 +78,7 @@ Runtime Examples:
   rnx run --runtime=python-3.11-ml --upload=script.py python script.py
   rnx run --runtime=openjdk-21 java -jar myapp.jar
   rnx run --runtime=python-3.11-ml python train_model.py
-  rnx run --runtime=node-18 --upload=app.js node app.js
+  rnx run --runtime=graalvmjdk-21 --upload=App.java java App.java
 
 Environment Variable Examples:
   # Pass regular environment variables (visible in logs)

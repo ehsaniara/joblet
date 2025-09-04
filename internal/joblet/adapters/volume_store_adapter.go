@@ -21,7 +21,7 @@ type volumeStore[K comparable, V any] interface {
 
 // Note: Error checking helpers are defined in job_store_adapter.go to avoid redeclaration
 
-// volumeStoreAdapter implements VolumeStoreAdapter using the new generic store backend.
+// volumeStoreAdapter implements VolumeStorer using the new generic store backend.
 // It maintains full compatibility with the existing state.VolumeStore interface.
 type volumeStoreAdapter struct {
 	// Generic storage backend
@@ -36,12 +36,12 @@ type volumeStoreAdapter struct {
 	closeMutex sync.RWMutex
 }
 
-// NewVolumeStoreAdapter creates a new volume store adapter with the specified backend.
+// NewVolumeStorer creates a new volume store adapter with the specified backend.
 // Initializes volume storage, job usage tracking, and logging for volume management.
 func NewVolumeStoreAdapter(
 	volumeStore volumeStore[string, *domain.Volume],
 	logger *logger.Logger,
-) VolumeStoreAdapter {
+) VolumeStorer {
 	if logger == nil {
 		logger = logger.WithField("component", "volume-store-adapter")
 	}

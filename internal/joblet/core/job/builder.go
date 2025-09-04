@@ -11,8 +11,6 @@ import (
 	"joblet/pkg/logger"
 )
 
-//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
-
 // Builder creates jobs with validation and defaults.
 // Core job construction service that transforms requests into validated domain objects
 // with proper UUIDs, resource limits, and field population.
@@ -36,24 +34,22 @@ func NewBuilder(cfg *config.Config, idGen *IDGenerator, resValidator *validation
 }
 
 // BuildRequest represents a request to build a job.
-// Interface defining all parameters needed for job construction,
-// implemented by various request types (individual, workflow, scheduled).
-//
-//counterfeiter:generate . BuildRequest
-type BuildRequest interface {
-	GetCommand() string
-	GetArgs() []string
-	GetLimits() domain.ResourceLimits
-	GetNetwork() string
-	GetVolumes() []string
-	GetRuntime() string
-	GetEnvironment() map[string]string
-	GetSecretEnvironment() map[string]string
-	GetJobType() domain.JobType
-	GetWorkflowUuid() string
-	GetWorkingDirectory() string
-	GetUploads() []domain.FileUpload
-	GetDependencies() []string
+// Simplified from interface to concrete struct since there's only one real implementation.
+type BuildRequest struct {
+	Command           string
+	Args              []string
+	Limits            domain.ResourceLimits
+	Schedule          string // Added for compatibility with scheduling
+	Network           string
+	Volumes           []string
+	Runtime           string
+	Environment       map[string]string
+	SecretEnvironment map[string]string
+	JobType           domain.JobType
+	WorkflowUuid      string
+	WorkingDirectory  string
+	Uploads           []domain.FileUpload
+	Dependencies      []string
 }
 
 // Build creates a new job from the request.
@@ -63,12 +59,12 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	// Generate UUID
 	jobUuid := b.idGenerator.Next()
 
-	b.logger.Debug("building job", "jobUuid", jobUuid, "command", req.GetCommand())
+	b.logger.Debug("building job", "jobUuid", jobUuid, "command", req.Command)
 
 	// Create job - debug all field values
-	volumes := b.copyStrings(req.GetVolumes())
-	network := req.GetNetwork()
-	runtime := req.GetRuntime()
+	volumes := b.copyStrings(req.Volumes)
+	network := req.Network
+	runtime := req.Runtime
 
 	b.logger.Debug("building job with all fields",
 		"jobUuid", jobUuid,
@@ -81,25 +77,25 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 
 	job := &domain.Job{
 		Uuid:              jobUuid,
-		Command:           req.GetCommand(),
-		Args:              b.copyStrings(req.GetArgs()),
+		Command:           req.Command,
+		Args:              b.copyStrings(req.Args),
 		Type:              b.determineJobType(req), // Set job type
 		Status:            domain.StatusInitializing,
 		CgroupPath:        b.generateCgroupPath(jobUuid),
 		StartTime:         time.Now(),
-		Network:           req.GetNetwork(),
+		Network:           req.Network,
 		Volumes:           volumes,
-		Runtime:           req.GetRuntime(),
-		Environment:       b.copyEnvironment(req.GetEnvironment()),
-		SecretEnvironment: b.copyEnvironment(req.GetSecretEnvironment()),
-		WorkflowUuid:      req.GetWorkflowUuid(),
-		WorkingDirectory:  req.GetWorkingDirectory(),
-		Uploads:           req.GetUploads(),
-		Dependencies:      b.copyStrings(req.GetDependencies()),
+		Runtime:           req.Runtime,
+		Environment:       b.copyEnvironment(req.Environment),
+		SecretEnvironment: b.copyEnvironment(req.SecretEnvironment),
+		WorkflowUuid:      req.WorkflowUuid,
+		WorkingDirectory:  req.WorkingDirectory,
+		Uploads:           req.Uploads,
+		Dependencies:      b.copyStrings(req.Dependencies),
 	}
 
 	// Apply resource limits with defaults
-	job.Limits = b.applyResourceDefaults(req.GetLimits())
+	job.Limits = b.applyResourceDefaults(req.Limits)
 
 	// Calculate effective CPU if cores are specified
 	if !job.Limits.CPUCores.IsEmpty() {
@@ -150,8 +146,8 @@ func (b *Builder) applyResourceDefaults(limits domain.ResourceLimits) domain.Res
 }
 
 // generateCgroupPath generates the cgroup path for a job
-func (b *Builder) generateCgroupPath(jobUuid string) string {
-	return filepath.Join(b.config.Cgroup.BaseDir, "job-"+jobUuid)
+func (b *Builder) generateCgroupPath(jobUUID string) string {
+	return filepath.Join(b.config.Cgroup.BaseDir, "job-"+jobUUID)
 }
 
 // copyStrings creates a copy of string slice
@@ -176,47 +172,10 @@ func (b *Builder) copyEnvironment(src map[string]string) map[string]string {
 	return dst
 }
 
-// BuildParams can be used as an alternative to the interface approach
-type BuildParams struct {
-	Command           string
-	Network           string
-	Args              []string
-	Limits            domain.ResourceLimits
-	Volumes           []string
-	Runtime           string
-	Environment       map[string]string
-	SecretEnvironment map[string]string
-	JobType           domain.JobType
-	WorkflowUuid      string
-	WorkingDirectory  string
-	Uploads           []domain.FileUpload
-	Dependencies      []string
-}
-
-// Implement BuildRequest interface for BuildParams
-func (p BuildParams) GetCommand() string                      { return p.Command }
-func (p BuildParams) GetArgs() []string                       { return p.Args }
-func (p BuildParams) GetLimits() domain.ResourceLimits        { return p.Limits }
-func (p BuildParams) GetNetwork() string                      { return p.Network }
-func (p BuildParams) GetVolumes() []string                    { return p.Volumes }
-func (p BuildParams) GetRuntime() string                      { return p.Runtime }
-func (p BuildParams) GetEnvironment() map[string]string       { return p.Environment }
-func (p BuildParams) GetSecretEnvironment() map[string]string { return p.SecretEnvironment }
-func (p BuildParams) GetJobType() domain.JobType              { return p.JobType }
-func (p BuildParams) GetWorkflowUuid() string                 { return p.WorkflowUuid }
-func (p BuildParams) GetWorkingDirectory() string             { return p.WorkingDirectory }
-func (p BuildParams) GetUploads() []domain.FileUpload         { return p.Uploads }
-func (p BuildParams) GetDependencies() []string               { return p.Dependencies }
-
-// BuildFromParams builds a job from BuildParams (convenience method)
-func (b *Builder) BuildFromParams(params BuildParams) (*domain.Job, error) {
-	return b.Build(params)
-}
-
 // determineJobType determines the job type based on the request
 func (b *Builder) determineJobType(req BuildRequest) domain.JobType {
 	// Use the explicit JobType from the request (set by service layer)
-	jobType := req.GetJobType()
+	jobType := req.JobType
 
 	if jobType == domain.JobTypeRuntimeBuild {
 		b.logger.Debug("using runtime build job type from service request")

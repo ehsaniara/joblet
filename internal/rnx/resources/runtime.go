@@ -3,24 +3,20 @@ package resources
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"joblet/internal/rnx/common"
 	"joblet/pkg/client"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"text/tabwriter"
 	"time"
 
 	pb "joblet/api/gen"
 
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc/status"
 )
 
 func NewRuntimeCmd() *cobra.Command {
@@ -58,9 +54,6 @@ Examples:
 	cmd.AddCommand(NewRuntimeInfoCmd())
 	cmd.AddCommand(NewRuntimeTestCmd())
 	cmd.AddCommand(NewRuntimeInstallCmd())
-	cmd.AddCommand(NewRuntimeBuildCmd())
-	cmd.AddCommand(NewRuntimeStatusCmd())
-	cmd.AddCommand(NewRuntimeBuildsCmd())
 	cmd.AddCommand(NewRuntimeValidateCmd())
 	cmd.AddCommand(NewRuntimeRemoveCmd())
 
@@ -457,310 +450,6 @@ func runRuntimeInstall(cmd *cobra.Command, runtimeSpec string, force bool, githu
 	}
 }
 
-// New runtime building commands
-
-func NewRuntimeBuildCmd() *cobra.Command {
-	var repository, branch, path string
-	var force bool
-
-	cmd := &cobra.Command{
-		Use:   "build <runtime-spec>",
-		Short: "Build a runtime from a custom source",
-		Long: `Build a runtime environment from a custom source configuration.
-This provides more control than the install command, allowing you to specify
-custom repositories, branches, or even local scripts.
-
-Examples:
-  # Build from default repository
-  rnx runtime build python-3.11-ml
-  
-  # Build from custom repository
-  rnx runtime build openjdk-21 --repository=myorg/custom-runtimes
-  
-  # Build from specific branch
-  rnx runtime build python-3.11-ml --repository=myorg/runtimes --branch=experimental`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRuntimeBuild(cmd, args[0], repository, branch, path, force)
-		},
-	}
-
-	cmd.Flags().StringVar(&repository, "repository", "", "GitHub repository (default: joblet-org/runtimes)")
-	cmd.Flags().StringVar(&branch, "branch", "", "Repository branch (default: main)")
-	cmd.Flags().StringVar(&path, "path", "", "Path within repository (auto-detected if not specified)")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force rebuild if runtime already exists")
-
-	return cmd
-}
-
-func runRuntimeBuild(cmd *cobra.Command, runtimeSpec, repository, branch, path string, force bool) error {
-	ctx := cmd.Context()
-
-	fmt.Printf("🏗️  Building runtime: %s\n", runtimeSpec)
-
-	// Create client and connect to server
-	client, err := common.NewJobClient()
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-	defer client.Close()
-
-	// Check for local runtime scripts first
-	localRuntimePath := filepath.Join("runtimes", runtimeSpec)
-	setupScriptPath := filepath.Join(localRuntimePath, "setup.sh")
-
-	if _, err := os.Stat(setupScriptPath); err == nil {
-		fmt.Printf("📦 Found local runtime at: %s\n", localRuntimePath)
-		return runLocalRuntimeBuild(ctx, client, runtimeSpec, localRuntimePath, force)
-	}
-
-	// If no local runtime and no custom repository specified, error out
-	if repository == "" {
-		return fmt.Errorf("no local runtime found at %s and no repository specified", localRuntimePath)
-	}
-
-	fmt.Printf("📦 No local runtime found, using GitHub repository %s\n", repository)
-
-	// Create build request with GitHub source (only if repository is explicitly specified)
-	req := &pb.BuildRuntimeRequest{
-		RuntimeSpec:  runtimeSpec,
-		Name:         fmt.Sprintf("Build %s", runtimeSpec),
-		ForceRebuild: force,
-		Source: &pb.RuntimeSourceConfig{
-			SourceType: &pb.RuntimeSourceConfig_Github{
-				Github: &pb.GithubSource{
-					Repository: repository,
-					Branch:     branch,
-					Path:       path,
-				},
-			},
-		},
-	}
-
-	resp, err := client.BuildRuntime(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to start runtime build: %w", err)
-	}
-
-	fmt.Printf("✅ Runtime build started\n")
-	fmt.Printf("🔧 Build Job: %s\n", resp.BuildJobUuid)
-	fmt.Printf("📊 Status: %s\n", resp.Status)
-
-	if resp.Message != "" {
-		fmt.Printf("💬 Message: %s\n", resp.Message)
-	}
-
-	fmt.Printf("\n💡 Monitor progress with:\n")
-	fmt.Printf("  rnx log %s                # View build logs\n", resp.BuildJobUuid)
-	fmt.Printf("  rnx runtime status %s     # Check build status\n", resp.BuildJobUuid)
-
-	return nil
-}
-
-func runLocalRuntimeBuild(ctx context.Context, client *client.JobClient, runtimeSpec, localRuntimePath string, force bool) error {
-	// Upload all files from the local runtime directory
-	fmt.Printf("📤 Uploading local runtime scripts...\n")
-
-	// Collect runtime files
-	files := make([]*pb.RuntimeFile, 0)
-
-	// Walk through the runtime directory and collect all files
-	err := filepath.Walk(localRuntimePath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() {
-			// Read file content
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", path, err)
-			}
-
-			// Get relative path from runtime directory
-			relPath, err := filepath.Rel(localRuntimePath, path)
-			if err != nil {
-				return fmt.Errorf("failed to get relative path for %s: %w", path, err)
-			}
-
-			// Create runtime file
-			files = append(files, &pb.RuntimeFile{
-				Path:       relPath,
-				Content:    content,
-				Executable: strings.HasSuffix(relPath, ".sh"),
-			})
-
-			fmt.Printf("📄 Added file: %s\n", relPath)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to collect runtime files: %w", err)
-	}
-
-	if len(files) == 0 {
-		return fmt.Errorf("no files found in runtime directory: %s", localRuntimePath)
-	}
-
-	fmt.Printf("📦 Collected %d files for upload\n", len(files))
-
-	// Create install runtime from local request
-	req := &pb.InstallRuntimeFromLocalRequest{
-		RuntimeSpec:    runtimeSpec,
-		Files:          files,
-		ForceReinstall: force,
-	}
-
-	resp, err := client.InstallRuntimeFromLocal(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to start local runtime installation: %w", err)
-	}
-
-	fmt.Printf("✅ Runtime installation started\n")
-	fmt.Printf("📊 Status: %s\n", resp.Status)
-	fmt.Printf("💬 Message: %s\n", resp.Message)
-
-	return nil
-}
-
-func NewRuntimeStatusCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status <build-job-uuid>",
-		Short: "Check the status of a runtime build",
-		Long:  `Display the current status and progress of a runtime build job.`,
-		Args:  cobra.ExactArgs(1),
-		RunE:  runRuntimeStatus,
-	}
-}
-
-func runRuntimeStatus(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	buildJobUUID := args[0]
-
-	// Create client and connect to server
-	client, err := common.NewJobClient()
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-	defer client.Close()
-
-	req := &pb.GetBuildStatusRequest{
-		BuildJobUuid: buildJobUUID,
-	}
-
-	resp, err := client.GetBuildStatus(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to get build status: %w", err)
-	}
-
-	// Display build status
-	fmt.Printf("Build Job: %s\n", resp.BuildJobUuid)
-	fmt.Printf("Runtime: %s\n", resp.RuntimeSpec)
-	fmt.Printf("Status: %s\n", resp.Status)
-	fmt.Printf("Message: %s\n", resp.Message)
-
-	if resp.StartTime != "" {
-		fmt.Printf("Started: %s\n", resp.StartTime)
-	}
-
-	if resp.EndTime != "" && resp.EndTime != "0001-01-01T00:00:00Z" {
-		fmt.Printf("Ended: %s\n", resp.EndTime)
-	}
-
-	if resp.ExitCode != 0 && (resp.Status == "completed" || resp.Status == "failed") {
-		fmt.Printf("Exit Code: %d\n", resp.ExitCode)
-	}
-
-	// Display progress if available
-	if resp.Progress != nil && resp.Progress.TotalSteps > 0 {
-		fmt.Printf("\nProgress:\n")
-		fmt.Printf("  Step %d of %d: %s\n", resp.Progress.StepNumber, resp.Progress.TotalSteps, resp.Progress.CurrentStep)
-		if resp.Progress.PercentComplete > 0 {
-			fmt.Printf("  Progress: %.1f%%\n", resp.Progress.PercentComplete)
-		}
-
-		if len(resp.Progress.CompletedSteps) > 0 {
-			fmt.Printf("  Completed steps:\n")
-			for _, step := range resp.Progress.CompletedSteps {
-				fmt.Printf("    ✅ %s\n", step)
-			}
-		}
-	}
-
-	return nil
-}
-
-func NewRuntimeBuildsCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "builds",
-		Short: "List all runtime build jobs",
-		Long:  `List all runtime build jobs with their current status.`,
-		RunE:  runRuntimeBuilds,
-	}
-}
-
-func runRuntimeBuilds(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
-	// Create client and connect to server
-	client, err := common.NewJobClient()
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-	defer client.Close()
-
-	resp, err := client.ListBuildJobs(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list build jobs: %w", err)
-	}
-
-	if len(resp.BuildJobs) == 0 {
-		fmt.Println("No runtime build jobs found.")
-		return nil
-	}
-
-	// Display builds in a table
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "BUILD JOB\tRUNTIME\tSTATUS\tSTARTED\tENDED")
-	fmt.Fprintln(w, "---------\t-------\t------\t-------\t-----")
-
-	for _, build := range resp.BuildJobs {
-		endTime := build.EndTime
-		if endTime == "0001-01-01T00:00:00Z" {
-			endTime = "-"
-		} else if len(endTime) > 19 {
-			endTime = endTime[:19] // Truncate to YYYY-MM-DDTHH:MM:SS
-		}
-
-		startTime := build.StartTime
-		if len(startTime) > 19 {
-			startTime = startTime[:19] // Truncate to YYYY-MM-DDTHH:MM:SS
-		}
-
-		jobUUID := build.BuildJobUuid
-		if len(jobUUID) > 8 {
-			jobUUID = jobUUID[:8] + "..." // Truncate for table display
-		}
-
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			jobUUID,
-			build.RuntimeSpec,
-			build.Status,
-			startTime,
-			endTime,
-		)
-	}
-
-	w.Flush()
-
-	fmt.Printf("\nTotal: %d runtime build jobs\n", len(resp.BuildJobs))
-	fmt.Printf("Use 'rnx runtime status <build-job-uuid>' for detailed status\n")
-
-	return nil
-}
-
 func NewRuntimeValidateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate <runtime-spec>",
@@ -1075,39 +764,56 @@ func runGitHubRuntimeInstall(ctx context.Context, client *client.JobClient, runt
 	fmt.Printf("📋 Path: %s\n", path)
 	fmt.Printf("📦 Starting GitHub runtime installation...\n\n")
 
-	// Create build request with GitHub source
-	req := &pb.BuildRuntimeRequest{
-		RuntimeSpec:  runtimeSpec,
-		Name:         fmt.Sprintf("Install %s from GitHub", runtimeSpec),
-		ForceRebuild: force,
-		Source: &pb.RuntimeSourceConfig{
-			SourceType: &pb.RuntimeSourceConfig_Github{
-				Github: &pb.GithubSource{
-					Repository: repository,
-					Branch:     branch,
-					Path:       path,
-				},
-			},
-		},
+	// Create streaming installation request with GitHub source
+	req := &pb.InstallRuntimeRequest{
+		RuntimeSpec:    runtimeSpec,
+		ForceReinstall: force,
+		Repository:     repository,
+		Branch:         branch,
+		Path:           path,
 	}
 
-	resp, err := client.BuildRuntime(ctx, req)
+	stream, err := client.StreamingInstallRuntimeFromGithub(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to start GitHub runtime installation: %w", err)
+		return fmt.Errorf("failed to start streaming GitHub runtime installation: %w", err)
 	}
 
-	fmt.Printf("✅ GitHub runtime installation started\n")
-	fmt.Printf("🔧 Build Job: %s\n", resp.BuildJobUuid)
-	fmt.Printf("📊 Status: %s\n", resp.Status)
+	// Process streaming chunks
+	for {
+		chunk, err := stream.Recv()
+		if err == io.EOF {
+			// Stream completed successfully
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("streaming error: %w", err)
+		}
 
-	if resp.Message != "" {
-		fmt.Printf("💬 Message: %s\n", resp.Message)
+		switch chunk.ChunkType.(type) {
+		case *pb.RuntimeInstallationChunk_Progress:
+			progress := chunk.GetProgress()
+			fmt.Printf("📊 %s\n", progress.Message)
+
+		case *pb.RuntimeInstallationChunk_Log:
+			log := chunk.GetLog()
+			fmt.Print(string(log.Data))
+
+		case *pb.RuntimeInstallationChunk_Result:
+			result := chunk.GetResult()
+			if result.Success {
+				fmt.Printf("\n🎉 %s\n", result.Message)
+				if result.InstallPath != "" {
+					fmt.Printf("📍 Installed at: %s\n", result.InstallPath)
+				}
+				return nil
+			} else {
+				return fmt.Errorf("GitHub runtime installation failed: %s", result.Message)
+			}
+		}
 	}
 
-	fmt.Printf("📦 Starting real-time log streaming...\n\n")
-
-	// Stream build logs automatically for consistent UX
-	return streamBuildLogs(ctx, client, resp.BuildJobUuid)
+	fmt.Printf("\n✅ GitHub runtime installation completed successfully!\n")
+	return nil
 }
 
 // parseGitHubRepo parses GitHub repository URL in various formats
@@ -1147,63 +853,6 @@ func parseGitHubRepo(githubRepo string) (repository, branch, path string, err er
 	}
 
 	return repository, branch, path, nil
-}
-
-// streamBuildLogs streams build logs automatically for consistent UX with local installations
-func streamBuildLogs(ctx context.Context, client *client.JobClient, buildJobUUID string) error {
-	// Set up signal handling for Ctrl+C
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-sigCh
-		fmt.Println("\nReceived termination signal. Closing log stream...")
-		cancel()
-	}()
-
-	// Stream build logs
-	stream, err := client.GetJobLogs(ctx, buildJobUUID)
-	if err != nil {
-		return fmt.Errorf("failed to start log stream: %v", err)
-	}
-
-	for {
-		chunk, e := stream.Recv()
-		if e == io.EOF {
-			// Build completed successfully
-			fmt.Printf("\n✅ GitHub runtime installation completed successfully!\n")
-			return nil
-		}
-		if e != nil {
-			if errors.Is(ctx.Err(), context.Canceled) {
-				// This is an expected error due to our cancellation
-				return nil
-			}
-
-			if s, ok := status.FromError(e); ok {
-				return fmt.Errorf("log stream error: %v", s.Message())
-			}
-
-			return fmt.Errorf("error receiving log stream: %v", e)
-		}
-
-		// Output the log chunk (same as local streaming)
-		if common.JSONOutput {
-			logEntry := map[string]interface{}{
-				"timestamp": time.Now().Format(time.RFC3339),
-				"data":      string(chunk.Payload),
-			}
-			encoder := json.NewEncoder(os.Stdout)
-			if err := encoder.Encode(logEntry); err != nil {
-				return fmt.Errorf("failed to output JSON: %v", err)
-			}
-		} else {
-			fmt.Printf("%s", chunk.Payload)
-		}
-	}
 }
 
 // findProjectRoot finds the project root directory by looking for go.mod file

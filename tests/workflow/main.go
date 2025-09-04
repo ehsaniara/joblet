@@ -52,10 +52,10 @@ func main() {
 
 		// Convert requirements
 		for _, req := range job.Requires {
-			if req.JobId != "" {
+			if req.JobID != "" {
 				deps.Requirements = append(deps.Requirements, workflow.Requirement{
 					Type:   workflow.RequirementSimple,
-					JobId:  req.JobId,
+					JobID:  req.JobID,
 					Status: req.Status,
 				})
 			} else if req.Expression != "" {
@@ -94,34 +94,25 @@ func main() {
 	readyJobs = resolver.GetReadyJobs(workflowID)
 	fmt.Printf("   ✓ After feature-engineering completed, ready jobs: %v\n", readyJobs)
 
-	// Test 7: Test expression parser
-	fmt.Println("\n7. Testing expression parser...")
-	expr := "(job-a=COMPLETED AND job-b=FAILED) OR job-c=COMPLETED"
-	node, err := workflow.ParseExpression(expr)
-	if err != nil {
-		log.Fatalf("Failed to parse expression: %v", err)
+	// Test 7: Test expression evaluator
+	fmt.Println("\n7. Testing expression evaluator...")
+	expr := "job-a=COMPLETED AND job-b=FAILED"
+
+	// Test evaluation with domain.JobStatus
+	jobStates := map[string]domain.JobStatus{
+		"job-a": domain.StatusCompleted,
+		"job-b": domain.StatusFailed,
+		"job-c": domain.StatusPending,
 	}
 
-	// Test evaluation
-	jobStates := map[string]string{
-		"job-a": "COMPLETED",
-		"job-b": "RUNNING",
-		"job-c": "FAILED",
-	}
-
-	result, err := node.Evaluate(jobStates)
-	if err != nil {
-		log.Fatalf("Failed to evaluate expression: %v", err)
-	}
+	evaluator := workflow.NewSimpleExpressionEvaluator(jobStates)
+	result := evaluator.Evaluate(expr)
 	fmt.Printf("   ✓ Expression '%s' with states %v = %v\n", expr, jobStates, result)
 
 	// Test with different states
-	jobStates["job-c"] = "COMPLETED"
-	result, err = node.Evaluate(jobStates)
-	if err != nil {
-		log.Fatalf("Failed to evaluate expression: %v", err)
-	}
-	fmt.Printf("   ✓ Expression '%s' with states %v = %v\n", expr, jobStates, result)
+	jobStates["job-c"] = domain.StatusCompleted
+	result2 := evaluator.Evaluate(expr)
+	fmt.Printf("   ✓ Expression '%s' with updated states %v = %v\n", expr, jobStates, result2)
 
 	// Test 8: Test cascading cancellation
 	fmt.Println("\n8. Testing cascading cancellation...")

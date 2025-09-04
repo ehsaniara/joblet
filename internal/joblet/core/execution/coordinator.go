@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -17,6 +16,7 @@ type ExecutionCoordinator struct {
 	networkManager     NetworkManager
 	processManager     ProcessManager
 	isolationManager   IsolationManager
+	platform           platform.Platform
 	logger             *logger.Logger
 }
 
@@ -28,6 +28,7 @@ func NewExecutionCoordinator(
 	netManager NetworkManager,
 	procManager ProcessManager,
 	isolManager IsolationManager,
+	platform platform.Platform,
 	logger *logger.Logger,
 ) *ExecutionCoordinator {
 	return &ExecutionCoordinator{
@@ -35,6 +36,7 @@ func NewExecutionCoordinator(
 		networkManager:     netManager,
 		processManager:     procManager,
 		isolationManager:   isolManager,
+		platform:           platform,
 		logger:             logger.WithField("component", "execution-coordinator"),
 	}
 }
@@ -137,11 +139,11 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 		// Signal network ready to job process by creating the signal file
 		if networkReadyFile != "" {
 			log.Debug("signaling network ready to job process", "file", networkReadyFile)
-			if err := os.WriteFile(networkReadyFile, []byte("ready"), 0644); err != nil {
+			if err := ec.platform.WriteFile(networkReadyFile, []byte("ready"), 0644); err != nil {
 				log.Error("failed to create network ready signal file", "error", err)
-			} else {
-				log.Debug("network ready signal file created successfully")
+				return nil, fmt.Errorf("failed to create network ready signal file: %w", err)
 			}
+			log.Debug("network ready signal file created successfully")
 		}
 	}
 

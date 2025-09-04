@@ -177,7 +177,7 @@ func (c *HostCollector) parseLSBRelease(filename string) string {
 	}
 	defer file.Close()
 
-	var description, distId, release string
+	var description, distID, release string
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -185,7 +185,7 @@ func (c *HostCollector) parseLSBRelease(filename string) string {
 		if strings.HasPrefix(line, "DISTRIB_DESCRIPTION=") {
 			description = c.parseQuotedValue(line[20:])
 		} else if strings.HasPrefix(line, "DISTRIB_ID=") {
-			distId = c.parseQuotedValue(line[11:])
+			distID = c.parseQuotedValue(line[11:])
 		} else if strings.HasPrefix(line, "DISTRIB_RELEASE=") {
 			release = c.parseQuotedValue(line[16:])
 		}
@@ -194,11 +194,11 @@ func (c *HostCollector) parseLSBRelease(filename string) string {
 	if description != "" {
 		return description
 	}
-	if distId != "" && release != "" {
-		return fmt.Sprintf("%s %s", distId, release)
+	if distID != "" && release != "" {
+		return fmt.Sprintf("%s %s", distID, release)
 	}
-	if distId != "" {
-		return distId
+	if distID != "" {
+		return distID
 	}
 
 	return ""

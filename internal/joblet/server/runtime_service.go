@@ -6,16 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	pb "joblet/api/gen"
-	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/runtime"
-	"joblet/internal/joblet/runtime/installers"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
@@ -29,10 +24,7 @@ type RuntimeServiceServer struct {
 	pb.UnimplementedRuntimeServiceServer
 	auth             auth.GRPCAuthorization
 	resolver         *runtime.Resolver
-	jobStore         adapters.JobStoreAdapter // DEPRECATED
-	joblet           interfaces.Joblet        // DEPRECATED
 	runtimeInstaller *core.RuntimeInstaller
-	installerManager *installers.Manager
 	runtimesPath     string
 	logger           *logger.Logger
 }
@@ -40,16 +32,13 @@ type RuntimeServiceServer struct {
 var _ pb.RuntimeServiceServer = (*RuntimeServiceServer)(nil)
 
 // NewRuntimeServiceServer creates a new gRPC runtime service for managing execution environments
-func NewRuntimeServiceServer(auth auth.GRPCAuthorization, runtimesBasePath string, platform platform.Platform, config *config.Config, jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet) *RuntimeServiceServer {
+func NewRuntimeServiceServer(auth auth.GRPCAuthorization, runtimesBasePath string, platform platform.Platform, config *config.Config) *RuntimeServiceServer {
 	runtimeLogger := logger.New().WithField("component", "runtime-grpc")
 
 	return &RuntimeServiceServer{
 		auth:             auth,
 		resolver:         runtime.NewResolver(runtimesBasePath, platform),
-		jobStore:         jobStore, // DEPRECATED
-		joblet:           joblet,   // DEPRECATED
 		runtimeInstaller: core.NewRuntimeInstaller(config, runtimeLogger, platform),
-		installerManager: installers.NewManager(runtimesBasePath),
 		runtimesPath:     runtimesBasePath,
 		logger:           runtimeLogger,
 	}
@@ -190,176 +179,6 @@ func extractLanguageFromName(name string) string {
 	}
 
 	return name // No hyphen found, return whole name
-}
-
-// Runtime Building Methods
-
-// BuildRuntime builds a runtime using the builder isolation environment
-func (s *RuntimeServiceServer) BuildRuntime(ctx context.Context, req *pb.BuildRuntimeRequest) (*pb.BuildRuntimeResponse, error) {
-	log := s.logger.WithFields(
-		"operation", "BuildRuntime",
-		"runtimeSpec", req.RuntimeSpec,
-		"name", req.Name,
-		"forceRebuild", req.ForceRebuild,
-	)
-
-	log.Debug("build runtime request received")
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.RunJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	// Validate runtime spec
-	if req.RuntimeSpec == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "runtime spec is required")
-	}
-
-	// Check if runtime already exists and not forcing rebuild
-	if !req.ForceRebuild {
-		runtimePath := filepath.Join(s.runtimesPath, req.RuntimeSpec)
-		// Check if runtime directory already exists
-		if _, err := os.Stat(runtimePath); err == nil {
-			log.Debug("runtime already exists, use --force to rebuild", "path", runtimePath)
-			return nil, status.Errorf(codes.AlreadyExists, "runtime %s already exists, use force=true to rebuild", req.RuntimeSpec)
-		}
-	}
-
-	// Convert source config to build command/script
-	buildCommand, buildArgs, err := s.buildCommandFromSource(req.Source, req.RuntimeSpec, req.BuildArgs)
-	if err != nil {
-		log.Error("failed to generate build command", "error", err)
-		return nil, status.Errorf(codes.InvalidArgument, "invalid source configuration: %v", err)
-	}
-
-	// Create job request for runtime building using builder isolation
-	jobReq := interfaces.StartJobRequest{
-		Name:    req.Name,
-		Command: buildCommand,
-		Args:    buildArgs,
-		Resources: interfaces.ResourceLimits{
-			MaxCPU:    0, // No limits for build jobs
-			MaxMemory: 0,
-			MaxIOBPS:  0,
-		},
-		Runtime:           "", // Builder jobs don't use runtimes
-		Environment:       make(map[string]string),
-		SecretEnvironment: make(map[string]string),
-		JobType:           domain.JobTypeRuntimeBuild, // RuntimeService jobs use builder chroot
-	}
-
-	// Add build-specific environment variables
-	jobReq.Environment["BUILD_RUNTIME_SPEC"] = req.RuntimeSpec
-	jobReq.Environment["BUILD_TARGET_PATH"] = filepath.Join(s.runtimesPath, req.RuntimeSpec)
-
-	// Add custom build args as environment variables
-	for key, value := range req.BuildArgs {
-		jobReq.Environment[fmt.Sprintf("BUILD_ARG_%s", strings.ToUpper(key))] = value
-	}
-
-	// Execute the build job using builder isolation
-	result, err := s.joblet.StartJob(ctx, jobReq)
-	if err != nil {
-		log.Error("failed to submit build job", "error", err)
-		return nil, status.Errorf(codes.Internal, "failed to start runtime build: %v", err)
-	}
-
-	return &pb.BuildRuntimeResponse{
-		BuildJobUuid: result.Uuid,
-		RuntimeSpec:  req.RuntimeSpec,
-		Status:       "building",
-		Message:      fmt.Sprintf("Runtime build started for %s", req.RuntimeSpec),
-	}, nil
-}
-
-// GetBuildStatus gets the status of a runtime build job
-func (s *RuntimeServiceServer) GetBuildStatus(ctx context.Context, req *pb.GetBuildStatusRequest) (*pb.GetBuildStatusResponse, error) {
-	log := s.logger.WithFields(
-		"operation", "GetBuildStatus",
-		"buildJobUuid", req.BuildJobUuid,
-	)
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if req.BuildJobUuid == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "build job UUID is required")
-	}
-
-	// Get job status from job store
-	job, found := s.jobStore.GetJob(req.BuildJobUuid)
-	if !found {
-		log.Error("build job not found", "jobUuid", req.BuildJobUuid)
-		return nil, status.Errorf(codes.NotFound, "build job not found: %s", req.BuildJobUuid)
-	}
-
-	// Extract runtime spec from environment variables
-	runtimeSpec := job.Environment["BUILD_RUNTIME_SPEC"]
-	if runtimeSpec == "" {
-		runtimeSpec = "unknown"
-	}
-
-	// Map job status to build status
-	buildStatus := s.mapJobStatusToBuildStatus(job.Status)
-
-	// Create progress information
-	progress := &pb.BuildProgress{
-		CurrentStep:     s.getCurrentBuildStep(job.Status),
-		StepNumber:      s.getStepNumber(job.Status),
-		TotalSteps:      4, // Typical: download, compile, install, validate
-		PercentComplete: s.getPercentComplete(job.Status),
-	}
-
-	return &pb.GetBuildStatusResponse{
-		BuildJobUuid: req.BuildJobUuid,
-		RuntimeSpec:  runtimeSpec,
-		Status:       buildStatus,
-		Message:      string(job.Status),
-		StartTime:    job.StartTime.Format(time.RFC3339),
-		EndTime:      job.EndTime.Format(time.RFC3339),
-		ExitCode:     int32(job.ExitCode),
-		Progress:     progress,
-	}, nil
-}
-
-// ListBuildJobs lists all runtime build jobs
-func (s *RuntimeServiceServer) ListBuildJobs(ctx context.Context, req *pb.EmptyRequest) (*pb.BuildJobsResponse, error) {
-	log := s.logger.WithField("operation", "ListBuildJobs")
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	// Get all jobs from job store
-	jobs := s.jobStore.ListJobs()
-
-	// Filter for runtime build jobs only
-	var buildJobs []*pb.BuildJob
-	for _, job := range jobs {
-		// Check if this is a runtime build job
-		if runtimeSpec, exists := job.Environment["BUILD_RUNTIME_SPEC"]; exists {
-			buildJob := &pb.BuildJob{
-				BuildJobUuid: job.Uuid,
-				RuntimeSpec:  runtimeSpec,
-				Name:         job.Name,
-				Status:       s.mapJobStatusToBuildStatus(job.Status),
-				StartTime:    job.StartTime.Format(time.RFC3339),
-				EndTime:      job.EndTime.Format(time.RFC3339),
-				// Source config would be reconstructed from job environment if needed
-			}
-			buildJobs = append(buildJobs, buildJob)
-		}
-	}
-
-	return &pb.BuildJobsResponse{
-		BuildJobs: buildJobs,
-	}, nil
 }
 
 // InstallRuntimeFromGithub installs a runtime from a GitHub repository using dedicated chroot (no job system)
@@ -543,45 +362,6 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 		Message:         fmt.Sprintf("Runtime '%s' removed successfully", req.Runtime),
 		FreedSpaceBytes: totalSize,
 	}, nil
-}
-
-// Helper methods for runtime building
-
-func (s *RuntimeServiceServer) buildCommandFromSource(source *pb.RuntimeSourceConfig, runtimeSpec string, buildArgs map[string]string) (string, []string, error) {
-	// Create install specification
-	spec := &installers.InstallSpec{
-		RuntimeSpec: runtimeSpec,
-		Source:      source,
-		BuildArgs:   buildArgs,
-		TargetPath:  filepath.Join(s.runtimesPath, runtimeSpec),
-	}
-
-	// Use the installer manager to install the runtime
-	result, err := s.installerManager.Install(context.Background(), spec)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to generate installation command: %w", err)
-	}
-
-	if !result.Success {
-		return "", nil, fmt.Errorf("installation failed: %s", result.Message)
-	}
-
-	return result.Command, result.Args, nil
-}
-
-func (s *RuntimeServiceServer) getPercentComplete(status domain.JobStatus) float64 {
-	switch status {
-	case domain.StatusPending, domain.StatusScheduled, domain.StatusInitializing:
-		return 10.0
-	case domain.StatusRunning:
-		return 50.0
-	case domain.StatusCompleted:
-		return 100.0
-	case domain.StatusFailed, domain.StatusStopped, domain.StatusCanceled:
-		return 75.0
-	default:
-		return 0.0
-	}
 }
 
 func (s *RuntimeServiceServer) autoDetectRuntimePath(runtimeSpec string) string {
@@ -946,53 +726,4 @@ func (g *grpcRuntimeStreamer) SendLog(data []byte) error {
 		},
 	}
 	return g.stream.Send(chunk)
-}
-
-// Helper methods that were accidentally removed
-
-func (s *RuntimeServiceServer) mapJobStatusToBuildStatus(status domain.JobStatus) string {
-	switch status {
-	case domain.StatusPending, domain.StatusScheduled, domain.StatusInitializing:
-		return "queued"
-	case domain.StatusRunning:
-		return "building"
-	case domain.StatusCompleted:
-		return "completed"
-	case domain.StatusFailed, domain.StatusCanceled:
-		return "failed"
-	default:
-		return "unknown"
-	}
-}
-
-func (s *RuntimeServiceServer) getCurrentBuildStep(status domain.JobStatus) string {
-	switch status {
-	case domain.StatusPending, domain.StatusScheduled, domain.StatusInitializing:
-		return "Initializing build environment"
-	case domain.StatusRunning:
-		return "Building runtime"
-	case domain.StatusCompleted:
-		return "Build completed"
-	case domain.StatusFailed:
-		return "Build failed"
-	case domain.StatusCanceled:
-		return "Build canceled"
-	default:
-		return "Unknown"
-	}
-}
-
-func (s *RuntimeServiceServer) getStepNumber(status domain.JobStatus) int32 {
-	switch status {
-	case domain.StatusPending, domain.StatusScheduled, domain.StatusInitializing:
-		return 1
-	case domain.StatusRunning:
-		return 2
-	case domain.StatusCompleted:
-		return 4
-	case domain.StatusFailed, domain.StatusCanceled:
-		return 0
-	default:
-		return 0
-	}
 }

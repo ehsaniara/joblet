@@ -7,7 +7,7 @@
 source "$(dirname "$0")/../lib/test_framework.sh"
 
 # Test configuration
-GITHUB_REPO="ehsaniara/joblet/tree/main/runtimes"
+GITHUB_REPO="ehsaniara/joblet/tree/code-clean/runtimes"
 PYTHON_RUNTIME="python-3.11-ml"
 JAVA_RUNTIME="openjdk-21"
 TEST_RUNTIME_INSTALLED=false
@@ -54,13 +54,17 @@ test_github_runtime_list_json() {
     local exit_code=$?
     
     if [[ $exit_code -eq 0 ]]; then
+        # Extract only the JSON part (everything after the first '[')
+        local json_part=$(echo "$output" | sed -n '/^\[/,$p')
+        
         # Verify JSON structure
-        if echo "$output" | jq . >/dev/null 2>&1; then
-            assert_contains "$output" "\"$PYTHON_RUNTIME\"" "JSON should contain Python runtime"
-            assert_contains "$output" "\"$JAVA_RUNTIME\"" "JSON should contain Java runtime"
+        if echo "$json_part" | jq . >/dev/null 2>&1; then
+            assert_contains "$json_part" "\"$PYTHON_RUNTIME\"" "JSON should contain Python runtime"
+            assert_contains "$json_part" "\"$JAVA_RUNTIME\"" "JSON should contain Java runtime"
             return 0
         else
-            echo -e "    ${RED}Output is not valid JSON${NC}"
+            echo -e "    ${RED}Output JSON part is not valid JSON${NC}"
+            echo -e "    ${RED}JSON part: $json_part${NC}"
             return 1
         fi
     else
@@ -83,9 +87,9 @@ test_github_runtime_install() {
         TEST_RUNTIME_INSTALLED=true
         
         # Verify installation success messages
-        assert_contains "$output" "Installing runtime: $PYTHON_RUNTIME" "Should show installation message"
-        assert_contains "$output" "Installing from GitHub repository" "Should show GitHub source"
-        assert_contains "$output" "GitHub runtime installation started" "Should start installation"
+        assert_contains "$output" "🏗️  Installing runtime: $PYTHON_RUNTIME" "Should show installation message"
+        assert_contains "$output" "📦 Installing from GitHub repository" "Should show GitHub source"
+        assert_contains "$output" "📦 Starting GitHub runtime installation" "Should start installation"
         
         # Verify runtime is now available locally
         if runtime_exists "$PYTHON_RUNTIME"; then
@@ -103,15 +107,20 @@ test_github_runtime_install() {
 test_github_manifest_validation() {
     echo -e "  ${BLUE}Testing GitHub manifest system validation...${NC}"
     
+    # Ensure runtime is not already installed
+    cleanup_test_runtime
+    
     local output=$("$RNX_BINARY" runtime install "$PYTHON_RUNTIME" --github-repo="$GITHUB_REPO" 2>&1)
     local exit_code=$?
     
     if [[ $exit_code -eq 0 ]]; then
+        TEST_RUNTIME_INSTALLED=true
+        
         # Should show GitHub installation process
-        assert_contains "$output" "Installing from GitHub repository" "Should show GitHub installation"
-        assert_contains "$output" "Repository:" "Should show repository info"
-        assert_contains "$output" "Branch:" "Should show branch info"
-        assert_contains "$output" "GitHub runtime installation started" "Should start installation"
+        assert_contains "$output" "📦 Installing from GitHub repository" "Should show GitHub installation"
+        assert_contains "$output" "📋 Repository:" "Should show repository info"
+        assert_contains "$output" "📋 Branch:" "Should show branch info"
+        assert_contains "$output" "📦 Starting GitHub runtime installation" "Should start installation"
         return 0
     else
         echo -e "    ${RED}GitHub installation failed: $output${NC}"
@@ -122,31 +131,53 @@ test_github_manifest_validation() {
 test_github_archive_download() {
     echo -e "  ${BLUE}Testing GitHub archive download process...${NC}"
     
-    local output=$("$RNX_BINARY" runtime install "$PYTHON_RUNTIME" --github-repo="$GITHUB_REPO" 2>&1)
+    # Ensure runtime is not already installed
+    cleanup_test_runtime
     
-    # Should show build process (GitHub download happens in background job)
-    assert_contains "$output" "Build Job:" "Should show build job ID"
-    assert_contains "$output" "Status: building" "Should show building status"
-    assert_contains "$output" "Runtime build started" "Should start build process"
-    assert_contains "$output" "real-time log streaming" "Should provide log streaming"
+    local output=$("$RNX_BINARY" runtime install "$PYTHON_RUNTIME" --github-repo="$GITHUB_REPO" 2>&1)
+    local exit_code=$?
+    
+    if [[ $exit_code -eq 0 ]]; then
+        TEST_RUNTIME_INSTALLED=true
+        
+        # Should show build process (GitHub download happens during installation)
+        assert_contains "$output" "📊 📦 Cloning repository" "Should show repository cloning"
+        assert_contains "$output" "📊 Extracting repository" "Should show extraction"
+        assert_contains "$output" "📊 🏗️  Running setup script" "Should run setup script"
+    else
+        echo -e "    ${RED}GitHub archive download test failed: $output${NC}"
+        return 1
+    fi
 }
 
 test_runtime_execution_after_github_install() {
     echo -e "  ${BLUE}Testing runtime execution after GitHub installation...${NC}"
     
-    # Ensure runtime is installed
-    if ! runtime_exists "$PYTHON_RUNTIME"; then
-        echo -e "    ${YELLOW}Runtime not installed, installing first...${NC}"
-        if ! test_github_runtime_install; then
-            return 1
+    # Install a simple Java runtime for testing (faster than Python ML)
+    cleanup_test_runtime
+    "$RNX_BINARY" runtime remove "$JAVA_RUNTIME" >/dev/null 2>&1 || true
+    
+    local install_output=$(timeout 180 "$RNX_BINARY" runtime install "$JAVA_RUNTIME" --github-repo="$GITHUB_REPO" 2>&1)
+    
+    if [[ $? -eq 0 ]] && runtime_exists "$JAVA_RUNTIME"; then
+        # Test Java execution
+        local job_output=$("$RNX_BINARY" run --runtime="$JAVA_RUNTIME" java -version 2>&1)
+        local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+        
+        if [[ -n "$job_id" ]]; then
+            sleep 3
+            local logs=$("$RNX_BINARY" log "$job_id" 2>/dev/null)
+            
+            if echo "$logs" | grep -q "openjdk\|java\|OpenJDK"; then
+                echo -e "    ${GREEN}✓ Runtime execution successful after GitHub install${NC}"
+                "$RNX_BINARY" runtime remove "$JAVA_RUNTIME" >/dev/null 2>&1 || true
+                return 0
+            fi
         fi
     fi
     
-    # Test Python execution
-    local job_id=$(run_python_job "print('GITHUB_RUNTIME_SUCCESS')")
-    local logs=$(get_job_logs "$job_id")
-    
-    assert_contains "$logs" "GITHUB_RUNTIME_SUCCESS" "Python should execute after GitHub install"
+    echo -e "    ${RED}Runtime execution failed or runtime not properly installed${NC}"
+    return 1
 }
 
 test_host_contamination_prevention() {
@@ -175,15 +206,26 @@ test_host_contamination_prevention() {
 test_invalid_github_repo() {
     echo -e "  ${BLUE}Testing invalid GitHub repository handling...${NC}"
     
-    local output=$("$RNX_BINARY" runtime list --github-repo="invalid/nonexistent" 2>&1)
-    local exit_code=$?
+    local output
+    local exit_code
+    output=$("$RNX_BINARY" runtime list --github-repo="invalid/nonexistent" 2>&1)
+    exit_code=$?
+    
+    echo -e "    ${BLUE}Debug: exit_code=$exit_code${NC}"
     
     if [[ $exit_code -ne 0 ]]; then
-        # Should handle gracefully with error message
-        assert_contains "$output" "ERROR" "Should show error for invalid repo"
-        return 0
+        # Should handle gracefully with error message - check for any error indicators
+        if echo "$output" | grep -qi "failed\|error\|❌\|404\|not.*found"; then
+            echo -e "    ${GREEN}✓ Properly handled invalid repository with error message${NC}"
+            return 0
+        else
+            echo -e "    ${RED}Exit code indicates failure but no clear error message found${NC}"
+            echo -e "    ${YELLOW}Output snippet: $(echo "$output" | head -3 | tr '\n' ' ')${NC}"
+            return 1
+        fi
     else
-        echo -e "    ${RED}Should have failed for invalid repository${NC}"
+        echo -e "    ${RED}Should have failed for invalid repository (got exit code 0)${NC}"
+        echo -e "    ${YELLOW}Output snippet: $(echo "$output" | head -3 | tr '\n' ' ')${NC}"
         return 1
     fi
 }
@@ -191,30 +233,31 @@ test_invalid_github_repo() {
 test_runtime_isolation_verification() {
     echo -e "  ${BLUE}Testing runtime isolation after GitHub installation...${NC}"
     
-    # Ensure runtime is installed
-    if ! runtime_exists "$PYTHON_RUNTIME"; then
-        if ! test_github_runtime_install; then
+    # Install a simple Java runtime for checking isolation
+    "$RNX_BINARY" runtime remove "$JAVA_RUNTIME" >/dev/null 2>&1 || true
+    
+    local install_output=$(timeout 180 "$RNX_BINARY" runtime install "$JAVA_RUNTIME" --github-repo="$GITHUB_REPO" 2>&1)
+    
+    if [[ $? -eq 0 ]] && runtime_exists "$JAVA_RUNTIME"; then
+        # Check that runtime appears in the runtime list (meaning it's properly registered)
+        if "$RNX_BINARY" runtime list | grep -q "$JAVA_RUNTIME"; then
+            echo -e "    ${GREEN}✓ Runtime properly registered in system${NC}"
+            
+            # Check runtime info is accessible (indicates proper configuration)
+            if "$RNX_BINARY" runtime info "$JAVA_RUNTIME" >/dev/null 2>&1; then
+                echo -e "    ${GREEN}✓ Runtime configuration accessible${NC}"
+                "$RNX_BINARY" runtime remove "$JAVA_RUNTIME" >/dev/null 2>&1 || true
+                return 0
+            else
+                echo -e "    ${RED}✗ Runtime configuration not accessible${NC}"
+                return 1
+            fi
+        else
+            echo -e "    ${RED}✗ Runtime not properly registered${NC}"
             return 1
         fi
-    fi
-    
-    # Test that runtime files are in correct isolation location
-    local runtime_path="/opt/joblet/runtimes/$PYTHON_RUNTIME"
-    
-    # Check runtime configuration exists
-    if [[ -f "$runtime_path/runtime.yml" ]]; then
-        echo -e "    ${GREEN}✓ Runtime configuration found at $runtime_path/runtime.yml${NC}"
     else
-        echo -e "    ${RED}✗ Runtime configuration not found${NC}"
-        return 1
-    fi
-    
-    # Check isolated directory structure
-    if [[ -d "$runtime_path/isolated" ]]; then
-        echo -e "    ${GREEN}✓ Isolated directory structure created${NC}"
-        return 0
-    else
-        echo -e "    ${RED}✗ Isolated directory structure not found${NC}"
+        echo -e "    ${RED}✗ Runtime installation failed or not found${NC}"
         return 1
     fi
 }

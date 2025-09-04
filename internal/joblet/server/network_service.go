@@ -17,12 +17,12 @@ import (
 type NetworkServiceServer struct {
 	pb.UnimplementedNetworkServiceServer
 	auth         auth2.GRPCAuthorization
-	networkStore adapters.NetworkStoreAdapter
+	networkStore adapters.NetworkStorer
 	logger       *logger.Logger
 }
 
 // NewNetworkServiceServer creates a new network service server
-func NewNetworkServiceServer(auth auth2.GRPCAuthorization, networkStore adapters.NetworkStoreAdapter) *NetworkServiceServer {
+func NewNetworkServiceServer(auth auth2.GRPCAuthorization, networkStore adapters.NetworkStorer) *NetworkServiceServer {
 	return &NetworkServiceServer{
 		auth:         auth,
 		networkStore: networkStore,
@@ -63,7 +63,7 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 	}
 
 	// Get network info for response
-	network, exists := s.networkStore.GetNetwork(req.Name)
+	network, exists := s.networkStore.Network(req.Name)
 	if !exists {
 		return nil, status.Errorf(codes.Internal, "network created but not found")
 	}

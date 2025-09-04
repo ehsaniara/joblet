@@ -25,13 +25,13 @@ import (
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth     auth2.GRPCAuthorization
-	jobStore adapters.JobStoreAdapter // Uses the new adapter interface
-	joblet   interfaces.Joblet        // Uses the new interface
+	jobStore adapters.JobStorer // Uses the new adapter interface
+	joblet   interfaces.Joblet  // Uses the new interface
 	logger   *logger.Logger
 }
 
 // NewJobServiceServer creates a new job service that uses request objects
-func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, joblet interfaces.Joblet) *JobServiceServer {
 	return &JobServiceServer{
 		auth:     auth,
 		jobStore: jobStore,
@@ -154,7 +154,6 @@ func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReq) 
 		return nil, err
 	}
 
-	// Create delete request
 	deleteRequest := interfaces.DeleteJobRequest{
 		JobID:  req.GetUuid(),
 		Reason: "user_requested",
@@ -193,7 +192,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 	}
 
 	// Retrieve job from store (supports both full UUID and prefix)
-	job, exists := s.jobStore.GetJobByPrefix(req.GetUuid())
+	job, exists := s.jobStore.JobByPrefix(req.GetUuid())
 	if !exists {
 		log.Error("job not found", "jobUuid", req.GetUuid())
 		return nil, status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
@@ -218,18 +217,9 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		scheduledTimeStr = job.ScheduledTime.Format("2006-01-02T15:04:05Z07:00")
 	}
 
-	// TODO: File uploads information would need to be stored in Job domain object
-	// For now, we'll leave this empty since uploads aren't persisted in the Job struct
 	var uploadStrings []string
-
-	// TODO: Dependencies would need to be resolved from workflow store
-	// This requires additional information that's not currently stored in the Job
 	var dependencies []string
-
-	// TODO: WorkDir would need to be added to Job domain object
 	workDir := ""
-
-	// TODO: WorkflowUuid would need to be added to Job domain object
 	workflowUuid := ""
 
 	// Debug logging to identify empty fields
@@ -562,7 +552,7 @@ func (s *JobServiceServer) ExecuteScheduledJob(ctx context.Context, jobID string
 	log.Debug("executing scheduled job")
 
 	// Retrieve the job
-	job, exists := s.jobStore.GetJob(jobID)
+	job, exists := s.jobStore.Job(jobID)
 	if !exists {
 		return fmt.Errorf("scheduled job not found: %s", jobID)
 	}

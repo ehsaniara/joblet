@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"joblet/internal/joblet/network"
 	"joblet/pkg/logger"
 )
 
@@ -38,7 +39,7 @@ type networkStoreAdapter struct {
 }
 
 // Ensure networkStoreAdapter implements the interfaces
-var _ NetworkStoreAdapter = (*networkStoreAdapter)(nil)
+var _ NetworkStorer = (*networkStoreAdapter)(nil)
 
 // ipPool manages IP allocation for a specific network
 type ipPool struct {
@@ -54,7 +55,7 @@ func NewNetworkStoreAdapter(
 	networkStore networkStore[string, *NetworkConfig],
 	allocationStore networkStore[string, *JobNetworkAllocation],
 	logger *logger.Logger,
-) NetworkStoreAdapter {
+) NetworkStorer {
 	if logger == nil {
 		logger = logger.WithField("component", "network-store-adapter")
 	}
@@ -87,12 +88,10 @@ func (a *networkStoreAdapter) CreateNetwork(config *NetworkConfig) error {
 		return fmt.Errorf("network name cannot be empty")
 	}
 
-	// Validate network configuration
 	if err := a.validateNetworkConfig(config); err != nil {
 		return fmt.Errorf("network config validation failed: %w", err)
 	}
 
-	// Set timestamps
 	now := time.Now().Unix()
 	config.CreatedAt = now
 	config.UpdatedAt = now
@@ -127,7 +126,7 @@ func (a *networkStoreAdapter) CreateNetwork(config *NetworkConfig) error {
 // GetNetwork retrieves a network configuration by name.
 // Returns a deep copy to prevent external modification.
 // Returns nil and false if network not found.
-func (a *networkStoreAdapter) GetNetwork(name string) (*NetworkConfig, bool) {
+func (a *networkStoreAdapter) Network(name string) (*NetworkConfig, bool) {
 	a.closeMutex.RLock()
 	if a.closed {
 		a.closeMutex.RUnlock()
@@ -149,7 +148,6 @@ func (a *networkStoreAdapter) GetNetwork(name string) (*NetworkConfig, bool) {
 
 	if exists {
 		a.logger.Debug("network retrieved successfully", "networkName", name, "type", config.Type)
-		// Return a copy to prevent external modification
 		configCopy := *config
 		if config.DNS != nil {
 			configCopy.DNS = make([]string, len(config.DNS))
@@ -166,6 +164,26 @@ func (a *networkStoreAdapter) GetNetwork(name string) (*NetworkConfig, bool) {
 
 	a.logger.Debug("network not found", "networkName", name)
 	return nil, false
+}
+
+// GetNetworkConfig implements network.NetworkStoreInterface by converting adapter types.
+// This method eliminates the need for NetworkSetupBridge by adapting directly.
+func (a *networkStoreAdapter) NetworkConfig(name string) (*network.NetworkConfig, error) {
+	config, found := a.Network(name)
+	if !found {
+		return nil, fmt.Errorf("network not found: %s", name)
+	}
+
+	// Convert adapters.NetworkConfig to network.NetworkConfig
+	return &network.NetworkConfig{
+		CIDR:   config.CIDR,
+		Bridge: config.BridgeName,
+	}, nil
+}
+
+// GetNetworkConfig is an alias for NetworkConfig for backwards compatibility with network.NetworkStoreInterface
+func (a *networkStoreAdapter) GetNetworkConfig(name string) (*network.NetworkConfig, error) {
+	return a.NetworkConfig(name)
 }
 
 // ListNetworks returns all network configurations.
@@ -186,7 +204,6 @@ func (a *networkStoreAdapter) ListNetworks() []*NetworkConfig {
 		return []*NetworkConfig{}
 	}
 
-	// Create copies to prevent external modification
 	result := make([]*NetworkConfig, len(networks))
 	for i, network := range networks {
 		configCopy := *network
@@ -223,13 +240,11 @@ func (a *networkStoreAdapter) RemoveNetwork(name string) error {
 		return fmt.Errorf("network name cannot be empty")
 	}
 
-	// Check if any jobs are still assigned to this network
 	jobsInNetwork := a.ListJobsInNetwork(name)
 	if len(jobsInNetwork) > 0 {
 		return fmt.Errorf("network is still in use by %d job(s)", len(jobsInNetwork))
 	}
 
-	// Get network for statistics before deletion
 	ctx := context.Background()
 	network, exists, err := a.networkStore.Get(ctx, name)
 	if err != nil {
@@ -286,13 +301,11 @@ func (a *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allo
 		return fmt.Errorf("job network allocation cannot be nil")
 	}
 
-	// Check if network exists
-	_, exists := a.GetNetwork(networkName)
+	_, exists := a.Network(networkName)
 	if !exists {
 		return fmt.Errorf("network not found: %s", networkName)
 	}
 
-	// Set allocation timestamp
 	allocation.AssignedAt = time.Now().Unix()
 	allocation.JobID = jobID
 	allocation.NetworkName = networkName
@@ -318,7 +331,7 @@ func (a *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allo
 // GetJobNetworkAllocation retrieves the network allocation for a job.
 // Returns a deep copy to prevent external modification.
 // Returns nil and false if job has no network assignment.
-func (a *networkStoreAdapter) GetJobNetworkAllocation(jobID string) (*JobNetworkAllocation, bool) {
+func (a *networkStoreAdapter) JobNetworkAllocation(jobID string) (*JobNetworkAllocation, bool) {
 	a.closeMutex.RLock()
 	if a.closed {
 		a.closeMutex.RUnlock()
@@ -340,7 +353,6 @@ func (a *networkStoreAdapter) GetJobNetworkAllocation(jobID string) (*JobNetwork
 
 	if exists {
 		a.logger.Debug("job allocation retrieved successfully", "jobId", jobID, "networkName", allocation.NetworkName)
-		// Return a copy to prevent external modification
 		allocationCopy := *allocation
 		if allocation.Metadata != nil {
 			allocationCopy.Metadata = make(map[string]string)
@@ -370,8 +382,7 @@ func (a *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
 		return fmt.Errorf("job ID cannot be empty")
 	}
 
-	// Get allocation before deletion for IP release
-	allocation, exists := a.GetJobNetworkAllocation(jobID)
+	allocation, exists := a.JobNetworkAllocation(jobID)
 	if !exists {
 		return fmt.Errorf("job not assigned to any network: %s", jobID)
 	}
@@ -468,7 +479,6 @@ func (a *networkStoreAdapter) AllocateIP(networkName string) (string, error) {
 		return "", fmt.Errorf("no available IP addresses in network: %s", networkName)
 	}
 
-	// Get first available IP
 	ip := pool.available[0]
 	pool.available = pool.available[1:]
 	pool.allocated[ip] = true
@@ -536,7 +546,6 @@ func (a *networkStoreAdapter) Close() error {
 	a.ipPools = make(map[string]*ipPool)
 	a.poolsMutex.Unlock()
 
-	// Close backend stores
 	if err := a.networkStore.Close(); err != nil {
 		a.logger.Error("failed to close network store", "error", err)
 	}
@@ -562,7 +571,6 @@ func (a *networkStoreAdapter) validateNetworkConfig(config *NetworkConfig) error
 		return fmt.Errorf("network type is required")
 	}
 
-	// Validate network type
 	validTypes := []string{"bridge", "host", "none", "custom"}
 	isValidType := false
 	for _, validType := range validTypes {
@@ -575,7 +583,6 @@ func (a *networkStoreAdapter) validateNetworkConfig(config *NetworkConfig) error
 		return fmt.Errorf("invalid network type: %s (must be one of: %v)", config.Type, validTypes)
 	}
 
-	// Validate CIDR if provided
 	if config.CIDR != "" {
 		_, _, err := net.ParseCIDR(config.CIDR)
 		if err != nil {
@@ -583,14 +590,12 @@ func (a *networkStoreAdapter) validateNetworkConfig(config *NetworkConfig) error
 		}
 	}
 
-	// Validate gateway if provided
 	if config.Gateway != "" {
 		if net.ParseIP(config.Gateway) == nil {
 			return fmt.Errorf("invalid gateway IP: %s", config.Gateway)
 		}
 	}
 
-	// Validate DNS servers if provided
 	for _, dns := range config.DNS {
 		if net.ParseIP(dns) == nil {
 			return fmt.Errorf("invalid DNS server IP: %s", dns)

@@ -11,18 +11,15 @@ import (
 	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/monitoring"
-	"joblet/internal/joblet/pubsub"
 	"joblet/internal/joblet/server"
 	"joblet/internal/modes/isolation"
 	"joblet/internal/modes/jobexec"
-	"joblet/pkg/buffer"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -48,81 +45,30 @@ func RunServer(cfg *config.Config) error {
 		"address", cfg.GetServerAddress(),
 		"maxJobs", cfg.Joblet.MaxConcurrentJobs)
 
-	// Create adapter factory for new storage system
-	adapterFactory := adapters.NewAdapterFactory(log)
-
 	// Create platform instance
 	platformInstance := platform.NewPlatform()
 
-	// Create new storage adapters with memory backend
+	// Create simple storage adapters directly (no factory overhead)
+	volumeStoreAdapter := adapters.NewVolumeStore(log)
+	defer func() {
+		if closeErr := volumeStoreAdapter.Close(); closeErr != nil {
+			log.Error("error closing volume store adapter", "error", closeErr)
+		}
+	}()
 
-	// Volume storage is filesystem-based - volumes are directories in volumes.base_path
-	volumeStoreConfig := &adapters.VolumeStoreConfig{
-		Store: &adapters.StoreConfig{
-			Backend: "memory",                 // Simple in-memory metadata store
-			Memory:  &adapters.MemoryConfig{}, // No limits or eviction
-		},
-	}
-	volumeStoreAdapter, err := adapterFactory.CreateVolumeStoreAdapter(volumeStoreConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create volume store adapter: %w", err)
-	}
+	networkStoreAdapter := adapters.NewNetworkStore(log)
+	defer func() {
+		if closeErr := networkStoreAdapter.Close(); closeErr != nil {
+			log.Error("error closing network store adapter", "error", closeErr)
+		}
+	}()
 
-	// Create network store adapter - always uses file backend for persistence
-	networkStoreConfig := &adapters.NetworkStoreConfig{
-		NetworkStore: &adapters.StoreConfig{
-			Backend: "file",
-			Path:    cfg.Network.Storage.Path,
-		},
-		AllocationStore: &adapters.StoreConfig{
-			Backend: "file", // Always file backend for both network and allocations
-			Path:    cfg.Network.Storage.Path,
-		},
-	}
-	networkStoreAdapter, err := adapterFactory.CreateNetworkStoreAdapter(networkStoreConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create network store adapter: %w", err)
-	}
-
-	// Create job store adapter from configuration
-	// Jobs storage is always memory-based for single-machine operation
-	// PubSub is always memory-based for single-machine operation - simple validation
-	if cfg.Buffers.DefaultConfig.PubsubBufferSize <= 0 {
-		return fmt.Errorf("pubsub buffer_size must be positive")
-	}
-
-	// Validate buffer configuration
-	if cfg.Buffers.DefaultConfig.Type == "" {
-		return fmt.Errorf("buffer type not configured")
-	}
-	if cfg.Buffers.DefaultConfig.ChunkSize <= 0 {
-		return fmt.Errorf("buffer chunk size not configured or invalid")
-	}
-
-	jobStoreConfig := &adapters.JobStoreConfig{
-		Store: &adapters.StoreConfig{
-			Backend: "memory",                 // Always memory for single-machine operation
-			Memory:  &adapters.MemoryConfig{}, // No limits or eviction
-		},
-		PubSub: &pubsub.PubSubConfig{
-			BufferSize: cfg.Buffers.DefaultConfig.PubsubBufferSize,
-		},
-		BufferManager: &adapters.BufferManagerConfig{
-			DefaultBufferConfig: &buffer.BufferConfig{
-				Type:                 cfg.Buffers.DefaultConfig.Type,
-				InitialCapacity:      int(cfg.Buffers.DefaultConfig.InitialCapacity),
-				MaxCapacity:          int(cfg.Buffers.DefaultConfig.MaxCapacity),
-				MaxSubscribers:       cfg.Buffers.DefaultConfig.MaxSubscribers,
-				SubscriberBufferSize: cfg.Buffers.DefaultConfig.SubscriberBufferSize,
-				EnableMetrics:        cfg.Buffers.DefaultConfig.EnableMetrics,
-			},
-		},
-		LogPersistence: &cfg.Buffers.LogPersistence,
-	}
-	jobStoreAdapter, err := adapterFactory.CreateJobStoreAdapter(jobStoreConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create job store adapter: %w", err)
-	}
+	jobStoreAdapter := adapters.NewJobStore(log)
+	defer func() {
+		if closeErr := jobStoreAdapter.Close(); closeErr != nil {
+			log.Error("error closing job store adapter", "error", closeErr)
+		}
+	}()
 
 	// Create volume manager using the new adapter
 	if cfg.Volumes.BasePath == "" {
@@ -153,6 +99,11 @@ func RunServer(cfg *config.Config) error {
 	if e := monitoringService.Start(); e != nil {
 		return fmt.Errorf("failed to start monitoring service: %w", e)
 	}
+	defer func() {
+		if stopErr := monitoringService.Stop(); stopErr != nil {
+			log.Error("error stopping monitoring service", "error", stopErr)
+		}
+	}()
 	log.Info("monitoring service started successfully")
 
 	// Start gRPC server with configuration using new adapters
@@ -175,23 +126,6 @@ func RunServer(cfg *config.Config) error {
 	log.Info("received shutdown signal, stopping server...")
 
 	// Graceful shutdown
-	log.Info("stopping monitoring service...")
-	if err := monitoringService.Stop(); err != nil {
-		log.Error("error stopping monitoring service", "error", err)
-	}
-
-	// Close new adapters
-	log.Info("closing storage adapters...")
-	if err := jobStoreAdapter.Close(); err != nil {
-		log.Error("error closing job store adapter", "error", err)
-	}
-	if err := volumeStoreAdapter.Close(); err != nil {
-		log.Error("error closing volume store adapter", "error", err)
-	}
-	if err := networkStoreAdapter.Close(); err != nil {
-		log.Error("error closing network store adapter", "error", err)
-	}
-
 	grpcServer.GracefulStop()
 	log.Info("server stopped gracefully")
 
@@ -221,11 +155,7 @@ func RunJobInit(cfg *config.Config) error {
 		initLogger = initLogger.WithField("jobId", jobID)
 	}
 
-	initLogger.Debug("joblet starting in INIT mode",
-		"platform", runtime.GOOS,
-		"mode", "init",
-		"phase", phase,
-		"jobId", jobID)
+	// Log minimal info for normal operation
 
 	// Phase-specific handling
 	switch phase {
@@ -298,7 +228,7 @@ func runUploadPhase(cfg *config.Config, logger *logger.Logger, platform platform
 //
 // Returns: Error if job execution fails or resource setup encounters issues
 func runExecutePhase(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
-	logger.Debug("starting execution phase in isolation")
+	logger.Debug("starting execution phase")
 
 	// CRITICAL: Wait for network setup FIRST before any other operations
 	if err := waitForNetworkReady(logger, platform); err != nil {
@@ -321,13 +251,7 @@ func runExecutePhase(cfg *config.Config, logger *logger.Logger, platform platfor
 		return fmt.Errorf("cgroup assignment verification failed: %w", err)
 	}
 
-	limits := map[string]string{
-		"maxCPU":    platform.Getenv("JOB_MAX_CPU"),
-		"maxMemory": platform.Getenv("JOB_MAX_MEMORY"),
-		"maxIOBPS":  platform.Getenv("JOB_MAX_IOBPS"),
-	}
-
-	logger.Debug("resource limits applied", "limits", limits)
+	// Resource limits have been applied by cgroup assignment
 
 	// Set up isolation
 	if err := isolation.Setup(logger); err != nil {
@@ -553,12 +477,12 @@ func waitForNetworkReady(logger *logger.Logger, platform platform.Platform) erro
 
 	// Use file-based approach if available
 	if networkReadyFile != "" {
-		logger.Debug("waiting for network setup", "file", networkReadyFile)
+		// Waiting for network setup via file
 		return waitForNetworkReadyFile(logger, networkReadyFile)
 	}
 
 	// Fall back to FD-based approach
-	logger.Debug("waiting for network setup", "fd", networkReadyFD)
+	// Waiting for network setup via FD
 
 	fd, err := strconv.Atoi(networkReadyFD)
 	if err != nil {
@@ -577,7 +501,7 @@ func waitForNetworkReady(logger *logger.Logger, platform platform.Platform) erro
 
 	// Read one byte - this blocks until network is ready
 	buf := make([]byte, 1)
-	logger.Debug("blocking on network ready signal...")
+	// Blocking on network ready signal
 
 	n, err := file.Read(buf)
 	if err != nil {
@@ -588,18 +512,18 @@ func waitForNetworkReady(logger *logger.Logger, platform platform.Platform) erro
 		return fmt.Errorf("unexpected read size from network ready FD: %d", n)
 	}
 
-	logger.Debug("network setup signal received, proceeding with initialization")
+	logger.Debug("network ready")
 	return nil
 }
 
 // waitForNetworkReadyFile waits for the network ready signal file to be created
 func waitForNetworkReadyFile(logger *logger.Logger, filePath string) error {
-	logger.Debug("blocking on network ready signal file...")
+	// Waiting for network ready signal file
 
 	// Poll for the file to exist with a timeout
 	for i := 0; i < 100; i++ { // 10 second timeout (100 * 100ms)
 		if _, err := os.Stat(filePath); err == nil {
-			logger.Debug("network setup signal received, proceeding with initialization")
+			logger.Debug("network ready")
 			// Clean up the signal file
 			os.Remove(filePath)
 			return nil
@@ -662,7 +586,7 @@ func assignToCgroup(cgroupPath string, logger *logger.Logger, platform platform.
 		return fmt.Errorf("failed to write PID %d to %s: %w", pid, procsFile, err)
 	}
 
-	logger.Debug("process assigned to cgroup successfully")
+	// Process assigned to cgroup
 	return nil
 }
 
@@ -687,8 +611,6 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger, pl
 	}
 
 	cgroupContent := strings.TrimSpace(string(cgroupData))
-	pid := os.Getpid()
-
 	// In cgroup namespace, we expect something like "0::/job-1" or similar
 	// The key is that it should NOT be "0::/" (root cgroup)
 	if cgroupContent == "0::/" {
@@ -702,7 +624,8 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger, pl
 			"jobID", jobID, "cgroupContent", cgroupContent)
 	}
 
-	logger.Debug("cgroup assignment verified successfully", "pid", pid)
+	// Cgroup assignment verified for pid
+	_ = os.Getpid() // pid available if needed for debugging
 	return nil
 }
 
@@ -717,7 +640,7 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger, pl
 //   - log: Structured logger for network initialization
 //
 // Returns: Error if network creation fails, nil if all networks created successfully
-func initializeDefaultNetworks(networkStore adapters.NetworkStoreAdapter, cfg *config.Config, log *logger.Logger) error {
+func initializeDefaultNetworks(networkStore adapters.NetworkStorer, cfg *config.Config, log *logger.Logger) error {
 	log.Info("initializing default networks from configuration")
 
 	if !cfg.Network.Enabled {
@@ -737,7 +660,7 @@ func initializeDefaultNetworks(networkStore adapters.NetworkStoreAdapter, cfg *c
 		}
 
 		// Check if network already exists
-		existing, exists := networkStore.GetNetwork(name)
+		existing, exists := networkStore.Network(name)
 		if exists {
 			log.Debug("network already exists", "name", name, "existingCIDR", existing.CIDR)
 			continue

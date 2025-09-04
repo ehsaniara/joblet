@@ -44,7 +44,7 @@ const (
 type WorkflowServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth              auth2.GRPCAuthorization
-	jobStore          adapters.JobStoreAdapter
+	jobStore          adapters.JobStorer
 	joblet            interfaces.Joblet
 	workflowManager   *workflow.WorkflowManager
 	workflowValidator *validation.WorkflowValidator
@@ -59,11 +59,9 @@ type WorkflowServiceServer struct {
 // This server handles workflow creation, status monitoring, and job orchestration.
 // It requires authentication, job store access, joblet interface for job execution,
 // a workflow manager for dependency tracking and job coordination, and managers for validation.
-func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet, workflowManager *workflow.WorkflowManager, volumeManager *volume.Manager, runtimeResolver *runtime.Resolver) *WorkflowServiceServer {
-	// Create workflow validator with adapters
-	volumeAdapter := validation.NewVolumeManagerAdapter(volumeManager)
-	runtimeAdapter := validation.NewRuntimeManagerAdapter(runtimeResolver)
-	workflowValidator := validation.NewWorkflowValidator(volumeAdapter, runtimeAdapter)
+func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, joblet interfaces.Joblet, workflowManager *workflow.WorkflowManager, volumeManager *volume.Manager, runtimeResolver *runtime.Resolver) *WorkflowServiceServer {
+	// Create workflow validator with concrete managers (no adapter pattern needed)
+	workflowValidator := validation.NewWorkflowValidator(volumeManager, runtimeResolver)
 
 	return &WorkflowServiceServer{
 		auth:              auth,
@@ -646,7 +644,7 @@ func (s *WorkflowServiceServer) convertJobDependenciesToWorkflowJobs(jobs map[st
 		}
 
 		for _, req := range jobDep.Requirements {
-			wfJob.Dependencies = append(wfJob.Dependencies, req.JobId)
+			wfJob.Dependencies = append(wfJob.Dependencies, req.JobID)
 		}
 
 		workflowJobs = append(workflowJobs, wfJob)
@@ -702,7 +700,7 @@ func (s *WorkflowServiceServer) StartWorkflowOrchestration(ctx context.Context, 
 		for depJob, status := range dependencies {
 			requirements = append(requirements, workflow.Requirement{
 				Type:   workflow.RequirementSimple,
-				JobId:  depJob,
+				JobID:  depJob,
 				Status: status,
 			})
 		}
@@ -926,7 +924,7 @@ func (s *WorkflowServiceServer) monitorWorkflowJob(ctx context.Context, jobName,
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			job, exists := s.jobStore.GetJob(jobID)
+			job, exists := s.jobStore.Job(jobID)
 			if !exists {
 				log.Warn("job not found in store")
 				continue
@@ -1014,7 +1012,7 @@ func (s *WorkflowServiceServer) StartWorkflowOrchestrationWithContent(ctx contex
 		for depJob, status := range dependencies {
 			requirements = append(requirements, workflow.Requirement{
 				Type:   workflow.RequirementSimple,
-				JobId:  depJob,
+				JobID:  depJob,
 				Status: status,
 			})
 		}
@@ -1164,7 +1162,7 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 	}
 
 	// Retrieve job from store (supports both full UUID and prefix)
-	job, exists := s.jobStore.GetJobByPrefix(req.GetUuid())
+	job, exists := s.jobStore.JobByPrefix(req.GetUuid())
 	if !exists {
 		log.Error("job not found", "jobId", req.GetUuid())
 		return nil, status.Errorf(codes.NotFound, "job %s not found", req.GetUuid())

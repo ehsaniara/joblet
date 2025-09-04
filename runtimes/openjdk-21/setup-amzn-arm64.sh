@@ -2,7 +2,22 @@
 # Self-contained Amazon Linux ARM64 OpenJDK 21 Runtime Setup
 # Uses YUM package manager for reliable installation
 
-set -e
+
+set -e  # Exit on any error
+set -u  # Exit on undefined variables
+set -o pipefail  # Exit on pipe failures
+
+# Error handling function
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    echo "❌ ERROR: Script failed at line $line_number with exit code $exit_code"
+    echo "❌ Installation FAILED - runtime may be in inconsistent state"
+    exit $exit_code
+}
+
+# Set up error trap
+trap 'handle_error ${LINENO}' ERR
 
 # =============================================================================
 # CONFIGURATION
@@ -106,7 +121,44 @@ copy_java_runtime() {
         }
     fi
     
-    # Note: Java binaries are already in JVM directory structure
+    # Create wrapper scripts for Java binaries (fixes boot class path issues)
+    echo "Creating Java wrapper scripts..."
+    mkdir -p isolated/usr/bin
+    
+    # Create java wrapper
+    cat > isolated/usr/bin/java << 'EOF'
+#!/bin/bash
+exec /usr/lib/jvm/bin/java "$@"
+EOF
+    chmod +x isolated/usr/bin/java
+    
+    # Create javac wrapper
+    cat > isolated/usr/bin/javac << 'EOF'
+#!/bin/bash
+exec /usr/lib/jvm/bin/javac "$@"
+EOF
+    chmod +x isolated/usr/bin/javac
+    
+    # Create jar wrapper
+    cat > isolated/usr/bin/jar << 'EOF'
+#!/bin/bash
+exec /usr/lib/jvm/bin/jar "$@"
+EOF
+    chmod +x isolated/usr/bin/jar
+    
+    # Copy JVM configuration file (fixes "could not open /usr/lib/jvm.cfg" errors)
+    if [ -f "$JAVA_HOME/lib/jvm.cfg" ]; then
+        mkdir -p isolated/usr/lib
+        cp "$JAVA_HOME/lib/jvm.cfg" isolated/usr/lib/jvm.cfg
+        echo "✓ Copied JVM configuration file"
+    fi
+    
+    # Copy server JVM library (fixes "missing server JVM" errors)
+    if [ -d "$JAVA_HOME/lib/server" ]; then
+        mkdir -p isolated/usr/lib/server
+        if ! cp "$JAVA_HOME/lib/server"/*.so isolated/usr/lib/server/ 2>/dev/null; then echo "  ⚠ Failed to copy "$JAVA_HOME/lib/server"/*.so isolated/usr/lib/server/ (non-critical)"; fi
+        echo "✓ Copied server JVM libraries"
+    fi
     
     echo "✓ Java runtime files copied"
 }
@@ -218,7 +270,6 @@ environment:
   PATH: "/usr/lib/jvm/bin:/usr/bin:/bin"
 EOF
         echo "✓ Design-compliant runtime.yml created"
-    fi
 }
 
 # Print installation summary
@@ -244,7 +295,32 @@ print_summary() {
 # =============================================================================
 
 install_java_packages() {
-    echo "Installing OpenJDK packages via YUM (Amazon Linux)..."
+    echo "Installing OpenJDK packages via YUM (Amazon Linux ARM64)..."
+    
+    # Check if we're in a chroot or read-only environment
+    if [ "$CHROOT" = "true" ] || ! [ -w "/usr/sbin" ]; then
+        echo "⚠ Detected chroot/read-only environment - using host system Java"
+        
+        # Look for existing Java installations on host system
+        local java_homes=(
+            "/usr/lib/jvm/java-21-amazon-corretto"
+            "/usr/lib/jvm/java-21-openjdk"
+            "/usr/lib/jvm/java-11-amazon-corretto"
+            "/usr/lib/jvm/java-11-openjdk"
+            "/usr/lib/jvm/java-1.8.0-openjdk"
+            "/usr/lib/jvm/default-java"
+        )
+        
+        for jh in "${java_homes[@]}"; do
+            if [ -d "$jh" ]; then
+                echo "✓ Found existing Java installation at $jh"
+                return 0
+            fi
+        done
+        
+        echo "⚠ No existing Java found - setup may fail"
+        return 0
+    fi
     
     # Update package lists (with fallback)
     yum update -y -q || {
@@ -278,7 +354,7 @@ copy_system_libraries() {
             local lib_patterns=("libc.so*" "libdl.so*" "libpthread.so*" "librt.so*" "libm.so*" "libz.so*" "libgcc_s.so*" "ld-linux*.so*" "libstdc++.so*")
             
             for pattern in "${lib_patterns[@]}"; do
-                find "$lib_dir" -name "$pattern" -exec cp {} "isolated/$(basename "$lib_dir")/" \; 2>/dev/null || true
+                find "$lib_dir" -name "$pattern" -exec cp {} "isolated/$(basename "$lib_dir")/" \; 2>/dev/null || echo "  ⚠ Failed to copy $pattern from $lib_dir (non-critical)"
             done
         fi
     done
@@ -307,8 +383,7 @@ main() {
     # Step 4: Copy Java runtime files
     copy_java_runtime
     
-    # Step 4.1: Remove Java binaries that may conflict with JVM installation
-    rm -f isolated/usr/bin/java isolated/usr/bin/javac isolated/usr/bin/jar 2>/dev/null || true
+    # Step 4.1: Java wrapper scripts are now created instead of binary copies
     
     # Step 5: Copy platform-specific system libraries
     copy_system_libraries

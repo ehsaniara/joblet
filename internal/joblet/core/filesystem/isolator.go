@@ -224,8 +224,8 @@ func (f *JobFilesystem) createBuilderEssentialFiles() error {
 	f.logger.Debug("creating DNS configuration for builder chroot")
 
 	// Try to use the dedicated chroot resolv.conf if available, otherwise create one
-	chroot_resolv_path := "/opt/joblet/chroot-resolv.conf"
-	if content, err := f.platform.ReadFile(chroot_resolv_path); err == nil {
+	chrootResolvPath := "/opt/joblet/chroot-resolv.conf"
+	if content, err := f.platform.ReadFile(chrootResolvPath); err == nil {
 		// Use the dedicated chroot resolv.conf from host
 		if err := f.platform.WriteFile("/etc/resolv.conf", content, 0644); err != nil {
 			return fmt.Errorf("failed to copy chroot resolv.conf: %w", err)
@@ -582,17 +582,22 @@ func (f *JobFilesystem) mountAllowedDirs() error {
 		// Bind mount as read-only
 		flags := uintptr(syscall.MS_BIND)
 		if err := f.platform.Mount(allowedDir, targetPath, "", flags, ""); err != nil {
-			f.logger.Warn("failed to mount allowed directory", "source", allowedDir, "target", targetPath, "error", err)
+			// Only log mount failures in debug mode - /etc/hosts missing is common
+			if strings.Contains(err.Error(), "/etc/hosts") {
+				// Skip logging for /etc/hosts - this is expected when container networking isn't set up yet
+			} else {
+				f.logger.Debug("failed to mount allowed directory", "source", allowedDir, "target", targetPath, "error", err)
+			}
 			continue
 		}
 
 		// Remount as read-only
 		flags = uintptr(syscall.MS_BIND | syscall.MS_REMOUNT | syscall.MS_RDONLY)
 		if err := f.platform.Mount("", targetPath, "", flags, ""); err != nil {
-			f.logger.Warn("failed to remount as read-only", "target", targetPath, "error", err)
+			f.logger.Debug("failed to remount as read-only", "target", targetPath, "error", err)
 		}
 
-		f.logger.Debug("mounted allowed directory", "source", allowedDir, "target", targetPath)
+		// Mounted allowed directory
 	}
 	return nil
 }
@@ -830,8 +835,9 @@ func (f *JobFilesystem) mountPipesDirectory() error {
 		}
 	}
 
-	// Target path inside chroot (maintaining the same path structure)
-	targetPipesPath := filepath.Join(f.RootDir, "opt/joblet/jobs", jobID, "pipes")
+	// Target path inside chroot - mount pipes at /pipes instead of /opt/joblet/...
+	// since /opt is read-only in runtime mounts
+	targetPipesPath := filepath.Join(f.RootDir, "pipes", jobID)
 
 	// Create the directory structure in chroot
 	targetParentDir := filepath.Dir(targetPipesPath)
@@ -864,15 +870,15 @@ func (f *JobFilesystem) mountPipesDirectory() error {
 // Continues mounting remaining volumes if individual volume mounts fail,
 // ensuring partial volume failures don't prevent job execution.
 func (f *JobFilesystem) mountVolumes() error {
-	f.logger.Debug("mountVolumes() called", "jobID", f.JobID, "volumes", f.Volumes, "volumeCount", len(f.Volumes))
+	// Check if volumes need mounting
 	if len(f.Volumes) == 0 {
-		f.logger.Debug("no volumes to mount - returning early", "jobID", f.JobID)
+		// No volumes to mount
 		return nil
 	}
 
-	f.logger.Debug("volumes present, proceeding to mount", "jobID", f.JobID, "volumes", f.Volumes)
+	// Proceeding to mount volumes
 	log := f.logger.WithField("operation", "mount-volumes")
-	log.Debug("mounting volumes", "count", len(f.Volumes), "volumes", f.Volumes)
+	log.Debug("mounting volumes", "count", len(f.Volumes))
 
 	for _, volumeName := range f.Volumes {
 		if err := f.mountSingleVolume(volumeName); err != nil {
@@ -882,7 +888,9 @@ func (f *JobFilesystem) mountVolumes() error {
 		}
 	}
 
-	log.Debug("volume mounting completed")
+	if len(f.Volumes) > 0 {
+		log.Debug("volume mounting completed", "count", len(f.Volumes))
+	}
 	return nil
 }
 
@@ -893,16 +901,16 @@ func (f *JobFilesystem) mountVolumes() error {
 // Returns error if volume doesn't exist or mount operation fails.
 func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
 	log := f.logger.WithField("volume", volumeName)
-	log.Debug("mounting single volume", "volumeName", volumeName, "jobID", f.JobID)
+	// Mounting volume
 
 	// Host volume path - this is where the actual volume data lives
 	hostVolumePath := fmt.Sprintf("%s/%s/data", f.getVolumesBasePath(), volumeName)
-	log.Debug("checking volume path", "hostVolumePath", hostVolumePath, "volumeName", volumeName)
+	// Check volume path
 
 	// Check if host volume directory exists
-	log.Debug("calling platform.Stat", "hostVolumePath", hostVolumePath)
-	stat, err := f.platform.Stat(hostVolumePath)
-	log.Debug("platform.Stat completed", "error", err, "stat", stat)
+	// Verify volume exists
+	_, err := f.platform.Stat(hostVolumePath)
+	// Volume existence check completed
 	if err != nil {
 		if f.platform.IsNotExist(err) {
 			log.Warn("volume does not exist", "hostVolumePath", hostVolumePath, "volumeName", volumeName)
@@ -911,7 +919,7 @@ func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
 		log.Error("failed to stat volume directory", "error", err, "hostVolumePath", hostVolumePath)
 		return fmt.Errorf("failed to stat volume directory: %w", err)
 	}
-	log.Debug("volume path exists, proceeding to mount", "hostVolumePath", hostVolumePath)
+	// Volume exists, mounting
 
 	// Target path inside chroot - mount volumes under /volumes/{name}
 	targetVolumePath := filepath.Join(f.RootDir, "volumes", volumeName)
@@ -1087,7 +1095,7 @@ func (f *JobFilesystem) mountRuntime() error {
 		return fmt.Errorf("failed to mount runtime %s: %w", f.Runtime, err)
 	}
 
-	log.Info("runtime mounted successfully", "runtime", f.Runtime)
+	log.Debug("runtime mounted", "runtime", f.Runtime, "jobID", f.JobID)
 	return nil
 }
 
@@ -1242,7 +1250,7 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 		if mount.ReadOnly {
 			flags = uintptr(syscall.MS_BIND | syscall.MS_REMOUNT | syscall.MS_RDONLY)
 			if err := f.platform.Mount("", targetPath, "", flags, ""); err != nil {
-				f.logger.Warn("failed to remount as read-only", "target", targetPath, "error", err)
+				f.logger.Debug("failed to remount as read-only", "target", targetPath, "error", err)
 			}
 		}
 

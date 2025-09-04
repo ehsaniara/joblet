@@ -22,8 +22,8 @@ export JOBLET_ROOT="${JOBLET_ROOT:-/home/jay/joblet}"
 export RNX_BINARY="${RNX_BINARY:-$JOBLET_ROOT/bin/rnx}"
 export TESTS_DIR="$JOBLET_ROOT/tests/e2e"
 
-# Runtime configuration
-export DEFAULT_RUNTIME="python-3.11-ml"
+# Runtime configuration  
+export DEFAULT_RUNTIME="openjdk-21"
 export RUNTIME_TIMEOUT=60
 export JOB_TIMEOUT=15
 

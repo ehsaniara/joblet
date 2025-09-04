@@ -36,7 +36,7 @@ func StartGRPCServerWithRegistry(serviceComponents *core.ServiceComponents, cfg 
 
 // StartGRPCServer initializes and starts the main Joblet gRPC server.
 // DEPRECATED: Use StartGRPCServerWithRegistry for new implementations
-func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStoreAdapter, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
+func StartGRPCServer(jobStore adapters.JobStorer, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStorer, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -93,7 +93,7 @@ func StartGRPCServer(jobStore adapters.JobStoreAdapter, joblet interfaces.Joblet
 	pb.RegisterMonitoringServiceServer(grpcServer, monitoringGrpcService)
 
 	// Create and register runtime service with direct installation capabilities (no job system)
-	runtimeService := NewRuntimeServiceServer(auth, cfg.Runtime.BasePath, platform, cfg, jobStore, joblet)
+	runtimeService := NewRuntimeServiceServer(auth, cfg.Runtime.BasePath, platform, cfg)
 	pb.RegisterRuntimeServiceServer(grpcServer, runtimeService)
 
 	lis, err := net.Listen("tcp", serverAddress)

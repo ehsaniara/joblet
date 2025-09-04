@@ -63,6 +63,9 @@ func Execute() error {
 }
 
 func init() {
+	// Disable Cobra's automatic completion command generation
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&common.ConfigPath, "config", "",
 		"Path to client configuration file (searches common locations if not specified)")
@@ -77,7 +80,6 @@ func init() {
 	rootCmd.AddCommand(jobs.NewStopCmd())
 	rootCmd.AddCommand(jobs.NewDeleteCmd())
 	rootCmd.AddCommand(jobs.NewLogCmd())
-	rootCmd.AddCommand(jobs.NewLogManageCmd())
 	rootCmd.AddCommand(jobs.NewListCmd())
 	rootCmd.AddCommand(NewNodesCmd())
 	rootCmd.AddCommand(NewHelpConfigCmd())

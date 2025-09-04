@@ -23,7 +23,7 @@ func NewLogCmd() *cobra.Command {
 		Short: "Stream job logs",
 		Long: `Stream logs from a running or completed job in real-time.
 
-By default, this command follows the log stream for running jobs and shows
+This command follows the log stream for running jobs and shows
 all output for completed jobs. Use Ctrl+C to stop following a log stream.
 
 Short-form UUIDs are supported - you can use just the first 8 characters
@@ -44,16 +44,8 @@ Examples:
 		RunE: runLog,
 	}
 
-	cmd.Flags().BoolVarP(&logParams.follow, "follow", "f", true, "Follow the log stream (can be terminated with Ctrl+C)")
-
 	return cmd
 }
-
-type logCmdParams struct {
-	follow bool
-}
-
-var logParams = &logCmdParams{}
 
 func runLog(cmd *cobra.Command, args []string) error {
 	jobID := args[0]

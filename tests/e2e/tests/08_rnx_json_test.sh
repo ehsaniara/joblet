@@ -64,9 +64,17 @@ execute_rnx_json() {
         return 1
     fi
     
-    if validate_basic_json "$json_output" && check_json_fields "$json_output" "$expected_fields"; then
-        echo "$json_output"
-        return 0
+    # If no expected fields specified, just validate JSON structure
+    if [[ -z "$expected_fields" ]]; then
+        if validate_basic_json "$json_output"; then
+            echo "$json_output"
+            return 0
+        fi
+    else
+        if validate_basic_json "$json_output" && check_json_fields "$json_output" "$expected_fields"; then
+            echo "$json_output"
+            return 0
+        fi
     fi
     
     return 1
@@ -86,23 +94,31 @@ extract_json_value() {
 
 test_rnx_runtime_list_json() {
     local json_output
-    json_output=$(execute_rnx_json "runtime list" "name")
+    json_output=$(execute_rnx_json "runtime list" "")
     
     if [[ $? -eq 0 ]]; then
         # Check that it looks like a JSON array
         if echo "$json_output" | grep -q '^\s*\[' && echo "$json_output" | grep -q '\]\s*$'; then
             # Check for runtime structure if any runtimes exist
             if echo "$json_output" | grep -q '"name"'; then
-                # Check for expected runtime fields
-                local required_runtime_fields="name language version available"
+                # Check for expected runtime fields (note: available is a boolean, not quoted)
+                local required_runtime_fields="name language version"
                 for field in $required_runtime_fields; do
                     if ! echo "$json_output" | grep -q "\"$field\""; then
                         echo "    ${RED}Runtime object missing field: $field${NC}"
                         return 1
                     fi
                 done
+                # Check for available field (boolean, so no quotes around value)
+                if ! echo "$json_output" | grep -q '"available":\s*\(true\|false\)'; then
+                    echo "    ${RED}Runtime object missing or invalid 'available' field${NC}"
+                    return 1
+                fi
             fi
             return 0
+        else
+            echo "    ${RED}Output is not a JSON array${NC}"
+            return 1
         fi
     fi
     

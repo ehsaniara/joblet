@@ -2,7 +2,27 @@
 # Self-contained Ubuntu/Debian AMD64 OpenJDK 21 Runtime Setup
 # Uses APT package manager for reliable installation
 
-set -e
+
+set -e  # Exit on any error
+set -u  # Exit on undefined variables
+set -o pipefail  # Exit on pipe failures
+
+# Error handling function
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    echo "❌ ERROR: Script failed at line $line_number with exit code $exit_code"
+    echo "❌ Installation FAILED - runtime may be in inconsistent state"
+    exit $exit_code
+}
+
+# Set up error trap
+trap 'handle_error ${LINENO}' ERR
+
+# Bypass systemd in isolated environment to prevent bus connection errors
+export SYSTEMCTL_SKIP_REDIRECT=1
+unset DBUS_SESSION_BUS_ADDRESS
+unset DBUS_SYSTEM_BUS_ADDRESS
 
 # =============================================================================
 # CONFIGURATION
@@ -97,31 +117,42 @@ find_java_installation() {
 copy_java_runtime() {
     echo "Copying Java runtime files..."
     
-    # Copy JVM
+    # Copy complete JVM installation
     if [ -d "$JAVA_HOME" ]; then
         echo "Copying JVM from $JAVA_HOME..."
-        cp -r "$JAVA_HOME"/* isolated/usr/lib/jvm/ 2>/dev/null || {
-            echo "WARNING: Failed to copy complete Java home, copying essentials..."
-            mkdir -p "isolated/usr/lib/jvm/$(basename "$JAVA_HOME")"
-            # Copy essential directories
-            for dir in bin lib jmods conf legal; do
-                if [ -d "$JAVA_HOME/$dir" ]; then
-                    cp -r "$JAVA_HOME/$dir" "isolated/usr/lib/jvm/$(basename "$JAVA_HOME")/" || echo "Warning: Failed to copy $dir"
-                fi
+        local java_basename=$(basename "$JAVA_HOME")
+        
+        # Create the full JVM directory structure in isolated environment
+        mkdir -p "isolated/usr/lib/jvm/$java_basename"
+        
+        # Copy all essential directories
+        for dir in bin lib jmods conf legal include; do
+            if [ -d "$JAVA_HOME/$dir" ]; then
+                echo "Copying $dir directory..."
+                cp -r "$JAVA_HOME/$dir" "isolated/usr/lib/jvm/$java_basename/" 2>/dev/null || echo "Warning: Failed to copy $dir"
+            fi
+        done
+        
+        # Copy critical Java libraries to system library locations
+        echo "Copying Java libraries to system locations..."
+        if [ -d "$JAVA_HOME/lib" ]; then
+            # Copy libjava.so and other critical JVM libraries
+            find "$JAVA_HOME/lib" -name "*.so*" -type f | while read libfile; do
+                if ! cp "$libfile" "isolated/usr/lib/x86_64-linux-gnu/" 2>/dev/null; then echo "  ⚠ Failed to copy "$libfile" "isolated/usr/lib/x86_64-linux-gnu/" (non-critical)"; fi
+                if ! cp "$libfile" "isolated/lib/x86_64-linux-gnu/" 2>/dev/null; then echo "  ⚠ Failed to copy "$libfile" "isolated/lib/x86_64-linux-gnu/" (non-critical)"; fi
+                if ! cp "$libfile" "isolated/usr/lib/" 2>/dev/null; then echo "  ⚠ Failed to copy "$libfile" "isolated/usr/lib/" (non-critical)"; fi
+                if ! cp "$libfile" "isolated/lib/" 2>/dev/null; then echo "  ⚠ Failed to copy "$libfile" "isolated/lib/" (non-critical)"; fi
             done
-        }
-    fi
-    
-    # Note: Java binaries are already in JVM directory structure
-    
-    # Copy JVM libraries to system locations
-    echo "Copying JVM libraries..."
-    if [ -n "$JAVA_HOME" ] && [ -d "$JAVA_HOME/lib" ]; then
-        echo "Copying JVM libraries from $JAVA_HOME/lib..."
-        # Copy libjli.so and other JVM libraries to system lib directories
-        find "$JAVA_HOME/lib" -name "*.so*" -exec cp {} "isolated/usr/lib/x86_64-linux-gnu/" \; 2>/dev/null || true
-        # Also copy to lib directory for broader compatibility
-        find "$JAVA_HOME/lib" -name "*.so*" -exec cp {} "isolated/lib/x86_64-linux-gnu/" \; 2>/dev/null || true
+            
+            # Special handling for server and client JVM libraries
+            if [ -d "$JAVA_HOME/lib/server" ]; then
+                echo "Copying server JVM libraries..."
+                find "$JAVA_HOME/lib/server" -name "*.so*" -type f | while read libfile; do
+                    if ! cp "$libfile" "isolated/usr/lib/x86_64-linux-gnu/" 2>/dev/null; then echo "  ⚠ Failed to copy "$libfile" "isolated/usr/lib/x86_64-linux-gnu/" (non-critical)"; fi
+                    if ! cp "$libfile" "isolated/lib/x86_64-linux-gnu/" 2>/dev/null; then echo "  ⚠ Failed to copy "$libfile" "isolated/lib/x86_64-linux-gnu/" (non-critical)"; fi
+                done
+            fi
+        fi
     fi
     
     echo "✓ Java runtime files copied"
@@ -231,10 +262,10 @@ mounts:
     readonly: true   # Java runtime needs CPU detection
 
 environment:
-  JAVA_HOME: "/usr/lib/jvm"
-  PATH: "/usr/lib/jvm/bin:/usr/bin:/bin"
+  JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
+  PATH: "/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/bin:/bin:/usr/sbin:/sbin"
   JAVA_VERSION: "$java_version"
-  LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib/jvm/lib"
+  LD_LIBRARY_PATH: "/usr/lib/jvm/java-21-openjdk-amd64/lib:/usr/lib/jvm/java-21-openjdk-amd64/lib/server:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib:/lib"
 EOF
     
     echo "✓ runtime.yml created successfully for $ARCHITECTURE $PLATFORM"
@@ -263,26 +294,50 @@ print_summary() {
 # =============================================================================
 
 install_java_packages() {
+    echo "Installing OpenJDK packages..."
+    
+    # Check if we're in a chroot/read-only environment (like local installation)
+    if [ "${CHROOT:-false}" = "true" ] || [ ! -w /usr/sbin ] 2>/dev/null; then
+        echo "⚠ Detected isolated/read-only environment - skipping APT installation"
+        echo "⚠ Using host system's existing Java installation instead"
+        
+        # Verify Java is available on host system
+        if ! command -v java >/dev/null 2>&1; then
+            echo "❌ ERROR: No Java installation found on host system"
+            echo "   Please install OpenJDK on the host system first:"
+            echo "   sudo apt-get install openjdk-21-jdk-headless"
+            exit 1
+        fi
+        
+        echo "✓ Found Java on host system, will copy in next step"
+        return 0
+    fi
+    
+    # Only attempt APT installation in non-chroot environments (GitHub installation)
     echo "Installing OpenJDK packages via APT..."
     
-    # Configure APT for non-interactive installation
+    # Configure APT for isolated environment installation
     export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    export NEEDRESTART_SUSPEND=1
+    export SYSTEMD_LOG_LEVEL=emerg
+    export RUNLEVEL=1
     
-    # Update package lists (with fallback)
-    apt-get update -qq || {
+    # Update package lists with error handling
+    echo "Updating package lists..."
+    apt-get update -qq 2>/dev/null || {
         echo "⚠ Failed to update package lists, continuing with existing packages"
     }
     
-    # Install OpenJDK 21 (with fallback chain)
+    # Install OpenJDK 21 with robust options
     echo "Installing OpenJDK 21 packages..."
-    if ! apt-get install -y openjdk-21-jdk-headless openjdk-21-jre-headless ca-certificates-java; then
-        echo "⚠ OpenJDK 21 failed, trying available Java packages..."
-        if ! apt-get install -y default-jdk-headless default-jre-headless ca-certificates-java; then
-            echo "⚠ Default JDK failed, installing minimal Java packages..."
-            apt-get install -y openjdk-11-jdk-headless || \
-            apt-get install -y default-jdk || \
-            echo "⚠ Some Java package installations failed, continuing..."
-        fi
+    local apt_opts=("-y" "-o" "DPkg::Options::=--force-confold" "-o" "APT::Install-Recommends=false")
+    
+    if ! apt-get install "${apt_opts[@]}" openjdk-21-jdk-headless openjdk-21-jre-headless ca-certificates-java 2>/dev/null; then
+        echo "⚠ OpenJDK 21 failed, trying fallback packages..."
+        apt-get install "${apt_opts[@]}" default-jdk-headless ca-certificates-java 2>/dev/null || \
+        apt-get install "${apt_opts[@]}" openjdk-11-jdk-headless 2>/dev/null || \
+        echo "⚠ Some Java package installations failed, continuing..."
     fi
     
     echo "✓ Java package installation completed"
@@ -309,7 +364,7 @@ copy_system_libraries() {
             fi
             
             for pattern in "${lib_patterns[@]}"; do
-                find "$lib_dir" -name "$pattern" -exec cp {} "$target_dir/" \; 2>/dev/null || true
+                find "$lib_dir" -name "$pattern" -exec cp {} "$target_dir/" \; 2>/dev/null || echo "  ⚠ Failed to copy {} "$target_dir/" (non-critical)"
             done
         fi
     done
@@ -319,7 +374,7 @@ copy_system_libraries() {
     
     # Copy the actual dynamic linker from /lib/x86_64-linux-gnu/
     if [ -f "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" ]; then
-        cp "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" "isolated/lib/x86_64-linux-gnu/" 2>/dev/null || true
+        if ! cp "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" "isolated/lib/x86_64-linux-gnu/" 2>/dev/null; then echo "  ⚠ Failed to copy "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" "isolated/lib/x86_64-linux-gnu/" (non-critical)"; fi
     fi
     
     # Create the /lib64 symlink structure
@@ -346,7 +401,7 @@ copy_system_files() {
             local bin_patterns=("bash" "sh" "ls" "cat" "grep" "find" "which" "dirname" "basename")
             for pattern in "${bin_patterns[@]}"; do
                 if [ -f "$bin_dir/$pattern" ]; then
-                    cp "$bin_dir/$pattern" "isolated$bin_dir/" 2>/dev/null || true
+                    if ! cp "$bin_dir/$pattern" "isolated$bin_dir/" 2>/dev/null; then echo "  ⚠ Failed to copy "$bin_dir/$pattern" "isolated$bin_dir/" (non-critical)"; fi
                 fi
             done
         fi
@@ -359,7 +414,7 @@ copy_system_files() {
         # Copy essential files and directories from /etc
         for item in "resolv.conf" "hosts" "nsswitch.conf" "ssl" "pki" "ca-certificates" "passwd" "group"; do
             if [ -e "/etc/$item" ]; then
-                cp -r "/etc/$item" "isolated/etc/" 2>/dev/null || true
+                if ! cp -r "/etc/$item" "isolated/etc/" 2>/dev/null; then echo "  ⚠ Failed to copy -r "/etc/$item" "isolated/etc/" (non-critical)"; fi
             fi
         done
         
@@ -376,7 +431,7 @@ copy_system_files() {
         for item in "ca-certificates" "zoneinfo"; do
             if [ -d "/usr/share/$item" ]; then
                 mkdir -p "isolated/usr/share"
-                cp -r "/usr/share/$item" "isolated/usr/share/" 2>/dev/null || true
+                if ! cp -r "/usr/share/$item" "isolated/usr/share/" 2>/dev/null; then echo "  ⚠ Failed to copy -r "/usr/share/$item" "isolated/usr/share/" (non-critical)"; fi
             fi
         done
     fi
@@ -405,8 +460,44 @@ main() {
     # Step 4: Copy Java runtime files
     copy_java_runtime
     
-    # Step 4.1: Remove Java binaries that may conflict with JVM installation
-    rm -f isolated/usr/bin/java isolated/usr/bin/javac isolated/usr/bin/jar 2>/dev/null || true
+    # Step 4.1: Copy Java binaries for PATH compatibility
+    echo "Copying Java binaries to standard locations..."
+    if [ -n "$JAVA_HOME" ]; then
+        # Create wrapper scripts that properly delegate to JAVA_HOME binaries
+        for binary in java javac jar; do
+            if [ -f "$JAVA_HOME/bin/$binary" ]; then
+                # Create wrapper script that uses full path
+                cat > "isolated/usr/bin/$binary" << 'WRAPPER_EOF'
+#!/bin/bash
+exec /usr/lib/jvm/java-21-openjdk-amd64/bin/java "$@"
+WRAPPER_EOF
+                # Replace java with correct binary name in the wrapper
+                sed -i "s|/bin/java|/bin/$binary|g" "isolated/usr/bin/$binary"
+                chmod +x "isolated/usr/bin/$binary"
+                
+                # Also copy to /bin for compatibility
+                if ! cp "isolated/usr/bin/$binary" "isolated/bin/$binary" 2>/dev/null; then echo "  ⚠ Failed to copy "isolated/usr/bin/$binary" "isolated/bin/$binary" (non-critical)"; fi
+            fi
+        done
+        
+        # Copy JVM configuration file to expected location
+        if [ -f "$JAVA_HOME/lib/jvm.cfg" ]; then
+            mkdir -p "isolated/usr/lib"
+            if ! cp "$JAVA_HOME/lib/jvm.cfg" "isolated/usr/lib/jvm.cfg" 2>/dev/null; then echo "  ⚠ Failed to copy "$JAVA_HOME/lib/jvm.cfg" "isolated/usr/lib/jvm.cfg" (non-critical)"; fi
+            echo "✓ JVM configuration copied to /usr/lib/jvm.cfg"
+        fi
+        
+        # Copy server JVM library to expected location
+        if [ -f "$JAVA_HOME/lib/server/libjvm.so" ]; then
+            mkdir -p "isolated/usr/lib/server"
+            if ! cp "$JAVA_HOME/lib/server/libjvm.so" "isolated/usr/lib/server/libjvm.so" 2>/dev/null; then echo "  ⚠ Failed to copy "$JAVA_HOME/lib/server/libjvm.so" "isolated/usr/lib/server/libjvm.so" (non-critical)"; fi
+            # Also copy other server JVM files that might be needed
+            if ! cp "$JAVA_HOME"/lib/server/*.so "isolated/usr/lib/server/" 2>/dev/null; then echo "  ⚠ Failed to copy "$JAVA_HOME"/lib/server/*.so "isolated/usr/lib/server/" (non-critical)"; fi
+            echo "✓ Server JVM libraries copied to /usr/lib/server/"
+        fi
+        
+        echo "✓ Java binaries copied to standard locations"
+    fi
     
     # Step 5: Copy platform-specific system libraries
     copy_system_libraries

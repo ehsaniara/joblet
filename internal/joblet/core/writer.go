@@ -8,8 +8,8 @@ import (
 // to the job storage buffer system for real-time log streaming.
 // Thread-safe for concurrent writes from multiple goroutines.
 type OutputWriter struct {
-	jobId string
-	store adapters.JobStoreAdapter
+	jobID string
+	store adapters.JobStorer
 }
 
 // NewWrite creates a new OutputWriter for the specified job.
@@ -17,11 +17,11 @@ type OutputWriter struct {
 //
 // Parameters:
 //   - store: Job storage adapter for buffer management
-//   - jobId: Unique identifier for the job
+//   - jobID: Unique identifier for the job
 //
 // Returns: OutputWriter instance configured for the specified job
-func NewWrite(store adapters.JobStoreAdapter, jobId string) *OutputWriter {
-	return &OutputWriter{store: store, jobId: jobId}
+func NewWrite(store adapters.JobStorer, jobID string) *OutputWriter {
+	return &OutputWriter{store: store, jobID: jobID}
 }
 
 // Write implements the io.Writer interface for job output streaming.
@@ -43,7 +43,7 @@ func (w *OutputWriter) Write(p []byte) (n int, err error) {
 	chunk := make([]byte, len(p))
 	copy(chunk, p)
 
-	w.store.WriteToBuffer(w.jobId, chunk)
+	w.store.WriteToBuffer(w.jobID, chunk)
 
 	// Return the number of bytes written (always successful)
 	return len(p), nil

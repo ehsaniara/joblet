@@ -33,7 +33,7 @@ type Coordinator struct {
 	activeCleanups sync.Map // jobID -> cleanup status
 
 	networkSetup *network.NetworkSetup
-	networkStore adapters.NetworkStoreAdapter
+	networkStore adapters.NetworkStorer
 }
 
 // CleanupStatus tracks the status of a cleanup operation.
@@ -58,13 +58,12 @@ func NewCoordinator(
 	platform platform.Platform,
 	config *config.Config,
 	logger *logger.Logger,
-	networkStore adapters.NetworkStoreAdapter,
+	networkStore adapters.NetworkStorer,
 ) *Coordinator {
 	var networkSetup *network.NetworkSetup
 	if networkStore != nil {
-		// Use the consolidated network setup bridge
-		networkStoreInterface := adapters.NewNetworkSetupBridge(networkStore)
-		networkSetup = network.NewNetworkSetup(platform, networkStoreInterface)
+		// Use the network store adapter directly (implements NetworkStoreInterface)
+		networkSetup = network.NewNetworkSetup(platform, networkStore)
 	}
 
 	return &Coordinator{
@@ -85,19 +84,18 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 	log := c.logger.WithField("jobID", jobID)
 	log.Debug("starting job cleanup")
 
-	// Check if cleanup is already in progress
-	if _, exists := c.activeCleanups.Load(jobID); exists {
-		log.Warn("cleanup already in progress for job")
-		return fmt.Errorf("cleanup already in progress for job %s", jobID)
-	}
-
-	// Track cleanup status
+	// Track cleanup status with atomic operation to prevent race condition
 	status := &CleanupStatus{
 		JobID:     jobID,
 		StartTime: time.Now(),
 		Errors:    make([]error, 0),
 	}
-	c.activeCleanups.Store(jobID, status)
+
+	// Use LoadOrStore to atomically check and set
+	if _, loaded := c.activeCleanups.LoadOrStore(jobID, status); loaded {
+		log.Warn("cleanup already in progress for job")
+		return fmt.Errorf("cleanup already in progress for job %s", jobID)
+	}
 	defer c.activeCleanups.Delete(jobID)
 
 	// Perform cleanup operations in order
@@ -126,7 +124,7 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 
 	// Clean up network resources if network store is available
 	if c.networkStore != nil {
-		if adapterAlloc, exists := c.networkStore.GetJobNetworkAllocation(jobID); exists {
+		if adapterAlloc, exists := c.networkStore.JobNetworkAllocation(jobID); exists {
 			if c.networkSetup != nil {
 				// Convert adapter allocation to network allocation for cleanup
 				alloc := &network.JobAllocation{
@@ -171,19 +169,18 @@ func (c *Coordinator) CleanupJobSystemResourcesOnly(jobID string) error {
 	log := c.logger.WithField("jobID", jobID)
 	log.Debug("starting system resource cleanup only - preserving filesystem artifacts")
 
-	// Check if cleanup is already in progress
-	if _, exists := c.activeCleanups.Load(jobID); exists {
-		log.Warn("cleanup already in progress for job")
-		return fmt.Errorf("cleanup already in progress for job %s", jobID)
-	}
-
-	// Track cleanup status
+	// Track cleanup status with atomic operation to prevent race condition
 	status := &CleanupStatus{
 		JobID:     jobID,
 		StartTime: time.Now(),
 		Errors:    make([]error, 0),
 	}
-	c.activeCleanups.Store(jobID, status)
+
+	// Use LoadOrStore to atomically check and set
+	if _, loaded := c.activeCleanups.LoadOrStore(jobID, status); loaded {
+		log.Warn("cleanup already in progress for job")
+		return fmt.Errorf("cleanup already in progress for job %s", jobID)
+	}
 	defer c.activeCleanups.Delete(jobID)
 
 	// Only clean system resources, not filesystem artifacts

@@ -234,8 +234,8 @@ func (m *VolumeMapper) ToDTO(volume *domain.Volume) *VolumeDTO {
 		Path:        volume.Path,
 		CreatedTime: volume.CreatedTime,
 		JobCount:    volume.JobCount,
-		MountPath:   volume.GetMountPath(), // Use volume's own method
-		InUse:       volume.IsInUse(),      // Use volume's own method
+		MountPath:   volume.MountPath(), // Use volume's own method
+		InUse:       volume.IsInUse(),   // Use volume's own method
 	}
 }
 

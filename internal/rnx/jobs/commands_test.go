@@ -8,6 +8,7 @@ import (
 	"joblet/internal/rnx/common"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func TestNewRunCmd(t *testing.T) {
@@ -278,31 +279,85 @@ func TestNewLogCmd(t *testing.T) {
 		t.Error("RunE function is nil")
 	}
 
-	// Check for follow flag
-	if flag := cmd.Flags().Lookup("follow"); flag == nil {
-		t.Error("Expected 'follow' flag not found")
+	// Test log command structure and behavior
+	if cmd.Use != "log <job-uuid>" {
+		t.Errorf("Expected Use 'log <job-uuid>', got %s", cmd.Use)
+	}
+
+	if !strings.Contains(cmd.Long, "Stream logs from a running or completed job") {
+		t.Error("Long description should mention streaming logs")
+	}
+
+	if !strings.Contains(cmd.Long, "Short-form UUIDs are supported") {
+		t.Error("Long description should mention short-form UUID support")
+	}
+
+	if !strings.Contains(cmd.Long, "Ctrl+C") {
+		t.Error("Long description should mention Ctrl+C to stop following")
+	}
+
+	// Test that command expects exactly one argument
+	if cmd.Args == nil {
+		t.Error("Expected Args function to be set for log command")
 	}
 }
 
-func TestNewLogManageCmd(t *testing.T) {
-	cmd := NewLogManageCmd()
+func TestLogCommandHelpExamples(t *testing.T) {
+	cmd := NewLogCmd()
+	helpContent := cmd.Long
 
-	if cmd == nil {
-		t.Fatal("NewLogManageCmd() returned nil")
+	// Test that specific log examples are included
+	expectedExamples := []string{
+		"rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"rnx log f47ac10b",
+		"rnx log a1b2c3d4",
 	}
 
-	if cmd.Use != "logs" {
-		t.Errorf("Expected Use 'logs', got %s", cmd.Use)
+	for _, example := range expectedExamples {
+		if !strings.Contains(helpContent, example) {
+			t.Errorf("Help content missing log example: '%s'", example)
+		}
+	}
+}
+
+func TestLogCommandBehavior(t *testing.T) {
+	cmd := NewLogCmd()
+
+	// Test that log command doesn't have flags (automatically follows)
+	flags := cmd.Flags()
+	flagCount := 0
+	flags.VisitAll(func(flag *pflag.Flag) {
+		flagCount++
+	})
+
+	if flagCount > 0 {
+		t.Errorf("Expected log command to have no flags (automatically follows), but found %d flags", flagCount)
 	}
 
-	if cmd.Short == "" {
-		t.Error("Short description is empty")
+	// Test command description mentions automatic following behavior
+	if !strings.Contains(cmd.Long, "follows the log stream for running jobs") {
+		t.Error("Long description should mention automatic following for running jobs")
 	}
 
-	// Check that subcommands exist
-	subcommands := cmd.Commands()
-	if len(subcommands) == 0 {
-		t.Error("No subcommands found for log-manage")
+	if !strings.Contains(cmd.Long, "all output for completed jobs") {
+		t.Error("Long description should mention showing all output for completed jobs")
+	}
+}
+
+func TestLogCommandValidation(t *testing.T) {
+	cmd := NewLogCmd()
+
+	// Test that the command requires exactly one argument
+	// We can't easily test the Args function directly without running it,
+	// but we can verify it's set and matches the expected signature
+	if cmd.Args == nil {
+		t.Error("Log command should have Args validation function")
+	}
+
+	// Test that command has proper usage format
+	expectedUsage := "log <job-uuid>"
+	if cmd.Use != expectedUsage {
+		t.Errorf("Expected usage '%s', got '%s'", expectedUsage, cmd.Use)
 	}
 }
 
@@ -419,7 +474,7 @@ func TestJobCommandFlags(t *testing.T) {
 		{
 			name:          "log command flags",
 			cmdFunc:       NewLogCmd,
-			expectedFlags: []string{"follow"},
+			expectedFlags: []string{}, // Log command has no flags - automatically follows for running jobs
 		},
 	}
 
@@ -553,7 +608,6 @@ func TestCommandHelpText(t *testing.T) {
 		{"stop", NewStopCmd},
 		{"delete", NewDeleteCmd},
 		{"log", NewLogCmd},
-		{"log-manage", NewLogManageCmd},
 		{"monitor", NewMonitorCmd},
 	}
 

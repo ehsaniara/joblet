@@ -7,22 +7,25 @@ import (
 	"regexp"
 	"strings"
 
+	"joblet/internal/joblet/core/volume"
+	"joblet/internal/joblet/runtime"
 	"joblet/internal/joblet/workflow/types"
 	"joblet/pkg/logger"
 )
 
 // WorkflowValidator provides comprehensive validation of workflow definitions
 // before execution to prevent runtime failures and resource waste.
+// Uses concrete manager implementations directly instead of excessive interface abstractions.
 type WorkflowValidator struct {
 	logger *logger.Logger
 
-	// Service interfaces for validation
-	volumeManager  VolumeManagerInterface
-	runtimeManager RuntimeManagerInterface
+	// Direct concrete managers - no interface abstraction needed
+	volumeManager  *volume.Manager
+	runtimeManager *runtime.Resolver
 }
 
 // NewWorkflowValidator creates a new workflow validator with required dependencies
-func NewWorkflowValidator(volumeManager VolumeManagerInterface, runtimeManager RuntimeManagerInterface) *WorkflowValidator {
+func NewWorkflowValidator(volumeManager *volume.Manager, runtimeManager *runtime.Resolver) *WorkflowValidator {
 	return &WorkflowValidator{
 		logger:         logger.WithField("component", "workflow-validator"),
 		volumeManager:  volumeManager,
@@ -145,10 +148,10 @@ func (wv *WorkflowValidator) validateVolumesExist(workflow types.WorkflowYAML) e
 		return nil
 	}
 
-	// Check each volume exists
+	// Check each volume exists using concrete volume manager
 	var missingVolumes []string
 	for volumeName := range requiredVolumes {
-		if !wv.volumeManager.VolumeExists(volumeName) {
+		if _, exists := wv.volumeManager.GetVolume(volumeName); !exists {
 			// Also check filesystem path as fallback
 			volumePath := filepath.Join("/opt/joblet/volumes", volumeName, "data")
 			if _, err := os.Stat(volumePath); os.IsNotExist(err) {
@@ -222,9 +225,12 @@ func (wv *WorkflowValidator) validateRuntimesExist(workflow types.WorkflowYAML) 
 		return nil
 	}
 
-	// Get available runtimes from runtime manager
+	// Get available runtimes from concrete runtime manager
 	availableRuntimes := make(map[string]bool)
-	runtimes := wv.runtimeManager.ListRuntimes()
+	runtimes, err := wv.runtimeManager.ListRuntimes()
+	if err != nil {
+		return fmt.Errorf("failed to list available runtimes: %w", err)
+	}
 	for _, runtime := range runtimes {
 		if runtime.Available {
 			// Support both hyphen and colon format
@@ -243,11 +249,8 @@ func (wv *WorkflowValidator) validateRuntimesExist(workflow types.WorkflowYAML) 
 		normalizedName := normalizeRuntimeName(runtimeName)
 
 		if !availableRuntimes[runtimeName] && !availableRuntimes[normalizedName] {
-			// Also try direct runtime manager check
-			if !wv.runtimeManager.RuntimeExists(runtimeName) && !wv.runtimeManager.RuntimeExists(normalizedName) {
-				missingRuntimes = append(missingRuntimes, runtimeName)
-				wv.logger.Warn("runtime not found", "runtime", runtimeName)
-			}
+			missingRuntimes = append(missingRuntimes, runtimeName)
+			wv.logger.Warn("runtime not found", "runtime", runtimeName)
 		}
 	}
 

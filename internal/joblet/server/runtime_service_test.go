@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	pb "joblet/api/gen"
-	"joblet/internal/joblet/adapters/adaptersfakes"
 	"joblet/internal/joblet/auth/authfakes"
-	"joblet/internal/joblet/core/interfaces/interfacesfakes"
 	"joblet/pkg/config"
 	"joblet/pkg/platform"
 
@@ -19,18 +17,14 @@ import (
 
 func TestNewRuntimeServiceServer(t *testing.T) {
 	fakeAuth := &authfakes.FakeGRPCAuthorization{}
-	fakeJobStore := &adaptersfakes.FakeJobStoreAdapter{}
-	fakeJoblet := &interfacesfakes.FakeJoblet{}
 	testPlatform := platform.NewPlatform()
 	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/opt/joblet/runtimes", testPlatform, testConfig, fakeJobStore, fakeJoblet)
+	server := NewRuntimeServiceServer(fakeAuth, "/opt/joblet/runtimes", testPlatform, testConfig)
 
 	assert.NotNil(t, server)
 	assert.Equal(t, fakeAuth, server.auth)
 	assert.NotNil(t, server.resolver)
-	assert.Equal(t, fakeJobStore, server.jobStore)
-	assert.Equal(t, fakeJoblet, server.joblet)
 	assert.NotNil(t, server.runtimeInstaller)
 	assert.Equal(t, "/opt/joblet/runtimes", server.runtimesPath)
 }
@@ -39,12 +33,10 @@ func TestRuntimeServiceServer_ListRuntimes_AuthorizationFailed(t *testing.T) {
 	fakeAuth := &authfakes.FakeGRPCAuthorization{}
 	fakeAuth.AuthorizedReturns(status.Errorf(codes.PermissionDenied, "access denied"))
 
-	fakeJobStore := &adaptersfakes.FakeJobStoreAdapter{}
-	fakeJoblet := &interfacesfakes.FakeJoblet{}
 	testPlatform := platform.NewPlatform()
 	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig, fakeJobStore, fakeJoblet)
+	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig)
 
 	req := &pb.EmptyRequest{}
 	resp, err := server.ListRuntimes(context.Background(), req)
@@ -58,12 +50,10 @@ func TestRuntimeServiceServer_GetRuntimeInfo_EmptyRuntime(t *testing.T) {
 	fakeAuth := &authfakes.FakeGRPCAuthorization{}
 	fakeAuth.AuthorizedReturns(nil)
 
-	fakeJobStore := &adaptersfakes.FakeJobStoreAdapter{}
-	fakeJoblet := &interfacesfakes.FakeJoblet{}
 	testPlatform := platform.NewPlatform()
 	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig, fakeJobStore, fakeJoblet)
+	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig)
 
 	req := &pb.RuntimeInfoReq{Runtime: ""}
 	resp, err := server.GetRuntimeInfo(context.Background(), req)
@@ -80,12 +70,10 @@ func TestRuntimeServiceServer_ValidateRuntimeSpec_EmptySpec(t *testing.T) {
 	fakeAuth := &authfakes.FakeGRPCAuthorization{}
 	fakeAuth.AuthorizedReturns(nil)
 
-	fakeJobStore := &adaptersfakes.FakeJobStoreAdapter{}
-	fakeJoblet := &interfacesfakes.FakeJoblet{}
 	testPlatform := platform.NewPlatform()
 	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig, fakeJobStore, fakeJoblet)
+	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig)
 
 	req := &pb.ValidateRuntimeSpecRequest{RuntimeSpec: ""}
 	resp, err := server.ValidateRuntimeSpec(context.Background(), req)

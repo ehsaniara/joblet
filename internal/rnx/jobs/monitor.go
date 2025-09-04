@@ -872,9 +872,9 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 				Used:       disk.UsedBytes,
 				Available:  disk.FreeBytes,
 				Percent:    disk.UsagePercent,
-				ReadBps:    1024000, // Placeholder values
-				WriteBps:   512000,  // Placeholder values
-				IOPS:       150,     // Placeholder values
+				ReadBps:    0, // TODO: Calculate actual read BPS from metrics
+				WriteBps:   0, // TODO: Calculate actual write BPS from metrics
+				IOPS:       0, // TODO: Calculate actual IOPS from metrics
 			})
 		}
 	}
@@ -902,10 +902,10 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 				Name:        net.Interface,
 				Type:        interfaceType,
 				Status:      "up",
-				Speed:       1000,                      // Placeholder
-				MTU:         1500,                      // Placeholder
-				IPAddresses: []string{"192.168.1.100"}, // Placeholder
-				MacAddress:  "aa:bb:cc:dd:ee:ff",       // Placeholder
+				Speed:       1000,       // TODO: Get actual interface speed
+				MTU:         1500,       // TODO: Get actual MTU
+				IPAddresses: []string{}, // TODO: Get actual IP addresses
+				MacAddress:  "unknown",  // TODO: Get actual MAC address
 				RxBytes:     net.BytesReceived,
 				TxBytes:     net.BytesSent,
 				RxPackets:   net.PacketsReceived,
@@ -935,13 +935,13 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 			PID:         proc.Pid,
 			Name:        proc.Name,
 			Command:     proc.Command,
-			User:        "root", // Placeholder
+			User:        "unknown", // TODO: Get actual process user
 			CPU:         proc.CpuPercent,
 			Memory:      proc.MemoryPercent,
 			MemoryBytes: proc.MemoryBytes,
 			Status:      status,
 			StartTime:   proc.StartTime,
-			Threads:     1, // Placeholder
+			Threads:     0, // TODO: Get actual thread count
 		})
 	}
 
