@@ -246,7 +246,9 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 	}
 
 	// Create device nodes for proper operation
-	ri.createDeviceNodes(chrootDir)
+	if err := ri.createDeviceNodes(chrootDir); err != nil {
+		return "", nil, fmt.Errorf("failed to create device nodes: %w", err)
+	}
 
 	// Mount special filesystems
 	specialMounts := []struct {
@@ -304,7 +306,10 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 	cleanup := func() {
 		// Unmount all mounted paths in reverse order
 		for i := len(mountedPaths) - 1; i >= 0; i-- {
-			syscall.Unmount(mountedPaths[i], syscall.MNT_DETACH)
+			if err := syscall.Unmount(mountedPaths[i], syscall.MNT_DETACH); err != nil {
+				// Log but don't fail on unmount errors during cleanup
+				fmt.Printf("Warning: failed to unmount %s: %v\n", mountedPaths[i], err)
+			}
 		}
 		os.RemoveAll(chrootDir)
 	}
@@ -343,7 +348,9 @@ func (ri *RuntimeInstaller) makedev(major, minor uint32) uint64 {
 // downloadAndExtractRepo downloads and extracts GitHub repository
 func (ri *RuntimeInstaller) downloadAndExtractRepo(ctx context.Context, chrootDir string, req *RuntimeInstallRequest) error {
 	if req.Streamer != nil {
-		req.Streamer.SendProgress("📦 Cloning repository...")
+		if err := req.Streamer.SendProgress("📦 Cloning repository..."); err != nil {
+			return fmt.Errorf("failed to send progress: %w", err)
+		}
 	}
 
 	// Download as ZIP
@@ -372,7 +379,9 @@ func (ri *RuntimeInstaller) downloadAndExtractRepo(ctx context.Context, chrootDi
 	}
 
 	if req.Streamer != nil {
-		req.Streamer.SendProgress("Extracting repository...")
+		if err := req.Streamer.SendProgress("Extracting repository..."); err != nil {
+			return fmt.Errorf("failed to send progress: %w", err)
+		}
 	}
 
 	// Extract ZIP
@@ -399,7 +408,9 @@ func (ri *RuntimeInstaller) downloadAndExtractRepo(ctx context.Context, chrootDi
 		targetPath := filepath.Join(extractDir, relativePath)
 
 		if file.FileInfo().IsDir() {
-			os.MkdirAll(targetPath, file.Mode())
+			if err := os.MkdirAll(targetPath, file.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", targetPath, err)
+			}
 			continue
 		}
 
@@ -424,11 +435,16 @@ func (ri *RuntimeInstaller) downloadAndExtractRepo(ctx context.Context, chrootDi
 			return fmt.Errorf("failed to extract file: %w", err)
 		}
 
-		dst.Chmod(file.Mode())
+		if err := dst.Chmod(file.Mode()); err != nil {
+			return fmt.Errorf("failed to set file permissions: %w", err)
+		}
 	}
 
 	if req.Streamer != nil {
-		req.Streamer.SendProgress("Repository extracted successfully")
+		if err := req.Streamer.SendProgress("Repository extracted successfully"); err != nil {
+			// Log but don't fail on progress send errors
+			fmt.Printf("Warning: failed to send progress: %v\n", err)
+		}
 	}
 
 	return nil
@@ -437,7 +453,9 @@ func (ri *RuntimeInstaller) downloadAndExtractRepo(ctx context.Context, chrootDi
 // executeSetupScript executes the setup.sh script for GitHub installations
 func (ri *RuntimeInstaller) executeSetupScript(ctx context.Context, chrootDir string, req *RuntimeInstallRequest) (string, error) {
 	if req.Streamer != nil {
-		req.Streamer.SendProgress("🏗️  Running setup script...")
+		if err := req.Streamer.SendProgress("🏗️  Running setup script..."); err != nil {
+			return "", fmt.Errorf("failed to send progress: %w", err)
+		}
 	}
 
 	workDir := fmt.Sprintf("/tmp/runtime-build/%s/%s", req.Path, req.RuntimeSpec)
@@ -467,7 +485,9 @@ fi
 // executeLocalSetupScript executes the setup.sh script for local installations
 func (ri *RuntimeInstaller) executeLocalSetupScript(ctx context.Context, chrootDir string, req *RuntimeInstallFromLocalRequest) (string, error) {
 	if req.Streamer != nil {
-		req.Streamer.SendProgress("🏗️  Running local setup script...")
+		if err := req.Streamer.SendProgress("🏗️  Running local setup script..."); err != nil {
+			return "", fmt.Errorf("failed to send progress: %w", err)
+		}
 	}
 
 	script := `#!/bin/bash
@@ -544,7 +564,10 @@ func (ri *RuntimeInstaller) runChrootCommand(ctx context.Context, chrootDir, com
 			if n > 0 {
 				data := buf[:n]
 				outputBuffer.Write(data)
-				streamer.SendLog(data)
+				if err := streamer.SendLog(data); err != nil {
+					// Log but don't fail on log send errors
+					fmt.Printf("Warning: failed to send log: %v\n", err)
+				}
 			}
 			if err != nil {
 				break
@@ -561,7 +584,10 @@ func (ri *RuntimeInstaller) runChrootCommand(ctx context.Context, chrootDir, com
 			if n > 0 {
 				data := buf[:n]
 				outputBuffer.Write(data)
-				streamer.SendLog(data)
+				if err := streamer.SendLog(data); err != nil {
+					// Log but don't fail on log send errors
+					fmt.Printf("Warning: failed to send log: %v\n", err)
+				}
 			}
 			if err != nil {
 				break
