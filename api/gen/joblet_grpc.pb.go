@@ -23,6 +23,7 @@ const (
 	JobService_GetJobStatus_FullMethodName      = "/joblet.JobService/GetJobStatus"
 	JobService_StopJob_FullMethodName           = "/joblet.JobService/StopJob"
 	JobService_DeleteJob_FullMethodName         = "/joblet.JobService/DeleteJob"
+	JobService_DeleteAllJobs_FullMethodName     = "/joblet.JobService/DeleteAllJobs"
 	JobService_GetJobLogs_FullMethodName        = "/joblet.JobService/GetJobLogs"
 	JobService_ListJobs_FullMethodName          = "/joblet.JobService/ListJobs"
 	JobService_RunWorkflow_FullMethodName       = "/joblet.JobService/RunWorkflow"
@@ -44,6 +45,7 @@ type JobServiceClient interface {
 	GetJobStatus(ctx context.Context, in *GetJobStatusReq, opts ...grpc.CallOption) (*GetJobStatusRes, error)
 	StopJob(ctx context.Context, in *StopJobReq, opts ...grpc.CallOption) (*StopJobRes, error)
 	DeleteJob(ctx context.Context, in *DeleteJobReq, opts ...grpc.CallOption) (*DeleteJobRes, error)
+	DeleteAllJobs(ctx context.Context, in *DeleteAllJobsReq, opts ...grpc.CallOption) (*DeleteAllJobsRes, error)
 	GetJobLogs(ctx context.Context, in *GetJobLogsReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataChunk], error)
 	ListJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Jobs, error)
 	// Workflow-based job and workflow execution
@@ -95,6 +97,16 @@ func (c *jobServiceClient) DeleteJob(ctx context.Context, in *DeleteJobReq, opts
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteJobRes)
 	err := c.cc.Invoke(ctx, JobService_DeleteJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) DeleteAllJobs(ctx context.Context, in *DeleteAllJobsReq, opts ...grpc.CallOption) (*DeleteAllJobsRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAllJobsRes)
+	err := c.cc.Invoke(ctx, JobService_DeleteAllJobs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -183,6 +195,7 @@ type JobServiceServer interface {
 	GetJobStatus(context.Context, *GetJobStatusReq) (*GetJobStatusRes, error)
 	StopJob(context.Context, *StopJobReq) (*StopJobRes, error)
 	DeleteJob(context.Context, *DeleteJobReq) (*DeleteJobRes, error)
+	DeleteAllJobs(context.Context, *DeleteAllJobsReq) (*DeleteAllJobsRes, error)
 	GetJobLogs(*GetJobLogsReq, grpc.ServerStreamingServer[DataChunk]) error
 	ListJobs(context.Context, *EmptyRequest) (*Jobs, error)
 	// Workflow-based job and workflow execution
@@ -211,6 +224,9 @@ func (UnimplementedJobServiceServer) StopJob(context.Context, *StopJobReq) (*Sto
 }
 func (UnimplementedJobServiceServer) DeleteJob(context.Context, *DeleteJobReq) (*DeleteJobRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteJob not implemented")
+}
+func (UnimplementedJobServiceServer) DeleteAllJobs(context.Context, *DeleteAllJobsReq) (*DeleteAllJobsRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAllJobs not implemented")
 }
 func (UnimplementedJobServiceServer) GetJobLogs(*GetJobLogsReq, grpc.ServerStreamingServer[DataChunk]) error {
 	return status.Errorf(codes.Unimplemented, "method GetJobLogs not implemented")
@@ -319,6 +335,24 @@ func _JobService_DeleteJob_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(JobServiceServer).DeleteJob(ctx, req.(*DeleteJobReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_DeleteAllJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAllJobsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).DeleteAllJobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_DeleteAllJobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).DeleteAllJobs(ctx, req.(*DeleteAllJobsReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -446,6 +480,10 @@ var JobService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteJob",
 			Handler:    _JobService_DeleteJob_Handler,
+		},
+		{
+			MethodName: "DeleteAllJobs",
+			Handler:    _JobService_DeleteAllJobs_Handler,
 		},
 		{
 			MethodName: "ListJobs",

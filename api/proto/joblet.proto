@@ -13,6 +13,7 @@ service JobService {
   rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes){}
   rpc StopJob(StopJobReq) returns (StopJobRes){}
   rpc DeleteJob(DeleteJobReq) returns (DeleteJobRes){}
+  rpc DeleteAllJobs(DeleteAllJobsReq) returns (DeleteAllJobsRes){}
   rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
   rpc ListJobs(EmptyRequest) returns (Jobs){}
 
@@ -139,6 +140,18 @@ message DeleteJobRes{
   string uuid = 1;                         // Job UUID identifier
   bool success = 2;
   string message = 3;
+}
+
+// DeleteAllJobs
+message DeleteAllJobsReq{
+  // No parameters needed - deletes all non-running jobs
+}
+
+message DeleteAllJobsRes{
+  bool success = 1;
+  string message = 2;
+  int32 deleted_count = 3;                 // Number of jobs deleted
+  int32 skipped_count = 4;                 // Number of jobs skipped (running/scheduled)
 }
 
 // GetJobLogs

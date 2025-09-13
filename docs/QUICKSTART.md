@@ -304,6 +304,8 @@ rnx list                    # List all jobs
 rnx status <job-uuid>       # Check job status
 rnx log <job-uuid>          # View job logs
 rnx stop <job-uuid>         # Stop running job
+rnx delete <job-uuid>       # Delete specific job
+rnx delete-all              # Delete all non-running jobs
 
 # Workflow Management
 rnx run --workflow=file.yaml    # Run workflow

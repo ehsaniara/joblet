@@ -9,6 +9,20 @@ import (
 )
 
 type FakeJoblet struct {
+	DeleteAllJobsStub        func(context.Context, interfaces.DeleteAllJobsRequest) (*interfaces.DeleteAllJobsResponse, error)
+	deleteAllJobsMutex       sync.RWMutex
+	deleteAllJobsArgsForCall []struct {
+		arg1 context.Context
+		arg2 interfaces.DeleteAllJobsRequest
+	}
+	deleteAllJobsReturns struct {
+		result1 *interfaces.DeleteAllJobsResponse
+		result2 error
+	}
+	deleteAllJobsReturnsOnCall map[int]struct {
+		result1 *interfaces.DeleteAllJobsResponse
+		result2 error
+	}
 	DeleteJobStub        func(context.Context, interfaces.DeleteJobRequest) error
 	deleteJobMutex       sync.RWMutex
 	deleteJobArgsForCall []struct {
@@ -61,6 +75,71 @@ type FakeJoblet struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeJoblet) DeleteAllJobs(arg1 context.Context, arg2 interfaces.DeleteAllJobsRequest) (*interfaces.DeleteAllJobsResponse, error) {
+	fake.deleteAllJobsMutex.Lock()
+	ret, specificReturn := fake.deleteAllJobsReturnsOnCall[len(fake.deleteAllJobsArgsForCall)]
+	fake.deleteAllJobsArgsForCall = append(fake.deleteAllJobsArgsForCall, struct {
+		arg1 context.Context
+		arg2 interfaces.DeleteAllJobsRequest
+	}{arg1, arg2})
+	stub := fake.DeleteAllJobsStub
+	fakeReturns := fake.deleteAllJobsReturns
+	fake.recordInvocation("DeleteAllJobs", []interface{}{arg1, arg2})
+	fake.deleteAllJobsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeJoblet) DeleteAllJobsCallCount() int {
+	fake.deleteAllJobsMutex.RLock()
+	defer fake.deleteAllJobsMutex.RUnlock()
+	return len(fake.deleteAllJobsArgsForCall)
+}
+
+func (fake *FakeJoblet) DeleteAllJobsCalls(stub func(context.Context, interfaces.DeleteAllJobsRequest) (*interfaces.DeleteAllJobsResponse, error)) {
+	fake.deleteAllJobsMutex.Lock()
+	defer fake.deleteAllJobsMutex.Unlock()
+	fake.DeleteAllJobsStub = stub
+}
+
+func (fake *FakeJoblet) DeleteAllJobsArgsForCall(i int) (context.Context, interfaces.DeleteAllJobsRequest) {
+	fake.deleteAllJobsMutex.RLock()
+	defer fake.deleteAllJobsMutex.RUnlock()
+	argsForCall := fake.deleteAllJobsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeJoblet) DeleteAllJobsReturns(result1 *interfaces.DeleteAllJobsResponse, result2 error) {
+	fake.deleteAllJobsMutex.Lock()
+	defer fake.deleteAllJobsMutex.Unlock()
+	fake.DeleteAllJobsStub = nil
+	fake.deleteAllJobsReturns = struct {
+		result1 *interfaces.DeleteAllJobsResponse
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeJoblet) DeleteAllJobsReturnsOnCall(i int, result1 *interfaces.DeleteAllJobsResponse, result2 error) {
+	fake.deleteAllJobsMutex.Lock()
+	defer fake.deleteAllJobsMutex.Unlock()
+	fake.DeleteAllJobsStub = nil
+	if fake.deleteAllJobsReturnsOnCall == nil {
+		fake.deleteAllJobsReturnsOnCall = make(map[int]struct {
+			result1 *interfaces.DeleteAllJobsResponse
+			result2 error
+		})
+	}
+	fake.deleteAllJobsReturnsOnCall[i] = struct {
+		result1 *interfaces.DeleteAllJobsResponse
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeJoblet) DeleteJob(arg1 context.Context, arg2 interfaces.DeleteJobRequest) error {

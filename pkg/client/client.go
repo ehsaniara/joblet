@@ -107,6 +107,22 @@ func (c *JobClient) DeleteJob(ctx context.Context, id string) (*pb.DeleteJobRes,
 	return resp, nil
 }
 
+func (c *JobClient) DeleteAllJobs(ctx context.Context) (*pb.DeleteAllJobsRes, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := c.jobClient.DeleteAllJobs(ctx, &pb.DeleteAllJobsReq{})
+	if err != nil {
+		if s, ok := status.FromError(err); ok {
+			if s.Code() == codes.DeadlineExceeded {
+				return nil, fmt.Errorf("timeout while deleting all jobs: server may still be processing the request")
+			}
+		}
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (c *JobClient) ListJobs(ctx context.Context) (*pb.Jobs, error) {
 	return c.jobClient.ListJobs(ctx, &pb.EmptyRequest{})
 }

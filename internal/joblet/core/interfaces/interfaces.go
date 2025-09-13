@@ -18,6 +18,9 @@ type Joblet interface {
 	// DeleteJob completely removes a job including logs and metadata
 	DeleteJob(ctx context.Context, req DeleteJobRequest) error
 
+	// DeleteAllJobs removes all non-running jobs including logs and metadata
+	DeleteAllJobs(ctx context.Context, req DeleteAllJobsRequest) (*DeleteAllJobsResponse, error)
+
 	// ExecuteScheduledJob transitions a scheduled job to execution (used by scheduler)
 	ExecuteScheduledJob(ctx context.Context, req ExecuteScheduledJobRequest) error
 

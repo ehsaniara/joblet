@@ -40,6 +40,11 @@ func (w *linuxJoblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobReq
 	return w.platformJoblet.DeleteJob(ctx, req)
 }
 
+// DeleteAllJobs delegates to the platform joblet
+func (w *linuxJoblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobsRequest) (*interfaces.DeleteAllJobsResponse, error) {
+	return w.platformJoblet.DeleteAllJobs(ctx, req)
+}
+
 // ExecuteScheduledJob delegates to the platform joblet
 func (w *linuxJoblet) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
 	return w.platformJoblet.ExecuteScheduledJob(ctx, req)

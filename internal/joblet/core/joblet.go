@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"joblet/internal/joblet/adapters"
@@ -391,6 +392,60 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 
 	log.Info("job deleted successfully")
 	return nil
+}
+
+// DeleteAllJobs removes all non-running jobs from the system, including logs and metadata.
+// Iterates through all jobs in the store, identifies non-running ones, and deletes them.
+// Returns counts of deleted and skipped jobs. Skips running and scheduled jobs.
+func (j *Joblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobsRequest) (*interfaces.DeleteAllJobsResponse, error) {
+	log := j.logger.WithField("operation", "DeleteAllJobs")
+	log.Info("bulk job deletion requested", "reason", req.Reason)
+
+	// Get all jobs from the store
+	allJobs := j.store.ListJobs()
+
+	deletedCount := 0
+	skippedCount := 0
+	var errors []string
+
+	for _, job := range allJobs {
+		// Skip running and scheduled jobs
+		if job.IsRunning() || job.IsScheduled() {
+			skippedCount++
+			log.Debug("skipping job", "jobID", job.Uuid, "status", job.Status)
+			continue
+		}
+
+		// Delete the job using the existing delete logic
+		deleteRequest := interfaces.DeleteJobRequest{
+			JobID:  job.Uuid,
+			Reason: req.Reason,
+		}
+
+		err := j.DeleteJob(ctx, deleteRequest)
+		if err != nil {
+			log.Error("failed to delete job", "jobID", job.Uuid, "error", err)
+			errors = append(errors, fmt.Sprintf("job %s: %v", job.Uuid, err))
+			continue
+		}
+
+		deletedCount++
+		log.Debug("job deleted", "jobID", job.Uuid)
+	}
+
+	if len(errors) > 0 {
+		log.Warn("some jobs failed to delete", "errors", len(errors))
+		return nil, fmt.Errorf("failed to delete %d jobs: %s", len(errors), strings.Join(errors, "; "))
+	}
+
+	log.Info("bulk job deletion completed",
+		"deletedCount", deletedCount,
+		"skippedCount", skippedCount)
+
+	return &interfaces.DeleteAllJobsResponse{
+		DeletedCount: deletedCount,
+		SkippedCount: skippedCount,
+	}, nil
 }
 
 // monitorJob monitors a running job until completion asynchronously.

@@ -65,6 +65,17 @@ type DeleteJobRequest struct {
 	Reason string // Optional reason for audit/logging
 }
 
+// DeleteAllJobsRequest encapsulates parameters for deleting all non-running jobs
+type DeleteAllJobsRequest struct {
+	Reason string // Optional reason for audit/logging
+}
+
+// DeleteAllJobsResponse contains the result of deleting all non-running jobs
+type DeleteAllJobsResponse struct {
+	DeletedCount int // Number of jobs deleted
+	SkippedCount int // Number of jobs skipped (running/scheduled)
+}
+
 // ExecuteScheduledJobRequest for executing a scheduled job
 type ExecuteScheduledJobRequest struct {
 	Job *domain.Job

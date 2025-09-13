@@ -471,6 +471,48 @@ rnx delete f47ac10b-58cc-4372-a567-0e02b2c3d479
 rnx delete f47ac10b
 ```
 
+### `rnx delete-all`
+
+Delete all non-running jobs from the system.
+
+```bash
+rnx delete-all [flags]
+```
+
+Permanently removes all jobs that are not currently running or scheduled. Jobs in completed, failed, or stopped states will be deleted. Running and scheduled jobs are preserved and will not be affected.
+
+Complete deletion includes:
+- Job records and metadata
+- Log files and buffers
+- Subscriptions and streams
+- Any remaining resources
+
+#### Flags
+
+- `--json`: Output results in JSON format
+
+#### Examples
+
+```bash
+# Delete all non-running jobs
+rnx delete-all
+
+# Delete all non-running jobs with JSON output
+rnx delete-all --json
+```
+
+**Example JSON Output:**
+```json
+{
+  "success": true,
+  "message": "Successfully deleted 3 jobs, skipped 1 running/scheduled jobs",
+  "deleted_count": 3,
+  "skipped_count": 1
+}
+```
+
+**Note:** This operation is irreversible. Once deleted, job information and logs cannot be recovered. Only non-running jobs are affected.
+
 ## Volume Commands
 
 ### `rnx volume create`

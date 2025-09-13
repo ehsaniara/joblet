@@ -1276,6 +1276,47 @@ func (s *WorkflowServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJob
 	}, nil
 }
 
+// DeleteAllJobs implements the JobService interface for bulk job deletion
+func (s *WorkflowServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJobsReq) (*pb.DeleteAllJobsRes, error) {
+	log := s.logger.WithField("operation", "DeleteAllJobs")
+	log.Debug("delete all jobs request received")
+
+	// Authorization check
+	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	deleteRequest := interfaces.DeleteAllJobsRequest{
+		Reason: "user_requested",
+	}
+
+	log.Info("processing bulk job deletion")
+
+	// Call core joblet to delete all non-running jobs
+	result, err := s.joblet.DeleteAllJobs(ctx, deleteRequest)
+	if err != nil {
+		log.Error("bulk job deletion failed", "error", err)
+		return &pb.DeleteAllJobsRes{
+			Success:      false,
+			Message:      err.Error(),
+			DeletedCount: 0,
+			SkippedCount: 0,
+		}, status.Errorf(codes.Internal, "bulk job deletion failed: %v", err)
+	}
+
+	log.Info("bulk job deletion completed successfully",
+		"deletedCount", result.DeletedCount,
+		"skippedCount", result.SkippedCount)
+
+	return &pb.DeleteAllJobsRes{
+		Success:      true,
+		Message:      fmt.Sprintf("Successfully deleted %d jobs, skipped %d running/scheduled jobs", result.DeletedCount, result.SkippedCount),
+		DeletedCount: int32(result.DeletedCount),
+		SkippedCount: int32(result.SkippedCount),
+	}, nil
+}
+
 // GetJobLogs implements the JobService interface
 func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
 	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetUuid())

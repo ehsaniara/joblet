@@ -808,6 +808,111 @@ func (x *DeleteJobRes) GetMessage() string {
 	return ""
 }
 
+// DeleteAllJobs
+type DeleteAllJobsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAllJobsReq) Reset() {
+	*x = DeleteAllJobsReq{}
+	mi := &file_joblet_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAllJobsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAllJobsReq) ProtoMessage() {}
+
+func (x *DeleteAllJobsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_joblet_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAllJobsReq.ProtoReflect.Descriptor instead.
+func (*DeleteAllJobsReq) Descriptor() ([]byte, []int) {
+	return file_joblet_proto_rawDescGZIP(), []int{10}
+}
+
+type DeleteAllJobsRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	DeletedCount  int32                  `protobuf:"varint,3,opt,name=deleted_count,json=deletedCount,proto3" json:"deleted_count,omitempty"` // Number of jobs deleted
+	SkippedCount  int32                  `protobuf:"varint,4,opt,name=skipped_count,json=skippedCount,proto3" json:"skipped_count,omitempty"` // Number of jobs skipped (running/scheduled)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAllJobsRes) Reset() {
+	*x = DeleteAllJobsRes{}
+	mi := &file_joblet_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAllJobsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAllJobsRes) ProtoMessage() {}
+
+func (x *DeleteAllJobsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_joblet_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAllJobsRes.ProtoReflect.Descriptor instead.
+func (*DeleteAllJobsRes) Descriptor() ([]byte, []int) {
+	return file_joblet_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DeleteAllJobsRes) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeleteAllJobsRes) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DeleteAllJobsRes) GetDeletedCount() int32 {
+	if x != nil {
+		return x.DeletedCount
+	}
+	return 0
+}
+
+func (x *DeleteAllJobsRes) GetSkippedCount() int32 {
+	if x != nil {
+		return x.SkippedCount
+	}
+	return 0
+}
+
 // GetJobLogs
 type GetJobLogsReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -818,7 +923,7 @@ type GetJobLogsReq struct {
 
 func (x *GetJobLogsReq) Reset() {
 	*x = GetJobLogsReq{}
-	mi := &file_joblet_proto_msgTypes[10]
+	mi := &file_joblet_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -830,7 +935,7 @@ func (x *GetJobLogsReq) String() string {
 func (*GetJobLogsReq) ProtoMessage() {}
 
 func (x *GetJobLogsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[10]
+	mi := &file_joblet_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +948,7 @@ func (x *GetJobLogsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobLogsReq.ProtoReflect.Descriptor instead.
 func (*GetJobLogsReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{10}
+	return file_joblet_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetJobLogsReq) GetUuid() string {
@@ -862,7 +967,7 @@ type DataChunk struct {
 
 func (x *DataChunk) Reset() {
 	*x = DataChunk{}
-	mi := &file_joblet_proto_msgTypes[11]
+	mi := &file_joblet_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -874,7 +979,7 @@ func (x *DataChunk) String() string {
 func (*DataChunk) ProtoMessage() {}
 
 func (x *DataChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[11]
+	mi := &file_joblet_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -887,7 +992,7 @@ func (x *DataChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataChunk.ProtoReflect.Descriptor instead.
 func (*DataChunk) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{11}
+	return file_joblet_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DataChunk) GetPayload() []byte {
@@ -911,7 +1016,7 @@ type RuntimeInstallationChunk struct {
 
 func (x *RuntimeInstallationChunk) Reset() {
 	*x = RuntimeInstallationChunk{}
-	mi := &file_joblet_proto_msgTypes[12]
+	mi := &file_joblet_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +1028,7 @@ func (x *RuntimeInstallationChunk) String() string {
 func (*RuntimeInstallationChunk) ProtoMessage() {}
 
 func (x *RuntimeInstallationChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[12]
+	mi := &file_joblet_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1041,7 @@ func (x *RuntimeInstallationChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInstallationChunk.ProtoReflect.Descriptor instead.
 func (*RuntimeInstallationChunk) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{12}
+	return file_joblet_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RuntimeInstallationChunk) GetChunkType() isRuntimeInstallationChunk_ChunkType {
@@ -1006,7 +1111,7 @@ type RuntimeInstallationProgress struct {
 
 func (x *RuntimeInstallationProgress) Reset() {
 	*x = RuntimeInstallationProgress{}
-	mi := &file_joblet_proto_msgTypes[13]
+	mi := &file_joblet_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1123,7 @@ func (x *RuntimeInstallationProgress) String() string {
 func (*RuntimeInstallationProgress) ProtoMessage() {}
 
 func (x *RuntimeInstallationProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[13]
+	mi := &file_joblet_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1136,7 @@ func (x *RuntimeInstallationProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInstallationProgress.ProtoReflect.Descriptor instead.
 func (*RuntimeInstallationProgress) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{13}
+	return file_joblet_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RuntimeInstallationProgress) GetMessage() string {
@@ -1064,7 +1169,7 @@ type RuntimeInstallationLog struct {
 
 func (x *RuntimeInstallationLog) Reset() {
 	*x = RuntimeInstallationLog{}
-	mi := &file_joblet_proto_msgTypes[14]
+	mi := &file_joblet_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +1181,7 @@ func (x *RuntimeInstallationLog) String() string {
 func (*RuntimeInstallationLog) ProtoMessage() {}
 
 func (x *RuntimeInstallationLog) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[14]
+	mi := &file_joblet_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +1194,7 @@ func (x *RuntimeInstallationLog) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInstallationLog.ProtoReflect.Descriptor instead.
 func (*RuntimeInstallationLog) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{14}
+	return file_joblet_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RuntimeInstallationLog) GetData() []byte {
@@ -1111,7 +1216,7 @@ type RuntimeInstallationResult struct {
 
 func (x *RuntimeInstallationResult) Reset() {
 	*x = RuntimeInstallationResult{}
-	mi := &file_joblet_proto_msgTypes[15]
+	mi := &file_joblet_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1123,7 +1228,7 @@ func (x *RuntimeInstallationResult) String() string {
 func (*RuntimeInstallationResult) ProtoMessage() {}
 
 func (x *RuntimeInstallationResult) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[15]
+	mi := &file_joblet_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1136,7 +1241,7 @@ func (x *RuntimeInstallationResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInstallationResult.ProtoReflect.Descriptor instead.
 func (*RuntimeInstallationResult) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{15}
+	return file_joblet_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RuntimeInstallationResult) GetSuccess() bool {
@@ -1177,7 +1282,7 @@ type CreateNetworkReq struct {
 
 func (x *CreateNetworkReq) Reset() {
 	*x = CreateNetworkReq{}
-	mi := &file_joblet_proto_msgTypes[16]
+	mi := &file_joblet_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1189,7 +1294,7 @@ func (x *CreateNetworkReq) String() string {
 func (*CreateNetworkReq) ProtoMessage() {}
 
 func (x *CreateNetworkReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[16]
+	mi := &file_joblet_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1202,7 +1307,7 @@ func (x *CreateNetworkReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNetworkReq.ProtoReflect.Descriptor instead.
 func (*CreateNetworkReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{16}
+	return file_joblet_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CreateNetworkReq) GetName() string {
@@ -1230,7 +1335,7 @@ type CreateNetworkRes struct {
 
 func (x *CreateNetworkRes) Reset() {
 	*x = CreateNetworkRes{}
-	mi := &file_joblet_proto_msgTypes[17]
+	mi := &file_joblet_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1242,7 +1347,7 @@ func (x *CreateNetworkRes) String() string {
 func (*CreateNetworkRes) ProtoMessage() {}
 
 func (x *CreateNetworkRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[17]
+	mi := &file_joblet_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1255,7 +1360,7 @@ func (x *CreateNetworkRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNetworkRes.ProtoReflect.Descriptor instead.
 func (*CreateNetworkRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{17}
+	return file_joblet_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateNetworkRes) GetName() string {
@@ -1288,7 +1393,7 @@ type RemoveNetworkReq struct {
 
 func (x *RemoveNetworkReq) Reset() {
 	*x = RemoveNetworkReq{}
-	mi := &file_joblet_proto_msgTypes[18]
+	mi := &file_joblet_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1300,7 +1405,7 @@ func (x *RemoveNetworkReq) String() string {
 func (*RemoveNetworkReq) ProtoMessage() {}
 
 func (x *RemoveNetworkReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[18]
+	mi := &file_joblet_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1313,7 +1418,7 @@ func (x *RemoveNetworkReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveNetworkReq.ProtoReflect.Descriptor instead.
 func (*RemoveNetworkReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{18}
+	return file_joblet_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RemoveNetworkReq) GetName() string {
@@ -1333,7 +1438,7 @@ type RemoveNetworkRes struct {
 
 func (x *RemoveNetworkRes) Reset() {
 	*x = RemoveNetworkRes{}
-	mi := &file_joblet_proto_msgTypes[19]
+	mi := &file_joblet_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1345,7 +1450,7 @@ func (x *RemoveNetworkRes) String() string {
 func (*RemoveNetworkRes) ProtoMessage() {}
 
 func (x *RemoveNetworkRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[19]
+	mi := &file_joblet_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,7 +1463,7 @@ func (x *RemoveNetworkRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveNetworkRes.ProtoReflect.Descriptor instead.
 func (*RemoveNetworkRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{19}
+	return file_joblet_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RemoveNetworkRes) GetSuccess() bool {
@@ -1387,7 +1492,7 @@ type Network struct {
 
 func (x *Network) Reset() {
 	*x = Network{}
-	mi := &file_joblet_proto_msgTypes[20]
+	mi := &file_joblet_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1399,7 +1504,7 @@ func (x *Network) String() string {
 func (*Network) ProtoMessage() {}
 
 func (x *Network) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[20]
+	mi := &file_joblet_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1412,7 +1517,7 @@ func (x *Network) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Network.ProtoReflect.Descriptor instead.
 func (*Network) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{20}
+	return file_joblet_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Network) GetName() string {
@@ -1452,7 +1557,7 @@ type Networks struct {
 
 func (x *Networks) Reset() {
 	*x = Networks{}
-	mi := &file_joblet_proto_msgTypes[21]
+	mi := &file_joblet_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1464,7 +1569,7 @@ func (x *Networks) String() string {
 func (*Networks) ProtoMessage() {}
 
 func (x *Networks) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[21]
+	mi := &file_joblet_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1477,7 +1582,7 @@ func (x *Networks) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Networks.ProtoReflect.Descriptor instead.
 func (*Networks) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{21}
+	return file_joblet_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Networks) GetNetworks() []*Network {
@@ -1498,7 +1603,7 @@ type CreateVolumeReq struct {
 
 func (x *CreateVolumeReq) Reset() {
 	*x = CreateVolumeReq{}
-	mi := &file_joblet_proto_msgTypes[22]
+	mi := &file_joblet_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1510,7 +1615,7 @@ func (x *CreateVolumeReq) String() string {
 func (*CreateVolumeReq) ProtoMessage() {}
 
 func (x *CreateVolumeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[22]
+	mi := &file_joblet_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1523,7 +1628,7 @@ func (x *CreateVolumeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVolumeReq.ProtoReflect.Descriptor instead.
 func (*CreateVolumeReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{22}
+	return file_joblet_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CreateVolumeReq) GetName() string {
@@ -1559,7 +1664,7 @@ type CreateVolumeRes struct {
 
 func (x *CreateVolumeRes) Reset() {
 	*x = CreateVolumeRes{}
-	mi := &file_joblet_proto_msgTypes[23]
+	mi := &file_joblet_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1571,7 +1676,7 @@ func (x *CreateVolumeRes) String() string {
 func (*CreateVolumeRes) ProtoMessage() {}
 
 func (x *CreateVolumeRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[23]
+	mi := &file_joblet_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1584,7 +1689,7 @@ func (x *CreateVolumeRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVolumeRes.ProtoReflect.Descriptor instead.
 func (*CreateVolumeRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{23}
+	return file_joblet_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CreateVolumeRes) GetName() string {
@@ -1624,7 +1729,7 @@ type RemoveVolumeReq struct {
 
 func (x *RemoveVolumeReq) Reset() {
 	*x = RemoveVolumeReq{}
-	mi := &file_joblet_proto_msgTypes[24]
+	mi := &file_joblet_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1636,7 +1741,7 @@ func (x *RemoveVolumeReq) String() string {
 func (*RemoveVolumeReq) ProtoMessage() {}
 
 func (x *RemoveVolumeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[24]
+	mi := &file_joblet_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1649,7 +1754,7 @@ func (x *RemoveVolumeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveVolumeReq.ProtoReflect.Descriptor instead.
 func (*RemoveVolumeReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{24}
+	return file_joblet_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RemoveVolumeReq) GetName() string {
@@ -1669,7 +1774,7 @@ type RemoveVolumeRes struct {
 
 func (x *RemoveVolumeRes) Reset() {
 	*x = RemoveVolumeRes{}
-	mi := &file_joblet_proto_msgTypes[25]
+	mi := &file_joblet_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1681,7 +1786,7 @@ func (x *RemoveVolumeRes) String() string {
 func (*RemoveVolumeRes) ProtoMessage() {}
 
 func (x *RemoveVolumeRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[25]
+	mi := &file_joblet_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1694,7 +1799,7 @@ func (x *RemoveVolumeRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveVolumeRes.ProtoReflect.Descriptor instead.
 func (*RemoveVolumeRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{25}
+	return file_joblet_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RemoveVolumeRes) GetSuccess() bool {
@@ -1725,7 +1830,7 @@ type Volume struct {
 
 func (x *Volume) Reset() {
 	*x = Volume{}
-	mi := &file_joblet_proto_msgTypes[26]
+	mi := &file_joblet_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1737,7 +1842,7 @@ func (x *Volume) String() string {
 func (*Volume) ProtoMessage() {}
 
 func (x *Volume) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[26]
+	mi := &file_joblet_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1750,7 +1855,7 @@ func (x *Volume) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Volume.ProtoReflect.Descriptor instead.
 func (*Volume) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{26}
+	return file_joblet_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *Volume) GetName() string {
@@ -1804,7 +1909,7 @@ type Volumes struct {
 
 func (x *Volumes) Reset() {
 	*x = Volumes{}
-	mi := &file_joblet_proto_msgTypes[27]
+	mi := &file_joblet_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1816,7 +1921,7 @@ func (x *Volumes) String() string {
 func (*Volumes) ProtoMessage() {}
 
 func (x *Volumes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[27]
+	mi := &file_joblet_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1829,7 +1934,7 @@ func (x *Volumes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Volumes.ProtoReflect.Descriptor instead.
 func (*Volumes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{27}
+	return file_joblet_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Volumes) GetVolumes() []*Volume {
@@ -1857,7 +1962,7 @@ type SystemStatusRes struct {
 
 func (x *SystemStatusRes) Reset() {
 	*x = SystemStatusRes{}
-	mi := &file_joblet_proto_msgTypes[28]
+	mi := &file_joblet_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1869,7 +1974,7 @@ func (x *SystemStatusRes) String() string {
 func (*SystemStatusRes) ProtoMessage() {}
 
 func (x *SystemStatusRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[28]
+	mi := &file_joblet_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1882,7 +1987,7 @@ func (x *SystemStatusRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemStatusRes.ProtoReflect.Descriptor instead.
 func (*SystemStatusRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{28}
+	return file_joblet_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SystemStatusRes) GetTimestamp() string {
@@ -1972,7 +2077,7 @@ type SystemMetricsRes struct {
 
 func (x *SystemMetricsRes) Reset() {
 	*x = SystemMetricsRes{}
-	mi := &file_joblet_proto_msgTypes[29]
+	mi := &file_joblet_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1984,7 +2089,7 @@ func (x *SystemMetricsRes) String() string {
 func (*SystemMetricsRes) ProtoMessage() {}
 
 func (x *SystemMetricsRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[29]
+	mi := &file_joblet_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1997,7 +2102,7 @@ func (x *SystemMetricsRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemMetricsRes.ProtoReflect.Descriptor instead.
 func (*SystemMetricsRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{29}
+	return file_joblet_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SystemMetricsRes) GetTimestamp() string {
@@ -2073,7 +2178,7 @@ type StreamMetricsReq struct {
 
 func (x *StreamMetricsReq) Reset() {
 	*x = StreamMetricsReq{}
-	mi := &file_joblet_proto_msgTypes[30]
+	mi := &file_joblet_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2085,7 +2190,7 @@ func (x *StreamMetricsReq) String() string {
 func (*StreamMetricsReq) ProtoMessage() {}
 
 func (x *StreamMetricsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[30]
+	mi := &file_joblet_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2098,7 +2203,7 @@ func (x *StreamMetricsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamMetricsReq.ProtoReflect.Descriptor instead.
 func (*StreamMetricsReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{30}
+	return file_joblet_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *StreamMetricsReq) GetIntervalSeconds() int32 {
@@ -2135,7 +2240,7 @@ type HostInfo struct {
 
 func (x *HostInfo) Reset() {
 	*x = HostInfo{}
-	mi := &file_joblet_proto_msgTypes[31]
+	mi := &file_joblet_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2147,7 +2252,7 @@ func (x *HostInfo) String() string {
 func (*HostInfo) ProtoMessage() {}
 
 func (x *HostInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[31]
+	mi := &file_joblet_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2160,7 +2265,7 @@ func (x *HostInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostInfo.ProtoReflect.Descriptor instead.
 func (*HostInfo) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{31}
+	return file_joblet_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *HostInfo) GetHostname() string {
@@ -2264,7 +2369,7 @@ type CPUMetrics struct {
 
 func (x *CPUMetrics) Reset() {
 	*x = CPUMetrics{}
-	mi := &file_joblet_proto_msgTypes[32]
+	mi := &file_joblet_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2276,7 +2381,7 @@ func (x *CPUMetrics) String() string {
 func (*CPUMetrics) ProtoMessage() {}
 
 func (x *CPUMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[32]
+	mi := &file_joblet_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2289,7 +2394,7 @@ func (x *CPUMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CPUMetrics.ProtoReflect.Descriptor instead.
 func (*CPUMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{32}
+	return file_joblet_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *CPUMetrics) GetCores() int32 {
@@ -2373,7 +2478,7 @@ type MemoryMetrics struct {
 
 func (x *MemoryMetrics) Reset() {
 	*x = MemoryMetrics{}
-	mi := &file_joblet_proto_msgTypes[33]
+	mi := &file_joblet_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2385,7 +2490,7 @@ func (x *MemoryMetrics) String() string {
 func (*MemoryMetrics) ProtoMessage() {}
 
 func (x *MemoryMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[33]
+	mi := &file_joblet_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2398,7 +2503,7 @@ func (x *MemoryMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryMetrics.ProtoReflect.Descriptor instead.
 func (*MemoryMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{33}
+	return file_joblet_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *MemoryMetrics) GetTotalBytes() int64 {
@@ -2490,7 +2595,7 @@ type DiskMetrics struct {
 
 func (x *DiskMetrics) Reset() {
 	*x = DiskMetrics{}
-	mi := &file_joblet_proto_msgTypes[34]
+	mi := &file_joblet_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2502,7 +2607,7 @@ func (x *DiskMetrics) String() string {
 func (*DiskMetrics) ProtoMessage() {}
 
 func (x *DiskMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[34]
+	mi := &file_joblet_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2515,7 +2620,7 @@ func (x *DiskMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiskMetrics.ProtoReflect.Descriptor instead.
 func (*DiskMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{34}
+	return file_joblet_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *DiskMetrics) GetDevice() string {
@@ -2614,7 +2719,7 @@ type NetworkMetrics struct {
 
 func (x *NetworkMetrics) Reset() {
 	*x = NetworkMetrics{}
-	mi := &file_joblet_proto_msgTypes[35]
+	mi := &file_joblet_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2626,7 +2731,7 @@ func (x *NetworkMetrics) String() string {
 func (*NetworkMetrics) ProtoMessage() {}
 
 func (x *NetworkMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[35]
+	mi := &file_joblet_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2639,7 +2744,7 @@ func (x *NetworkMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkMetrics.ProtoReflect.Descriptor instead.
 func (*NetworkMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{35}
+	return file_joblet_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *NetworkMetrics) GetInterface() string {
@@ -2734,7 +2839,7 @@ type IOMetrics struct {
 
 func (x *IOMetrics) Reset() {
 	*x = IOMetrics{}
-	mi := &file_joblet_proto_msgTypes[36]
+	mi := &file_joblet_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2746,7 +2851,7 @@ func (x *IOMetrics) String() string {
 func (*IOMetrics) ProtoMessage() {}
 
 func (x *IOMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[36]
+	mi := &file_joblet_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2759,7 +2864,7 @@ func (x *IOMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IOMetrics.ProtoReflect.Descriptor instead.
 func (*IOMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{36}
+	return file_joblet_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *IOMetrics) GetTotalReads() int64 {
@@ -2828,7 +2933,7 @@ type DiskIOMetrics struct {
 
 func (x *DiskIOMetrics) Reset() {
 	*x = DiskIOMetrics{}
-	mi := &file_joblet_proto_msgTypes[37]
+	mi := &file_joblet_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2840,7 +2945,7 @@ func (x *DiskIOMetrics) String() string {
 func (*DiskIOMetrics) ProtoMessage() {}
 
 func (x *DiskIOMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[37]
+	mi := &file_joblet_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2853,7 +2958,7 @@ func (x *DiskIOMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiskIOMetrics.ProtoReflect.Descriptor instead.
 func (*DiskIOMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{37}
+	return file_joblet_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *DiskIOMetrics) GetDevice() string {
@@ -2935,7 +3040,7 @@ type ProcessMetrics struct {
 
 func (x *ProcessMetrics) Reset() {
 	*x = ProcessMetrics{}
-	mi := &file_joblet_proto_msgTypes[38]
+	mi := &file_joblet_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2947,7 +3052,7 @@ func (x *ProcessMetrics) String() string {
 func (*ProcessMetrics) ProtoMessage() {}
 
 func (x *ProcessMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[38]
+	mi := &file_joblet_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2960,7 +3065,7 @@ func (x *ProcessMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProcessMetrics.ProtoReflect.Descriptor instead.
 func (*ProcessMetrics) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{38}
+	return file_joblet_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ProcessMetrics) GetTotalProcesses() int32 {
@@ -3037,7 +3142,7 @@ type ProcessInfo struct {
 
 func (x *ProcessInfo) Reset() {
 	*x = ProcessInfo{}
-	mi := &file_joblet_proto_msgTypes[39]
+	mi := &file_joblet_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3049,7 +3154,7 @@ func (x *ProcessInfo) String() string {
 func (*ProcessInfo) ProtoMessage() {}
 
 func (x *ProcessInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[39]
+	mi := &file_joblet_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3062,7 +3167,7 @@ func (x *ProcessInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProcessInfo.ProtoReflect.Descriptor instead.
 func (*ProcessInfo) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{39}
+	return file_joblet_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ProcessInfo) GetPid() int32 {
@@ -3150,7 +3255,7 @@ type CloudInfo struct {
 
 func (x *CloudInfo) Reset() {
 	*x = CloudInfo{}
-	mi := &file_joblet_proto_msgTypes[40]
+	mi := &file_joblet_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3162,7 +3267,7 @@ func (x *CloudInfo) String() string {
 func (*CloudInfo) ProtoMessage() {}
 
 func (x *CloudInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[40]
+	mi := &file_joblet_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3175,7 +3280,7 @@ func (x *CloudInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudInfo.ProtoReflect.Descriptor instead.
 func (*CloudInfo) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{40}
+	return file_joblet_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CloudInfo) GetProvider() string {
@@ -3237,7 +3342,7 @@ type RuntimesRes struct {
 
 func (x *RuntimesRes) Reset() {
 	*x = RuntimesRes{}
-	mi := &file_joblet_proto_msgTypes[41]
+	mi := &file_joblet_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3249,7 +3354,7 @@ func (x *RuntimesRes) String() string {
 func (*RuntimesRes) ProtoMessage() {}
 
 func (x *RuntimesRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[41]
+	mi := &file_joblet_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3262,7 +3367,7 @@ func (x *RuntimesRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimesRes.ProtoReflect.Descriptor instead.
 func (*RuntimesRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{41}
+	return file_joblet_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *RuntimesRes) GetRuntimes() []*RuntimeInfo {
@@ -3288,7 +3393,7 @@ type RuntimeInfo struct {
 
 func (x *RuntimeInfo) Reset() {
 	*x = RuntimeInfo{}
-	mi := &file_joblet_proto_msgTypes[42]
+	mi := &file_joblet_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3300,7 +3405,7 @@ func (x *RuntimeInfo) String() string {
 func (*RuntimeInfo) ProtoMessage() {}
 
 func (x *RuntimeInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[42]
+	mi := &file_joblet_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3313,7 +3418,7 @@ func (x *RuntimeInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInfo.ProtoReflect.Descriptor instead.
 func (*RuntimeInfo) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{42}
+	return file_joblet_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RuntimeInfo) GetName() string {
@@ -3382,7 +3487,7 @@ type RuntimeRequirements struct {
 
 func (x *RuntimeRequirements) Reset() {
 	*x = RuntimeRequirements{}
-	mi := &file_joblet_proto_msgTypes[43]
+	mi := &file_joblet_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3394,7 +3499,7 @@ func (x *RuntimeRequirements) String() string {
 func (*RuntimeRequirements) ProtoMessage() {}
 
 func (x *RuntimeRequirements) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[43]
+	mi := &file_joblet_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3407,7 +3512,7 @@ func (x *RuntimeRequirements) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeRequirements.ProtoReflect.Descriptor instead.
 func (*RuntimeRequirements) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{43}
+	return file_joblet_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *RuntimeRequirements) GetArchitectures() []string {
@@ -3433,7 +3538,7 @@ type RuntimeInfoReq struct {
 
 func (x *RuntimeInfoReq) Reset() {
 	*x = RuntimeInfoReq{}
-	mi := &file_joblet_proto_msgTypes[44]
+	mi := &file_joblet_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3445,7 +3550,7 @@ func (x *RuntimeInfoReq) String() string {
 func (*RuntimeInfoReq) ProtoMessage() {}
 
 func (x *RuntimeInfoReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[44]
+	mi := &file_joblet_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3458,7 +3563,7 @@ func (x *RuntimeInfoReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInfoReq.ProtoReflect.Descriptor instead.
 func (*RuntimeInfoReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{44}
+	return file_joblet_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *RuntimeInfoReq) GetRuntime() string {
@@ -3478,7 +3583,7 @@ type RuntimeInfoRes struct {
 
 func (x *RuntimeInfoRes) Reset() {
 	*x = RuntimeInfoRes{}
-	mi := &file_joblet_proto_msgTypes[45]
+	mi := &file_joblet_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3490,7 +3595,7 @@ func (x *RuntimeInfoRes) String() string {
 func (*RuntimeInfoRes) ProtoMessage() {}
 
 func (x *RuntimeInfoRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[45]
+	mi := &file_joblet_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3503,7 +3608,7 @@ func (x *RuntimeInfoRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeInfoRes.ProtoReflect.Descriptor instead.
 func (*RuntimeInfoRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{45}
+	return file_joblet_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *RuntimeInfoRes) GetRuntime() *RuntimeInfo {
@@ -3529,7 +3634,7 @@ type RuntimeTestReq struct {
 
 func (x *RuntimeTestReq) Reset() {
 	*x = RuntimeTestReq{}
-	mi := &file_joblet_proto_msgTypes[46]
+	mi := &file_joblet_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3541,7 +3646,7 @@ func (x *RuntimeTestReq) String() string {
 func (*RuntimeTestReq) ProtoMessage() {}
 
 func (x *RuntimeTestReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[46]
+	mi := &file_joblet_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3554,7 +3659,7 @@ func (x *RuntimeTestReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeTestReq.ProtoReflect.Descriptor instead.
 func (*RuntimeTestReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{46}
+	return file_joblet_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *RuntimeTestReq) GetRuntime() string {
@@ -3576,7 +3681,7 @@ type RuntimeTestRes struct {
 
 func (x *RuntimeTestRes) Reset() {
 	*x = RuntimeTestRes{}
-	mi := &file_joblet_proto_msgTypes[47]
+	mi := &file_joblet_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3588,7 +3693,7 @@ func (x *RuntimeTestRes) String() string {
 func (*RuntimeTestRes) ProtoMessage() {}
 
 func (x *RuntimeTestRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[47]
+	mi := &file_joblet_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3601,7 +3706,7 @@ func (x *RuntimeTestRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeTestRes.ProtoReflect.Descriptor instead.
 func (*RuntimeTestRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{47}
+	return file_joblet_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *RuntimeTestRes) GetSuccess() bool {
@@ -3659,7 +3764,7 @@ type RunJobRequest struct {
 
 func (x *RunJobRequest) Reset() {
 	*x = RunJobRequest{}
-	mi := &file_joblet_proto_msgTypes[48]
+	mi := &file_joblet_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3671,7 +3776,7 @@ func (x *RunJobRequest) String() string {
 func (*RunJobRequest) ProtoMessage() {}
 
 func (x *RunJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[48]
+	mi := &file_joblet_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3684,7 +3789,7 @@ func (x *RunJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunJobRequest.ProtoReflect.Descriptor instead.
 func (*RunJobRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{48}
+	return file_joblet_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *RunJobRequest) GetName() string {
@@ -3833,7 +3938,7 @@ type RunJobResponse struct {
 
 func (x *RunJobResponse) Reset() {
 	*x = RunJobResponse{}
-	mi := &file_joblet_proto_msgTypes[49]
+	mi := &file_joblet_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3845,7 +3950,7 @@ func (x *RunJobResponse) String() string {
 func (*RunJobResponse) ProtoMessage() {}
 
 func (x *RunJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[49]
+	mi := &file_joblet_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3858,7 +3963,7 @@ func (x *RunJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunJobResponse.ProtoReflect.Descriptor instead.
 func (*RunJobResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{49}
+	return file_joblet_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *RunJobResponse) GetJobUuid() string {
@@ -3956,7 +4061,7 @@ type JobRequirement struct {
 
 func (x *JobRequirement) Reset() {
 	*x = JobRequirement{}
-	mi := &file_joblet_proto_msgTypes[50]
+	mi := &file_joblet_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3968,7 +4073,7 @@ func (x *JobRequirement) String() string {
 func (*JobRequirement) ProtoMessage() {}
 
 func (x *JobRequirement) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[50]
+	mi := &file_joblet_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3981,7 +4086,7 @@ func (x *JobRequirement) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobRequirement.ProtoReflect.Descriptor instead.
 func (*JobRequirement) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{50}
+	return file_joblet_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *JobRequirement) GetJobUuid() string {
@@ -4018,7 +4123,7 @@ type RunWorkflowRequest struct {
 
 func (x *RunWorkflowRequest) Reset() {
 	*x = RunWorkflowRequest{}
-	mi := &file_joblet_proto_msgTypes[51]
+	mi := &file_joblet_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4030,7 +4135,7 @@ func (x *RunWorkflowRequest) String() string {
 func (*RunWorkflowRequest) ProtoMessage() {}
 
 func (x *RunWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[51]
+	mi := &file_joblet_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4043,7 +4148,7 @@ func (x *RunWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*RunWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{51}
+	return file_joblet_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *RunWorkflowRequest) GetWorkflow() string {
@@ -4091,7 +4196,7 @@ type RunWorkflowResponse struct {
 
 func (x *RunWorkflowResponse) Reset() {
 	*x = RunWorkflowResponse{}
-	mi := &file_joblet_proto_msgTypes[52]
+	mi := &file_joblet_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4103,7 +4208,7 @@ func (x *RunWorkflowResponse) String() string {
 func (*RunWorkflowResponse) ProtoMessage() {}
 
 func (x *RunWorkflowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[52]
+	mi := &file_joblet_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4116,7 +4221,7 @@ func (x *RunWorkflowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunWorkflowResponse.ProtoReflect.Descriptor instead.
 func (*RunWorkflowResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{52}
+	return file_joblet_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *RunWorkflowResponse) GetWorkflowUuid() string {
@@ -4142,7 +4247,7 @@ type GetWorkflowStatusRequest struct {
 
 func (x *GetWorkflowStatusRequest) Reset() {
 	*x = GetWorkflowStatusRequest{}
-	mi := &file_joblet_proto_msgTypes[53]
+	mi := &file_joblet_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4154,7 +4259,7 @@ func (x *GetWorkflowStatusRequest) String() string {
 func (*GetWorkflowStatusRequest) ProtoMessage() {}
 
 func (x *GetWorkflowStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[53]
+	mi := &file_joblet_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4167,7 +4272,7 @@ func (x *GetWorkflowStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkflowStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkflowStatusRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{53}
+	return file_joblet_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *GetWorkflowStatusRequest) GetWorkflowUuid() string {
@@ -4187,7 +4292,7 @@ type GetWorkflowStatusResponse struct {
 
 func (x *GetWorkflowStatusResponse) Reset() {
 	*x = GetWorkflowStatusResponse{}
-	mi := &file_joblet_proto_msgTypes[54]
+	mi := &file_joblet_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4199,7 +4304,7 @@ func (x *GetWorkflowStatusResponse) String() string {
 func (*GetWorkflowStatusResponse) ProtoMessage() {}
 
 func (x *GetWorkflowStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[54]
+	mi := &file_joblet_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4212,7 +4317,7 @@ func (x *GetWorkflowStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkflowStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetWorkflowStatusResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{54}
+	return file_joblet_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *GetWorkflowStatusResponse) GetWorkflow() *WorkflowInfo {
@@ -4238,7 +4343,7 @@ type ListWorkflowsRequest struct {
 
 func (x *ListWorkflowsRequest) Reset() {
 	*x = ListWorkflowsRequest{}
-	mi := &file_joblet_proto_msgTypes[55]
+	mi := &file_joblet_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4250,7 +4355,7 @@ func (x *ListWorkflowsRequest) String() string {
 func (*ListWorkflowsRequest) ProtoMessage() {}
 
 func (x *ListWorkflowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[55]
+	mi := &file_joblet_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4263,7 +4368,7 @@ func (x *ListWorkflowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkflowsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkflowsRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{55}
+	return file_joblet_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *ListWorkflowsRequest) GetIncludeCompleted() bool {
@@ -4282,7 +4387,7 @@ type ListWorkflowsResponse struct {
 
 func (x *ListWorkflowsResponse) Reset() {
 	*x = ListWorkflowsResponse{}
-	mi := &file_joblet_proto_msgTypes[56]
+	mi := &file_joblet_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4294,7 +4399,7 @@ func (x *ListWorkflowsResponse) String() string {
 func (*ListWorkflowsResponse) ProtoMessage() {}
 
 func (x *ListWorkflowsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[56]
+	mi := &file_joblet_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4307,7 +4412,7 @@ func (x *ListWorkflowsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkflowsResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkflowsResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{56}
+	return file_joblet_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *ListWorkflowsResponse) GetWorkflows() []*WorkflowInfo {
@@ -4326,7 +4431,7 @@ type GetWorkflowJobsRequest struct {
 
 func (x *GetWorkflowJobsRequest) Reset() {
 	*x = GetWorkflowJobsRequest{}
-	mi := &file_joblet_proto_msgTypes[57]
+	mi := &file_joblet_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4338,7 +4443,7 @@ func (x *GetWorkflowJobsRequest) String() string {
 func (*GetWorkflowJobsRequest) ProtoMessage() {}
 
 func (x *GetWorkflowJobsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[57]
+	mi := &file_joblet_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4351,7 +4456,7 @@ func (x *GetWorkflowJobsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkflowJobsRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkflowJobsRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{57}
+	return file_joblet_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *GetWorkflowJobsRequest) GetWorkflowUuid() string {
@@ -4370,7 +4475,7 @@ type GetWorkflowJobsResponse struct {
 
 func (x *GetWorkflowJobsResponse) Reset() {
 	*x = GetWorkflowJobsResponse{}
-	mi := &file_joblet_proto_msgTypes[58]
+	mi := &file_joblet_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4382,7 +4487,7 @@ func (x *GetWorkflowJobsResponse) String() string {
 func (*GetWorkflowJobsResponse) ProtoMessage() {}
 
 func (x *GetWorkflowJobsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[58]
+	mi := &file_joblet_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4395,7 +4500,7 @@ func (x *GetWorkflowJobsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkflowJobsResponse.ProtoReflect.Descriptor instead.
 func (*GetWorkflowJobsResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{58}
+	return file_joblet_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *GetWorkflowJobsResponse) GetJobs() []*WorkflowJob {
@@ -4424,7 +4529,7 @@ type WorkflowInfo struct {
 
 func (x *WorkflowInfo) Reset() {
 	*x = WorkflowInfo{}
-	mi := &file_joblet_proto_msgTypes[59]
+	mi := &file_joblet_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4436,7 +4541,7 @@ func (x *WorkflowInfo) String() string {
 func (*WorkflowInfo) ProtoMessage() {}
 
 func (x *WorkflowInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[59]
+	mi := &file_joblet_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4449,7 +4554,7 @@ func (x *WorkflowInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowInfo.ProtoReflect.Descriptor instead.
 func (*WorkflowInfo) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{59}
+	return file_joblet_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *WorkflowInfo) GetUuid() string {
@@ -4544,7 +4649,7 @@ type WorkflowJob struct {
 
 func (x *WorkflowJob) Reset() {
 	*x = WorkflowJob{}
-	mi := &file_joblet_proto_msgTypes[60]
+	mi := &file_joblet_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4556,7 +4661,7 @@ func (x *WorkflowJob) String() string {
 func (*WorkflowJob) ProtoMessage() {}
 
 func (x *WorkflowJob) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[60]
+	mi := &file_joblet_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4569,7 +4674,7 @@ func (x *WorkflowJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowJob.ProtoReflect.Descriptor instead.
 func (*WorkflowJob) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{60}
+	return file_joblet_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *WorkflowJob) GetJobUuid() string {
@@ -4631,7 +4736,7 @@ type Timestamp struct {
 
 func (x *Timestamp) Reset() {
 	*x = Timestamp{}
-	mi := &file_joblet_proto_msgTypes[61]
+	mi := &file_joblet_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4643,7 +4748,7 @@ func (x *Timestamp) String() string {
 func (*Timestamp) ProtoMessage() {}
 
 func (x *Timestamp) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[61]
+	mi := &file_joblet_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4656,7 +4761,7 @@ func (x *Timestamp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Timestamp.ProtoReflect.Descriptor instead.
 func (*Timestamp) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{61}
+	return file_joblet_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *Timestamp) GetSeconds() int64 {
@@ -4686,7 +4791,7 @@ type InstallRuntimeRequest struct {
 
 func (x *InstallRuntimeRequest) Reset() {
 	*x = InstallRuntimeRequest{}
-	mi := &file_joblet_proto_msgTypes[62]
+	mi := &file_joblet_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4698,7 +4803,7 @@ func (x *InstallRuntimeRequest) String() string {
 func (*InstallRuntimeRequest) ProtoMessage() {}
 
 func (x *InstallRuntimeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[62]
+	mi := &file_joblet_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4711,7 +4816,7 @@ func (x *InstallRuntimeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallRuntimeRequest.ProtoReflect.Descriptor instead.
 func (*InstallRuntimeRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{62}
+	return file_joblet_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *InstallRuntimeRequest) GetRuntimeSpec() string {
@@ -4763,7 +4868,7 @@ type InstallRuntimeResponse struct {
 
 func (x *InstallRuntimeResponse) Reset() {
 	*x = InstallRuntimeResponse{}
-	mi := &file_joblet_proto_msgTypes[63]
+	mi := &file_joblet_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4775,7 +4880,7 @@ func (x *InstallRuntimeResponse) String() string {
 func (*InstallRuntimeResponse) ProtoMessage() {}
 
 func (x *InstallRuntimeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[63]
+	mi := &file_joblet_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4788,7 +4893,7 @@ func (x *InstallRuntimeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallRuntimeResponse.ProtoReflect.Descriptor instead.
 func (*InstallRuntimeResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{63}
+	return file_joblet_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *InstallRuntimeResponse) GetBuildJobUuid() string {
@@ -4844,7 +4949,7 @@ type InstallRuntimeFromLocalRequest struct {
 
 func (x *InstallRuntimeFromLocalRequest) Reset() {
 	*x = InstallRuntimeFromLocalRequest{}
-	mi := &file_joblet_proto_msgTypes[64]
+	mi := &file_joblet_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4856,7 +4961,7 @@ func (x *InstallRuntimeFromLocalRequest) String() string {
 func (*InstallRuntimeFromLocalRequest) ProtoMessage() {}
 
 func (x *InstallRuntimeFromLocalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[64]
+	mi := &file_joblet_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4869,7 +4974,7 @@ func (x *InstallRuntimeFromLocalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallRuntimeFromLocalRequest.ProtoReflect.Descriptor instead.
 func (*InstallRuntimeFromLocalRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{64}
+	return file_joblet_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *InstallRuntimeFromLocalRequest) GetRuntimeSpec() string {
@@ -4904,7 +5009,7 @@ type RuntimeFile struct {
 
 func (x *RuntimeFile) Reset() {
 	*x = RuntimeFile{}
-	mi := &file_joblet_proto_msgTypes[65]
+	mi := &file_joblet_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4916,7 +5021,7 @@ func (x *RuntimeFile) String() string {
 func (*RuntimeFile) ProtoMessage() {}
 
 func (x *RuntimeFile) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[65]
+	mi := &file_joblet_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4929,7 +5034,7 @@ func (x *RuntimeFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeFile.ProtoReflect.Descriptor instead.
 func (*RuntimeFile) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{65}
+	return file_joblet_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *RuntimeFile) GetPath() string {
@@ -4962,7 +5067,7 @@ type ValidateRuntimeSpecRequest struct {
 
 func (x *ValidateRuntimeSpecRequest) Reset() {
 	*x = ValidateRuntimeSpecRequest{}
-	mi := &file_joblet_proto_msgTypes[66]
+	mi := &file_joblet_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4974,7 +5079,7 @@ func (x *ValidateRuntimeSpecRequest) String() string {
 func (*ValidateRuntimeSpecRequest) ProtoMessage() {}
 
 func (x *ValidateRuntimeSpecRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[66]
+	mi := &file_joblet_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4987,7 +5092,7 @@ func (x *ValidateRuntimeSpecRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateRuntimeSpecRequest.ProtoReflect.Descriptor instead.
 func (*ValidateRuntimeSpecRequest) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{66}
+	return file_joblet_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *ValidateRuntimeSpecRequest) GetRuntimeSpec() string {
@@ -5009,7 +5114,7 @@ type ValidateRuntimeSpecResponse struct {
 
 func (x *ValidateRuntimeSpecResponse) Reset() {
 	*x = ValidateRuntimeSpecResponse{}
-	mi := &file_joblet_proto_msgTypes[67]
+	mi := &file_joblet_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5021,7 +5126,7 @@ func (x *ValidateRuntimeSpecResponse) String() string {
 func (*ValidateRuntimeSpecResponse) ProtoMessage() {}
 
 func (x *ValidateRuntimeSpecResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[67]
+	mi := &file_joblet_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5034,7 +5139,7 @@ func (x *ValidateRuntimeSpecResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateRuntimeSpecResponse.ProtoReflect.Descriptor instead.
 func (*ValidateRuntimeSpecResponse) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{67}
+	return file_joblet_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *ValidateRuntimeSpecResponse) GetValid() bool {
@@ -5074,7 +5179,7 @@ type RuntimeRemoveReq struct {
 
 func (x *RuntimeRemoveReq) Reset() {
 	*x = RuntimeRemoveReq{}
-	mi := &file_joblet_proto_msgTypes[68]
+	mi := &file_joblet_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5086,7 +5191,7 @@ func (x *RuntimeRemoveReq) String() string {
 func (*RuntimeRemoveReq) ProtoMessage() {}
 
 func (x *RuntimeRemoveReq) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[68]
+	mi := &file_joblet_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5099,7 +5204,7 @@ func (x *RuntimeRemoveReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeRemoveReq.ProtoReflect.Descriptor instead.
 func (*RuntimeRemoveReq) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{68}
+	return file_joblet_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *RuntimeRemoveReq) GetRuntime() string {
@@ -5120,7 +5225,7 @@ type RuntimeRemoveRes struct {
 
 func (x *RuntimeRemoveRes) Reset() {
 	*x = RuntimeRemoveRes{}
-	mi := &file_joblet_proto_msgTypes[69]
+	mi := &file_joblet_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5132,7 +5237,7 @@ func (x *RuntimeRemoveRes) String() string {
 func (*RuntimeRemoveRes) ProtoMessage() {}
 
 func (x *RuntimeRemoveRes) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[69]
+	mi := &file_joblet_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5145,7 +5250,7 @@ func (x *RuntimeRemoveRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeRemoveRes.ProtoReflect.Descriptor instead.
 func (*RuntimeRemoveRes) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{69}
+	return file_joblet_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *RuntimeRemoveRes) GetSuccess() bool {
@@ -5181,7 +5286,7 @@ type RuntimeSpecInfo struct {
 
 func (x *RuntimeSpecInfo) Reset() {
 	*x = RuntimeSpecInfo{}
-	mi := &file_joblet_proto_msgTypes[70]
+	mi := &file_joblet_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5193,7 +5298,7 @@ func (x *RuntimeSpecInfo) String() string {
 func (*RuntimeSpecInfo) ProtoMessage() {}
 
 func (x *RuntimeSpecInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_joblet_proto_msgTypes[70]
+	mi := &file_joblet_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5206,7 +5311,7 @@ func (x *RuntimeSpecInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeSpecInfo.ProtoReflect.Descriptor instead.
 func (*RuntimeSpecInfo) Descriptor() ([]byte, []int) {
-	return file_joblet_proto_rawDescGZIP(), []int{70}
+	return file_joblet_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *RuntimeSpecInfo) GetLanguage() string {
@@ -5321,7 +5426,13 @@ const file_joblet_proto_rawDesc = "" +
 	"\fDeleteJobRes\x12\x12\n" +
 	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"#\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x12\n" +
+	"\x10DeleteAllJobsReq\"\x90\x01\n" +
+	"\x10DeleteAllJobsRes\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12#\n" +
+	"\rdeleted_count\x18\x03 \x01(\x05R\fdeletedCount\x12#\n" +
+	"\rskipped_count\x18\x04 \x01(\x05R\fskippedCount\"#\n" +
 	"\rGetJobLogsReq\x12\x12\n" +
 	"\x04uuid\x18\x01 \x01(\tR\x04uuid\"%\n" +
 	"\tDataChunk\x12\x18\n" +
@@ -5716,13 +5827,14 @@ const file_joblet_proto_rawDesc = "" +
 	"\blanguage\x18\x01 \x01(\tR\blanguage\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1a\n" +
 	"\bvariants\x18\x03 \x03(\tR\bvariants\x12\"\n" +
-	"\farchitecture\x18\x04 \x01(\tR\farchitecture2\xb3\x05\n" +
+	"\farchitecture\x18\x04 \x01(\tR\farchitecture2\xfa\x05\n" +
 	"\n" +
 	"JobService\x129\n" +
 	"\x06RunJob\x12\x15.joblet.RunJobRequest\x1a\x16.joblet.RunJobResponse\"\x00\x12B\n" +
 	"\fGetJobStatus\x12\x17.joblet.GetJobStatusReq\x1a\x17.joblet.GetJobStatusRes\"\x00\x123\n" +
 	"\aStopJob\x12\x12.joblet.StopJobReq\x1a\x12.joblet.StopJobRes\"\x00\x129\n" +
-	"\tDeleteJob\x12\x14.joblet.DeleteJobReq\x1a\x14.joblet.DeleteJobRes\"\x00\x128\n" +
+	"\tDeleteJob\x12\x14.joblet.DeleteJobReq\x1a\x14.joblet.DeleteJobRes\"\x00\x12E\n" +
+	"\rDeleteAllJobs\x12\x18.joblet.DeleteAllJobsReq\x1a\x18.joblet.DeleteAllJobsRes\"\x00\x128\n" +
 	"\n" +
 	"GetJobLogs\x12\x15.joblet.GetJobLogsReq\x1a\x11.joblet.DataChunk0\x01\x120\n" +
 	"\bListJobs\x12\x14.joblet.EmptyRequest\x1a\f.joblet.Jobs\"\x00\x12H\n" +
@@ -5764,7 +5876,7 @@ func file_joblet_proto_rawDescGZIP() []byte {
 	return file_joblet_proto_rawDescData
 }
 
-var file_joblet_proto_msgTypes = make([]protoimpl.MessageInfo, 78)
+var file_joblet_proto_msgTypes = make([]protoimpl.MessageInfo, 80)
 var file_joblet_proto_goTypes = []any{
 	(*Jobs)(nil),                           // 0: joblet.Jobs
 	(*Job)(nil),                            // 1: joblet.Job
@@ -5776,181 +5888,185 @@ var file_joblet_proto_goTypes = []any{
 	(*StopJobRes)(nil),                     // 7: joblet.StopJobRes
 	(*DeleteJobReq)(nil),                   // 8: joblet.DeleteJobReq
 	(*DeleteJobRes)(nil),                   // 9: joblet.DeleteJobRes
-	(*GetJobLogsReq)(nil),                  // 10: joblet.GetJobLogsReq
-	(*DataChunk)(nil),                      // 11: joblet.DataChunk
-	(*RuntimeInstallationChunk)(nil),       // 12: joblet.RuntimeInstallationChunk
-	(*RuntimeInstallationProgress)(nil),    // 13: joblet.RuntimeInstallationProgress
-	(*RuntimeInstallationLog)(nil),         // 14: joblet.RuntimeInstallationLog
-	(*RuntimeInstallationResult)(nil),      // 15: joblet.RuntimeInstallationResult
-	(*CreateNetworkReq)(nil),               // 16: joblet.CreateNetworkReq
-	(*CreateNetworkRes)(nil),               // 17: joblet.CreateNetworkRes
-	(*RemoveNetworkReq)(nil),               // 18: joblet.RemoveNetworkReq
-	(*RemoveNetworkRes)(nil),               // 19: joblet.RemoveNetworkRes
-	(*Network)(nil),                        // 20: joblet.Network
-	(*Networks)(nil),                       // 21: joblet.Networks
-	(*CreateVolumeReq)(nil),                // 22: joblet.CreateVolumeReq
-	(*CreateVolumeRes)(nil),                // 23: joblet.CreateVolumeRes
-	(*RemoveVolumeReq)(nil),                // 24: joblet.RemoveVolumeReq
-	(*RemoveVolumeRes)(nil),                // 25: joblet.RemoveVolumeRes
-	(*Volume)(nil),                         // 26: joblet.Volume
-	(*Volumes)(nil),                        // 27: joblet.Volumes
-	(*SystemStatusRes)(nil),                // 28: joblet.SystemStatusRes
-	(*SystemMetricsRes)(nil),               // 29: joblet.SystemMetricsRes
-	(*StreamMetricsReq)(nil),               // 30: joblet.StreamMetricsReq
-	(*HostInfo)(nil),                       // 31: joblet.HostInfo
-	(*CPUMetrics)(nil),                     // 32: joblet.CPUMetrics
-	(*MemoryMetrics)(nil),                  // 33: joblet.MemoryMetrics
-	(*DiskMetrics)(nil),                    // 34: joblet.DiskMetrics
-	(*NetworkMetrics)(nil),                 // 35: joblet.NetworkMetrics
-	(*IOMetrics)(nil),                      // 36: joblet.IOMetrics
-	(*DiskIOMetrics)(nil),                  // 37: joblet.DiskIOMetrics
-	(*ProcessMetrics)(nil),                 // 38: joblet.ProcessMetrics
-	(*ProcessInfo)(nil),                    // 39: joblet.ProcessInfo
-	(*CloudInfo)(nil),                      // 40: joblet.CloudInfo
-	(*RuntimesRes)(nil),                    // 41: joblet.RuntimesRes
-	(*RuntimeInfo)(nil),                    // 42: joblet.RuntimeInfo
-	(*RuntimeRequirements)(nil),            // 43: joblet.RuntimeRequirements
-	(*RuntimeInfoReq)(nil),                 // 44: joblet.RuntimeInfoReq
-	(*RuntimeInfoRes)(nil),                 // 45: joblet.RuntimeInfoRes
-	(*RuntimeTestReq)(nil),                 // 46: joblet.RuntimeTestReq
-	(*RuntimeTestRes)(nil),                 // 47: joblet.RuntimeTestRes
-	(*RunJobRequest)(nil),                  // 48: joblet.RunJobRequest
-	(*RunJobResponse)(nil),                 // 49: joblet.RunJobResponse
-	(*JobRequirement)(nil),                 // 50: joblet.JobRequirement
-	(*RunWorkflowRequest)(nil),             // 51: joblet.RunWorkflowRequest
-	(*RunWorkflowResponse)(nil),            // 52: joblet.RunWorkflowResponse
-	(*GetWorkflowStatusRequest)(nil),       // 53: joblet.GetWorkflowStatusRequest
-	(*GetWorkflowStatusResponse)(nil),      // 54: joblet.GetWorkflowStatusResponse
-	(*ListWorkflowsRequest)(nil),           // 55: joblet.ListWorkflowsRequest
-	(*ListWorkflowsResponse)(nil),          // 56: joblet.ListWorkflowsResponse
-	(*GetWorkflowJobsRequest)(nil),         // 57: joblet.GetWorkflowJobsRequest
-	(*GetWorkflowJobsResponse)(nil),        // 58: joblet.GetWorkflowJobsResponse
-	(*WorkflowInfo)(nil),                   // 59: joblet.WorkflowInfo
-	(*WorkflowJob)(nil),                    // 60: joblet.WorkflowJob
-	(*Timestamp)(nil),                      // 61: joblet.Timestamp
-	(*InstallRuntimeRequest)(nil),          // 62: joblet.InstallRuntimeRequest
-	(*InstallRuntimeResponse)(nil),         // 63: joblet.InstallRuntimeResponse
-	(*InstallRuntimeFromLocalRequest)(nil), // 64: joblet.InstallRuntimeFromLocalRequest
-	(*RuntimeFile)(nil),                    // 65: joblet.RuntimeFile
-	(*ValidateRuntimeSpecRequest)(nil),     // 66: joblet.ValidateRuntimeSpecRequest
-	(*ValidateRuntimeSpecResponse)(nil),    // 67: joblet.ValidateRuntimeSpecResponse
-	(*RuntimeRemoveReq)(nil),               // 68: joblet.RuntimeRemoveReq
-	(*RuntimeRemoveRes)(nil),               // 69: joblet.RuntimeRemoveRes
-	(*RuntimeSpecInfo)(nil),                // 70: joblet.RuntimeSpecInfo
-	nil,                                    // 71: joblet.Job.EnvironmentEntry
-	nil,                                    // 72: joblet.Job.SecretEnvironmentEntry
-	nil,                                    // 73: joblet.GetJobStatusRes.EnvironmentEntry
-	nil,                                    // 74: joblet.GetJobStatusRes.SecretEnvironmentEntry
-	nil,                                    // 75: joblet.CloudInfo.MetadataEntry
-	nil,                                    // 76: joblet.RunJobRequest.EnvironmentEntry
-	nil,                                    // 77: joblet.RunJobRequest.SecretEnvironmentEntry
+	(*DeleteAllJobsReq)(nil),               // 10: joblet.DeleteAllJobsReq
+	(*DeleteAllJobsRes)(nil),               // 11: joblet.DeleteAllJobsRes
+	(*GetJobLogsReq)(nil),                  // 12: joblet.GetJobLogsReq
+	(*DataChunk)(nil),                      // 13: joblet.DataChunk
+	(*RuntimeInstallationChunk)(nil),       // 14: joblet.RuntimeInstallationChunk
+	(*RuntimeInstallationProgress)(nil),    // 15: joblet.RuntimeInstallationProgress
+	(*RuntimeInstallationLog)(nil),         // 16: joblet.RuntimeInstallationLog
+	(*RuntimeInstallationResult)(nil),      // 17: joblet.RuntimeInstallationResult
+	(*CreateNetworkReq)(nil),               // 18: joblet.CreateNetworkReq
+	(*CreateNetworkRes)(nil),               // 19: joblet.CreateNetworkRes
+	(*RemoveNetworkReq)(nil),               // 20: joblet.RemoveNetworkReq
+	(*RemoveNetworkRes)(nil),               // 21: joblet.RemoveNetworkRes
+	(*Network)(nil),                        // 22: joblet.Network
+	(*Networks)(nil),                       // 23: joblet.Networks
+	(*CreateVolumeReq)(nil),                // 24: joblet.CreateVolumeReq
+	(*CreateVolumeRes)(nil),                // 25: joblet.CreateVolumeRes
+	(*RemoveVolumeReq)(nil),                // 26: joblet.RemoveVolumeReq
+	(*RemoveVolumeRes)(nil),                // 27: joblet.RemoveVolumeRes
+	(*Volume)(nil),                         // 28: joblet.Volume
+	(*Volumes)(nil),                        // 29: joblet.Volumes
+	(*SystemStatusRes)(nil),                // 30: joblet.SystemStatusRes
+	(*SystemMetricsRes)(nil),               // 31: joblet.SystemMetricsRes
+	(*StreamMetricsReq)(nil),               // 32: joblet.StreamMetricsReq
+	(*HostInfo)(nil),                       // 33: joblet.HostInfo
+	(*CPUMetrics)(nil),                     // 34: joblet.CPUMetrics
+	(*MemoryMetrics)(nil),                  // 35: joblet.MemoryMetrics
+	(*DiskMetrics)(nil),                    // 36: joblet.DiskMetrics
+	(*NetworkMetrics)(nil),                 // 37: joblet.NetworkMetrics
+	(*IOMetrics)(nil),                      // 38: joblet.IOMetrics
+	(*DiskIOMetrics)(nil),                  // 39: joblet.DiskIOMetrics
+	(*ProcessMetrics)(nil),                 // 40: joblet.ProcessMetrics
+	(*ProcessInfo)(nil),                    // 41: joblet.ProcessInfo
+	(*CloudInfo)(nil),                      // 42: joblet.CloudInfo
+	(*RuntimesRes)(nil),                    // 43: joblet.RuntimesRes
+	(*RuntimeInfo)(nil),                    // 44: joblet.RuntimeInfo
+	(*RuntimeRequirements)(nil),            // 45: joblet.RuntimeRequirements
+	(*RuntimeInfoReq)(nil),                 // 46: joblet.RuntimeInfoReq
+	(*RuntimeInfoRes)(nil),                 // 47: joblet.RuntimeInfoRes
+	(*RuntimeTestReq)(nil),                 // 48: joblet.RuntimeTestReq
+	(*RuntimeTestRes)(nil),                 // 49: joblet.RuntimeTestRes
+	(*RunJobRequest)(nil),                  // 50: joblet.RunJobRequest
+	(*RunJobResponse)(nil),                 // 51: joblet.RunJobResponse
+	(*JobRequirement)(nil),                 // 52: joblet.JobRequirement
+	(*RunWorkflowRequest)(nil),             // 53: joblet.RunWorkflowRequest
+	(*RunWorkflowResponse)(nil),            // 54: joblet.RunWorkflowResponse
+	(*GetWorkflowStatusRequest)(nil),       // 55: joblet.GetWorkflowStatusRequest
+	(*GetWorkflowStatusResponse)(nil),      // 56: joblet.GetWorkflowStatusResponse
+	(*ListWorkflowsRequest)(nil),           // 57: joblet.ListWorkflowsRequest
+	(*ListWorkflowsResponse)(nil),          // 58: joblet.ListWorkflowsResponse
+	(*GetWorkflowJobsRequest)(nil),         // 59: joblet.GetWorkflowJobsRequest
+	(*GetWorkflowJobsResponse)(nil),        // 60: joblet.GetWorkflowJobsResponse
+	(*WorkflowInfo)(nil),                   // 61: joblet.WorkflowInfo
+	(*WorkflowJob)(nil),                    // 62: joblet.WorkflowJob
+	(*Timestamp)(nil),                      // 63: joblet.Timestamp
+	(*InstallRuntimeRequest)(nil),          // 64: joblet.InstallRuntimeRequest
+	(*InstallRuntimeResponse)(nil),         // 65: joblet.InstallRuntimeResponse
+	(*InstallRuntimeFromLocalRequest)(nil), // 66: joblet.InstallRuntimeFromLocalRequest
+	(*RuntimeFile)(nil),                    // 67: joblet.RuntimeFile
+	(*ValidateRuntimeSpecRequest)(nil),     // 68: joblet.ValidateRuntimeSpecRequest
+	(*ValidateRuntimeSpecResponse)(nil),    // 69: joblet.ValidateRuntimeSpecResponse
+	(*RuntimeRemoveReq)(nil),               // 70: joblet.RuntimeRemoveReq
+	(*RuntimeRemoveRes)(nil),               // 71: joblet.RuntimeRemoveRes
+	(*RuntimeSpecInfo)(nil),                // 72: joblet.RuntimeSpecInfo
+	nil,                                    // 73: joblet.Job.EnvironmentEntry
+	nil,                                    // 74: joblet.Job.SecretEnvironmentEntry
+	nil,                                    // 75: joblet.GetJobStatusRes.EnvironmentEntry
+	nil,                                    // 76: joblet.GetJobStatusRes.SecretEnvironmentEntry
+	nil,                                    // 77: joblet.CloudInfo.MetadataEntry
+	nil,                                    // 78: joblet.RunJobRequest.EnvironmentEntry
+	nil,                                    // 79: joblet.RunJobRequest.SecretEnvironmentEntry
 }
 var file_joblet_proto_depIdxs = []int32{
 	1,  // 0: joblet.Jobs.jobs:type_name -> joblet.Job
-	71, // 1: joblet.Job.environment:type_name -> joblet.Job.EnvironmentEntry
-	72, // 2: joblet.Job.secret_environment:type_name -> joblet.Job.SecretEnvironmentEntry
-	73, // 3: joblet.GetJobStatusRes.environment:type_name -> joblet.GetJobStatusRes.EnvironmentEntry
-	74, // 4: joblet.GetJobStatusRes.secret_environment:type_name -> joblet.GetJobStatusRes.SecretEnvironmentEntry
-	13, // 5: joblet.RuntimeInstallationChunk.progress:type_name -> joblet.RuntimeInstallationProgress
-	14, // 6: joblet.RuntimeInstallationChunk.log:type_name -> joblet.RuntimeInstallationLog
-	15, // 7: joblet.RuntimeInstallationChunk.result:type_name -> joblet.RuntimeInstallationResult
-	20, // 8: joblet.Networks.networks:type_name -> joblet.Network
-	26, // 9: joblet.Volumes.volumes:type_name -> joblet.Volume
-	31, // 10: joblet.SystemStatusRes.host:type_name -> joblet.HostInfo
-	32, // 11: joblet.SystemStatusRes.cpu:type_name -> joblet.CPUMetrics
-	33, // 12: joblet.SystemStatusRes.memory:type_name -> joblet.MemoryMetrics
-	34, // 13: joblet.SystemStatusRes.disks:type_name -> joblet.DiskMetrics
-	35, // 14: joblet.SystemStatusRes.networks:type_name -> joblet.NetworkMetrics
-	36, // 15: joblet.SystemStatusRes.io:type_name -> joblet.IOMetrics
-	38, // 16: joblet.SystemStatusRes.processes:type_name -> joblet.ProcessMetrics
-	40, // 17: joblet.SystemStatusRes.cloud:type_name -> joblet.CloudInfo
-	31, // 18: joblet.SystemMetricsRes.host:type_name -> joblet.HostInfo
-	32, // 19: joblet.SystemMetricsRes.cpu:type_name -> joblet.CPUMetrics
-	33, // 20: joblet.SystemMetricsRes.memory:type_name -> joblet.MemoryMetrics
-	34, // 21: joblet.SystemMetricsRes.disks:type_name -> joblet.DiskMetrics
-	35, // 22: joblet.SystemMetricsRes.networks:type_name -> joblet.NetworkMetrics
-	36, // 23: joblet.SystemMetricsRes.io:type_name -> joblet.IOMetrics
-	38, // 24: joblet.SystemMetricsRes.processes:type_name -> joblet.ProcessMetrics
-	40, // 25: joblet.SystemMetricsRes.cloud:type_name -> joblet.CloudInfo
-	37, // 26: joblet.IOMetrics.diskIO:type_name -> joblet.DiskIOMetrics
-	39, // 27: joblet.ProcessMetrics.topByCPU:type_name -> joblet.ProcessInfo
-	39, // 28: joblet.ProcessMetrics.topByMemory:type_name -> joblet.ProcessInfo
-	75, // 29: joblet.CloudInfo.metadata:type_name -> joblet.CloudInfo.MetadataEntry
-	42, // 30: joblet.RuntimesRes.runtimes:type_name -> joblet.RuntimeInfo
-	43, // 31: joblet.RuntimeInfo.requirements:type_name -> joblet.RuntimeRequirements
-	42, // 32: joblet.RuntimeInfoRes.runtime:type_name -> joblet.RuntimeInfo
+	73, // 1: joblet.Job.environment:type_name -> joblet.Job.EnvironmentEntry
+	74, // 2: joblet.Job.secret_environment:type_name -> joblet.Job.SecretEnvironmentEntry
+	75, // 3: joblet.GetJobStatusRes.environment:type_name -> joblet.GetJobStatusRes.EnvironmentEntry
+	76, // 4: joblet.GetJobStatusRes.secret_environment:type_name -> joblet.GetJobStatusRes.SecretEnvironmentEntry
+	15, // 5: joblet.RuntimeInstallationChunk.progress:type_name -> joblet.RuntimeInstallationProgress
+	16, // 6: joblet.RuntimeInstallationChunk.log:type_name -> joblet.RuntimeInstallationLog
+	17, // 7: joblet.RuntimeInstallationChunk.result:type_name -> joblet.RuntimeInstallationResult
+	22, // 8: joblet.Networks.networks:type_name -> joblet.Network
+	28, // 9: joblet.Volumes.volumes:type_name -> joblet.Volume
+	33, // 10: joblet.SystemStatusRes.host:type_name -> joblet.HostInfo
+	34, // 11: joblet.SystemStatusRes.cpu:type_name -> joblet.CPUMetrics
+	35, // 12: joblet.SystemStatusRes.memory:type_name -> joblet.MemoryMetrics
+	36, // 13: joblet.SystemStatusRes.disks:type_name -> joblet.DiskMetrics
+	37, // 14: joblet.SystemStatusRes.networks:type_name -> joblet.NetworkMetrics
+	38, // 15: joblet.SystemStatusRes.io:type_name -> joblet.IOMetrics
+	40, // 16: joblet.SystemStatusRes.processes:type_name -> joblet.ProcessMetrics
+	42, // 17: joblet.SystemStatusRes.cloud:type_name -> joblet.CloudInfo
+	33, // 18: joblet.SystemMetricsRes.host:type_name -> joblet.HostInfo
+	34, // 19: joblet.SystemMetricsRes.cpu:type_name -> joblet.CPUMetrics
+	35, // 20: joblet.SystemMetricsRes.memory:type_name -> joblet.MemoryMetrics
+	36, // 21: joblet.SystemMetricsRes.disks:type_name -> joblet.DiskMetrics
+	37, // 22: joblet.SystemMetricsRes.networks:type_name -> joblet.NetworkMetrics
+	38, // 23: joblet.SystemMetricsRes.io:type_name -> joblet.IOMetrics
+	40, // 24: joblet.SystemMetricsRes.processes:type_name -> joblet.ProcessMetrics
+	42, // 25: joblet.SystemMetricsRes.cloud:type_name -> joblet.CloudInfo
+	39, // 26: joblet.IOMetrics.diskIO:type_name -> joblet.DiskIOMetrics
+	41, // 27: joblet.ProcessMetrics.topByCPU:type_name -> joblet.ProcessInfo
+	41, // 28: joblet.ProcessMetrics.topByMemory:type_name -> joblet.ProcessInfo
+	77, // 29: joblet.CloudInfo.metadata:type_name -> joblet.CloudInfo.MetadataEntry
+	44, // 30: joblet.RuntimesRes.runtimes:type_name -> joblet.RuntimeInfo
+	45, // 31: joblet.RuntimeInfo.requirements:type_name -> joblet.RuntimeRequirements
+	44, // 32: joblet.RuntimeInfoRes.runtime:type_name -> joblet.RuntimeInfo
 	3,  // 33: joblet.RunJobRequest.uploads:type_name -> joblet.FileUpload
-	76, // 34: joblet.RunJobRequest.environment:type_name -> joblet.RunJobRequest.EnvironmentEntry
-	77, // 35: joblet.RunJobRequest.secret_environment:type_name -> joblet.RunJobRequest.SecretEnvironmentEntry
-	50, // 36: joblet.RunJobRequest.requirements:type_name -> joblet.JobRequirement
+	78, // 34: joblet.RunJobRequest.environment:type_name -> joblet.RunJobRequest.EnvironmentEntry
+	79, // 35: joblet.RunJobRequest.secret_environment:type_name -> joblet.RunJobRequest.SecretEnvironmentEntry
+	52, // 36: joblet.RunJobRequest.requirements:type_name -> joblet.JobRequirement
 	3,  // 37: joblet.RunWorkflowRequest.workflowFiles:type_name -> joblet.FileUpload
-	59, // 38: joblet.GetWorkflowStatusResponse.workflow:type_name -> joblet.WorkflowInfo
-	60, // 39: joblet.GetWorkflowStatusResponse.jobs:type_name -> joblet.WorkflowJob
-	59, // 40: joblet.ListWorkflowsResponse.workflows:type_name -> joblet.WorkflowInfo
-	60, // 41: joblet.GetWorkflowJobsResponse.jobs:type_name -> joblet.WorkflowJob
-	61, // 42: joblet.WorkflowInfo.createdAt:type_name -> joblet.Timestamp
-	61, // 43: joblet.WorkflowInfo.startedAt:type_name -> joblet.Timestamp
-	61, // 44: joblet.WorkflowInfo.completedAt:type_name -> joblet.Timestamp
-	61, // 45: joblet.WorkflowJob.startTime:type_name -> joblet.Timestamp
-	61, // 46: joblet.WorkflowJob.endTime:type_name -> joblet.Timestamp
-	65, // 47: joblet.InstallRuntimeFromLocalRequest.files:type_name -> joblet.RuntimeFile
-	70, // 48: joblet.ValidateRuntimeSpecResponse.specInfo:type_name -> joblet.RuntimeSpecInfo
-	48, // 49: joblet.JobService.RunJob:input_type -> joblet.RunJobRequest
+	61, // 38: joblet.GetWorkflowStatusResponse.workflow:type_name -> joblet.WorkflowInfo
+	62, // 39: joblet.GetWorkflowStatusResponse.jobs:type_name -> joblet.WorkflowJob
+	61, // 40: joblet.ListWorkflowsResponse.workflows:type_name -> joblet.WorkflowInfo
+	62, // 41: joblet.GetWorkflowJobsResponse.jobs:type_name -> joblet.WorkflowJob
+	63, // 42: joblet.WorkflowInfo.createdAt:type_name -> joblet.Timestamp
+	63, // 43: joblet.WorkflowInfo.startedAt:type_name -> joblet.Timestamp
+	63, // 44: joblet.WorkflowInfo.completedAt:type_name -> joblet.Timestamp
+	63, // 45: joblet.WorkflowJob.startTime:type_name -> joblet.Timestamp
+	63, // 46: joblet.WorkflowJob.endTime:type_name -> joblet.Timestamp
+	67, // 47: joblet.InstallRuntimeFromLocalRequest.files:type_name -> joblet.RuntimeFile
+	72, // 48: joblet.ValidateRuntimeSpecResponse.specInfo:type_name -> joblet.RuntimeSpecInfo
+	50, // 49: joblet.JobService.RunJob:input_type -> joblet.RunJobRequest
 	4,  // 50: joblet.JobService.GetJobStatus:input_type -> joblet.GetJobStatusReq
 	6,  // 51: joblet.JobService.StopJob:input_type -> joblet.StopJobReq
 	8,  // 52: joblet.JobService.DeleteJob:input_type -> joblet.DeleteJobReq
-	10, // 53: joblet.JobService.GetJobLogs:input_type -> joblet.GetJobLogsReq
-	2,  // 54: joblet.JobService.ListJobs:input_type -> joblet.EmptyRequest
-	51, // 55: joblet.JobService.RunWorkflow:input_type -> joblet.RunWorkflowRequest
-	53, // 56: joblet.JobService.GetWorkflowStatus:input_type -> joblet.GetWorkflowStatusRequest
-	55, // 57: joblet.JobService.ListWorkflows:input_type -> joblet.ListWorkflowsRequest
-	57, // 58: joblet.JobService.GetWorkflowJobs:input_type -> joblet.GetWorkflowJobsRequest
-	16, // 59: joblet.NetworkService.CreateNetwork:input_type -> joblet.CreateNetworkReq
-	2,  // 60: joblet.NetworkService.ListNetworks:input_type -> joblet.EmptyRequest
-	18, // 61: joblet.NetworkService.RemoveNetwork:input_type -> joblet.RemoveNetworkReq
-	22, // 62: joblet.VolumeService.CreateVolume:input_type -> joblet.CreateVolumeReq
-	2,  // 63: joblet.VolumeService.ListVolumes:input_type -> joblet.EmptyRequest
-	24, // 64: joblet.VolumeService.RemoveVolume:input_type -> joblet.RemoveVolumeReq
-	2,  // 65: joblet.MonitoringService.GetSystemStatus:input_type -> joblet.EmptyRequest
-	30, // 66: joblet.MonitoringService.StreamSystemMetrics:input_type -> joblet.StreamMetricsReq
-	2,  // 67: joblet.RuntimeService.ListRuntimes:input_type -> joblet.EmptyRequest
-	44, // 68: joblet.RuntimeService.GetRuntimeInfo:input_type -> joblet.RuntimeInfoReq
-	46, // 69: joblet.RuntimeService.TestRuntime:input_type -> joblet.RuntimeTestReq
-	62, // 70: joblet.RuntimeService.InstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
-	64, // 71: joblet.RuntimeService.InstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
-	62, // 72: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
-	64, // 73: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
-	66, // 74: joblet.RuntimeService.ValidateRuntimeSpec:input_type -> joblet.ValidateRuntimeSpecRequest
-	68, // 75: joblet.RuntimeService.RemoveRuntime:input_type -> joblet.RuntimeRemoveReq
-	49, // 76: joblet.JobService.RunJob:output_type -> joblet.RunJobResponse
-	5,  // 77: joblet.JobService.GetJobStatus:output_type -> joblet.GetJobStatusRes
-	7,  // 78: joblet.JobService.StopJob:output_type -> joblet.StopJobRes
-	9,  // 79: joblet.JobService.DeleteJob:output_type -> joblet.DeleteJobRes
-	11, // 80: joblet.JobService.GetJobLogs:output_type -> joblet.DataChunk
-	0,  // 81: joblet.JobService.ListJobs:output_type -> joblet.Jobs
-	52, // 82: joblet.JobService.RunWorkflow:output_type -> joblet.RunWorkflowResponse
-	54, // 83: joblet.JobService.GetWorkflowStatus:output_type -> joblet.GetWorkflowStatusResponse
-	56, // 84: joblet.JobService.ListWorkflows:output_type -> joblet.ListWorkflowsResponse
-	58, // 85: joblet.JobService.GetWorkflowJobs:output_type -> joblet.GetWorkflowJobsResponse
-	17, // 86: joblet.NetworkService.CreateNetwork:output_type -> joblet.CreateNetworkRes
-	21, // 87: joblet.NetworkService.ListNetworks:output_type -> joblet.Networks
-	19, // 88: joblet.NetworkService.RemoveNetwork:output_type -> joblet.RemoveNetworkRes
-	23, // 89: joblet.VolumeService.CreateVolume:output_type -> joblet.CreateVolumeRes
-	27, // 90: joblet.VolumeService.ListVolumes:output_type -> joblet.Volumes
-	25, // 91: joblet.VolumeService.RemoveVolume:output_type -> joblet.RemoveVolumeRes
-	28, // 92: joblet.MonitoringService.GetSystemStatus:output_type -> joblet.SystemStatusRes
-	29, // 93: joblet.MonitoringService.StreamSystemMetrics:output_type -> joblet.SystemMetricsRes
-	41, // 94: joblet.RuntimeService.ListRuntimes:output_type -> joblet.RuntimesRes
-	45, // 95: joblet.RuntimeService.GetRuntimeInfo:output_type -> joblet.RuntimeInfoRes
-	47, // 96: joblet.RuntimeService.TestRuntime:output_type -> joblet.RuntimeTestRes
-	63, // 97: joblet.RuntimeService.InstallRuntimeFromGithub:output_type -> joblet.InstallRuntimeResponse
-	63, // 98: joblet.RuntimeService.InstallRuntimeFromLocal:output_type -> joblet.InstallRuntimeResponse
-	12, // 99: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:output_type -> joblet.RuntimeInstallationChunk
-	12, // 100: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:output_type -> joblet.RuntimeInstallationChunk
-	67, // 101: joblet.RuntimeService.ValidateRuntimeSpec:output_type -> joblet.ValidateRuntimeSpecResponse
-	69, // 102: joblet.RuntimeService.RemoveRuntime:output_type -> joblet.RuntimeRemoveRes
-	76, // [76:103] is the sub-list for method output_type
-	49, // [49:76] is the sub-list for method input_type
+	10, // 53: joblet.JobService.DeleteAllJobs:input_type -> joblet.DeleteAllJobsReq
+	12, // 54: joblet.JobService.GetJobLogs:input_type -> joblet.GetJobLogsReq
+	2,  // 55: joblet.JobService.ListJobs:input_type -> joblet.EmptyRequest
+	53, // 56: joblet.JobService.RunWorkflow:input_type -> joblet.RunWorkflowRequest
+	55, // 57: joblet.JobService.GetWorkflowStatus:input_type -> joblet.GetWorkflowStatusRequest
+	57, // 58: joblet.JobService.ListWorkflows:input_type -> joblet.ListWorkflowsRequest
+	59, // 59: joblet.JobService.GetWorkflowJobs:input_type -> joblet.GetWorkflowJobsRequest
+	18, // 60: joblet.NetworkService.CreateNetwork:input_type -> joblet.CreateNetworkReq
+	2,  // 61: joblet.NetworkService.ListNetworks:input_type -> joblet.EmptyRequest
+	20, // 62: joblet.NetworkService.RemoveNetwork:input_type -> joblet.RemoveNetworkReq
+	24, // 63: joblet.VolumeService.CreateVolume:input_type -> joblet.CreateVolumeReq
+	2,  // 64: joblet.VolumeService.ListVolumes:input_type -> joblet.EmptyRequest
+	26, // 65: joblet.VolumeService.RemoveVolume:input_type -> joblet.RemoveVolumeReq
+	2,  // 66: joblet.MonitoringService.GetSystemStatus:input_type -> joblet.EmptyRequest
+	32, // 67: joblet.MonitoringService.StreamSystemMetrics:input_type -> joblet.StreamMetricsReq
+	2,  // 68: joblet.RuntimeService.ListRuntimes:input_type -> joblet.EmptyRequest
+	46, // 69: joblet.RuntimeService.GetRuntimeInfo:input_type -> joblet.RuntimeInfoReq
+	48, // 70: joblet.RuntimeService.TestRuntime:input_type -> joblet.RuntimeTestReq
+	64, // 71: joblet.RuntimeService.InstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
+	66, // 72: joblet.RuntimeService.InstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
+	64, // 73: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
+	66, // 74: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
+	68, // 75: joblet.RuntimeService.ValidateRuntimeSpec:input_type -> joblet.ValidateRuntimeSpecRequest
+	70, // 76: joblet.RuntimeService.RemoveRuntime:input_type -> joblet.RuntimeRemoveReq
+	51, // 77: joblet.JobService.RunJob:output_type -> joblet.RunJobResponse
+	5,  // 78: joblet.JobService.GetJobStatus:output_type -> joblet.GetJobStatusRes
+	7,  // 79: joblet.JobService.StopJob:output_type -> joblet.StopJobRes
+	9,  // 80: joblet.JobService.DeleteJob:output_type -> joblet.DeleteJobRes
+	11, // 81: joblet.JobService.DeleteAllJobs:output_type -> joblet.DeleteAllJobsRes
+	13, // 82: joblet.JobService.GetJobLogs:output_type -> joblet.DataChunk
+	0,  // 83: joblet.JobService.ListJobs:output_type -> joblet.Jobs
+	54, // 84: joblet.JobService.RunWorkflow:output_type -> joblet.RunWorkflowResponse
+	56, // 85: joblet.JobService.GetWorkflowStatus:output_type -> joblet.GetWorkflowStatusResponse
+	58, // 86: joblet.JobService.ListWorkflows:output_type -> joblet.ListWorkflowsResponse
+	60, // 87: joblet.JobService.GetWorkflowJobs:output_type -> joblet.GetWorkflowJobsResponse
+	19, // 88: joblet.NetworkService.CreateNetwork:output_type -> joblet.CreateNetworkRes
+	23, // 89: joblet.NetworkService.ListNetworks:output_type -> joblet.Networks
+	21, // 90: joblet.NetworkService.RemoveNetwork:output_type -> joblet.RemoveNetworkRes
+	25, // 91: joblet.VolumeService.CreateVolume:output_type -> joblet.CreateVolumeRes
+	29, // 92: joblet.VolumeService.ListVolumes:output_type -> joblet.Volumes
+	27, // 93: joblet.VolumeService.RemoveVolume:output_type -> joblet.RemoveVolumeRes
+	30, // 94: joblet.MonitoringService.GetSystemStatus:output_type -> joblet.SystemStatusRes
+	31, // 95: joblet.MonitoringService.StreamSystemMetrics:output_type -> joblet.SystemMetricsRes
+	43, // 96: joblet.RuntimeService.ListRuntimes:output_type -> joblet.RuntimesRes
+	47, // 97: joblet.RuntimeService.GetRuntimeInfo:output_type -> joblet.RuntimeInfoRes
+	49, // 98: joblet.RuntimeService.TestRuntime:output_type -> joblet.RuntimeTestRes
+	65, // 99: joblet.RuntimeService.InstallRuntimeFromGithub:output_type -> joblet.InstallRuntimeResponse
+	65, // 100: joblet.RuntimeService.InstallRuntimeFromLocal:output_type -> joblet.InstallRuntimeResponse
+	14, // 101: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:output_type -> joblet.RuntimeInstallationChunk
+	14, // 102: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:output_type -> joblet.RuntimeInstallationChunk
+	69, // 103: joblet.RuntimeService.ValidateRuntimeSpec:output_type -> joblet.ValidateRuntimeSpecResponse
+	71, // 104: joblet.RuntimeService.RemoveRuntime:output_type -> joblet.RuntimeRemoveRes
+	77, // [77:105] is the sub-list for method output_type
+	49, // [49:77] is the sub-list for method input_type
 	49, // [49:49] is the sub-list for extension type_name
 	49, // [49:49] is the sub-list for extension extendee
 	0,  // [0:49] is the sub-list for field type_name
@@ -5961,7 +6077,7 @@ func file_joblet_proto_init() {
 	if File_joblet_proto != nil {
 		return
 	}
-	file_joblet_proto_msgTypes[12].OneofWrappers = []any{
+	file_joblet_proto_msgTypes[14].OneofWrappers = []any{
 		(*RuntimeInstallationChunk_Progress)(nil),
 		(*RuntimeInstallationChunk_Log)(nil),
 		(*RuntimeInstallationChunk_Result)(nil),
@@ -5972,7 +6088,7 @@ func file_joblet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_joblet_proto_rawDesc), len(file_joblet_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   78,
+			NumMessages:   80,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

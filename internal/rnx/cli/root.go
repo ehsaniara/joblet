@@ -33,6 +33,8 @@ Quick Examples:
   rnx list --workflow                         # List all workflows
   rnx status <job-uuid>                       # Check job status (supports short UUIDs)
   rnx log <job-uuid>                          # Stream job logs (supports short UUIDs)
+  rnx delete <job-uuid>                       # Delete a specific job
+  rnx delete-all                              # Delete all non-running jobs
   rnx monitor status                          # View remote server metrics and volumes
   rnx monitor top --json                      # JSON output for dashboards
 
@@ -79,6 +81,7 @@ func init() {
 	rootCmd.AddCommand(jobs.NewStatusCmd())
 	rootCmd.AddCommand(jobs.NewStopCmd())
 	rootCmd.AddCommand(jobs.NewDeleteCmd())
+	rootCmd.AddCommand(jobs.NewDeleteAllCmd())
 	rootCmd.AddCommand(jobs.NewLogCmd())
 	rootCmd.AddCommand(jobs.NewListCmd())
 	rootCmd.AddCommand(NewNodesCmd())

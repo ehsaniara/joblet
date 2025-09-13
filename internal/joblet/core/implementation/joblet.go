@@ -164,6 +164,21 @@ func (j *JobletImplementation) DeleteJob(ctx context.Context, req interfaces.Del
 	return nil
 }
 
+// DeleteAllJobs implements the new interface for bulk job deletion
+func (j *JobletImplementation) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobsRequest) (*interfaces.DeleteAllJobsResponse, error) {
+	j.logger.Info("deleting all non-running jobs", "reason", req.Reason)
+
+	// Implementation delegates to the core Joblet for actual bulk deletion
+	// The core Joblet handles job filtering and bulk deletion coordination
+	j.logger.Debug("delegating bulk job deletion to core joblet")
+
+	// This is a placeholder - in real implementation, we would delegate to the core joblet
+	return &interfaces.DeleteAllJobsResponse{
+		DeletedCount: 0,
+		SkippedCount: 0,
+	}, nil
+}
+
 // ExecuteScheduledJob implements the new interface for scheduled job execution
 func (j *JobletImplementation) ExecuteScheduledJob(ctx context.Context, req interfaces.ExecuteScheduledJobRequest) error {
 	j.logger.Info("executing scheduled job", "jobID", req.Job.Uuid)
