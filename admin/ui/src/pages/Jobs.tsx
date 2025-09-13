@@ -21,7 +21,8 @@ const Jobs: React.FC = () => {
         setPageSize,
         stopJob,
         deleteJob,
-        refreshJobs
+        refreshJobs,
+        deleteAllJobs
     } = useJobs();
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'logs' | 'details'>('logs');
@@ -39,6 +40,13 @@ const Jobs: React.FC = () => {
         show: false,
         jobId: '',
         stopping: false
+    });
+    const [deleteAllConfirm, setDeleteAllConfirm] = useState<{
+        show: boolean;
+        deleting: boolean;
+    }>({
+        show: false,
+        deleting: false
     });
     const {logs, connected, error: logError, clearLogs} = useLogStream(selectedJobId);
     const logContainerRef = useRef<HTMLDivElement>(null);
@@ -171,8 +179,28 @@ setStopJobConfirm(prev => ({...prev, stopping: true}));
         setStopJobConfirm({show: false, jobId: '', stopping: false});
     };
 
+    const handleDeleteAllJobs = () => {
+        setDeleteAllConfirm({show: true, deleting: false});
+    };
+
+    const confirmDeleteAllJobs = async () => {
+        setDeleteAllConfirm(prev => ({...prev, deleting: true}));
+        try {
+            await deleteAllJobs();
+            setDeleteAllConfirm({show: false, deleting: false});
+        } catch (error) {
+            console.error('Failed to delete all jobs:', error);
+            alert('Failed to delete all jobs: ' + (error instanceof Error ? error.message : 'Unknown error'));
+            setDeleteAllConfirm(prev => ({...prev, deleting: false}));
+        }
+    };
+
+    const cancelDeleteAllJobs = () => {
+        setDeleteAllConfirm({show: false, deleting: false});
+    };
+
     const handleDeleteJob = async (jobId: string) => {
-        if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this job? This action cannot be UNDONE.')) {
             return;
         }
 
@@ -241,7 +269,17 @@ setStopJobConfirm(prev => ({...prev, stopping: true}));
                             <span className="text-gray-400">Auto-refresh enabled (5s)</span>
                         </div>
                     </div>
-                    <div>
+                    <div className="flex space-x-3">
+                        {totalJobs > 0 && (
+                            <button
+                                onClick={handleDeleteAllJobs}
+                                className="inline-flex items-center px-4 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-300 bg-transparent hover:bg-red-600 hover:text-white"
+                                title="Delete all non-running jobs"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2"/>
+                                Delete All Jobs
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowCreateJob(true)}
                             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
@@ -512,6 +550,15 @@ rnx job logs &lt;job-id&gt;
                                         <pre
                                             className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
 rnx job run "npm test" --cpu=50 --memory=512MB
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                                            Delete All Non-Running Jobs
+                                        </label>
+                                        <pre
+                                            className="bg-gray-900 text-red-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx delete-all
                                         </pre>
                                     </div>
                                 </div>
@@ -1030,6 +1077,79 @@ rnx job run "npm test" --cpu=50 --memory=512MB
                                 onClose={handleCloseCreateJob}
                                 showHeader={false}
                             />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete All Jobs Confirmation Dialog */}
+            {deleteAllConfirm.show && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4">
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-medium text-gray-200">
+                                    Delete All Jobs
+                                </h3>
+                                <button
+                                    onClick={cancelDeleteAllJobs}
+                                    className="text-gray-400 hover:text-gray-300"
+                                    disabled={deleteAllConfirm.deleting}
+                                >
+                                    <X className="h-5 w-5"/>
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-gray-300 mb-2">
+                                        Are you sure you want to delete all non-running jobs?
+                                    </p>
+                                    <p className="text-sm text-red-400">
+                                        This will permanently delete all completed, failed, and stopped jobs including their logs and metadata. Running and scheduled jobs will not be affected.
+                                    </p>
+                                    <p className="text-sm text-orange-400 mt-2">
+                                        This action cannot be UNDONE.
+                                    </p>
+                                </div>
+
+                                {/* Command Preview */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Command Preview
+                                    </label>
+                                    <pre className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
+{`rnx delete-all`}
+                                    </pre>
+                                </div>
+                            </div>
+
+                            <div className="flex space-x-3 justify-end mt-6">
+                                <button
+                                    onClick={cancelDeleteAllJobs}
+                                    disabled={deleteAllConfirm.deleting}
+                                    className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDeleteAllJobs}
+                                    disabled={deleteAllConfirm.deleting}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-md text-sm font-medium disabled:cursor-not-allowed flex items-center"
+                                >
+                                    {deleteAllConfirm.deleting ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 className="h-4 w-4 mr-2"/>
+                                            Delete All Jobs
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

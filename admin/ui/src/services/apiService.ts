@@ -145,6 +145,12 @@ class APIService {
         });
     }
 
+    async deleteAllJobs(): Promise<{ message: string; output: string }> {
+        return this.request<{ message: string; output: string }>(`/jobs?node=${this.currentNode}`, {
+            method: 'DELETE',
+        });
+    }
+
     async getJobLogs(jobId: string): Promise<{ logs: string[] }> {
         return this.request<{ logs: string[] }>(`/jobs/${jobId}/logs`);
     }

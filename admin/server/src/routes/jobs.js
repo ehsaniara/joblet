@@ -260,4 +260,23 @@ router.delete('/:jobId', async (req, res) => {
     }
 });
 
+// Delete all non-running jobs
+router.delete('/', async (req, res) => {
+    try {
+        const node = req.query.node || 'default';
+        const output = await execRnx(['delete-all'], {node});
+
+        res.json({
+            message: 'All non-running jobs deleted successfully',
+            output: output.trim()
+        });
+    } catch (error) {
+        console.error('Failed to delete all jobs:', error);
+        res.status(500).json({
+            error: 'Failed to delete all jobs',
+            message: error.message
+        });
+    }
+});
+
 export default router;

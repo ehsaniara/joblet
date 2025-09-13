@@ -987,7 +987,7 @@ const Resources: React.FC = () => {
                                         Are you sure you want to delete the volume "{deleteConfirm.volumeName}"?
                                     </p>
                                     <p className="text-sm text-red-400">
-                                        This action cannot be undone. All data in this volume will be permanently lost.
+                                        This action cannot be UNDONE. All data in this volume will be permanently lost.
                                     </p>
                                 </div>
 
@@ -1189,7 +1189,7 @@ const Resources: React.FC = () => {
                                         Are you sure you want to delete the network "{deleteNetworkConfirm.networkName}"?
                                     </p>
                                     <p className="text-sm text-red-400">
-                                        This action cannot be undone. Any containers using this network must be stopped
+                                        This action cannot be UNDONE. Any containers using this network must be stopped
                                         first.
                                     </p>
                                 </div>
@@ -1761,7 +1761,7 @@ const Resources: React.FC = () => {
                                     )}
                                     {runtimeConfirm.action === 'remove' && (
                                         <p className="text-sm text-red-400">
-                                            This action cannot be undone. The runtime will be completely removed from
+                                            This action cannot be UNDONE. The runtime will be completely removed from
                                             the system.
                                         </p>
                                     )}

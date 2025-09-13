@@ -104,6 +104,77 @@ const Monitoring: React.FC = () => {
                         <ProcessesCard processesInfo={systemInfo.processesInfo}/>
                     )}
 
+                    {/* Command Examples Section */}
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                        <h3 className="text-lg font-medium text-gray-200 mb-4">Command Examples</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Server Status
+                                </label>
+                                <pre className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx monitor status
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Current Metrics
+                                </label>
+                                <pre className="bg-gray-900 text-green-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx monitor top
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Real-time Monitoring
+                                </label>
+                                <pre className="bg-gray-900 text-blue-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx monitor watch
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    JSON Output for Dashboards
+                                </label>
+                                <pre className="bg-gray-900 text-blue-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx monitor top --json
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    List Volumes
+                                </label>
+                                <pre className="bg-gray-900 text-purple-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx volume list
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    List Networks
+                                </label>
+                                <pre className="bg-gray-900 text-purple-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx network list
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Create Volume
+                                </label>
+                                <pre className="bg-gray-900 text-yellow-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx volume create my-data-volume
+                                </pre>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Create Network
+                                </label>
+                                <pre className="bg-gray-900 text-yellow-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
+rnx network create my-network
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             )}
         </div>

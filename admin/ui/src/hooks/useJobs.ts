@@ -11,6 +11,7 @@ interface UseJobsReturn {
     executeJob: (request: JobExecuteRequest) => Promise<string>;
     stopJob: (jobId: string) => Promise<void>;
     deleteJob: (jobId: string) => Promise<void>;
+    deleteAllJobs: () => Promise<void>;
     // Pagination
     currentPage: number;
     pageSize: number;
@@ -114,6 +115,15 @@ export const useJobs = (): UseJobsReturn => {
         }
     }, [fetchJobs]);
 
+    const deleteAllJobs = useCallback(async (): Promise<void> => {
+        try {
+            await apiService.deleteAllJobs();
+            await fetchJobs(false); // Refresh job list without loading indicator
+        } catch (err) {
+            throw new Error(err instanceof Error ? err.message : 'Failed to delete all jobs');
+        }
+    }, [fetchJobs]);
+
     // Calculate pagination values
     const totalJobs = jobs.length;
     const totalPages = Math.ceil(totalJobs / pageSize);
@@ -150,6 +160,7 @@ export const useJobs = (): UseJobsReturn => {
         executeJob,
         stopJob,
         deleteJob,
+        deleteAllJobs,
         currentPage,
         pageSize,
         totalJobs,
