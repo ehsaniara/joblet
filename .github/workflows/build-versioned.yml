@@ -1,0 +1,94 @@
+name: Build with Versioning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  build-versioned:
+    name: Build with Version Info
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [rnx, joblet]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate version detection
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build ${{ matrix.component }} with version info
+        run: |
+          chmod +x ./scripts/build-version.sh
+          ./scripts/build-version.sh ${{ matrix.component }} dist/
+
+      - name: Test version command
+        if: matrix.component == 'rnx'
+        run: |
+          ./dist/rnx version
+          echo "---"
+          ./dist/rnx --version
+          echo "---"
+          ./dist/rnx version --json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.component }}-${{ runner.os }}-${{ runner.arch }}
+          path: dist/${{ matrix.component }}
+          retention-days: 7
+
+  # Separate job for building all components together (testing unified build)
+  build-unified:
+    name: Build All Components (Unified)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build all components
+        run: |
+          chmod +x ./scripts/build-version.sh
+          ./scripts/build-version.sh all dist/
+
+      - name: Test all binaries
+        run: |
+          echo "=== RNX Version ==="
+          ./dist/rnx version
+
+          echo -e "\n=== Joblet Version (if supported) ==="
+          if ./dist/joblet version 2>/dev/null; then
+            echo "Joblet version command works"
+          else
+            echo "Joblet version command not implemented yet"
+          fi
+
+      - name: Upload unified artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: joblet-unified-${{ runner.os }}-${{ runner.arch }}
+          path: dist/
+          retention-days: 7

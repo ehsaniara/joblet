@@ -75,11 +75,19 @@ mkdir -p ~/.rnx
 scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
-### 2. Test Connection
+### 2. Verify Version and Connection
 
 ```bash
-# List jobs (should show "No jobs found" initially)
-rnx list
+# Check client and server versions
+rnx --version
+
+# This shows:
+# - RNX Client version (your local CLI)
+# - Joblet Server version (remote server)
+# If versions differ significantly, consider updating
+
+# Test connection by listing jobs
+rnx list  # Should show "No jobs found" initially
 ```
 
 ## 🎯 First Job

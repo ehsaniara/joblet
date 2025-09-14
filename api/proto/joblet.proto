@@ -267,6 +267,7 @@ message SystemStatusRes {
   IOMetrics io = 8;
   ProcessMetrics processes = 9;
   CloudInfo cloud = 10;
+  ServerVersionInfo server_version = 11;
 }
 
 message SystemMetricsRes {
@@ -410,6 +411,16 @@ message CloudInfo {
   string instanceType = 5;
   string hypervisorType = 6;
   map<string, string> metadata = 7;
+}
+
+message ServerVersionInfo {
+  string version = 1;        // Version string (e.g., "v1.2.3" or "dev-abc1234")
+  string git_commit = 2;     // Git commit hash
+  string git_tag = 3;        // Git tag if available
+  string build_date = 4;     // Build timestamp
+  string component = 5;      // Component name ("joblet")
+  string go_version = 6;     // Go version used for build
+  string platform = 7;      // OS/architecture (e.g., "linux/amd64")
 }
 
 // Runtime management messages

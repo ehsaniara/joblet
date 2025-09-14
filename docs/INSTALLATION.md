@@ -198,6 +198,32 @@ make test
 sudo make install
 ```
 
+### Verify Installation
+
+After installation, verify both client and server versions:
+
+```bash
+# Check RNX client version
+rnx --version
+
+# Output should show both client and server versions:
+# RNX Client:
+# rnx version v4.3.3 (abc1234)
+# Built: 2025-09-14T05:17:17Z
+# ...
+#
+# Joblet Server (default):
+# joblet version v4.3.3 (abc1234)
+# Built: 2025-09-14T05:18:24Z
+# ...
+
+# If server is not reachable, you'll see:
+# Joblet Server: failed to connect to server: <error>
+
+# Test basic functionality
+rnx list  # Should connect to server and list jobs
+```
+
 ### Cross-compilation
 
 ```bash

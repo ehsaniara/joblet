@@ -7,6 +7,16 @@ REMOTE_ARCH ?= amd64
 
 all: rnx joblet admin-ui
 
+# Version-aware builds
+rnx-versioned:
+	./scripts/build-version.sh rnx bin/
+
+joblet-versioned:
+	./scripts/build-version.sh joblet bin/
+
+all-versioned:
+	./scripts/build-version.sh all bin/
+
 help:
 	@echo "Joblet Makefile - Embedded Certificates Version"
 	@echo ""
@@ -64,8 +74,9 @@ help:
 	@echo "  make setup-remote-passwordless"
 
 rnx:
-	@echo "Building RNX CLI..."
-	GOTMPDIR=/var/tmp GOOS=$(GOOS) GOARCH=$(REMOTE_ARCH) go build -o bin/rnx ./cmd/rnx
+	@echo "Building RNX CLI with version info..."
+	@chmod +x ./scripts/build-version.sh
+	./scripts/build-version.sh rnx bin/
 
 admin-server: admin-ui
 	@echo "Installing Admin Server dependencies..."
@@ -73,8 +84,9 @@ admin-server: admin-ui
 	@echo "✅ Admin Server ready"
 
 joblet:
-	@echo "Building Joblet..."
-	GOOS=linux GOARCH=$(REMOTE_ARCH) go build -o bin/joblet ./cmd/joblet
+	@echo "Building Joblet with version info..."
+	@chmod +x ./scripts/build-version.sh
+	GOOS=linux GOARCH=$(REMOTE_ARCH) ./scripts/build-version.sh joblet bin/
 
 admin-ui:
 	@echo "Building Admin UI..."

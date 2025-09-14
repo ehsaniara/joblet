@@ -84,29 +84,37 @@ jobs:
         run: |
           cd admin/ui && npm run build
 
-      - name: Build Go binaries
+      - name: Build Go binaries with version info
         shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
+          # Make build script executable
+          chmod +x ./scripts/build-version.sh
+
           # Create dist directory
           mkdir -p dist
-          
-          # Build rnx CLI with build timestamp and unique build ID
-          BUILD_TIME=$(date -u +%Y%m%d%H%M%S)
-          BUILD_ID="${{ github.sha }}-${BUILD_TIME}"
-          go build -a -ldflags="-s -w -X main.buildTime=${BUILD_TIME} -X main.buildID=${BUILD_ID}" -o dist/rnx${{ matrix.ext }} ./cmd/rnx
-          
-          # Build joblet server (Linux only for now)
+
+          # Build RNX CLI
+          echo "Building RNX CLI for ${{ matrix.platform }}..."
+          ./scripts/build-version.sh rnx dist/
+          mv dist/rnx dist/rnx${{ matrix.ext }}
+
+          # Build Joblet Server (Linux only)
           if [ "${{ matrix.goos }}" = "linux" ]; then
-            go build -a -ldflags="-s -w -X main.buildTime=${BUILD_TIME} -X main.buildID=${BUILD_ID}" -o dist/joblet${{ matrix.ext }} ./cmd/joblet
+            echo "Building Joblet Server for ${{ matrix.platform }}..."
+            ./scripts/build-version.sh joblet dist/
+            mv dist/joblet dist/joblet${{ matrix.ext }}
           fi
-          
-          # Verify volume command is built into the binary (on Linux only for testing)
-          if [ "${{ matrix.goos }}" = "linux" ]; then
-            ./dist/rnx${{ matrix.ext }} volume --help > /dev/null || echo "WARNING: volume command not found in binary"
+
+          # Test version output (Linux only for simplicity)
+          if [ "${{ matrix.goos }}" = "linux" ] && [ "${{ matrix.goarch }}" = "amd64" ]; then
+            echo "Testing version output:"
+            ./dist/rnx${{ matrix.ext }} version
+            echo "---"
+            ./dist/rnx${{ matrix.ext }} --version
           fi
 
       - name: Create release package

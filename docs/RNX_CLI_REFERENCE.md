@@ -28,6 +28,7 @@ Complete reference for the RNX command-line interface, including all commands, o
     - [runtime validate](#rnx-runtime-validate)
     - [runtime remove](#rnx-runtime-remove)
 - [System Commands](#system-commands)
+    - [version](#rnx-version)
     - [monitor](#rnx-monitor)
     - [nodes](#rnx-nodes)
     - [admin](#rnx-admin)
@@ -42,6 +43,7 @@ Options available for all commands:
 --config <path>    # Path to configuration file (default: searches standard locations)
 --node <name>      # Node name from configuration (default: "default")
 --json             # Output in JSON format
+--version, -v      # Show version information for both client and server
 --help, -h         # Show help for command
 ```
 
@@ -804,6 +806,62 @@ rnx runtime validate openjdk:21
 ```
 
 ## System Commands
+
+### `rnx version`
+
+Display version information for both RNX client and Joblet server.
+
+```bash
+rnx version [flags]
+```
+
+#### Flags
+
+| Flag     | Description                      | Default |
+|----------|----------------------------------|---------|
+| `--json` | Output version info as JSON     | false   |
+
+#### Examples
+
+```bash
+# Show version information
+rnx version
+
+# Output:
+# RNX Client:
+# rnx version v4.3.3 (4c11220)
+# Built: 2025-09-14T05:17:17Z
+# Commit: 4c11220b6e4f98960853fa0379b5c25d2f19e33f
+# Go: go1.24.0
+# Platform: linux/amd64
+#
+# Joblet Server (default):
+# joblet version v4.3.3 (4c11220)
+# Built: 2025-09-14T05:18:24Z
+# Commit: 4c11220b6e4f98960853fa0379b5c25d2f19e33f
+# Go: go1.24.0
+# Platform: linux/amd64
+
+# Show version as JSON
+rnx version --json
+
+# Use --version flag (alternative)
+rnx --version
+```
+
+#### Version Information Details
+
+- **Client Version**: The version of the RNX CLI tool running on your local machine
+- **Server Version**: The version of the Joblet server it's connected to (from config)
+- **Version Format**: `vMAJOR.MINOR.PATCH[+dev]` where `+dev` indicates development builds after the tagged release
+- **Build Information**: Includes git commit hash, build date, Go version, and platform
+
+#### Use Cases
+
+- **Version Compatibility**: Ensure client and server versions are compatible
+- **Debugging**: Identify specific builds when reporting issues
+- **Deployment Tracking**: Verify which version is deployed on production servers
+- **Development**: Track development builds with `+dev` suffix
 
 ### `rnx monitor`
 

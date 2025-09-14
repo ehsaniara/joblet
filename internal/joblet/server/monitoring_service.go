@@ -11,6 +11,7 @@ import (
 	"joblet/internal/joblet/monitoring"
 	"joblet/internal/joblet/monitoring/domain"
 	"joblet/pkg/logger"
+	"joblet/pkg/version"
 )
 
 // MonitoringServiceServer implements the gRPC monitoring service
@@ -133,16 +134,17 @@ func (s *MonitoringServiceServer) filterMetrics(metrics *domain.SystemMetrics, t
 
 func (s *MonitoringServiceServer) systemStatusToProto(status *monitoring.SystemStatus) *pb.SystemStatusRes {
 	return &pb.SystemStatusRes{
-		Timestamp: status.Timestamp.Format(time.RFC3339),
-		Available: status.Available,
-		Host:      s.hostInfoToProto(status.Host),
-		Cpu:       s.cpuMetricsToProto(status.CPU),
-		Memory:    s.memoryMetricsToProto(status.Memory),
-		Disks:     s.diskMetricsToProto(status.Disk),
-		Networks:  s.networkMetricsToProto(status.Network),
-		Io:        s.ioMetricsToProto(status.IO),
-		Processes: s.processMetricsToProto(status.Processes),
-		Cloud:     s.cloudInfoToProto(status.Cloud),
+		Timestamp:     status.Timestamp.Format(time.RFC3339),
+		Available:     status.Available,
+		Host:          s.hostInfoToProto(status.Host),
+		Cpu:           s.cpuMetricsToProto(status.CPU),
+		Memory:        s.memoryMetricsToProto(status.Memory),
+		Disks:         s.diskMetricsToProto(status.Disk),
+		Networks:      s.networkMetricsToProto(status.Network),
+		Io:            s.ioMetricsToProto(status.IO),
+		Processes:     s.processMetricsToProto(status.Processes),
+		Cloud:         s.cloudInfoToProto(status.Cloud),
+		ServerVersion: s.serverVersionToProto(),
 	}
 }
 
@@ -316,5 +318,19 @@ func (s *MonitoringServiceServer) cloudInfoToProto(c *domain.CloudInfo) *pb.Clou
 		InstanceType:   c.InstanceType,
 		HypervisorType: c.HypervisorType,
 		Metadata:       c.Metadata,
+	}
+}
+
+func (s *MonitoringServiceServer) serverVersionToProto() *pb.ServerVersionInfo {
+	buildInfo := version.GetBuildInfo()
+
+	return &pb.ServerVersionInfo{
+		Version:   version.GetVersion(),
+		GitCommit: buildInfo.GitCommit,
+		GitTag:    buildInfo.GitTag,
+		BuildDate: buildInfo.BuildDate,
+		Component: buildInfo.Component,
+		GoVersion: buildInfo.GoVersion,
+		Platform:  buildInfo.Platform + "/" + buildInfo.Architecture,
 	}
 }

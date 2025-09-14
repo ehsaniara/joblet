@@ -48,6 +48,13 @@ Use 'rnx <command> --help' for detailed information about any command.`,
 			return
 		}
 
+		// Check if --version flag is used - version commands can work without config
+		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag || cmd.Name() == "version" {
+			// Try to load config but don't exit on failure
+			common.NodeConfig, _ = config.LoadClientConfig(common.ConfigPath)
+			return
+		}
+
 		// Load client configuration - REQUIRED (no direct server connections)
 		var err error
 		common.NodeConfig, err = config.LoadClientConfig(common.ConfigPath)
@@ -91,4 +98,8 @@ func init() {
 	rootCmd.AddCommand(jobs.NewMonitorCmd())
 	rootCmd.AddCommand(resources.NewRuntimeCmd())
 	rootCmd.AddCommand(NewAdminCmd())
+	rootCmd.AddCommand(NewVersionCmd())
+
+	// Add --version flag support
+	AddVersionFlag(rootCmd)
 }
