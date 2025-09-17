@@ -22,13 +22,13 @@ Contains four basic job examples:
 
 ```bash
 # Run individual jobs
-rnx run --workflow=basic-jobs.yaml:hello
-rnx run --workflow=basic-jobs.yaml:analytics
-rnx run --workflow=basic-jobs.yaml:webserver
-rnx run --workflow=basic-jobs.yaml:backup
+rnx job run --workflow=basic-jobs.yaml:hello
+rnx job run --workflow=basic-jobs.yaml:analytics
+rnx job run --workflow=basic-jobs.yaml:webserver
+rnx job run --workflow=basic-jobs.yaml:backup
 
 # Run the entire workflow (all jobs)
-rnx run --workflow=basic-jobs.yaml
+rnx job run --workflow=basic-jobs.yaml
 ```
 
 ## Prerequisites

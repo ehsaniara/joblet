@@ -16,7 +16,7 @@ fi
 
 # Test connection
 echo "🔗 Testing connection to Joblet server..."
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo "❌ Error: Cannot connect to Joblet server"
     exit 1
 fi
@@ -26,49 +26,49 @@ echo ""
 echo "📋 Demo 1: Basic Command Execution"
 echo "----------------------------------"
 echo "Running: echo 'Hello, Joblet!'"
-rnx run echo "Hello, Joblet!"
+rnx job run echo "Hello, Joblet!"
 echo ""
 
 echo "📋 Demo 2: System Information"
 echo "-----------------------------"
 echo "Running: uname -a"
-rnx run uname -a
+rnx job run uname -a
 echo ""
 
 echo "📋 Demo 3: Directory Listing"
 echo "----------------------------"
 echo "Running: ls -la"
-rnx run ls -la
+rnx job run ls -la
 echo ""
 
 echo "📋 Demo 4: Current Working Directory"
 echo "------------------------------------"
 echo "Running: pwd"
-rnx run pwd
+rnx job run pwd
 echo ""
 
 echo "📋 Demo 5: Environment Information"
 echo "----------------------------------"
 echo "Running: env | head -10"
-rnx run bash -c "env | head -10"
+rnx job run bash -c "env | head -10"
 echo ""
 
 echo "📋 Demo 6: Process Information"
 echo "------------------------------"
 echo "Running: ps aux | head -5"
-rnx run bash -c "ps aux | head -5"
+rnx job run bash -c "ps aux | head -5"
 echo ""
 
 echo "📋 Demo 7: Multi-command Execution"
 echo "----------------------------------"
 echo "Running: Multiple commands in sequence"
-rnx run bash -c "echo 'Current time:' && date && echo 'Uptime:' && uptime"
+rnx job run bash -c "echo 'Current time:' && date && echo 'Uptime:' && uptime"
 echo ""
 
 echo "📋 Demo 8: Command with Error Handling"
 echo "--------------------------------------"
 echo "Running: Command that might fail (gracefully handled)"
-if rnx run bash -c "echo 'This works' && echo 'Testing error handling' && ls /nonexistent 2>/dev/null || echo 'Error handled gracefully'"; then
+if rnx job run bash -c "echo 'This works' && echo 'Testing error handling' && ls /nonexistent 2>/dev/null || echo 'Error handled gracefully'"; then
     echo "✅ Command completed successfully"
 else
     echo "ℹ️  Command completed with expected error handling"

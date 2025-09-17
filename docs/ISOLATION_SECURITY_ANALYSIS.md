@@ -173,7 +173,7 @@ func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error)
 **Security Properties:**
 
 - **Explicit Service Control**: Only `RuntimeService` can set `runtime-build` type
-- **No User Override**: Users cannot manually specify job type via `rnx run`
+- **No User Override**: Users cannot manually specify job type via `rnx job run`
 - **Environment Isolation**: Job type passed through secure environment variables
 - **Fail-Safe Default**: Unknown/missing job types default to production isolation
 

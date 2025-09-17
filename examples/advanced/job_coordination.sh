@@ -20,7 +20,7 @@ rnx volume create shared-data --size=100MB --type=filesystem 2>/dev/null || echo
 echo ""
 echo "📝 Job 1: Generate data"
 echo "----------------------"
-rnx run --volume=shared-data --max-memory=256 \
+rnx job run --volume=shared-data --max-memory=256 \
     python3 -c "
 import json
 import random
@@ -48,7 +48,7 @@ sleep 3
 echo ""
 echo "📊 Job 2: Process data (depends on Job 1)"
 echo "-----------------------------------------"
-rnx run --volume=shared-data --max-memory=256 \
+rnx job run --volume=shared-data --max-memory=256 \
     python3 -c "
 import json
 import statistics
@@ -93,5 +93,5 @@ echo ""
 echo "✅ Job Coordination Complete!"
 echo ""
 echo "📊 View results:"
-echo "  rnx run --volume=shared-data cat /volumes/shared-data/data.json    # Raw data"
-echo "  rnx run --volume=shared-data cat /volumes/shared-data/results.json # Analysis"
+echo "  rnx job run --volume=shared-data cat /volumes/shared-data/data.json    # Raw data"
+echo "  rnx job run --volume=shared-data cat /volumes/shared-data/results.json # Analysis"

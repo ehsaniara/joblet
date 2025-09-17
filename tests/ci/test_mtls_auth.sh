@@ -12,7 +12,7 @@ test_valid_certificate_auth() {
     
     # Test with valid certificates (should work)
     local result
-    if ! result=$(rnx --config "$RNX_CONFIG" list 2>&1); then
+    if ! result=$("$RNX_BINARY" --config "$RNX_CONFIG" job list 2>&1); then
         echo "Valid certificate authentication failed: $result"
         return 1
     fi
@@ -41,7 +41,7 @@ EOF
     # Test with invalid config
     set +e
     local error_result
-    error_result=$(rnx --config "$temp_config" list 2>&1)
+    error_result=$("$RNX_BINARY" --config "$temp_config" list 2>&1)
     local exit_code=$?
     set -e
     
@@ -64,7 +64,7 @@ test_secure_connection() {
     # This is a basic test since we can't easily inspect the connection in CI
     
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run echo "testing secure connection" 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run echo "testing secure connection" 2>&1)
     
     # Extract job ID
     local job_id
@@ -81,7 +81,7 @@ test_secure_connection() {
     
     # Verify we can get job status (indicating secure communication works)
     local status_output
-    status_output=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>&1)
+    status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>&1)
     local status
     status=$(echo "$status_output" | grep "^Status:" | awk '{print $2}')
     
@@ -94,7 +94,7 @@ test_secure_connection() {
     echo "✓ Secure connection working"
     
     # Cleanup
-    rnx --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+    "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" >/dev/null 2>&1 || true
 }
 
 test_client_certificate_required() {
@@ -105,7 +105,7 @@ test_client_certificate_required() {
     
     # Try to connect and perform operation (should work with valid certs)
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run echo "client cert test" 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run echo "client cert test" 2>&1)
     
     # Extract job ID
     local job_id
@@ -122,7 +122,7 @@ test_client_certificate_required() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"client cert test"* ]]; then
         echo "Client certificate test failed - unexpected output"
@@ -146,7 +146,7 @@ test_certificate_expiry_handling() {
     
     # Perform operation that requires certificate
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run echo "cert expiry test" 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run echo "cert expiry test" 2>&1)
     
     # Extract job ID
     local job_id
@@ -172,7 +172,7 @@ test_certificate_expiry_handling() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"cert expiry test"* ]]; then
         echo "Certificate expiry test failed - unexpected output"
@@ -192,7 +192,7 @@ test_server_certificate_validation() {
     
     # Verify we can establish connection (indicates cert validation passed)
     local job_list
-    job_list=$(rnx --config "$RNX_CONFIG" list 2>&1)
+    job_list=$("$RNX_BINARY" --config "$RNX_CONFIG" job list 2>&1)
     
     # Check if we got a proper response (not an error)
     if [[ "$job_list" == *"Error"* ]] || [[ "$job_list" == *"failed"* ]]; then
@@ -231,7 +231,7 @@ EOF
     # Test with invalid config
     set +e
     local error_output
-    RNX_CONFIG="$temp_config" error_output=$(timeout 5 rnx --config "$temp_config" list 2>&1)
+    RNX_CONFIG="$temp_config" error_output=$(timeout 5 "$RNX_BINARY" --config "$temp_config" list 2>&1)
     local exit_code=$?
     set -e
     

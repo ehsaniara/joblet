@@ -351,7 +351,7 @@ func TestOutputRuntimeInfoJSON(t *testing.T) {
 			}
 
 			// Test that usage string would be properly formatted
-			expectedUsage := fmt.Sprintf("rnx run --runtime=%s <command>", tt.runtimeSpec)
+			expectedUsage := fmt.Sprintf("rnx job run --runtime=%s <command>", tt.runtimeSpec)
 			if !strings.Contains(expectedUsage, tt.runtimeSpec) {
 				t.Errorf("Usage string doesn't contain runtime spec: %s", expectedUsage)
 			}

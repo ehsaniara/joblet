@@ -20,13 +20,13 @@ dependencies. All examples use only Python 3's standard library.
 
 ```bash
 # Run specific analytics examples using the workflow
-rnx run --workflow=jobs.yaml:sales-analysis        # Sales data statistical analysis
-rnx run --workflow=jobs.yaml:customer-segmentation # K-means clustering from scratch
-rnx run --workflow=jobs.yaml:time-series          # Time series data processing
-rnx run --workflow=jobs.yaml:complete-analytics   # Full analytics pipeline
+rnx job run --workflow=jobs.yaml:sales-analysis        # Sales data statistical analysis
+rnx job run --workflow=jobs.yaml:customer-segmentation # K-means clustering from scratch
+rnx job run --workflow=jobs.yaml:time-series          # Time series data processing
+rnx job run --workflow=jobs.yaml:complete-analytics   # Full analytics pipeline
 
 # Setup volumes first (handled automatically by templates)
-rnx run --workflow=jobs.yaml:setup-volumes
+rnx job run --workflow=jobs.yaml:setup-volumes
 ```
 
 ### Traditional Method
@@ -88,7 +88,7 @@ rnx volume create analytics-data --size=1GB --type=filesystem
 rnx volume create ml-models --size=500MB --type=filesystem
 
 # Run the analytics
-rnx run --upload=simple_analytics.py \
+rnx job run --upload=simple_analytics.py \
         --upload=sales_data.csv \
         --upload=customers.csv \
         --volume=analytics-data \
@@ -103,13 +103,13 @@ After running the demo, inspect the results:
 
 ```bash
 # View sales analysis results
-rnx run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json
+rnx job run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json
 
 # List processed time series files
-rnx run --volume=analytics-data ls /volumes/analytics-data/processed/
+rnx job run --volume=analytics-data ls /volumes/analytics-data/processed/
 
 # View a specific processed chunk
-rnx run --volume=analytics-data cat /volumes/analytics-data/processed/chunk_1.json
+rnx job run --volume=analytics-data cat /volumes/analytics-data/processed/chunk_1.json
 ```
 
 ## 📁 File Structure

@@ -26,12 +26,12 @@ Usage:
 
 ```bash
 # Compile and run Java program
-rnx run --runtime=openjdk-21 --upload=examples/java/JavaRuntimeTest.java javac JavaRuntimeTest.java
-rnx run --runtime=openjdk-21 java JavaRuntimeTest
+rnx job run --runtime=openjdk-21 --upload=examples/java/JavaRuntimeTest.java javac JavaRuntimeTest.java
+rnx job run --runtime=openjdk-21 java JavaRuntimeTest
 
 # Or using GraalVM
-rnx run --runtime=graalvmjdk-21 --upload=examples/java/JavaRuntimeTest.java javac JavaRuntimeTest.java
-rnx run --runtime=graalvmjdk-21 java JavaRuntimeTest
+rnx job run --runtime=graalvmjdk-21 --upload=examples/java/JavaRuntimeTest.java javac JavaRuntimeTest.java
+rnx job run --runtime=graalvmjdk-21 java JavaRuntimeTest
 ```
 
 ### SimpleTest.java
@@ -53,10 +53,10 @@ Usage:
 
 ```bash
 # Run with ML runtime (full NumPy, Pandas support)
-rnx run --runtime=python-3.11-ml --upload=examples/python/comprehensive-python-test.py python3 comprehensive-python-test.py
+rnx job run --runtime=python-3.11-ml --upload=examples/python/comprehensive-python-test.py python3 comprehensive-python-test.py
 
 # Run with basic runtime (lightweight, essential packages only)
-rnx run --runtime=python-3.11 --upload=examples/python/comprehensive-python-test.py python3 comprehensive-python-test.py
+rnx job run --runtime=python-3.11 --upload=examples/python/comprehensive-python-test.py python3 comprehensive-python-test.py
 ```
 
 ### data-processor.py & data-analyzer.py
@@ -102,7 +102,7 @@ Example scripts for multi-job workflows demonstrating data processing pipelines.
 Multi-job workflow for compiling and executing Java code:
 
 ```bash
-rnx run --workflow=examples/workflows/java-complete-test.yaml --upload=examples/java/JavaRuntimeTest.java
+rnx job run --workflow=examples/workflows/java-complete-test.yaml --upload=examples/java/JavaRuntimeTest.java
 ```
 
 ### python-e2e-test.yaml
@@ -110,7 +110,7 @@ rnx run --workflow=examples/workflows/java-complete-test.yaml --upload=examples/
 End-to-end Python runtime test workflow:
 
 ```bash
-rnx run --workflow=examples/workflows/python-e2e-test.yaml --upload=examples/python/comprehensive-python-test.py
+rnx job run --workflow=examples/workflows/python-e2e-test.yaml --upload=examples/python/comprehensive-python-test.py
 ```
 
 ### multi-job-test.yaml
@@ -118,5 +118,5 @@ rnx run --workflow=examples/workflows/python-e2e-test.yaml --upload=examples/pyt
 Demonstrates volume sharing between Python jobs in a data processing pipeline:
 
 ```bash
-rnx run --workflow=examples/workflows/multi-job-test.yaml --upload=examples/python/data-processor.py --upload=examples/python/data-analyzer.py
+rnx job run --workflow=examples/workflows/multi-job-test.yaml --upload=examples/python/data-processor.py --upload=examples/python/data-analyzer.py
 ```

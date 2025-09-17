@@ -87,7 +87,7 @@ rnx --version
 # If versions differ significantly, consider updating
 
 # Test connection by listing jobs
-rnx list  # Should show "No jobs found" initially
+rnx job list  # Should show "No jobs found" initially
 ```
 
 ## 🎯 First Job
@@ -95,7 +95,7 @@ rnx list  # Should show "No jobs found" initially
 ### Run a Simple Command
 
 ```bash
-rnx run echo "Hello, Joblet!"
+rnx job run echo "Hello, Joblet!"
 ```
 
 Output:
@@ -111,13 +111,13 @@ StartTime: 2025-08-03T10:00:00Z
 ### Check Job Status
 
 ```bash
-rnx status 550e8400-e29b-41d4-a716-446655440000
+rnx job status 550e8400-e29b-41d4-a716-446655440000
 ```
 
 ### View Job Logs
 
 ```bash
-rnx log 550e8400-e29b-41d4-a716-446655440000
+rnx job log 550e8400-e29b-41d4-a716-446655440000
 ```
 
 ## 📊 Resource Limits Example
@@ -125,7 +125,7 @@ rnx log 550e8400-e29b-41d4-a716-446655440000
 Run a Python script with resource limits:
 
 ```bash
-rnx run --max-cpu=50 --max-memory=512 --max-iobps=10485760 \
+rnx job run --max-cpu=50 --max-memory=512 --max-iobps=10485760 \
   python3 -c "import time; print('Processing...'); time.sleep(5); print('Done!')"
 ```
 
@@ -156,11 +156,11 @@ rnx runtime list
 
 ```bash
 # Python with ML packages - no installation delay!
-rnx run --runtime=python-3.11-ml python3 -c "import pandas, numpy; print('ML ready!')"
+rnx job run --runtime=python-3.11-ml python3 -c "import pandas, numpy; print('ML ready!')"
 
 # Java compilation and execution
-rnx run --runtime=openjdk:21 --upload=HelloWorld.java javac HelloWorld.java
-rnx run --runtime=openjdk:21 java HelloWorld
+rnx job run --runtime=openjdk:21 --upload=HelloWorld.java javac HelloWorld.java
+rnx job run --runtime=openjdk:21 java HelloWorld
 
 # Check runtime information
 rnx runtime info python-3.11-ml
@@ -181,10 +181,10 @@ Create persistent storage:
 rnx volume create mydata --size=1GB --type=filesystem
 
 # Run job with volume mounted
-rnx run --volume=mydata sh -c 'echo "Persistent data" > /volumes/mydata/data.txt'
+rnx job run --volume=mydata sh -c 'echo "Persistent data" > /volumes/mydata/data.txt'
 
 # Verify data persists
-rnx run --volume=mydata cat /volumes/mydata/data.txt
+rnx job run --volume=mydata cat /volumes/mydata/data.txt
 ```
 
 ## 🌐 Network Isolation
@@ -196,11 +196,11 @@ Create an isolated network:
 rnx network create isolated --cidr=10.10.0.0/24
 
 # Run job in isolated network
-rnx run --network=isolated ping -c 3 google.com
+rnx job run --network=isolated ping -c 3 google.com
 # This will fail - no internet access in isolated network
 
 # Run with default bridge network (internet access)
-rnx run --network=bridge ping -c 3 google.com
+rnx job run --network=bridge ping -c 3 google.com
 ```
 
 ## 📁 File Uploads
@@ -216,7 +216,7 @@ echo "Working directory: $(pwd)"
 ' > test.sh
 
 # Upload and run
-rnx run --upload=test.sh bash test.sh
+rnx job run --upload=test.sh bash test.sh
 ```
 
 ## 📅 Scheduled Jobs
@@ -225,10 +225,10 @@ Schedule a job for future execution:
 
 ```bash
 # Run in 5 minutes
-rnx run --schedule="5min" echo "Scheduled job executed!"
+rnx job run --schedule="5min" echo "Scheduled job executed!"
 
 # Run at specific time
-rnx run --schedule="2025-08-03T15:00:00" echo "Scheduled for 3 PM"
+rnx job run --schedule="2025-08-03T15:00:00" echo "Scheduled for 3 PM"
 ```
 
 ## 🏗️ Runtime Systems
@@ -256,10 +256,10 @@ rnx runtime install python-3.11-ml
 
 ```bash
 # Run Java application with isolated runtime
-rnx run --runtime=openjdk-21 java -version
+rnx job run --runtime=openjdk-21 java -version
 
 # Run Python ML script with pre-installed packages
-rnx run --runtime=python-3.11-ml python3 -c "import pandas, numpy; print('ML ready!')"
+rnx job run --runtime=python-3.11-ml python3 -c "import pandas, numpy; print('ML ready!')"
 
 # List available runtimes
 rnx runtime list
@@ -283,7 +283,7 @@ rnx monitor
 rnx monitor status
 
 # Stream job logs (use Ctrl+C to stop)
-rnx log <job-uuid>
+rnx job log <job-uuid>
 ```
 
 ## 🎉 Next Steps
@@ -307,20 +307,20 @@ Congratulations! You've successfully:
 
 ```bash
 # Job Management
-rnx run <command>           # Run a job
-rnx list                    # List all jobs
-rnx status <job-uuid>       # Check job status
-rnx log <job-uuid>          # View job logs
-rnx stop <job-uuid>         # Stop running job
-rnx delete <job-uuid>       # Delete specific job
-rnx delete-all              # Delete all non-running jobs
+rnx job run <command>           # Run a job
+rnx job list                    # List all jobs
+rnx job status <job-uuid>       # Check job status
+rnx job log <job-uuid>          # View job logs
+rnx job stop <job-uuid>         # Stop running job
+rnx job delete <job-uuid>       # Delete specific job
+rnx job delete-all              # Delete all non-running jobs
 
 # Workflow Management
-rnx run --workflow=file.yaml    # Run workflow
-rnx list --workflow             # List workflows
-rnx status --workflow <uuid>    # Check workflow status
-rnx status --workflow --detail <uuid> # View workflow status + YAML
-rnx status --workflow --json --detail <uuid> # JSON output with YAML content
+rnx job run --workflow=file.yaml    # Run workflow
+rnx job list --workflow             # List workflows
+rnx job status --workflow <uuid>    # Check workflow status
+rnx job status --workflow --detail <uuid> # View workflow status + YAML
+rnx job status --workflow --json --detail <uuid> # JSON output with YAML content
 
 # Volume Management
 rnx volume create <name>    # Create volume

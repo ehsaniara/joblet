@@ -11,7 +11,7 @@ test_basic_command_execution() {
     echo "Testing basic command execution..."
     
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run echo "Hello, CI!" 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run echo "Hello, CI!" 2>&1)
     
     # Extract job ID
     local job_id
@@ -51,7 +51,7 @@ test_job_with_args() {
     echo "Testing job with multiple arguments..."
     
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sh -c 'echo "arg1: $1, arg2: $2"' -- "test1" "test2" 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'echo "arg1: $1, arg2: $2"' -- "test1" "test2" 2>&1)
     
     # Extract job ID
     local job_id
@@ -93,7 +93,7 @@ test_job_exit_codes() {
     
     # Test successful job (exit 0)
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sh -c 'exit 0' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'exit 0' 2>&1)
     local success_job_id
     success_job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
@@ -107,7 +107,7 @@ test_job_exit_codes() {
     
     # Check job status
     local status_output
-    status_output=$(rnx --config "$RNX_CONFIG" status "$success_job_id" 2>&1)
+    status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$success_job_id" 2>&1)
     local success_status
     success_status=$(echo "$status_output" | grep "^Status:" | awk '{print $2}')
     
@@ -119,7 +119,7 @@ test_job_exit_codes() {
     fi
     
     # Test failing job (exit 1)
-    job_output=$(rnx --config "$RNX_CONFIG" run sh -c 'exit 1' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'exit 1' 2>&1)
     local fail_job_id
     fail_job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
@@ -133,7 +133,7 @@ test_job_exit_codes() {
     
     # Check job status
     local fail_status_output
-    fail_status_output=$(rnx --config "$RNX_CONFIG" status "$fail_job_id" 2>&1)
+    fail_status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$fail_job_id" 2>&1)
     local fail_status
     fail_status=$(echo "$fail_status_output" | grep "^Status:" | awk '{print $2}')
     
@@ -152,7 +152,7 @@ test_environment_isolation() {
     
     # Run env command
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run env 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run env 2>&1)
     
     # Extract job ID
     local job_id
@@ -169,7 +169,7 @@ test_environment_isolation() {
     
     # Get job logs and count USER variable occurrences
     local env_count
-    env_count=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -c "USER" || echo "0")
+    env_count=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -c "USER" || echo "0")
     
     # Should have minimal environment variables
     if [[ $env_count -gt 10 ]]; then

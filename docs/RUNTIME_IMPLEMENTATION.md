@@ -152,17 +152,17 @@ rnx runtime list
 rnx runtime info openjdk-21
 
 # Run job with runtime
-rnx run --runtime=openjdk-21 java -version
+rnx job run --runtime=openjdk-21 java -version
 
 # Upload and run script with runtime
-rnx run --runtime=openjdk-21 --upload=App.java bash -c "javac App.java && java App"
+rnx job run --runtime=openjdk-21 --upload=App.java bash -c "javac App.java && java App"
 ```
 
 ### ML/Data Science Example (When Available)
 
 ```bash
 # Use Python ML runtime with volumes for data persistence  
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --volume=datasets \
         --upload=analysis.py \
         python analysis.py
@@ -172,7 +172,7 @@ rnx run --runtime=python-3.11-ml \
 
 ```bash
 # Compile and run Java application
-rnx run --runtime=openjdk-21 \
+rnx job run --runtime=openjdk-21 \
         --upload=HelloWorld.java \
         bash -c "javac HelloWorld.java && java HelloWorld"
 ```
@@ -219,7 +219,7 @@ Added `runtime` field to `RunJobReq` message for client-server communication.
 
 ### CLI Commands
 
-Extended `rnx run` command with `--runtime` flag and added `rnx runtime` management commands.
+Extended `rnx job run` command with `--runtime` flag and added `rnx runtime` management commands.
 
 ## Testing
 

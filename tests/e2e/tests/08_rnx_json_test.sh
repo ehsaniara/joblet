@@ -178,7 +178,7 @@ test_rnx_list_json() {
 test_rnx_status_json() {
     # First create a test job to get status for  
     local run_output
-    run_output=$("$RNX_BINARY" --json run --env=TEST_VAR=status_test echo 'status-test-job' 2>&1)
+    run_output=$("$RNX_BINARY" --json job run --env=TEST_VAR=status_test echo 'status-test-job' 2>&1)
     
     if [[ $? -ne 0 ]]; then
         echo "    ${RED}Failed to create test job for status test${NC}"
@@ -238,7 +238,7 @@ test_rnx_status_json() {
 test_rnx_status_enhanced_display() {
     # Test that the enhanced status display contains expected sections
     local run_output
-    run_output=$("$RNX_BINARY" --json run --max-cpu=50 --max-memory=256 --env=TEST_VAR=enhanced --secret-env=SECRET_VAR=hidden echo 'enhanced-status-test' 2>&1)
+    run_output=$("$RNX_BINARY" --json job run --max-cpu=50 --max-memory=256 --env=TEST_VAR=enhanced --secret-env=SECRET_VAR=hidden echo 'enhanced-status-test' 2>&1)
     
     if [[ $? -ne 0 ]]; then
         echo "    ${RED}Failed to create enhanced test job${NC}"
@@ -258,7 +258,7 @@ test_rnx_status_enhanced_display() {
     
     # Test regular (non-JSON) status output for enhanced sections
     local status_output
-    status_output=$("$RNX_BINARY" status "$job_uuid" 2>&1)
+    status_output=$("$RNX_BINARY" job status "$job_uuid" 2>&1)
     
     if [[ $? -eq 0 ]]; then
         # Check for expected sections in the enhanced display
@@ -341,9 +341,9 @@ main() {
     
     test_section "RNX Core Commands with --json"
     run_test "rnx runtime list --json" test_rnx_runtime_list_json
-    run_test "rnx run --json" test_rnx_run_json
-    run_test "rnx list --json" test_rnx_list_json
-    run_test "rnx status --json" test_rnx_status_json
+    run_test "rnx job run --json" test_rnx_run_json
+    run_test "rnx job list --json" test_rnx_list_json
+    run_test "rnx job status --json" test_rnx_status_json
     
     test_section "Enhanced Status Command Tests"
     run_test "Enhanced status display" test_rnx_status_enhanced_display

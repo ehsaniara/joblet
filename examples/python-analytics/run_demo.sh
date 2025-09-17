@@ -22,7 +22,7 @@ echo ""
 echo "🚀 Running analytics demo..."
 
 # Run the simple analytics that works with standard library only
-rnx run --upload=simple_analytics.py \
+rnx job run --upload=simple_analytics.py \
         --upload=sales_data.csv \
         --upload=customers.csv \
         --volume=analytics-data \
@@ -34,6 +34,6 @@ echo ""
 echo "✅ Demo complete! Check the results:"
 echo ""
 echo "📊 View results:"
-echo "  rnx run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json"
-echo "  rnx run --volume=ml-models cat /volumes/ml-models/clustering_results.json"
-echo "  rnx run --volume=analytics-data ls /volumes/analytics-data/processed/"
+echo "  rnx job run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json"
+echo "  rnx job run --volume=ml-models cat /volumes/ml-models/clustering_results.json"
+echo "  rnx job run --volume=analytics-data ls /volumes/analytics-data/processed/"

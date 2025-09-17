@@ -21,7 +21,7 @@ TEST_DATA="test_data_$(date +%s)"
 # Run job on remote host
 run_remote_job() {
     local cmd="$1"
-    local job_output=$("$RNX_BINARY" run sh -c "$cmd" 2>&1)
+    local job_output=$("$RNX_BINARY" job run sh -c "$cmd" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     if [[ -z "$job_id" ]]; then
@@ -69,7 +69,7 @@ test_upload_file() {
     
     echo -e "    ${BLUE}Testing file upload to remote host $REMOTE_HOST${NC}"
     
-    local job_output=$("$RNX_BINARY" run \
+    local job_output=$("$RNX_BINARY" job run \
         --upload="$test_file" \
         sh -c "
 ls -la /work
@@ -102,7 +102,7 @@ fi
 
 test_download_result() {
     # Test downloading results from a job
-    local job_output=$("$RNX_BINARY" run sh -c "
+    local job_output=$("$RNX_BINARY" job run sh -c "
 echo 'DOWNLOAD_TEST_DATA' > /work/output.txt && echo 'FILE_CREATED'
 " 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
@@ -152,7 +152,7 @@ test_volume_mounting() {
     # Test mounting a volume to a job with remote host verification
     echo -e "    ${BLUE}Testing volume mounting on remote host $REMOTE_HOST${NC}"
     
-    local job_output=$("$RNX_BINARY" run \
+    local job_output=$("$RNX_BINARY" job run \
         --volume="$TEST_VOLUME_NAME:/data" \
         sh -c "
 if [ -d '/data' ]; then
@@ -201,7 +201,7 @@ test_volume_persistence() {
     echo -e "    ${BLUE}Testing data persistence isolation on remote host $REMOTE_HOST${NC}"
     
     # First job: write data to /work
-    local job1_output=$("$RNX_BINARY" run sh -c "
+    local job1_output=$("$RNX_BINARY" job run sh -c "
 mkdir -p /work/persist
 echo 'PERSISTENT_DATA' > /work/persist/data.txt
 echo 'DATA_WRITTEN'
@@ -226,7 +226,7 @@ ls -la /work/persist/
     sleep 3
     
     # Second job: try to read data (should NOT persist without volumes - proper isolation)
-    local job2_output=$("$RNX_BINARY" run sh -c "
+    local job2_output=$("$RNX_BINARY" job run sh -c "
 echo 'CHECKING_PERSISTENCE'
 if [ -f '/work/persist/data.txt' ]; then
     echo 'FOUND:'
@@ -279,7 +279,7 @@ test_volume_size_limits() {
     # Test volume size restrictions with remote host verification
     echo -e "    ${BLUE}Testing volume size limits on remote host $REMOTE_HOST${NC}"
     
-    local job_output=$("$RNX_BINARY" run sh -c "
+    local job_output=$("$RNX_BINARY" job run sh -c "
 # Try to write a large file (10MB)
 echo 'CREATING_LARGE_FILE'
 dd if=/dev/zero of=/work/large.txt bs=1M count=10 2>/dev/null

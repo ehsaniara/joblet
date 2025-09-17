@@ -132,7 +132,7 @@ rpc RunJob(RunJobReq) returns (RunJobRes);
 
 ```bash
 # CLI
-rnx run --max-cpu=50 --max-memory=512 python3 script.py
+rnx job run --max-cpu=50 --max-memory=512 python3 script.py
 
 # Expected Response
 Job started:
@@ -167,7 +167,7 @@ rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
 
 ```bash
 # CLI
-rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response
 Id: f47ac10b-58cc-4372-a567-0e02b2c3d479
@@ -211,7 +211,7 @@ rpc StopJob(StopJobReq) returns (StopJobRes);
 
 ```bash
 # CLI
-rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response
 Job stopped successfully:
@@ -241,7 +241,7 @@ rpc ListJobs(EmptyRequest) returns (Jobs);
 
 ```bash
 # CLI
-rnx list
+rnx job list
 
 # Expected Response
 f47ac10b-58cc-4372-a567-0e02b2c3d479 COMPLETED StartTime: 2024-01-15T10:30:00Z Command: echo hello
@@ -280,7 +280,7 @@ rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
 
 ```bash
 # CLI
-rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Expected Response (streaming)
 Logs for job f47ac10b-58cc-4372-a567-0e02b2c3d479 (Press Ctrl+C to exit if streaming):
@@ -445,7 +445,7 @@ Error: failed to create isolated environment: operation not permitted
 Create and start a new job with optional resource limits.
 
 ```bash
-rnx run [flags] <command> [args...]
+rnx job run [flags] <command> [args...]
 
 Flags:
   --max-cpu int      Max CPU percentage (default: from config)
@@ -453,10 +453,10 @@ Flags:
   --max-iobps int    Max I/O bytes per second (default: 0=unlimited)
 
 Examples:
-  rnx run echo "hello world"
-  rnx run --max-cpu=50 python3 script.py
-  rnx run --max-memory=1024 java -jar app.jar
-  rnx run bash -c "sleep 10 && echo done"
+  rnx job run echo "hello world"
+  rnx job run --max-cpu=50 python3 script.py
+  rnx job run --max-memory=1024 java -jar app.jar
+  rnx job run bash -c "sleep 10 && echo done"
 ```
 
 #### status
@@ -464,10 +464,10 @@ Examples:
 Get detailed information about a job by UUID.
 
 ```bash
-rnx status <job-uuid>
+rnx job status <job-uuid>
 
 Example:
-  rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 #### list
@@ -475,10 +475,10 @@ Example:
 List all jobs with their current status.
 
 ```bash
-rnx list
+rnx job list
 
 Example:
-  rnx list
+  rnx job list
 ```
 
 #### stop
@@ -486,10 +486,10 @@ Example:
 Stop a running job gracefully (SIGTERM) or forcefully (SIGKILL).
 
 ```bash
-rnx stop <job-uuid>
+rnx job stop <job-uuid>
 
 Example:
-  rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 #### log
@@ -497,13 +497,13 @@ Example:
 Stream job output in real-time or view historical logs.
 
 ```bash
-rnx log <job-uuid>
+rnx job log <job-uuid>
 
 Streams logs from running or completed jobs. Use Ctrl+C to stop following.
 
 Examples:
-  rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479              # Stream logs
-  rnx log f47ac10b | grep ERROR                             # Filter output
+  rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479              # Stream logs
+  rnx job log f47ac10b | grep ERROR                             # Filter output
 ```
 
 ### Configuration Examples
@@ -526,7 +526,7 @@ export JOBLET_CERT_PATH="./certs/admin-client-cert.pem"
 export JOBLET_KEY_PATH="./certs/admin-client-key.pem"
 export JOBLET_CA_PATH="./certs/ca-cert.pem"
 
-rnx run python3 script.py
+rnx job run python3 script.py
 ```
 
 ## Configuration & Limits
@@ -585,7 +585,7 @@ ERROR - Job failures, system errors, authentication failures
 
 ```bash
 # Check server health
-rnx list
+rnx job list
 
 # Verify certificate and connection
 rnx --server=your-server:50051 list
@@ -597,7 +597,7 @@ sudo journalctl -u joblet -f
 
 ### Performance Monitoring
 
-- **Concurrent Jobs**: Monitor via `rnx list`
+- **Concurrent Jobs**: Monitor via `rnx job list`
 - **Resource Usage**: Check cgroup statistics in `/sys/fs/cgroup/joblet.slice/`
 - **Network**: Monitor gRPC connection count and latency
 - **Memory**: Track job output buffer sizes and cleanup efficiency
@@ -735,13 +735,13 @@ Workflow status commands automatically display job names for better visibility:
 
 ```bash
 # Get workflow status with job names and dependencies
-rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # List workflows
-rnx list --workflow
+rnx job list --workflow
 
 # Execute workflow
-rnx run --workflow=pipeline.yaml
+rnx job run --workflow=pipeline.yaml
 ```
 
 ## Recent Updates

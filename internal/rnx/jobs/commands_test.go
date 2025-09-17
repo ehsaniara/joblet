@@ -119,13 +119,13 @@ func TestStatusCommandHelpExamples(t *testing.T) {
 
 	// Test that specific examples are included
 	expectedExamples := []string{
-		"rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"rnx status f47ac10b",
-		"rnx status --json f47ac10b",
-		"rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef",
-		"rnx status --workflow a1b2c3d4",
-		"rnx status --workflow --detail a1b2c3d4",
-		"rnx status --workflow --json a1b2c3d4",
+		"rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"rnx job status f47ac10b",
+		"rnx job status --json f47ac10b",
+		"rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef",
+		"rnx job status --workflow a1b2c3d4",
+		"rnx job status --workflow --detail a1b2c3d4",
+		"rnx job status --workflow --json a1b2c3d4",
 	}
 
 	for _, example := range expectedExamples {
@@ -308,9 +308,9 @@ func TestLogCommandHelpExamples(t *testing.T) {
 
 	// Test that specific log examples are included
 	expectedExamples := []string{
-		"rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"rnx log f47ac10b",
-		"rnx log a1b2c3d4",
+		"rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"rnx job log f47ac10b",
+		"rnx job log a1b2c3d4",
 	}
 
 	for _, example := range expectedExamples {

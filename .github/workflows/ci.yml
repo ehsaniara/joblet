@@ -199,7 +199,7 @@ jobs:
           export PATH="$PWD/bin:$PATH"
           export RNX_CONFIG="/tmp/joblet/config/rnx-config.yml"
           echo "Testing rnx connectivity..."
-          rnx list 2>&1 || echo "Initial rnx list failed with exit code: $?"
+          rnx job list 2>&1 || echo "Initial rnx job list failed with exit code: $?"
           
           # Check if server is listening
           echo "Checking if server is listening on port 50051..."

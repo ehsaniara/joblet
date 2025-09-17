@@ -16,12 +16,12 @@ Enterprise Java development with the `java:17` runtime environment - instant com
 
 ```bash
 # Run specific Java 17 example using the workflow
-rnx run --workflow=jobs.yaml:hello-joblet      # Compile and run HelloJoblet
-rnx run --workflow=jobs.yaml:optimized-jvm     # Run with JVM optimization
-rnx run --workflow=jobs.yaml:java17-features   # Demonstrate Java 17 features
-rnx run --workflow=jobs.yaml:jar-package       # Package as JAR and run
-rnx run --workflow=jobs.yaml:performance-test  # Performance testing
-rnx run --workflow=jobs.yaml:data-persistence  # Persistent storage example
+rnx job run --workflow=jobs.yaml:hello-joblet      # Compile and run HelloJoblet
+rnx job run --workflow=jobs.yaml:optimized-jvm     # Run with JVM optimization
+rnx job run --workflow=jobs.yaml:java17-features   # Demonstrate Java 17 features
+rnx job run --workflow=jobs.yaml:jar-package       # Package as JAR and run
+rnx job run --workflow=jobs.yaml:performance-test  # Performance testing
+rnx job run --workflow=jobs.yaml:data-persistence  # Persistent storage example
 ```
 
 ### Prerequisites
@@ -49,17 +49,17 @@ sudo /opt/joblet/runtimes/java-17/setup_java_17.sh
 
 ```bash
 # Compile and run the Hello example
-rnx run --runtime=java:17 --upload=HelloJoblet.java \
+rnx job run --runtime=java:17 --upload=HelloJoblet.java \
   bash -c "javac HelloJoblet.java && java HelloJoblet"
 
 # Quick test
-rnx run --runtime=java:17 java -version
+rnx job run --runtime=java:17 java -version
 
 # Interactive Java REPL
-rnx run --runtime=java:17 jshell
+rnx job run --runtime=java:17 jshell
 
 # One-liner Java program
-rnx run --runtime=java:17 bash -c "echo 'public class Test { public static void main(String[] args) { System.out.println(\"Java 17 works!\"); } }' > Test.java && javac Test.java && java Test"
+rnx job run --runtime=java:17 bash -c "echo 'public class Test { public static void main(String[] args) { System.out.println(\"Java 17 works!\"); } }' > Test.java && javac Test.java && java Test"
 ```
 
 ## 📁 Example Files
@@ -83,13 +83,13 @@ public class HelloJoblet {
 
 ```bash
 # Compile a Java source file
-rnx run --runtime=java:17 --upload=MyApp.java javac MyApp.java
+rnx job run --runtime=java:17 --upload=MyApp.java javac MyApp.java
 
 # Run the compiled class
-rnx run --runtime=java:17 java MyApp
+rnx job run --runtime=java:17 java MyApp
 
 # Compile and run in one command
-rnx run --runtime=java:17 --upload=MyApp.java \
+rnx job run --runtime=java:17 --upload=MyApp.java \
   bash -c "javac MyApp.java && java MyApp"
 ```
 
@@ -97,14 +97,14 @@ rnx run --runtime=java:17 --upload=MyApp.java \
 
 ```bash
 # Create a JAR file with manifest
-rnx run --runtime=java:17 --upload-dir=src bash -c "
+rnx job run --runtime=java:17 --upload-dir=src bash -c "
 javac src/*.java && \
 echo 'Main-Class: Main' > manifest.txt && \
 jar cfm app.jar manifest.txt *.class
 "
 
 # Run the JAR file
-rnx run --runtime=java:17 --upload=app.jar java -jar app.jar
+rnx job run --runtime=java:17 --upload=app.jar java -jar app.jar
 ```
 
 ## 🎯 Common Use Cases
@@ -154,7 +154,7 @@ public class EnterpriseApp {
 
 ```bash
 # Start interactive session
-rnx run --runtime=java:17 jshell
+rnx job run --runtime=java:17 jshell
 
 # In JShell, experiment with Java 17 features:
 jshell> var list = List.of(1, 2, 3, 4, 5)
@@ -168,7 +168,7 @@ jshell> System.out.println(person)
 
 ```bash
 # Create and package JAR
-rnx run --runtime=java:17 --volume=java-artifacts bash -c "
+rnx job run --runtime=java:17 --volume=java-artifacts bash -c "
 echo 'public class App { 
     public static void main(String[] args) { 
         System.out.println(\"JAR Application Running!\"); 
@@ -180,7 +180,7 @@ cp app.jar /volumes/java-artifacts/
 "
 
 # Run JAR from volume
-rnx run --runtime=java:17 --volume=java-artifacts \
+rnx job run --runtime=java:17 --volume=java-artifacts \
   java -jar /volumes/java-artifacts/app.jar
 ```
 
@@ -214,11 +214,11 @@ public class SimpleHttpServer {
 
 ```bash
 # Run HTTP server
-rnx run --runtime=java:17 --upload=SimpleHttpServer.java --network=java-api --port=8000:8000 \
+rnx job run --runtime=java:17 --upload=SimpleHttpServer.java --network=java-api --port=8000:8000 \
   bash -c "javac SimpleHttpServer.java && java SimpleHttpServer"
 
 # Test from another job
-rnx run --network=java-api curl http://10.200.0.2:8000
+rnx job run --network=java-api curl http://10.200.0.2:8000
 ```
 
 ## 📦 Volume Persistence
@@ -228,11 +228,11 @@ rnx run --network=java-api curl http://10.200.0.2:8000
 rnx volume create java-builds
 
 # Compile to volume
-rnx run --runtime=java:17 --volume=java-builds --upload=HelloJoblet.java \
+rnx job run --runtime=java:17 --volume=java-builds --upload=HelloJoblet.java \
   bash -c "javac -d /volumes/java-builds HelloJoblet.java"
 
 # Run from volume
-rnx run --runtime=java:17 --volume=java-builds \
+rnx job run --runtime=java:17 --volume=java-builds \
   bash -c "cd /volumes/java-builds && java HelloJoblet"
 ```
 
@@ -249,14 +249,14 @@ rnx run --runtime=java:17 --volume=java-builds \
 
 ```bash
 # Enable debugging
-rnx run --runtime=java:17 --upload=App.java \
+rnx job run --runtime=java:17 --upload=App.java \
   bash -c "javac -g App.java && java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 App"
 
 # JVM diagnostics
-rnx run --runtime=java:17 java -XshowSettings:vm -version
+rnx job run --runtime=java:17 java -XshowSettings:vm -version
 
 # Memory analysis
-rnx run --runtime=java:17 --max-memory=2048 \
+rnx job run --runtime=java:17 --max-memory=2048 \
   java -Xmx1g -XX:+PrintGCDetails -XX:+PrintGCTimeStamps App
 ```
 
@@ -276,7 +276,7 @@ sudo tar -xzf java-17-runtime-complete.tar.gz -C /opt/joblet/runtimes/java/
 
 ```bash
 # Set classpath explicitly
-rnx run --runtime=java:17 --upload-dir=libs \
+rnx job run --runtime=java:17 --upload-dir=libs \
   java -cp "/volumes/libs/*:." MainClass
 ```
 
@@ -284,7 +284,7 @@ rnx run --runtime=java:17 --upload-dir=libs \
 
 ```bash
 # Increase heap size
-rnx run --runtime=java:17 --max-memory=4096 \
+rnx job run --runtime=java:17 --max-memory=4096 \
   java -Xmx3g -Xms1g LargeApp
 ```
 

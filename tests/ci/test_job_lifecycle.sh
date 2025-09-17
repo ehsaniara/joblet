@@ -12,7 +12,7 @@ test_async_job_creation() {
     
     # Start long-running job (all jobs are async by default)
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sleep 30 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 30 2>&1)
     
     # Extract job ID
     local job_id
@@ -27,7 +27,7 @@ test_async_job_creation() {
     echo "✓ Async job created with ID: $job_id"
     
     # Clean up
-    rnx --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+    "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" >/dev/null 2>&1 || true
 }
 
 test_job_status_checking() {
@@ -35,7 +35,7 @@ test_job_status_checking() {
     
     # Start job and extract ID
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sleep 5 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 5 2>&1)
     local job_id
     job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
@@ -46,20 +46,20 @@ test_job_status_checking() {
     
     # Check status immediately (should be RUNNING)
     local status_output
-    status_output=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>&1)
+    status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>&1)
     local status
     status=$(echo "$status_output" | grep "^Status:" | awk '{print $2}')
     
     if [[ "$status" != "RUNNING" && "$status" != "COMPLETED" ]]; then
         echo "Unexpected job status: $status"
-        rnx --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+        "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" >/dev/null 2>&1 || true
         return 1
     fi
     
     echo "✓ Job status check passed: $status"
     
     # Clean up
-    rnx --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+    "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" >/dev/null 2>&1 || true
 }
 
 test_job_stopping() {
@@ -67,7 +67,7 @@ test_job_stopping() {
     
     # Start long-running job
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sleep 60 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 60 2>&1)
     local job_id
     job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
@@ -78,14 +78,14 @@ test_job_stopping() {
     
     # Stop the job
     local stop_result
-    stop_result=$(rnx --config "$RNX_CONFIG" stop "$job_id" 2>&1)
+    stop_result=$("$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" 2>&1)
     
     # Wait a moment for status to update
     sleep 1
     
     # Verify job was stopped
     local status_output
-    status_output=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>&1)
+    status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>&1)
     local final_status
     final_status=$(echo "$status_output" | grep "^Status:" | awk '{print $2}')
     
@@ -102,8 +102,8 @@ test_job_listing() {
     
     # Start a few jobs
     local job_output1 job_output2
-    job_output1=$(rnx --config "$RNX_CONFIG" run sleep 10 2>&1)
-    job_output2=$(rnx --config "$RNX_CONFIG" run sleep 10 2>&1)
+    job_output1=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 10 2>&1)
+    job_output2=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 10 2>&1)
     
     local job1_id job2_id
     job1_id=$(echo "$job_output1" | grep "^ID:" | awk '{print $2}')
@@ -116,7 +116,7 @@ test_job_listing() {
     
     # List jobs
     local job_list
-    job_list=$(rnx --config "$RNX_CONFIG" list 2>&1)
+    job_list=$("$RNX_BINARY" --config "$RNX_CONFIG" job list 2>&1)
     
     # Check that our jobs are in the list
     if [[ "$job_list" != *"$job1_id"* ]] || [[ "$job_list" != *"$job2_id"* ]]; then
@@ -124,16 +124,16 @@ test_job_listing() {
         echo "Looking for: $job1_id and $job2_id"
         echo "Job list:"
         echo "$job_list"
-        rnx --config "$RNX_CONFIG" stop "$job1_id" >/dev/null 2>&1 || true
-        rnx --config "$RNX_CONFIG" stop "$job2_id" >/dev/null 2>&1 || true
+        "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job1_id" >/dev/null 2>&1 || true
+        "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job2_id" >/dev/null 2>&1 || true
         return 1
     fi
     
     echo "✓ Job listing working correctly"
     
     # Clean up
-    rnx --config "$RNX_CONFIG" stop "$job1_id" >/dev/null 2>&1 || true
-    rnx --config "$RNX_CONFIG" stop "$job2_id" >/dev/null 2>&1 || true
+    "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job1_id" >/dev/null 2>&1 || true
+    "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job2_id" >/dev/null 2>&1 || true
 }
 
 test_completed_job_status() {
@@ -141,7 +141,7 @@ test_completed_job_status() {
     
     # Run short job that will complete with specific exit code
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sh -c 'echo "done" && exit 42' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'echo "done" && exit 42' 2>&1)
     local job_id
     job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
@@ -155,7 +155,7 @@ test_completed_job_status() {
     
     # Check final status
     local status_output
-    status_output=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>&1)
+    status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>&1)
     local status
     status=$(echo "$status_output" | grep "^Status:" | awk '{print $2}')
     

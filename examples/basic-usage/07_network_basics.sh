@@ -13,7 +13,7 @@ if ! command -v rnx &> /dev/null; then
     exit 1
 fi
 
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo "❌ Error: Cannot connect to Joblet server"
     exit 1
 fi
@@ -26,7 +26,7 @@ echo "----------------------------------------"
 echo "Understanding the default bridge network configuration"
 
 echo "Default network connectivity test:"
-rnx run bash -c "
+rnx job run bash -c "
 echo 'Testing default bridge network:'
 echo ''
 echo 'Network interfaces:'
@@ -48,7 +48,7 @@ echo "-------------------------------------"
 echo "Testing outbound internet connectivity"
 
 echo "HTTP connectivity test:"
-rnx run bash -c "
+rnx job run bash -c "
 echo 'Testing HTTP connectivity:'
 echo ''
 if command -v curl &> /dev/null; then
@@ -72,7 +72,7 @@ echo "----------------------------------------"
 echo "Demonstrating network isolation with --network=none"
 
 echo "No network access test:"
-rnx run --network=none bash -c "
+rnx job run --network=none bash -c "
 echo 'Testing isolated network (no network access):'
 echo ''
 echo 'Network interfaces in isolated mode:'
@@ -93,7 +93,7 @@ echo "----------------------------"
 echo "Using host network mode (shares host network stack)"
 
 echo "Host network test:"
-rnx run --network=host bash -c "
+rnx job run --network=host bash -c "
 echo 'Testing host network mode:'
 echo ''
 echo 'Network interfaces (should match host):'
@@ -112,7 +112,7 @@ echo "----------------------------------------------"
 echo "Gathering detailed network information"
 
 echo "Comprehensive network diagnostics:"
-rnx run bash -c "
+rnx job run bash -c "
 echo '=== Network Diagnostics ==='
 echo ''
 echo '1. Hostname and system info:'
@@ -150,7 +150,7 @@ echo "-----------------------------------"
 echo "Basic network performance testing"
 
 echo "Network performance test:"
-rnx run bash -c "
+rnx job run bash -c "
 echo 'Network Performance Test:'
 echo ''
 echo 'Testing DNS lookup speed:'
@@ -182,7 +182,7 @@ echo "------------------------------------"
 echo "Understanding network security implications"
 
 echo "Network security demonstration:"
-rnx run bash -c "
+rnx job run bash -c "
 echo 'Network Security Concepts:'
 echo ''
 echo '1. Default network isolation:'
@@ -224,7 +224,7 @@ echo "----------------------------------"
 echo "Understanding custom network capabilities"
 
 echo "Custom network concepts (demonstration only):"
-rnx run bash -c "
+rnx job run bash -c "
 echo 'Custom Network Concepts:'
 echo ''
 echo 'Joblet supports custom networks for advanced use cases:'
@@ -237,7 +237,7 @@ echo '   • Different custom networks are isolated from each other'
 echo ''
 
 echo '2. Using Custom Networks:'
-echo '   rnx run --network=mynet command'
+echo '   rnx job run --network=mynet command'
 echo '   • Job joins the specified custom network'
 echo '   • Gets IP address from network CIDR range'
 echo '   • Can communicate with other jobs on same network'
@@ -265,7 +265,7 @@ echo "----------------------------------"
 echo "Common network troubleshooting techniques"
 
 echo "Network troubleshooting guide:"
-rnx run bash -c "
+rnx job run bash -c "
 echo 'Network Troubleshooting Checklist:'
 echo ''
 echo '1. Basic connectivity test:'

@@ -88,7 +88,7 @@ run_job_with_host_verification() {
 
 # Check if Python runtime has actual binaries or just stubs
 check_python_runtime() {
-    local test_job=$("$RNX_BINARY" run --runtime="$DEFAULT_RUNTIME" python3 --version 2>&1)
+    local test_job=$("$RNX_BINARY" job run --runtime="$DEFAULT_RUNTIME" python3 --version 2>&1)
     if echo "$test_job" | grep -q "stub"; then
         echo "stub"
     else
@@ -115,9 +115,9 @@ run_job_with_network() {
     
     local job_output
     if [[ -n "$network" ]]; then
-        job_output=$("$RNX_BINARY" run --network="$network" --runtime="$runtime" "$command" 2>&1)
+        job_output=$("$RNX_BINARY" job run --network="$network" --runtime="$runtime" "$command" 2>&1)
     else
-        job_output=$("$RNX_BINARY" run --runtime="$runtime" "$command" 2>&1)
+        job_output=$("$RNX_BINARY" job run --runtime="$runtime" "$command" 2>&1)
     fi
     echo "$job_output" | grep "ID:" | awk '{print $2}'
 }
@@ -127,9 +127,9 @@ run_python_network_job() {
     local network="$2"
     
     if [[ -n "$network" ]]; then
-        local job_output=$("$RNX_BINARY" run --network="$network" --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
+        local job_output=$("$RNX_BINARY" job run --network="$network" --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
     else
-        local job_output=$("$RNX_BINARY" run --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
+        local job_output=$("$RNX_BINARY" job run --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
     fi
     echo "$job_output" | grep "ID:" | awk '{print $2}'
 }

@@ -18,12 +18,12 @@ This example demonstrates **two different runtime approaches** for the same ML c
 
 ```bash
 # Run ML analysis examples using the workflow
-rnx run --workflow=jobs.yaml:ml-analysis           # Data analysis with pre-installed ML libs
-rnx run --workflow=jobs.yaml:ml-packaged           # Same analysis with packaged dependencies
-rnx run --workflow=jobs.yaml:feature-engineering   # Feature engineering pipeline
-rnx run --workflow=jobs.yaml:model-training        # Model training and evaluation
-rnx run --workflow=jobs.yaml:visualization         # Data visualization generation
-rnx run --workflow=jobs.yaml:ml-pipeline           # Complete ML pipeline
+rnx job run --workflow=jobs.yaml:ml-analysis           # Data analysis with pre-installed ML libs
+rnx job run --workflow=jobs.yaml:ml-packaged           # Same analysis with packaged dependencies
+rnx job run --workflow=jobs.yaml:feature-engineering   # Feature engineering pipeline
+rnx job run --workflow=jobs.yaml:model-training        # Model training and evaluation
+rnx job run --workflow=jobs.yaml:visualization         # Data visualization generation
+rnx job run --workflow=jobs.yaml:ml-pipeline           # Complete ML pipeline
 ```
 
 ### Option 1: Heavy Runtime (`python-3.11-ml`)
@@ -32,7 +32,7 @@ rnx run --workflow=jobs.yaml:ml-pipeline           # Complete ML pipeline
 cd examples/python-3.11-ml
 
 # No setup needed - ML libs pre-installed on host
-rnx run --runtime=python-3.11-ml python example_data_analysis.py
+rnx job run --runtime=python-3.11-ml python example_data_analysis.py
 ```
 
 ### Option 2: Packaged Dependencies (`python-3.11`)
@@ -44,7 +44,7 @@ cd examples/python-3.11-ml
 ./setup.sh              # Installs all ML dependencies
 
 # Upload entire project including dependencies
-rnx run --runtime=python-3.11 --upload-dir=. python example_data_analysis.py
+rnx job run --runtime=python-3.11 --upload-dir=. python example_data_analysis.py
 ```
 
 ## 📦 Example Included
@@ -89,7 +89,7 @@ Works with **both runtime approaches**:
 cd examples/python-3.11-ml
 
 # No setup needed - run directly
-rnx run --runtime=python-3.11-ml python example_data_analysis.py
+rnx job run --runtime=python-3.11-ml python example_data_analysis.py
 ```
 
 ### For `python-3.11` Runtime (Packaged Dependencies)
@@ -104,7 +104,7 @@ cd examples/python-3.11-ml
 python3 example_data_analysis.py
 
 # 3. Deploy with dependencies
-rnx run --runtime=python:3.11 --upload-dir=. python example_data_analysis.py
+rnx job run --runtime=python:3.11 --upload-dir=. python example_data_analysis.py
 ```
 
 ## 📊 What the Example Does

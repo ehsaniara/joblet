@@ -85,8 +85,8 @@ Move-Item rnx.exe "$env:USERPROFILE\bin\"
 
 ```bash
 # From any client machine with RNX installed:
-rnx list                           # List jobs
-rnx run echo "Hello from Joblet!" # Run a simple job
+rnx job list                           # List jobs
+rnx job run echo "Hello from Joblet!" # Run a simple job
 rnx monitor status                 # Check server metrics
 
 # Web admin UI (macOS with --with-admin):
@@ -99,46 +99,46 @@ rnx admin                          # Launch at http://localhost:5173
 
 ```bash
 # Run pre-configured jobs with workflows
-rnx run --workflow=jobs.yaml:ml-analysis      # Python ML analysis
-rnx run --workflow=jobs.yaml:hello-joblet     # Java application
-rnx run --workflow=ml-pipeline.yaml           # Full ML workflow
+rnx job run --workflow=jobs.yaml:ml-analysis      # Python ML analysis
+rnx job run --workflow=jobs.yaml:hello-joblet     # Java application
+rnx job run --workflow=ml-pipeline.yaml           # Full ML workflow
 
 # Check status
-rnx status <job-uuid>
-rnx status --workflow <workflow-uuid>
+rnx job status <job-uuid>
+rnx job status --workflow <workflow-uuid>
 ```
 
 ### Traditional Commands
 
 ```bash
 # Run commands with isolation
-rnx run echo "Hello World"
-rnx run --max-cpu=50 --max-memory=512 python3 script.py
+rnx job run echo "Hello World"
+rnx job run --max-cpu=50 --max-memory=512 python3 script.py
 
 # Pre-built runtimes
-rnx run --runtime=python-3.11-ml python analysis.py    # 2-3 seconds
-rnx run --runtime=openjdk-21 java App.java
-rnx run --runtime=graalvmjdk-21 java GraalApp.java
+rnx job run --runtime=python-3.11-ml python analysis.py    # 2-3 seconds
+rnx job run --runtime=openjdk-21 java App.java
+rnx job run --runtime=graalvmjdk-21 java GraalApp.java
 
 # Upload files and run
-rnx run --upload=data.csv --upload=script.py python3 script.py
+rnx job run --upload=data.csv --upload=script.py python3 script.py
 
 # Environment variables
-rnx run --env=NODE_ENV=production node app.js
-rnx run --secret-env=API_KEY=secret python app.py
+rnx job run --env=NODE_ENV=production node app.js
+rnx job run --secret-env=API_KEY=secret python app.py
 
 # Network isolation
-rnx run --network=none secure_task.sh           # No network
-rnx run --network=isolated wget https://api.com # External only
-rnx run --network=bridge api_server.py          # Inter-job communication
+rnx job run --network=none secure_task.sh           # No network
+rnx job run --network=isolated wget https://api.com # External only
+rnx job run --network=bridge api_server.py          # Inter-job communication
 
 # Persistent storage
 rnx volume create mydata --size=1GB
-rnx run --volume=mydata python3 process_data.py
+rnx job run --volume=mydata python3 process_data.py
 
 # Job scheduling
-rnx run --schedule="1hour" backup.sh
-rnx run --schedule="2025-12-25T00:00:00" maintenance.py
+rnx job run --schedule="1hour" backup.sh
+rnx job run --schedule="2025-12-25T00:00:00" maintenance.py
 ```
 
 ## 🎨 Web Admin UI

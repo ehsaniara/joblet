@@ -13,7 +13,7 @@ Machine learning pipeline with real ML scripts.
 - **Commands**: `python3` with actual ML processing scripts
 - **Features**: Data prep → Feature selection → Training → Evaluation → Deployment
 - **Scripts**: 5 Python ML scripts with JSON data flow
-- **Test**: `cd examples/workflows/ml-pipeline && rnx run --workflow=ml-pipeline.yaml:data-validation`
+- **Test**: `cd examples/workflows/ml-pipeline && rnx job run --workflow=ml-pipeline.yaml:data-validation`
 
 ### 2. `data-pipeline/`
 
@@ -23,7 +23,7 @@ ETL data processing workflow with file uploads and shared volumes.
 - **Commands**: `python3` scripts, `rm` for cleanup
 - **Features**: File uploads, volume mounting, resource limits
 - **Scripts**: 5 Python ETL scripts with JSON data flow
-- **Test**: `cd examples/workflows/data-pipeline && rnx run --workflow=data-pipeline.yaml:extract-data`
+- **Test**: `cd examples/workflows/data-pipeline && rnx job run --workflow=data-pipeline.yaml:extract-data`
 
 ### 3. `multi-workflow/`
 
@@ -33,7 +33,7 @@ Multiple named workflows in one file.
 - **Commands**: `python3` (with real ML scripts), `tar`, `rsync`
 - **Features**: Named workflow selection, ML training + deployment workflows
 - **Scripts**: Same 5 ML scripts as ml-pipeline
-- **Test**: `cd examples/workflows/multi-workflow && rnx run --workflow=multi-workflow.yaml:data-prep`
+- **Test**: `cd examples/workflows/multi-workflow && rnx job run --workflow=multi-workflow.yaml:data-prep`
 
 ### 4. `parallel-jobs/`
 
@@ -43,7 +43,7 @@ Parallel batch processing without dependencies.
 - **Commands**: `python3` with batch processing scripts
 - **Features**: Independent parallel jobs, different processing times
 - **Scripts**: 3 batch processing scripts with simulated work
-- **Test**: `cd examples/workflows/parallel-jobs && rnx run --workflow=parallel-jobs.yaml:batch1`
+- **Test**: `cd examples/workflows/parallel-jobs && rnx job run --workflow=parallel-jobs.yaml:batch1`
 
 ### 5. `basic-usage/`
 
@@ -53,7 +53,7 @@ Simple workflow examples demonstrating basic functionality.
 - **Commands**: `echo`, `python3`, `nginx`, `bash`
 - **Features**: Hello world, analytics, webserver, backup jobs
 - **Scripts**: Python analytics script with sample data
-- **Test**: `cd examples/workflows/basic-usage && rnx run --workflow=basic-jobs.yaml:hello`
+- **Test**: `cd examples/workflows/basic-usage && rnx job run --workflow=basic-jobs.yaml:hello`
 
 ### 6. `tests/` - Job Names Feature Testing 🧪
 
@@ -66,7 +66,7 @@ Test workflows specifically for validating job names functionality and workflow 
     - `test-simple-workflow.yaml` - 2-job workflow for basic job names testing
     - `test-workflow-names.yaml` - 4-job workflow for comprehensive job names testing
     - `demo-workflow.yaml` - Basic 3-step sequential workflow
-- **Test**: `cd examples/workflows/tests && rnx run --workflow=test-workflow-names.yaml`
+- **Test**: `cd examples/workflows/tests && rnx job run --workflow=test-workflow-names.yaml`
 - **Purpose**: Validate that workflow jobs display proper job IDs vs job names in CLI
 
 ### 7. `java-microservices/`
@@ -77,7 +77,7 @@ Java-based microservices architecture examples.
 - **Commands**: `java` with various JVM configurations
 - **Features**: API gateway, user service, payment processing, database migration
 - **Scripts**: JAR files for Spring Boot microservices
-- **Test**: `cd examples/workflows/java-microservices && rnx run --workflow=java-services.yaml:api-gateway`
+- **Test**: `cd examples/workflows/java-microservices && rnx job run --workflow=java-services.yaml:api-gateway`
 
 ### 7. `etl-processing/`
 
@@ -87,7 +87,7 @@ Advanced ETL pipeline with job dependencies.
 - **Commands**: `python3`, `bash`, `rsync`, `pg_dump`
 - **Features**: ETL → validation → compression → reporting workflow
 - **Scripts**: ETL processing scripts with dependency chain
-- **Test**: `cd examples/workflows/etl-processing && rnx run --workflow=etl-pipeline.yaml:etl`
+- **Test**: `cd examples/workflows/etl-processing && rnx job run --workflow=etl-pipeline.yaml:etl`
 
 ### 8. `verification/`
 
@@ -96,7 +96,7 @@ Negative test cases for workflow validation.
 - **Location**: `examples/workflows/verification/`
 - **Purpose**: Test error scenarios (missing volumes, circular dependencies, etc.)
 - **Features**: Validation testing, error handling demonstrations
-- **Test**: `cd examples/workflows/verification && rnx run --workflow=test-missing-volume.yaml` (should fail)
+- **Test**: `cd examples/workflows/verification && rnx job run --workflow=test-missing-volume.yaml` (should fail)
 
 ## Realistic Joblet Features Used
 
@@ -130,23 +130,23 @@ All examples use only confirmed Joblet capabilities:
 
 ```bash
 cd examples/workflows/ml-pipeline
-rnx run --workflow=ml-pipeline.yaml:data-validation
+rnx job run --workflow=ml-pipeline.yaml:data-validation
 ```
 
 **Workflow Orchestration**: ✅ **Fully Working** (NEW - Consolidated Commands)
 
 ```bash
 cd examples/workflows/ml-pipeline  
-rnx run --workflow=ml-pipeline.yaml     # ✅ Unified workflow execution
-rnx status <workflow-id>                # ✅ Unified status checking
+rnx job run --workflow=ml-pipeline.yaml     # ✅ Unified workflow execution
+rnx job status <workflow-id>                # ✅ Unified status checking
 ```
 
 **Current Commands**:
 
 ```bash
-rnx run --workflow=ml-pipeline.yaml     # Run a workflow from YAML file
-rnx status <id>                         # Check workflow or job status
-rnx list --workflow                     # List all workflows
+rnx job run --workflow=ml-pipeline.yaml     # Run a workflow from YAML file
+rnx job status <id>                         # Check workflow or job status
+rnx job list --workflow                     # List all workflows
 ```
 
 ## Native Job Execution
@@ -163,7 +163,7 @@ You can run individual jobs from any workflow template:
 
 ```bash
 # Run specific job from workflow
-rnx run --workflow=examples/workflows/ml-pipeline.yaml:data-validation
+rnx job run --workflow=examples/workflows/ml-pipeline.yaml:data-validation
 ```
 
 ## Workflow File Format

@@ -16,7 +16,7 @@ fi
 
 # Test connection to Joblet server
 echo "🔗 Testing connection to Joblet server..."
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo "❌ Error: Cannot connect to Joblet server"
     echo "Please ensure Joblet daemon is running and RNX is configured"
     exit 1
@@ -69,13 +69,13 @@ echo "Running LLM inference with caching and metrics..."
 
 # Check Python AI environment
 echo "🔍 Checking Python AI environment..."
-if ! rnx run --max-memory=512 python3 -c "import numpy, json, hashlib; print('✅ Basic Python packages available')"; then
+if ! rnx job run --max-memory=512 python3 -c "import numpy, json, hashlib; print('✅ Basic Python packages available')"; then
     echo "❌ Error: Basic Python packages not available in Joblet environment"
     echo "Please ensure Python 3.8+ with standard library is available"
     exit 1
 fi
 
-if ! rnx run --upload=llm_inference.py \
+if ! rnx job run --upload=llm_inference.py \
        --volume=ai-cache \
        --volume=ai-outputs \
        --volume=ai-metrics \
@@ -94,7 +94,7 @@ fi
 echo ""
 echo "🤖 Demo 2: Multi-Agent Coordination System"  
 echo "Running coordinated multi-agent workflow..."
-if ! rnx run --upload=multi_agent_system.py \
+if ! rnx job run --upload=multi_agent_system.py \
        --volume=ai-outputs \
        --volume=ai-metrics \
        --max-memory=4096 \
@@ -112,7 +112,7 @@ fi
 echo ""
 echo "🔍 Demo 3: RAG (Retrieval-Augmented Generation) System"
 echo "Running semantic search with vector database..."
-if ! rnx run --upload=rag_system.py \
+if ! rnx job run --upload=rag_system.py \
        --volume=ai-cache \
        --volume=ai-outputs \
        --volume=ai-metrics \
@@ -130,7 +130,7 @@ fi
 echo ""
 echo "⚡ Demo 4: Distributed AI Training Simulation"
 echo "Simulating distributed model training workflow..."
-rnx run --upload=distributed_training.py \
+rnx job run --upload=distributed_training.py \
        --volume=ai-models \
        --volume=ai-metrics \
        --max-memory=6144 \
@@ -148,7 +148,7 @@ echo "Running end-to-end AI pipeline with multiple stages..."
 
 # Stage 1: Data Preparation
 echo "Stage 1: Data Preparation"
-rnx run --volume=ai-outputs \
+rnx job run --volume=ai-outputs \
        python3 -c "
 import json
 import os
@@ -179,7 +179,7 @@ print('Training data prepared and saved')
 
 # Stage 2: Model Training
 echo "Stage 2: Model Training"
-rnx run --volume=ai-outputs \
+rnx job run --volume=ai-outputs \
        --volume=ai-models \
        --max-memory=2048 \
        python3 -c "
@@ -217,7 +217,7 @@ print(f'Validation Accuracy: {model_info[\"validation_accuracy\"]:.2%}')
 
 # Stage 3: Model Evaluation
 echo "Stage 3: Model Evaluation"
-rnx run --volume=ai-outputs \
+rnx job run --volume=ai-outputs \
        --volume=ai-models \
        --volume=ai-metrics \
        python3 -c "
@@ -260,20 +260,20 @@ sleep 10
 
 # Stop distributed training if still running
 echo "Checking distributed training status..."
-rnx stop $TRAINING_JOB_ID || echo "Training job may have already completed"
+rnx job stop $TRAINING_JOB_ID || echo "Training job may have already completed"
 
 echo ""
 echo "✅ Agentic AI Demo Complete!"
 echo ""
 echo "📋 Check results:"
-echo "  rnx run --volume=ai-outputs ls -la /volumes/ai-outputs/"
-echo "  rnx run --volume=ai-metrics ls -la /volumes/ai-metrics/" 
-echo "  rnx run --volume=ai-models ls -la /volumes/ai-models/"
+echo "  rnx job run --volume=ai-outputs ls -la /volumes/ai-outputs/"
+echo "  rnx job run --volume=ai-metrics ls -la /volumes/ai-metrics/" 
+echo "  rnx job run --volume=ai-models ls -la /volumes/ai-models/"
 echo ""
 echo "📊 View demo results:"
-echo "  rnx run --volume=ai-outputs find /volumes/ai-outputs -name '*.json' -exec basename {} \;"
-echo "  rnx run --volume=ai-metrics cat /volumes/ai-metrics/rag_metrics_*.json | head -20"
+echo "  rnx job run --volume=ai-outputs find /volumes/ai-outputs -name '*.json' -exec basename {} \;"
+echo "  rnx job run --volume=ai-metrics cat /volumes/ai-metrics/rag_metrics_*.json | head -20"
 echo ""
 echo "🔍 Inspect specific outputs:"
-echo "  rnx run --volume=ai-outputs cat /volumes/ai-outputs/inference_results_*.json"
-echo "  rnx run --volume=ai-outputs cat /volumes/ai-outputs/workflow_results_*.json"
+echo "  rnx job run --volume=ai-outputs cat /volumes/ai-outputs/inference_results_*.json"
+echo "  rnx job run --volume=ai-outputs cat /volumes/ai-outputs/workflow_results_*.json"

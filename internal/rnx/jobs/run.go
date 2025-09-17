@@ -29,68 +29,68 @@ func NewRunCmd() *cobra.Command {
 
 Examples:
   # Immediate execution with Default network (bridge)
-  rnx run nginx
-  rnx run python3 script.py
-  rnx run bash -c "curl https://example.com"
-  rnx --node=srv1 run ps aux
+  rnx job run nginx
+  rnx job run python3 script.py
+  rnx job run bash -c "curl https://example.com"
+  rnx --node=srv1 job run ps aux
   
   # No network
-  rnx run --network=none python3 process_local.py
+  rnx job run --network=none python3 process_local.py
   
   # Isolated network (external only)
-  rnx run --network=isolated wget https://example.com
+  rnx job run --network=isolated wget https://example.com
   
   # Custom network with automatic hostname (job_<jobid>)
-  rnx run --network=backend python3 api.py
-  rnx run --network=backend postgres
+  rnx job run --network=backend python3 api.py
+  rnx job run --network=backend postgres
   
   # With other flags
-  rnx run --network=frontend --max-cpu=50 --max-memory=512 node app.js
+  rnx job run --network=frontend --max-cpu=50 --max-memory=512 node app.js
 
   # Using YAML workflow for single job
-  rnx run --workflow=jobs.yaml:analytics
-  rnx run --workflow=deploy.yaml:production --args="v1.2.3"
+  rnx job run --workflow=jobs.yaml:analytics
+  rnx job run --workflow=deploy.yaml:production --args="v1.2.3"
   
   # Using YAML workflow for multi-job workflow (runs all jobs with dependencies)
-  rnx run --workflow=ml-pipeline.yaml
-  rnx run --workflow=workflow.yaml
+  rnx job run --workflow=ml-pipeline.yaml
+  rnx job run --workflow=workflow.yaml
 
   # Scheduled execution
-  rnx run --schedule="1hour" python3 script.py
-  rnx run --schedule="30min" echo "Hello World"
-  rnx run --schedule="2025-07-18T20:02:48" backup_script.sh
-  rnx run --schedule="2h30m" --max-memory=512 data_processing.py
+  rnx job run --schedule="1hour" python3 script.py
+  rnx job run --schedule="30min" echo "Hello World"
+  rnx job run --schedule="2025-07-18T20:02:48" backup_script.sh
+  rnx job run --schedule="2h30m" --max-memory=512 data_processing.py
 
 File Upload Examples:
   # Uploads work with both immediate and scheduled jobs
-  rnx run --upload=script.py python3 script.py
-  rnx run --schedule="1hour" --upload-dir=. python3 main.py
-  rnx run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
+  rnx job run --upload=script.py python3 script.py
+  rnx job run --schedule="1hour" --upload-dir=. python3 main.py
+  rnx job run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
 
 Volume Examples:
   # Use persistent volumes to share data between jobs
-  rnx run --volume=backend --upload=App1.jar java -jar App1.jar
-  rnx run --volume=backend --upload=App2.jar java -jar App2.jar
-  rnx run --volume=cache --volume=data python3 process.py
+  rnx job run --volume=backend --upload=App1.jar java -jar App1.jar
+  rnx job run --volume=backend --upload=App2.jar java -jar App2.jar
+  rnx job run --volume=cache --volume=data python3 process.py
 
 Runtime Examples:
   # Use pre-built runtime environments for fast job startup
-  rnx run --runtime=python-3.11-ml --upload=script.py python script.py
-  rnx run --runtime=openjdk-21 java -jar myapp.jar
-  rnx run --runtime=python-3.11-ml python train_model.py
-  rnx run --runtime=graalvmjdk-21 --upload=App.java java App.java
+  rnx job run --runtime=python-3.11-ml --upload=script.py python script.py
+  rnx job run --runtime=openjdk-21 java -jar myapp.jar
+  rnx job run --runtime=python-3.11-ml python train_model.py
+  rnx job run --runtime=graalvmjdk-21 --upload=App.java java App.java
 
 Environment Variable Examples:
   # Pass regular environment variables (visible in logs)
-  rnx run --env=NODE_ENV=production --env=PORT=8080 node app.js
-  rnx run -e DEBUG=true python app.py
+  rnx job run --env=NODE_ENV=production --env=PORT=8080 node app.js
+  rnx job run -e DEBUG=true python app.py
   
   # Pass secret environment variables (hidden from logs)
-  rnx run --secret-env=API_KEY=secret123 --secret-env=DB_PASSWORD=pass123 python app.py
-  rnx run -s JWT_SECRET=mysecret node server.js
+  rnx job run --secret-env=API_KEY=secret123 --secret-env=DB_PASSWORD=pass123 python app.py
+  rnx job run -s JWT_SECRET=mysecret node server.js
   
   # Combine different types
-  rnx run --env=NODE_ENV=prod --secret-env=API_KEY=secret node app.js
+  rnx job run --env=NODE_ENV=prod --secret-env=API_KEY=secret node app.js
 
 Scheduling Formats:
   # Relative time
@@ -880,7 +880,7 @@ func executeWorkflowViaService(workflowPath string, workflowName string) error {
 	}
 
 	fmt.Printf("Workflow created with UUID: %s\n", createRes.WorkflowUuid)
-	fmt.Printf("Use 'rnx status --workflow %s' to monitor progress\n", createRes.WorkflowUuid)
+	fmt.Printf("Use 'rnx job status --workflow %s' to monitor progress\n", createRes.WorkflowUuid)
 
 	return nil
 }

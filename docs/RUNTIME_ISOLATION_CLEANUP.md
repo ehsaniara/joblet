@@ -215,21 +215,21 @@ mounts:
 1. **Runtime Isolation Test:**
    ```bash
    # Test that production job cannot access host filesystem
-   rnx run --runtime=java:21 find /usr -name "*.so" | head -10
+   rnx job run --runtime=java:21 find /usr -name "*.so" | head -10
    # Should only see isolated runtime files, not host libraries
    ```
 
 2. **Path Traversal Test:**
    ```bash
    # Test that runtime mounts cannot escape isolation
-   rnx run --runtime=java:21 ls -la /usr/../../../
+   rnx job run --runtime=java:21 ls -la /usr/../../../
    # Should be contained within runtime isolation
    ```
 
 3. **File Integrity Test:**
    ```bash
    # Verify runtime files are functional copies
-   rnx run --runtime=java:21 java -version
+   rnx job run --runtime=java:21 java -version
    # Should work correctly with isolated Java installation
    ```
 

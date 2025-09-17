@@ -130,7 +130,7 @@ sudo systemctl restart joblet
 scp /opt/joblet/config/rnx-config.yml client:~/.rnx/
 
 # 4. Verify new certificates
-rnx list  # Should work with new certs
+rnx job list  # Should work with new certs
 ```
 
 ### TLS Configuration
@@ -177,30 +177,30 @@ Joblet uses certificate Organization Unit (OU) for roles:
 
 ```bash
 # Full access operations
-rnx run echo "Admin can run jobs"
-rnx stop <job-id>
+rnx job run echo "Admin can run jobs"
+rnx job stop <job-id>
 rnx volume create admin-vol --size=1GB
 rnx network create admin-net --cidr=10.1.0.0/24
 
 # All monitoring operations
 rnx monitor
-rnx list
-rnx status <job-id>
-rnx log <job-id>
+rnx job list
+rnx job status <job-id>
+rnx job log <job-id>
 ```
 
 ### Viewer Role (OU=viewer)
 
 ```bash
 # Read-only operations (allowed)
-rnx list
-rnx status <job-id>
-rnx log <job-id>
+rnx job list
+rnx job status <job-id>
+rnx job log <job-id>
 rnx monitor status
 
 # Write operations (denied)
-rnx run echo "test"          # ERROR: Permission denied
-rnx stop <job-id>            # ERROR: Permission denied
+rnx job run echo "test"          # ERROR: Permission denied
+rnx job stop <job-id>            # ERROR: Permission denied
 rnx volume create test       # ERROR: Permission denied
 ```
 
@@ -263,8 +263,8 @@ Joblet implements automatic isolation based on which API service initiates jobs:
 
 ```bash
 # Production Jobs (JobService API) - Minimal Chroot
-rnx run echo "Hello World"           # Uses minimal chroot isolation
-rnx run --runtime=java:21 java App  # Secure runtime mounting
+rnx job run echo "Hello World"           # Uses minimal chroot isolation
+rnx job run --runtime=java:21 java App  # Secure runtime mounting
 
 # Runtime Build Jobs (RuntimeService API) - Builder Chroot  
 rnx runtime install java:21         # Uses builder chroot with host OS access
@@ -291,9 +291,9 @@ Minimal Chroot          Builder Chroot
 
 ```bash
 # Minimal filesystem access
-rnx run ls /                    # Limited directories
-rnx run which apt              # Command not found
-rnx run ls /opt/joblet         # No access to joblet internals
+rnx job run ls /                    # Limited directories
+rnx job run which apt              # Command not found
+rnx job run ls /opt/joblet         # No access to joblet internals
 ```
 
 #### Runtime Builds (Builder Chroot)
@@ -312,22 +312,22 @@ Both job types use identical namespace isolation:
 
 ```bash
 # PID namespace - process isolation
-rnx run ps aux  # Only sees job processes
+rnx job run ps aux  # Only sees job processes
 
 # Mount namespace - filesystem isolation
-rnx run mount  # Shows only job-specific mounts
+rnx job run mount  # Shows only job-specific mounts
 
 # Network namespace - network isolation
-rnx run ip addr show  # Shows only job network interface
+rnx job run ip addr show  # Shows only job network interface
 
 # IPC namespace - inter-process communication isolation
-rnx run ipcs  # No shared memory/semaphores from host
+rnx job run ipcs  # No shared memory/semaphores from host
 
 # UTS namespace - hostname isolation
-rnx run hostname  # Job-specific hostname
+rnx job run hostname  # Job-specific hostname
 
 # Cgroup namespace - resource visibility
-rnx run cat /proc/cgroups  # Limited cgroup view
+rnx job run cat /proc/cgroups  # Limited cgroup view
 ```
 
 ### Runtime Isolation Security
@@ -344,7 +344,7 @@ Joblet prevents host filesystem exposure through runtime cleanup:
 # - source: "isolated/usr/lib/jvm/java-21-openjdk-amd64"  # ISOLATED COPY
 
 # Production jobs using runtimes are completely isolated
-rnx run --runtime=java:21 find /usr -type f | head -5
+rnx job run --runtime=java:21 find /usr -type f | head -5
 # Only shows isolated runtime files, not host OS files
 ```
 
@@ -364,28 +364,28 @@ rnx run --runtime=java:21 find /usr -type f | head -5
 
 ```bash
 # Jobs run as unprivileged user
-rnx run id
+rnx job run id
 # Output: uid=65534(nobody) gid=65534(nogroup)
 
 # No sudo/setuid capabilities
-rnx run sudo echo "test"  # Command not found
+rnx job run sudo echo "test"  # Command not found
 
 # Limited filesystem access
-rnx run ls /root  # Permission denied
-rnx run ls /etc/shadow  # Permission denied
+rnx job run ls /root  # Permission denied
+rnx job run ls /etc/shadow  # Permission denied
 ```
 
 ### Resource Limits (Security)
 
 ```bash
 # Prevent fork bombs
-rnx run --max-cpu=100 :(){ :|:& };:  # Limited by CPU quota
+rnx job run --max-cpu=100 :(){ :|:& };:  # Limited by CPU quota
 
 # Prevent memory exhaustion
-rnx run --max-memory=512 bash -c 'a=(); while true; do a+=($a); done'  # Killed by OOM
+rnx job run --max-memory=512 bash -c 'a=(); while true; do a+=($a); done'  # Killed by OOM
 
 # Prevent I/O attacks
-rnx run --max-iobps=1048576 dd if=/dev/zero of=/work/attack bs=1M  # Limited bandwidth
+rnx job run --max-iobps=1048576 dd if=/dev/zero of=/work/attack bs=1M  # Limited bandwidth
 ```
 
 ## Network Security
@@ -399,23 +399,23 @@ rnx network create internal --cidr=10.2.0.0/24      # Internal services
 rnx network create secure --cidr=10.3.0.0/24        # Sensitive data
 
 # Jobs in different networks cannot communicate
-rnx run --network=dmz ping 10.2.0.1        # Will fail
-rnx run --network=internal ping 10.3.0.1   # Will fail
+rnx job run --network=dmz ping 10.2.0.1        # Will fail
+rnx job run --network=internal ping 10.3.0.1   # Will fail
 ```
 
 ### Zero-Trust Network Model
 
 ```bash
 # No network access for sensitive processing
-rnx run --network=none --volume=sensitive-data \
+rnx job run --network=none --volume=sensitive-data \
   python process_classified.py
 
 # Limited network access
-rnx run --network=internal --volume=app-data \
+rnx job run --network=internal --volume=app-data \
   python internal_service.py
 
 # Full internet access (carefully controlled)
-rnx run --network=bridge \
+rnx job run --network=bridge \
   curl https://api.trusted-service.com
 ```
 
@@ -423,11 +423,11 @@ rnx run --network=bridge \
 
 ```bash
 # Limit bandwidth to prevent data exfiltration
-rnx run --max-iobps=1048576 --network=bridge \
+rnx job run --max-iobps=1048576 --network=bridge \
   curl https://malicious-site.com  # Limited to 1MB/s
 
 # Monitor network usage
-rnx run --network=monitored iftop
+rnx job run --network=monitored iftop
 ```
 
 ## Data Security
@@ -439,14 +439,14 @@ rnx run --network=monitored iftop
 rnx volume create encrypted-data --size=10GB
 
 # 2. Encrypt data before storage
-rnx run --volume=encrypted-data bash -c '
+rnx job run --volume=encrypted-data bash -c '
   echo "sensitive information" | \
   openssl enc -aes-256-cbc -k "$ENCRYPTION_KEY" \
   > /volumes/encrypted-data/secret.enc
 '
 
 # 3. Decrypt only when needed
-rnx run --volume=encrypted-data --env=ENCRYPTION_KEY=xxx bash -c '
+rnx job run --volume=encrypted-data --env=ENCRYPTION_KEY=xxx bash -c '
   openssl enc -aes-256-cbc -d -k "$ENCRYPTION_KEY" \
   < /volumes/encrypted-data/secret.enc
 '
@@ -456,19 +456,19 @@ rnx run --volume=encrypted-data --env=ENCRYPTION_KEY=xxx bash -c '
 
 ```bash
 # Avoid embedding secrets in commands (BAD)
-rnx run curl -H "Authorization: Bearer secret123" api.com
+rnx job run curl -H "Authorization: Bearer secret123" api.com
 
 # Use environment variables (BETTER)
-rnx run --env=API_TOKEN=secret123 \
+rnx job run --env=API_TOKEN=secret123 \
   curl -H "Authorization: Bearer \$API_TOKEN" api.com
 
 # Use volume-based secrets (BEST)
-echo "secret123" | rnx run --volume=secrets bash -c '
+echo "secret123" | rnx job run --volume=secrets bash -c '
   cat > /volumes/secrets/api-token
   chmod 600 /volumes/secrets/api-token
 '
 
-rnx run --volume=secrets bash -c '
+rnx job run --volume=secrets bash -c '
   API_TOKEN=$(cat /volumes/secrets/api-token)
   curl -H "Authorization: Bearer $API_TOKEN" api.com
 '
@@ -478,19 +478,19 @@ rnx run --volume=secrets bash -c '
 
 ```bash
 # Public data - no restrictions
-rnx run --network=bridge --volume=public-data \
+rnx job run --network=bridge --volume=public-data \
   wget https://public-dataset.com/data.csv
 
 # Internal data - network restrictions
-rnx run --network=internal --volume=internal-data \
+rnx job run --network=internal --volume=internal-data \
   python process_internal.py
 
 # Confidential data - maximum isolation
-rnx run --network=none --volume=confidential-data \
+rnx job run --network=none --volume=confidential-data \
   python process_confidential.py
 
 # Secret data - encrypted storage
-rnx run --network=none --volume=encrypted-secrets \
+rnx job run --network=none --volume=encrypted-secrets \
   --env=DECRYPT_KEY=xxx \
   python process_secrets.py
 ```
@@ -638,7 +638,7 @@ if [ $FAILED_AUTH -gt 10 ]; then
 fi
 
 # Check for unusual job patterns
-RUNNING_JOBS=$(rnx list --json | jq '[.[] | select(.status == "RUNNING")] | length')
+RUNNING_JOBS=$(rnx job list --json | jq '[.[] | select(.status == "RUNNING")] | length')
 if [ $RUNNING_JOBS -gt 50 ]; then
   echo "ALERT: Unusual number of running jobs: $RUNNING_JOBS"
 fi
@@ -688,7 +688,7 @@ rnx volume create phi-data --size=100GB --type=filesystem
 # (Already provided by audit logging)
 
 # 4. Data minimization
-rnx run --network=none --volume=phi-data \
+rnx job run --network=none --volume=phi-data \
   python anonymize_phi.py
 
 # 5. Secure disposal
@@ -702,7 +702,7 @@ rnx volume remove phi-data  # Secure deletion
 rnx network create pci-zone --cidr=10.100.0.0/24
 
 # Restricted processing environment
-rnx run \
+rnx job run \
   --network=pci-zone \
   --volume=pci-secure \
   --max-memory=2048 \
@@ -725,12 +725,12 @@ if grep -q "setuid\|sudo\|su " /var/log/joblet/audit.log; then
 fi
 
 # Detect network scanning
-if rnx list --json | jq '.[] | select(.command | contains("nmap"))' | grep -q .; then
+if rnx job list --json | jq '.[] | select(.command | contains("nmap"))' | grep -q .; then
   echo "THREAT: Network scanning detected"
 fi
 
 # Detect data exfiltration patterns
-if rnx list --json | jq '.[] | select(.command | contains("curl") and .max_iobps == 0)' | grep -q .; then
+if rnx job list --json | jq '.[] | select(.command | contains("curl") and .max_iobps == 0)' | grep -q .; then
   echo "THREAT: Potential data exfiltration (unlimited bandwidth)"
 fi
 EOF
@@ -741,7 +741,7 @@ EOF
 ```bash
 # 1. Immediate response
 # Stop suspicious jobs
-rnx list --json | jq -r '.[] | select(.status == "RUNNING" and (.command | contains("suspicious"))) | .id' | xargs rnx stop
+rnx job list --json | jq -r '.[] | select(.status == "RUNNING" and (.command | contains("suspicious"))) | .id' | xargs rnx job stop
 
 # 2. Isolate affected networks
 rnx network delete compromised-network

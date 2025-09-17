@@ -418,7 +418,7 @@ npm --version
 
 ```bash
 # Verify server connectivity
-rnx list
+rnx job list
 
 # Check configuration
 cat ~/.rnx/rnx-config.yml

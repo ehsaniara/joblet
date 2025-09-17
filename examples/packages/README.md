@@ -163,24 +163,24 @@ rnx runtime test java:21
 rnx runtime test python-3.11-ml
 
 # Run test commands
-rnx run --runtime=java:17 java -version
-rnx run --runtime=java:21 java -version
-rnx run --runtime=python-3.11-ml python --version
+rnx job run --runtime=java:17 java -version
+rnx job run --runtime=java:21 java -version
+rnx job run --runtime=python-3.11-ml python --version
 ```
 
 ### Test Runtime Functionality
 
 ```bash
 # Java 17 - Compile and run
-rnx run --runtime=java:17 bash -c "echo 'public class Test { public static void main(String[] args) { System.out.println(\"Java 17 works!\"); } }' > Test.java && javac Test.java && java Test"
+rnx job run --runtime=java:17 bash -c "echo 'public class Test { public static void main(String[] args) { System.out.println(\"Java 17 works!\"); } }' > Test.java && javac Test.java && java Test"
 
 # Java 21 - Test Virtual Threads
-rnx run --runtime=java:21 jshell -s - << 'EOF'
+rnx job run --runtime=java:21 jshell -s - << 'EOF'
 Thread.startVirtualThread(() -> System.out.println("Virtual Thread works!")).join();
 EOF
 
 # Python ML - Test packages
-rnx run --runtime=python-3.11-ml python -c "import numpy as np; import pandas as pd; print(f'NumPy {np.__version__}, Pandas {pd.__version__}')"
+rnx job run --runtime=python-3.11-ml python -c "import numpy as np; import pandas as pd; print(f'NumPy {np.__version__}, Pandas {pd.__version__}')"
 ```
 
 ## 📊 Performance Comparison

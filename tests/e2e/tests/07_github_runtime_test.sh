@@ -161,12 +161,12 @@ test_runtime_execution_after_github_install() {
     
     if [[ $? -eq 0 ]] && runtime_exists "$JAVA_RUNTIME"; then
         # Test Java execution
-        local job_output=$("$RNX_BINARY" run --runtime="$JAVA_RUNTIME" java -version 2>&1)
+        local job_output=$("$RNX_BINARY" job run --runtime="$JAVA_RUNTIME" java -version 2>&1)
         local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
         
         if [[ -n "$job_id" ]]; then
             sleep 3
-            local logs=$("$RNX_BINARY" log "$job_id" 2>/dev/null)
+            local logs=$("$RNX_BINARY" job log "$job_id" 2>/dev/null)
             
             if echo "$logs" | grep -q "openjdk\|java\|OpenJDK"; then
                 echo -e "    ${GREEN}✓ Runtime execution successful after GitHub install${NC}"

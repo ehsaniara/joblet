@@ -22,12 +22,12 @@ cutting-edge Java features.
 
 ```bash
 # Run specific Java 21 example using the workflow
-rnx run --workflow=jobs.yaml:virtual-threads      # Virtual threads demo
-rnx run --workflow=jobs.yaml:java21-features      # Java 21 language features
-rnx run --workflow=jobs.yaml:virtual-server       # HTTP server with virtual threads
-rnx run --workflow=jobs.yaml:thread-comparison    # Platform vs Virtual threads comparison
-rnx run --workflow=jobs.yaml:structured-concurrency  # Structured concurrency patterns
-rnx run --workflow=jobs.yaml:graalvm-ready        # GraalVM-optimized application
+rnx job run --workflow=jobs.yaml:virtual-threads      # Virtual threads demo
+rnx job run --workflow=jobs.yaml:java21-features      # Java 21 language features
+rnx job run --workflow=jobs.yaml:virtual-server       # HTTP server with virtual threads
+rnx job run --workflow=jobs.yaml:thread-comparison    # Platform vs Virtual threads comparison
+rnx job run --workflow=jobs.yaml:structured-concurrency  # Structured concurrency patterns
+rnx job run --workflow=jobs.yaml:graalvm-ready        # GraalVM-optimized application
 ```
 
 ### Prerequisites
@@ -55,17 +55,17 @@ sudo /opt/joblet/runtimes/java-21/setup_java_21.sh
 
 ```bash
 # Run Virtual Threads example
-rnx run --runtime=java:21 --upload=VirtualThreadExample.java \
+rnx job run --runtime=java:21 --upload=VirtualThreadExample.java \
   bash -c "javac VirtualThreadExample.java && java VirtualThreadExample"
 
 # Quick Virtual Thread test
-rnx run --runtime=java:21 jshell -s - << 'EOF'
+rnx job run --runtime=java:21 jshell -s - << 'EOF'
 Thread.startVirtualThread(() -> System.out.println("Virtual Thread works!")).join();
 System.out.println("Created virtual thread successfully!");
 EOF
 
 # Pattern Matching demonstration
-rnx run --runtime=java:21 bash -c "cat > PatternTest.java << 'EOF'
+rnx job run --runtime=java:21 bash -c "cat > PatternTest.java << 'EOF'
 public class PatternTest {
     public static void main(String[] args) {
         Object obj = \"Hello\";
@@ -243,11 +243,11 @@ public class VirtualThreadServer {
 
 ```bash
 # Run high-performance server
-rnx run --runtime=java:21 --upload=VirtualThreadServer.java --network=vthread-server --port=8000:8000 \
+rnx job run --runtime=java:21 --upload=VirtualThreadServer.java --network=vthread-server --port=8000:8000 \
   bash -c "javac VirtualThreadServer.java && java VirtualThreadServer"
 
 # Load test with virtual threads
-rnx run --runtime=java:21 --network=vthread-server bash -c "
+rnx job run --runtime=java:21 --network=vthread-server bash -c "
 for i in {1..1000}; do
   curl -s http://10.200.0.2:8000 &
 done
@@ -262,7 +262,7 @@ echo 'Handled 1000 concurrent requests with virtual threads!'
 
 ```bash
 # Create a multi-file Java project using virtual threads
-rnx run --runtime=java:21 --volume=java21-project bash -c "
+rnx job run --runtime=java:21 --volume=java21-project bash -c "
 mkdir -p /volumes/java21-project/src/com/example && \
 cd /volumes/java21-project && \
 cat > src/com/example/Server.java << 'EOF'
@@ -290,7 +290,7 @@ EOF
 "
 
 # Compile and run the application
-rnx run --runtime=java:21 --volume=java21-project bash -c "
+rnx job run --runtime=java:21 --volume=java21-project bash -c "
 cd /volumes/java21-project && \
 javac -d out src/com/example/*.java && \
 java -cp out com.example.Server
@@ -310,16 +310,16 @@ java -cp out com.example.Server
 
 ```bash
 # Virtual thread statistics
-rnx run --runtime=java:21 jcmd 1 Thread.dump_to_file -format=json /tmp/threads.json
+rnx job run --runtime=java:21 jcmd 1 Thread.dump_to_file -format=json /tmp/threads.json
 
 # JVM flags for virtual threads
-rnx run --runtime=java:21 java -XX:+ShowCodeDetailsInExceptionMessages \
+rnx job run --runtime=java:21 java -XX:+ShowCodeDetailsInExceptionMessages \
   -Djdk.virtualThreadScheduler.parallelism=4 \
   -Djdk.virtualThreadScheduler.maxPoolSize=256 \
   VirtualThreadApp
 
 # Memory analysis with virtual threads
-rnx run --runtime=java:21 --max-memory=4096 \
+rnx job run --runtime=java:21 --max-memory=4096 \
   java -Xmx2g -XX:+UseZGC -XX:+ZGenerational App
 ```
 
@@ -329,10 +329,10 @@ rnx run --runtime=java:21 --max-memory=4096 \
 
 ```bash
 # Verify Java 21
-rnx run --runtime=java:21 java -version
+rnx job run --runtime=java:21 java -version
 
 # Check virtual thread support
-rnx run --runtime=java:21 jshell -s - << 'EOF'
+rnx job run --runtime=java:21 jshell -s - << 'EOF'
 try {
     Thread.ofVirtual().start(() -> {}).join();
     System.out.println("Virtual threads supported!");
@@ -346,8 +346,8 @@ EOF
 
 ```bash
 # Enable preview features
-rnx run --runtime=java:21 javac --enable-preview --release 21 ModernApp.java
-rnx run --runtime=java:21 java --enable-preview ModernApp
+rnx job run --runtime=java:21 javac --enable-preview --release 21 ModernApp.java
+rnx job run --runtime=java:21 java --enable-preview ModernApp
 ```
 
 ## 📚 Related Documentation

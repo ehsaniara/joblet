@@ -28,12 +28,12 @@ etl → validate → compress → report → cleanup
 
 ```bash
 # Run the complete ETL pipeline
-rnx run --workflow=etl-pipeline.yaml
+rnx job run --workflow=etl-pipeline.yaml
 
 # Run individual jobs
-rnx run --workflow=etl-pipeline.yaml:etl
-rnx run --workflow=etl-pipeline.yaml:validate
-rnx run --workflow=etl-pipeline.yaml:db-backup
+rnx job run --workflow=etl-pipeline.yaml:etl
+rnx job run --workflow=etl-pipeline.yaml:validate
+rnx job run --workflow=etl-pipeline.yaml:db-backup
 ```
 
 ## Prerequisites

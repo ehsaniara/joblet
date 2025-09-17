@@ -33,10 +33,10 @@ Complete deletion includes:
 
 Examples:
   # Delete all non-running jobs
-  rnx delete-all
+  rnx job delete-all
 
   # Delete all non-running jobs with JSON output
-  rnx delete-all --json
+  rnx job delete-all --json
 
 Note: This operation is irreversible. Once deleted, job information and logs
 cannot be recovered. Only non-running jobs are affected.`,

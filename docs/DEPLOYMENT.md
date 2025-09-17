@@ -614,8 +614,8 @@ cat /proc/sys/kernel/pid_max
 cat /proc/sys/vm/max_map_count
 
 # Debug job isolation
-rnx run ps aux  # Should show limited process tree
-rnx run mount   # Should show isolated mount namespace
+rnx job run ps aux  # Should show limited process tree
+rnx job run mount   # Should show isolated mount namespace
 ```
 
 #### 4. Performance Issues

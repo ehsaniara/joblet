@@ -37,7 +37,7 @@ FAILED_TESTS=0
 # Helper function to run command and get output
 run_remote_job() {
     local cmd="$1"
-    local job_output=$("$RNX_BINARY" run sh -c "$cmd" 2>&1)
+    local job_output=$("$RNX_BINARY" job run sh -c "$cmd" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     if [[ -z "$job_id" ]]; then
@@ -49,7 +49,7 @@ run_remote_job() {
     sleep 3
     
     # Get logs
-    "$RNX_BINARY" log "$job_id" 2>/dev/null | grep -v "^\[" | grep -v "^$"
+    "$RNX_BINARY" job log "$job_id" 2>/dev/null | grep -v "^\[" | grep -v "^$"
 }
 
 # Test function wrapper
@@ -78,9 +78,9 @@ echo -e "${BLUE}─────────────────────�
 
 test_two_stage_execution() {
     # Check for init process in logs - this verifies the server->init transition
-    local job_id=$("$RNX_BINARY" run echo "2STAGE_TEST_OK" | grep "ID:" | awk '{print $2}')
+    local job_id=$("$RNX_BINARY" job run echo "2STAGE_TEST_OK" | grep "ID:" | awk '{print $2}')
     sleep 2
-    local logs=$("$RNX_BINARY" log "$job_id" 2>&1)
+    local logs=$("$RNX_BINARY" job log "$job_id" 2>&1)
     
     # Look for evidence of 2-stage execution
     if echo "$logs" | grep -q "\[init\]"; then
@@ -295,12 +295,12 @@ test_cgroup_membership() {
 
 test_memory_limits() {
     # Test with memory limit
-    local job_output=$("$RNX_BINARY" run --max-memory=100 sh -c "echo 'MEM_TEST_OK'" 2>&1)
+    local job_output=$("$RNX_BINARY" job run --max-memory=100 sh -c "echo 'MEM_TEST_OK'" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     if [[ -n "$job_id" ]]; then
         sleep 2
-        local logs=$("$RNX_BINARY" log "$job_id" 2>/dev/null)
+        local logs=$("$RNX_BINARY" job log "$job_id" 2>/dev/null)
         
         if echo "$logs" | grep -q "MEM_TEST_OK"; then
             echo "    Memory limits can be applied"
@@ -313,12 +313,12 @@ test_memory_limits() {
 
 test_cpu_limits() {
     # Test with CPU limit
-    local job_output=$("$RNX_BINARY" run --max-cpu=50 sh -c "echo 'CPU_TEST_OK'" 2>&1)
+    local job_output=$("$RNX_BINARY" job run --max-cpu=50 sh -c "echo 'CPU_TEST_OK'" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     if [[ -n "$job_id" ]]; then
         sleep 2
-        local logs=$("$RNX_BINARY" log "$job_id" 2>/dev/null)
+        local logs=$("$RNX_BINARY" job log "$job_id" 2>/dev/null)
         
         if echo "$logs" | grep -q "CPU_TEST_OK"; then
             echo "    CPU limits can be applied"

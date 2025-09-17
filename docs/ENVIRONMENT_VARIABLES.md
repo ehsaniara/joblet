@@ -38,40 +38,40 @@ Joblet supports two types of environment variables:
 
 ```bash
 # Regular environment variables (visible in logs)
-rnx run --env="KEY=value" command
+rnx job run --env="KEY=value" command
 
 # Secret environment variables (hidden from logs)
-rnx run --secret-env="SECRET_KEY=secret_value" command
+rnx job run --secret-env="SECRET_KEY=secret_value" command
 
 # Multiple variables
-rnx run --env="VAR1=value1" --env="VAR2=value2" command
+rnx job run --env="VAR1=value1" --env="VAR2=value2" command
 
 # Mixed usage
-rnx run --env="PUBLIC_VAR=public" --secret-env="SECRET_KEY=secret" command
+rnx job run --env="PUBLIC_VAR=public" --secret-env="SECRET_KEY=secret" command
 ```
 
 ### Short Flags
 
 ```bash
 # Short flags available
-rnx run -e "VAR=value" -s "SECRET=secret" command
+rnx job run -e "VAR=value" -s "SECRET=secret" command
 ```
 
 ### CLI Examples
 
 ```bash
 # Simple web application
-rnx run --env="PORT=8080" --secret-env="DB_PASSWORD=secret123" --runtime=java:17 java WebServer
+rnx job run --env="PORT=8080" --secret-env="DB_PASSWORD=secret123" --runtime=java:17 java WebServer
 
 # Data processing job
-rnx run --env="INPUT_FILE=data.csv" --env="OUTPUT_DIR=/results" python process.py
+rnx job run --env="INPUT_FILE=data.csv" --env="OUTPUT_DIR=/results" python process.py
 
 # Machine learning job
-rnx run --env="MODEL_TYPE=xgboost" --secret-env="MODEL_API_KEY=secret" python train.py
+rnx job run --env="MODEL_TYPE=xgboost" --secret-env="MODEL_API_KEY=secret" python train.py
 
 # Development vs production
-rnx run --env="NODE_ENV=development" --env="DEBUG=true" npm start
-rnx run --env="NODE_ENV=production" --env="DEBUG=false" npm start
+rnx job run --env="NODE_ENV=development" --env="DEBUG=true" npm start
+rnx job run --env="NODE_ENV=production" --env="DEBUG=false" npm start
 ```
 
 ## Workflow Usage
@@ -326,7 +326,7 @@ When viewing job status, secret environment variables are automatically masked f
 
 ```bash
 # Regular job status shows environment variables
-rnx status job-123
+rnx job status job-123
 
 Job Details:
 ID: job-123
@@ -357,7 +357,7 @@ Secret environment variables are designed for sensitive data:
 
 ```bash
 # CLI: Secret variables hidden from logs
-rnx run --secret-env="DB_PASSWORD=secret123" --secret-env="API_KEY=dummy_api_key_abc" python app.py
+rnx job run --secret-env="DB_PASSWORD=secret123" --secret-env="API_KEY=dummy_api_key_abc" python app.py
 ```
 
 ```yaml
@@ -441,7 +441,7 @@ jobs:
 Joblet warns when you override system variables:
 
 ```bash
-rnx run --env="PATH=/custom/path" command
+rnx job run --env="PATH=/custom/path" command
 # Warning: 'PATH' is a reserved environment variable name
 ```
 
@@ -470,7 +470,7 @@ jobs:
 
 ```bash
 # ✅ Good: Organized configuration
-rnx run --env="APP_NAME=myapp" --env="NODE_ENV=prod" --secret-env="API_KEY=secret" python app.py
+rnx job run --env="APP_NAME=myapp" --env="NODE_ENV=prod" --secret-env="API_KEY=secret" python app.py
 ```
 
 ### 3. Use Descriptive Variable Names

@@ -33,16 +33,16 @@ rnx runtime install graalvmjdk-21
 
 ```bash
 # Basic Python for AI agents
-rnx run --runtime=python-3.11 python -c "import requests; print('Ready!')"
+rnx job run --runtime=python-3.11 python -c "import requests; print('Ready!')"
 
 # Python with ML libraries
-rnx run --runtime=python-3.11-ml python -c "import numpy; print(numpy.__version__)"
+rnx job run --runtime=python-3.11-ml python -c "import numpy; print(numpy.__version__)"
 
 # Java applications
-rnx run --runtime=openjdk-21 java -version
+rnx job run --runtime=openjdk-21 java -version
 
 # Native compilation
-rnx run --runtime=graalvmjdk-21 native-image --version
+rnx job run --runtime=graalvmjdk-21 native-image --version
 ```
 
 ## Runtime Features

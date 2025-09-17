@@ -59,7 +59,7 @@ jobs:
 - Job names are the keys in the `jobs` section (e.g., `job-name`, `previous-job`)
 - Names should be descriptive and unique within the workflow
 - Used for dependency references and monitoring displays
-- Displayed in `rnx status --workflow` and `rnx list --workflow` commands
+- Displayed in `rnx job status --workflow` and `rnx job list --workflow` commands
 
 ### Job Specification Fields
 
@@ -265,7 +265,7 @@ Joblet performs comprehensive validation before executing workflows:
 ### Validation Output
 
 ```bash
-$ rnx run --workflow=my-workflow.yaml
+$ rnx job run --workflow=my-workflow.yaml
 🔍 Validating workflow prerequisites...
 ✅ No circular dependencies found
 ✅ All required volumes exist
@@ -278,7 +278,7 @@ $ rnx run --workflow=my-workflow.yaml
 ### Validation Errors
 
 ```bash
-$ rnx run --workflow=broken-workflow.yaml
+$ rnx job run --workflow=broken-workflow.yaml
 Error: workflow validation failed: network validation failed: missing networks: [non-existent-network]. Available networks: [bridge isolated none custom-net]
 ```
 
@@ -288,29 +288,29 @@ Error: workflow validation failed: network validation failed: missing networks: 
 
 ```bash
 # Execute workflow
-rnx run --workflow=data-pipeline.yaml
+rnx job run --workflow=data-pipeline.yaml
 
 # Execute with file uploads
-rnx run --workflow=ml-workflow.yaml  # Automatically uploads files specified in YAML
+rnx job run --workflow=ml-workflow.yaml  # Automatically uploads files specified in YAML
 ```
 
 ### Monitoring Progress
 
 ```bash
 # List all workflows
-rnx list --workflow
+rnx job list --workflow
 
 # Check specific workflow status (enhanced with job names and dependencies)
-rnx status --workflow <workflow-uuid>
+rnx job status --workflow <workflow-uuid>
 
 # View workflow status with original YAML content
-rnx status --workflow --detail <workflow-uuid>
+rnx job status --workflow --detail <workflow-uuid>
 
 # Get workflow status with YAML content in JSON format (for scripting)
-rnx status --workflow --json --detail <workflow-uuid>
+rnx job status --workflow --json --detail <workflow-uuid>
 
 # Monitor job logs
-rnx log <job-uuid>
+rnx job log <job-uuid>
 ```
 
 ### Workflow Status
@@ -328,7 +328,7 @@ ID   NAME                 STATUS      PROGRESS
 **Detailed Workflow Status:**
 
 ```bash
-# rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+# rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
 Workflow: data-pipeline.yaml
 Status: RUNNING
@@ -359,7 +359,7 @@ Use the `--detail` flag with workflow status to view the original YAML content:
 
 ```bash
 # Display workflow status with original YAML content
-rnx status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx job status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 ```
 
 **Key Benefits:**
@@ -580,7 +580,7 @@ Check: Workflow validation passed
 
 ```bash
 # Check workflow validation
-rnx run --workflow=my-workflow.yaml  # Shows validation details
+rnx job run --workflow=my-workflow.yaml  # Shows validation details
 
 # Check available resources
 rnx runtime list
@@ -593,7 +593,7 @@ rnx monitor status
 
 ### Getting Help
 
-- Check logs: `rnx log <job-uuid>`
+- Check logs: `rnx job log <job-uuid>`
 - Validate workflows: Run without execution to see validation results
 - Review examples: See `/examples/workflows/` directory
 - Check documentation: Review relevant docs for specific features

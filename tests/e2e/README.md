@@ -122,7 +122,7 @@ validate_config          # Manual validation
 
 ```bash
 # Debug commands
-./bin/rnx list                           # Test connection
+./bin/rnx job list                           # Test connection
 TEST_VERBOSE=true ./test_joblet_principles.sh  # Detailed output
 systemctl status joblet                  # Service status
 ```
@@ -143,7 +143,7 @@ systemctl status joblet                  # Service status
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-config.sh"
 
-run_rnx list                          # Configurable rnx command
+run_rnx job list                          # Configurable rnx command
 wait_for_job_completion "$workflow"   # Built-in timeout handling
 cleanup_test_resources               # Auto cleanup
 log_test_result "Test" "PASSED"      # Consistent logging

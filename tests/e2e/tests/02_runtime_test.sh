@@ -128,11 +128,11 @@ test_runtime_execution() {
     case "$runtime" in
         "graalvmjdk-21"|"openjdk-21")
             # Test Java runtimes
-            local job_id=$("$RNX_BINARY" run --runtime="$runtime" java -version 2>&1 | grep "ID:" | awk '{print $2}')
+            local job_id=$("$RNX_BINARY" job run --runtime="$runtime" java -version 2>&1 | grep "ID:" | awk '{print $2}')
             ;;
         "python-3.11"|"python-3.11-ml")
             # Test Python runtimes
-            local job_id=$("$RNX_BINARY" run --runtime="$runtime" python3 -c "print('PYTHON_OK')" 2>&1 | grep "ID:" | awk '{print $2}')
+            local job_id=$("$RNX_BINARY" job run --runtime="$runtime" python3 -c "print('PYTHON_OK')" 2>&1 | grep "ID:" | awk '{print $2}')
             ;;
         *)
             echo "    Unknown runtime type: $runtime"
@@ -310,8 +310,8 @@ test_concurrent_runtime_usage() {
     echo "    Starting concurrent jobs with $runtime1 and $runtime2..."
     
     # Start jobs with different runtimes concurrently  
-    local job1=$("$RNX_BINARY" run --runtime="$runtime1" java -version 2>&1 | grep "ID:" | awk '{print $2}')
-    local job2=$("$RNX_BINARY" run --runtime="$runtime2" java -version 2>&1 | grep "ID:" | awk '{print $2}')
+    local job1=$("$RNX_BINARY" job run --runtime="$runtime1" java -version 2>&1 | grep "ID:" | awk '{print $2}')
+    local job2=$("$RNX_BINARY" job run --runtime="$runtime2" java -version 2>&1 | grep "ID:" | awk '{print $2}')
     
     # Wait for completion
     sleep 5

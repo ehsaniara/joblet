@@ -43,11 +43,11 @@ Key Features:
   - Stream real-time logs from running jobs
 
 Quick Examples:
-  rnx run python script.py                    # Run a simple job
-  rnx run --workflow=pipeline.yaml            # Execute a workflow
-  rnx list --workflow                         # List all workflows
-  rnx status <job-uuid>                       # Check job status (supports short UUIDs)
-  rnx log <job-uuid>                          # Stream job logs (supports short UUIDs)
+  rnx job run python script.py                    # Run a simple job
+  rnx job run --workflow=pipeline.yaml            # Execute a workflow
+  rnx job list --workflow                         # List all workflows
+  rnx job status <job-uuid>                       # Check job status (supports short UUIDs)
+  rnx job log <job-uuid>                          # Stream job logs (supports short UUIDs)
   rnx monitor status                          # View remote server metrics and volumes
   rnx monitor top --json                      # JSON output for dashboards
 

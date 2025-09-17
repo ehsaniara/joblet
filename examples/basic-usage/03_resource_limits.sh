@@ -13,7 +13,7 @@ if ! command -v rnx &> /dev/null; then
     exit 1
 fi
 
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo "❌ Error: Cannot connect to Joblet server"
     exit 1
 fi
@@ -24,7 +24,7 @@ echo ""
 echo "📋 Demo 1: Memory Limits"
 echo "------------------------"
 echo "Running job with 256MB memory limit"
-rnx run --max-memory=256 bash -c "
+rnx job run --max-memory=256 bash -c "
 echo 'Memory-limited job started'
 echo 'Available memory info:'
 free -h || echo 'free command not available'
@@ -35,7 +35,7 @@ echo ""
 echo "📋 Demo 2: CPU Limits"
 echo "---------------------"
 echo "Running job with 50% CPU limit"
-rnx run --max-cpu=50 bash -c "
+rnx job run --max-cpu=50 bash -c "
 echo 'CPU-limited job started'
 echo 'Running CPU-intensive task for 10 seconds...'
 timeout 10s bash -c 'while true; do :; done' || echo 'CPU task completed'
@@ -46,7 +46,7 @@ echo ""
 echo "📋 Demo 3: I/O Bandwidth Limits"
 echo "-------------------------------"
 echo "Running job with 1MB/s I/O limit"
-rnx run --max-iobps=1048576 bash -c "
+rnx job run --max-iobps=1048576 bash -c "
 echo 'I/O-limited job started'
 echo 'Creating test file with controlled I/O...'
 dd if=/dev/zero of=/tmp/test_file bs=1M count=5 2>/dev/null || echo 'I/O operation completed'
@@ -58,7 +58,7 @@ echo ""
 echo "📋 Demo 4: CPU Core Binding"
 echo "---------------------------"
 echo "Running job bound to specific CPU cores (0-1)"
-rnx run --cpu-cores="0-1" bash -c "
+rnx job run --cpu-cores="0-1" bash -c "
 echo 'CPU core-bound job started'
 echo 'Job is restricted to CPU cores 0-1'
 echo 'Checking CPU affinity (if available):'
@@ -72,7 +72,7 @@ echo ""
 echo "📋 Demo 5: Combined Resource Limits"
 echo "-----------------------------------"
 echo "Running job with multiple resource constraints"
-rnx run --max-cpu=25 --max-memory=128 --max-iobps=524288 bash -c "
+rnx job run --max-cpu=25 --max-memory=128 --max-iobps=524288 bash -c "
 echo 'Multi-constrained job started:'
 echo '  • CPU: 25% limit'
 echo '  • Memory: 128MB limit'  
@@ -103,7 +103,7 @@ echo "---------------------------------"
 echo "Testing different memory limits to understand enforcement"
 
 echo "Testing 64MB limit with small task:"
-rnx run --max-memory=64 bash -c "
+rnx job run --max-memory=64 bash -c "
 echo 'Small task in 64MB limit:'
 echo 'Current date:' && date
 echo 'Simple calculations:'
@@ -113,7 +113,7 @@ echo 'Task completed successfully within 64MB'
 echo ""
 
 echo "Testing 512MB limit with larger task:"
-rnx run --max-memory=512 bash -c "
+rnx job run --max-memory=512 bash -c "
 echo 'Larger task in 512MB limit:'
 echo 'Generating and processing data...'
 seq 1 1000 | awk '{sum += \$1} END {print \"Sum of 1-1000:\", sum}'
@@ -132,7 +132,7 @@ echo "-------------------------------------"
 echo "Comparing job performance with different CPU limits"
 
 echo "Unlimited CPU job (running calculation):"
-TIME_UNLIMITED=$(timeout 15s rnx run bash -c "
+TIME_UNLIMITED=$(timeout 15s rnx job run bash -c "
 start=\$(date +%s.%N)
 for i in {1..100000}; do
     echo 'scale=10; sqrt(\$i)' | bc -l >/dev/null 2>&1 || break
@@ -144,7 +144,7 @@ echo "Time taken (unlimited): ${TIME_UNLIMITED:-unknown} seconds"
 echo ""
 
 echo "50% CPU limited job (same calculation):"
-TIME_LIMITED=$(timeout 15s rnx run --max-cpu=50 bash -c "
+TIME_LIMITED=$(timeout 15s rnx job run --max-cpu=50 bash -c "
 start=\$(date +%s.%N)
 for i in {1..100000}; do
     echo 'scale=10; sqrt(\$i)' | bc -l >/dev/null 2>&1 || break
@@ -161,7 +161,7 @@ echo "Starting long-running job to demonstrate monitoring"
 
 # Start a background job for monitoring
 echo "Starting background job with resource limits..."
-JOB_OUTPUT=$(rnx run --max-cpu=30 --max-memory=256 bash -c "
+JOB_OUTPUT=$(rnx job run --max-cpu=30 --max-memory=256 bash -c "
 echo 'Long-running job started (30% CPU, 256MB memory)'
 echo 'Job ID: \$\$'
 echo 'Running for 20 seconds...'
@@ -174,7 +174,7 @@ done
 echo 'Long-running job completed'
 " &)
 
-echo "✨ Background job started (check with 'rnx list' to see active jobs)"
+echo "✨ Background job started (check with 'rnx job list' to see active jobs)"
 echo ""
 
 echo "✅ Resource Limits Demo Complete!"
@@ -199,7 +199,7 @@ echo "💡 Best practices:"
 echo "  • Always set appropriate memory limits for production jobs"
 echo "  • Use CPU limits to prevent jobs from monopolizing processors"
 echo "  • Set I/O limits for disk-intensive operations"
-echo "  • Monitor resource usage with 'rnx list' and 'rnx status'"
+echo "  • Monitor resource usage with 'rnx job list' and 'rnx status'"
 echo "  • Choose limits based on job requirements and available resources"
 echo ""
 echo "➡️  Next: Try ./04_volume_storage.sh to learn about persistent data"

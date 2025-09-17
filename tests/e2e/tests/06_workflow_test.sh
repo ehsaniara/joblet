@@ -68,7 +68,7 @@ jobs:
 EOF
     
     # Try to run workflow
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_output=$("$RNX_BINARY" job run --workflow="$workflow_file" 2>&1)
     local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
@@ -83,7 +83,7 @@ EOF
     # Wait for workflow completion
     local max_wait=30
     for i in $(seq 1 $max_wait); do
-        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        local status=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
         if [[ "$status" == "COMPLETED" ]]; then
             echo "    ✓ Workflow completed successfully"
             verify_workflow_on_remote "$workflow_id" "STEP3_COMPLETE"
@@ -141,7 +141,7 @@ jobs:
       - process3: "COMPLETED"
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_output=$("$RNX_BINARY" job run --workflow="$workflow_file" 2>&1)
     local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
@@ -158,7 +158,7 @@ EOF
     local max_wait=45
     
     for i in $(seq 1 $max_wait); do
-        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        local status=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
         if [[ "$status" == "COMPLETED" ]]; then
             local end_time=$(date +%s)
             local duration=$((end_time - start_time))
@@ -214,7 +214,7 @@ jobs:
       - bad_job: "COMPLETED"
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_output=$("$RNX_BINARY" job run --workflow="$workflow_file" 2>&1)
     local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
@@ -229,12 +229,12 @@ EOF
     # Wait for workflow to process failure
     local max_wait=30
     for i in $(seq 1 $max_wait); do
-        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        local status=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
         if [[ "$status" == "FAILED" ]]; then
             echo "    ✓ Workflow correctly failed when job failed"
             
             # Check that dependent job didn't run
-            local progress=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Progress:" || echo "")
+            local progress=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Progress:" || echo "")
             if echo "$progress" | grep -q "failed"; then
                 echo "    ✓ Dependent job correctly prevented from running"
             fi
@@ -262,7 +262,7 @@ jobs:
     args: ["-c", "echo 'QUICK_STATUS_TEST'"]
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_output=$("$RNX_BINARY" job run --workflow="$workflow_file" 2>&1)
     local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
@@ -279,7 +279,7 @@ EOF
     local max_wait=20
     
     for i in $(seq 1 $max_wait); do
-        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        local status=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
         
         if [[ "$status" == "RUNNING" ]] || [[ "$status" == "PENDING" ]]; then
             seen_running=true
@@ -313,7 +313,7 @@ jobs:
     args: ["-c", "echo 'STARTING_LONG_JOB'; sleep 30; echo 'SHOULD_NOT_COMPLETE'"]
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_output=$("$RNX_BINARY" job run --workflow="$workflow_file" 2>&1)
     local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
     
     rm -f "$workflow_file"
@@ -333,16 +333,16 @@ EOF
     if cancel_output=$("$RNX_BINARY" cancel --workflow "$workflow_id" 2>&1); then
         echo "    ✓ Cancel command executed"
         return 0
-    elif cancel_output=$("$RNX_BINARY" delete --workflow "$workflow_id" 2>&1); then
+    elif cancel_output=$("$RNX_BINARY" job delete --workflow "$workflow_id" 2>&1); then
         echo "    ✓ Delete command executed"
         return 0
-    elif cancel_output=$("$RNX_BINARY" stop --workflow "$workflow_id" 2>&1); then
+    elif cancel_output=$("$RNX_BINARY" job stop --workflow "$workflow_id" 2>&1); then
         echo "    ✓ Stop command executed"
         return 0
     else
         echo "    ? Workflow cancellation commands not found"
         # Try to check if workflow finished naturally
-        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        local status=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
         if [[ "$status" == "RUNNING" ]]; then
             echo "    ✓ Workflow still running (cancellation may not be implemented)"
         fi
@@ -390,7 +390,7 @@ jobs:
       - job_b: "COMPLETED"
 EOF
     
-    local workflow_output=$("$RNX_BINARY" run --workflow="$workflow_file" 2>&1)
+    local workflow_output=$("$RNX_BINARY" job run --workflow="$workflow_file" 2>&1)
     
     rm -f "$workflow_file"
     
@@ -402,7 +402,7 @@ EOF
         local workflow_id=$(echo "$workflow_output" | grep -oE '[a-f0-9-]{36}' | head -1)
         echo "    ? Cyclic workflow created: $workflow_id (may fail at execution)"
         sleep 5
-        local status=$("$RNX_BINARY" status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
+        local status=$("$RNX_BINARY" job status --workflow "$workflow_id" 2>/dev/null | grep "Status:" | awk '{print $2}' | sed 's/\x1b\[[0-9;]*m//g')
         if [[ "$status" == "FAILED" ]]; then
             echo "    ✓ Cyclic workflow failed at execution (correct behavior)"
         fi

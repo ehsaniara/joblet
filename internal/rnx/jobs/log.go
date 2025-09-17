@@ -31,13 +31,13 @@ if they uniquely identify a job.
 
 Examples:
   # Stream logs from a running job (full UUID)
-  rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479
   
   # Stream logs from a running job (short-form UUID)
-  rnx log f47ac10b
+  rnx job log f47ac10b
   
   # View logs from a completed job (short-form UUID)
-  rnx log a1b2c3d4
+  rnx job log a1b2c3d4
   
   # Stop following with Ctrl+C for running jobs`,
 		Args: cobra.ExactArgs(1),

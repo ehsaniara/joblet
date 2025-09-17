@@ -28,15 +28,15 @@ Key Features:
   - Stream real-time logs from running jobs
 
 Quick Examples:
-  rnx run python script.py                    # Run a simple job
-  rnx run --workflow=pipeline.yaml            # Execute a workflow
-  rnx list --workflow                         # List all workflows
-  rnx status <job-uuid>                       # Check job status (supports short UUIDs)
-  rnx log <job-uuid>                          # Stream job logs (supports short UUIDs)
-  rnx delete <job-uuid>                       # Delete a specific job
-  rnx delete-all                              # Delete all non-running jobs
-  rnx monitor status                          # View remote server metrics and volumes
-  rnx monitor top --json                      # JSON output for dashboards
+  rnx job run python script.py               # Run a simple job
+  rnx job run --workflow=pipeline.yaml       # Execute a workflow
+  rnx job list --workflow                    # List all workflows
+  rnx job status <job-uuid>                  # Check job status (supports short UUIDs)
+  rnx job log <job-uuid>                     # Stream job logs (supports short UUIDs)
+  rnx job delete <job-uuid>                  # Delete a specific job
+  rnx job delete-all                         # Delete all non-running jobs
+  rnx monitor status                         # View remote server metrics and volumes
+  rnx monitor top --json                     # JSON output for dashboards
 
 Note: Job and workflow UUIDs support short-form usage (first 8 characters)
 if they uniquely identify the resource.
@@ -85,18 +85,12 @@ func init() {
 		"Output in JSON format")
 
 	// Add subcommands
-	rootCmd.AddCommand(jobs.NewRunCmd())
-	rootCmd.AddCommand(jobs.NewStatusCmd())
-	rootCmd.AddCommand(jobs.NewStopCmd())
-	rootCmd.AddCommand(jobs.NewDeleteCmd())
-	rootCmd.AddCommand(jobs.NewDeleteAllCmd())
-	rootCmd.AddCommand(jobs.NewLogCmd())
-	rootCmd.AddCommand(jobs.NewListCmd())
+	rootCmd.AddCommand(jobs.NewJobCmd())
+	rootCmd.AddCommand(jobs.NewMonitorCmd())
 	rootCmd.AddCommand(NewNodesCmd())
 	rootCmd.AddCommand(NewHelpConfigCmd())
 	rootCmd.AddCommand(resources.NewNetworkCmd())
 	rootCmd.AddCommand(resources.NewVolumeCmd())
-	rootCmd.AddCommand(jobs.NewMonitorCmd())
 	rootCmd.AddCommand(resources.NewRuntimeCmd())
 	rootCmd.AddCommand(NewAdminCmd())
 	rootCmd.AddCommand(NewVersionCmd())

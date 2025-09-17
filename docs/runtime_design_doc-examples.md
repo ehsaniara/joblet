@@ -10,7 +10,7 @@ This document provides practical examples of using the Joblet runtime system acr
 
 ```bash
 # Upload data file and run analysis
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=data.csv \
         --volume=analysis-results \
         python -c "
@@ -27,7 +27,7 @@ data.to_json('/volumes/analysis-results/summary.json')
 
 ```bash
 # Using Python 3.12 modern syntax
-rnx run --runtime=python-3.12 \
+rnx job run --runtime=python-3.12 \
         --upload=modern_app.py \
         python modern_app.py
 ```
@@ -36,7 +36,7 @@ rnx run --runtime=python-3.12 \
 
 ```bash
 # Flask web application with external access
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=api.py \
         --network=web \
         --max-memory=512 \
@@ -49,7 +49,7 @@ rnx run --runtime=python-3.11-ml \
 
 ```bash
 # Compile and run Java application
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --upload=Application.java \
         --volume=maven-cache \
         bash -c "javac Application.java && java Application"
@@ -59,7 +59,7 @@ rnx run --runtime=java:17 \
 
 ```bash
 # High-concurrency application using Virtual Threads
-rnx run --runtime=java:21 \
+rnx job run --runtime=java:21 \
         --upload=VirtualThreadApp.java \
         --max-memory=1024 \
         bash -c "javac VirtualThreadApp.java && java VirtualThreadApp"
@@ -69,7 +69,7 @@ rnx run --runtime=java:21 \
 
 ```bash
 # Build entire Maven project
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --upload-dir=spring-project \
         --volume=maven-cache \
         --max-memory=2048 \
@@ -82,7 +82,7 @@ rnx run --runtime=java:17 \
 
 ```bash
 # Run Spring Boot application with external access
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --upload=application.jar \
         --upload=application.properties \
         --network=web \
@@ -94,7 +94,7 @@ rnx run --runtime=java:17 \
 
 ```bash
 # Compile and run Java application
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --upload=Main.java \
         --upload=pom.xml \
         bash -c "javac -cp . Main.java && java Main"
@@ -108,7 +108,7 @@ rnx run --runtime=java:17 \
 
 ```bash
 # Prepare and clean data
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=raw_data.csv \
         --volume=pipeline-data \
         python -c "
@@ -124,7 +124,7 @@ print(f'Cleaned dataset: {len(cleaned)} rows')
 
 ```bash
 # Run machine learning analysis
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --volume=pipeline-data \
         --max-memory=2048 \
         python -c "
@@ -142,7 +142,7 @@ joblib.dump(model, '/volumes/pipeline-data/model.pkl')
 
 ```bash
 # Generate PDF reports
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --volume=pipeline-data \
         --upload=ReportGenerator.java \
         bash -c "
@@ -157,7 +157,7 @@ java ReportGenerator /volumes/pipeline-data/model.pkl
 
 ```bash
 # Test package in isolated environment
-rnx run --runtime=python-3.12 \
+rnx job run --runtime=python-3.12 \
         --upload-dir=my-package \
         --volume=dev-pip-cache \
         bash -c "
@@ -173,7 +173,7 @@ python setup.py sdist
 ```bash
 # Multi-version compatibility testing
 # Test on Java 17
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --upload-dir=java-library \
         --volume=test-results \
         bash -c "
@@ -183,7 +183,7 @@ cp target/surefire-reports/* /volumes/test-results/java17-
 "
 
 # Test on Java 21
-rnx run --runtime=java:21 \
+rnx job run --runtime=java:21 \
         --upload-dir=java-library \
         --volume=test-results \
         bash -c "
@@ -199,7 +199,7 @@ cp target/surefire-reports/* /volumes/test-results/java21-
 
 ```bash
 # Frontend build (Java-based)
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --upload-dir=frontend \
         --volume=frontend-dist \
         bash -c "
@@ -209,7 +209,7 @@ cp -r target/* /volumes/frontend-dist/
 "
 
 # Backend API (Python)
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload-dir=backend \
         --volume=frontend-dist \
         --network=web \
@@ -235,7 +235,7 @@ app.run(host='0.0.0.0', port=8080)
 
 ```bash
 # Connect to database and analyze
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --network=database \
         --volume=db-cache \
         python -c "
@@ -256,7 +256,7 @@ summary.to_csv('/volumes/db-cache/region_summary.csv')
 
 ```bash
 # Process large CSV files in chunks
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=large_dataset.csv \
         --volume=processed-chunks \
         --max-memory=4096 \
@@ -282,7 +282,7 @@ for chunk in pd.read_csv('large_dataset.csv', chunksize=chunk_size):
 
 ```bash
 # Producer (Python)
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --network=message-queue \
         python -c "
 import json
@@ -296,7 +296,7 @@ for i in range(100):
 "
 
 # Consumer (Java)
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --network=message-queue \
         --upload=Consumer.java \
         java Consumer
@@ -308,7 +308,7 @@ rnx run --runtime=java:17 \
 
 ```bash
 # Large dataset processing with memory constraints
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=big_data.csv \
         --max-memory=1024 \
         --volume=temp-storage \
@@ -339,7 +339,7 @@ process_large_file('big_data.csv')
 
 ```bash
 # Multi-core processing
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=compute_task.py \
         --max-cpu=8 \
         --max-memory=4096 \
@@ -371,7 +371,7 @@ if __name__ == '__main__':
 # Test script across multiple Python versions
 for runtime in python-3.11-ml python-3.12; do
     echo "Testing on $runtime"
-    rnx run --runtime=$runtime \
+    rnx job run --runtime=$runtime \
             --upload=compatibility_test.py \
             python compatibility_test.py
 done
@@ -382,19 +382,19 @@ done
 ```bash
 # Test complete application stack
 # Database setup
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --network=test-net \
         --volume=test-db \
         python setup_test_db.py
 
 # API testing
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --network=test-net \
         --upload=test_api.py \
         python test_api.py
 
 # Frontend testing (Java-based)
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --network=test-net \
         --upload-dir=frontend-tests \
         bash -c "cd frontend-tests && mvn test"
@@ -406,7 +406,7 @@ rnx run --runtime=java:17 \
 
 ```bash
 # Monitor resource usage during job execution
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=heavy_computation.py \
         --monitor=memory,cpu \
         --max-runtime=300 \
@@ -417,7 +417,7 @@ rnx run --runtime=python-3.11-ml \
 
 ```bash
 # Run with debug logging and extended timeout
-rnx run --runtime=java:21 \
+rnx job run --runtime=java:21 \
         --upload=DebugApp.java \
         --debug \
         --max-runtime=600 \
@@ -436,7 +436,7 @@ java -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 Debug
 python3 my_script.py
 
 # After (runtime-isolated)
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=my_script.py \
         python my_script.py
 ```
@@ -450,7 +450,7 @@ rnx run --runtime=python-3.11-ml \
 # python3 app.py
 
 # New runtime-based deployment
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --upload=app.py \
         --upload=requirements.txt \
         --volume=app-data \
@@ -464,7 +464,7 @@ rnx run --runtime=python-3.11-ml \
 
 ```bash
 # Appropriate resource allocation
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --max-memory=2048 \      # 2GB for ML workloads
         --max-cpu=4 \            # 4 cores for parallel processing
         --max-runtime=3600 \     # 1 hour timeout
@@ -476,7 +476,7 @@ rnx run --runtime=python-3.11-ml \
 
 ```bash
 # Persistent data and cache management
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --volume=maven-cache \     # Persistent Maven cache
         --volume=project-data \    # Persistent project data
         --upload-dir=java-app \
@@ -491,13 +491,13 @@ mvn exec:java
 
 ```bash
 # Secure network access patterns
-rnx run --runtime=python-3.11-ml \
+rnx job run --runtime=python-3.11-ml \
         --network=database \     # Access only to database
         --upload=data_processor.py \
         python data_processor.py
 
 # Web service with controlled access
-rnx run --runtime=java:17 \
+rnx job run --runtime=java:17 \
         --network=web \          # External web access
         --upload=ApiServer.java \
         java ApiServer

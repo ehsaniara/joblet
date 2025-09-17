@@ -27,10 +27,10 @@ environments for instant execution.
 
 ```bash
 # Check RNX connection
-rnx list
+rnx job list
 
 # Check server connectivity
-rnx run echo "Hello Joblet"
+rnx job run echo "Hello Joblet"
 
 # Check available runtimes (if installed)
 rnx runtime list
@@ -52,7 +52,7 @@ cd python-ml/
 
 # Data Analysis Example
 cd python-3.11-ml/
-rnx run --runtime=python-3.11-ml --upload=example_data_analysis.py python example_data_analysis.py
+rnx job run --runtime=python-3.11-ml --upload=example_data_analysis.py python example_data_analysis.py
 ```
 
 **Java Development:**
@@ -60,11 +60,11 @@ rnx run --runtime=python-3.11-ml --upload=example_data_analysis.py python exampl
 ```bash
 # Java 17 LTS Example
 cd java-17/
-rnx run --runtime=java:17 --upload=HelloJoblet.java javac HelloJoblet.java && java HelloJoblet
+rnx job run --runtime=java:17 --upload=HelloJoblet.java javac HelloJoblet.java && java HelloJoblet
 
 # Java 21 with Modern Features
 cd java-21/
-rnx run --runtime=java:21 --upload=VirtualThreadExample.java javac VirtualThreadExample.java && java VirtualThreadExample
+rnx job run --runtime=java:21 --upload=VirtualThreadExample.java javac VirtualThreadExample.java && java VirtualThreadExample
 ```
 
 #### 📋 Traditional Examples (System Dependencies)
@@ -176,7 +176,7 @@ cd advanced/
 
 #### Job failures
 
-- **Check logs**: `rnx log <job-id>`
+- **Check logs**: `rnx job log <job-id>`
 - **Resource limits**: Increase memory limits if needed
 - **Dependencies**: Use examples with minimal dependencies
 
@@ -190,10 +190,10 @@ cd advanced/
 
 ```bash
 # List all jobs
-rnx list
+rnx job list
 
 # View job output
-rnx log <job-id>
+rnx job log <job-id>
 
 # Check volumes
 rnx volume list
@@ -208,17 +208,17 @@ rnx monitor
 
 ```bash
 # View sales analysis
-rnx run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json
+rnx job run --volume=analytics-data cat /volumes/analytics-data/results/sales_analysis.json
 
 # View processed time series
-rnx run --volume=analytics-data ls /volumes/analytics-data/processed/
+rnx job run --volume=analytics-data ls /volumes/analytics-data/processed/
 ```
 
 ### After Running Job Coordination
 
 ```bash
 # View coordination results
-rnx run --volume=shared-data cat /volumes/shared-data/results.json
+rnx job run --volume=shared-data cat /volumes/shared-data/results.json
 ```
 
 ## 💡 Best Practices
@@ -246,7 +246,7 @@ rnx run --volume=shared-data cat /volumes/shared-data/results.json
 
 ## Getting Help
 
-- **Check Logs**: Always start with `rnx log <job-id>` for failures
+- **Check Logs**: Always start with `rnx job log <job-id>` for failures
 - **Resource Issues**: Monitor with `rnx monitor`
-- **Connectivity**: Test with simple `rnx run echo "test"` commands
+- **Connectivity**: Test with simple `rnx job run echo "test"` commands
 - **Documentation**: See individual example README files for specific guidance

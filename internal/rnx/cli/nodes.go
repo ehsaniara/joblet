@@ -112,10 +112,10 @@ func runNodes(jsonOutput bool) error {
 	}
 
 	fmt.Printf("Usage examples:\n")
-	fmt.Printf("  rnx list                    # uses 'default' node\n")
+	fmt.Printf("  rnx job list                    # uses 'default' node\n")
 	for _, name := range nodeNames {
 		if name != "default" {
-			fmt.Printf("  rnx --node=%s list         # uses '%s' node\n", name, name)
+			fmt.Printf("  rnx --node=%s job list         # uses '%s' node\n", name, name)
 			break
 		}
 	}

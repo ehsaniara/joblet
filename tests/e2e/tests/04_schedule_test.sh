@@ -13,7 +13,7 @@ source "$(dirname "$0")/../lib/test_framework.sh"
 test_immediate_job() {
     # Test a job that runs immediately
     # Use a simple echo command that works without any runtime
-    local job_output=$("$RNX_BINARY" run echo "IMMEDIATE_JOB_RAN" 2>&1)
+    local job_output=$("$RNX_BINARY" job run echo "IMMEDIATE_JOB_RAN" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     if [[ -z "$job_id" ]]; then
@@ -32,7 +32,7 @@ test_delayed_job() {
     # Using 10s schedule for quick testing
     
     # Create a scheduled job with --schedule flag
-    local job_output=$("$RNX_BINARY" run --schedule="10s" echo "DELAYED_JOB_RAN" 2>&1)
+    local job_output=$("$RNX_BINARY" job run --schedule="10s" echo "DELAYED_JOB_RAN" 2>&1)
     
     if echo "$job_output" | grep -q "ID:"; then
         local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
@@ -77,7 +77,7 @@ test_schedule_formats() {
     
     for format in "${formats[@]}"; do
         # Test that the format is accepted (job creation succeeds)
-        local job_output=$("$RNX_BINARY" run --schedule="$format" \
+        local job_output=$("$RNX_BINARY" job run --schedule="$format" \
             echo "SCHEDULED_FORMAT_TEST" 2>&1)
         
         if echo "$job_output" | grep -q "ID:"; then
@@ -99,7 +99,7 @@ test_schedule_formats() {
     
     # Clean up scheduled jobs
     for job_id in "${job_ids[@]}"; do
-        "$RNX_BINARY" delete "$job_id" 2>/dev/null || true
+        "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
     done
     
     return 0
@@ -110,7 +110,7 @@ test_scheduled_job_execution() {
     echo -e "    ${YELLOW}Scheduling job for 15 seconds from now (will wait)...${NC}"
     
     # Schedule a job for 15 seconds from now
-    local job_output=$("$RNX_BINARY" run --schedule="15s" echo "SCHEDULED_JOB_EXECUTED" 2>&1)
+    local job_output=$("$RNX_BINARY" job run --schedule="15s" echo "SCHEDULED_JOB_EXECUTED" 2>&1)
     
     if ! echo "$job_output" | grep -q "ID:"; then
         echo -e "    ${RED}Failed to create scheduled job${NC}"
@@ -156,7 +156,7 @@ test_multiple_scheduled_jobs() {
     
     # Schedule 3 jobs using simple echo commands
     for i in 1 2 3; do
-        local job_output=$("$RNX_BINARY" run sh -c "echo 'SCHEDULED_JOB_$i'; sleep 1" 2>&1)
+        local job_output=$("$RNX_BINARY" job run sh -c "echo 'SCHEDULED_JOB_$i'; sleep 1" 2>&1)
         local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
         if [[ -n "$job_id" ]]; then
             job_ids+=("$job_id")
@@ -185,15 +185,15 @@ test_multiple_scheduled_jobs() {
 
 test_job_queue_ordering() {
     # Test that jobs are executed in order
-    local job_output1=$("$RNX_BINARY" run echo "FIRST" 2>&1)
+    local job_output1=$("$RNX_BINARY" job run echo "FIRST" 2>&1)
     local job1=$(echo "$job_output1" | grep "ID:" | awk '{print $2}')
     sleep 0.5
     
-    local job_output2=$("$RNX_BINARY" run echo "SECOND" 2>&1)
+    local job_output2=$("$RNX_BINARY" job run echo "SECOND" 2>&1)
     local job2=$(echo "$job_output2" | grep "ID:" | awk '{print $2}')
     sleep 0.5
     
-    local job_output3=$("$RNX_BINARY" run echo "THIRD" 2>&1)
+    local job_output3=$("$RNX_BINARY" job run echo "THIRD" 2>&1)
     local job3=$(echo "$job_output3" | grep "ID:" | awk '{print $2}')
     
     sleep 5
@@ -229,14 +229,14 @@ test_recurring_schedule() {
 
 test_schedule_cancellation() {
     # Test cancelling a scheduled job
-    local job_output=$("$RNX_BINARY" run sh -c "sleep 10; echo 'SHOULD_NOT_COMPLETE'" 2>&1)
+    local job_output=$("$RNX_BINARY" job run sh -c "sleep 10; echo 'SHOULD_NOT_COMPLETE'" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
     
     # Give it a moment to start
     sleep 2
     
     # Try to cancel/delete the job
-    local cancel_output=$("$RNX_BINARY" delete "$job_id" 2>&1 || echo "")
+    local cancel_output=$("$RNX_BINARY" job delete "$job_id" 2>&1 || echo "")
     
     # Wait a bit
     sleep 3

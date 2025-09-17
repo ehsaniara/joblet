@@ -252,7 +252,7 @@ rnx volume remove <name> [options]
   --force           Remove even if in use
 
 # Job execution with volumes
-rnx run --volume=data:/data --volume=cache:/cache <command>
+rnx job run --volume=data:/data --volume=cache:/cache <command>
 ```
 
 ### Internal Interfaces

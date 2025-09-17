@@ -27,10 +27,10 @@ For scheduled jobs, it will cancel the scheduled execution.
 
 Examples:
   # Stop a running job
-  rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
   
   # Cancel a scheduled job before it starts
-  rnx stop a1b2c3d4-5678-90ab-cdef-1234567890ab`,
+  rnx job stop a1b2c3d4-5678-90ab-cdef-1234567890ab`,
 		Args: cobra.ExactArgs(1),
 		RunE: runStop,
 	}

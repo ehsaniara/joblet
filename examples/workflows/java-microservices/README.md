@@ -19,16 +19,16 @@ Contains six Java service examples:
 
 ```bash
 # Run individual services
-rnx run --workflow=java-services.yaml:api-gateway
-rnx run --workflow=java-services.yaml:user-service
-rnx run --workflow=java-services.yaml:order-service
-rnx run --workflow=java-services.yaml:payment-service
+rnx job run --workflow=java-services.yaml:api-gateway
+rnx job run --workflow=java-services.yaml:user-service
+rnx job run --workflow=java-services.yaml:order-service
+rnx job run --workflow=java-services.yaml:payment-service
 
 # Run database migration
-rnx run --workflow=java-services.yaml:db-migration
+rnx job run --workflow=java-services.yaml:db-migration
 
 # Run batch processor
-rnx run --workflow=java-services.yaml:batch-processor
+rnx job run --workflow=java-services.yaml:batch-processor
 ```
 
 ## Prerequisites

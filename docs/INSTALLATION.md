@@ -221,7 +221,7 @@ rnx --version
 # Joblet Server: failed to connect to server: <error>
 
 # Test basic functionality
-rnx list  # Should connect to server and list jobs
+rnx job list  # Should connect to server and list jobs
 ```
 
 ### Cross-compilation
@@ -370,8 +370,8 @@ Joblet provides native Linux process isolation with:
 
 **Joblet Commands:**
 
-- `rnx run` - Execute isolated processes
-- `rnx run --workflow=workflow.yaml` - Run complex workflows
+- `rnx job run` - Execute isolated processes
+- `rnx job run --workflow=workflow.yaml` - Run complex workflows
 - `rnx runtime install` - Install pre-built runtime environments
 
 ## ✅ Post-Installation Verification
@@ -396,10 +396,10 @@ sudo ss -tlnp | grep 50051
 scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 
 # Test connection
-rnx list
+rnx job list
 
 # Run test job
-rnx run echo "Installation successful!"
+rnx job run echo "Installation successful!"
 ```
 
 ## 🔧 Troubleshooting Installation

@@ -29,14 +29,14 @@ test_volume_debug() {
         
         # Test 3: Use volume in job
         echo "Test 3: Using volume in a job..."
-        output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=debug-vol sh -c 'echo "Volume job test"' 2>&1)
+        output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=debug-vol sh -c 'echo "Volume job test"' 2>&1)
         local job_id=$(echo "$output" | grep "^ID:" | awk '{print $2}')
         echo "Job creation output:"
         echo "$output"
         
         if [[ -n "$job_id" ]]; then
             sleep 2
-            local logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\\[" | grep -v "^$")
+            local logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\\[" | grep -v "^$")
             echo "Job logs:"
             echo "$logs"
         fi

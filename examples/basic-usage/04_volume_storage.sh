@@ -13,7 +13,7 @@ if ! command -v rnx &> /dev/null; then
     exit 1
 fi
 
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo "❌ Error: Cannot connect to Joblet server"
     exit 1
 fi
@@ -51,7 +51,7 @@ echo ""
 echo "📋 Demo 3: Using Filesystem Volume"
 echo "----------------------------------"
 echo "Writing data to persistent filesystem volume"
-rnx run --volume=demo-data bash -c "
+rnx job run --volume=demo-data bash -c "
 echo 'Writing to persistent volume at /volumes/demo-data/'
 echo 'Volume mount point contents:'
 ls -la /volumes/
@@ -72,7 +72,7 @@ echo ""
 echo "📋 Demo 4: Data Persistence Verification"
 echo "----------------------------------------"
 echo "Running new job to verify data persists across job runs"
-rnx run --volume=demo-data bash -c "
+rnx job run --volume=demo-data bash -c "
 echo 'New job reading from persistent volume:'
 echo ''
 echo 'Previous data still exists:'
@@ -88,7 +88,7 @@ echo ""
 echo "📋 Demo 5: Using Memory Volume"
 echo "------------------------------"
 echo "Working with fast memory-based volume"
-rnx run --volume=temp-cache bash -c "
+rnx job run --volume=temp-cache bash -c "
 echo 'Using memory volume for temporary fast storage:'
 echo ''
 echo 'Memory volume is mounted at /volumes/temp-cache/'
@@ -110,7 +110,7 @@ echo ""
 echo "📋 Demo 6: Multiple Volume Usage"
 echo "--------------------------------"
 echo "Using both volumes in a single job"
-rnx run --volume=demo-data --volume=temp-cache bash -c "
+rnx job run --volume=demo-data --volume=temp-cache bash -c "
 echo 'Job with multiple volumes mounted:'
 echo ''
 echo 'Available volumes:'
@@ -144,7 +144,7 @@ echo ""
 echo "📋 Demo 7: Volume Size and Usage"
 echo "--------------------------------"
 echo "Demonstrating volume space management"
-rnx run --volume=demo-data bash -c "
+rnx job run --volume=demo-data bash -c "
 echo 'Checking volume space usage:'
 echo ''
 echo 'Current volume contents:'
@@ -170,7 +170,7 @@ echo ""
 echo "📋 Demo 8: Workspace vs Volume Storage"
 echo "--------------------------------------"
 echo "Comparing temporary workspace with persistent volume storage"
-rnx run --volume=demo-data bash -c "
+rnx job run --volume=demo-data bash -c "
 echo 'Understanding storage locations:'
 echo ''
 echo '1. Temporary workspace (lost after job):'
@@ -193,7 +193,7 @@ echo ""
 echo "📋 Demo 9: Verifying Persistence"
 echo "--------------------------------"
 echo "Final verification that volume data persists"
-rnx run --volume=demo-data bash -c "
+rnx job run --volume=demo-data bash -c "
 echo 'Final persistence check - new job, same volume:'
 echo ''
 echo 'Volume contents (should include all previous files):'

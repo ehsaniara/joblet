@@ -86,8 +86,8 @@ Job started: ID: Y
 ✅ Job Coordination Complete!
 
 📊 View results:
-  rnx run --volume=shared-data cat /volumes/shared-data/data.json
-  rnx run --volume=shared-data cat /volumes/shared-data/results.json
+  rnx job run --volume=shared-data cat /volumes/shared-data/data.json
+  rnx job run --volume=shared-data cat /volumes/shared-data/results.json
 ```
 
 ### Viewing Results
@@ -96,10 +96,10 @@ After the demo completes, you can inspect the coordinated job results:
 
 ```bash
 # View the generated data
-rnx run --volume=shared-data cat /volumes/shared-data/data.json
+rnx job run --volume=shared-data cat /volumes/shared-data/data.json
 
 # View the analysis results
-rnx run --volume=shared-data cat /volumes/shared-data/results.json
+rnx job run --volume=shared-data cat /volumes/shared-data/results.json
 ```
 
 The analysis results will show statistical summary:
@@ -134,7 +134,7 @@ The analysis results will show statistical summary:
 
 ```bash
 # Add a third job that further processes the results
-rnx run --volume=shared-data --max-memory=256 \
+rnx job run --volume=shared-data --max-memory=256 \
     python3 -c "
 import json
 

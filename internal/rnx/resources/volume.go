@@ -119,7 +119,7 @@ func runVolumeCreate(name, size, volumeType string) error {
 	fmt.Printf("  Size: %s\n", resp.Size)
 	fmt.Printf("  Type: %s\n", resp.Type)
 	fmt.Printf("  Path: %s\n", resp.Path)
-	fmt.Printf("\nUse this volume with: rnx run --volume=%s <command>\n", name)
+	fmt.Printf("\nUse this volume with: rnx job run --volume=%s <command>\n", name)
 
 	return nil
 }

@@ -188,10 +188,10 @@ The default network mode with NAT and internet access.
 
 ```bash
 # Uses bridge network by default
-rnx run ping google.com
+rnx job run ping google.com
 
 # Explicitly specify bridge
-rnx run --network=bridge curl https://api.example.com
+rnx job run --network=bridge curl https://api.example.com
 ```
 
 **Characteristics:**
@@ -210,7 +210,7 @@ User-defined networks with specific CIDR ranges.
 rnx network create myapp --cidr=10.10.0.0/24
 
 # Use custom network
-rnx run --network=myapp ip addr show
+rnx job run --network=myapp ip addr show
 ```
 
 **Characteristics:**
@@ -226,10 +226,10 @@ External-only network access with no inter-job communication.
 
 ```bash
 # Run with isolated network
-rnx run --network=isolated wget https://example.com
+rnx job run --network=isolated wget https://example.com
 
 # No access to other jobs, but external access works
-rnx run --network=isolated ping google.com
+rnx job run --network=isolated ping google.com
 ```
 
 **Characteristics:**
@@ -245,10 +245,10 @@ Complete network isolation - no network access.
 
 ```bash
 # No network access
-rnx run --network=none ip addr show
+rnx job run --network=none ip addr show
 
 # Useful for secure processing
-rnx run --network=none --upload=sensitive.data process_offline.sh
+rnx job run --network=none --upload=sensitive.data process_offline.sh
 ```
 
 **Characteristics:**
@@ -326,11 +326,11 @@ rnx network create tenant-a --cidr=10.100.0.0/24
 rnx network create tenant-b --cidr=10.101.0.0/24
 
 # Run jobs in isolated networks
-rnx run --network=tenant-a nginx
-rnx run --network=tenant-b nginx
+rnx job run --network=tenant-a nginx
+rnx job run --network=tenant-b nginx
 
 # Jobs cannot communicate across networks
-rnx run --network=tenant-a ping 10.101.0.2  # Will fail
+rnx job run --network=tenant-a ping 10.101.0.2  # Will fail
 ```
 
 ### Security Groups Simulation
@@ -343,7 +343,7 @@ rnx network create db-net --cidr=10.20.0.0/24
 rnx network create app-net --cidr=10.21.0.0/24
 
 # Run database in isolated network
-rnx run --network=db-net --volume=pgdata postgres:latest
+rnx job run --network=db-net --volume=pgdata postgres:latest
 
 # Run app with access to both networks (if supported)
 # Note: Joblet typically supports one network per job
@@ -355,16 +355,16 @@ rnx run --network=db-net --volume=pgdata postgres:latest
 
 ```bash
 # Start parameter server for distributed training
-rnx run \
+rnx job run \
   --network=training-net \
   --name=ps-0 \
   python3 parameter_server.py --port=2222
 
 # Get parameter server IP
-PS_IP=$(rnx run --network=training-net --json hostname -I | jq -r .output | awk '{print $1}')
+PS_IP=$(rnx job run --network=training-net --json hostname -I | jq -r .output | awk '{print $1}')
 
 # Start worker nodes
-rnx run \
+rnx job run \
   --network=training-net \
   python3 worker.py --ps-host=$PS_IP --worker-id=0
 ```
@@ -376,16 +376,16 @@ rnx run \
 rnx network create microservices --cidr=10.30.0.0/24
 
 # Start backend service
-BACKEND_JOB=$(rnx run --json \
+BACKEND_JOB=$(rnx job run --json \
   --network=microservices \
   python -m http.server 8000 | jq -r .id)
 
 # Get backend IP
 sleep 2
-BACKEND_IP=$(rnx run --network=microservices ip addr show | grep "inet 10.30" | awk '{print $2}' | cut -d/ -f1)
+BACKEND_IP=$(rnx job run --network=microservices ip addr show | grep "inet 10.30" | awk '{print $2}' | cut -d/ -f1)
 
 # Start frontend connecting to backend
-rnx run --network=microservices node frontend.js
+rnx job run --network=microservices node frontend.js
 ```
 
 ### Load Balancing Pattern
@@ -393,11 +393,11 @@ rnx run --network=microservices node frontend.js
 ```bash
 # Start multiple backend instances
 for i in {1..3}; do
-  rnx run --network=app-net python app.py --port=$((8000 + i)) &
+  rnx job run --network=app-net python app.py --port=$((8000 + i)) &
 done
 
 # Simple load balancer
-rnx run --network=app-net --upload=nginx.conf nginx -c /work/nginx.conf
+rnx job run --network=app-net --upload=nginx.conf nginx -c /work/nginx.conf
 ```
 
 ### Workflow Network Configuration
@@ -437,7 +437,7 @@ jobs:
 **Workflow Network Validation:**
 
 ```bash
-$ rnx run --workflow=microservices-workflow.yaml
+$ rnx job run --workflow=microservices-workflow.yaml
 🔍 Validating workflow prerequisites...
 ✅ All required networks exist
 ```
@@ -461,14 +461,14 @@ While Joblet doesn't have built-in firewall rules, you can implement security pa
 rnx network create secure-db --cidr=10.50.0.0/24
 
 # 2. Run database with no external access
-rnx run \
+rnx job run \
   --network=secure-db \
   --volume=secure-data \
   --env=POSTGRES_PASSWORD_FILE=/volumes/secure-data/password \
   postgres
 
 # 3. Access only through application
-rnx run \
+rnx job run \
   --network=secure-db \
   --upload=db-client.py \
   python db-client.py
@@ -484,7 +484,7 @@ rnx network create dev-full --cidr=10.60.0.0/24
 rnx network create prod-restricted --cidr=10.61.0.0/24
 
 # Use network=none for maximum security
-rnx run \
+rnx job run \
   --network=none \
   --volume=offline-data \
   python process_sensitive.py
@@ -497,35 +497,35 @@ rnx run \
 ```bash
 # Limit total I/O operations (affects network, disk, all I/O)
 # Note: --max-iobps controls all I/O operations, not network-specific bandwidth
-rnx run \
+rnx job run \
   --max-iobps=10485760 \
   --network=bridge \
   wget https://example.com/large-file.zip
 
 # Set memory and CPU limits along with network isolation
-rnx run \
+rnx job run \
   --max-memory=512M \
   --max-cpu=50 \
   --network=isolated \
   python data-processing.py
 
 # Test network performance within resource constraints
-rnx run --network=bridge iperf3 -c iperf.server.com
+rnx job run --network=bridge iperf3 -c iperf.server.com
 ```
 
 ### Network Performance Testing
 
 ```bash
 # Test latency
-rnx run --network=mynet ping -c 10 8.8.8.8
+rnx job run --network=mynet ping -c 10 8.8.8.8
 
 # Test bandwidth
-rnx run --network=mynet \
+rnx job run --network=mynet \
   curl -o /dev/null -w "Download Speed: %{speed_download} bytes/sec\n" \
   https://speed.cloudflare.com/__down?bytes=10000000
 
 # DNS performance
-rnx run --network=mynet \
+rnx job run --network=mynet \
   dig @8.8.8.8 google.com
 ```
 
@@ -536,11 +536,11 @@ rnx run --network=mynet \
 rnx network create fast-local --cidr=10.70.0.0/24
 
 # Run communicating services together in same network
-rnx run --network=fast-local data-producer
-rnx run --network=fast-local data-consumer
+rnx job run --network=fast-local data-producer
+rnx job run --network=fast-local data-consumer
 
 # Use bridge network for balanced performance and isolation
-rnx run --network=bridge iperf3 -c remote-server
+rnx job run --network=bridge iperf3 -c remote-server
 ```
 
 ## Best Practices
@@ -592,9 +592,9 @@ rnx network create app-tier --cidr=10.10.2.0/24    # Application
 rnx network create data-tier --cidr=10.10.3.0/24   # Database
 
 # Run services in appropriate tiers
-rnx run --network=dmz nginx
-rnx run --network=app-tier python app.py
-rnx run --network=data-tier postgres
+rnx job run --network=dmz nginx
+rnx job run --network=app-tier python app.py
+rnx job run --network=data-tier postgres
 ```
 
 ### 4. Network Cleanup
@@ -605,7 +605,7 @@ rnx run --network=data-tier postgres
 # List unused networks (no running jobs)
 for network in $(rnx network list --json | jq -r '.networks[].name'); do
   if [ "$network" != "bridge" ]; then
-    JOBS=$(rnx list --json | jq --arg net "$network" '.[] | select(.network == $net) | .id')
+    JOBS=$(rnx job list --json | jq --arg net "$network" '.[] | select(.network == $net) | .id')
     if [ -z "$JOBS" ]; then
       echo "Network $network appears unused"
       # rnx network remove $network
@@ -623,13 +623,13 @@ rnx network list --json | \
 
 ```bash
 # Network usage monitoring
-rnx run --network=myapp ifstat 1 10
+rnx job run --network=myapp ifstat 1 10
 
 # Connection tracking
-rnx run --network=myapp netstat -an | grep ESTABLISHED
+rnx job run --network=myapp netstat -an | grep ESTABLISHED
 
 # DNS resolution testing
-rnx run --network=myapp nslookup google.com
+rnx job run --network=myapp nslookup google.com
 ```
 
 ## Troubleshooting
@@ -649,69 +649,69 @@ rnx network create mynet --cidr=10.99.0.0/24  # Use unique range
 
 ```bash
 # Check network mode
-rnx run --network=custom-net ping 8.8.8.8
+rnx job run --network=custom-net ping 8.8.8.8
 
 # If fails, check if network has NAT enabled
 # Bridge network should have internet access
-rnx run --network=bridge ping google.com
+rnx job run --network=bridge ping google.com
 ```
 
 **3. Jobs Cannot Communicate**
 
 ```bash
 # Ensure jobs are in same network
-rnx run --network=app-net nc -l 8080
-rnx run --network=app-net nc <job-ip> 8080  # Should connect
+rnx job run --network=app-net nc -l 8080
+rnx job run --network=app-net nc <job-ip> 8080  # Should connect
 
 # Different networks cannot communicate
-rnx run --network=net1 nc -l 8080
-rnx run --network=net2 nc <job-ip> 8080  # Will fail
+rnx job run --network=net1 nc -l 8080
+rnx job run --network=net2 nc <job-ip> 8080  # Will fail
 ```
 
 **4. DNS Resolution Issues**
 
 ```bash
 # Test DNS
-rnx run --network=mynet nslookup google.com
+rnx job run --network=mynet nslookup google.com
 
 # Check resolv.conf
-rnx run --network=mynet cat /etc/resolv.conf
+rnx job run --network=mynet cat /etc/resolv.conf
 
 # Use specific DNS
-rnx run --network=mynet dig @1.1.1.1 cloudflare.com
+rnx job run --network=mynet dig @1.1.1.1 cloudflare.com
 ```
 
 **5. Network Performance Issues**
 
 ```bash
 # Check network interface
-rnx run --network=slow-net ip link show
+rnx job run --network=slow-net ip link show
 
 # Test bandwidth
-rnx run --network=slow-net \
+rnx job run --network=slow-net \
   dd if=/dev/zero bs=1M count=100 | nc remote-host 9999
 
 # Check for packet loss
-rnx run --network=slow-net ping -c 100 target-host
+rnx job run --network=slow-net ping -c 100 target-host
 ```
 
 ### Debugging Commands
 
 ```bash
 # Show network interfaces
-rnx run --network=debug-net ip addr show
+rnx job run --network=debug-net ip addr show
 
 # Show routing table
-rnx run --network=debug-net ip route show
+rnx job run --network=debug-net ip route show
 
 # Show network statistics
-rnx run --network=debug-net netstat -i
+rnx job run --network=debug-net netstat -i
 
 # Trace network path
-rnx run --network=debug-net traceroute google.com
+rnx job run --network=debug-net traceroute google.com
 
 # Check connectivity
-rnx run --network=debug-net nc -zv target-host 80
+rnx job run --network=debug-net nc -zv target-host 80
 ```
 
 ## Examples
@@ -726,19 +726,19 @@ rnx network create data-processing-net --cidr=10.80.3.0/24
 
 # Deploy ML pipeline components
 # Training job with GPUs
-rnx run \
+rnx job run \
   --network=training-net \
   --upload-dir=./models \
   python3 train_model.py --epochs=100 --batch-size=128
 
 # Inference/evaluation job
-rnx run \
+rnx job run \
   --network=inference-net \
   --upload-dir=./models \
   python3 evaluate.py --model-path=/volumes/models/latest
 
 # Data preprocessing
-rnx run \
+rnx job run \
   --network=data-processing-net \
   python3 preprocess.py --input=/volumes/raw --output=/volumes/processed
 ```
@@ -750,12 +750,12 @@ rnx run \
 rnx network create test-env --cidr=10.90.0.0/24
 
 # Run test database
-rnx run \
+rnx job run \
   --network=test-env \
   postgres
 
 # Run integration tests
-rnx run \
+rnx job run \
   --network=test-env \
   --upload-dir=./tests \
   pytest integration_tests/
@@ -769,12 +769,12 @@ rnx network create ml-dev --cidr=10.100.0.0/24
 
 # Start supporting services for ML development
 # Jupyter notebook server for experimentation
-rnx run --network=ml-dev --name=jupyter python3 -m jupyter notebook --ip=0.0.0.0
+rnx job run --network=ml-dev --name=jupyter python3 -m jupyter notebook --ip=0.0.0.0
 # TensorBoard for monitoring training
-rnx run --network=ml-dev --name=tensorboard tensorboard --logdir=/volumes/logs
+rnx job run --network=ml-dev --name=tensorboard tensorboard --logdir=/volumes/logs
 
 # Run training experiment with live monitoring
-rnx run \
+rnx job run \
   --network=ml-dev \
   --volume=experiments \
   --upload-dir=./experiments \

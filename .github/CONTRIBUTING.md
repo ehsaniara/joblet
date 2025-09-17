@@ -145,7 +145,7 @@ golangci-lint run
 # 5. Build and test integration
 make all
 ./bin/joblet &
-./bin/rnx run echo "test"
+./bin/rnx job run echo "test"
 
 # 6. Commit with conventional format
 git commit -m "feat(core): add job timeout configuration
@@ -408,19 +408,19 @@ sleep 2
 
 # Test basic job execution
 echo "Testing basic job execution..."
-JOB_ID=$(./bin/rnx run echo "e2e-test" | grep "ID:" | cut -d' ' -f2)
+JOB_ID=$(./bin/rnx job run echo "e2e-test" | grep "ID:" | cut -d' ' -f2)
 
 # Test job status
 echo "Testing job status..."
-./bin/rnx status "$JOB_ID"
+./bin/rnx job status "$JOB_ID"
 
 # Test job listing
 echo "Testing job listing..."
-./bin/rnx list | grep "$JOB_ID"
+./bin/rnx job list | grep "$JOB_ID"
 
 # Test log streaming
 echo "Testing log streaming..."
-./bin/rnx log "$JOB_ID" | grep "e2e-test"
+./bin/rnx job log "$JOB_ID" | grep "e2e-test"
 
 echo "E2E tests completed successfully!"
 ```

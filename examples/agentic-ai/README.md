@@ -18,16 +18,16 @@ Examples demonstrating how to use Joblet for AI systems, LLM workflows, and agen
 
 ```bash
 # Run specific AI job using the workflow
-rnx run --workflow=jobs.yaml:multi-agent      # Run multi-agent system
-rnx run --workflow=jobs.yaml:llm-inference    # Run LLM inference
-rnx run --workflow=jobs.yaml:rag-system       # Run RAG system
-rnx run --workflow=jobs.yaml:distributed-training  # Run distributed training
+rnx job run --workflow=jobs.yaml:multi-agent      # Run multi-agent system
+rnx job run --workflow=jobs.yaml:llm-inference    # Run LLM inference
+rnx job run --workflow=jobs.yaml:rag-system       # Run RAG system
+rnx job run --workflow=jobs.yaml:distributed-training  # Run distributed training
 
 # Run all demos using template
-rnx run --workflow=jobs.yaml:run-all
+rnx job run --workflow=jobs.yaml:run-all
 
 # Setup dependencies first
-rnx run --workflow=jobs.yaml:setup-deps
+rnx job run --workflow=jobs.yaml:setup-deps
 ```
 
 ### Run All Demos (Traditional Method)
@@ -68,7 +68,7 @@ Language model inference service with intelligent caching and performance metric
 
 ```bash
 # Deploy LLM inference service
-rnx run --upload=llm_inference.py \
+rnx job run --upload=llm_inference.py \
        --volume=ai-cache \
        --volume=ai-outputs \
        --volume=ai-metrics \
@@ -137,7 +137,7 @@ Coordinated multi-agent system with specialized agents for research, analysis, a
 
 ```bash
 # Run multi-agent coordination workflow
-rnx run --upload=multi_agent_system.py \
+rnx job run --upload=multi_agent_system.py \
        --volume=ai-outputs \
        --volume=ai-metrics \
        --max-memory=4096 \
@@ -205,7 +205,7 @@ Retrieval-Augmented Generation system with vector database and semantic search.
 
 ```bash
 # Run RAG system with knowledge base
-rnx run --upload=rag_system.py \
+rnx job run --upload=rag_system.py \
        --volume=ai-cache \
        --volume=ai-outputs \
        --volume=ai-metrics \
@@ -272,7 +272,7 @@ Distributed machine learning training simulation with multiple workers.
 
 ```bash
 # Run distributed training simulation
-rnx run --upload=distributed_training.py \
+rnx job run --upload=distributed_training.py \
        --volume=ai-models \
        --volume=ai-metrics \
        --max-memory=6144 \
@@ -361,40 +361,40 @@ After running the demos, check results in the following locations:
 
 ```bash
 # View inference results and metrics
-rnx run --volume=ai-outputs cat /volumes/ai-outputs/inference_results_*.json
-rnx run --volume=ai-metrics cat /volumes/ai-metrics/inference_metrics_*.json
+rnx job run --volume=ai-outputs cat /volumes/ai-outputs/inference_results_*.json
+rnx job run --volume=ai-metrics cat /volumes/ai-metrics/inference_metrics_*.json
 ```
 
 ### Multi-Agent Workflow Results
 
 ```bash
 # View agent coordination results
-rnx run --volume=ai-outputs cat /volumes/ai-outputs/workflow_results_*.json
-rnx run --volume=ai-metrics cat /volumes/ai-metrics/agent_metrics_*.json
+rnx job run --volume=ai-outputs cat /volumes/ai-outputs/workflow_results_*.json
+rnx job run --volume=ai-metrics cat /volumes/ai-metrics/agent_metrics_*.json
 ```
 
 ### RAG System Results
 
 ```bash
 # View RAG responses and knowledge base queries
-rnx run --volume=ai-outputs cat /volumes/ai-outputs/rag_demo_results_*.json
-rnx run --volume=ai-cache ls -la /volumes/ai-cache/
+rnx job run --volume=ai-outputs cat /volumes/ai-outputs/rag_demo_results_*.json
+rnx job run --volume=ai-cache ls -la /volumes/ai-cache/
 ```
 
 ### Distributed Training Results
 
 ```bash
 # View training results and model artifacts
-rnx run --volume=ai-models cat /volumes/ai-models/distributed_training_*.json
-rnx run --volume=ai-metrics cat /volumes/ai-metrics/training_metrics_*.json
+rnx job run --volume=ai-models cat /volumes/ai-models/distributed_training_*.json
+rnx job run --volume=ai-metrics cat /volumes/ai-metrics/training_metrics_*.json
 ```
 
 ### AI Pipeline Results
 
 ```bash
 # View complete pipeline results
-rnx run --volume=ai-outputs cat /volumes/ai-outputs/pipeline/evaluation_results.json
-rnx run --volume=ai-models cat /volumes/ai-models/pipeline/model_info.json
+rnx job run --volume=ai-outputs cat /volumes/ai-outputs/pipeline/evaluation_results.json
+rnx job run --volume=ai-models cat /volumes/ai-models/pipeline/model_info.json
 ```
 
 ## 🎯 Best Practices Demonstrated
@@ -436,10 +436,10 @@ rnx run --volume=ai-models cat /volumes/ai-models/pipeline/model_info.json
 rnx monitor
 
 # Check job status and resource usage
-rnx list
+rnx job list
 
 # View specific AI job logs
-rnx log <job-id>
+rnx job log <job-id>
 
 # Monitor AI volume usage
 rnx volume list

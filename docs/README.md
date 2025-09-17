@@ -43,15 +43,15 @@ Joblet runs jobs in isolated Linux namespaces with configurable resource limits.
 
 ```bash
 # Run jobs with pre-built runtime environments
-rnx run --runtime=python-3.11-ml pytest tests/
-rnx run --runtime=openjdk-21 --upload=pom.xml --upload=src/ mvn clean install
+rnx job run --runtime=python-3.11-ml pytest tests/
+rnx job run --runtime=openjdk-21 --upload=pom.xml --upload=src/ mvn clean install
 ```
 
 ### **Data Engineering & Analytics**
 
 ```bash
 # Isolated data processing with resource limits
-rnx run --max-memory=8192 --max-cpu=400 \
+rnx job run --max-memory=8192 --max-cpu=400 \
         --volume=data-lake \
         --runtime=python-3.11-ml \
         python process_big_data.py
@@ -62,8 +62,8 @@ rnx run --max-memory=8192 --max-cpu=400 \
 ```bash
 # Network-isolated service testing
 rnx network create test-env --cidr=10.10.0.0/24
-rnx run --network=test-env --runtime=openjdk-21 ./service-a
-rnx run --network=test-env --runtime=python-3.11-ml ./service-b
+rnx job run --network=test-env --runtime=openjdk-21 ./service-a
+rnx job run --network=test-env --runtime=python-3.11-ml ./service-b
 ```
 
 ### **Workflow Orchestration**
@@ -92,11 +92,11 @@ jobs:
 
 ```bash
 # Execute and monitor workflow with job names
-rnx run --workflow=ml-pipeline.yaml
-rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx job run --workflow=ml-pipeline.yaml
+rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # View workflow status with original YAML content (available from any workstation)
-rnx status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx job status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Output shows human-readable job names and dependencies:
 # JOB UUID        JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
@@ -109,12 +109,12 @@ rnx status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 ```bash
 # Resource-bounded health checks with timeout
-rnx run --max-cpu=10 --max-memory=64 \
+rnx job run --max-cpu=10 --max-memory=64 \
         --runtime=python-3.11 \
         python health_check.py
 
 # Isolated incident response tooling
-rnx run --network=isolated \
+rnx job run --network=isolated \
         --volume=incident-logs \
         ./debug-analyzer.sh
 ```
@@ -123,14 +123,14 @@ rnx run --network=isolated \
 
 ```bash
 # Multi-agent system with isolation
-rnx run --max-memory=4096 --runtime=python-3.11-ml \
+rnx job run --max-memory=4096 --runtime=python-3.11-ml \
         python agent_coordinator.py
 
-rnx run --max-memory=2048 --runtime=python-3.11-ml \
+rnx job run --max-memory=2048 --runtime=python-3.11-ml \
         --network=agent-net \
         python data_processing_agent.py
 
-rnx run --max-memory=1024 --runtime=python-3.11-ml \
+rnx job run --max-memory=1024 --runtime=python-3.11-ml \
         --network=agent-net \
         python monitoring_agent.py
 ```
@@ -200,7 +200,7 @@ rnx run --max-memory=1024 --runtime=python-3.11-ml \
 # Download from GitHub releases and run installation script
 
 # Run your first job
-rnx run echo "Hello, Joblet!"
+rnx job run echo "Hello, Joblet!"
 
 # Create a workflow
 cat > ml-pipeline.yaml << EOF
@@ -213,7 +213,7 @@ jobs:
 EOF
 
 # Execute the workflow
-rnx run --workflow=ml-pipeline.yaml
+rnx job run --workflow=ml-pipeline.yaml
 ```
 
 ## 🎮 Quick Command Reference
@@ -222,16 +222,16 @@ rnx run --workflow=ml-pipeline.yaml
 
 ```bash
 # Run basic commands
-rnx run echo "Hello World"
-rnx run --runtime=python-3.11-ml python script.py
-rnx run --runtime=openjdk-21 java MyApp
+rnx job run echo "Hello World"
+rnx job run --runtime=python-3.11-ml python script.py
+rnx job run --runtime=openjdk-21 java MyApp
 
 # Resource limits
-rnx run --max-memory=2048 --max-cpu=200 intensive-task
+rnx job run --max-memory=2048 --max-cpu=200 intensive-task
 
 # Multi-process jobs (see PROCESS_ISOLATION.md for details)
-rnx run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
-rnx run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
+rnx job run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
+rnx job run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
 ```
 
 ### Runtime Management
@@ -266,7 +266,7 @@ rnx network create my-network --cidr=10.0.0.0/24
 rnx volume create data-vol --size=10GB
 
 # Use in jobs
-rnx run --network=my-network --volume=data-vol app
+rnx job run --network=my-network --volume=data-vol app
 ```
 
 ## 🎯 Value Proposition

@@ -28,13 +28,13 @@ func NewListCmd() *cobra.Command {
 
 Examples:
   # List all jobs
-  rnx list
+  rnx job list
   
   # List all workflows
-  rnx list --workflow
+  rnx job list --workflow
   
   # List workflows in JSON format
-  rnx list --workflow --json`,
+  rnx job list --workflow --json`,
 		RunE: runList,
 	}
 

@@ -20,15 +20,15 @@ Basic examples of Joblet features.
 
 ```bash
 # Run specific example using the workflow
-rnx run --workflow=jobs.yaml:hello-world      # Basic hello world
-rnx run --workflow=jobs.yaml:file-ops         # File operations demo
-rnx run --workflow=jobs.yaml:resource-test    # Resource limits testing
-rnx run --workflow=jobs.yaml:volume-demo      # Volume storage demo
-rnx run --workflow=jobs.yaml:network-test     # Network isolation test
-rnx run --workflow=jobs.yaml:workflow         # Multi-step workflow
+rnx job run --workflow=jobs.yaml:hello-world      # Basic hello world
+rnx job run --workflow=jobs.yaml:file-ops         # File operations demo
+rnx job run --workflow=jobs.yaml:resource-test    # Resource limits testing
+rnx job run --workflow=jobs.yaml:volume-demo      # Volume storage demo
+rnx job run --workflow=jobs.yaml:network-test     # Network isolation test
+rnx job run --workflow=jobs.yaml:workflow         # Multi-step workflow
 
 # Run all demos using template
-rnx run --workflow=jobs.yaml:run-all-demos
+rnx job run --workflow=jobs.yaml:run-all-demos
 ```
 
 ### Run All Basic Examples (Traditional Method)
@@ -72,7 +72,7 @@ Learn the basics of running commands with Joblet.
 
 - **Job Submission**: How commands are sent to the Joblet server
 - **Isolation**: Each job runs in its own isolated environment
-- **Command Syntax**: Basic `rnx run <command>` usage
+- **Command Syntax**: Basic `rnx job run <command>` usage
 - **Output Handling**: How to see results from executed jobs
 
 ### Usage
@@ -178,7 +178,7 @@ Learn how to track job status and view logs.
 
 ### What It Demonstrates
 
-- Checking job status with `rnx list`
+- Checking job status with `rnx job list`
 - Viewing job logs with `rnx log`
 - Understanding job lifecycle states
 - Monitoring long-running jobs

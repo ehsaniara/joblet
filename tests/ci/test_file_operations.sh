@@ -32,7 +32,7 @@ test_file_upload_basic() {
     
     # Upload and use file in job (file is uploaded with same name)
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run --upload="$test_dir/file1.txt" cat file1.txt 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --upload="$test_dir/file1.txt" cat file1.txt 2>&1)
     
     # Extract job ID
     local job_id
@@ -49,7 +49,7 @@ test_file_upload_basic() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"Hello from file1"* ]]; then
         echo "File upload failed - content not found"
@@ -71,7 +71,7 @@ test_multiple_file_uploads() {
     
     # Upload multiple files
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run \
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run \
         --upload="$test_dir/file1.txt" \
         --upload="$test_dir/file2.txt" \
         sh -c 'cat file1.txt && echo "---" && cat file2.txt' 2>&1)
@@ -91,7 +91,7 @@ test_multiple_file_uploads() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"Hello from file1"* ]] || [[ "$job_logs" != *"Content of file2"* ]]; then
         echo "Multiple file upload failed"
@@ -113,7 +113,7 @@ test_directory_upload() {
     
     # Upload entire directory
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run \
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run \
         --upload-dir="$test_dir" \
         find . -type f -exec basename {} \; | sort 2>&1)
     
@@ -132,7 +132,7 @@ test_directory_upload() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     # Check if all files are present
     if [[ "$job_logs" != *"file1.txt"* ]] || \
@@ -157,7 +157,7 @@ test_workspace_isolation() {
     
     # Create file in first job and wait for it to complete
     local job1_output
-    job1_output=$(rnx --config "$RNX_CONFIG" run sh -c 'echo "job1 data" > job1.txt && pwd' 2>&1)
+    job1_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'echo "job1 data" > job1.txt && pwd' 2>&1)
     local job1_id
     job1_id=$(echo "$job1_output" | grep "^ID:" | awk '{print $2}')
     
@@ -172,11 +172,11 @@ test_workspace_isolation() {
     
     # Verify job1 completed and show its working directory
     local job1_logs
-    job1_logs=$(rnx --config "$RNX_CONFIG" log "$job1_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job1_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job1_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     # Now run job2 to check its workspace (should be different from job1)
     local job2_output
-    job2_output=$(rnx --config "$RNX_CONFIG" run sh -c 'pwd && ls job1.txt 2>/dev/null && echo "found_job1_file" || echo "workspace_empty"' 2>&1)
+    job2_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'pwd && ls job1.txt 2>/dev/null && echo "found_job1_file" || echo "workspace_empty"' 2>&1)
     local job2_id
     job2_id=$(echo "$job2_output" | grep "^ID:" | awk '{print $2}')
     
@@ -191,7 +191,7 @@ test_workspace_isolation() {
     
     # Get job2 logs
     local job2_logs
-    job2_logs=$(rnx --config "$RNX_CONFIG" log "$job2_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job2_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job2_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     # Check if workspaces are isolated
     if [[ "$job2_logs" == *"found_job1_file"* ]]; then
@@ -225,7 +225,7 @@ test_file_permissions() {
     
     # Upload and check permissions
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run \
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run \
         --upload="$test_dir/file1.txt" \
         ls -l file1.txt 2>&1)
     
@@ -244,7 +244,7 @@ test_file_permissions() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     # Check if file is present (basic check)
     if [[ "$job_logs" != *"file1.txt"* ]]; then
@@ -269,7 +269,7 @@ test_empty_file_upload() {
     
     # Upload empty file
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run \
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run \
         --upload="$test_dir/empty.txt" \
         sh -c 'wc -c empty.txt | cut -d" " -f1' 2>&1)
     
@@ -288,7 +288,7 @@ test_empty_file_upload() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"0"* ]]; then
         echo "Empty file upload failed - size not 0"

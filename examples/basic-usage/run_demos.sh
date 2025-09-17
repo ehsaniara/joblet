@@ -69,7 +69,7 @@ if ! command -v rnx &> /dev/null; then
 fi
 
 # Check server connection
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo -e "${RED}❌ Error: Cannot connect to Joblet server${NC}"
     echo "   Please ensure Joblet server is running and accessible"
     exit 1
@@ -90,7 +90,7 @@ echo ""
 # Server information
 echo "🌐 Joblet Server Information"
 echo "============================"
-echo "   Active jobs: $(rnx list 2>/dev/null | wc -l) (including header)"
+echo "   Active jobs: $(rnx job list 2>/dev/null | wc -l) (including header)"
 echo "   Volumes: $(rnx volume list 2>/dev/null | wc -l) (including header)"
 echo ""
 
@@ -168,8 +168,8 @@ echo "   cd ../python-analytics/    # Data science workflows"
 echo "   cd ../agentic-ai/          # AI agent systems and LLM inference"
 echo ""
 echo "2. 🔧 Try Your Own Jobs:"
-echo "   rnx run echo \"Hello, I understand Joblet now!\""
-echo "   rnx run --max-memory=256 --upload=myfile.txt python3 process.py"
+echo "   rnx job run echo \"Hello, I understand Joblet now!\""
+echo "   rnx job run --max-memory=256 --upload=myfile.txt python3 process.py"
 echo "   rnx volume create mydata --size=1GB --type=filesystem"
 echo ""
 echo "3. 📖 Learn More:"
@@ -197,7 +197,7 @@ echo "To clean up demo volumes (optional):"
 echo "   rnx volume remove demo-data    # Remove persistent demo volume"
 echo ""
 echo "Check current jobs:"
-rnx list
+rnx job list
 echo ""
 
 # Final message

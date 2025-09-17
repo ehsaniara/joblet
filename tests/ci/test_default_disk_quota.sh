@@ -12,7 +12,7 @@ test_default_disk_quota() {
     
     # Run a job that does NOT specify any volume
     local job_output
-    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run sh -c 'pwd; ls -la /; test -d /work && echo "Work directory info shown" || echo "Failed to access /work"' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'pwd; ls -la /; test -d /work && echo "Work directory info shown" || echo "Failed to access /work"' 2>&1)
     
     # Extract job ID
     local job_id
@@ -29,7 +29,7 @@ test_default_disk_quota() {
     
     # Get job logs - handle CI environment log streaming issues
     local job_logs
-    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id" 2>&1)
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1)
     
     # Check for log streaming errors (common in CI)
     if [[ "$job_logs" == *"buffer is closed"* ]] || [[ "$job_logs" == *"failed to stream logs"* ]]; then
@@ -82,11 +82,11 @@ test_no_volume_vs_volume_difference() {
     
     # Run job without volume (should have 1MB limit)
     local no_vol_output
-    no_vol_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run sh -c 'echo "No volume job"' 2>&1)
+    no_vol_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'echo "No volume job"' 2>&1)
     
     # Run job with volume (should have larger space)
     local with_vol_output
-    with_vol_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=test-quota-vol sh -c 'echo "With volume job"' 2>&1)
+    with_vol_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=test-quota-vol sh -c 'echo "With volume job"' 2>&1)
     
     # Get job IDs
     local no_vol_id with_vol_id
@@ -103,8 +103,8 @@ test_no_volume_vs_volume_difference() {
     
     # Get logs
     local no_vol_logs with_vol_logs
-    no_vol_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$no_vol_id" 2>&1 | grep -v "^\\[" | grep -v "^$")
-    with_vol_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$with_vol_id" 2>&1 | grep -v "^\\[" | grep -v "^$")
+    no_vol_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$no_vol_id" 2>&1 | grep -v "^\\[" | grep -v "^$")
+    with_vol_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$with_vol_id" 2>&1 | grep -v "^\\[" | grep -v "^$")
     
     if [[ "$no_vol_logs" == *"No volume job"* ]] && [[ "$with_vol_logs" == *"With volume job"* ]]; then
         echo "✓ Both job types executed successfully"

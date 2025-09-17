@@ -11,7 +11,7 @@ workloads, and any scenario requiring strict resource control.
 
 - **Two-Stage Security Architecture**: Server Mode (privileged) creates cgroups and namespaces, while Init Mode (
   unprivileged) runs jobs as PID 1 in isolation
-- **Real-time Job Streaming**: Stream job output from start to finish with `rnx log <job-id>`
+- **Real-time Job Streaming**: Stream job output from start to finish with `rnx job log <job-id>`
 - **mTLS Communication**: Secure client-server communication using mutual TLS
 - **Resource Limits**: Fine-grained control over CPU, memory, and I/O resources
 - **Pre-built Runtimes**: Python, Java (OpenJDK), GraalVM environments with instant startup
@@ -92,8 +92,8 @@ sudo systemctl enable joblet
 sudo systemctl status joblet
 
 # Test with local RNX client
-rnx list
-rnx run echo "Joblet is working!"
+rnx job list
+rnx job run echo "Joblet is working!"
 
 # Check logs if needed
 sudo journalctl -u joblet -f
@@ -171,13 +171,13 @@ scp ubuntu@YOUR_SERVER_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/
 
 ```bash
 # List jobs (should connect to server)
-rnx list
+rnx job list
 
 # Check server status
 rnx monitor status
 
 # Run a simple test job
-rnx run echo "Hello from macOS client!"
+rnx job run echo "Hello from macOS client!"
 ```
 
 ## Part 3: Running the Admin UI
@@ -229,13 +229,13 @@ Now let's explore different ways to create and run jobs using Joblet.
 
 ```bash
 # Basic echo command
-rnx run echo "Hello, Joblet!"
+rnx job run echo "Hello, Joblet!"
 
 # Run a Python script
-rnx run python3 -c "print('Processing data...')"
+rnx job run python3 -c "print('Processing data...')"
 
 # Run with resource limits
-rnx run --max-cpu=50 --max-memory=512 stress --cpu 2 --timeout 10
+rnx job run --max-cpu=50 --max-memory=512 stress --cpu 2 --timeout 10
 ```
 
 ### Example 2: File Upload and Processing
@@ -267,7 +267,7 @@ Run the analysis job:
 
 ```bash
 # Upload files and run analysis
-rnx run --upload=analyze.py --upload=data.csv \
+rnx job run --upload=analyze.py --upload=data.csv \
   --runtime=python-3.11-ml \
   python3 analyze.py
 ```
@@ -280,7 +280,7 @@ execution:
 ```bash
 # Python with ML libraries (NumPy, Pandas, Scikit-learn)
 # Note: Make sure you've installed the runtime first with: rnx runtime install python-3.11-ml
-rnx run --runtime=python-3.11-ml python3 -c "
+rnx job run --runtime=python-3.11-ml python3 -c "
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -291,11 +291,11 @@ print(f'Pandas version: {pd.__version__}')
 
 # Java application
 # Note: Install first with: rnx runtime install openjdk-21
-rnx run --runtime=openjdk-21 java -version
+rnx job run --runtime=openjdk-21 java -version
 
 # GraalVM for high-performance Java
 # Note: Install first with: rnx runtime install graalvmjdk-21
-rnx run --runtime=graalvmjdk-21 java -version
+rnx job run --runtime=graalvmjdk-21 java -version
 ```
 
 The benefit of runtimes: After the initial installation, jobs start in 2-3 seconds with all dependencies ready, versus
@@ -339,50 +339,50 @@ Run the workflow:
 
 ```bash
 # Run a specific job from the workflow
-rnx run --workflow=jobs.yaml:data-prep
+rnx job run --workflow=jobs.yaml:data-prep
 
 # Run the entire workflow (all jobs with dependencies)
-rnx run --workflow=jobs.yaml
+rnx job run --workflow=jobs.yaml
 
 # Check workflow status
-rnx status --workflow <workflow-id>
+rnx job status --workflow <workflow-id>
 ```
 
 ### Example 5: Long-running Jobs with Monitoring
 
 ```bash
 # Start a web server
-rnx run --runtime=python-3.11 \
+rnx job run --runtime=python-3.11 \
   python3 -m http.server 8000 &
 
 # Get the job ID
-JOB_ID=$(rnx list --json | jq -r '.[-1].uuid')
+JOB_ID=$(rnx job list --json | jq -r '.[-1].uuid')
 
 # Monitor the job
-rnx status $JOB_ID
+rnx job status $JOB_ID
 
 # Stream logs in real-time
-rnx log $JOB_ID
+rnx job log $JOB_ID
 
 # Stop the job when done
-rnx stop $JOB_ID
+rnx job stop $JOB_ID
 ```
 
 ### Example 6: Network Isolation
 
 ```bash
 # No network access
-rnx run --network=none python3 process_local.py
+rnx job run --network=none python3 process_local.py
 
 # External network only (no inter-job communication)
-rnx run --network=isolated curl https://api.github.com
+rnx job run --network=isolated curl https://api.github.com
 
 # Custom network for job communication
-rnx run --network=backend --runtime=python-3.11 \
+rnx job run --network=backend --runtime=python-3.11 \
   python3 -m http.server 5000 &
 
 # Another job on the same network can access it
-rnx run --network=backend \
+rnx job run --network=backend \
   curl http://job_<first-job-id>:5000
 ```
 
@@ -393,11 +393,11 @@ rnx run --network=backend \
 rnx volume create mydata --size=1GB
 
 # Write data to the volume
-rnx run --volume=mydata \
+rnx job run --volume=mydata \
   bash -c "echo 'Persistent data' > /volumes/mydata/data.txt"
 
 # Read data from the volume in another job
-rnx run --volume=mydata \
+rnx job run --volume=mydata \
   cat /volumes/mydata/data.txt
 ```
 
@@ -447,10 +447,10 @@ openssl x509 -in ~/.rnx/client.crt -text -noout
 
 ```bash
 # Check job logs
-rnx log <job-id>
+rnx job log <job-id>
 
 # View detailed job status
-rnx status <job-id>
+rnx job status <job-id>
 
 # Check server logs
 sudo journalctl -u joblet -f

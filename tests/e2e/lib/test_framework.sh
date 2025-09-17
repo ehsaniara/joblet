@@ -146,9 +146,9 @@ run_job() {
     
     local job_output
     if [[ -n "$runtime" ]]; then
-        job_output=$("$RNX_BINARY" run --runtime="$runtime" "$command" 2>&1)
+        job_output=$("$RNX_BINARY" job run --runtime="$runtime" "$command" 2>&1)
     else
-        job_output=$("$RNX_BINARY" run "$command" 2>&1)
+        job_output=$("$RNX_BINARY" job run "$command" 2>&1)
     fi
     
     echo "$job_output" | grep "ID:" | awk '{print $2}'
@@ -160,9 +160,9 @@ run_python_job() {
     # Run python with separate arguments instead of one quoted command
     local job_output
     if [[ -n "$DEFAULT_RUNTIME" ]]; then
-        job_output=$("$RNX_BINARY" run --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
+        job_output=$("$RNX_BINARY" job run --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
     else
-        job_output=$("$RNX_BINARY" run python3 -c "$python_code" 2>&1)
+        job_output=$("$RNX_BINARY" job run python3 -c "$python_code" 2>&1)
     fi
     echo "$job_output" | grep "ID:" | awk '{print $2}'
 }
@@ -191,7 +191,7 @@ get_job_logs() {
     
     # Brief wait to ensure logs are fully written
     sleep 0.2
-    "$RNX_BINARY" log "$job_id" 2>/dev/null
+    "$RNX_BINARY" job log "$job_id" 2>/dev/null
 }
 
 # Get clean output (no debug/info logs)
@@ -206,7 +206,7 @@ get_clean_output() {
 # Check job status
 check_job_status() {
     local job_id="$1"
-    local status_output=$("$RNX_BINARY" status "$job_id" 2>/dev/null)
+    local status_output=$("$RNX_BINARY" job status "$job_id" 2>/dev/null)
     if [[ -z "$status_output" ]]; then
         echo "UNKNOWN"
         return

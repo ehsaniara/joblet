@@ -83,7 +83,7 @@ test_volume_with_job_filesystem() {
     
     # Create a file in the volume and verify it persists
     local job_output
-    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=test-fs-vol sh -c 'echo "persistent data" > /work/test.txt && cat /work/test.txt' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=test-fs-vol sh -c 'echo "persistent data" > /work/test.txt && cat /work/test.txt' 2>&1)
     
     # Extract job ID
     local job_id
@@ -100,7 +100,7 @@ test_volume_with_job_filesystem() {
     
     # Get job logs - handle CI environment log streaming issues
     local job_logs
-    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id" 2>&1)
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1)
     
     # Check for log streaming errors (common in CI)
     if [[ "$job_logs" == *"buffer is closed"* ]] || [[ "$job_logs" == *"failed to stream logs"* ]]; then
@@ -127,7 +127,7 @@ test_volume_with_job_filesystem() {
     
     # Run another job to verify data persistence
     local job_output2
-    job_output2=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=test-fs-vol cat /work/test.txt 2>&1)
+    job_output2=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=test-fs-vol cat /work/test.txt 2>&1)
     
     local job_id2
     job_id2=$(echo "$job_output2" | grep "^ID:" | awk '{print $2}')
@@ -142,7 +142,7 @@ test_volume_with_job_filesystem() {
     
     # Get job logs for persistence test
     local job_logs2
-    job_logs2=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id2" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs2=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id2" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs2" != *"persistent data"* ]]; then
         echo "Data persistence test failed"
@@ -159,7 +159,7 @@ test_volume_with_job_memory() {
     
     # Test memory volume functionality
     local job_output
-    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=test-mem-vol sh -c 'echo "temp data" > /work/temp.txt && cat /work/temp.txt' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=test-mem-vol sh -c 'echo "temp data" > /work/temp.txt && cat /work/temp.txt' 2>&1)
     
     # Extract job ID
     local job_id
@@ -176,7 +176,7 @@ test_volume_with_job_memory() {
     
     # Get job logs
     local job_logs
-    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"temp data"* ]]; then
         echo "Memory volume job failed"
@@ -193,13 +193,13 @@ test_volume_isolation() {
     
     # Run two jobs with different volumes to ensure isolation
     local job1_output
-    job1_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=test-fs-vol sh -c 'echo "fs-data" > /work/isolation.txt' 2>&1)
+    job1_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=test-fs-vol sh -c 'echo "fs-data" > /work/isolation.txt' 2>&1)
     
     local job1_id
     job1_id=$(echo "$job1_output" | grep "^ID:" | awk '{print $2}')
     
     local job2_output
-    job2_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=test-mem-vol sh -c 'ls /work/ || echo "no files"' 2>&1)
+    job2_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=test-mem-vol sh -c 'ls /work/ || echo "no files"' 2>&1)
     
     local job2_id
     job2_id=$(echo "$job2_output" | grep "^ID:" | awk '{print $2}')
@@ -214,7 +214,7 @@ test_volume_isolation() {
     
     # Check that memory volume doesn't have the filesystem volume's file
     local job2_logs
-    job2_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job2_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job2_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job2_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job2_logs" == *"isolation.txt"* ]]; then
         echo "Volume isolation failed - memory volume sees filesystem volume data"
@@ -240,7 +240,7 @@ test_volume_error_handling() {
     
     # Test using non-existent volume
     local nonexistent_output
-    nonexistent_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=nonexistent-vol echo "test" 2>&1 || echo "EXPECTED_ERROR")
+    nonexistent_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=nonexistent-vol echo "test" 2>&1 || echo "EXPECTED_ERROR")
     
     if [[ "$nonexistent_output" != *"EXPECTED_ERROR"* ]] && [[ "$nonexistent_output" != *"not found"* ]] && [[ "$nonexistent_output" != *"failed"* ]]; then
         echo "Using non-existent volume should fail"
@@ -268,7 +268,7 @@ test_volume_disk_quota() {
     # Note: This test may not always work in CI environments without loop device support
     # so we'll make it informational rather than failing
     local quota_test_output
-    quota_test_output=$("$RNX_BINARY" --config "$RNX_CONFIG" run --volume=quota-test sh -c 'dd if=/dev/zero of=/work/big-file bs=1M count=15 2>&1 || echo "QUOTA_ENFORCED"' 2>&1)
+    quota_test_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run --volume=quota-test sh -c 'dd if=/dev/zero of=/work/big-file bs=1M count=15 2>&1 || echo "QUOTA_ENFORCED"' 2>&1)
     
     # Get job ID and logs
     local quota_job_id
@@ -277,7 +277,7 @@ test_volume_disk_quota() {
     if [[ -n "$quota_job_id" ]]; then
         sleep 3
         local quota_logs
-        quota_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$quota_job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+        quota_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$quota_job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
         
         if [[ "$quota_logs" == *"QUOTA_ENFORCED"* ]] || [[ "$quota_logs" == *"No space left"* ]] || [[ "$quota_logs" == *"Disk quota exceeded"* ]]; then
             echo "✓ Disk quota appears to be working (limited disk space)"

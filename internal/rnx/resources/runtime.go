@@ -220,7 +220,7 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("\nUsage:")
-	fmt.Printf("  rnx run --runtime=%s <command>\n", runtimeSpec)
+	fmt.Printf("  rnx job run --runtime=%s <command>\n", runtimeSpec)
 
 	return nil
 }
@@ -232,7 +232,7 @@ func outputRuntimeInfoJSON(rt *pb.RuntimeInfo, runtimeSpec string) error {
 		"version":     rt.Version,
 		"description": rt.Description,
 		"packages":    rt.Packages,
-		"usage":       fmt.Sprintf("rnx run --runtime=%s <command>", runtimeSpec),
+		"usage":       fmt.Sprintf("rnx job run --runtime=%s <command>", runtimeSpec),
 	}
 
 	// Add requirements if they exist
@@ -310,7 +310,7 @@ func runRuntimeTest(cmd *cobra.Command, args []string) error {
 	// TODO: Read test_command from runtime.yml when implementing generic approach
 
 	fmt.Printf("\nTo test the runtime in a job:\n")
-	fmt.Printf("  rnx run --runtime=%s %s\n", runtimeSpec, testCmd)
+	fmt.Printf("  rnx job run --runtime=%s %s\n", runtimeSpec, testCmd)
 
 	return nil
 }

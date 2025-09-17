@@ -12,7 +12,7 @@ test_grpc_connectivity() {
     
     # Test basic connectivity by listing jobs
     local result
-    if ! result=$(rnx --config "$RNX_CONFIG" list 2>&1); then
+    if ! result=$("$RNX_BINARY" --config "$RNX_CONFIG" job list 2>&1); then
         echo "gRPC connectivity failed: $result"
         return 1
     fi
@@ -26,7 +26,7 @@ test_api_error_handling() {
     # Try to get status of non-existent job
     set +e
     local error_result
-    error_result=$(rnx --config "$RNX_CONFIG" status "non-existent-job-id" 2>&1)
+    error_result=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "non-existent-job-id" 2>&1)
     local exit_code=$?
     set -e
     
@@ -49,7 +49,7 @@ test_human_readable_output_format() {
     
     # Start a job and check output format
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sleep 2 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 2 2>&1)
     
     # Extract job ID
     local job_id
@@ -66,7 +66,7 @@ test_human_readable_output_format() {
     
     # Get job status and validate format
     local status_output
-    if ! status_output=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>&1); then
+    if ! status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>&1); then
         echo "Failed to get job status"
         return 1
     fi
@@ -93,7 +93,7 @@ test_concurrent_requests() {
     local job_ids=()
     for i in {1..3}; do
         local job_output
-        job_output=$(rnx --config "$RNX_CONFIG" run sleep 5 2>&1)
+        job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 5 2>&1)
         local job_id
         job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
         
@@ -105,7 +105,7 @@ test_concurrent_requests() {
     # Check all job statuses concurrently
     local pids=()
     for job_id in "${job_ids[@]}"; do
-        (rnx --config "$RNX_CONFIG" status "$job_id" >/dev/null) &
+        ("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" >/dev/null) &
         pids+=($!)
     done
     
@@ -119,7 +119,7 @@ test_concurrent_requests() {
     
     # Clean up jobs
     for job_id in "${job_ids[@]}"; do
-        rnx --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+        "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" >/dev/null 2>&1 || true
     done
     
     if [[ $failed -eq 1 ]]; then
@@ -135,7 +135,7 @@ test_large_output_handling() {
     
     # Generate job with large output
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sh -c 'for i in $(seq 1 100); do echo "Line $i: This is a test line with some content"; done' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'for i in $(seq 1 100); do echo "Line $i: This is a test line with some content"; done' 2>&1)
     
     # Extract job ID
     local job_id
@@ -151,7 +151,7 @@ test_large_output_handling() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     # Check if output contains expected content
     local line_count
@@ -171,7 +171,7 @@ test_special_characters_in_commands() {
     
     # Test command with special characters
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sh -c 'echo "Special chars: !@#$%^&*()[]{}|;:,.<>?"' 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sh -c 'echo "Special chars: !@#$%^&*()[]{}|;:,.<>?"' 2>&1)
     
     # Extract job ID
     local job_id
@@ -187,7 +187,7 @@ test_special_characters_in_commands() {
     
     # Get job logs
     local job_logs
-    job_logs=$(rnx --config "$RNX_CONFIG" log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1 | grep -v "^\[" | grep -v "^$")
     
     if [[ "$job_logs" != *"Special chars: !@#$%^&*()[]{}|;:,.<>?"* ]]; then
         echo "Special characters handling failed"
@@ -204,7 +204,7 @@ test_timeout_handling() {
     
     # Start long-running job and stop it (simulates timeout)
     local job_output
-    job_output=$(rnx --config "$RNX_CONFIG" run sleep 60 2>&1)
+    job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run sleep 60 2>&1)
     local job_id
     job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
@@ -216,14 +216,14 @@ test_timeout_handling() {
     # Wait a bit, then stop
     sleep 1
     local stop_result
-    stop_result=$(rnx --config "$RNX_CONFIG" stop "$job_id" 2>&1)
+    stop_result=$("$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" 2>&1)
     
     # Wait for status to update
     sleep 1
     
     # Verify job was stopped properly
     local status_output
-    status_output=$(rnx --config "$RNX_CONFIG" status "$job_id" 2>&1)
+    status_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>&1)
     local final_status
     final_status=$(echo "$status_output" | grep "^Status:" | awk '{print $2}')
     

@@ -14,7 +14,7 @@ Experience real-time log streaming with microsecond write latency and 5M+ writes
 
 ### **Real-Time Log Streaming**
 
-- **Live Updates**: Watch logs appear instantly with `rnx log -f`
+- **Live Updates**: Watch logs appear instantly with `rnx job log -f`
 - **Historical Access**: View complete job logs from start to finish
 - **Multiple Clients**: Concurrent streaming to multiple terminals
 - **Backpressure Handling**: Automatic cleanup of slow clients
@@ -45,35 +45,35 @@ Choose from:
 
 ```bash
 # Quick 10-second demo (100 counts at 10 logs/second)
-rnx run --workflow=jobs.yaml:quick-demo
+rnx job run --workflow=jobs.yaml:quick-demo
 
 # Standard demo (1000 counts at 10 logs/second) 
-rnx run --workflow=jobs.yaml:standard-demo
+rnx job run --workflow=jobs.yaml:standard-demo
 
 # High-frequency test (20 logs/second)
-rnx run --workflow=jobs.yaml:high-frequency
+rnx job run --workflow=jobs.yaml:high-frequency
 
 # Burst test (50 logs/second - tests async overflow)
-rnx run --workflow=jobs.yaml:burst-test
+rnx job run --workflow=jobs.yaml:burst-test
 
 # HPC simulation (10,000 counts over ~16 minutes)
-rnx run --workflow=jobs.yaml:hpc-simulation
+rnx job run --workflow=jobs.yaml:hpc-simulation
 
 # Stress test (100 logs/second)
-rnx run --workflow=jobs.yaml:stress-test
+rnx job run --workflow=jobs.yaml:stress-test
 ```
 
 ### **Option 3: Real-Time Streaming**
 
 ```bash
 # Start a logging job
-JOB_ID=$(rnx run --workflow=jobs.yaml:standard-demo | grep -o '[0-9a-f\-]*')
+JOB_ID=$(rnx job run --workflow=jobs.yaml:standard-demo | grep -o '[0-9a-f\-]*')
 
 # Stream logs in real-time (watch async system in action)
-rnx log -f $JOB_ID
+rnx job log -f $JOB_ID
 
 # View complete logs after job finishes
-rnx log --follow=false $JOB_ID
+rnx job log --follow=false $JOB_ID
 ```
 
 ## 📊 Available Logging Patterns
@@ -93,7 +93,7 @@ rnx log --follow=false $JOB_ID
 
 ```bash
 # Configure your own logging pattern
-START_NUM=0 END_NUM=5000 INTERVAL=0.05 rnx run --workflow=jobs.yaml:custom-range
+START_NUM=0 END_NUM=5000 INTERVAL=0.05 rnx job run --workflow=jobs.yaml:custom-range
 ```
 
 Environment variables:
@@ -108,15 +108,15 @@ Test multiple high-frequency loggers simultaneously:
 
 ```bash
 # Run multiple concurrent loggers
-rnx run --workflow=concurrent-logging.yaml
+rnx job run --workflow=concurrent-logging.yaml
 
 # Or start them individually
-rnx run --workflow=jobs.yaml:quick-demo &
-rnx run --workflow=jobs.yaml:quick-demo &
-rnx run --workflow=jobs.yaml:quick-demo &
+rnx job run --workflow=jobs.yaml:quick-demo &
+rnx job run --workflow=jobs.yaml:quick-demo &
+rnx job run --workflow=jobs.yaml:quick-demo &
 
 # Monitor all jobs
-rnx list
+rnx job list
 ```
 
 ## 📈 Performance Monitoring
@@ -128,26 +128,26 @@ rnx list
 rnx monitor status
 
 # View all active jobs
-rnx list
+rnx job list
 
 # Check specific job status
-rnx status <job-uuid>
+rnx job status <job-uuid>
 ```
 
 ### **Log Analysis**
 
 ```bash
 # Count total log entries
-rnx log --follow=false <job-uuid> | wc -l
+rnx job log --follow=false <job-uuid> | wc -l
 
 # Analyze timestamp precision
-rnx log --follow=false <job-uuid> | head -20
+rnx job log --follow=false <job-uuid> | head -20
 
 # Check for burst patterns
-rnx log --follow=false <job-uuid> | grep "BURST"
+rnx job log --follow=false <job-uuid> | grep "BURST"
 
 # Verify HPC simulation patterns
-rnx log --follow=false <job-uuid> | grep "PHASE\|ALLOC"
+rnx job log --follow=false <job-uuid> | grep "PHASE\|ALLOC"
 ```
 
 ## 🎛️ Logging Script Features
@@ -230,7 +230,7 @@ log_persistence:
 ### **Streaming Display**
 
 ```bash
-$ rnx log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
+$ rnx job log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 Logs for job f47ac10b-58cc-4372-a567-0e02b2c3d479 (Press Ctrl+C to exit):
 [2025-01-22 10:30:00.123] 🎯 Starting high-frequency logger
@@ -272,7 +272,7 @@ Logs for job f47ac10b-58cc-4372-a567-0e02b2c3d479 (Press Ctrl+C to exit):
 
 ```bash
 # Check job status
-rnx status <job-uuid>
+rnx job status <job-uuid>
 
 # Verify async log system configuration
 cat /opt/joblet/config/joblet-config.yml | grep -A 10 log_persistence
@@ -282,7 +282,7 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 10 log_persistence
 
 ```bash
 # Normal for stress tests - verify limits
-rnx status <job-uuid>
+rnx job status <job-uuid>
 
 # Monitor system resources
 rnx monitor status
@@ -292,10 +292,10 @@ rnx monitor status
 
 ```bash
 # Check interval configuration
-rnx status <job-uuid>
+rnx job status <job-uuid>
 
 # Use longer-running jobs
-rnx run --workflow=jobs.yaml:hpc-simulation
+rnx job run --workflow=jobs.yaml:hpc-simulation
 ```
 
 ### **Performance Validation**

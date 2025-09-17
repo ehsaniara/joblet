@@ -6,7 +6,7 @@
 # with various high-frequency logging patterns and real-time streaming.
 #
 # Features demonstrated:
-# - Real-time log streaming with `rnx log -f`
+# - Real-time log streaming with `rnx job log -f`
 # - Rate-decoupled async persistence (5M+ writes/second)
 # - Overflow protection during burst logging
 # - Multiple concurrent logging jobs
@@ -58,7 +58,7 @@ echo_info "This demo showcases Joblet's rate-decoupled async log persistence sys
 echo_info "optimized for HPC workloads with microsecond write latency and 5M+ writes/second."
 echo
 echo_info "Features being demonstrated:"
-echo "  • Real-time log streaming with rnx log -f"
+echo "  • Real-time log streaming with rnx job log -f"
 echo "  • High-frequency logging (10-100 logs/second)"
 echo "  • Async overflow protection strategies"
 echo "  • Concurrent job logging scenarios"
@@ -88,11 +88,11 @@ run_demo_job() {
     echo_header "Demo: $description"
     
     echo_info "Starting job: $job_name"
-    echo_command "rnx run --workflow=jobs.yaml:$job_name"
+    echo_command "rnx job run --workflow=jobs.yaml:$job_name"
     
     # Start the job and capture the job ID
     local job_output
-    job_output=$(rnx run --workflow=jobs.yaml:$job_name 2>&1)
+    job_output=$(rnx job run --workflow=jobs.yaml:$job_name 2>&1)
     local job_id
     job_id=$(echo "$job_output" | grep -E "Job [A-Za-z0-9-]+ started" | awk '{print $2}' || echo "")
     
@@ -116,10 +116,10 @@ run_demo_job() {
         echo_warning "Press Ctrl+C when ready to move to next demo"
         echo
         
-        echo_command "rnx log -f $job_id"
+        echo_command "rnx job log -f $job_id"
         
         # Stream logs with timeout or until user interrupts
-        timeout 30s rnx log -f "$job_id" 2>/dev/null || true
+        timeout 30s rnx job log -f "$job_id" 2>/dev/null || true
         
         echo
         echo_success "Log streaming demo completed"
@@ -128,13 +128,13 @@ run_demo_job() {
     # Show final status
     echo
     echo_info "Final job status:"
-    echo_command "rnx status $job_id"
-    rnx status "$job_id" || echo_warning "Could not retrieve job status"
+    echo_command "rnx job status $job_id"
+    rnx job status "$job_id" || echo_warning "Could not retrieve job status"
     
     # Save logs to file for later analysis
     local log_file="$LOG_DIR/${job_name}_${job_id}.log"
     echo_info "Saving complete logs to: $log_file"
-    rnx log --follow=false "$job_id" > "$log_file" 2>/dev/null || echo_warning "Could not save logs"
+    rnx job log --follow=false "$job_id" > "$log_file" 2>/dev/null || echo_warning "Could not save logs"
     
     echo
     sleep 2
@@ -152,9 +152,9 @@ demo_concurrent_logging() {
     
     # Start multiple jobs concurrently
     for i in {1..3}; do
-        echo_command "rnx run --workflow=jobs.yaml:quick-demo (job $i)"
+        echo_command "rnx job run --workflow=jobs.yaml:quick-demo (job $i)"
         local job_output
-        job_output=$(rnx run --workflow=jobs.yaml:quick-demo 2>&1)
+        job_output=$(rnx job run --workflow=jobs.yaml:quick-demo 2>&1)
         local job_id
         job_id=$(echo "$job_output" | grep -E "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" | head -1 | awk '{print $1}' || echo "")
         
@@ -177,7 +177,7 @@ demo_concurrent_logging() {
     for job_id in "${job_ids[@]}"; do
         if [[ -n "$job_id" ]]; then
             echo_info "Streaming logs from $job_id:"
-            timeout 10s rnx log -f "$job_id" 2>/dev/null &
+            timeout 10s rnx job log -f "$job_id" 2>/dev/null &
         fi
     done
     
@@ -191,8 +191,8 @@ demo_concurrent_logging() {
     echo_info "Final status of all concurrent jobs:"
     for job_id in "${job_ids[@]}"; do
         if [[ -n "$job_id" ]]; then
-            echo_command "rnx status $job_id"
-            rnx status "$job_id" || echo_warning "Could not retrieve status for $job_id"
+            echo_command "rnx job status $job_id"
+            rnx job status "$job_id" || echo_warning "Could not retrieve status for $job_id"
             echo
         fi
     done
@@ -252,7 +252,7 @@ echo "   • Burst logging up to system limits"
 echo "   • Multiple concurrent jobs handled seamlessly"
 echo
 echo "✅ Real-time streaming"
-echo "   • Live log updates via 'rnx log -f'"
+echo "   • Live log updates via 'rnx job log -f'"
 echo "   • Historical + live log access"
 echo "   • Multiple client streaming support"
 echo
@@ -279,16 +279,16 @@ echo_header "🚀 Next Steps"
 echo_info "Try these commands to explore the async log system further:"
 echo
 echo_command "# Run custom logging patterns"
-echo_command "START_NUM=5000 END_NUM=6000 INTERVAL=0.05 rnx run --workflow=jobs.yaml:custom-range"
+echo_command "START_NUM=5000 END_NUM=6000 INTERVAL=0.05 rnx job run --workflow=jobs.yaml:custom-range"
 echo
 echo_command "# Monitor system performance during logging"
 echo_command "rnx monitor status  # View system metrics in real-time"
 echo
 echo_command "# View all current jobs"
-echo_command "rnx list"
+echo_command "rnx job list"
 echo
 echo_command "# Run concurrent workflow"
-echo_command "rnx run --workflow=concurrent-logging.yaml"
+echo_command "rnx job run --workflow=concurrent-logging.yaml"
 
 echo_success "🎉 Async log system demo completed successfully!"
 echo_info "The rate-decoupled async architecture ensures your jobs never wait for disk I/O,"

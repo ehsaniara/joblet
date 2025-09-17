@@ -25,7 +25,7 @@ Comprehensive troubleshooting guide for common Joblet issues, error messages, an
 sudo systemctl status joblet
 
 # 2. Test client connectivity
-rnx list
+rnx job list
 
 # 3. Check server logs
 sudo journalctl -u joblet -f
@@ -34,7 +34,7 @@ sudo journalctl -u joblet -f
 sudo ss -tlnp | grep 50051
 
 # 5. Test simple job
-rnx run echo "health check"
+rnx job run echo "health check"
 
 # 6. Check system resources
 rnx monitor status
@@ -201,17 +201,17 @@ ping -M do -s 1472 joblet-server
 # Error: Job exits with code 127 (command not found)
 
 # Check command availability
-rnx run which python3
-rnx run echo $PATH
+rnx job run which python3
+rnx job run echo $PATH
 
 # Install required packages
-rnx run apt update && apt install -y python3
+rnx job run apt update && apt install -y python3
 
 # Use full path
-rnx run /usr/bin/python3 script.py
+rnx job run /usr/bin/python3 script.py
 
 # Check uploaded files
-rnx run ls -la /work
+rnx job run ls -la /work
 ```
 
 ### Command Not Found
@@ -220,15 +220,15 @@ rnx run ls -la /work
 # Error: "bash: command not found"
 
 # Check available commands
-rnx run ls -la /usr/bin/
-rnx run echo $PATH
+rnx job run ls -la /usr/bin/
+rnx job run echo $PATH
 
 # Use alternative commands
-rnx run sh -c "echo test"  # Instead of bash
-rnx run python3 -c "print('test')"  # Instead of python
+rnx job run sh -c "echo test"  # Instead of bash
+rnx job run python3 -c "print('test')"  # Instead of python
 
 # Install packages if allowed
-rnx run apt update && apt install -y curl
+rnx job run apt update && apt install -y curl
 ```
 
 ### File Upload Issues
@@ -240,13 +240,13 @@ rnx run apt update && apt install -y curl
 ls -la script.py
 
 # 2. Check upload was specified
-rnx run --upload=script.py ls -la /work
+rnx job run --upload=script.py ls -la /work
 
 # 3. Use correct filename
-rnx run --upload=script.py python3 script.py  # Not ./script.py
+rnx job run --upload=script.py python3 script.py  # Not ./script.py
 
 # 4. Check file permissions
-rnx run --upload=script.py ls -la script.py
+rnx job run --upload=script.py ls -la script.py
 ```
 
 ### Environment Issues
@@ -255,13 +255,13 @@ rnx run --upload=script.py ls -la script.py
 # Error: "environment variable not set"
 
 # 1. Set environment variable
-rnx run --env=DATABASE_URL=postgres://localhost/db python app.py
+rnx job run --env=DATABASE_URL=postgres://localhost/db python app.py
 
 # 2. Check environment
-rnx run env | grep DATABASE
+rnx job run env | grep DATABASE
 
 # 3. Use defaults in script
-rnx run python -c "import os; print(os.getenv('VAR', 'default'))"
+rnx job run python -c "import os; print(os.getenv('VAR', 'default'))"
 ```
 
 ### Working Directory Issues
@@ -270,16 +270,16 @@ rnx run python -c "import os; print(os.getenv('VAR', 'default'))"
 # Error: "no such file or directory" for relative paths
 
 # 1. Check current directory
-rnx run pwd
+rnx job run pwd
 
 # 2. Set working directory
-rnx run --workdir=/work/app npm start
+rnx job run --workdir=/work/app npm start
 
 # 3. Use absolute paths
-rnx run python3 /work/script.py
+rnx job run python3 /work/script.py
 
 # 4. Check uploaded directory structure
-rnx run --upload-dir=./project find /work -type f
+rnx job run --upload-dir=./project find /work -type f
 ```
 
 ## Resource and Performance
@@ -290,19 +290,19 @@ rnx run --upload-dir=./project find /work -type f
 # Error: "Killed" or "Out of memory"
 
 # 1. Check current memory limit
-rnx status <job-id> | grep "Max Memory"
+rnx job status <job-id> | grep "Max Memory"
 
 # 2. Increase memory limit
-rnx run --max-memory=2048 python memory_intensive.py
+rnx job run --max-memory=2048 python memory_intensive.py
 
 # 3. Monitor actual usage
-rnx run --max-memory=1024 python -c "
+rnx job run --max-memory=1024 python -c "
 import psutil
 print(f'Memory usage: {psutil.virtual_memory().percent}%')
 "
 
 # 4. Optimize memory usage
-rnx run python -c "
+rnx job run python -c "
 import gc
 # Process data in chunks
 # Use generators instead of lists
@@ -316,16 +316,16 @@ gc.collect()
 # Job running slowly or timing out
 
 # 1. Check CPU limits
-rnx status <job-id> | grep "Max CPU"
+rnx job status <job-id> | grep "Max CPU"
 
 # 2. Increase CPU allocation
-rnx run --max-cpu=200 compute_intensive.py
+rnx job run --max-cpu=200 compute_intensive.py
 
 # 3. Monitor CPU usage
 rnx monitor
 
 # 4. Use multiple cores efficiently
-rnx run --cpu-cores="0-3" make -j4
+rnx job run --cpu-cores="0-3" make -j4
 ```
 
 ### I/O Bandwidth Limits
@@ -334,17 +334,17 @@ rnx run --cpu-cores="0-3" make -j4
 # Error: "Operation timed out" for file operations
 
 # 1. Check I/O limits
-rnx status <job-id> | grep "Max IO"
+rnx job status <job-id> | grep "Max IO"
 
 # 2. Increase I/O bandwidth
-rnx run --max-iobps=52428800 rsync -av /large/dataset/
+rnx job run --max-iobps=52428800 rsync -av /large/dataset/
 
 # 3. Use memory volumes for temporary I/O
 rnx volume create temp-io --size=2GB --type=memory
-rnx run --volume=temp-io process_data.py
+rnx job run --volume=temp-io process_data.py
 
 # 4. Optimize I/O patterns
-rnx run python -c "
+rnx job run python -c "
 # Read in larger chunks
 # Use buffered I/O
 # Minimize random access
@@ -360,10 +360,10 @@ rnx run python -c "
 rnx monitor status
 
 # 2. List resource-heavy jobs
-rnx list --json | jq '.[] | select(.max_memory > 8192)'
+rnx job list --json | jq '.[] | select(.max_memory > 8192)'
 
 # 3. Stop problematic jobs
-rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .uuid' | head -5 | xargs rnx stop
+rnx job list --json | jq -r '.[] | select(.status == "RUNNING") | .uuid' | head -5 | xargs rnx job stop
 
 # 4. Adjust default limits
 # Edit /opt/joblet/config/joblet-config.yml
@@ -414,13 +414,13 @@ rnx volume create mydata --size=1GB --type=filesystem
 rnx volume list | grep mydata
 
 # 2. Verify mount point
-rnx run --volume=mydata ls -la /volumes/
+rnx job run --volume=mydata ls -la /volumes/
 
 # 3. Check volume permissions
-rnx run --volume=mydata ls -la /volumes/mydata
+rnx job run --volume=mydata ls -la /volumes/mydata
 
 # 4. Fix permissions if needed
-rnx run --volume=mydata chmod 755 /volumes/mydata
+rnx job run --volume=mydata chmod 755 /volumes/mydata
 ```
 
 ### Volume Space Issues
@@ -429,17 +429,17 @@ rnx run --volume=mydata chmod 755 /volumes/mydata
 # Error: "No space left on device"
 
 # 1. Check volume usage
-rnx run --volume=full-vol df -h /volumes/full-vol
+rnx job run --volume=full-vol df -h /volumes/full-vol
 
 # 2. Clean up files
-rnx run --volume=full-vol rm -f /volumes/full-vol/*.tmp
+rnx job run --volume=full-vol rm -f /volumes/full-vol/*.tmp
 
 # 3. Increase volume size (recreate)
 rnx volume remove full-vol
 rnx volume create full-vol --size=10GB
 
 # 4. Use cleanup script
-rnx run --volume=data bash -c '
+rnx job run --volume=data bash -c '
 find /volumes/data -mtime +7 -type f -delete
 '
 ```
@@ -467,13 +467,13 @@ ip addr show
 # Job cannot reach external sites
 
 # 1. Test from bridge network
-rnx run --network=bridge ping 8.8.8.8
+rnx job run --network=bridge ping 8.8.8.8
 
 # 2. Check DNS resolution
-rnx run --network=bridge nslookup google.com
+rnx job run --network=bridge nslookup google.com
 
 # 3. Use host network for debugging
-rnx run --network=host curl https://google.com
+rnx job run --network=host curl https://google.com
 
 # 4. Check custom network config
 # Custom networks may not have NAT enabled
@@ -485,18 +485,18 @@ rnx run --network=host curl https://google.com
 # Jobs in same network cannot communicate
 
 # 1. Verify same network
-rnx run --network=mynet ip addr show
+rnx job run --network=mynet ip addr show
 
 # 2. Test connectivity
-rnx run --network=mynet --name=server nc -l 8080 &
-rnx run --network=mynet nc server 8080
+rnx job run --network=mynet --name=server nc -l 8080 &
+rnx job run --network=mynet nc server 8080
 
 # 3. Check firewall/iptables
-rnx run --network=mynet iptables -L
+rnx job run --network=mynet iptables -L
 
 # 4. Use IP addresses instead of hostnames
-SERVER_IP=$(rnx run --network=mynet hostname -I | awk '{print $1}')
-rnx run --network=mynet nc $SERVER_IP 8080
+SERVER_IP=$(rnx job run --network=mynet hostname -I | awk '{print $1}')
+rnx job run --network=mynet nc $SERVER_IP 8080
 ```
 
 ## Certificate and Security
@@ -590,13 +590,13 @@ sudo journalctl -u joblet --since="1 hour ago" > joblet.log
 
 ```bash
 # Stream job logs (use Ctrl+C to stop)
-rnx log <job-id>
+rnx job log <job-id>
 
 # Search job logs
-rnx log <job-id> | grep ERROR
+rnx job log <job-id> | grep ERROR
 
 # Save logs for analysis
-rnx log <job-id> > job-output.log
+rnx job log <job-id> > job-output.log
 ```
 
 ### Audit Logs
@@ -639,8 +639,8 @@ rnx runtime install openjdk:21
 # ERROR: Runtime build failed
 
 # Check build job logs  
-rnx status <build-job-uuid>
-rnx log <build-job-uuid>
+rnx job status <build-job-uuid>
+rnx job log <build-job-uuid>
 ```
 
 **Solutions:**
@@ -694,7 +694,7 @@ rnx runtime install java:21
 
 ```bash
 # Check job type in environment
-rnx run env | grep JOB_TYPE
+rnx job run env | grep JOB_TYPE
 # Should show: JOB_TYPE=standard (for production jobs)
 
 # Check if runtime installation uses isolated environment
@@ -709,7 +709,7 @@ rnx runtime install test:1.0
 cat /opt/joblet/config/joblet-config.yml | grep -A 10 isolation
 
 # 2. Check job logs for isolation setup
-rnx log <job-uuid> | grep -i "isolation\|chroot"
+rnx job log <job-uuid> | grep -i "isolation\|chroot"
 
 # 3. Restart server if configuration changed
 sudo systemctl restart joblet
@@ -720,7 +720,7 @@ sudo systemctl restart joblet
 **Problem: Java runtime fails with "no such file or directory"**
 
 ```bash
-rnx run --runtime=openjdk:21 java -version
+rnx job run --runtime=openjdk:21 java -version
 # Error: exec failed: no such file or directory
 ```
 
@@ -736,19 +736,19 @@ rnx runtime info openjdk:21
 # Should show ~292MB with 192 files
 
 # Verify Java works in runtime
-rnx run --runtime=openjdk:21 java -version
+rnx job run --runtime=openjdk:21 java -version
 # Should output: openjdk version "21.0.8"
 
 # Test compilation works
 echo 'public class Test { public static void main(String[] args) { System.out.println("Hello!"); }}' > Test.java
-rnx run --runtime=openjdk:21 --upload=Test.java javac Test.java
-rnx run --runtime=openjdk:21 java Test
+rnx job run --runtime=openjdk:21 --upload=Test.java javac Test.java
+rnx job run --runtime=openjdk:21 java Test
 ```
 
 **Problem: Java compilation fails with security configuration errors**
 
 ```bash
-rnx run --runtime=openjdk:21 --upload=Test.java javac Test.java
+rnx job run --runtime=openjdk:21 --upload=Test.java javac Test.java
 # Exception: Error loading java.security file
 ```
 
@@ -784,15 +784,15 @@ rnx runtime list
 
 ```bash
 # Test that production job cannot access host filesystem
-rnx run --runtime=openjdk:21 find /usr -name "*.so" | wc -l
+rnx job run --runtime=openjdk:21 find /usr -name "*.so" | wc -l
 # Should show limited results (only isolated runtime files)
 
 # Test that runtime job cannot access joblet internals
-rnx run --runtime=openjdk:21 ls /opt/joblet/
+rnx job run --runtime=openjdk:21 ls /opt/joblet/
 # Should fail or show very limited access
 
 # Verify runtime files are copies, not host mounts
-rnx run --runtime=openjdk:21 ls -la /usr/lib/jvm/
+rnx job run --runtime=openjdk:21 ls -la /usr/lib/jvm/
 # Should show Java installation but isolated from host
 ```
 
@@ -802,7 +802,7 @@ rnx run --runtime=openjdk:21 ls -la /usr/lib/jvm/
 
 ```bash
 # Check runtime installation progress
-rnx status <installation-job-uuid> --follow
+rnx job status <installation-job-uuid> --follow
 
 # Monitor resource usage during build
 rnx monitor
@@ -821,7 +821,7 @@ runtime:
     timeout: "7200s"  # 2 hours instead of 1
 
 # 2. Monitor cleanup phase specifically
-rnx log <build-job-uuid> | grep -A 20 -B 5 "cleanup phase"
+rnx job log <build-job-uuid> | grep -A 20 -B 5 "cleanup phase"
 
 # 3. Check disk I/O during copy operations
 iostat -x 1 5
@@ -856,8 +856,8 @@ ip addr show
 iptables -L
 
 # 7. Job details (if job-related)
-rnx status <job-id>
-rnx log <job-id>
+rnx job status <job-id>
+rnx job log <job-id>
 ```
 
 ### Debugging Steps
@@ -893,7 +893,7 @@ What actually happens
 
 ## Steps to Reproduce
 
-1. Run `rnx run echo test`
+1. Run `rnx job run echo test`
 2. Observe error
 3. Check logs
 

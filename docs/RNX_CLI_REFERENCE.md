@@ -59,12 +59,12 @@ RNX searches for configuration in this order:
 
 ## Job Commands
 
-### `rnx run`
+### `rnx job run`
 
 Execute a command on the Joblet server.
 
 ```bash
-rnx run [flags] <command> [args...]
+rnx job run [flags] <command> [args...]
 ```
 
 #### Flags
@@ -89,57 +89,57 @@ rnx run [flags] <command> [args...]
 
 ```bash
 # Simple command
-rnx run echo "Hello, World!"
+rnx job run echo "Hello, World!"
 
 # With resource limits
-rnx run --max-cpu=50 --max-memory=512 --max-iobps=10485760 \
+rnx job run --max-cpu=50 --max-memory=512 --max-iobps=10485760 \
   python3 intensive_script.py
 
 # CPU core binding
-rnx run --cpu-cores="0-3" stress-ng --cpu 4 --timeout 60s
+rnx job run --cpu-cores="0-3" stress-ng --cpu 4 --timeout 60s
 
 # Multiple volumes
-rnx run --volume=data --volume=config \
+rnx job run --volume=data --volume=config \
   python3 process.py
 
 # Environment variables (regular - visible in logs)
-rnx run --env="NODE_ENV=production" --env="PORT=8080" \
+rnx job run --env="NODE_ENV=production" --env="PORT=8080" \
   node app.js
 
 # Secret environment variables (hidden from logs)
-rnx run --secret-env="API_KEY=dummy_api_key_123" --secret-env="DB_PASSWORD=secret" \
+rnx job run --secret-env="API_KEY=dummy_api_key_123" --secret-env="DB_PASSWORD=secret" \
   python app.py
 
 # Mixed environment variables
-rnx run --env="DEBUG=true" --secret-env="SECRET_KEY=mysecret" \
+rnx job run --env="DEBUG=true" --secret-env="SECRET_KEY=mysecret" \
   python app.py
 
 
 # File upload
-rnx run --upload=script.py --upload=data.csv \
+rnx job run --upload=script.py --upload=data.csv \
   python3 script.py data.csv
 
 # Directory upload
-rnx run --upload-dir=./project \
+rnx job run --upload-dir=./project \
   npm start
 
 # Scheduled execution
-rnx run --schedule="30min" backup.sh
-rnx run --schedule="2025-08-03T15:00:00" maintenance.sh
+rnx job run --schedule="30min" backup.sh
+rnx job run --schedule="2025-08-03T15:00:00" maintenance.sh
 
 # Custom network
-rnx run --network=isolated ping google.com
+rnx job run --network=isolated ping google.com
 
 # Workflow execution
-rnx run --workflow=ml-pipeline.yaml           # Execute full workflow
-rnx run --workflow=jobs.yaml:ml-analysis      # Execute specific job from workflow
+rnx job run --workflow=ml-pipeline.yaml           # Execute full workflow
+rnx job run --workflow=jobs.yaml:ml-analysis      # Execute specific job from workflow
 
 # Using runtime
-rnx run --runtime=python-3.11-ml python -c "import torch; print(torch.__version__)"
-rnx run --runtime=openjdk-21 java -version
+rnx job run --runtime=python-3.11-ml python -c "import torch; print(torch.__version__)"
+rnx job run --runtime=openjdk-21 java -version
 
 # Complex example
-rnx run \
+rnx job run \
   --max-cpu=200 \
   --max-memory=2048 \
   --cpu-cores="0,2,4,6" \
@@ -156,7 +156,7 @@ rnx run \
 When using `--workflow`, Joblet performs comprehensive pre-execution validation:
 
 ```bash
-$ rnx run --workflow=my-workflow.yaml
+$ rnx job run --workflow=my-workflow.yaml
 🔍 Validating workflow prerequisites...
 ✅ No circular dependencies found
 ✅ All required volumes exist
@@ -180,13 +180,13 @@ $ rnx run --workflow=my-workflow.yaml
 Error: workflow validation failed: network validation failed: missing networks: [non-existent-network]. Available networks: [bridge isolated none custom-net]
 ```
 
-### `rnx list`
+### `rnx job list`
 
 List all jobs or workflows on the server.
 
 ```bash
-rnx list [flags]              # List all jobs
-rnx list --workflow [flags]   # List all workflows
+rnx job list [flags]              # List all jobs
+rnx job list --workflow [flags]   # List all workflows
 ```
 
 #### Flags
@@ -214,7 +214,7 @@ information.
 
 ```bash
 # List all jobs (table format)
-rnx list
+rnx job list
 
 # Example output:
 # UUID                                 NAME         STATUS      START TIME           COMMAND
@@ -225,7 +225,7 @@ rnx list
 # c3d4e5f6-a7b8-9012-cdef-345678901234  -            SCHEDULED   N/A                  backup.sh
 
 # List all workflows (table format)
-rnx list --workflow
+rnx job list --workflow
 
 # Example output:
 # UUID                                 WORKFLOW             STATUS      PROGRESS
@@ -234,7 +234,7 @@ rnx list --workflow
 # b2c3d4e5-f6a7-8901-2345-678901bcdefg ml-pipeline.yaml     COMPLETED   5/5
 
 # JSON output for scripting
-rnx list --json
+rnx job list --json
 
 # Example JSON output:
 # [
@@ -263,18 +263,18 @@ rnx list --json
 # ]
 
 # Filter with jq
-rnx list --json | jq '.[] | select(.status == "FAILED")'
-rnx list --json | jq '.[] | select(.max_memory > 1024)'
+rnx job list --json | jq '.[] | select(.status == "FAILED")'
+rnx job list --json | jq '.[] | select(.max_memory > 1024)'
 ```
 
-### `rnx status`
+### `rnx job status`
 
 Get detailed status of a specific job or workflow.
 
 ```bash
-rnx status [flags] <job-uuid>              # Get job status
-rnx status --workflow <workflow-uuid>      # Get workflow status
-rnx status --workflow --detail <workflow-uuid>  # Get workflow status with YAML content
+rnx job status [flags] <job-uuid>              # Get job status
+rnx job status --workflow <workflow-uuid>      # Get workflow status
+rnx job status --workflow --detail <workflow-uuid>  # Get workflow status with YAML content
 ```
 
 #### Job Status
@@ -309,26 +309,26 @@ rnx status --workflow --detail <workflow-uuid>  # Get workflow status with YAML 
 
 ```bash
 # Get job status (human-readable format)
-rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Get workflow status
-rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Get workflow status with original YAML content
-rnx status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx job status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Get status in JSON format
-rnx status --json f47ac10b-58cc-4372-a567-0e02b2c3d479    # Job JSON output
-rnx status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef     # Workflow JSON output
-rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef  # Workflow JSON with YAML content
+rnx job status --json f47ac10b-58cc-4372-a567-0e02b2c3d479    # Job JSON output
+rnx job status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef     # Workflow JSON output
+rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef  # Workflow JSON with YAML content
 
 # Check multiple jobs/workflows
-for uuid in f47ac10b-58cc-4372-a567-0e02b2c3d479 a1b2c3d4-e5f6-7890-1234-567890abcdef; do rnx status $uuid; done
+for uuid in f47ac10b-58cc-4372-a567-0e02b2c3d479 a1b2c3d4-e5f6-7890-1234-567890abcdef; do rnx job status $uuid; done
 
 # JSON output for scripting
-rnx status --json f47ac10b-58cc-4372-a567-0e02b2c3d479 | jq .status      # Job status
-rnx status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .total_jobs   # Workflow progress
-rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .yaml_content  # Extract YAML content
+rnx job status --json f47ac10b-58cc-4372-a567-0e02b2c3d479 | jq .status      # Job status
+rnx job status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .total_jobs   # Workflow progress
+rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .yaml_content  # Extract YAML content
 
 # Example workflow status output:
 # Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
@@ -375,7 +375,7 @@ rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq 
 #### Example Workflow JSON Output with YAML Content
 
 ```bash
-# rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+# rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 {
   "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
   "workflow": "data-pipeline.yaml",
@@ -411,12 +411,12 @@ rnx status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq 
 - **Machine-readable format** for automation and scripting
 - **Complete workflow metadata** including job details and dependencies
 
-### `rnx log`
+### `rnx job log`
 
 Stream job logs in real-time.
 
 ```bash
-rnx log <job-uuid>
+rnx job log <job-uuid>
 ```
 
 Streams logs from running or completed jobs. Use Ctrl+C to stop following the log stream.
@@ -425,40 +425,40 @@ Streams logs from running or completed jobs. Use Ctrl+C to stop following the lo
 
 ```bash
 # Stream logs from a job
-rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Use standard Unix tools for filtering
-rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 | tail -100
-rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 | grep ERROR
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 | tail -100
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 | grep ERROR
 
 # Save logs to file
-rnx log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
 ```
 
-### `rnx stop`
+### `rnx job stop`
 
 Stop a running or scheduled job.
 
 ```bash
-rnx stop <job-uuid>
+rnx job stop <job-uuid>
 ```
 
 #### Examples
 
 ```bash
 # Stop a running job
-rnx stop f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Stop multiple jobs
-rnx list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | xargs -I {} rnx stop {}
+rnx job list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | xargs -I {} rnx job stop {}
 ```
 
-### `rnx delete`
+### `rnx job delete`
 
 Delete a job completely from the system.
 
 ```bash
-rnx delete <job-uuid>
+rnx job delete <job-uuid>
 ```
 
 Permanently removes the specified job including logs, metadata, and all associated resources. The job must be in a
@@ -468,18 +468,18 @@ completed, failed, or stopped state - running jobs cannot be deleted directly an
 
 ```bash
 # Delete a completed job
-rnx delete f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job delete f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Delete using short UUID (if unique)
-rnx delete f47ac10b
+rnx job delete f47ac10b
 ```
 
-### `rnx delete-all`
+### `rnx job delete-all`
 
 Delete all non-running jobs from the system.
 
 ```bash
-rnx delete-all [flags]
+rnx job delete-all [flags]
 ```
 
 Permanently removes all jobs that are not currently running or scheduled. Jobs in completed, failed, or stopped states
@@ -500,10 +500,10 @@ Complete deletion includes:
 
 ```bash
 # Delete all non-running jobs
-rnx delete-all
+rnx job delete-all
 
 # Delete all non-running jobs with JSON output
-rnx delete-all --json
+rnx job delete-all --json
 ```
 
 **Example JSON Output:**
@@ -1108,7 +1108,7 @@ rnx help config
 
 # Process files in parallel with resource limits
 for file in *.csv; do
-  rnx run \
+  rnx job run \
     --max-cpu=100 \
     --max-memory=1024 \
     --upload="$file" \
@@ -1119,9 +1119,9 @@ done
 wait
 
 # Collect results
-rnx list --json | jq -r '.[] | select(.status == "COMPLETED") | .id' | \
+rnx job list --json | jq -r '.[] | select(.status == "COMPLETED") | .id' | \
 while read job_uuid; do
-  rnx log "$job_uuid" > "result-$(echo $job_uuid | cut -c1-8).txt"
+  rnx job log "$job_uuid" > "result-$(echo $job_uuid | cut -c1-8).txt"
 done
 ```
 
@@ -1131,7 +1131,7 @@ done
 # GitHub Actions example
 - name: Run tests in Joblet
   run: |
-    rnx run \
+    rnx job run \
       --max-cpu=400 \
       --max-memory=4096 \
       --volume=test-results \
@@ -1140,11 +1140,11 @@ done
       npm test
 
     # Check job status
-    JOB_UUID=$(rnx list --json | jq -r '.[-1].uuid')
-    rnx status $JOB_UUID
+    JOB_UUID=$(rnx job list --json | jq -r '.[-1].uuid')
+    rnx job status $JOB_UUID
 
     # Get test results
-    rnx run --volume=test-results cat /volumes/test-results/report.xml
+    rnx job run --volume=test-results cat /volumes/test-results/report.xml
 ```
 
 ### Monitoring and Alerting
@@ -1152,10 +1152,10 @@ done
 ```bash
 # Monitor job failures
 while true; do
-  FAILED=$(rnx list --json | jq '[.[] | select(.status == "FAILED")] | length')
+  FAILED=$(rnx job list --json | jq '[.[] | select(.status == "FAILED")] | length')
   if [ $FAILED -gt 0 ]; then
     echo "Alert: $FAILED failed jobs detected"
-    rnx list --json | jq '.[] | select(.status == "FAILED")'
+    rnx job list --json | jq '.[] | select(.status == "FAILED")'
   fi
   sleep 60
 done

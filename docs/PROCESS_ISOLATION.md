@@ -5,7 +5,7 @@ process environment with complete separation from the host system.
 
 ## How Process Isolation Works
 
-When you run a job with `rnx run`, Joblet:
+When you run a job with `rnx job run`, Joblet:
 
 1. **Creates a PID namespace** - The job gets its own process space
 2. **Makes job process PID 1** - Your command becomes the init process in the namespace
@@ -27,7 +27,7 @@ In the isolated namespace:
 Create a job that spawns multiple child processes:
 
 ```bash
-rnx run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
+rnx job run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
 ```
 
 **Output:**
@@ -52,7 +52,7 @@ USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
 Create a more complex job with different types of processes:
 
 ```bash
-rnx run --runtime=python-3.11-ml bash -c "echo 'Starting processes...' && sleep 60 & echo 'Sleep started' && python3 -c 'import time; [print(f\"Python process {i}\") or time.sleep(1) for i in range(5)]' & echo 'Python started' && ps aux && echo 'Waiting for processes...' && wait"
+rnx job run --runtime=python-3.11-ml bash -c "echo 'Starting processes...' && sleep 60 & echo 'Sleep started' && python3 -c 'import time; [print(f\"Python process {i}\") or time.sleep(1) for i in range(5)]' & echo 'Python started' && ps aux && echo 'Waiting for processes...' && wait"
 ```
 
 **Process Tree Shows:**
@@ -68,7 +68,7 @@ rnx run --runtime=python-3.11-ml bash -c "echo 'Starting processes...' && sleep 
 Create processes and wait for them to complete:
 
 ```bash
-rnx run --runtime=python-3.11-ml bash -c "(sleep 10; echo 'Child 1 done') & (sleep 15; echo 'Child 2 done') & echo 'Both children started' && ps aux && wait && echo 'All processes completed'"
+rnx job run --runtime=python-3.11-ml bash -c "(sleep 10; echo 'Child 1 done') & (sleep 15; echo 'Child 2 done') & echo 'Both children started' && ps aux && wait && echo 'All processes completed'"
 ```
 
 This demonstrates:
@@ -109,19 +109,19 @@ All standard Linux process management commands work within the isolated namespac
 
 ```bash
 # View all processes in your job
-rnx run --runtime=python-3.11-ml ps aux
+rnx job run --runtime=python-3.11-ml ps aux
 
 # Monitor processes in real-time
-rnx run --runtime=python-3.11-ml top
+rnx job run --runtime=python-3.11-ml top
 
 # Create background processes
-rnx run --runtime=python-3.11-ml bash -c "long-running-task &"
+rnx job run --runtime=python-3.11-ml bash -c "long-running-task &"
 
 # Wait for background processes
-rnx run --runtime=python-3.11-ml bash -c "background-task & wait"
+rnx job run --runtime=python-3.11-ml bash -c "background-task & wait"
 
 # Kill specific processes (by PID within namespace)
-rnx run --runtime=python-3.11-ml bash -c "sleep 60 & kill %1"
+rnx job run --runtime=python-3.11-ml bash -c "sleep 60 & kill %1"
 ```
 
 ## Technical Implementation
@@ -154,10 +154,10 @@ Always ensure child processes are cleaned up:
 
 ```bash
 # Good: Wait for all background processes
-rnx run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
+rnx job run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
 
 # Good: Trap signals for cleanup
-rnx run --runtime=python-3.11-ml bash -c "trap 'kill $(jobs -p)' EXIT; task1 & task2 & wait"
+rnx job run --runtime=python-3.11-ml bash -c "trap 'kill $(jobs -p)' EXIT; task1 & task2 & wait"
 ```
 
 ### 2. **Resource Management**
@@ -166,7 +166,7 @@ Monitor process resource usage:
 
 ```bash
 # Monitor memory and CPU usage
-rnx run --runtime=python-3.11-ml bash -c "memory-intensive-task & top -p \$!"
+rnx job run --runtime=python-3.11-ml bash -c "memory-intensive-task & top -p \$!"
 ```
 
 ### 3. **Error Handling**
@@ -175,7 +175,7 @@ Handle process failures gracefully:
 
 ```bash
 # Check background process status
-rnx run --runtime=python-3.11-ml bash -c "risky-task & wait \$! || echo 'Task failed'"
+rnx job run --runtime=python-3.11-ml bash -c "risky-task & wait \$! || echo 'Task failed'"
 ```
 
 ## Security Implications

@@ -422,7 +422,7 @@ rnx monitor top --filter=process
 rnx monitor watch --filter=cpu,memory --interval=1
 
 # Check for resource-intensive jobs
-rnx list --json | jq '.[] | select(.status=="running")'
+rnx job list --json | jq '.[] | select(.status=="running")'
 ```
 
 **Network Monitoring Issues**
@@ -495,7 +495,7 @@ rnx volume list | grep -v "in-use"
 ```bash
 # Monitor job performance impact
 rnx monitor watch --filter=cpu,memory &
-rnx run --max-cpu=50 heavy-computation.py
+rnx job run --max-cpu=50 heavy-computation.py
 ```
 
 ### 5. Historical Tracking

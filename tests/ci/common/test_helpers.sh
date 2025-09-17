@@ -18,8 +18,13 @@ export RNX_CONFIG="${RNX_CONFIG:-/tmp/joblet/config/rnx-config.yml}"
 
 # Function to find RNX binary
 find_rnx_binary() {
+    # Check if rnx is in PATH
     if command -v rnx >/dev/null 2>&1; then
         echo "rnx"
+    # Check for bin/rnx relative to script location (for CI)
+    elif [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/bin/rnx" ]]; then
+        echo "$(dirname "$(dirname "$(dirname "$0")")")/bin/rnx"
+    # Check for rnx in project root (legacy path)
     elif [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/rnx" ]]; then
         echo "$(dirname "$(dirname "$(dirname "$0")")")/rnx"
     else
@@ -79,7 +84,7 @@ wait_for_server() {
     
     print_info "Waiting for joblet server to be ready..."
     
-    while ! "$RNX_BINARY" --config "$RNX_CONFIG" list >/dev/null 2>&1; do
+    while ! "$RNX_BINARY" --config "$RNX_CONFIG" job list >/dev/null 2>&1; do
         attempt=$((attempt + 1))
         if [[ $attempt -ge $max_attempts ]]; then
             print_error "Joblet server failed to start within $max_attempts seconds"
@@ -96,8 +101,10 @@ wait_for_server() {
 check_prerequisites() {
     local missing_deps=()
     
-    # Check for required commands - check for rnx binary in project root first
-    if ! command -v rnx >/dev/null 2>&1 && ! [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/rnx" ]]; then
+    # Check for required commands - check for rnx binary in various locations
+    if ! command -v rnx >/dev/null 2>&1 && \
+       ! [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/bin/rnx" ]] && \
+       ! [[ -x "$(dirname "$(dirname "$(dirname "$0")")")/rnx" ]]; then
         missing_deps+=("rnx")
     fi
     command -v jq >/dev/null 2>&1 || missing_deps+=("jq")
@@ -130,14 +137,14 @@ cleanup_test_jobs() {
     
     # Get list of jobs and stop any that match our test pattern
     local job_list
-    if job_list=$("$RNX_BINARY" --config "$RNX_CONFIG" list 2>/dev/null); then
+    if job_list=$("$RNX_BINARY" --config "$RNX_CONFIG" job list 2>/dev/null); then
         local job_ids
         job_ids=$(echo "$job_list" | jq -r '.[] | select(.command | contains("'$pattern'")) | .id' 2>/dev/null || echo "")
         
         for job_id in $job_ids; do
             if [[ -n "$job_id" && "$job_id" != "null" ]]; then
                 print_info "Stopping test job: $job_id"
-                "$RNX_BINARY" --config "$RNX_CONFIG" stop "$job_id" >/dev/null 2>&1 || true
+                "$RNX_BINARY" --config "$RNX_CONFIG" job stop "$job_id" >/dev/null 2>&1 || true
             fi
         done
     fi
@@ -166,7 +173,7 @@ wait_for_job_completion() {
     
     while [[ $elapsed -lt $timeout ]]; do
         local status
-        if status=$("$RNX_BINARY" --config "$RNX_CONFIG" status "$job_id" 2>/dev/null | jq -r '.status' 2>/dev/null); then
+        if status=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>/dev/null | jq -r '.status' 2>/dev/null); then
             if [[ "$status" == "COMPLETED" || "$status" == "STOPPED" || "$status" == "FAILED" ]]; then
                 return 0
             fi
@@ -186,7 +193,7 @@ get_job_logs_safe() {
     local description="${2:-job}"
     
     local job_logs
-    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" log "$job_id" 2>&1)
+    job_logs=$("$RNX_BINARY" --config "$RNX_CONFIG" job log "$job_id" 2>&1)
     
     # Check for log streaming errors (common in CI)
     if [[ "$job_logs" == *"buffer is closed"* ]] || [[ "$job_logs" == *"failed to stream logs"* ]]; then

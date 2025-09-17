@@ -9,14 +9,14 @@ delays and provide instant access to programming languages, databases, web serve
 
 ```bash
 # Traditional approach: 5-45 minutes every time
-rnx run 'apt-get update && apt-get install python3-pip && pip install pandas numpy scikit-learn matplotlib && python analysis.py'
+rnx job run 'apt-get update && apt-get install python3-pip && pip install pandas numpy scikit-learn matplotlib && python analysis.py'
 ```
 
 ### The Runtime Solution
 
 ```bash
 # Runtime approach: 2-3 seconds total
-rnx run --runtime=python-3.11-ml python analysis.py
+rnx job run --runtime=python-3.11-ml python analysis.py
 ```
 
 ## 📋 Table of Contents
@@ -56,8 +56,8 @@ Joblet provides curated runtime environments for Python, Java, and machine learn
 
 ```bash
 # Usage examples
-rnx run --runtime=python-3.11-ml python3 -c "import pandas; print('Ready!')"
-rnx run --runtime=python-3.11-ml --upload=analysis.py python3 analysis.py
+rnx job run --runtime=python-3.11-ml python3 -c "import pandas; print('Ready!')"
+rnx job run --runtime=python-3.11-ml --upload=analysis.py python3 analysis.py
 rnx runtime info python-3.11-ml  # See all packages and details
 ```
 
@@ -73,9 +73,9 @@ rnx runtime info python-3.11-ml  # See all packages and details
 
 ```bash
 # Usage examples
-rnx run --runtime=python-3.11 python --version
-rnx run --runtime=python-3.11 pip install requests
-rnx run --runtime=python-3.11 python script.py
+rnx job run --runtime=python-3.11 python --version
+rnx job run --runtime=python-3.11 pip install requests
+rnx job run --runtime=python-3.11 python script.py
 ```
 
 ### OpenJDK 21 (`openjdk-21`)
@@ -96,9 +96,9 @@ rnx run --runtime=python-3.11 python script.py
 
 ```bash
 # Usage examples
-rnx run --runtime=openjdk-21 java -version
-rnx run --runtime=openjdk-21 --upload=HelloWorld.java javac HelloWorld.java
-rnx run --runtime=openjdk-21 java HelloWorld
+rnx job run --runtime=openjdk-21 java -version
+rnx job run --runtime=openjdk-21 --upload=HelloWorld.java javac HelloWorld.java
+rnx job run --runtime=openjdk-21 java HelloWorld
 ```
 
 ### GraalVM JDK 21 (`graalvmjdk-21`)
@@ -116,9 +116,9 @@ rnx run --runtime=openjdk-21 java HelloWorld
 
 ```bash
 # Usage examples
-rnx run --runtime=graalvmjdk-21 java -version
-rnx run --runtime=graalvmjdk-21 native-image --version
-rnx run --runtime=graalvmjdk-21 js --version
+rnx job run --runtime=graalvmjdk-21 java -version
+rnx job run --runtime=graalvmjdk-21 native-image --version
+rnx job run --runtime=graalvmjdk-21 js --version
 
 ## 🚀 Getting Started
 
@@ -201,7 +201,7 @@ Pre-installed Packages:
   - scipy>=1.11.0,<1.12
 
 Usage:
-  rnx run --runtime=python-3.11-ml <command>
+  rnx job run --runtime=python-3.11-ml <command>
 ```
 
 ### 4. Test Runtime Functionality
@@ -219,7 +219,7 @@ Testing runtime: python-3.11-ml
 Output: Runtime resolution successful
 
 To test the runtime in a job:
-  rnx run --runtime=python-3.11-ml python --version
+  rnx job run --runtime=python-3.11-ml python --version
 ```
 
 ## 📦 Runtime Deployment
@@ -321,19 +321,19 @@ rnx runtime status
 
 ```bash
 # Basic usage
-rnx run --runtime=<runtime-name> <command>
+rnx job run --runtime=<runtime-name> <command>
 
 # With file uploads
-rnx run --runtime=python-3.11-ml --upload=script.py python script.py
+rnx job run --runtime=python-3.11-ml --upload=script.py python script.py
 
 # With resource limits
-rnx run --runtime=java:17 --max-memory=2048 --max-cpu=50 java BigApplication
+rnx job run --runtime=java:17 --max-memory=2048 --max-cpu=50 java BigApplication
 
 # With networks and volumes
-rnx run --runtime=python-3.11-ml --volume=datasets --network=isolated python analysis.py
+rnx job run --runtime=python-3.11-ml --volume=datasets --network=isolated python analysis.py
 
 # Scheduled execution
-rnx run --runtime=java:21 --schedule="1hour" java MaintenanceJob
+rnx job run --runtime=java:21 --schedule="1hour" java MaintenanceJob
 ```
 
 ### Runtime Naming
@@ -371,14 +371,14 @@ Runtime names support multiple formats:
 
 ```bash
 # 15-30 minutes every time
-rnx run 'apt-get update && apt-get install -y python3-pip && pip install pandas numpy scikit-learn matplotlib seaborn && python analysis.py'
+rnx job run 'apt-get update && apt-get install -y python3-pip && pip install pandas numpy scikit-learn matplotlib seaborn && python analysis.py'
 ```
 
 **Runtime Approach:**
 
 ```bash
 # 2-3 seconds total
-rnx run --runtime=python-3.11-ml python analysis.py
+rnx job run --runtime=python-3.11-ml python analysis.py
 ```
 
 #### Java Development
@@ -387,14 +387,14 @@ rnx run --runtime=python-3.11-ml python analysis.py
 
 ```bash
 # 2-5 minutes every time  
-rnx run 'apt-get update && apt-get install -y openjdk-17-jdk maven && javac HelloWorld.java && java HelloWorld'
+rnx job run 'apt-get update && apt-get install -y openjdk-17-jdk maven && javac HelloWorld.java && java HelloWorld'
 ```
 
 **Runtime Approach:**
 
 ```bash
 # 2-3 seconds total
-rnx run --runtime=java:17 bash -c "javac HelloWorld.java && java HelloWorld"
+rnx job run --runtime=java:17 bash -c "javac HelloWorld.java && java HelloWorld"
 ```
 
 #### Node.js Web Development
@@ -403,14 +403,14 @@ rnx run --runtime=java:17 bash -c "javac HelloWorld.java && java HelloWorld"
 
 ```bash
 # 5-10 minutes every time
-rnx run 'apt-get update && apt-get install -y default-jdk maven && mvn compile exec:java'
+rnx job run 'apt-get update && apt-get install -y default-jdk maven && mvn compile exec:java'
 ```
 
 **Runtime Approach:**
 
 ```bash
 # 2-3 seconds total  
-rnx run --runtime=java:17 java Application
+rnx job run --runtime=java:17 java Application
 ```
 
 ## 🏗️ Architecture
@@ -661,19 +661,19 @@ EOF
 1. **Memory Allocation**: Allocate sufficient memory for runtime environments
    ```bash
    # Python ML jobs typically need 1-4GB
-   rnx run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
+   rnx job run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
    ```
 
 2. **CPU Allocation**: Use appropriate CPU limits
    ```bash
    # CPU-intensive ML workloads
-   rnx run --runtime=python-3.11-ml --max-cpu=75 --cpu-cores="0-3" python training.py
+   rnx job run --runtime=python-3.11-ml --max-cpu=75 --cpu-cores="0-3" python training.py
    ```
 
 3. **Storage**: Use volumes for large datasets
    ```bash
    rnx volume create datasets --size=10GB
-   rnx run --runtime=python-3.11-ml --volume=datasets python process_data.py
+   rnx job run --runtime=python-3.11-ml --volume=datasets python process_data.py
    ```
 
 ### Security Considerations
@@ -687,17 +687,17 @@ EOF
 
 1. **Development Phase**: Use runtimes for fast iteration
    ```bash
-   rnx run --runtime=python-3.11-ml --upload=experiment.py python experiment.py
+   rnx job run --runtime=python-3.11-ml --upload=experiment.py python experiment.py
    ```
 
 2. **Testing Phase**: Test with resource limits
    ```bash
-   rnx run --runtime=python-3.11-ml --max-memory=512 --upload=test.py python test.py
+   rnx job run --runtime=python-3.11-ml --max-memory=512 --upload=test.py python test.py
    ```
 
 3. **Production Phase**: Use volumes and networks
    ```bash
-   rnx run --runtime=python-3.11-ml --volume=data --network=prod python production.py
+   rnx job run --runtime=python-3.11-ml --volume=data --network=prod python production.py
    ```
 
 ## 🔧 Troubleshooting
@@ -737,7 +737,7 @@ sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
 
 ```bash
 # ML jobs typically need 1-4GB
-rnx run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
+rnx job run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
 ```
 
 #### 4. Package Compatibility
@@ -748,7 +748,7 @@ rnx run --runtime=python-3.11-ml --max-memory=2048 python analysis.py
 
 ```bash
 # Don't install additional packages - use what's pre-installed
-rnx run --runtime=python-3.11-ml python -c "import numpy; print(numpy.__version__)"
+rnx job run --runtime=python-3.11-ml python -c "import numpy; print(numpy.__version__)"
 ```
 
 ### Diagnostic Commands
@@ -764,7 +764,7 @@ rnx runtime test python-3.11-ml
 rnx runtime info python-3.11-ml
 
 # Verify job execution
-rnx run --runtime=python-3.11-ml python -c "import sys; print(sys.executable)"
+rnx job run --runtime=python-3.11-ml python -c "import sys; print(sys.executable)"
 
 # Check server logs (on server)
 sudo journalctl -u joblet.service -f

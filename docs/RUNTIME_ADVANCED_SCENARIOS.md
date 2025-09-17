@@ -62,7 +62,7 @@ deploy_runtime_blue_green() {
     ssh admin@$host "sudo unzip /tmp/$runtime_file -d /opt/joblet/runtimes/"
     
     # Step 2: Health check new runtime
-    ssh admin@$host "rnx run --runtime=python-3.11-ml-v2.0 python $HEALTH_CHECK_SCRIPT" || {
+    ssh admin@$host "rnx job run --runtime=python-3.11-ml-v2.0 python $HEALTH_CHECK_SCRIPT" || {
         echo "❌ Health check failed on $host"
         return 1
     }
@@ -71,7 +71,7 @@ deploy_runtime_blue_green() {
     ssh admin@$host "sudo ln -sfn /opt/joblet/runtimes/python/python-3.11-ml-v2.0 /opt/joblet/runtimes/python/python-3.11-ml"
     
     # Step 4: Verify production traffic
-    ssh admin@$host "rnx run --runtime=python-3.11-ml python -c 'print(\"✅ Production ready\")'"
+    ssh admin@$host "rnx job run --runtime=python-3.11-ml python -c 'print(\"✅ Production ready\")'"
     
     echo "✅ Blue-green deployment complete on $host"
 }

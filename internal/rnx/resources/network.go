@@ -111,7 +111,7 @@ func runNetworkCreate(name, cidr string) error {
 	fmt.Printf("  Name:   %s\n", resp.Name)
 	fmt.Printf("  CIDR:   %s\n", resp.Cidr)
 	fmt.Printf("  Bridge: %s\n", resp.Bridge)
-	fmt.Printf("\nUse this network with: rnx run --network=%s <command>\n", name)
+	fmt.Printf("\nUse this network with: rnx job run --network=%s <command>\n", name)
 
 	return nil
 }

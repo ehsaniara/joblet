@@ -43,27 +43,27 @@ Use --detail flag with workflow status to show the original YAML content.
 
 Job Status Examples:
   # Get comprehensive job status (using full UUID)
-  rnx status f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
   
   # Get job status (using short-form UUID)
-  rnx status f47ac10b
+  rnx job status f47ac10b
   
   # Get job status in JSON format (all fields)
-  rnx status --json f47ac10b
+  rnx job status --json f47ac10b
 
 Workflow Status Examples:
   # Get workflow status (using full UUID)
-  rnx status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+  rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
   
   # Get workflow status (using short-form UUID)
-  rnx status --workflow a1b2c3d4
+  rnx job status --workflow a1b2c3d4
   
   # Get workflow status with original YAML content
-  rnx status --workflow --detail a1b2c3d4
+  rnx job status --workflow --detail a1b2c3d4
   
   # Get workflow status in JSON format
-  rnx status --workflow --json a1b2c3d4
-  rnx status --workflow --json --detail a1b2c3d4  # JSON with YAML content
+  rnx job status --workflow --json a1b2c3d4
+  rnx job status --workflow --json --detail a1b2c3d4  # JSON with YAML content
 
 Job Status Information Displayed:
   • Basic Info: Job UUID, name, command with arguments, current status
@@ -121,12 +121,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// If both fail, show a helpful error message
 	if strings.Contains(jobErr.Error(), "not found") && strings.Contains(workflowErr.Error(), "not found") {
-		return fmt.Errorf("no job or workflow found with ID '%s'\n\nHint: Use 'rnx list' to see jobs or 'rnx list --workflow' to see workflows", id)
+		return fmt.Errorf("no job or workflow found with ID '%s'\n\nHint: Use 'rnx job list' to see jobs or 'rnx job list --workflow' to see workflows", id)
 	}
 
 	// If workflow exists but job also exists with same ID, suggest using --workflow flag
 	if !strings.Contains(workflowErr.Error(), "not found") {
-		fmt.Fprintf(os.Stderr, "\nNote: Both job and workflow exist with ID '%s'. Showing job status.\nUse 'rnx status --workflow %s' to see workflow status.\n\n", id, id)
+		fmt.Fprintf(os.Stderr, "\nNote: Both job and workflow exist with ID '%s'. Showing job status.\nUse 'rnx job status --workflow %s' to see workflow status.\n\n", id, id)
 		return nil
 	}
 
@@ -310,16 +310,16 @@ func getJobStatus(jobID string) error {
 	fmt.Printf("\nAvailable Actions:\n")
 	switch response.Status {
 	case "SCHEDULED":
-		fmt.Printf("  • rnx stop %s     # Cancel scheduled job\n", response.Uuid)
-		fmt.Printf("  • rnx status %s   # Check status again\n", response.Uuid)
+		fmt.Printf("  • rnx job stop %s     # Cancel scheduled job\n", response.Uuid)
+		fmt.Printf("  • rnx job status %s   # Check status again\n", response.Uuid)
 	case "RUNNING":
-		fmt.Printf("  • rnx log %s      # Stream live logs\n", response.Uuid)
-		fmt.Printf("  • rnx stop %s     # Stop running job\n", response.Uuid)
+		fmt.Printf("  • rnx job log %s      # Stream live logs\n", response.Uuid)
+		fmt.Printf("  • rnx job stop %s     # Stop running job\n", response.Uuid)
 	case "COMPLETED", "FAILED", "STOPPED":
-		fmt.Printf("  • rnx log %s      # View job logs\n", response.Uuid)
+		fmt.Printf("  • rnx job log %s      # View job logs\n", response.Uuid)
 	default:
-		fmt.Printf("  • rnx log %s      # View job logs\n", response.Uuid)
-		fmt.Printf("  • rnx stop %s     # Stop job if running\n", response.Uuid)
+		fmt.Printf("  • rnx job log %s      # View job logs\n", response.Uuid)
+		fmt.Printf("  • rnx job stop %s     # Stop job if running\n", response.Uuid)
 	}
 
 	return nil
@@ -576,13 +576,13 @@ func getWorkflowStatus(workflowID string) error {
 
 	// Show available actions
 	fmt.Printf("\nAvailable Actions:\n")
-	fmt.Printf("  • rnx list --workflow    # List all workflows\n")
+	fmt.Printf("  • rnx job list --workflow    # List all workflows\n")
 	if workflow.Status == "RUNNING" {
-		fmt.Printf("  • rnx status %s          # Refresh workflow status\n", workflow.Uuid)
+		fmt.Printf("  • rnx job status %s          # Refresh workflow status\n", workflow.Uuid)
 	}
 	for _, job := range res.Jobs {
 		if job.Status == "COMPLETED" || job.Status == "FAILED" {
-			fmt.Printf("  • rnx log %s             # View logs for job %s\n", job.JobUuid, job.JobUuid)
+			fmt.Printf("  • rnx job log %s             # View logs for job %s\n", job.JobUuid, job.JobUuid)
 			break
 		}
 	}

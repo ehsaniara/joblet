@@ -13,7 +13,7 @@ if ! command -v rnx &> /dev/null; then
     exit 1
 fi
 
-if ! rnx list &> /dev/null; then
+if ! rnx job list &> /dev/null; then
     echo "❌ Error: Cannot connect to Joblet server"
     exit 1
 fi
@@ -30,19 +30,19 @@ echo ""
 echo "📋 Demo 1: Single File Upload"
 echo "-----------------------------"
 echo "Uploading and displaying sample_data.txt"
-rnx run --upload=sample_data.txt cat sample_data.txt
+rnx job run --upload=sample_data.txt cat sample_data.txt
 echo ""
 
 echo "📋 Demo 2: File Analysis"
 echo "------------------------"
 echo "Counting lines, words, and characters in uploaded file"
-rnx run --upload=sample_data.txt wc sample_data.txt
+rnx job run --upload=sample_data.txt wc sample_data.txt
 echo ""
 
 echo "📋 Demo 3: Workspace Exploration"
 echo "--------------------------------"
 echo "Exploring the job workspace structure"
-rnx run --upload=sample_data.txt bash -c "
+rnx job run --upload=sample_data.txt bash -c "
 echo 'Current directory:' && pwd
 echo ''
 echo 'Directory contents:' && ls -la
@@ -54,7 +54,7 @@ echo ""
 echo "📋 Demo 4: File Processing"
 echo "--------------------------"
 echo "Processing file with various commands"
-rnx run --upload=sample_data.txt bash -c "
+rnx job run --upload=sample_data.txt bash -c "
 echo '=== First 5 lines ==='
 head -5 sample_data.txt
 echo ''
@@ -69,7 +69,7 @@ echo ""
 echo "📋 Demo 5: Creating Files in Workspace"
 echo "--------------------------------------"
 echo "Creating and processing new files within the job"
-rnx run --upload=sample_data.txt bash -c "
+rnx job run --upload=sample_data.txt bash -c "
 echo 'Creating a new file...'
 echo 'This is a generated file' > generated.txt
 echo 'Processing complete' >> generated.txt
@@ -93,7 +93,7 @@ Line 2 of second file
 Line 3 of second file
 EOF
 
-rnx run --upload=sample_data.txt --upload=temp_file2.txt bash -c "
+rnx job run --upload=sample_data.txt --upload=temp_file2.txt bash -c "
 echo 'Files in workspace:'
 ls -la *.txt
 echo ''
@@ -119,7 +119,7 @@ echo "File 1 content" > demo_dir/file1.txt
 echo "File 2 content" > demo_dir/file2.txt
 echo "Subdirectory file" > demo_dir/subdir/file3.txt
 
-rnx run --upload-dir=demo_dir bash -c "
+rnx job run --upload-dir=demo_dir bash -c "
 echo 'Uploaded directory structure:'
 find demo_dir -type f -exec echo '{}:' \; -exec cat {} \; -exec echo '' \;
 echo ''
@@ -134,7 +134,7 @@ echo ""
 echo "📋 Demo 8: File Processing Pipeline"
 echo "-----------------------------------"
 echo "Demonstrating a multi-step file processing workflow"
-rnx run --upload=sample_data.txt bash -c "
+rnx job run --upload=sample_data.txt bash -c "
 echo 'Step 1: Analyze input file'
 wc sample_data.txt
 echo ''

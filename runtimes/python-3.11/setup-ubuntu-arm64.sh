@@ -239,9 +239,9 @@ if [ $status -eq 0 ]; then
     echo "Runtime installed at: $RUNTIME_BASE_DIR"
     echo ""
     echo "Usage examples:"
-    echo "  rnx run --runtime=python-3.11 python --version"
-    echo "  rnx run --runtime=python-3.11 python -c 'import sys; print(sys.version)'"
-    echo "  rnx run --runtime=python-3.11 python -c 'import requests; print(\"requests available\")'"
+    echo "  rnx job run --runtime=python-3.11 python --version"
+    echo "  rnx job run --runtime=python-3.11 python -c 'import sys; print(sys.version)'"
+    echo "  rnx job run --runtime=python-3.11 python -c 'import requests; print(\"requests available\")'"
 else
     echo ""
     echo "⚠ Installation completed with warnings"

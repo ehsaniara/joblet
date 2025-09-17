@@ -33,10 +33,10 @@ Complete deletion includes:
 
 Examples:
   # Delete a completed job
-  rnx delete f47ac10b-58cc-4372-a567-0e02b2c3d479
+  rnx job delete f47ac10b-58cc-4372-a567-0e02b2c3d479
   
   # Delete using short UUID (if unique)
-  rnx delete f47ac10b
+  rnx job delete f47ac10b
 
 Note: This operation is irreversible. Once deleted, job information and logs 
 cannot be recovered.`,
