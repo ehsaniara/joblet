@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         const node = req.query.node;
-        const output = await execRnx(['list', '--json'], {node});
+        const output = await execRnx(['job', 'list', '--json'], {node});
 
         // Parse rnx list output
         let jobs = [];
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
                     }));
                 }
             } catch (e) {
-                console.warn('Failed to parse JSON from rnx list:', e.message);
+                console.warn('Failed to parse JSON from rnx job list:', e.message);
                 jobs = [];
             }
         }
@@ -62,7 +62,7 @@ router.post('/execute', async (req, res) => {
             return res.status(400).json({error: 'Command is required'});
         }
 
-        const args = ['run'];
+        const args = ['job', 'run'];
 
         // Add schedule if provided (using = format)
         if (schedule && schedule.trim()) {
@@ -143,12 +143,12 @@ router.post('/execute', async (req, res) => {
     }
 });
 
-// Get comprehensive job status using rnx status
+// Get comprehensive job status using rnx job status
 router.get('/:jobId/status', async (req, res) => {
     try {
         const {jobId} = req.params;
         const node = req.query.node;
-        const output = await execRnx(['status', jobId, '--json'], {node});
+        const output = await execRnx(['job', 'status', jobId, '--json'], {node});
         const statusData = JSON.parse(output);
         res.json(statusData);
     } catch (error) {
@@ -166,7 +166,7 @@ router.get('/:jobId', async (req, res) => {
     try {
         const {jobId} = req.params;
         const node = req.query.node;
-        const output = await execRnx(['status', jobId, '--json'], {node});
+        const output = await execRnx(['job', 'status', jobId, '--json'], {node});
 
         let jobDetails;
         if (output && output.trim()) {
@@ -199,7 +199,7 @@ router.get('/:jobId', async (req, res) => {
                     resourceUsage: rawJob.resourceUsage || rawJob.resource_usage
                 };
             } catch (e) {
-                console.warn('Failed to parse JSON from rnx status:', e.message);
+                console.warn('Failed to parse JSON from rnx job status:', e.message);
                 jobDetails = {
                     id: jobId,
                     status: 'UNKNOWN',
@@ -231,7 +231,7 @@ router.post('/:jobId/stop', async (req, res) => {
     try {
         const {jobId} = req.params;
         const node = req.query.node;
-        const output = await execRnx(['stop', jobId], {node});
+        const output = await execRnx(['job', 'stop', jobId], {node});
         res.json({success: true, output});
     } catch (error) {
         console.error('Failed to stop job:', error);
@@ -245,7 +245,7 @@ router.delete('/:jobId', async (req, res) => {
         const {jobId} = req.params;
         const node = req.query.node || 'default';
 
-        const output = await execRnx(['delete', jobId], {node});
+        const output = await execRnx(['job', 'delete', jobId], {node});
 
         res.json({
             message: `Job ${jobId} deleted successfully`,
@@ -264,7 +264,7 @@ router.delete('/:jobId', async (req, res) => {
 router.delete('/', async (req, res) => {
     try {
         const node = req.query.node || 'default';
-        const output = await execRnx(['delete-all'], {node});
+        const output = await execRnx(['job', 'delete-all'], {node});
 
         res.json({
             message: 'All non-running jobs deleted successfully',

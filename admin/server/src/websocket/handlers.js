@@ -14,7 +14,7 @@ export function handleLogStream(ws, jobId) {
     }));
 
     // First, try to get historical logs without --follow
-    const historicalLogProcess = spawn(config.RNX_PATH, ['log', jobId], {
+    const historicalLogProcess = spawn(config.RNX_PATH, ['job', 'log', jobId], {
         stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -62,7 +62,7 @@ export function handleLogStream(ws, jobId) {
         if (!isAlive) return;
 
         // Check if job is still running by trying to get status
-        execRnx(['status', jobId, '--json'], {node: 'default'})
+        execRnx(['job', 'status', jobId, '--json'], {node: 'default'})
             .then(output => {
                 if (!isAlive) return;
 
@@ -105,7 +105,7 @@ export function handleLogStream(ws, jobId) {
     });
 
     function startFollowingLogs() {
-        followingLogProcess = spawn(config.RNX_PATH, ['log', jobId, '--follow'], {
+        followingLogProcess = spawn(config.RNX_PATH, ['job', 'log', jobId, '--follow'], {
             stdio: ['pipe', 'pipe', 'pipe']
         });
 
@@ -175,7 +175,7 @@ export function handleLogStream(ws, jobId) {
 export function handleWorkflowStatusStream(ws, workflowId, node) {
     const interval = setInterval(async () => {
         try {
-            const output = await execRnx(['list', '--json'], {node});
+            const output = await execRnx(['job', 'list', '--json'], {node});
             const jobs = JSON.parse(output);
 
             // Find jobs that belong to this workflow
@@ -213,7 +213,7 @@ export function handleRuntimeInstallStream(ws, buildJobId, node) {
     }));
 
     // Start following the build logs immediately
-    followingLogProcess = spawn(config.RNX_PATH, ['log', buildJobId, '--follow'], {
+    followingLogProcess = spawn(config.RNX_PATH, ['job', 'log', buildJobId, '--follow'], {
         stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -259,7 +259,7 @@ export function handleRuntimeInstallStream(ws, buildJobId, node) {
         if (!isAlive) return;
 
         // Check final status of the build job
-        execRnx(['status', buildJobId, '--json'], {node})
+        execRnx(['job', 'status', buildJobId, '--json'], {node})
             .then(output => {
                 if (!isAlive) return;
 

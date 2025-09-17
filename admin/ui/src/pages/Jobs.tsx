@@ -576,7 +576,7 @@ rnx job run "npm test" --cpu=50 --memory=512MB
                                         </label>
                                         <pre
                                             className="bg-gray-900 text-red-400 p-3 rounded-md text-sm overflow-x-auto font-mono">
-rnx delete-all
+rnx job delete-all
                                         </pre>
                                     </div>
                                 </div>
@@ -1137,7 +1137,7 @@ rnx delete-all
                                         Command Preview
                                     </label>
                                     <pre className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
-{`rnx delete-all`}
+{`rnx job delete-all`}
                                     </pre>
                                 </div>
                             </div>
@@ -1210,7 +1210,7 @@ rnx delete-all
                                         Command Preview
                                     </label>
                                     <pre className="bg-gray-900 text-red-400 p-4 rounded-md text-sm overflow-x-auto font-mono">
-{`rnx delete ${deleteJobConfirm.jobId}`}
+{`rnx job delete ${deleteJobConfirm.jobId}`}
                                     </pre>
                                 </div>
                             </div>

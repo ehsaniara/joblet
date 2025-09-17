@@ -93,7 +93,7 @@ export class CommandBuilder {
 
 
     build(): GeneratedCommand {
-        const parts: string[] = ['rnx run'];
+        const parts: string[] = ['rnx job run'];
         const flagsArray: JobFlag[] = [];
 
         // Build flag arguments with proper ordering

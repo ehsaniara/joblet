@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         const node = req.query.node;
-        const output = await execRnx(['list', '--workflow', '--json'], {node});
+        const output = await execRnx(['job', 'list', '--workflow', '--json'], {node});
 
         let workflows = [];
         if (output && output.trim()) {
@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
                     workflows = [];
                 }
             } catch (e) {
-                console.warn('Failed to parse JSON from rnx list --workflow:', e.message);
+                console.warn('Failed to parse JSON from rnx job list --workflow:', e.message);
                 workflows = [];
             }
         }
@@ -254,7 +254,7 @@ router.post('/execute', async (req, res) => {
             // Execute the workflow directly from the file path
             // If workflowName is provided, use the format file:workflowName
             const workflowArg = workflowName ? `${filePath}:${workflowName}` : filePath;
-            const output = await execRnx(['run', '--workflow', workflowArg], {node});
+            const output = await execRnx(['job', 'run', '--workflow', workflowArg], {node});
 
             // Extract workflow UUID from output
             let workflowId = `workflow-${Date.now()}`;
@@ -315,11 +315,11 @@ router.get('/:workflowId', async (req, res) => {
         // Get detailed workflow status including jobs
         let workflowData;
         try {
-            const output = await execRnx(['status', '--workflow', workflowId, '--json'], {node});
+            const output = await execRnx(['job', 'status', '--workflow', workflowId, '--json'], {node});
             workflowData = JSON.parse(output);
         } catch (statusError) {
             // If status fails, try to get from list
-            const workflowsOutput = await execRnx(['list', '--workflow', '--json'], {node});
+            const workflowsOutput = await execRnx(['job', 'list', '--workflow', '--json'], {node});
             let workflows = [];
             if (workflowsOutput && workflowsOutput.trim()) {
                 workflows = JSON.parse(workflowsOutput);
@@ -345,7 +345,7 @@ router.get('/:workflowId', async (req, res) => {
             // Fetch individual job details to get accurate timing information
             if (job.id) {
                 try {
-                    const jobOutput = await execRnx(['status', job.id, '--json'], {node});
+                    const jobOutput = await execRnx(['job', 'status', job.id, '--json'], {node});
                     const jobDetails = JSON.parse(jobOutput);
                     jobTiming = {
                         startTime: jobDetails.startTime || (jobDetails.start_time ? new Date(jobDetails.start_time).toISOString() : undefined),
@@ -450,7 +450,7 @@ router.get('/:workflowId/yaml', async (req, res) => {
         const node = req.query.node;
 
         // Get workflow status with YAML content using --detail flag
-        const output = await execRnx(['status', '--workflow', '--detail', workflowId, '--json'], {node});
+        const output = await execRnx(['job', 'status', '--workflow', '--detail', workflowId, '--json'], {node});
         const workflowData = JSON.parse(output);
 
         if (!workflowData.yaml_content) {
