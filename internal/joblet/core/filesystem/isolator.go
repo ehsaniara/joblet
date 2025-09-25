@@ -736,6 +736,130 @@ func (f *JobFilesystem) createEssentialDevices() error {
 	return nil
 }
 
+// CreateGPUDeviceNodes creates GPU device nodes in the isolated environment
+// Creates device nodes as specified in the design document:
+//   - /dev/nvidia0, /dev/nvidia1, etc. (char 195:N) - specific GPU devices
+//   - /dev/nvidiactl (char 195:255) - NVIDIA control device
+//   - /dev/nvidia-uvm (char 237:0) - Unified Virtual Memory device
+func (f *JobFilesystem) CreateGPUDeviceNodes(gpuIndices []int) error {
+	log := f.logger.WithField("gpuIndices", gpuIndices)
+	log.Debug("creating GPU device nodes")
+
+	// Ensure /dev directory exists
+	if err := f.platform.MkdirAll("/dev", 0755); err != nil {
+		if !f.platform.IsExist(err) {
+			return fmt.Errorf("failed to create /dev directory: %w", err)
+		}
+	}
+
+	// Create common NVIDIA devices needed by all GPU jobs
+	commonDevices := []struct {
+		path  string
+		major int
+		minor int
+	}{
+		{"/dev/nvidiactl", 195, 255}, // NVIDIA control device
+		{"/dev/nvidia-uvm", 237, 0},  // Unified Virtual Memory
+	}
+
+	for _, device := range commonDevices {
+		if err := syscall.Mknod(device.path, syscall.S_IFCHR|0666, int(makedev(uint32(device.major), uint32(device.minor)))); err != nil {
+			if !f.platform.IsExist(err) {
+				log.Warn("failed to create common GPU device", "device", device.path, "error", err)
+			} else {
+				log.Debug("common GPU device already exists", "device", device.path)
+			}
+		} else {
+			log.Debug("created common GPU device", "device", device.path)
+		}
+	}
+
+	// Create specific GPU device nodes for allocated GPUs
+	for _, gpuIndex := range gpuIndices {
+		devicePath := fmt.Sprintf("/dev/nvidia%d", gpuIndex)
+
+		if err := syscall.Mknod(devicePath, syscall.S_IFCHR|0666, int(makedev(195, uint32(gpuIndex)))); err != nil {
+			if !f.platform.IsExist(err) {
+				log.Warn("failed to create GPU device node", "device", devicePath, "gpuIndex", gpuIndex, "error", err)
+			} else {
+				log.Debug("GPU device node already exists", "device", devicePath, "gpuIndex", gpuIndex)
+			}
+		} else {
+			log.Debug("created GPU device node", "device", devicePath, "gpuIndex", gpuIndex)
+		}
+	}
+
+	log.Info("GPU device nodes setup completed", "gpuCount", len(gpuIndices))
+	return nil
+}
+
+// MountCUDALibraries mounts CUDA libraries and binaries into the isolated environment
+// Mounts CUDA installation directories as read-only bind mounts according to the design:
+//   - /usr/local/cuda/lib64 → {chroot}/usr/local/cuda/lib64
+//   - /usr/local/cuda/bin → {chroot}/usr/local/cuda/bin
+//   - /usr/local/cuda/include → {chroot}/usr/local/cuda/include
+func (f *JobFilesystem) MountCUDALibraries(cudaPath string, mountPaths []string) error {
+	log := f.logger.WithFields("cudaPath", cudaPath, "mountPaths", mountPaths)
+	log.Debug("mounting CUDA libraries")
+
+	for _, hostPath := range mountPaths {
+		// Skip if the host path doesn't exist
+		if _, err := f.platform.Stat(hostPath); f.platform.IsNotExist(err) {
+			log.Debug("skipping non-existent CUDA path", "path", hostPath)
+			continue
+		}
+
+		// Determine target path in chroot - preserve the full path structure
+		targetPath := filepath.Join(f.RootDir, strings.TrimPrefix(hostPath, "/"))
+
+		// Create parent directories
+		targetDir := filepath.Dir(targetPath)
+		if err := f.platform.MkdirAll(targetDir, 0755); err != nil {
+			log.Warn("failed to create CUDA mount parent directory", "dir", targetDir, "error", err)
+			continue
+		}
+
+		// Create target directory/file based on source type
+		sourceInfo, err := f.platform.Stat(hostPath)
+		if err != nil {
+			log.Warn("failed to stat CUDA source", "source", hostPath, "error", err)
+			continue
+		}
+
+		if sourceInfo.IsDir() {
+			// Source is directory - create target directory
+			if err := f.platform.MkdirAll(targetPath, 0755); err != nil {
+				log.Warn("failed to create CUDA target directory", "target", targetPath, "error", err)
+				continue
+			}
+		} else {
+			// Source is file - create empty target file
+			if err := f.platform.WriteFile(targetPath, []byte{}, 0644); err != nil {
+				log.Warn("failed to create CUDA target file", "target", targetPath, "error", err)
+				continue
+			}
+		}
+
+		// Bind mount as read-only
+		flags := uintptr(syscall.MS_BIND)
+		if err := f.platform.Mount(hostPath, targetPath, "", flags, ""); err != nil {
+			log.Warn("failed to mount CUDA path", "source", hostPath, "target", targetPath, "error", err)
+			continue
+		}
+
+		// Remount as read-only
+		flags = uintptr(syscall.MS_BIND | syscall.MS_REMOUNT | syscall.MS_RDONLY)
+		if err := f.platform.Mount("", targetPath, "", flags, ""); err != nil {
+			log.Debug("failed to remount CUDA path as read-only", "target", targetPath, "error", err)
+		}
+
+		log.Debug("mounted CUDA path", "source", hostPath, "target", targetPath)
+	}
+
+	log.Info("CUDA library mounting completed", "cudaPath", cudaPath, "mountedPaths", len(mountPaths))
+	return nil
+}
+
 // Cleanup removes all job filesystem resources after job completion.
 // Called from the host system (not within chroot) to clean up:
 //   - Unmounts any tmpfs mounts (limited work directories)

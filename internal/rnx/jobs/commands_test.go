@@ -84,7 +84,7 @@ func TestStatusCommandEnhancedHelp(t *testing.T) {
 	expectedSections := []string{
 		"comprehensive status and details",
 		"Job identification (UUID, name, command, arguments)",
-		"Resource limits (CPU, memory, I/O, core binding)",
+		"Resource limits (CPU, memory, I/O, core binding, GPU allocation)",
 		"Runtime environment (Python, Java, Node.js runtimes)",
 		"Network configuration (bridge, isolated, custom networks)",
 		"Volume storage (mounted persistent and memory volumes)",

@@ -36,6 +36,9 @@ func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 		Runtime:           job.Runtime,
 		Environment:       job.Environment,
 		SecretEnvironment: job.SecretEnvironment,
+		GpuIndices:        job.GPUIndices,         // GPU allocation info
+		GpuCount:          job.GPUCount,           // GPU requirements
+		GpuMemoryMb:       int32(job.GPUMemoryMB), // GPU memory requirement
 	}
 
 	pbJob.EndTime = job.FormattedEndTime()             // Use job's formatting method
@@ -65,8 +68,11 @@ func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
 		Runtime:           pbJob.Runtime,
 		Environment:       pbJob.Environment,
 		SecretEnvironment: pbJob.SecretEnvironment,
-		CgroupPath:        "", // Not in protobuf
-		Pid:               0,  // Not in protobuf
+		CgroupPath:        "",                       // Not in protobuf
+		Pid:               0,                        // Not in protobuf
+		GPUIndices:        pbJob.GpuIndices,         // GPU allocation info
+		GPUCount:          pbJob.GpuCount,           // GPU requirements
+		GPUMemoryMB:       int64(pbJob.GpuMemoryMb), // GPU memory requirement
 	}
 
 	// Parse times

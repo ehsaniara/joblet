@@ -19,7 +19,7 @@ consequences. ADRs help future developers understand not just *what* we built, b
 | [005](005-async-log-persistence.md)               | Asynchronous Log Persistence System     | Accepted | Rate-decoupled logging system for high-performance job execution                               |
 | [006](006-embedded-certificates.md)               | Embedded Certificate Architecture       | Accepted | TLS certificates embedded in configuration files for operational simplicity                    |
 | [007](007-cgroups-v2-resource-management.md)      | Cgroups v2 for Resource Management      | Accepted | Modern cgroups v2 for clean, predictable resource control                                      |
-| [008](008-gpu-support-architecture.md)            | GPU Support Architecture                | Proposed | Native Linux kernel features for GPU isolation without container runtimes                      |
+| [008](008-gpu-support-architecture.md)            | GPU Support Architecture                | Accepted | Native Linux kernel features for GPU isolation without container runtimes                      |
 | [009](009-seccomp-syscall-filtering.md)           | Seccomp Syscall Filtering               | Proposed | Kernel-level syscall filtering for defense-in-depth security                                   |
 
 ## ADR Template

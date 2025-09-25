@@ -19,8 +19,15 @@ joblet:
 cgroup:
   baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service"
   namespaceMount: "/sys/fs/cgroup"
-  enableControllers: [ "memory", "cpu", "io", "pids", "cpuset" ]
+  enableControllers: [ "memory", "cpu", "io", "pids", "cpuset", "devices" ]
   cleanupTimeout: "100ms"       # Fast cgroup cleanup for performance
+
+# GPU support configuration
+gpu:
+  enabled: false               # Enable GPU support (off by default - opt-in only)
+  cuda_paths:                  # CUDA installation paths to search
+    - "/usr/local/cuda"
+    - "/opt/cuda"
 
 network:
   state_dir: "/opt/joblet/network"

@@ -10,7 +10,8 @@ orchestration, and monitoring through a gRPC API and CLI client.
 ### Key Features
 
 - **Process Isolation**: Jobs run in separate PID, network, mount, IPC, and UTS namespaces
-- **Resource Control**: CPU, memory, and I/O limits using cgroups v2
+- **Resource Control**: CPU, memory, I/O, and GPU limits using cgroups v2
+- **GPU Support**: NVIDIA GPU allocation, CUDA environment setup, and device isolation
 - **Job Scheduling**: Time-based scheduling and dependency management
 - **Network Management**: Custom networks with isolation and traffic control
 - **Volume Management**: Persistent storage with size and type controls
@@ -58,6 +59,12 @@ rnx job run --max-memory=8192 --max-cpu=400 \
         --volume=data-lake \
         --runtime=python-3.11-ml \
         python process_big_data.py
+
+# GPU-accelerated data processing
+rnx job run --gpu=2 --gpu-memory=16GB \
+        --max-memory=16384 \
+        --runtime=python-3.11-ml \
+        python gpu_analysis.py
 ```
 
 ### **Microservices & Testing**
@@ -91,6 +98,8 @@ jobs:
     resources:
       max_memory: 8192
       max_cpu: 400
+      gpu_count: 1
+      gpu_memory_mb: 8192
 ```
 
 ```bash
@@ -129,9 +138,11 @@ rnx job run --network=isolated \
 rnx job run --max-memory=4096 --runtime=python-3.11-ml \
         python agent_coordinator.py
 
-rnx job run --max-memory=2048 --runtime=python-3.11-ml \
+# GPU-powered ML agents
+rnx job run --gpu=1 --gpu-memory=8GB \
+        --max-memory=2048 --runtime=python-3.11-ml \
         --network=agent-net \
-        python data_processing_agent.py
+        python inference_agent.py
 
 rnx job run --max-memory=1024 --runtime=python-3.11-ml \
         --network=agent-net \
@@ -173,6 +184,7 @@ rnx job run --max-memory=1024 --runtime=python-3.11-ml \
 
 - [**RNX CLI Reference**](./RNX_CLI_REFERENCE.md) - Complete command reference with examples
 - [**Job Execution Guide**](./JOB_EXECUTION.md) - Running jobs with resource limits and isolation
+- [**GPU Support Guide**](./GPU_SUPPORT.md) - NVIDIA GPU acceleration, CUDA environments, and resource management
 - [**Workflows Guide**](./WORKFLOWS.md) - YAML workflows with dependencies and orchestration
 - [**Runtime System**](./RUNTIME_SYSTEM.md) - Pre-built environments for instant execution
 - [**Volume Management**](./VOLUME_MANAGEMENT.md) - Persistent and temporary storage
@@ -231,6 +243,10 @@ rnx job run --runtime=openjdk-21 java MyApp
 
 # Resource limits
 rnx job run --max-memory=2048 --max-cpu=200 intensive-task
+
+# GPU-accelerated jobs
+rnx job run --gpu=1 --gpu-memory=4GB python ml_training.py
+rnx job run --gpu=2 --runtime=python-3.11-ml python distributed_inference.py
 
 # Multi-process jobs (see PROCESS_ISOLATION.md for details)
 rnx job run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
@@ -304,10 +320,11 @@ rnx job run --network=my-network --volume=data-vol app
 
 ### AI/ML Workloads
 
+- GPU acceleration with NVIDIA driver support
 - Isolated execution for multiple agents
-- Resource controls for ML workloads
-- Pre-built ML environments with common packages
-- Workflow orchestration for agent chains
+- Resource controls for CPU, memory, and GPU workloads
+- Pre-built ML environments with CUDA support
+- Workflow orchestration for GPU-enabled agent chains
 
 ---
 

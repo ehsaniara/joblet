@@ -25,7 +25,7 @@ func NewStatusCmd() *cobra.Command {
 The status command shows complete job information including:
 • Job identification (UUID, name, command, arguments)
 • Execution status and timing (created, started, ended, duration)
-• Resource limits (CPU, memory, I/O, core binding)
+• Resource limits (CPU, memory, I/O, core binding, GPU allocation)
 • Runtime environment (Python, Java, Node.js runtimes)
 • Network configuration (bridge, isolated, custom networks)
 • Volume storage (mounted persistent and memory volumes)
@@ -68,12 +68,12 @@ Workflow Status Examples:
 Job Status Information Displayed:
   • Basic Info: Job UUID, name, command with arguments, current status
   • Timing: Creation time, start time, end time, execution duration
-  • Resource Limits: CPU percentage, memory MB, I/O bandwidth, CPU cores
+  • Resource Limits: CPU percentage, memory MB, I/O bandwidth, CPU cores, GPUs
   • Runtime Environment: Python, Java, Node.js runtime specifications
   • Network: Network configuration (bridge, isolated, custom networks)
   • Storage: Mounted volumes (filesystem and memory-based)
   • Working Directory: Job execution directory path
-  • Uploaded Files: List of files uploaded for job execution  
+  • Uploaded Files: List of files uploaded for job execution
   • Environment: Regular environment variables (visible in logs)
   • Secrets: Secret environment variables (masked as ***)
   • Workflow Context: Workflow UUID and job dependencies (if applicable)
@@ -226,6 +226,26 @@ func getJobStatus(jobID string) error {
 	}
 	if response.CpuCores != "" {
 		resourceLimits = append(resourceLimits, fmt.Sprintf("  CPU Cores: %s", response.CpuCores))
+		hasResourceLimits = true
+	}
+
+	// Add GPU resource information if available
+	if response.GpuCount > 0 {
+		if len(response.GpuIndices) > 0 {
+			// Show allocated GPUs
+			gpuIndicesStr := make([]string, len(response.GpuIndices))
+			for i, idx := range response.GpuIndices {
+				gpuIndicesStr[i] = fmt.Sprintf("%d", idx)
+			}
+			resourceLimits = append(resourceLimits, fmt.Sprintf("  GPUs: %d allocated (indices: %s)",
+				response.GpuCount, strings.Join(gpuIndicesStr, ", ")))
+		} else {
+			// Show requested but not yet allocated
+			resourceLimits = append(resourceLimits, fmt.Sprintf("  GPUs: %d requested", response.GpuCount))
+		}
+		if response.GpuMemoryMb > 0 {
+			resourceLimits = append(resourceLimits, fmt.Sprintf("  GPU Memory: %d MB", response.GpuMemoryMb))
+		}
 		hasResourceLimits = true
 	}
 

@@ -83,8 +83,12 @@ type Job struct {
 	Runtime           string                 `protobuf:"bytes,14,opt,name=runtime,proto3" json:"runtime,omitempty"`                                                                                                                        // Runtime spec
 	Environment       map[string]string      `protobuf:"bytes,15,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`                                      // Environment variables
 	SecretEnvironment map[string]string      `protobuf:"bytes,16,rep,name=secret_environment,json=secretEnvironment,proto3" json:"secret_environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Secret env vars (masked in logs)
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// GPU fields
+	GpuIndices    []int32 `protobuf:"varint,17,rep,packed,name=gpu_indices,json=gpuIndices,proto3" json:"gpu_indices,omitempty"` // Which GPUs allocated
+	GpuCount      int32   `protobuf:"varint,18,opt,name=gpu_count,json=gpuCount,proto3" json:"gpu_count,omitempty"`              // Number of GPUs requested/allocated
+	GpuMemoryMb   int32   `protobuf:"varint,19,opt,name=gpu_memory_mb,json=gpuMemoryMb,proto3" json:"gpu_memory_mb,omitempty"`   // GPU memory requirement (MB)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
@@ -227,6 +231,27 @@ func (x *Job) GetSecretEnvironment() map[string]string {
 		return x.SecretEnvironment
 	}
 	return nil
+}
+
+func (x *Job) GetGpuIndices() []int32 {
+	if x != nil {
+		return x.GpuIndices
+	}
+	return nil
+}
+
+func (x *Job) GetGpuCount() int32 {
+	if x != nil {
+		return x.GpuCount
+	}
+	return 0
+}
+
+func (x *Job) GetGpuMemoryMb() int32 {
+	if x != nil {
+		return x.GpuMemoryMb
+	}
+	return 0
 }
 
 type EmptyRequest struct {
@@ -402,8 +427,12 @@ type GetJobStatusRes struct {
 	Uploads           []string               `protobuf:"bytes,20,rep,name=uploads,proto3" json:"uploads,omitempty"`                                                                                                                        // Uploaded files/directories
 	Dependencies      []string               `protobuf:"bytes,21,rep,name=dependencies,proto3" json:"dependencies,omitempty"`                                                                                                              // Job dependencies (for workflow jobs)
 	WorkflowUuid      string                 `protobuf:"bytes,22,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"`                                                                                                              // Workflow UUID (if part of workflow)
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// GPU allocation info
+	GpuIndices    []int32 `protobuf:"varint,23,rep,packed,name=gpu_indices,json=gpuIndices,proto3" json:"gpu_indices,omitempty"` // Which GPUs allocated to this job
+	GpuCount      int32   `protobuf:"varint,24,opt,name=gpu_count,json=gpuCount,proto3" json:"gpu_count,omitempty"`              // Number of GPUs requested/allocated
+	GpuMemoryMb   int32   `protobuf:"varint,25,opt,name=gpu_memory_mb,json=gpuMemoryMb,proto3" json:"gpu_memory_mb,omitempty"`   // GPU memory requirement (MB)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetJobStatusRes) Reset() {
@@ -588,6 +617,27 @@ func (x *GetJobStatusRes) GetWorkflowUuid() string {
 		return x.WorkflowUuid
 	}
 	return ""
+}
+
+func (x *GetJobStatusRes) GetGpuIndices() []int32 {
+	if x != nil {
+		return x.GpuIndices
+	}
+	return nil
+}
+
+func (x *GetJobStatusRes) GetGpuCount() int32 {
+	if x != nil {
+		return x.GpuCount
+	}
+	return 0
+}
+
+func (x *GetJobStatusRes) GetGpuMemoryMb() int32 {
+	if x != nil {
+		return x.GpuMemoryMb
+	}
+	return 0
 }
 
 // StopJob
@@ -3871,9 +3921,12 @@ type RunJobRequest struct {
 	Environment       map[string]string      `protobuf:"bytes,14,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	SecretEnvironment map[string]string      `protobuf:"bytes,18,rep,name=secret_environment,json=secretEnvironment,proto3" json:"secret_environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Secret env vars
 	// Workflow fields (when job is part of workflow)
-	WorkflowUuid  string            `protobuf:"bytes,15,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"` // Workflow UUID
-	JobUuid       string            `protobuf:"bytes,16,opt,name=jobUuid,proto3" json:"jobUuid,omitempty"`           // Job UUID
-	Requirements  []*JobRequirement `protobuf:"bytes,17,rep,name=requirements,proto3" json:"requirements,omitempty"`
+	WorkflowUuid string            `protobuf:"bytes,15,opt,name=workflowUuid,proto3" json:"workflowUuid,omitempty"` // Workflow UUID
+	JobUuid      string            `protobuf:"bytes,16,opt,name=jobUuid,proto3" json:"jobUuid,omitempty"`           // Job UUID
+	Requirements []*JobRequirement `protobuf:"bytes,17,rep,name=requirements,proto3" json:"requirements,omitempty"`
+	// GPU fields (new GPU support)
+	GpuCount      int32 `protobuf:"varint,19,opt,name=gpu_count,json=gpuCount,proto3" json:"gpu_count,omitempty"`            // How many GPUs requested
+	GpuMemoryMb   int32 `protobuf:"varint,20,opt,name=gpu_memory_mb,json=gpuMemoryMb,proto3" json:"gpu_memory_mb,omitempty"` // Minimum GPU memory needed (MB)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4032,6 +4085,20 @@ func (x *RunJobRequest) GetRequirements() []*JobRequirement {
 		return x.Requirements
 	}
 	return nil
+}
+
+func (x *RunJobRequest) GetGpuCount() int32 {
+	if x != nil {
+		return x.GpuCount
+	}
+	return 0
+}
+
+func (x *RunJobRequest) GetGpuMemoryMb() int32 {
+	if x != nil {
+		return x.GpuMemoryMb
+	}
+	return 0
 }
 
 type RunJobResponse struct {
@@ -5464,7 +5531,7 @@ const file_joblet_proto_rawDesc = "" +
 	"\n" +
 	"\fjoblet.proto\x12\x06joblet\"'\n" +
 	"\x04Jobs\x12\x1f\n" +
-	"\x04jobs\x18\x01 \x03(\v2\v.joblet.JobR\x04jobs\"\x8e\x05\n" +
+	"\x04jobs\x18\x01 \x03(\v2\v.joblet.JobR\x04jobs\"\xf0\x05\n" +
 	"\x03Job\x12\x12\n" +
 	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -5482,7 +5549,11 @@ const file_joblet_proto_rawDesc = "" +
 	"\rscheduledTime\x18\r \x01(\tR\rscheduledTime\x12\x18\n" +
 	"\aruntime\x18\x0e \x01(\tR\aruntime\x12>\n" +
 	"\venvironment\x18\x0f \x03(\v2\x1c.joblet.Job.EnvironmentEntryR\venvironment\x12Q\n" +
-	"\x12secret_environment\x18\x10 \x03(\v2\".joblet.Job.SecretEnvironmentEntryR\x11secretEnvironment\x1a>\n" +
+	"\x12secret_environment\x18\x10 \x03(\v2\".joblet.Job.SecretEnvironmentEntryR\x11secretEnvironment\x12\x1f\n" +
+	"\vgpu_indices\x18\x11 \x03(\x05R\n" +
+	"gpuIndices\x12\x1b\n" +
+	"\tgpu_count\x18\x12 \x01(\x05R\bgpuCount\x12\"\n" +
+	"\rgpu_memory_mb\x18\x13 \x01(\x05R\vgpuMemoryMb\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aD\n" +
@@ -5497,7 +5568,7 @@ const file_joblet_proto_rawDesc = "" +
 	"\x04mode\x18\x03 \x01(\rR\x04mode\x12 \n" +
 	"\visDirectory\x18\x04 \x01(\bR\visDirectory\"%\n" +
 	"\x0fGetJobStatusReq\x12\x12\n" +
-	"\x04uuid\x18\x01 \x01(\tR\x04uuid\"\xe2\x06\n" +
+	"\x04uuid\x18\x01 \x01(\tR\x04uuid\"\xc4\a\n" +
 	"\x0fGetJobStatusRes\x12\x12\n" +
 	"\x04uuid\x18\x01 \x01(\tR\x04uuid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -5521,7 +5592,11 @@ const file_joblet_proto_rawDesc = "" +
 	"\aworkDir\x18\x13 \x01(\tR\aworkDir\x12\x18\n" +
 	"\auploads\x18\x14 \x03(\tR\auploads\x12\"\n" +
 	"\fdependencies\x18\x15 \x03(\tR\fdependencies\x12\"\n" +
-	"\fworkflowUuid\x18\x16 \x01(\tR\fworkflowUuid\x1a>\n" +
+	"\fworkflowUuid\x18\x16 \x01(\tR\fworkflowUuid\x12\x1f\n" +
+	"\vgpu_indices\x18\x17 \x03(\x05R\n" +
+	"gpuIndices\x12\x1b\n" +
+	"\tgpu_count\x18\x18 \x01(\x05R\bgpuCount\x12\"\n" +
+	"\rgpu_memory_mb\x18\x19 \x01(\x05R\vgpuMemoryMb\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aD\n" +
@@ -5818,7 +5893,7 @@ const file_joblet_proto_rawDesc = "" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06output\x18\x03 \x01(\tR\x06output\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12\x1a\n" +
-	"\bexitCode\x18\x05 \x01(\x05R\bexitCode\"\x98\x06\n" +
+	"\bexitCode\x18\x05 \x01(\x05R\bexitCode\"\xd9\x06\n" +
 	"\rRunJobRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12\x12\n" +
@@ -5838,7 +5913,9 @@ const file_joblet_proto_rawDesc = "" +
 	"\x12secret_environment\x18\x12 \x03(\v2,.joblet.RunJobRequest.SecretEnvironmentEntryR\x11secretEnvironment\x12\"\n" +
 	"\fworkflowUuid\x18\x0f \x01(\tR\fworkflowUuid\x12\x18\n" +
 	"\ajobUuid\x18\x10 \x01(\tR\ajobUuid\x12:\n" +
-	"\frequirements\x18\x11 \x03(\v2\x16.joblet.JobRequirementR\frequirements\x1a>\n" +
+	"\frequirements\x18\x11 \x03(\v2\x16.joblet.JobRequirementR\frequirements\x12\x1b\n" +
+	"\tgpu_count\x18\x13 \x01(\x05R\bgpuCount\x12\"\n" +
+	"\rgpu_memory_mb\x18\x14 \x01(\x05R\vgpuMemoryMb\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aD\n" +

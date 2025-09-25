@@ -1,0 +1,79 @@
+# GPU-accelerated Machine Learning Pipeline Example
+# This workflow demonstrates GPU resource allocation and CUDA environment setup
+# for a typical ML training pipeline with data preprocessing and model training.
+
+name: "GPU ML Training Pipeline"
+description: "Example GPU-accelerated machine learning workflow with preprocessing and training stages"
+
+jobs:
+  # Data preprocessing - CPU-only task
+  data-preprocessing:
+    command: "python3"
+    args: ["preprocess_data.py", "--input", "/data/raw", "--output", "/data/processed"]
+    runtime: "python-3.11-ml"
+    volumes: ["ml-data"]
+    resources:
+      max_memory: 4096      # 4GB RAM for data processing
+      max_cpu: 200          # 200% CPU (2 cores)
+    environment:
+      PYTHONPATH: "/workspace"
+      DATA_FORMAT: "parquet"
+      LOG_LEVEL: "INFO"
+
+  # Model training - GPU-accelerated
+  gpu-model-training:
+    command: "python3"
+    args: ["train_model.py", "--data", "/data/processed", "--output", "/models", "--epochs", "100"]
+    runtime: "python-3.11-ml"
+    volumes: ["ml-data", "model-storage"]
+    requires:
+      - data-preprocessing: "COMPLETED"
+    resources:
+      max_memory: 16384     # 16GB RAM for training
+      max_cpu: 400          # 400% CPU (4 cores)
+      gpu_count: 1          # Single GPU for training
+      gpu_memory_mb: 8192   # 8GB GPU memory minimum
+    environment:
+      PYTHONPATH: "/workspace"
+      CUDA_VISIBLE_DEVICES: "auto"    # Will be set by joblet
+      TRAINING_MODE: "gpu"
+      BATCH_SIZE: "64"
+      LEARNING_RATE: "0.001"
+
+  # Model evaluation - GPU for inference
+  model-evaluation:
+    command: "python3"
+    args: ["evaluate_model.py", "--model", "/models/latest", "--test-data", "/data/test"]
+    runtime: "python-3.11-ml"
+    volumes: ["ml-data", "model-storage"]
+    requires:
+      - gpu-model-training: "COMPLETED"
+    resources:
+      max_memory: 8192      # 8GB RAM for evaluation
+      max_cpu: 200          # 200% CPU
+      gpu_count: 1          # Single GPU for inference
+      gpu_memory_mb: 4096   # 4GB GPU memory for inference
+    environment:
+      PYTHONPATH: "/workspace"
+      INFERENCE_MODE: "gpu"
+      BATCH_SIZE: "128"
+
+  # Distributed training example - Multi-GPU
+  distributed-training:
+    command: "python3"
+    args: ["distributed_train.py", "--world-size", "2", "--data", "/data/processed"]
+    runtime: "python-3.11-ml"
+    volumes: ["ml-data", "model-storage"]
+    requires:
+      - data-preprocessing: "COMPLETED"
+    resources:
+      max_memory: 32768     # 32GB RAM for distributed training
+      max_cpu: 800          # 800% CPU (8 cores)
+      gpu_count: 2          # Two GPUs for distributed training
+      gpu_memory_mb: 12288  # 12GB minimum per GPU
+    environment:
+      PYTHONPATH: "/workspace"
+      NCCL_DEBUG: "INFO"
+      MASTER_ADDR: "127.0.0.1"
+      MASTER_PORT: "29500"
+      WORLD_SIZE: "2"

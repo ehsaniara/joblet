@@ -75,7 +75,15 @@ func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
 		}
 	}
 
-	log.Info("job resources setup completed")
+	// Setup GPU device permissions if GPUs are allocated
+	if job.IsGPUAllocated() {
+		if err := rm.setupGPUDevicePermissions(job); err != nil {
+			rm.cleanupAll(job.Uuid)
+			return fmt.Errorf("GPU device setup failed: %w", err)
+		}
+	}
+
+	log.Info("job resources setup completed", "hasGPU", job.IsGPUAllocated())
 	return nil
 }
 
@@ -184,4 +192,28 @@ func (rm *ResourceManager) cleanupWorkspace(jobID string) {
 func (rm *ResourceManager) cleanupAll(jobID string) {
 	rm.cgroup.CleanupCgroup(jobID)
 	rm.cleanupWorkspace(jobID)
+}
+
+// setupGPUDevicePermissions configures cgroup device permissions for GPU access
+func (rm *ResourceManager) setupGPUDevicePermissions(job *domain.Job) error {
+	log := rm.logger.WithFields("jobID", job.Uuid, "gpuIndices", job.GPUIndices)
+	log.Debug("setting up GPU device permissions")
+
+	if !job.IsGPUAllocated() {
+		return nil // No setup needed if no GPUs allocated
+	}
+
+	// Convert int32 GPU indices to int slice for the cgroup interface
+	gpuIndices := make([]int, len(job.GPUIndices))
+	for i, gpuIndex := range job.GPUIndices {
+		gpuIndices[i] = int(gpuIndex)
+	}
+
+	// Set up device permissions via cgroup devices controller
+	if err := rm.cgroup.SetGPUDevices(job.CgroupPath, gpuIndices); err != nil {
+		return fmt.Errorf("failed to set GPU device permissions: %w", err)
+	}
+
+	log.Info("GPU device permissions configured successfully", "allowedGPUs", gpuIndices)
+	return nil
 }

@@ -17,8 +17,8 @@ export PASSED_TESTS=0
 export FAILED_TESTS=0
 export SKIPPED_TESTS=0
 
-# Paths
-export JOBLET_ROOT="${JOBLET_ROOT:-/home/jay/joblet}"
+# Paths for developer
+export JOBLET_ROOT="${JOBLET_ROOT:-/home/jay/joblet/joblet}"
 export RNX_BINARY="${RNX_BINARY:-$JOBLET_ROOT/bin/rnx}"
 export TESTS_DIR="$JOBLET_ROOT/tests/e2e"
 

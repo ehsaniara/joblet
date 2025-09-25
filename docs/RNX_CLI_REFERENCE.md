@@ -75,6 +75,8 @@ rnx job run [flags] <command> [args...]
 | `--max-memory`     | Maximum memory in MB                                       | 0 (unlimited)  |
 | `--max-iobps`      | Maximum I/O bytes per second                               | 0 (unlimited)  |
 | `--cpu-cores`      | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
+| `--gpu`            | Number of GPUs to allocate to the job                     | 0 (none)       |
+| `--gpu-memory`     | Minimum GPU memory required (e.g., "8GB", "4096MB")       | none           |
 | `--network`        | Network mode: bridge, isolated, none, or custom            | "bridge"       |
 | `--volume`         | Volume to mount (can be specified multiple times)          | none           |
 | `--upload`         | Upload file to workspace (can be specified multiple times) | none           |
@@ -138,17 +140,24 @@ rnx job run --workflow=jobs.yaml:ml-analysis      # Execute specific job from wo
 rnx job run --runtime=python-3.11-ml python -c "import torch; print(torch.__version__)"
 rnx job run --runtime=openjdk-21 java -version
 
-# Complex example
+# GPU acceleration
+rnx job run --gpu=1 python gpu_script.py
+rnx job run --gpu=2 --gpu-memory=8GB python distributed_training.py
+rnx job run --gpu=1 --gpu-memory=16GB --max-memory=32768 python llm_inference.py
+
+# Complex example with GPU
 rnx job run \
-  --max-cpu=200 \
-  --max-memory=2048 \
+  --max-cpu=400 \
+  --max-memory=8192 \
   --cpu-cores="0,2,4,6" \
+  --gpu=1 \
+  --gpu-memory=8GB \
   --network=mynet \
   --volume=persistent-data \
   --env=PYTHONPATH=/app \
   --upload-dir=./src \
   --runtime=python-3.11-ml \
-  python3 main.py --process-data
+  python3 gpu_training.py --epochs=100
 ```
 
 #### Workflow Validation

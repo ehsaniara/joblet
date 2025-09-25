@@ -4,30 +4,33 @@ import (
 	"context"
 	"fmt"
 
+	"joblet/internal/joblet/domain"
 	"joblet/pkg/logger"
 	"joblet/pkg/platform"
 )
 
 // ExecutionCoordinator coordinates different execution services.
 // Replaces monolithic ExecutionEngine with focused coordinator that orchestrates
-// environment setup, networking, process management, and isolation for job execution.
+// environment setup, networking, process management, isolation, and GPU management for job execution.
 type ExecutionCoordinator struct {
 	environmentManager EnvironmentManager
 	networkManager     NetworkManager
 	processManager     ProcessManager
 	isolationManager   IsolationManager
+	gpuManager         GPUManager
 	platform           platform.Platform
 	logger             *logger.Logger
 }
 
 // NewExecutionCoordinator creates a new execution coordinator.
-// Initializes coordinator with environment, network, process, and isolation managers
+// Initializes coordinator with environment, network, process, isolation, and GPU managers
 // for comprehensive job execution orchestration.
 func NewExecutionCoordinator(
 	envManager EnvironmentManager,
 	netManager NetworkManager,
 	procManager ProcessManager,
 	isolManager IsolationManager,
+	gpuManager GPUManager,
 	platform platform.Platform,
 	logger *logger.Logger,
 ) *ExecutionCoordinator {
@@ -36,6 +39,7 @@ func NewExecutionCoordinator(
 		networkManager:     netManager,
 		processManager:     procManager,
 		isolationManager:   isolManager,
+		gpuManager:         gpuManager,
 		platform:           platform,
 		logger:             logger.WithField("component", "execution-coordinator"),
 	}
@@ -69,7 +73,33 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 		return nil, fmt.Errorf("failed to prepare workspace: %w", err)
 	}
 
-	// 3. Setup networking
+	// 3. Allocate GPU resources if needed
+	var gpuAllocation interface{} // Hold GPU allocation for cleanup
+	if opts.Job.HasGPURequirement() {
+		log.Info("allocating GPU resources for job", "gpuCount", opts.Job.GPUCount, "memoryRequirement", opts.Job.GPUMemoryMB)
+		alloc, err := ec.gpuManager.AllocateGPU(ctx, opts.Job)
+		if err != nil {
+			ec.cleanup(opts.Job.Uuid, workspaceDir)
+			return nil, fmt.Errorf("failed to allocate GPU resources: %w", err)
+		}
+		gpuAllocation = alloc
+
+		if alloc != nil {
+			log.Info("GPU resources allocated successfully", "allocatedGPUs", opts.Job.GPUIndices)
+
+			// Setup GPU devices and libraries after successful allocation
+			if err := ec.setupGPUEnvironment(ctx, opts.Job); err != nil {
+				log.Error("failed to setup GPU environment", "error", err)
+				ec.cleanup(opts.Job.Uuid, workspaceDir)
+				ec.cleanupGPU(ctx, opts.Job.Uuid, gpuAllocation)
+				return nil, fmt.Errorf("failed to setup GPU environment: %w", err)
+			}
+		} else {
+			log.Warn("job requested GPUs but none were allocated (GPU support may be disabled)")
+		}
+	}
+
+	// 4. Setup networking
 	var networkAlloc *NetworkAllocation
 	log.Debug("checking job network configuration", "network", opts.Job.Network, "isEmpty", opts.Job.Network == "")
 	if opts.Job.Network != "" {
@@ -77,6 +107,7 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 		networkAlloc, err = ec.networkManager.SetupNetworking(ctx, opts.Job.Uuid, opts.Job.Network)
 		if err != nil {
 			ec.cleanup(opts.Job.Uuid, workspaceDir)
+			ec.cleanupGPU(ctx, opts.Job.Uuid, gpuAllocation)
 			return nil, fmt.Errorf("failed to setup networking: %w", err)
 		}
 		log.Info("networking setup completed", "allocation", networkAlloc != nil)
@@ -84,16 +115,16 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 		log.Info("no networking configured for job")
 	}
 
-	// 4. Build environment
+	// 5. Build environment
 	environment := ec.environmentManager.BuildEnvironment(opts.Job, "execute")
 
-	// 5. Always use joblet binary as init for unified pub/sub logging
+	// 6. Always use joblet binary as init for unified pub/sub logging
 	// The joblet binary runs in init mode, sets up runtime environment, then exec's to the actual command
 	// This ensures all jobs (runtime and default) use the same logging mechanism
 	initPath := "/opt/joblet/joblet"
 	log.Debug("using joblet binary as init for namespace isolation and unified logging", "initPath", initPath)
 
-	// 6. Create network ready file for coordination if networking is enabled
+	// 7. Create network ready file for coordination if networking is enabled
 	var networkReadyFile string
 	if networkAlloc != nil && networkAlloc.Network != "none" {
 		// Create a signal file for network coordination
@@ -104,7 +135,7 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 		log.Debug("created network ready file path", "file", networkReadyFile)
 	}
 
-	// 7. Launch process
+	// 8. Launch process
 	launchConfig := &LaunchConfig{
 		InitPath:    initPath, // Use resolved absolute path
 		JobID:       opts.Job.Uuid,
@@ -123,6 +154,7 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 				log.Warn("failed to cleanup networking during process launch failure", "error", cleanupErr)
 			}
 		}
+		ec.cleanupGPU(ctx, opts.Job.Uuid, gpuAllocation)
 		return nil, fmt.Errorf("failed to launch process: %w", err)
 	}
 
@@ -163,6 +195,11 @@ func (ec *ExecutionCoordinator) StopJob(ctx context.Context, jobID string) error
 		errs = append(errs, fmt.Errorf("network cleanup failed: %w", err))
 	}
 
+	// Release GPU resources
+	if err := ec.gpuManager.ReleaseGPU(ctx, jobID); err != nil {
+		errs = append(errs, fmt.Errorf("GPU cleanup failed: %w", err))
+	}
+
 	if err := ec.environmentManager.CleanupWorkspace(jobID); err != nil {
 		errs = append(errs, fmt.Errorf("workspace cleanup failed: %w", err))
 	}
@@ -188,4 +225,42 @@ func (ec *ExecutionCoordinator) cleanup(jobID, workspaceDir string) {
 	if err := ec.isolationManager.DestroyIsolatedEnvironment(jobID); err != nil {
 		ec.logger.Warn("isolation cleanup failed during error recovery", "jobID", jobID, "error", err)
 	}
+}
+
+// cleanupGPU performs GPU resource cleanup during error recovery
+func (ec *ExecutionCoordinator) cleanupGPU(ctx context.Context, jobID string, gpuAllocation interface{}) {
+	if gpuAllocation != nil {
+		if err := ec.gpuManager.ReleaseGPU(ctx, jobID); err != nil {
+			ec.logger.Warn("GPU cleanup failed during error recovery", "jobID", jobID, "error", err)
+		}
+	}
+}
+
+// setupGPUEnvironment sets up GPU devices and CUDA libraries for jobs with GPU allocations
+func (ec *ExecutionCoordinator) setupGPUEnvironment(ctx context.Context, job *domain.Job) error {
+	if !job.IsGPUAllocated() {
+		return nil // No setup needed if no GPUs allocated
+	}
+
+	log := ec.logger.WithField("jobID", job.Uuid)
+	log.Debug("setting up GPU environment", "gpuIndices", job.GPUIndices)
+
+	// Note: In this architecture, device node creation and CUDA mounting would be handled
+	// by the isolation system when the job container/chroot is actually created.
+	// The coordinator primarily handles resource allocation and coordination.
+	//
+	// The actual GPU device setup will happen in the isolation system during job execution.
+	// For now, we log the setup requirement and rely on the environment service
+	// to provide the necessary environment variables (CUDA_VISIBLE_DEVICES, etc.)
+
+	log.Info("GPU environment setup completed",
+		"allocatedGPUs", job.GPUIndices,
+		"gpuCount", len(job.GPUIndices))
+
+	// TODO: Future enhancement could include:
+	// 1. Setting up GPU device cgroup permissions via the resource manager
+	// 2. Pre-mounting CUDA libraries if needed by the filesystem isolator
+	// 3. Creating device nodes in advance if required by the isolation system
+
+	return nil
 }

@@ -47,6 +47,8 @@ type BuildRequest struct {
 	WorkingDirectory  string
 	Uploads           []domain.FileUpload
 	Dependencies      []string
+	GPUCount          int32 // Number of GPUs requested
+	GPUMemoryMB       int64 // GPU memory requirement in MB
 }
 
 // Build creates a new job from the request.
@@ -89,6 +91,9 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		WorkingDirectory:  req.WorkingDirectory,
 		Uploads:           req.Uploads,
 		Dependencies:      b.copyStrings(req.Dependencies),
+		GPUCount:          req.GPUCount,    // GPU requirements
+		GPUMemoryMB:       req.GPUMemoryMB, // GPU memory requirement
+		GPUIndices:        []int32{},       // Will be populated during allocation
 	}
 
 	// Apply resource limits with defaults

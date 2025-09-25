@@ -85,6 +85,11 @@ type Job struct {
 	Environment       map[string]string // Environment variables (kept as map for backward compatibility)
 	SecretEnvironment map[string]string // Secret environment variables (kept as map for backward compatibility)
 
+	// GPU allocation
+	GPUIndices  []int32 // Which GPUs are allocated to this job
+	GPUCount    int32   // Number of GPUs requested/allocated
+	GPUMemoryMB int64   // GPU memory requirement in MB
+
 	// Legacy fields for backward compatibility
 	StartedAt   time.Time // Alias for StartTime (used by monitoring)
 	CompletedAt time.Time // Populated when job completes
@@ -134,6 +139,16 @@ func (j *Job) HasResourceLimits() bool {
 		j.Limits.HasMemoryLimit() ||
 		j.Limits.HasIOLimit() ||
 		j.Limits.HasCoreRestriction()
+}
+
+// HasGPURequirement returns true if the job requires GPUs
+func (j *Job) HasGPURequirement() bool {
+	return j.GPUCount > 0
+}
+
+// IsGPUAllocated returns true if GPUs have been allocated to this job
+func (j *Job) IsGPUAllocated() bool {
+	return len(j.GPUIndices) > 0
 }
 
 // Duration returns the job execution duration
@@ -413,6 +428,11 @@ func (j *Job) DeepCopy() *Job {
 		Environment:       make(map[string]string),
 		SecretEnvironment: make(map[string]string),
 
+		// GPU allocation
+		GPUIndices:  make([]int32, len(j.GPUIndices)),
+		GPUCount:    j.GPUCount,
+		GPUMemoryMB: j.GPUMemoryMB,
+
 		// Legacy fields
 		StartedAt:   j.StartedAt,
 		CompletedAt: j.CompletedAt,
@@ -421,6 +441,7 @@ func (j *Job) DeepCopy() *Job {
 	// Copy slices
 	copy(jobCopy.Args, j.Args)
 	copy(jobCopy.Volumes, j.Volumes)
+	copy(jobCopy.GPUIndices, j.GPUIndices)
 
 	// Deep copy environment maps
 	for k, v := range j.Environment {

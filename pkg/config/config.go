@@ -26,6 +26,7 @@ type Config struct {
 	Buffers    BuffersConfig    `yaml:"buffers" json:"buffers"`
 	Volumes    VolumesConfig    `yaml:"volumes" json:"volumes"`
 	Runtime    RuntimeConfig    `yaml:"runtime" json:"runtime"`
+	GPU        GPUConfig        `yaml:"gpu" json:"gpu"`
 }
 
 type NetworkConfig struct {
@@ -192,6 +193,12 @@ type RuntimeConfig struct {
 	CommonPaths []string `yaml:"common_paths" json:"common_paths"`
 }
 
+// GPUConfig holds GPU support configuration
+type GPUConfig struct {
+	Enabled   bool     `yaml:"enabled" json:"enabled"`       // Enable GPU support (off by default)
+	CUDAPaths []string `yaml:"cuda_paths" json:"cuda_paths"` // CUDA installation paths
+}
+
 // DefaultConfig provides default configuration values
 var DefaultConfig = Config{
 	Version: "3.0",
@@ -228,7 +235,7 @@ var DefaultConfig = Config{
 	Cgroup: CgroupConfig{
 		BaseDir:           "/sys/fs/cgroup/joblet.slice/joblet.service",
 		NamespaceMount:    "/sys/fs/cgroup",
-		EnableControllers: []string{"cpu", "memory", "io", "pids", "cpuset"},
+		EnableControllers: []string{"cpu", "memory", "io", "pids", "cpuset", "devices"},
 		CleanupTimeout:    5 * time.Second,
 	},
 	Filesystem: FilesystemConfig{
@@ -314,6 +321,13 @@ var DefaultConfig = Config{
 			"/usr/lib/jvm",
 			"/usr/local/node",
 			"/usr/local/go",
+		},
+	},
+	GPU: GPUConfig{
+		Enabled: false, // Off by default - opt-in only
+		CUDAPaths: []string{
+			"/usr/local/cuda",
+			"/opt/cuda",
 		},
 	},
 }

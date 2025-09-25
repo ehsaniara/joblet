@@ -22,13 +22,15 @@ on Joblet servers. It supports immediate execution, scheduling, and comprehensiv
 
 Key Features:
   - Execute jobs with resource limits and scheduling
-  - Manage multi-job workflows with dependencies  
+  - GPU acceleration support for ML/AI workloads
+  - Manage multi-job workflows with dependencies
   - Create and manage networks, volumes, and runtimes
   - Monitor remote server resources, job performance, and volume usage
   - Stream real-time logs from running jobs
 
 Quick Examples:
   rnx job run python script.py               # Run a simple job
+  rnx job run --gpu=1 python train.py        # Run GPU-accelerated job
   rnx job run --workflow=pipeline.yaml       # Execute a workflow
   rnx job list --workflow                    # List all workflows
   rnx job status <job-uuid>                  # Check job status (supports short UUIDs)

@@ -15,6 +15,7 @@ import (
 	"joblet/internal/joblet/core/unprivileged"
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/gpu"
 	"joblet/internal/joblet/network"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
@@ -27,7 +28,7 @@ type ExecutionEngineV2 struct {
 	coordinator execution.JobExecutor
 	platform    platform.Platform
 	config      *config.Config
-	store       JobStore
+	store       adapters.JobStorer
 	logger      *logger.Logger
 }
 
@@ -45,11 +46,12 @@ func NewExecutionEngineV2(
 	processManager *process.Manager,
 	uploadManager *upload.Manager,
 	platform platform.Platform,
-	store JobStore,
+	store adapters.JobStorer,
 	config *config.Config,
 	logger *logger.Logger,
 	jobIsolation *unprivileged.JobIsolation,
-	networkStore NetworkStore,
+	networkStore adapters.NetworkStorer,
+	gpuManager gpu.GPUManagerInterface,
 ) *ExecutionEngineV2 {
 	// Create environment builder
 	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
@@ -91,12 +93,16 @@ func NewExecutionEngineV2(
 		logger:    logger,
 	}
 
+	// Create GPU service
+	gpuService := execution.NewGPUService(gpuManager, logger)
+
 	// Create execution coordinator
 	coordinator := execution.NewExecutionCoordinator(
 		envService,
 		netService,
 		processService,
 		isolationService,
+		gpuService,
 		platform,
 		logger,
 	)
@@ -224,7 +230,7 @@ func (ee *ExecutionEngineV2) buildEnvironmentForCI(job *domain.Job) []string {
 
 // networkStoreAdapter adapts NetworkStore to execution.NetworkStoreInterface
 type networkStoreAdapter struct {
-	store NetworkStore
+	store adapters.NetworkStorer
 }
 
 func (nsa *networkStoreAdapter) AllocateIP(networkName string) (string, error) {
@@ -272,7 +278,7 @@ func (nsa *networkStoreAdapter) GetJobAllocation(jobID string) (*execution.JobNe
 type processManagerAdapter struct {
 	manager   *process.Manager
 	platform  platform.Platform
-	store     JobStore
+	store     adapters.JobStorer
 	logger    *logger.Logger
 	isolation *unprivileged.JobIsolation
 }

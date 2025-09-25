@@ -404,9 +404,11 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 		Network:           network,
 		Volumes:           req.Volumes,
 		Runtime:           req.Runtime,
-		Environment:       req.Environment,       // Regular environment variables (logged)
-		SecretEnvironment: req.SecretEnvironment, // Secret environment variables (not logged)
-		JobType:           jobType,               // Set job type for isolation configuration
+		Environment:       req.Environment,        // Regular environment variables (logged)
+		SecretEnvironment: req.SecretEnvironment,  // Secret environment variables (not logged)
+		JobType:           jobType,                // Set job type for isolation configuration
+		GPUCount:          req.GpuCount,           // Number of GPUs requested
+		GPUMemoryMB:       int64(req.GpuMemoryMb), // GPU memory requirement in MB
 	}
 
 	// Validate the request
@@ -429,6 +431,15 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 	if req.Resources.MaxIOBPS < 0 {
 		return fmt.Errorf("maxIOBPS cannot be negative")
 	}
+
+	// Validate GPU requirements
+	if req.GPUCount < 0 {
+		return fmt.Errorf("GPUCount cannot be negative")
+	}
+	if req.GPUMemoryMB < 0 {
+		return fmt.Errorf("GPUMemoryMB cannot be negative")
+	}
+	// Note: GPUCount = 0 is valid (means no GPU required)
 
 	// Validate network
 	validNetworks := map[string]bool{

@@ -6,44 +6,44 @@
 
 <img align="right" width="159px" src="docs/joblet-thumbnail.png">
 
-**Joblet** executes jobs on Linux systems with process isolation, resource limits, monitoring, and network isolation.
+**Joblet** is a secure Linux job execution platform that simplifies running isolated processes with comprehensive resource management. It handles process isolation, resource limits, GPU acceleration, and monitoring automatically, letting you focus on your applications rather than infrastructure complexity.
 
-> **📚 Documentation: [/docs/README.md](docs/README.md)**
+> **📚 Complete Documentation: [/docs/README.md](docs/README.md)**
 
-> **🤖 AI Agent Support:** Sandboxed code execution with resource controls and process isolation.
+> **🤖 AI Agent Ready:** Provides sandboxed code execution with GPU support, resource controls, and complete process isolation for AI workloads.
 
-## 🎯 Key Features
+## 🎯 Key Capabilities
 
-- **Process Isolation**: Separate PID namespaces with limited filesystem access
-- **Resource Control**: CPU, memory, I/O bandwidth limits with core binding
-- **Network Isolation**: Custom networks with traffic segmentation
-- **Volume Management**: Persistent storage (filesystem and memory-based)
-- **Job Scheduling**: Delayed execution with time specifications
-- **Monitoring**: Logs, metrics, and status tracking
-- **mTLS Security**: Certificate-based authentication with RBAC
-- **Pre-built Runtimes**: Python, Java, GraalVM environments
-- **Web Admin UI**: React interface (macOS)
+- **🔒 Process Isolation**: Jobs run in secure sandboxes with separate namespaces, preventing interference between workloads
+- **⚡ GPU Acceleration**: Native NVIDIA GPU support with automatic CUDA environment setup for AI/ML workloads
+- **🎛️ Resource Management**: Comprehensive CPU, memory, I/O, and GPU resource limits with fine-grained control
+- **🌐 Network Isolation**: Flexible networking options from complete isolation to custom networks for secure communication
+- **💾 Storage Solutions**: Persistent volumes for data retention and temporary storage with automatic cleanup
+- **⏰ Job Scheduling**: Execute jobs immediately, schedule for specific times, or set delayed execution with simple syntax
+- **🛡️ Enterprise Security**: Production-grade mTLS encryption with certificate-based authentication and role-based access control
+- **🐍 Runtime Environments**: Pre-configured Python ML, Java, and GraalVM environments eliminate container image management
+- **🎨 Management Interface**: Modern React-based web UI for comprehensive system administration and monitoring
 
-## 📦 Quick Start
+## 📦 Getting Started
 
-### A. Joblet Server Installation (Linux Only)
+### A. Joblet Server Installation (Linux)
 
 #### Option 1: Package Installation (Ubuntu/Debian)
 
 ```bash
-# Download and install the .deb package
+# Download and install the latest release
 wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
 sudo dpkg -i joblet_*_amd64.deb
 
-# Start the Joblet service
+# Start the service
 sudo systemctl start joblet
 sudo systemctl enable joblet
 ```
 
-#### Option 2: Manual Installation (Any Linux)
+#### Option 2: Manual Installation (Any Linux Distribution)
 
 ```bash
-# Download the Linux release
+# Download and extract the release
 curl -L -o rnx-linux-amd64.tar.gz $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*linux-amd64.tar.gz" | cut -d '"' -f 4)
 tar -xzf rnx-linux-amd64.tar.gz
 cd rnx-linux-amd64
@@ -53,17 +53,18 @@ sudo ./install.sh
 sudo systemctl start joblet
 ```
 
-### B. RNX Client Installation
+### B. RNX Client Installation (Cross-Platform)
 
 #### macOS (Homebrew)
 
 ```bash
+# Add the Joblet tap
 brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
 brew install rnx                                    # Interactive setup
-brew install ehsaniara/joblet/rnx --with-admin     # CLI + Web UI
+brew install ehsaniara/joblet/rnx --with-admin     # Includes Web UI
 brew install ehsaniara/joblet/rnx --without-admin  # CLI only
 
-# Copy configuration from your Joblet server
+# Copy configuration from server
 scp user@joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
@@ -81,16 +82,16 @@ Move-Item rnx.exe "$env:USERPROFILE\bin\"
 # Copy configuration from Joblet server to %USERPROFILE%\.rnx\rnx-config.yml
 ```
 
-### C. Quick Test
+### C. Verify Installation
 
 ```bash
-# From any client machine with RNX installed:
-rnx job list                           # List jobs
-rnx job run echo "Hello from Joblet!" # Run a simple job
-rnx monitor status                 # Check server metrics
+# Test the connection and run your first job
+rnx job list                           # List current jobs
+rnx job run echo "Hello from Joblet!" # Execute a simple test job
+rnx monitor status                     # Check server health
 
-# Web admin UI (macOS with --with-admin):
-rnx admin                          # Launch at http://localhost:5173
+# Launch Web UI (if installed with --with-admin):
+rnx admin                              # Opens dashboard at http://localhost:5173
 ```
 
 ### D. Python SDK Usage (Alternative to CLI)
@@ -109,99 +110,107 @@ with JobletClient(host="your-joblet-server") as client:
     print(f"Job started: {job['job_uuid']}")
 ```
 
-## 🚀 Basic Usage
+## 🚀 Usage Examples
 
-### YAML Workflows (Simplified Execution)
+### YAML Workflows (Recommended for Complex Jobs)
 
 ```bash
-# Run pre-configured jobs with workflows
+# Execute pre-configured workflows
 rnx job run --workflow=jobs.yaml:ml-analysis      # Python ML analysis
 rnx job run --workflow=jobs.yaml:hello-joblet     # Java application
-rnx job run --workflow=ml-pipeline.yaml           # Full ML workflow
+rnx job run --workflow=ml-pipeline.yaml           # ML pipeline with GPU support
 
-# Check status
+# Monitor execution status
 rnx job status <job-uuid>
 rnx job status --workflow <workflow-uuid>
 ```
 
-### Traditional Commands
+### Command Line Interface
 
 ```bash
-# Run commands with isolation
+# Basic job execution with resource isolation
 rnx job run echo "Hello World"
 rnx job run --max-cpu=50 --max-memory=512 python3 script.py
 
-# Pre-built runtimes
-rnx job run --runtime=python-3.11-ml python analysis.py    # 2-3 seconds
+# Pre-built runtime environments
+rnx job run --runtime=python-3.11-ml python analysis.py    # ML-ready Python environment
 rnx job run --runtime=openjdk-21 java App.java
 rnx job run --runtime=graalvmjdk-21 java GraalApp.java
 
-# Upload files and run
+# GPU acceleration for compute-intensive workloads
+rnx job run --gpu=1 --gpu-memory=8GB python train_model.py
+rnx job run --gpu=2 --runtime=python-3.11-ml python distributed_training.py
+
+# File uploads and environment configuration
 rnx job run --upload=data.csv --upload=script.py python3 script.py
 
-# Environment variables
+# Environment variables (visible and secure)
 rnx job run --env=NODE_ENV=production node app.js
-rnx job run --secret-env=API_KEY=secret python app.py
+rnx job run --secret-env=API_KEY=secret python app.py       # Hidden from logs
 
-# Network isolation
-rnx job run --network=none secure_task.sh           # No network
-rnx job run --network=isolated wget https://api.com # External only
-rnx job run --network=bridge api_server.py          # Inter-job communication
+# Network isolation modes
+rnx job run --network=none secure_task.sh                   # No network access
+rnx job run --network=isolated wget https://api.com         # External access only
+rnx job run --network=bridge api_server.py                  # Inter-job communication
 
-# Persistent storage
+# Persistent storage management
 rnx volume create mydata --size=1GB
 rnx job run --volume=mydata python3 process_data.py
 
-# Job scheduling
+# Job scheduling options
 rnx job run --schedule="1hour" backup.sh
 rnx job run --schedule="2025-12-25T00:00:00" maintenance.py
 ```
 
-## 🎨 Web Admin UI
+## 🎨 Web Administration Interface
 
-Available on macOS via Homebrew with `--with-admin`:
+Available on macOS via Homebrew with `--with-admin` option:
 
-- **System Monitoring**: CPU, memory, disk, network metrics
-- **Job Management**: List, filter, start/stop jobs with logs
-- **Workflow Visualization**: Dependency graphs and timelines
-- **Administration**: Volume, network, and runtime configuration
+- **📊 System Monitoring**: Real-time CPU, memory, disk, and network metrics with visual dashboards
+- **🎮 Job Management**: Comprehensive job listing, filtering, control, and log streaming capabilities
+- **🔗 Workflow Visualization**: Interactive dependency graphs and execution timelines
+- **⚙️ System Administration**: Intuitive volume, network, and runtime environment management
 
 ## 📊 System Requirements
 
-### Joblet Server (Linux Only)
+### Joblet Server (Linux)
 
-- Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+)
-- Multi-core CPU, 1GB+ RAM, 5GB+ disk
-- Port 50051 (gRPC), root access for namespaces
-- cgroups v2, iptables, iproute2, bridge-utils
+- **Operating System**: Linux kernel 4.6+ (Ubuntu 18.04+, CentOS 8+, or equivalent distributions)
+- **Hardware**: Multi-core CPU, 1GB+ RAM, 5GB+ disk space (scales with workload)
+- **Network**: Port 50051 accessible for gRPC communication
+- **Privileges**: Root access required for namespace and cgroup management
+- **Dependencies**: cgroups v2, iptables, iproute2, bridge-utils (standard on most distributions)
+- **GPU Support**: NVIDIA drivers (optional, required only for GPU workloads)
 
 ### RNX Client (Cross-Platform)
 
-- Linux, macOS 10.15+, or Windows 10+
-- 50MB+ RAM, network access to port 50051
+- **Operating Systems**: Linux, macOS 10.15+, Windows 10+
+- **Resources**: Minimal - 50MB+ RAM, network connectivity to server port 50051
+- **Distribution**: Single binary executable with no additional dependencies
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](docs/QUICKSTART.md)**
-- **[Installation Guide](docs/INSTALLATION.md)**
-- **[Job Execution Guide](docs/JOB_EXECUTION.md)**
-- **[RNX CLI Reference](docs/RNX_CLI_REFERENCE.md)**
-- **[Security Guide](docs/SECURITY.md)**
-- **[Examples](examples/)**
+- **[Quick Start Guide](docs/QUICKSTART.md)** - Get up and running quickly with step-by-step instructions
+- **[Installation Guide](docs/INSTALLATION.md)** - Comprehensive installation procedures for all platforms
+- **[GPU Support Guide](docs/GPU_SUPPORT.md)** - Complete guide to NVIDIA GPU acceleration and CUDA integration
+- **[Job Execution Guide](docs/JOB_EXECUTION.md)** - Detailed job management and execution patterns
+- **[RNX CLI Reference](docs/RNX_CLI_REFERENCE.md)** - Complete command reference with examples
+- **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
+- **[Working Examples](examples/)** - Production-ready workflow templates and configurations
 
 ## 🔗 Related Projects
 
 ### Protocol Definitions
-- **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)** - gRPC protocol buffer definitions for Joblet API
-  - Contains the official `.proto` files that define the Joblet gRPC API
-  - Used to generate client libraries for different programming languages
+- **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)** - Official gRPC protocol buffer definitions
+  - Contains the `.proto` files defining the Joblet API specification
+  - Foundation for building client libraries in any programming language
 
-### SDKs & Client Libraries
-- **[Joblet Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)** - Official Python SDK for Joblet
-  - Easy-to-use Python library for interacting with Joblet servers
-  - Supports all Joblet features: jobs, workflows, monitoring, SSL/TLS
+### Client SDKs
+- **[Joblet Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)** - Official Python client library
+  - Comprehensive Python interface for all Joblet functionality
+  - Supports jobs, workflows, monitoring, and secure SSL/TLS communication
 
-Want to build your own client library? Start with the [protocol definitions](https://github.com/ehsaniara/joblet-proto) and generate bindings for your preferred language.
+**Developing a custom client?** Start with the [protocol definitions](https://github.com/ehsaniara/joblet-proto) to generate language-specific bindings.
 
 ## 📄 License
 

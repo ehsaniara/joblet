@@ -196,6 +196,16 @@ func (e *ExecCommand) SetEnv(env []string) {
 	e.cmd.Env = env
 }
 
+// Output runs the command and returns its combined stdout and stderr
+func (e *ExecCommand) Output() ([]byte, error) {
+	return e.cmd.Output()
+}
+
+// CombinedOutput runs the command and returns its combined stdout and stderr
+func (e *ExecCommand) CombinedOutput() ([]byte, error) {
+	return e.cmd.CombinedOutput()
+}
+
 // ExecProcess wraps os.Process to implement Process interface
 type ExecProcess struct {
 	process *os.Process

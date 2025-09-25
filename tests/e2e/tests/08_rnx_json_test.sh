@@ -48,14 +48,10 @@ execute_rnx_json() {
     local command="$1"
     local expected_fields="$2"
     local timeout="${3:-10}"
-    
+
     local json_output
-    # Handle global --json flag (for run command) vs regular --json flag
-    if [[ "$command" == "--json "* ]]; then
-        json_output=$(timeout "$timeout" "$RNX_BINARY" $command 2>&1)
-    else
-        json_output=$(timeout "$timeout" "$RNX_BINARY" --json $command 2>&1)
-    fi
+    # Use --json as global flag for all commands
+    json_output=$(timeout "$timeout" "$RNX_BINARY" --json $command 2>&1)
     local exit_code=$?
     
     if [[ $exit_code -ne 0 ]]; then
@@ -127,7 +123,7 @@ test_rnx_runtime_list_json() {
 
 test_rnx_run_json() {
     local json_output
-    json_output=$(execute_rnx_json "--json run echo 'rnx-json-test'" "job_uuid status" 15)
+    json_output=$(execute_rnx_json "job run echo 'rnx-json-test'" "job_uuid status" 15)
     
     if [[ $? -eq 0 ]]; then
         # Validate job_uuid format (UUID-like) using basic pattern matching
@@ -153,7 +149,7 @@ test_rnx_run_json() {
 
 test_rnx_list_json() {
     local json_output
-    json_output=$(execute_rnx_json "list" "id")
+    json_output=$(execute_rnx_json "job list" "id")
     
     if [[ $? -eq 0 ]]; then
         # Check that it looks like a JSON array
@@ -176,7 +172,7 @@ test_rnx_list_json() {
 }
 
 test_rnx_status_json() {
-    # First create a test job to get status for  
+    # First create a test job to get status for
     local run_output
     run_output=$("$RNX_BINARY" --json job run --env=TEST_VAR=status_test echo 'status-test-job' 2>&1)
     
@@ -199,7 +195,7 @@ test_rnx_status_json() {
     
     # Test status command with JSON output
     local json_output
-    json_output=$(execute_rnx_json "status $job_uuid" "uuid command status")
+    json_output=$(execute_rnx_json "job status $job_uuid" "uuid command status")
     
     if [[ $? -eq 0 ]]; then
         # Check for enhanced status fields that were added

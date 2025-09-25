@@ -84,13 +84,25 @@ Environment Variable Examples:
   # Pass regular environment variables (visible in logs)
   rnx job run --env=NODE_ENV=production --env=PORT=8080 node app.js
   rnx job run -e DEBUG=true python app.py
-  
+
   # Pass secret environment variables (hidden from logs)
   rnx job run --secret-env=API_KEY=secret123 --secret-env=DB_PASSWORD=pass123 python app.py
   rnx job run -s JWT_SECRET=mysecret node server.js
-  
+
   # Combine different types
   rnx job run --env=NODE_ENV=prod --secret-env=API_KEY=secret node app.js
+
+GPU Examples:
+  # Request a single GPU for machine learning workloads
+  rnx job run --gpu=1 python train_model.py
+  rnx job run --gpu=1 --runtime=python-3.11-ml python pytorch_training.py
+
+  # Request multiple GPUs with memory requirements
+  rnx job run --gpu=2 --gpu-memory=16GB python distributed_training.py
+  rnx job run --gpu=4 --gpu-memory=8GB --upload=model.py python model.py
+
+  # GPU with other resource limits
+  rnx job run --gpu=1 --max-memory=4096 --max-cpu=200 python inference.py
 
 Scheduling Formats:
   # Relative time
@@ -119,7 +131,9 @@ Flags:
   --env=KEY=VALUE         Set environment variable (visible in logs)
   -e KEY=VALUE            Short form of --env
   --secret-env=KEY=VALUE  Set secret environment variable (hidden from logs)
-  -s KEY=VALUE            Short form of --secret-env`,
+  -s KEY=VALUE            Short form of --secret-env
+  --gpu=N             Request N GPUs for the job (requires GPU support enabled)
+  --gpu-memory=SIZE   Minimum GPU memory required (e.g., 8GB, 1024MB, 2048)`,
 		Args:               cobra.MinimumNArgs(1),
 		RunE:               runRun,
 		DisableFlagParsing: true,
@@ -149,6 +163,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		workflow      string
 		envVars       []string
 		secretEnvVars []string
+		gpuCount      int32
+		gpuMemoryMB   int32
 	)
 
 	commandStartIndex := -1
@@ -224,6 +240,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 			if i+1 < len(args) {
 				secretEnvVars = append(secretEnvVars, args[i+1])
 				i++ // Skip the next argument
+			}
+		} else if strings.HasPrefix(arg, "--gpu=") {
+			if val, err := parseIntFlag(arg, "--gpu="); err == nil {
+				gpuCount = int32(val)
+			}
+		} else if strings.HasPrefix(arg, "--gpu-memory=") {
+			gpuMemoryStr := strings.TrimPrefix(arg, "--gpu-memory=")
+			// Parse GPU memory - support formats like "8GB", "1024MB", or just "1024"
+			if val, err := parseGPUMemory(gpuMemoryStr); err == nil {
+				gpuMemoryMB = int32(val)
 			}
 		} else if arg == "--" {
 			// -- separator found, command starts at next position
@@ -402,6 +428,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		Runtime:           runtime,
 		Environment:       environment,
 		SecretEnvironment: secretEnvironment,
+		GpuCount:          gpuCount,
+		GpuMemoryMb:       gpuMemoryMB,
 	}
 
 	// Submit job
@@ -1414,4 +1442,29 @@ func outputRunJobJSON(response *pb.RunJobResponse, scheduleInput string, fileCou
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)
+}
+
+// parseGPUMemory parses GPU memory specifications like "8GB", "1024MB", or "2048"
+func parseGPUMemory(memoryStr string) (int, error) {
+	memoryStr = strings.TrimSpace(strings.ToUpper(memoryStr))
+
+	// Handle simple numeric values (assume MB)
+	if val, err := strconv.Atoi(memoryStr); err == nil {
+		return val, nil
+	}
+
+	// Handle values with units
+	if strings.HasSuffix(memoryStr, "GB") {
+		valueStr := strings.TrimSuffix(memoryStr, "GB")
+		if val, err := strconv.Atoi(valueStr); err == nil {
+			return val * 1024, nil // Convert GB to MB
+		}
+	} else if strings.HasSuffix(memoryStr, "MB") {
+		valueStr := strings.TrimSuffix(memoryStr, "MB")
+		if val, err := strconv.Atoi(valueStr); err == nil {
+			return val, nil
+		}
+	}
+
+	return 0, fmt.Errorf("invalid GPU memory format: %s (expected formats: 8GB, 1024MB, or 2048)", memoryStr)
 }

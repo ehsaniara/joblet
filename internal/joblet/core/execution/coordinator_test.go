@@ -36,6 +36,7 @@ func TestExecutionCoordinator_StartJob_DefaultRuntime(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)
@@ -107,6 +108,7 @@ func TestExecutionCoordinator_StartJob_RuntimeJob(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)
@@ -199,6 +201,7 @@ func TestExecutionCoordinator_StartJob_WithNetworking(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)
@@ -263,6 +266,7 @@ func TestExecutionCoordinator_StartJob_IsolationCreationFails(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)
@@ -314,6 +318,7 @@ func TestExecutionCoordinator_StartJob_WorkspacePreparationFails(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)
@@ -367,6 +372,7 @@ func TestExecutionCoordinator_StopJob_Success(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)
@@ -404,6 +410,7 @@ func TestExecutionCoordinator_StopJob_ContinuesCleanupOnFailures(t *testing.T) {
 		networkManager,
 		processManager,
 		isolationManager,
+		&executionfakes.FakeGPUManager{},
 		&platformfakes.FakePlatform{},
 		testLogger,
 	)

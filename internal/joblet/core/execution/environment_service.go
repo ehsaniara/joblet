@@ -90,6 +90,12 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		}
 	}
 
+	// Add GPU environment variables if GPUs are allocated
+	if job.HasGPURequirement() && job.IsGPUAllocated() {
+		gpuEnv := es.buildGPUEnvironment(job)
+		env = append(env, gpuEnv...)
+	}
+
 	for key, value := range job.Environment {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
@@ -240,4 +246,65 @@ func (es *EnvironmentService) getRuntimeEnvironment(runtimeSpec string) ([]strin
 
 	es.logger.Debug("loaded runtime environment variables", "runtime", runtimeSpec, "count", len(envVars), "vars", envVars)
 	return envVars, nil
+}
+
+// buildGPUEnvironment creates GPU-related environment variables for jobs with GPU allocations
+func (es *EnvironmentService) buildGPUEnvironment(job *domain.Job) []string {
+	var gpuEnv []string
+
+	// Set CUDA_VISIBLE_DEVICES to allocated GPU indices
+	if len(job.GPUIndices) > 0 {
+		gpuIndicesStr := make([]string, len(job.GPUIndices))
+		for i, gpuIndex := range job.GPUIndices {
+			gpuIndicesStr[i] = fmt.Sprintf("%d", gpuIndex)
+		}
+		cudaVisibleDevices := strings.Join(gpuIndicesStr, ",")
+		gpuEnv = append(gpuEnv, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", cudaVisibleDevices))
+
+		es.logger.Debug("setting GPU environment variables",
+			"jobID", job.Uuid,
+			"gpuIndices", job.GPUIndices,
+			"CUDA_VISIBLE_DEVICES", cudaVisibleDevices)
+	}
+
+	// Add GPU metadata environment variables
+	gpuEnv = append(gpuEnv,
+		fmt.Sprintf("JOBLET_GPU_COUNT=%d", job.GPUCount),
+		fmt.Sprintf("JOBLET_GPU_MEMORY_MB=%d", job.GPUMemoryMB),
+		fmt.Sprintf("JOBLET_GPU_ALLOCATED_COUNT=%d", len(job.GPUIndices)),
+	)
+
+	// If CUDA paths are available, add CUDA environment variables
+	if es.config.GPU.Enabled && len(es.config.GPU.CUDAPaths) > 0 {
+		// Use the first CUDA path as default
+		cudaPath := es.config.GPU.CUDAPaths[0]
+
+		// Basic CUDA environment setup
+		gpuEnv = append(gpuEnv,
+			fmt.Sprintf("CUDA_HOME=%s", cudaPath),
+			fmt.Sprintf("CUDA_ROOT=%s", cudaPath),
+		)
+
+		// Add CUDA lib path to LD_LIBRARY_PATH
+		cudaLibPath := filepath.Join(cudaPath, "lib64")
+		if es.platform.Getenv("LD_LIBRARY_PATH") != "" {
+			gpuEnv = append(gpuEnv, fmt.Sprintf("LD_LIBRARY_PATH=%s:%s", cudaLibPath, es.platform.Getenv("LD_LIBRARY_PATH")))
+		} else {
+			gpuEnv = append(gpuEnv, fmt.Sprintf("LD_LIBRARY_PATH=%s", cudaLibPath))
+		}
+
+		// Add CUDA bin path to PATH
+		cudaBinPath := filepath.Join(cudaPath, "bin")
+		if es.platform.Getenv("PATH") != "" {
+			gpuEnv = append(gpuEnv, fmt.Sprintf("PATH=%s:%s", cudaBinPath, es.platform.Getenv("PATH")))
+		} else {
+			gpuEnv = append(gpuEnv, fmt.Sprintf("PATH=%s", cudaBinPath))
+		}
+	}
+
+	es.logger.Debug("built GPU environment variables",
+		"jobID", job.Uuid,
+		"gpuEnvCount", len(gpuEnv))
+
+	return gpuEnv
 }

@@ -17,7 +17,7 @@ type linuxJoblet struct {
 }
 
 // NewJoblet creates a Linux joblet
-func NewJoblet(store JobStore, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
+func NewJoblet(store adapters.JobStorer, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
 	return &linuxJoblet{
 		platformJoblet: NewPlatformJoblet(store, cfg, networkStoreAdapter),
 	}

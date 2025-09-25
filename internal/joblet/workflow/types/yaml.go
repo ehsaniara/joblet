@@ -73,7 +73,9 @@ type JobUploads struct {
 // - MaxMemory: Memory limit in megabytes
 // - MaxIOBPS: I/O bandwidth limit in bytes per second
 // - CPUCores: Specific CPU cores to bind to (e.g., "0-3" or "0,2,4")
-// These limits are enforced by the job execution system using cgroups.
+// - GPUCount: Number of GPUs to allocate (requires GPU support enabled)
+// - GPUMemoryMB: Minimum GPU memory requirement in megabytes
+// These limits are enforced by the job execution system using cgroups and device controllers.
 type JobResources struct {
 	// MaxCPU limits CPU usage as a percentage (0-100)
 	MaxCPU int `yaml:"max_cpu"`
@@ -83,4 +85,8 @@ type JobResources struct {
 	MaxIOBPS int `yaml:"max_io_bps"`
 	// CPUCores specifies CPU core binding (e.g., "0-3", "0,2,4")
 	CPUCores string `yaml:"cpu_cores"`
+	// GPUCount specifies the number of GPUs to allocate (0 = no GPU)
+	GPUCount int `yaml:"gpu_count"`
+	// GPUMemoryMB specifies minimum GPU memory requirement in MB (0 = any)
+	GPUMemoryMB int `yaml:"gpu_memory_mb"`
 }

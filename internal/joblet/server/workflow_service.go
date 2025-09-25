@@ -888,8 +888,10 @@ func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflow
 		Network:           network,
 		Volumes:           jobSpec.Volumes,
 		Runtime:           jobSpec.Runtime,
-		Environment:       mergedEnvironment,       // Merged global + job-specific environment variables
-		SecretEnvironment: mergedSecretEnvironment, // Merged global + job-specific secret environment variables
+		Environment:       mergedEnvironment,                    // Merged global + job-specific environment variables
+		SecretEnvironment: mergedSecretEnvironment,              // Merged global + job-specific secret environment variables
+		GPUCount:          int32(jobSpec.Resources.GPUCount),    // GPU requirements from YAML
+		GPUMemoryMB:       int64(jobSpec.Resources.GPUMemoryMB), // GPU memory requirement
 	}
 
 	job, err := s.joblet.StartJob(ctx, jobRequest)

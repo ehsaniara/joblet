@@ -64,6 +64,7 @@ type Resource interface {
 	SetCPULimit(cgroupPath string, cpuLimit int) error
 	SetCPUCores(cgroupPath string, cores string) error
 	SetMemoryLimit(cgroupPath string, memoryLimitMB int) error
+	SetGPUDevices(cgroupPath string, gpuIndices []int) error
 	CleanupCgroup(jobID string)
 	EnsureControllers() error
 }
@@ -550,4 +551,52 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 	} else {
 		logger.Debug("successfully removed cgroup directory")
 	}
+}
+
+// SetGPUDevices configures device controller to allow access to specific GPU devices
+func (c *cgroup) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
+	log := c.logger.WithFields("cgroupPath", cgroupPath, "gpuIndices", gpuIndices)
+	log.Debug("setting GPU device permissions")
+
+	// Check if devices controller is available
+	devicesAllowPath := filepath.Join(cgroupPath, "devices.allow")
+	if _, err := os.Stat(devicesAllowPath); os.IsNotExist(err) {
+		log.Debug("devices controller not available, GPU device control not possible")
+		return fmt.Errorf("devices controller not available at %s", devicesAllowPath)
+	}
+
+	// GPU device permissions following design document:
+	// /dev/nvidia0:     char 195:0  rwm
+	// /dev/nvidiactl:   char 195:255 rwm
+	// /dev/nvidia-uvm:  char 237:0  rwm
+
+	// Allow common NVIDIA devices that all GPU jobs need
+	commonDevices := []string{
+		"c 195:255 rwm", // /dev/nvidiactl - NVIDIA control device
+		"c 237:0 rwm",   // /dev/nvidia-uvm - Unified Virtual Memory
+	}
+
+	for _, deviceRule := range commonDevices {
+		if err := os.WriteFile(devicesAllowPath, []byte(deviceRule), 0644); err != nil {
+			log.Warn("failed to allow common GPU device", "device", deviceRule, "error", err)
+		} else {
+			log.Debug("allowed common GPU device", "device", deviceRule)
+		}
+	}
+
+	// Allow specific GPU devices based on allocated GPUs
+	for _, gpuIndex := range gpuIndices {
+		// Each GPU gets its own device node: /dev/nvidia0, /dev/nvidia1, etc.
+		// Major number 195, minor number = GPU index
+		deviceRule := fmt.Sprintf("c 195:%d rwm", gpuIndex)
+
+		if err := os.WriteFile(devicesAllowPath, []byte(deviceRule), 0644); err != nil {
+			log.Warn("failed to allow GPU device", "gpuIndex", gpuIndex, "device", deviceRule, "error", err)
+		} else {
+			log.Debug("allowed GPU device", "gpuIndex", gpuIndex, "device", deviceRule)
+		}
+	}
+
+	log.Info("configured GPU device permissions", "allowedGPUs", gpuIndices)
+	return nil
 }

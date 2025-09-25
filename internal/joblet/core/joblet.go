@@ -20,6 +20,7 @@ import (
 	"joblet/internal/joblet/core/unprivileged"
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
+	"joblet/internal/joblet/gpu"
 	"joblet/internal/joblet/scheduler"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
@@ -33,7 +34,7 @@ import (
 // resource allocation, execution, and cleanup for all job types.
 type Joblet struct {
 	// Core dependencies
-	store    JobStore
+	store    adapters.JobStorer
 	config   *config.Config
 	logger   *logger.Logger
 	platform platform.Platform
@@ -49,7 +50,7 @@ type Joblet struct {
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components.
 // Initializes all core services, starts the scheduler, and begins periodic cleanup.
 // Returns a fully configured joblet ready for job execution.
-func NewPlatformJoblet(store JobStore, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
+func NewPlatformJoblet(store adapters.JobStorer, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
 
@@ -130,6 +131,8 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 		WorkflowUuid:      req.WorkflowUuid,
 		WorkingDirectory:  req.WorkingDirectory,
 		Dependencies:      req.Dependencies,
+		GPUCount:          req.GPUCount,    // GPU requirements
+		GPUMemoryMB:       req.GPUMemoryMB, // GPU memory requirement
 	}
 
 	log := j.logger.WithFields(
@@ -555,7 +558,7 @@ func (j *Joblet) getActiveJobIDs() map[string]bool {
 // initializeComponents creates all specialized components for job execution.
 // Sets up validation, job building, resource management, execution engine,
 // and cleanup coordinator with proper dependencies and configuration.
-func initializeComponents(store JobStore, cfg *config.Config, platform platform.Platform, logger *logger.Logger, networkStore NetworkStore) *components {
+func initializeComponents(store adapters.JobStorer, cfg *config.Config, platform platform.Platform, logger *logger.Logger, networkStore adapters.NetworkStorer) *components {
 	// Create core resources
 	cgroupResource := resource.New(cfg.Cgroup)
 	filesystemIsolator := filesystem.NewIsolator(cfg, platform)
@@ -564,6 +567,9 @@ func initializeComponents(store JobStore, cfg *config.Config, platform platform.
 	// Create managers
 	processManager := process.NewProcessManager(platform, cfg)
 	uploadManager := upload.NewManager(platform, logger)
+
+	// Create GPU manager
+	gpuManager := createGPUManager(cfg.GPU, platform, logger)
 
 	// Simplified validation - removed complex validation service
 
@@ -591,6 +597,7 @@ func initializeComponents(store JobStore, cfg *config.Config, platform platform.
 		logger,
 		jobIsolation,
 		networkStore,
+		gpuManager,
 	)
 
 	// Create cleanup coordinator with network store adapter
@@ -630,4 +637,28 @@ type jobletExecutor struct {
 
 func (je *jobletExecutor) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
 	return je.joblet.executeScheduledJob(ctx, job)
+}
+
+// createGPUManager creates and initializes a GPU manager based on configuration
+func createGPUManager(gpuConfig config.GPUConfig, platform platform.Platform, logger *logger.Logger) gpu.GPUManagerInterface {
+	// Create GPU discovery service
+	gpuDiscovery := gpu.NewNvidiaDiscovery(platform)
+
+	// Create CUDA detector
+	cudaDetector := gpu.NewCUDADetector(platform)
+
+	// Create and initialize GPU manager
+	gpuManager := gpu.NewManager(gpuConfig, gpuDiscovery, cudaDetector)
+
+	// Initialize GPU manager (discover GPUs)
+	if err := gpuManager.Initialize(); err != nil {
+		if gpuConfig.Enabled {
+			logger.Error("GPU manager initialization failed", "error", err)
+			// Continue without GPU support rather than failing completely
+		} else {
+			logger.Debug("GPU manager initialization skipped (GPU support disabled)")
+		}
+	}
+
+	return gpuManager
 }

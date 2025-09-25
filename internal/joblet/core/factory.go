@@ -32,9 +32,9 @@ type ServiceComponents struct {
 	VolumeManager     *volume.Manager
 	RuntimeResolver   *runtime.Resolver
 	MonitoringService *monitoring.Service
-	JobStore          JobStore
+	JobStore          adapters.JobStorer
 	NetworkStore      adapters.NetworkStorer
-	VolumeStore       VolumeStore
+	VolumeStore       adapters.VolumeStorer
 	EventBus          events.EventBus
 }
 
@@ -96,7 +96,7 @@ func (f *ComponentFactory) CreateServices() (*ServiceComponents, error) {
 
 // createJobStore sets up our job storage - this is where we keep track of all the jobs
 // running in the system. Think of it as our job memory bank.
-func (f *ComponentFactory) createJobStore() (JobStore, error) {
+func (f *ComponentFactory) createJobStore() (adapters.JobStorer, error) {
 	f.logger.Debug("creating job store adapter")
 
 	// We're using a straightforward approach here - no need to overcomplicate things
@@ -120,7 +120,7 @@ func (f *ComponentFactory) createNetworkStore() (adapters.NetworkStorer, error) 
 
 // createVolumeStore sets up storage for persistent volumes - this is where we keep
 // data that needs to stick around even after jobs finish.
-func (f *ComponentFactory) createVolumeStore() (VolumeStore, error) {
+func (f *ComponentFactory) createVolumeStore() (adapters.VolumeStorer, error) {
 	f.logger.Debug("creating volume store adapter")
 
 	// Simple and direct - just what we need
@@ -132,7 +132,7 @@ func (f *ComponentFactory) createVolumeStore() (VolumeStore, error) {
 
 // createVolumeManager builds the volume manager that actually deals with creating,
 // mounting, and cleaning up volumes on the filesystem.
-func (f *ComponentFactory) createVolumeManager(volumeStore VolumeStore) *volume.Manager {
+func (f *ComponentFactory) createVolumeManager(volumeStore adapters.VolumeStorer) *volume.Manager {
 	f.logger.Debug("creating volume manager")
 
 	basePath := "/opt/joblet/volumes"

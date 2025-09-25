@@ -60,6 +60,18 @@ type FakeResource struct {
 	setCPULimitReturnsOnCall map[int]struct {
 		result1 error
 	}
+	SetGPUDevicesStub        func(string, []int) error
+	setGPUDevicesMutex       sync.RWMutex
+	setGPUDevicesArgsForCall []struct {
+		arg1 string
+		arg2 []int
+	}
+	setGPUDevicesReturns struct {
+		result1 error
+	}
+	setGPUDevicesReturnsOnCall map[int]struct {
+		result1 error
+	}
 	SetIOLimitStub        func(string, int) error
 	setIOLimitMutex       sync.RWMutex
 	setIOLimitArgsForCall []struct {
@@ -357,6 +369,73 @@ func (fake *FakeResource) SetCPULimitReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.setCPULimitReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeResource) SetGPUDevices(arg1 string, arg2 []int) error {
+	var arg2Copy []int
+	if arg2 != nil {
+		arg2Copy = make([]int, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.setGPUDevicesMutex.Lock()
+	ret, specificReturn := fake.setGPUDevicesReturnsOnCall[len(fake.setGPUDevicesArgsForCall)]
+	fake.setGPUDevicesArgsForCall = append(fake.setGPUDevicesArgsForCall, struct {
+		arg1 string
+		arg2 []int
+	}{arg1, arg2Copy})
+	stub := fake.SetGPUDevicesStub
+	fakeReturns := fake.setGPUDevicesReturns
+	fake.recordInvocation("SetGPUDevices", []interface{}{arg1, arg2Copy})
+	fake.setGPUDevicesMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeResource) SetGPUDevicesCallCount() int {
+	fake.setGPUDevicesMutex.RLock()
+	defer fake.setGPUDevicesMutex.RUnlock()
+	return len(fake.setGPUDevicesArgsForCall)
+}
+
+func (fake *FakeResource) SetGPUDevicesCalls(stub func(string, []int) error) {
+	fake.setGPUDevicesMutex.Lock()
+	defer fake.setGPUDevicesMutex.Unlock()
+	fake.SetGPUDevicesStub = stub
+}
+
+func (fake *FakeResource) SetGPUDevicesArgsForCall(i int) (string, []int) {
+	fake.setGPUDevicesMutex.RLock()
+	defer fake.setGPUDevicesMutex.RUnlock()
+	argsForCall := fake.setGPUDevicesArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeResource) SetGPUDevicesReturns(result1 error) {
+	fake.setGPUDevicesMutex.Lock()
+	defer fake.setGPUDevicesMutex.Unlock()
+	fake.SetGPUDevicesStub = nil
+	fake.setGPUDevicesReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeResource) SetGPUDevicesReturnsOnCall(i int, result1 error) {
+	fake.setGPUDevicesMutex.Lock()
+	defer fake.setGPUDevicesMutex.Unlock()
+	fake.SetGPUDevicesStub = nil
+	if fake.setGPUDevicesReturnsOnCall == nil {
+		fake.setGPUDevicesReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.setGPUDevicesReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }

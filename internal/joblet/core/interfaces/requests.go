@@ -38,6 +38,10 @@ type StartJobRequest struct {
 	// Job type determines isolation level
 	JobType domain.JobType // JobTypeStandard (production isolation) or JobTypeRuntimeBuild (builder chroot)
 
+	// GPU resource requirements
+	GPUCount    int32 // Number of GPUs requested (0 = no GPU)
+	GPUMemoryMB int64 // Minimum GPU memory requirement in MB (0 = any)
+
 	// Workflow integration
 	WorkflowUuid     string   // UUID of parent workflow (empty for individual jobs)
 	WorkingDirectory string   // Execution directory path

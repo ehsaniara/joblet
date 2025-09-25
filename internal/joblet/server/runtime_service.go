@@ -120,7 +120,7 @@ func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.Runti
 		Available:   true,
 		Requirements: &pb.RuntimeRequirements{
 			Architectures: config.Requirements.Architectures,
-			Gpu:           false, // GPU support not implemented yet
+			Gpu:           true, // GPU support is now implemented
 		},
 	}
 
