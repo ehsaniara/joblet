@@ -37,6 +37,10 @@ export interface Job {
     workingDir?: string;
     workflowUUID?: string;
     name?: string;
+    // GPU fields
+    gpuIndices?: number[];
+    gpuCount?: number;
+    gpuMemoryMb?: number;
 }
 
 // Extended interface for workflow jobs with additional fields
@@ -71,6 +75,8 @@ export interface JobConfig {
     envVars: Record<string, string>;
     secretEnvVars: Record<string, string>;
     schedule: string;
+    gpuCount: number;
+    gpuMemoryMb: number;
 }
 
 export interface JobExecuteRequest {
@@ -88,6 +94,8 @@ export interface JobExecuteRequest {
     envVars?: Record<string, string>;
     secretEnvVars?: Record<string, string>;
     schedule?: string;
+    gpuCount?: number;
+    gpuMemoryMb?: number;
 }
 
 export interface JobFlag {

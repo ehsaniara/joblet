@@ -451,4 +451,39 @@ router.get('/github/runtimes', async (req, res) => {
     }
 });
 
+// Get version information
+router.get('/version', async (req, res) => {
+    try {
+        const node = req.query.node;
+        const output = await execRnx(['--version'], {node});
+
+        // Parse the version output
+        // Expected format: "rnx v4.4.0+dev (1614267)\njoblet v4.4.0+dev (298124f)"
+        const lines = output.split('\n');
+        const rnxLine = lines.find(line => line.startsWith('rnx '));
+        const jobletLine = lines.find(line => line.startsWith('joblet '));
+
+        const versionInfo = {};
+
+        if (rnxLine) {
+            const match = rnxLine.match(/rnx\s+(.+)/);
+            if (match) {
+                versionInfo.rnx = match[1];
+            }
+        }
+
+        if (jobletLine) {
+            const match = jobletLine.match(/joblet\s+(.+)/);
+            if (match) {
+                versionInfo.joblet = match[1];
+            }
+        }
+
+        res.json(versionInfo);
+    } catch (error) {
+        console.error('Failed to get version info:', error);
+        res.status(500).json({error: error.message});
+    }
+});
+
 export default router;

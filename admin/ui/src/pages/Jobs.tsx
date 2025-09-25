@@ -112,6 +112,19 @@ const Jobs: React.FC = () => {
         return uuid;
     };
 
+    const formatGpuInfo = (job: Job) => {
+        if (!job.gpuCount || job.gpuCount === 0) return '-';
+
+        const parts = [`${job.gpuCount}x GPU`];
+        if (job.gpuMemoryMb && job.gpuMemoryMb > 0) {
+            parts.push(`${job.gpuMemoryMb}MB`);
+        }
+        if (job.gpuIndices && job.gpuIndices.length > 0) {
+            parts.push(`[${job.gpuIndices.join(',')}]`);
+        }
+        return parts.join(' ');
+    };
+
     const handleViewJob = async (jobId: string) => {
         setSelectedJobId(jobId);
         setActiveTab('logs');
@@ -147,7 +160,10 @@ const Jobs: React.FC = () => {
                     envVars: statusData.environment || statusData.envVars || {},
                     secretEnvVars: statusData.secrets || statusData.secretEnvVars || {},
                     dependsOn: statusData.depends_on || statusData.dependsOn || [],
-                    workflowUUID: statusData.workflow_uuid || statusData.workflowUUID
+                    workflowUUID: statusData.workflow_uuid || statusData.workflowUUID,
+                    gpuIndices: statusData.gpu_indices || statusData.gpuIndices,
+                    gpuCount: statusData.gpu_count || statusData.gpuCount,
+                    gpuMemoryMb: statusData.gpu_memory_mb || statusData.gpuMemoryMb
                 };
                 setSelectedJob(enhancedJob);
             } catch (statusError) {
@@ -375,6 +391,9 @@ setStopJobConfirm(prev => ({...prev, stopping: true}));
                                             Duration
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                                            GPU
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                                             Started
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
@@ -406,6 +425,9 @@ setStopJobConfirm(prev => ({...prev, stopping: true}));
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                                                 {(job.startTime && job.endTime) ?
                                                     formatDuration(new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                {formatGpuInfo(job)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                                                 {job.startTime ? new Date(job.startTime).toLocaleString() : '-'}
@@ -839,6 +861,39 @@ rnx job delete-all
                                                     </div>
                                                 </dl>
                                             </div>
+
+                                            {/* GPU Resources */}
+                                            {(selectedJob.gpuCount && selectedJob.gpuCount > 0) && (
+                                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">GPU Resources</h4>
+                                                    <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                        <div>
+                                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">GPU Count</dt>
+                                                            <dd className="mt-1 text-sm text-gray-900 dark:text-white">{selectedJob.gpuCount}</dd>
+                                                        </div>
+                                                        {selectedJob.gpuMemoryMb && selectedJob.gpuMemoryMb > 0 && (
+                                                            <div>
+                                                                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">GPU Memory (MB)</dt>
+                                                                <dd className="mt-1 text-sm text-gray-900 dark:text-white">{selectedJob.gpuMemoryMb}</dd>
+                                                            </div>
+                                                        )}
+                                                        {selectedJob.gpuIndices && selectedJob.gpuIndices.length > 0 && (
+                                                            <div>
+                                                                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Allocated GPUs</dt>
+                                                                <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {selectedJob.gpuIndices.map((gpuIndex, index) => (
+                                                                            <span key={index} className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                                                                GPU {gpuIndex}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </dd>
+                                                            </div>
+                                                        )}
+                                                    </dl>
+                                                </div>
+                                            )}
 
                                             {/* Configuration */}
                                             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">

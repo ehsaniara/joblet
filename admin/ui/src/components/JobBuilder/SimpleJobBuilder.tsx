@@ -70,7 +70,9 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
         volumes: [],
         envVars: {},
         secretEnvVars: {},
-        schedule: ''
+        schedule: '',
+        gpuCount: 0,
+        gpuMemoryMb: 0
     });
 
     const [preview, setPreview] = useState<string>('');
@@ -336,7 +338,9 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                 uploadDirs: config.directories, // These are now actual directory paths
                 envVars: config.envVars,
                 secretEnvVars: config.secretEnvVars,
-                schedule: config.schedule || undefined
+                schedule: config.schedule || undefined,
+                gpuCount: config.gpuCount || undefined,
+                gpuMemoryMb: config.gpuMemoryMb || undefined
             };
 
             const jobId = await executeJob(request);
@@ -356,7 +360,9 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                 volumes: [],
                 envVars: {},
                 secretEnvVars: {},
-                schedule: ''
+                schedule: '',
+                gpuCount: 0,
+                gpuMemoryMb: 0
             });
             setUploadedFiles([]);
             setUploadError('');
@@ -379,7 +385,9 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
             volumes: [],
             envVars: {},
             secretEnvVars: {},
-            schedule: ''
+            schedule: '',
+            gpuCount: 0,
+            gpuMemoryMb: 0
         });
     }, []);
 
@@ -530,7 +538,7 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                         {/* Resource Limits */}
                         <div>
                             <h3 className="text-lg font-medium text-gray-500 mb-4">{t('jobBuilder.resourceLimits')}</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-white mb-2">
                                         CPU Limit (%)
@@ -595,6 +603,42 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
                                     />
                                     <p className="mt-1 text-xs text-gray-500">
                                         I/O bandwidth limit in bytes per second
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-white mb-2">
+                                        GPU Count
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={config.gpuCount || ''}
+                                        onChange={(e) => updateConfig({gpuCount: parseInt(e.target.value) || 0})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0"
+                                        min="0"
+                                        max="8"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Number of GPUs to request (0 = no GPU)
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-white mb-2">
+                                        GPU Memory (MB)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={config.gpuMemoryMb || ''}
+                                        onChange={(e) => updateConfig({gpuMemoryMb: parseInt(e.target.value) || 0})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0"
+                                        min="0"
+                                        disabled={!config.gpuCount || config.gpuCount === 0}
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        GPU memory limit in megabytes (0 = no limit)
                                     </p>
                                 </div>
                             </div>

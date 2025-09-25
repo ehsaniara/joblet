@@ -21,6 +21,7 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
     const [settingsForm, setSettingsForm] = useState<UserSettings>(settings);
     const [savingSettings, setSavingSettings] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+    const [rnxVersion, setRnxVersion] = useState<string>('');
 
     const navigation = [
         {name: t('nav.dashboard'), href: '/', icon: Home},
@@ -63,6 +64,25 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
         setSettingsForm(settings);
         setShowSettings(false);
     };
+
+    const fetchVersion = async () => {
+        try {
+            const response = await fetch(`/api/version?node=${selectedNode}`);
+            if (response.ok) {
+                const versionData = await response.json();
+                if (versionData.rnx) {
+                    setRnxVersion(versionData.rnx);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch version:', error);
+        }
+    };
+
+    // Fetch version information
+    useEffect(() => {
+        fetchVersion();
+    }, [selectedNode]);
 
     // Handle escape key to close dialogs
     useEffect(() => {
@@ -149,6 +169,11 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                         <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full mr-2"></div>
                         Connected: {selectedNode}
                     </div>
+                    {rnxVersion && (
+                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-500 ml-4">
+                            rnx {rnxVersion}
+                        </div>
+                    )}
                 </div>
             </div>
 
