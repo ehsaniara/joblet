@@ -59,8 +59,14 @@ type GPUManagerInterface interface {
 //
 //counterfeiter:generate . CUDADetectorInterface
 type CUDADetectorInterface interface {
-	// DetectCUDA finds CUDA installation paths
+	// DetectCUDA finds CUDA installation paths (legacy method)
 	DetectCUDA() ([]string, error)
 	// GetCUDAEnvironment returns environment variables for CUDA
 	GetCUDAEnvironment(cudaPath string) map[string]string
+	// DetectCUDAInstallations finds all CUDA installations with version information
+	DetectCUDAInstallations() ([]CUDAInstallation, error)
+	// FindCompatibleCUDA finds CUDA installations compatible with the required version
+	FindCompatibleCUDA(requiredVersion CUDAVersion) ([]CUDAInstallation, error)
+	// GetBestCUDA returns the best CUDA installation for a given requirement
+	GetBestCUDA(requiredVersion CUDAVersion) (CUDAInstallation, error)
 }

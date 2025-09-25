@@ -19,6 +19,44 @@ type FakeCUDADetectorInterface struct {
 		result1 []string
 		result2 error
 	}
+	DetectCUDAInstallationsStub        func() ([]gpu.CUDAInstallation, error)
+	detectCUDAInstallationsMutex       sync.RWMutex
+	detectCUDAInstallationsArgsForCall []struct {
+	}
+	detectCUDAInstallationsReturns struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}
+	detectCUDAInstallationsReturnsOnCall map[int]struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}
+	FindCompatibleCUDAStub        func(gpu.CUDAVersion) ([]gpu.CUDAInstallation, error)
+	findCompatibleCUDAMutex       sync.RWMutex
+	findCompatibleCUDAArgsForCall []struct {
+		arg1 gpu.CUDAVersion
+	}
+	findCompatibleCUDAReturns struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}
+	findCompatibleCUDAReturnsOnCall map[int]struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}
+	GetBestCUDAStub        func(gpu.CUDAVersion) (gpu.CUDAInstallation, error)
+	getBestCUDAMutex       sync.RWMutex
+	getBestCUDAArgsForCall []struct {
+		arg1 gpu.CUDAVersion
+	}
+	getBestCUDAReturns struct {
+		result1 gpu.CUDAInstallation
+		result2 error
+	}
+	getBestCUDAReturnsOnCall map[int]struct {
+		result1 gpu.CUDAInstallation
+		result2 error
+	}
 	GetCUDAEnvironmentStub        func(string) map[string]string
 	getCUDAEnvironmentMutex       sync.RWMutex
 	getCUDAEnvironmentArgsForCall []struct {
@@ -86,6 +124,190 @@ func (fake *FakeCUDADetectorInterface) DetectCUDAReturnsOnCall(i int, result1 []
 	}
 	fake.detectCUDAReturnsOnCall[i] = struct {
 		result1 []string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCUDADetectorInterface) DetectCUDAInstallations() ([]gpu.CUDAInstallation, error) {
+	fake.detectCUDAInstallationsMutex.Lock()
+	ret, specificReturn := fake.detectCUDAInstallationsReturnsOnCall[len(fake.detectCUDAInstallationsArgsForCall)]
+	fake.detectCUDAInstallationsArgsForCall = append(fake.detectCUDAInstallationsArgsForCall, struct {
+	}{})
+	stub := fake.DetectCUDAInstallationsStub
+	fakeReturns := fake.detectCUDAInstallationsReturns
+	fake.recordInvocation("DetectCUDAInstallations", []interface{}{})
+	fake.detectCUDAInstallationsMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeCUDADetectorInterface) DetectCUDAInstallationsCallCount() int {
+	fake.detectCUDAInstallationsMutex.RLock()
+	defer fake.detectCUDAInstallationsMutex.RUnlock()
+	return len(fake.detectCUDAInstallationsArgsForCall)
+}
+
+func (fake *FakeCUDADetectorInterface) DetectCUDAInstallationsCalls(stub func() ([]gpu.CUDAInstallation, error)) {
+	fake.detectCUDAInstallationsMutex.Lock()
+	defer fake.detectCUDAInstallationsMutex.Unlock()
+	fake.DetectCUDAInstallationsStub = stub
+}
+
+func (fake *FakeCUDADetectorInterface) DetectCUDAInstallationsReturns(result1 []gpu.CUDAInstallation, result2 error) {
+	fake.detectCUDAInstallationsMutex.Lock()
+	defer fake.detectCUDAInstallationsMutex.Unlock()
+	fake.DetectCUDAInstallationsStub = nil
+	fake.detectCUDAInstallationsReturns = struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCUDADetectorInterface) DetectCUDAInstallationsReturnsOnCall(i int, result1 []gpu.CUDAInstallation, result2 error) {
+	fake.detectCUDAInstallationsMutex.Lock()
+	defer fake.detectCUDAInstallationsMutex.Unlock()
+	fake.DetectCUDAInstallationsStub = nil
+	if fake.detectCUDAInstallationsReturnsOnCall == nil {
+		fake.detectCUDAInstallationsReturnsOnCall = make(map[int]struct {
+			result1 []gpu.CUDAInstallation
+			result2 error
+		})
+	}
+	fake.detectCUDAInstallationsReturnsOnCall[i] = struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCUDADetectorInterface) FindCompatibleCUDA(arg1 gpu.CUDAVersion) ([]gpu.CUDAInstallation, error) {
+	fake.findCompatibleCUDAMutex.Lock()
+	ret, specificReturn := fake.findCompatibleCUDAReturnsOnCall[len(fake.findCompatibleCUDAArgsForCall)]
+	fake.findCompatibleCUDAArgsForCall = append(fake.findCompatibleCUDAArgsForCall, struct {
+		arg1 gpu.CUDAVersion
+	}{arg1})
+	stub := fake.FindCompatibleCUDAStub
+	fakeReturns := fake.findCompatibleCUDAReturns
+	fake.recordInvocation("FindCompatibleCUDA", []interface{}{arg1})
+	fake.findCompatibleCUDAMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeCUDADetectorInterface) FindCompatibleCUDACallCount() int {
+	fake.findCompatibleCUDAMutex.RLock()
+	defer fake.findCompatibleCUDAMutex.RUnlock()
+	return len(fake.findCompatibleCUDAArgsForCall)
+}
+
+func (fake *FakeCUDADetectorInterface) FindCompatibleCUDACalls(stub func(gpu.CUDAVersion) ([]gpu.CUDAInstallation, error)) {
+	fake.findCompatibleCUDAMutex.Lock()
+	defer fake.findCompatibleCUDAMutex.Unlock()
+	fake.FindCompatibleCUDAStub = stub
+}
+
+func (fake *FakeCUDADetectorInterface) FindCompatibleCUDAArgsForCall(i int) gpu.CUDAVersion {
+	fake.findCompatibleCUDAMutex.RLock()
+	defer fake.findCompatibleCUDAMutex.RUnlock()
+	argsForCall := fake.findCompatibleCUDAArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeCUDADetectorInterface) FindCompatibleCUDAReturns(result1 []gpu.CUDAInstallation, result2 error) {
+	fake.findCompatibleCUDAMutex.Lock()
+	defer fake.findCompatibleCUDAMutex.Unlock()
+	fake.FindCompatibleCUDAStub = nil
+	fake.findCompatibleCUDAReturns = struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCUDADetectorInterface) FindCompatibleCUDAReturnsOnCall(i int, result1 []gpu.CUDAInstallation, result2 error) {
+	fake.findCompatibleCUDAMutex.Lock()
+	defer fake.findCompatibleCUDAMutex.Unlock()
+	fake.FindCompatibleCUDAStub = nil
+	if fake.findCompatibleCUDAReturnsOnCall == nil {
+		fake.findCompatibleCUDAReturnsOnCall = make(map[int]struct {
+			result1 []gpu.CUDAInstallation
+			result2 error
+		})
+	}
+	fake.findCompatibleCUDAReturnsOnCall[i] = struct {
+		result1 []gpu.CUDAInstallation
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCUDADetectorInterface) GetBestCUDA(arg1 gpu.CUDAVersion) (gpu.CUDAInstallation, error) {
+	fake.getBestCUDAMutex.Lock()
+	ret, specificReturn := fake.getBestCUDAReturnsOnCall[len(fake.getBestCUDAArgsForCall)]
+	fake.getBestCUDAArgsForCall = append(fake.getBestCUDAArgsForCall, struct {
+		arg1 gpu.CUDAVersion
+	}{arg1})
+	stub := fake.GetBestCUDAStub
+	fakeReturns := fake.getBestCUDAReturns
+	fake.recordInvocation("GetBestCUDA", []interface{}{arg1})
+	fake.getBestCUDAMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeCUDADetectorInterface) GetBestCUDACallCount() int {
+	fake.getBestCUDAMutex.RLock()
+	defer fake.getBestCUDAMutex.RUnlock()
+	return len(fake.getBestCUDAArgsForCall)
+}
+
+func (fake *FakeCUDADetectorInterface) GetBestCUDACalls(stub func(gpu.CUDAVersion) (gpu.CUDAInstallation, error)) {
+	fake.getBestCUDAMutex.Lock()
+	defer fake.getBestCUDAMutex.Unlock()
+	fake.GetBestCUDAStub = stub
+}
+
+func (fake *FakeCUDADetectorInterface) GetBestCUDAArgsForCall(i int) gpu.CUDAVersion {
+	fake.getBestCUDAMutex.RLock()
+	defer fake.getBestCUDAMutex.RUnlock()
+	argsForCall := fake.getBestCUDAArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeCUDADetectorInterface) GetBestCUDAReturns(result1 gpu.CUDAInstallation, result2 error) {
+	fake.getBestCUDAMutex.Lock()
+	defer fake.getBestCUDAMutex.Unlock()
+	fake.GetBestCUDAStub = nil
+	fake.getBestCUDAReturns = struct {
+		result1 gpu.CUDAInstallation
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCUDADetectorInterface) GetBestCUDAReturnsOnCall(i int, result1 gpu.CUDAInstallation, result2 error) {
+	fake.getBestCUDAMutex.Lock()
+	defer fake.getBestCUDAMutex.Unlock()
+	fake.GetBestCUDAStub = nil
+	if fake.getBestCUDAReturnsOnCall == nil {
+		fake.getBestCUDAReturnsOnCall = make(map[int]struct {
+			result1 gpu.CUDAInstallation
+			result2 error
+		})
+	}
+	fake.getBestCUDAReturnsOnCall[i] = struct {
+		result1 gpu.CUDAInstallation
 		result2 error
 	}{result1, result2}
 }

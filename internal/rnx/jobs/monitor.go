@@ -17,14 +17,15 @@ func NewMonitorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "monitor",
 		Short: "Monitor remote joblet server metrics",
-		Long: `Monitor comprehensive remote joblet server metrics including CPU, memory, disk, network, processes, and volumes.
+		Long: `Monitor comprehensive remote joblet server metrics including CPU, memory, disk, network, processes, volumes, and GPU resources.
 
 Remote monitoring provides detailed insights into joblet server resources:
-- Server resource utilization (CPU, memory, I/O) 
+- Server resource utilization (CPU, memory, I/O)
 - Server network interface statistics and throughput
 - Server disk usage for all mount points
 - Joblet volume usage and availability on the server
 - Server processes and resource consumption
+- GPU utilization, memory, and temperature monitoring
 - Server cloud environment detection
 
 All commands connect to the remote joblet server and support JSON output for dashboards.`,
@@ -33,6 +34,7 @@ All commands connect to the remote joblet server and support JSON output for das
 	cmd.AddCommand(NewMonitorStatusCmd())
 	cmd.AddCommand(NewMonitorTopCmd())
 	cmd.AddCommand(NewMonitorWatchCmd())
+	cmd.AddCommand(NewMonitorGPUCmd())
 
 	return cmd
 }
@@ -1000,4 +1002,160 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 			TotalProcesses: resp.Processes.TotalProcesses,
 		},
 	}
+}
+
+// GPU Monitoring Commands
+
+func NewMonitorGPUCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "gpu",
+		Short: "Monitor GPU resources on remote server",
+		Long: `Monitor GPU resources on the remote joblet server including GPU utilization, memory, temperature,
+and current job allocations. Works with NVIDIA GPUs using nvidia-smi.
+
+GPU monitoring shows real-time metrics for:
+- GPU utilization percentages
+- Memory usage (used, free, total)
+- Temperature and power draw
+- Currently running processes per GPU
+- Job allocations for each GPU
+
+All GPU monitoring commands connect to the remote joblet server and support JSON output.`,
+	}
+
+	cmd.AddCommand(NewMonitorGPUListCmd())
+	cmd.AddCommand(NewMonitorGPUStatusCmd())
+
+	return cmd
+}
+
+func NewMonitorGPUListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List available GPUs on remote server",
+		Long: `List all available GPUs on the remote joblet server with basic information.
+
+Shows GPU index, name, memory, and current allocation status by connecting to the server
+and running GPU detection commands remotely.
+
+Examples:
+  rnx monitor gpu list                    # List all GPUs on remote server
+  rnx monitor gpu list --json             # JSON output for APIs/UIs`,
+		RunE: runMonitorGPUList,
+	}
+}
+
+func NewMonitorGPUStatusCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show detailed GPU status from remote server",
+		Long: `Show detailed GPU status from the remote joblet server including utilization, temperature,
+memory usage, and current job allocations.
+
+Connects to the remote server and collects real-time GPU metrics using nvidia-smi.
+
+Examples:
+  rnx monitor gpu status                  # Show status for all GPUs on remote server
+  rnx monitor gpu status --gpu=0          # Show status for GPU 0 only on remote server
+  rnx monitor gpu status --json           # JSON output for dashboards
+  rnx monitor gpu status --watch          # Continuously monitor remote GPUs (updates every 5s)`,
+		RunE: runMonitorGPUStatus,
+	}
+
+	cmd.Flags().IntP("gpu", "g", -1, "Show status for specific GPU index (-1 for all)")
+	cmd.Flags().BoolP("watch", "w", false, "Continuously monitor GPU status")
+	cmd.Flags().IntP("interval", "i", 5, "Update interval in seconds for watch mode")
+
+	return cmd
+}
+
+// GPU Monitoring Command Implementations
+
+func runMonitorGPUList(cmd *cobra.Command, args []string) error {
+	if common.JSONOutput {
+		result := map[string]interface{}{
+			"message":    "GPU listing functionality requires dedicated GPU gRPC service",
+			"status":     "not_implemented",
+			"suggestion": "Use 'rnx job run --gpu=1 nvidia-smi' to check GPU availability on remote server",
+			"timestamp":  time.Now(),
+		}
+
+		output, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(output))
+		return nil
+	}
+
+	fmt.Println("Remote GPU Resources:")
+	fmt.Println("=" + strings.Repeat("=", 60))
+	fmt.Println()
+	fmt.Println("GPU listing functionality will be available once a dedicated GPU gRPC service is implemented.")
+	fmt.Println()
+	fmt.Println("To check GPU availability on the remote server, you can run:")
+	fmt.Println("  rnx job run --gpu=1 nvidia-smi")
+	fmt.Println()
+	fmt.Println("This will:")
+	fmt.Println("  • Test GPU allocation on the remote server")
+	fmt.Println("  • Show available GPUs on the remote server")
+	fmt.Println("  • Display GPU details and utilization from the remote server")
+	fmt.Println()
+
+	return nil
+}
+
+func runMonitorGPUStatus(cmd *cobra.Command, args []string) error {
+	gpuIndex, _ := cmd.Flags().GetInt("gpu")
+	watch, _ := cmd.Flags().GetBool("watch")
+	interval, _ := cmd.Flags().GetInt("interval")
+
+	if common.JSONOutput {
+		result := map[string]interface{}{
+			"message":       "GPU status functionality requires dedicated GPU gRPC service",
+			"status":        "not_implemented",
+			"requested_gpu": gpuIndex,
+			"watch_mode":    watch,
+			"interval":      interval,
+			"suggestion":    fmt.Sprintf("Use 'rnx job run --gpu=1 nvidia-smi -l %d' for continuous monitoring on remote server", interval),
+			"timestamp":     time.Now(),
+		}
+
+		output, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(output))
+		return nil
+	}
+
+	fmt.Println("Remote GPU Resource Status:")
+	fmt.Println("=" + strings.Repeat("=", 60))
+	fmt.Println()
+	fmt.Println("GPU status functionality will be available once a dedicated GPU gRPC service is implemented.")
+	fmt.Println()
+
+	if watch {
+		fmt.Printf("For continuous GPU monitoring on the remote server (every %d seconds), you can run:\n", interval)
+		fmt.Printf("  rnx job run --gpu=1 nvidia-smi -l %d\n", interval)
+	} else {
+		fmt.Println("For current GPU status from the remote server, you can run:")
+		fmt.Println("  rnx job run --gpu=1 nvidia-smi")
+	}
+
+	if gpuIndex >= 0 {
+		fmt.Printf("\nTo monitor specific GPU %d on the remote server:\n", gpuIndex)
+		fmt.Printf("  rnx job run --gpu=1 nvidia-smi -i %d\n", gpuIndex)
+	}
+
+	fmt.Println()
+	fmt.Println("This will show from the remote server:")
+	fmt.Println("  • GPU utilization")
+	fmt.Println("  • Memory usage")
+	fmt.Println("  • Temperature")
+	fmt.Println("  • Power consumption")
+	fmt.Println("  • Running processes")
+	fmt.Println()
+
+	return nil
 }

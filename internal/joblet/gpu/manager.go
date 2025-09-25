@@ -13,27 +13,29 @@ import (
 
 // Manager implements the GPUManagerInterface for managing GPU resources
 type Manager struct {
-	enabled      bool
-	gpus         map[int]*GPU              // GPU index -> GPU info
-	allocations  map[string]*GPUAllocation // job ID -> allocation
-	discovery    GPUDiscoveryInterface
-	cudaDetector CUDADetectorInterface
-	monitor      *GPUMonitor // GPU monitoring service
-	mutex        sync.RWMutex
-	config       config.GPUConfig
-	logger       *logger.Logger
+	enabled            bool
+	gpus               map[int]*GPU              // GPU index -> GPU info
+	allocations        map[string]*GPUAllocation // job ID -> allocation
+	discovery          GPUDiscoveryInterface
+	cudaDetector       CUDADetectorInterface
+	monitor            *GPUMonitor           // GPU monitoring service
+	allocationStrategy GPUAllocationStrategy // GPU allocation strategy
+	mutex              sync.RWMutex
+	config             config.GPUConfig
+	logger             *logger.Logger
 }
 
 // NewManager creates a new GPU manager with the given configuration
 func NewManager(cfg config.GPUConfig, discovery GPUDiscoveryInterface, cudaDetector CUDADetectorInterface) *Manager {
 	manager := &Manager{
-		enabled:      cfg.Enabled,
-		gpus:         make(map[int]*GPU),
-		allocations:  make(map[string]*GPUAllocation),
-		discovery:    discovery,
-		cudaDetector: cudaDetector,
-		config:       cfg,
-		logger:       logger.New().WithField("component", "gpu-manager"),
+		enabled:            cfg.Enabled,
+		gpus:               make(map[int]*GPU),
+		allocations:        make(map[string]*GPUAllocation),
+		discovery:          discovery,
+		cudaDetector:       cudaDetector,
+		allocationStrategy: GetAllocationStrategy(cfg.AllocationStrategy),
+		config:             cfg,
+		logger:             logger.New().WithField("component", "gpu-manager"),
 	}
 
 	// Initialize GPU monitor if enabled
@@ -157,17 +159,17 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 		}
 	}
 
-	// Check if we have enough GPUs
-	if len(availableGPUs) < gpuCount {
-		return nil, fmt.Errorf("insufficient GPUs available: need %d, have %d", gpuCount, len(availableGPUs))
+	// Use allocation strategy to select GPUs
+	selectedGPUs, err := m.allocationStrategy.SelectGPUs(availableGPUs, gpuCount, gpuMemoryMB)
+	if err != nil {
+		return nil, err
 	}
 
-	// Allocate the first N available GPUs
+	// Allocate the selected GPUs
 	allocatedIndices := make([]int, gpuCount)
 	allocatedAt := time.Now()
 
-	for i := 0; i < gpuCount; i++ {
-		gpu := availableGPUs[i]
+	for i, gpu := range selectedGPUs {
 		gpu.InUse = true
 		gpu.JobID = jobID
 		gpu.AllocatedAt = &allocatedAt
@@ -175,7 +177,8 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 
 		log.Debug("allocated GPU to job",
 			"gpuIndex", gpu.Index,
-			"gpuName", gpu.Name)
+			"gpuName", gpu.Name,
+			"strategy", m.allocationStrategy.Name())
 	}
 
 	// Create allocation record

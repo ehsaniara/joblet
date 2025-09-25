@@ -195,8 +195,9 @@ type RuntimeConfig struct {
 
 // GPUConfig holds GPU support configuration
 type GPUConfig struct {
-	Enabled   bool     `yaml:"enabled" json:"enabled"`       // Enable GPU support (off by default)
-	CUDAPaths []string `yaml:"cuda_paths" json:"cuda_paths"` // CUDA installation paths
+	Enabled            bool     `yaml:"enabled" json:"enabled"`                         // Enable GPU support (off by default)
+	CUDAPaths          []string `yaml:"cuda_paths" json:"cuda_paths"`                   // CUDA installation paths
+	AllocationStrategy string   `yaml:"allocation_strategy" json:"allocation_strategy"` // GPU allocation strategy (first-fit, pack, spread, best-fit)
 }
 
 // DefaultConfig provides default configuration values
@@ -324,7 +325,8 @@ var DefaultConfig = Config{
 		},
 	},
 	GPU: GPUConfig{
-		Enabled: false, // Off by default - opt-in only
+		Enabled:            false,       // Off by default - opt-in only
+		AllocationStrategy: "first-fit", // Default allocation strategy
 		CUDAPaths: []string{
 			"/usr/local/cuda",
 			"/opt/cuda",

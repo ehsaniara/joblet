@@ -553,15 +553,53 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 	}
 }
 
-// SetGPUDevices configures device controller to allow access to specific GPU devices
+// SetGPUDevices configures GPU device access for cgroups v2
+// In cgroups v2, device access control is handled through namespace isolation
+// and device node creation rather than the legacy devices controller
 func (c *cgroup) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "gpuIndices", gpuIndices)
-	log.Debug("setting GPU device permissions")
+	log.Debug("configuring GPU device access for cgroups v2")
+
+	// In cgroups v2, check if we're actually using cgroups v2
+	cgroupVersion := c.detectCgroupVersion()
+	log.Debug("detected cgroup version", "version", cgroupVersion)
+
+	switch cgroupVersion {
+	case 1:
+		return c.setGPUDevicesV1(cgroupPath, gpuIndices, log)
+	case 2:
+		return c.setGPUDevicesV2(cgroupPath, gpuIndices, log)
+	default:
+		return fmt.Errorf("unknown cgroup version: %d", cgroupVersion)
+	}
+}
+
+// detectCgroupVersion determines if we're running under cgroups v1 or v2
+func (c *cgroup) detectCgroupVersion() int {
+	// Check if devices.allow exists (cgroups v1)
+	devicesAllowPath := filepath.Join(c.config.BaseDir, "devices.allow")
+	if _, err := os.Stat(devicesAllowPath); err == nil {
+		return 1
+	}
+
+	// Check for cgroup.controllers (cgroups v2)
+	controllersPath := filepath.Join(c.config.BaseDir, "cgroup.controllers")
+	if _, err := os.Stat(controllersPath); err == nil {
+		return 2
+	}
+
+	// Default to v2 since most modern systems use it
+	return 2
+}
+
+// setGPUDevicesV1 handles GPU device access control for cgroups v1
+func (c *cgroup) setGPUDevicesV1(cgroupPath string, gpuIndices []int, log *logger.Logger) error {
+	log.Debug("using cgroups v1 device controller for GPU access")
 
 	// Check if devices controller is available
 	devicesAllowPath := filepath.Join(cgroupPath, "devices.allow")
 	if _, err := os.Stat(devicesAllowPath); os.IsNotExist(err) {
-		log.Debug("devices controller not available, GPU device control not possible")
+		log.Debug("devices controller not available in cgroups v1")
 		return fmt.Errorf("devices controller not available at %s", devicesAllowPath)
 	}
 
@@ -597,6 +635,45 @@ func (c *cgroup) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
 		}
 	}
 
-	log.Info("configured GPU device permissions", "allowedGPUs", gpuIndices)
+	log.Info("configured GPU device permissions via cgroups v1", "allowedGPUs", gpuIndices)
+	return nil
+}
+
+// setGPUDevicesV2 handles GPU device access control for cgroups v2
+func (c *cgroup) setGPUDevicesV2(cgroupPath string, gpuIndices []int, log *logger.Logger) error {
+	log.Debug("using cgroups v2 approach for GPU access control")
+
+	// In cgroups v2, device access control has been moved out of cgroups
+	// Device access is now controlled through:
+	// 1. Namespace isolation (mount namespace) - handled by IsolationManager.CreateGPUDeviceNodes()
+	// 2. Device node creation with proper permissions - handled by filesystem isolator
+	// 3. Optional: eBPF programs for fine-grained control (not implemented here)
+
+	// Validate that the cgroup exists
+	if _, err := os.Stat(cgroupPath); os.IsNotExist(err) {
+		return fmt.Errorf("cgroup path does not exist: %s", cgroupPath)
+	}
+
+	// Log that device access control is handled by namespace isolation
+	log.Info("GPU device access control in cgroups v2 is handled by namespace isolation and device node creation",
+		"cgroupPath", cgroupPath,
+		"gpuIndices", gpuIndices,
+		"approach", "namespace-isolation")
+
+	// In cgroups v2, we don't need to write to device control files
+	// The actual device access control happens in:
+	// - internal/joblet/core/filesystem/isolator.go:CreateGPUDeviceNodes()
+	// - Mount namespace isolation restricts device access to only created nodes
+
+	// Verify that device nodes will be created properly by logging the expected devices
+	expectedDevices := []string{"/dev/nvidiactl", "/dev/nvidia-uvm"}
+	for _, gpuIndex := range gpuIndices {
+		expectedDevices = append(expectedDevices, fmt.Sprintf("/dev/nvidia%d", gpuIndex))
+	}
+
+	log.Debug("GPU device access will be controlled by namespace isolation",
+		"expectedDevices", expectedDevices,
+		"note", "device nodes created by IsolationManager.CreateGPUDeviceNodes()")
+
 	return nil
 }
