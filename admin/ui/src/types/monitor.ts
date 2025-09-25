@@ -114,4 +114,22 @@ export interface DetailedSystemInfo {
         }>;
         totalProcesses?: number;
     };
+    gpuInfo?: {
+        gpus?: Array<{
+            id: number;
+            name: string;
+            memoryTotal: number;
+            memoryUsed: number;
+            memoryFree: number;
+            utilizationGpu: number;
+            utilizationMemory: number;
+            temperature: number;
+            powerDraw: number;
+            powerLimit: number;
+            status: string;
+        }>;
+        totalGpus?: number;
+        cudaVersion?: string;
+        driverVersion?: string;
+    };
 }

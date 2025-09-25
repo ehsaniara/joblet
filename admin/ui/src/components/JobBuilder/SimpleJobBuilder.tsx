@@ -7,6 +7,7 @@ import {File, FolderPlus, Play, RotateCcw, Trash2, Upload} from 'lucide-react';
 import clsx from 'clsx';
 import {UploadedFile, UploadService} from '../../services/uploadService';
 import {apiService} from '../../services/apiService';
+import {ResourceAvailability} from '../ResourceAvailability';
 
 interface Runtime {
     id: string;
@@ -412,6 +413,9 @@ export const SimpleJobBuilder: React.FC<SimpleJobBuilderProps> = ({
 
                 <form onSubmit={handleSubmit} className="p-6">
                     <div className="space-y-6">
+                        {/* System Resource Availability */}
+                        <ResourceAvailability className="mb-6" />
+
                         {/* Basic Configuration */}
                         <div>
                             <label className="block text-sm font-medium text-white mb-2">
