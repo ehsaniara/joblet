@@ -269,12 +269,30 @@ func (j *Joblet) executeScheduledJob(ctx context.Context, jobObj *domain.Job) er
 	log := j.logger.WithField("jobID", jobObj.Uuid)
 	log.Info("executing scheduled job")
 
+	// Get fresh job state from store to check for cancellation
+	freshJob, exists := j.store.Job(jobObj.Uuid)
+	if !exists {
+		return fmt.Errorf("job not found: %s", jobObj.Uuid)
+	}
+
+	// Prevent execution of canceled jobs (defensive check against race conditions)
+	if freshJob.Status == domain.StatusCanceled {
+		log.Info("skipping execution of canceled job")
+		return fmt.Errorf("job was canceled before execution: %s", jobObj.Uuid)
+	}
+
+	// Ensure job is still scheduled
+	if freshJob.Status != domain.StatusScheduled {
+		log.Warn("job is not in scheduled status", "currentStatus", freshJob.Status)
+		return fmt.Errorf("job is not scheduled (status: %s)", freshJob.Status)
+	}
+
 	// Transition state
-	jobObj.Status = domain.StatusInitializing
-	j.store.UpdateJob(jobObj)
+	freshJob.Status = domain.StatusInitializing
+	j.store.UpdateJob(freshJob)
 
 	// Execute (uploads already processed during scheduling)
-	_, err := j.executeJob(ctx, jobObj, job.BuildRequest{})
+	_, err := j.executeJob(ctx, freshJob, job.BuildRequest{})
 	return err
 }
 
@@ -293,7 +311,7 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 	// Handle scheduled jobs
 	if jb.IsScheduled() {
 		if j.scheduler.RemoveJob(req.JobID) {
-			jb.Status = domain.StatusStopped
+			jb.Status = domain.StatusCanceled
 			j.store.UpdateJob(jb)
 			// Skip cleanup for runtime build jobs even when stopped
 			if !jb.Type.IsRuntimeBuild() {

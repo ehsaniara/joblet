@@ -17,6 +17,7 @@ Available subcommands:
   status     Show status of a specific job
   log        Stream logs from a job
   stop       Stop a running job
+  cancel     Cancel a scheduled job (status becomes CANCELED)
   delete     Delete a specific job
   delete-all Delete all non-running jobs`,
 	}
@@ -27,6 +28,7 @@ Available subcommands:
 	cmd.AddCommand(NewStatusCmd())
 	cmd.AddCommand(NewLogCmd())
 	cmd.AddCommand(NewStopCmd())
+	cmd.AddCommand(NewCancelCmd())
 	cmd.AddCommand(NewDeleteCmd())
 	cmd.AddCommand(NewDeleteAllCmd())
 

@@ -36,6 +36,7 @@ Quick Examples:
   rnx job list --workflow                    # List all workflows
   rnx job status <job-uuid>                  # Check job status (supports short UUIDs)
   rnx job log <job-uuid>                     # Stream job logs (supports short UUIDs)
+  rnx job cancel <job-uuid>                  # Cancel a scheduled job (status: CANCELED)
   rnx job delete <job-uuid>                  # Delete a specific job
   rnx job delete-all                         # Delete all non-running jobs
   rnx monitor status                         # View remote server metrics and volumes

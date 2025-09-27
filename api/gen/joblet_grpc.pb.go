@@ -22,6 +22,7 @@ const (
 	JobService_RunJob_FullMethodName            = "/joblet.JobService/RunJob"
 	JobService_GetJobStatus_FullMethodName      = "/joblet.JobService/GetJobStatus"
 	JobService_StopJob_FullMethodName           = "/joblet.JobService/StopJob"
+	JobService_CancelJob_FullMethodName         = "/joblet.JobService/CancelJob"
 	JobService_DeleteJob_FullMethodName         = "/joblet.JobService/DeleteJob"
 	JobService_DeleteAllJobs_FullMethodName     = "/joblet.JobService/DeleteAllJobs"
 	JobService_GetJobLogs_FullMethodName        = "/joblet.JobService/GetJobLogs"
@@ -42,6 +43,7 @@ type JobServiceClient interface {
 	RunJob(ctx context.Context, in *RunJobRequest, opts ...grpc.CallOption) (*RunJobResponse, error)
 	GetJobStatus(ctx context.Context, in *GetJobStatusReq, opts ...grpc.CallOption) (*GetJobStatusRes, error)
 	StopJob(ctx context.Context, in *StopJobReq, opts ...grpc.CallOption) (*StopJobRes, error)
+	CancelJob(ctx context.Context, in *CancelJobReq, opts ...grpc.CallOption) (*CancelJobRes, error)
 	DeleteJob(ctx context.Context, in *DeleteJobReq, opts ...grpc.CallOption) (*DeleteJobRes, error)
 	DeleteAllJobs(ctx context.Context, in *DeleteAllJobsReq, opts ...grpc.CallOption) (*DeleteAllJobsRes, error)
 	GetJobLogs(ctx context.Context, in *GetJobLogsReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataChunk], error)
@@ -85,6 +87,16 @@ func (c *jobServiceClient) StopJob(ctx context.Context, in *StopJobReq, opts ...
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StopJobRes)
 	err := c.cc.Invoke(ctx, JobService_StopJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobServiceClient) CancelJob(ctx context.Context, in *CancelJobReq, opts ...grpc.CallOption) (*CancelJobRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelJobRes)
+	err := c.cc.Invoke(ctx, JobService_CancelJob_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +202,7 @@ type JobServiceServer interface {
 	RunJob(context.Context, *RunJobRequest) (*RunJobResponse, error)
 	GetJobStatus(context.Context, *GetJobStatusReq) (*GetJobStatusRes, error)
 	StopJob(context.Context, *StopJobReq) (*StopJobRes, error)
+	CancelJob(context.Context, *CancelJobReq) (*CancelJobRes, error)
 	DeleteJob(context.Context, *DeleteJobReq) (*DeleteJobRes, error)
 	DeleteAllJobs(context.Context, *DeleteAllJobsReq) (*DeleteAllJobsRes, error)
 	GetJobLogs(*GetJobLogsReq, grpc.ServerStreamingServer[DataChunk]) error
@@ -217,6 +230,9 @@ func (UnimplementedJobServiceServer) GetJobStatus(context.Context, *GetJobStatus
 }
 func (UnimplementedJobServiceServer) StopJob(context.Context, *StopJobReq) (*StopJobRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopJob not implemented")
+}
+func (UnimplementedJobServiceServer) CancelJob(context.Context, *CancelJobReq) (*CancelJobRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelJob not implemented")
 }
 func (UnimplementedJobServiceServer) DeleteJob(context.Context, *DeleteJobReq) (*DeleteJobRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteJob not implemented")
@@ -313,6 +329,24 @@ func _JobService_StopJob_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(JobServiceServer).StopJob(ctx, req.(*StopJobReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobService_CancelJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelJobReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobServiceServer).CancelJob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobService_CancelJob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobServiceServer).CancelJob(ctx, req.(*CancelJobReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -472,6 +506,10 @@ var JobService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StopJob",
 			Handler:    _JobService_StopJob_Handler,
+		},
+		{
+			MethodName: "CancelJob",
+			Handler:    _JobService_CancelJob_Handler,
 		},
 		{
 			MethodName: "DeleteJob",
