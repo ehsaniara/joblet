@@ -130,7 +130,13 @@ func formatJobList(jobs []*pb.Job) {
 	// each job
 	for _, job := range jobs {
 
-		startTime := formatStartTime(job.StartTime)
+		// For SCHEDULED jobs, show scheduled time; for others, show start time
+		var displayTime string
+		if job.Status == "SCHEDULED" && job.ScheduledTime != "" {
+			displayTime = formatStartTime(job.ScheduledTime)
+		} else {
+			displayTime = formatStartTime(job.StartTime)
+		}
 
 		// truncate long commands
 		command := formatCommand(job.Command, job.Args)
@@ -151,7 +157,7 @@ func formatJobList(jobs []*pb.Job) {
 			maxIDWidth, job.Uuid,
 			maxNameWidth, jobName,
 			statusColor, maxStatusWidth, job.Status, resetColor,
-			startTime,
+			displayTime,
 			command)
 	}
 }

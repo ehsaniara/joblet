@@ -74,16 +74,16 @@ test_schedule_formats() {
     # Now supports seconds! Minimum is 1 second in the future
     local formats=("5s" "30s" "2min" "1h" "2025-12-31T23:59:59Z")
     local job_ids=()
-    
+
     for format in "${formats[@]}"; do
         # Test that the format is accepted (job creation succeeds)
         local job_output=$("$RNX_BINARY" job run --schedule="$format" \
             echo "SCHEDULED_FORMAT_TEST" 2>&1)
-        
+
         if echo "$job_output" | grep -q "ID:"; then
             local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
             job_ids+=("$job_id")
-            
+
             # Verify job is in SCHEDULED state
             local status=$(check_job_status "$job_id")
             if [[ "$status" == "SCHEDULED" ]]; then
@@ -96,12 +96,12 @@ test_schedule_formats() {
             return 1
         fi
     done
-    
+
     # Clean up scheduled jobs
     for job_id in "${job_ids[@]}"; do
         "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
     done
-    
+
     return 0
 }
 
@@ -269,12 +269,72 @@ test_schedule_timezone_handling() {
     # Test timezone handling in schedules
     local current_tz=$(date +%Z)
     echo -e "    Current timezone: $current_tz"
-    
+
     # Would test scheduling in different timezones
     # For now, just verify we can get timezone info
     if [[ -n "$current_tz" ]]; then
         return 0
     else
+        return 1
+    fi
+}
+
+test_scheduled_time_display() {
+    # Test that scheduled jobs show the correct scheduled time in list output, not creation time
+    echo -e "    ${BLUE}Testing scheduled time display in job list${NC}"
+
+    # Get current time for comparison
+    local current_time=$(date +"%Y-%m-%d %H:%M")
+
+    # Schedule a job far in the future (end of year)
+    local future_time="2025-12-31T23:59:59Z"
+    local job_output=$("$RNX_BINARY" job run --schedule="$future_time" echo "FAR_FUTURE_JOB" 2>&1)
+
+    if ! echo "$job_output" | grep -q "ID:"; then
+        echo -e "    ${RED}Failed to create scheduled job${NC}"
+        return 1
+    fi
+
+    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    echo -e "    ${GREEN}Created scheduled job: $job_id${NC}"
+
+    # Get the job list output
+    local list_output=$("$RNX_BINARY" job list 2>&1)
+
+    # Find the line with our job
+    local job_line=$(echo "$list_output" | grep "$job_id")
+
+    if [[ -z "$job_line" ]]; then
+        echo -e "    ${RED}Job not found in list output${NC}"
+        "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
+        return 1
+    fi
+
+    echo -e "    Job list line: $job_line"
+
+    # Extract the displayed time from the list output (START TIME column)
+    # The format is: UUID NAME STATUS START_TIME COMMAND
+    # We need to extract the time portion which should be in format YYYY-MM-DD HH:MM:SS
+    local displayed_time=$(echo "$job_line" | awk '{print $4 " " $5}')
+
+    echo -e "    Current time:   $current_time"
+    echo -e "    Displayed time: $displayed_time"
+    echo -e "    Expected time:  2025-12-31 (or similar future date)"
+
+    # Check if the displayed time shows the scheduled time (December 2025)
+    # not the creation time (current time)
+    if echo "$displayed_time" | grep -q "2025-12-31"; then
+        echo -e "    ${GREEN}✓ List correctly shows scheduled time (future)${NC}"
+        "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
+        return 0
+    elif echo "$displayed_time" | grep -q "$(date +%Y-%m-%d)"; then
+        echo -e "    ${RED}✗ List incorrectly shows creation time (today) instead of scheduled time${NC}"
+        echo -e "    ${RED}This is a bug: SCHEDULED jobs should show their scheduled execution time${NC}"
+        "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
+        return 1
+    else
+        echo -e "    ${YELLOW}Unable to determine if time is correct${NC}"
+        "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
         return 1
     fi
 }
@@ -314,7 +374,8 @@ main() {
     
     test_section "Time Handling"
     run_test "Timezone handling" test_schedule_timezone_handling
-    
+    run_test "Scheduled time display validation" test_scheduled_time_display
+
     # Print summary
     test_suite_summary
     exit $?
