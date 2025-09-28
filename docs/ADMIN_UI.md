@@ -120,7 +120,7 @@ Displays essential server information:
 - **Platform**: Operating system and version
 - **Architecture**: CPU architecture (e.g., amd64, arm64)
 - **Kernel Version**: Linux kernel version
-- **Uptime**: Server uptime in human-readable format
+- **Uptime**: Server uptime in string format
 - **Cloud Environment**: Cloud provider, instance type, region (if applicable)
 
 ### CPU Details Card

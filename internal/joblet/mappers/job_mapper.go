@@ -39,6 +39,7 @@ func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 		GpuIndices:        job.GPUIndices,         // GPU allocation info
 		GpuCount:          job.GPUCount,           // GPU requirements
 		GpuMemoryMb:       int32(job.GPUMemoryMB), // GPU memory requirement
+		NodeId:            job.NodeId,             // Unique identifier of the Joblet node
 	}
 
 	pbJob.EndTime = job.FormattedEndTime()             // Use job's formatting method
@@ -73,6 +74,7 @@ func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
 		GPUIndices:        pbJob.GpuIndices,         // GPU allocation info
 		GPUCount:          pbJob.GpuCount,           // GPU requirements
 		GPUMemoryMB:       int64(pbJob.GpuMemoryMb), // GPU memory requirement
+		NodeId:            pbJob.NodeId,             // Unique identifier of the Joblet node
 	}
 
 	// Parse times
@@ -181,7 +183,7 @@ func (m *JobMapper) ParseUserInputToValueObjects(cpuStr, memoryStr, bandwidthStr
 	return limits, nil
 }
 
-// ValueObjectsToDisplayStrings converts value objects to human-readable strings
+// ValueObjectsToDisplayStrings converts value objects to readable strings
 func (m *JobMapper) ValueObjectsToDisplayStrings(limits *domain.ResourceLimits) map[string]string {
 	if limits == nil {
 		return map[string]string{}

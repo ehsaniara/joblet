@@ -104,7 +104,7 @@ func (m MemorySize) IsUnlimited() bool {
 	return m.bytes == 0
 }
 
-// String returns a human-readable string
+// String returns a readable string
 func (m MemorySize) String() string {
 	if m.bytes == 0 {
 		return "0"

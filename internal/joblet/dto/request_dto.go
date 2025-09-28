@@ -5,7 +5,7 @@ import "time"
 // StartJobRequestDTO encapsulates parameters for starting a job
 type StartJobRequestDTO struct {
 	// Job identification
-	Name string `json:"name,omitempty"` // Human-readable job name (for workflows)
+	Name string `json:"name,omitempty"` // Readable job name (for workflows)
 
 	// Command and arguments
 	Command string   `json:"command"`

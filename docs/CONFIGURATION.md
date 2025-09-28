@@ -31,6 +31,7 @@ server:
   mode: "server"                    # Always "server" for daemon mode
   address: "0.0.0.0"               # Listen address
   port: 50051                      # gRPC port
+  nodeId: ""                       # Unique node identifier (UUID, auto-generated during setup)
 
   # TLS configuration
   tls:
@@ -43,6 +44,43 @@ server:
     time: 120s                    # Keepalive time
     timeout: 20s                  # Keepalive timeout
 ```
+
+### Node Identification
+
+Joblet supports unique node identification for distributed deployments:
+
+```yaml
+server:
+  nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Unique UUID for this node
+```
+
+**Key Features:**
+
+- **Automatic Generation**: During Joblet setup, a unique UUID is automatically generated and stored in the configuration
+- **Job Tracking**: All jobs executed on a node are tagged with the node's UUID for tracking and debugging
+- **Distributed Visibility**: In multi-node deployments, you can identify which node executed specific jobs
+- **CLI Display**: The node ID is displayed in `rnx job list` and `rnx job status` commands
+
+**Setup Process:**
+
+The `nodeId` is automatically populated during Joblet installation via the `certs_gen_embedded.sh` script:
+
+```bash
+# Generates a UUID and updates the configuration
+NODE_ID=$(uuidgen)
+sed -i "s/nodeId: \"\"/nodeId: \"$NODE_ID\"/" /opt/joblet/config/joblet-config.yml
+```
+
+**Manual Configuration:**
+
+If needed, you can manually set a custom node ID:
+
+```yaml
+server:
+  nodeId: "custom-node-identifier-uuid"
+```
+
+**Note**: The nodeId should be a valid UUID format for consistency with the system's expectations.
 
 ### Resource Limits
 
@@ -459,6 +497,7 @@ openssl req -new -key client-key.pem -out viewer.csr \
 | `JOBLET_LOG_LEVEL`      | Log level override                 | from config                            |
 | `JOBLET_SERVER_ADDRESS` | Server address override            | from config                            |
 | `JOBLET_SERVER_PORT`    | Server port override               | from config                            |
+| `JOBLET_NODE_ID`        | Node identifier override           | from config                            |
 | `JOBLET_MAX_JOBS`       | Maximum concurrent jobs            | from config                            |
 | `JOBLET_CI_MODE`        | Enable CI mode (relaxed isolation) | `false`                                |
 

@@ -46,7 +46,7 @@ type WorkflowNetworkDTO struct {
 type WorkflowVolumeDTO struct {
 	Name string `json:"name"`
 	Type string `json:"type,omitempty"` // "filesystem" or "memory"
-	Size string `json:"size,omitempty"` // Human readable size
+	Size string `json:"size,omitempty"` // Readable size
 }
 
 // WorkflowDependencyDTO represents a dependency between workflow jobs
@@ -74,7 +74,7 @@ type WorkflowStatusDTO struct {
 	JobsFailed    int    `json:"jobs_failed"`
 	StartTime     string `json:"start_time,omitempty"` // ISO 8601 format
 	EndTime       string `json:"end_time,omitempty"`   // ISO 8601 format
-	Duration      string `json:"duration,omitempty"`   // Human readable duration
+	Duration      string `json:"duration,omitempty"`   // Readable duration
 }
 
 // WorkflowListItemDTO represents a workflow in list responses

@@ -26,7 +26,7 @@ management, and network isolation capabilities with enterprise-grade validation 
 
 ### Core Capabilities
 
-- **Semantic Job Naming**: Human-readable identifiers for enhanced workflow visibility and debugging
+- **Semantic Job Naming**: Identifiers for enhanced workflow visibility and debugging
 - **Dependency Management**: Declarative execution ordering through `requires` clauses with state validation
 - **Network Segmentation**: Granular network configuration per job (bridge, isolated, none, custom networks)
 - **Automated File Staging**: Declarative file upload and workspace preparation for each job

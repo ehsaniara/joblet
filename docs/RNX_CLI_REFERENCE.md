@@ -213,6 +213,7 @@ rnx job list --workflow [flags]   # List all workflows
 
 - **ID**: Job UUID (36-character identifier)
 - **NAME**: Job name (from workflows, "-" for individual jobs)
+- **NODE ID**: Unique identifier of the Joblet node that executed the job (36-character UUID, "-" if not assigned)
 - **STATUS**: Current job status (RUNNING, COMPLETED, FAILED, STOPPED, SCHEDULED)
 - **START TIME**: When the job started (format: YYYY-MM-DD HH:MM:SS)
 - **COMMAND**: The command being executed (truncated to 80 chars if too long)
@@ -228,12 +229,12 @@ information.
 rnx job list
 
 # Example output:
-# UUID                                 NAME         STATUS      START TIME           COMMAND
-# ------------------------------------  ------------ ----------  -------------------  -------
-# f47ac10b-58cc-4372-a567-0e02b2c3d479  setup-data   COMPLETED   2025-08-03 10:15:32  echo "Hello World"
-# a1b2c3d4-e5f6-7890-abcd-ef1234567890  process-data RUNNING     2025-08-03 10:16:45  python3 script.py
-# b2c3d4e5-f6a7-8901-bcde-f23456789012  -            FAILED      2025-08-03 10:17:20  invalid_command
-# c3d4e5f6-a7b8-9012-cdef-345678901234  -            SCHEDULED   N/A                  backup.sh
+# UUID                                 NAME         NODE ID                              STATUS      START TIME           COMMAND
+# ------------------------------------  ------------ ------------------------------------ ----------  -------------------  -------
+# f47ac10b-58cc-4372-a567-0e02b2c3d479  setup-data   8f94c5b2-1234-5678-9abc-def012345678 COMPLETED   2025-08-03 10:15:32  echo "Hello World"
+# a1b2c3d4-e5f6-7890-abcd-ef1234567890  process-data 8f94c5b2-1234-5678-9abc-def012345678 RUNNING     2025-08-03 10:16:45  python3 script.py
+# b2c3d4e5-f6a7-8901-bcde-f23456789012  -            -                                    FAILED      2025-08-03 10:17:20  invalid_command
+# c3d4e5f6-a7b8-9012-cdef-345678901234  -            -                                    SCHEDULED   N/A                  backup.sh
 
 # List all workflows (table format)
 rnx job list --workflow
@@ -262,6 +263,7 @@ rnx job list --json
 #   {
 #     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 #     "name": "process-data",
+#     "node_id": "8f94c5b2-1234-5678-9abc-def012345678",
 #     "status": "RUNNING",
 #     "start_time": "2025-08-03T10:16:45Z",
 #     "command": "python3",
@@ -319,7 +321,7 @@ rnx job status --workflow --detail <workflow-uuid>  # Get workflow status with Y
 #### Examples
 
 ```bash
-# Get job status (human-readable format)
+# Get job status (readable format)
 rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Get workflow status
@@ -360,6 +362,7 @@ rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef |
 # {
 #   "uuid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 #   "name": "process-data",
+#   "nodeId": "8f94c5b2-1234-5678-9abc-def012345678",
 #   "command": "python3",
 #   "args": ["process_data.py"],
 #   "maxCPU": 100,
@@ -377,6 +380,7 @@ rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef |
 #### Output includes:
 
 - Job ID and command
+- Node ID (unique identifier of the Joblet node that executed the job)
 - Current status
 - Start/end times
 - Resource limits

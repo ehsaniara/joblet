@@ -81,7 +81,7 @@ Job Status Information Displayed:
   • Actions: Contextual next steps (view logs, stop job, etc.)
 
 Output Formats:
-  • Default: Human-readable formatted output with sections
+  • Default: Readable formatted output with sections
   • --json: Machine-readable JSON with all available fields`,
 		Args: cobra.ExactArgs(1),
 		RunE: runStatus,
@@ -156,6 +156,9 @@ func getJobStatus(jobID string) error {
 	fmt.Printf("Job ID: %s\n", response.Uuid)
 	if response.Name != "" {
 		fmt.Printf("Job Name: %s\n", response.Name)
+	}
+	if response.NodeId != "" {
+		fmt.Printf("Node ID: %s\n", response.NodeId)
 	}
 	fmt.Printf("Command: %s %s\n", response.Command, strings.Join(response.Args, " "))
 
@@ -359,7 +362,7 @@ func formatTimestamp(timestamp string) string {
 	return t.Format("2006-01-02 15:04:05 MST")
 }
 
-// formatDuration formats a duration for human-readable display
+// formatDuration formats a duration for readable display
 
 func formatDuration(d time.Duration) string {
 	if d < time.Minute {
@@ -389,6 +392,7 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 	output := map[string]interface{}{
 		"uuid":              response.Uuid,
 		"name":              response.Name,
+		"nodeId":            response.NodeId,
 		"command":           response.Command,
 		"args":              response.Args,
 		"status":            response.Status,
@@ -432,11 +436,11 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 // - Fetches detailed workflow status from the joblet server
 // - Formats and displays workflow information with job names and dependencies
 // - Provides both tabular and JSON output formats for different use cases
-// - Integrates job names feature to show human-readable job identifiers
+// - Integrates job names feature to show readable job identifiers
 //
 // JOB NAMES DISPLAY:
 // - JOB ID column: Shows actual job IDs (e.g., "42", "43") for started jobs
-// - JOB NAME column: Shows human-readable names from workflow YAML (e.g., "setup-data")
+// - JOB NAME column: Shows readable names from workflow YAML (e.g., "setup-data")
 // - DEPENDENCIES column: Lists job name dependencies for clarity
 // - Properly handles jobs that haven't been started (show job names in ID column)
 //

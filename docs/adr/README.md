@@ -10,17 +10,17 @@ consequences. ADRs help future developers understand not just *what* we built, b
 
 ## ADR Index
 
-| ADR                                               | Title                                   | Status   | Summary                                                                                        |
-|---------------------------------------------------|-----------------------------------------|----------|------------------------------------------------------------------------------------------------|
-| [001](001-two-stage-execution-pattern.md)         | Two-Stage Execution Pattern             | Accepted | Single binary operates as both server and isolated job executor based on environment variables |
-| [002](002-workflow-vs-job-separation.md)          | Workflow vs Individual Job Architecture | Accepted | Complete separation of job and workflow services for clarity and optimization                  |
-| [003](003-namespace-isolation-strategy.md)        | Linux Namespace Isolation Strategy      | Accepted | Selective namespace isolation with shared networking for compatibility                         |
-| [004](004-self-contained-runtime-architecture.md) | Self-Contained Runtime Architecture     | Accepted | Each runtime includes complete filesystem for perfect isolation                                |
-| [005](005-async-log-persistence.md)               | Asynchronous Log Persistence System     | Accepted | Rate-decoupled logging system for high-performance job execution                               |
-| [006](006-embedded-certificates.md)               | Embedded Certificate Architecture       | Accepted | TLS certificates embedded in configuration files for operational simplicity                    |
-| [007](007-cgroups-v2-resource-management.md)      | Cgroups v2 for Resource Management      | Accepted | Modern cgroups v2 for clean, predictable resource control                                      |
-| [008](008-gpu-support-architecture.md)            | GPU Support Architecture                | Accepted | Native Linux kernel features for GPU isolation without container runtimes                      |
-| [009](009-seccomp-syscall-filtering.md)           | Seccomp Syscall Filtering               | Proposed | Kernel-level syscall filtering for defense-in-depth security                                   |
+| ADR                                               | Title                                   | Status      | Summary                                                                                        |
+|---------------------------------------------------|-----------------------------------------|-------------|------------------------------------------------------------------------------------------------|
+| [001](001-two-stage-execution-pattern.md)         | Two-Stage Execution Pattern             | Implemented | Single binary operates as both server and isolated job executor based on environment variables |
+| [002](002-workflow-vs-job-separation.md)          | Workflow vs Individual Job Architecture | Implemented | Complete separation of job and workflow services for clarity and optimization                  |
+| [003](003-namespace-isolation-strategy.md)        | Linux Namespace Isolation Strategy      | Implemented | Selective namespace isolation with shared networking for compatibility                         |
+| [004](004-self-contained-runtime-architecture.md) | Self-Contained Runtime Architecture     | Implemented | Each runtime includes complete filesystem for perfect isolation                                |
+| [005](005-async-log-persistence.md)               | Asynchronous Log Persistence System     | Implemented | Rate-decoupled logging system for high-performance job execution                               |
+| [006](006-embedded-certificates.md)               | Embedded Certificate Architecture       | Implemented | TLS certificates embedded in configuration files for operational simplicity                    |
+| [007](007-cgroups-v2-resource-management.md)      | Cgroups v2 for Resource Management      | Implemented | Modern cgroups v2 for clean, predictable resource control                                      |
+| [008](008-gpu-support-architecture.md)            | GPU Support Architecture                | Implemented | Native Linux kernel features for GPU isolation without container runtimes                      |
+| [009](009-seccomp-syscall-filtering.md)           | Seccomp Syscall Filtering               | Proposed    | Kernel-level syscall filtering for defense-in-depth security                                   |
 
 ## ADR Template
 
@@ -59,17 +59,6 @@ When creating a new ADR, use this template:
 
 [Links to related documentation, code, or external resources]
 ```
-
-## Contributing
-
-When adding a new ADR:
-
-1. Use the next number in sequence (e.g., 008)
-2. Follow the template above
-3. Update this README with a link to your ADR
-4. Write in a narrative, human style - tell the story
-5. Be honest about trade-offs and mistakes
-6. Include real examples where possible
 
 ## Why We Write ADRs
 

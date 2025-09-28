@@ -46,7 +46,7 @@ print_info() {
     echo -e "${BLUE}${INFO} $1${NC}"
 }
 
-# Format file size in human readable format
+# Format file size in readable format
 format_size() {
     local size=$1
     if [ $size -lt 1024 ]; then

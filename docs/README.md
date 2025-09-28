@@ -22,6 +22,7 @@ seamless integration with existing infrastructure through a unified gRPC API and
 - **Network Virtualization**: Software-defined networking with customizable CIDR blocks, traffic shaping, and inter-job
   communication policies
 - **Storage Abstraction**: Flexible volume management supporting persistent and ephemeral storage with quota enforcement
+- **Node Identification**: Unique node identification for distributed deployments with automatic UUID generation and job tracking
 - **Observability**: Real-time metrics collection, structured logging, and comprehensive audit trails for compliance
   requirements
 
@@ -123,11 +124,11 @@ rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
 # View workflow status with original YAML content (available from any workstation)
 rnx job status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 
-# Output shows human-readable job names and dependencies:
-# JOB UUID        JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
+# Output shows job names, node identification, and dependencies:
+# JOB UUID        JOB NAME             NODE ID         STATUS       EXIT CODE  DEPENDENCIES
 # -----------------------------------------------------------------------------------------
-# f47ac10b-...    data-extraction      COMPLETED    0          -                   
-# a1b2c3d4-...    model-training       RUNNING      -          data-extraction     
+# f47ac10b-...    data-extraction      8f94c5b2-...    COMPLETED    0          -
+# a1b2c3d4-...    model-training       8f94c5b2-...    RUNNING      -          data-extraction     
 ```
 
 ### Site Reliability Engineering Operations
@@ -266,6 +267,25 @@ rnx job run --gpu=2 --runtime=python-3.11-ml python distributed_inference.py
 # Multi-process jobs (see PROCESS_ISOLATION.md for details)
 rnx job run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
 rnx job run --runtime=python-3.11-ml bash -c "task1 & task2 & wait"
+```
+
+### Node Identification
+
+```bash
+# View jobs with node identification for distributed tracking
+rnx job list
+
+# Example output showing node IDs:
+# UUID                                 NAME         NODE ID                              STATUS
+# ------------------------------------  ------------ ------------------------------------ ----------
+# f47ac10b-58cc-4372-a567-0e02b2c3d479  setup-data   8f94c5b2-1234-5678-9abc-def012345678 COMPLETED
+# a1b2c3d4-e5f6-7890-abcd-ef1234567890  process-data 8f94c5b2-1234-5678-9abc-def012345678 RUNNING
+
+# View detailed job status including node information
+rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+# Node ID information helps identify which Joblet instance executed each job
+# Useful for debugging and tracking in multi-node distributed deployments
 ```
 
 ### Runtime Management

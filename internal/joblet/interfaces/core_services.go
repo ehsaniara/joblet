@@ -15,7 +15,7 @@ type ServiceRegistry interface {
 	GetRuntimeService() RuntimeService
 }
 
-// JobServiceInterface defines core job operations for lifecycle management
+// JobService Interface defines core job operations for lifecycle management
 type JobService interface {
 	// StartJob initiates a new job execution with the given configuration
 	StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error)
@@ -31,7 +31,7 @@ type JobService interface {
 	ListJobs(ctx context.Context) []*domain.Job
 }
 
-// VolumeServiceInterface defines volume operations for persistent storage management
+// VolumeService Interface defines volume operations for persistent storage management
 type VolumeService interface {
 	// CreateVolume creates a new persistent volume with specified name and size
 	CreateVolume(ctx context.Context, name string, size int64) error
@@ -43,7 +43,7 @@ type VolumeService interface {
 	MountVolume(ctx context.Context, volumeName, mountPath string) error
 }
 
-// NetworkServiceInterface defines network operations for job isolation and connectivity
+// NetworkService Interface defines network operations for job isolation and connectivity
 type NetworkService interface {
 	// CreateNetwork creates a new isolated network with the given configuration
 	CreateNetwork(ctx context.Context, name string, config interface{}) error
@@ -55,7 +55,7 @@ type NetworkService interface {
 	AssignJobToNetwork(ctx context.Context, jobID, networkName string) error
 }
 
-// MonitoringServiceInterface defines monitoring operations for system and job observability
+// MonitoringService Interface defines monitoring operations for system and job observability
 type MonitoringService interface {
 	// CollectSystemMetrics gathers current system resource usage and health data
 	CollectSystemMetrics(ctx context.Context) (map[string]interface{}, error)

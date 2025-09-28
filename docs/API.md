@@ -164,7 +164,7 @@ rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
 
 **Response**:
 
-- Complete job information including current status, execution time, exit code, and resource limits
+- Complete job information including current status, execution time, exit code, resource limits, and node identification
 
 **Example**:
 
@@ -303,7 +303,7 @@ Core job representation used across all API responses.
 ```protobuf
 message Job {
   string id = 1;                    // Unique job UUID identifier
-  string name = 2;                  // Human-readable job name (from workflows, empty for individual jobs)
+  string name = 2;                  // Readable job name (from workflows, empty for individual jobs)
   string command = 3;               // Command being executed
   repeated string args = 4;         // Command arguments
   int32 maxCPU = 5;                // CPU limit in percent
@@ -318,6 +318,8 @@ message Job {
   string runtime = 14;             // Runtime specification used
   map<string, string> environment = 15;       // Regular environment variables (visible)
   map<string, string> secret_environment = 16; // Secret environment variables (masked)
+  // Additional fields
+  string nodeId = 20;              // Unique identifier of the Joblet node that executed this job
 }
 ```
 
@@ -350,6 +352,41 @@ message RunJobReq {
   int32 maxCPU = 3;               // Optional: CPU limit percentage
   int32 maxMemory = 4;            // Optional: memory limit in MB
   int32 maxIOBPS = 5;             // Optional: I/O bandwidth limit
+}
+```
+
+### GetJobStatusRes
+
+Response message for job status requests, including node identification.
+
+```protobuf
+message GetJobStatusRes {
+  string uuid = 1;                  // Job UUID
+  string name = 2;                  // Job name (from workflows, empty for individual jobs)
+  string command = 3;               // Command being executed
+  repeated string args = 4;         // Command arguments
+  int32 maxCPU = 5;                // CPU limit in percent
+  string cpuCores = 6;             // CPU core binding specification
+  int32 maxMemory = 7;             // Memory limit in MB
+  int64 maxIOBPS = 8;              // IO limit in bytes per second
+  string status = 9;               // Current job status
+  string startTime = 10;           // Start time (RFC3339 format)
+  string endTime = 11;             // End time (RFC3339 format, empty if running)
+  int32 exitCode = 12;             // Process exit code
+  string scheduledTime = 13;       // Scheduled execution time (RFC3339 format)
+  string runtime = 14;             // Runtime specification used
+  map<string, string> environment = 15;       // Regular environment variables (visible)
+  map<string, string> secret_environment = 16; // Secret environment variables (masked)
+  string network = 17;             // Network configuration
+  repeated string volumes = 18;     // Volume names
+  string workDir = 19;             // Working directory
+  repeated FileUpload uploads = 20; // File uploads
+  repeated string dependencies = 21; // Job dependencies
+  string workflowUuid = 22;        // Workflow UUID if part of workflow
+  int32 gpuCount = 23;             // Number of GPUs allocated
+  repeated int32 gpuIndices = 24;   // GPU indices allocated
+  int64 gpuMemoryMB = 25;          // GPU memory in MB
+  string nodeId = 26;              // Unique identifier of the Joblet node that executed this job
 }
 ```
 
@@ -614,7 +651,7 @@ multi-job execution with dependency management, resource isolation, and comprehe
 
 ### Key Workflow Features
 
-- **Job Names**: Human-readable job names derived from YAML job keys
+- **Job Names**: Job names derived from YAML job keys
 - **Dependency Management**: Define job execution order with `requires` clauses
 - **Resource Isolation**: Per-job resource limits and network configuration
 - **Real-time Monitoring**: Track workflow progress with job-level status updates
@@ -673,7 +710,7 @@ Represents a job within a workflow with dependency information.
 ```protobuf
 message WorkflowJob {
   string jobId = 1;                      // Actual job UUID for started jobs, "0" for non-started jobs
-  string jobName = 2;                    // Human-readable job name from workflow YAML
+  string jobName = 2;                    // Job name from workflow YAML
   string status = 3;                     // Current job status
   repeated string dependencies = 4;       // List of job names this job depends on
   Timestamp startTime = 5;               // Job start time
@@ -701,7 +738,7 @@ message GetWorkflowStatusResponse {
 
 ### Job Names in Workflows
 
-Workflow jobs have **human-readable names** derived from YAML job keys:
+Workflow jobs have **Job names** derived from YAML job keys:
 
 ```yaml
 # workflow.yaml
@@ -721,7 +758,7 @@ jobs:
 
 - **Job ID**: Unique UUID identifier assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "
   6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-- **Job Name**: Human-readable name from workflow YAML (e.g., "setup-data", "process-data")
+- **Job Name**: Job name from workflow YAML (e.g., "setup-data", "process-data")
 
 **Status Display:**
 
@@ -784,7 +821,7 @@ rnx job run --workflow=pipeline.yaml
 
 #### Workflow Enhancements
 
-- **Job Names Support**: Added human-readable job names for workflow jobs
+- **Job Names Support**: Added job names for workflow jobs
     - Job names derived from YAML job keys (e.g., "setup-data", "process-data")
     - Enhanced CLI display with separate JOB ID and JOB NAME columns
     - Updated protobuf messages to include name field

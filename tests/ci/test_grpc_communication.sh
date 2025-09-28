@@ -44,8 +44,8 @@ test_api_error_handling() {
     fi
 }
 
-test_human_readable_output_format() {
-    echo "Testing human-readable output format..."
+test_readable_output_format() {
+    echo "Testing readable output format..."
     
     # Start a job and check output format
     local job_output
@@ -83,7 +83,7 @@ test_human_readable_output_format() {
         return 1
     fi
     
-    echo "✓ Human-readable output format working"
+    echo "✓ readable output format working"
 }
 
 test_concurrent_requests() {
@@ -242,7 +242,7 @@ main() {
     
     test_grpc_connectivity
     test_api_error_handling
-    test_human_readable_output_format
+    test_readable_output_format
     test_concurrent_requests
     test_large_output_handling
     test_special_characters_in_commands

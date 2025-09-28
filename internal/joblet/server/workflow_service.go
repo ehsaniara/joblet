@@ -596,12 +596,12 @@ func (s *WorkflowServiceServer) convertWorkflowStateToInfo(ws *workflow.Workflow
 // - Transforms internal workflow job data into API-compatible protobuf messages
 // - Properly separates job IDs from job names for CLI display
 // - Constructs dependency lists from job requirement specifications
-// - Enables proper job status reporting with both IDs and human-readable names
+// - Enables proper job status reporting with both IDs and readable names
 //
 // JOB NAMES INTEGRATION:
 // - JobId field contains actual job IDs (e.g., "42", "43") for jobs that have been started
 // - JobId field contains job names (e.g., "setup-data") for jobs that haven't been started yet
-// - JobName field always contains human-readable job names from workflow YAML
+// - JobName field always contains readable job names from workflow YAML
 // - This separation allows CLI to display both columns correctly
 //
 // WORKFLOW:
@@ -621,7 +621,7 @@ func (s *WorkflowServiceServer) convertWorkflowStateToInfo(ws *workflow.Workflow
 // CLI DISPLAY IMPACT:
 // This method directly affects how workflow status is displayed:
 // - JOB ID column shows actual job IDs for started jobs
-// - JOB NAME column shows human-readable names from YAML
+// - JOB NAME column shows readable names from YAML
 // - DEPENDENCIES column shows job name dependencies for clarity
 //
 // USAGE:
@@ -805,7 +805,7 @@ func (s *WorkflowServiceServer) orchestrateWorkflow(ctx context.Context, workflo
 // PARAMETERS:
 // - ctx: Context for request cancellation and timeout handling
 // - workflowID: Unique identifier of the parent workflow
-// - jobName: Human-readable job name from workflow YAML (e.g., "setup-data")
+// - jobName: readable job name from workflow YAML (e.g., "setup-data")
 // - jobSpec: Complete job specification including command, resources, dependencies
 // - workflowYAML: Full workflow configuration for environment variable merging
 // - uploadedFiles: Pre-uploaded files available to all jobs in the workflow
@@ -816,7 +816,7 @@ func (s *WorkflowServiceServer) orchestrateWorkflow(ctx context.Context, workflo
 // JOB NAMES INTEGRATION:
 // - Sets StartJobRequest.Name to jobName for proper job identification
 // - Calls UpdateJobID to map job name to actual job ID after creation
-// - Enables CLI to display both job IDs and human-readable names
+// - Enables CLI to display both job IDs and readable names
 //
 // ERROR HANDLING:
 // - Returns error immediately if job creation fails
@@ -1205,6 +1205,7 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 		Uploads:           s.convertUploadsToStringArray(job.Uploads),
 		Dependencies:      job.Dependencies,
 		WorkflowUuid:      job.WorkflowUuid,
+		NodeId:            job.NodeId, // Unique identifier of the Joblet node
 	}, nil
 }
 

@@ -6,7 +6,7 @@ import "time"
 type VolumeDTO struct {
 	Name        string    `json:"name"`
 	Type        string    `json:"type"`       // "filesystem" or "memory"
-	Size        string    `json:"size"`       // Human readable size (e.g., "1GB")
+	Size        string    `json:"size"`       // Readable size (e.g., "1GB")
 	SizeBytes   int64     `json:"size_bytes"` // Size in bytes
 	Path        string    `json:"path"`       // Host filesystem path
 	CreatedTime time.Time `json:"created_time"`
@@ -29,7 +29,7 @@ type VolumeListItemDTO struct {
 type CreateVolumeRequestDTO struct {
 	Name string `json:"name"`
 	Type string `json:"type"` // "filesystem" or "memory"
-	Size string `json:"size"` // Human readable size (e.g., "1GB", "500MB")
+	Size string `json:"size"` // Readable size (e.g., "1GB", "500MB")
 }
 
 // DeleteVolumeRequestDTO for deleting volumes

@@ -55,7 +55,7 @@ func NewMonitorStatusCmd() *cobra.Command {
 The --json flag outputs server data in UI-compatible format for dashboards and monitoring tools.
 
 Examples:
-  rnx monitor status                    # Human-readable server status
+  rnx monitor status                    # Server status
   rnx monitor status --json            # JSON server data for APIs/UIs
   rnx --node=production monitor status # Monitor specific server`,
 		Args: cobra.NoArgs,

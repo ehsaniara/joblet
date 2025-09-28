@@ -156,7 +156,7 @@ test_rnx_list_json() {
         if echo "$json_output" | grep -q '^\s*\[' && echo "$json_output" | grep -q '\]\s*$'; then
             # If jobs exist, check for basic job fields
             if echo "$json_output" | grep -q '"id"'; then
-                local required_job_fields="id command status"
+                local required_job_fields="id command status node_id"
                 for field in $required_job_fields; do
                     if ! echo "$json_output" | grep -q "\"$field\""; then
                         echo "    ${RED}Job object missing field: $field${NC}"
@@ -199,7 +199,7 @@ test_rnx_status_json() {
     
     if [[ $? -eq 0 ]]; then
         # Check for enhanced status fields that were added
-        local enhanced_fields="uuid command status startTime environment"
+        local enhanced_fields="uuid command status startTime environment nodeId"
         for field in $enhanced_fields; do
             if ! echo "$json_output" | grep -q "\"$field\""; then
                 echo "    ${RED}Status JSON missing enhanced field: $field${NC}"
@@ -258,7 +258,7 @@ test_rnx_status_enhanced_display() {
     
     if [[ $? -eq 0 ]]; then
         # Check for expected sections in the enhanced display
-        local expected_sections=("Job ID:" "Command:" "Status:" "Timing:" "Resource Limits:" "Environment Variables:")
+        local expected_sections=("Job ID:" "Node ID:" "Command:" "Status:" "Timing:" "Resource Limits:" "Environment Variables:")
         for section in "${expected_sections[@]}"; do
             if ! echo "$status_output" | grep -q "$section"; then
                 echo "    ${RED}Enhanced status display missing section: $section${NC}"

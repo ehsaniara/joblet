@@ -145,7 +145,7 @@ Displays comprehensive **remote server** status including all server resources a
 **Usage:**
 
 ```bash
-rnx monitor status                    # Human-readable server status
+rnx monitor status                    # Server status
 rnx monitor status --json            # JSON format (server data)
 rnx --node=production monitor status # Specific server node
 ```

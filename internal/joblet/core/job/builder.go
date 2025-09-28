@@ -91,9 +91,10 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		WorkingDirectory:  req.WorkingDirectory,
 		Uploads:           req.Uploads,
 		Dependencies:      b.copyStrings(req.Dependencies),
-		GPUCount:          req.GPUCount,    // GPU requirements
-		GPUMemoryMB:       req.GPUMemoryMB, // GPU memory requirement
-		GPUIndices:        []int32{},       // Will be populated during allocation
+		GPUCount:          req.GPUCount,           // GPU requirements
+		GPUMemoryMB:       req.GPUMemoryMB,        // GPU memory requirement
+		GPUIndices:        []int32{},              // Will be populated during allocation
+		NodeId:            b.config.Server.NodeId, // Unique identifier of the Joblet node
 	}
 
 	// Apply resource limits with defaults

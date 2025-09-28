@@ -5,7 +5,7 @@ import "time"
 // JobDTO represents a job for data transfer between layers
 type JobDTO struct {
 	Uuid              string            `json:"uuid"`
-	Name              string            `json:"name,omitempty"` // Human-readable job name for workflow jobs
+	Name              string            `json:"name,omitempty"` // Readable job name for workflow jobs
 	Command           string            `json:"command"`
 	Args              []string          `json:"args,omitempty"`
 	Status            string            `json:"status"`
@@ -49,7 +49,7 @@ type JobListItemDTO struct {
 	Command   string `json:"command"`
 	Status    string `json:"status"`
 	StartTime string `json:"start_time"` // ISO 8601 format
-	Duration  string `json:"duration"`   // Human readable duration
+	Duration  string `json:"duration"`   // Readable duration
 	Network   string `json:"network,omitempty"`
 	Runtime   string `json:"runtime,omitempty"`
 }

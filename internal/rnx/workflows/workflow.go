@@ -100,7 +100,7 @@ const (
 // WorkflowMetadata contains workflow tracking information
 type WorkflowMetadata struct {
 	ID            int               // Sequential workflow ID
-	Name          string            // Human-readable name
+	Name          string            // Readable Job name
 	WorkflowFile  string            // Source workflow file
 	Selector      string            // Workflow selector used
 	Status        WorkflowStatus    // Derived from job states

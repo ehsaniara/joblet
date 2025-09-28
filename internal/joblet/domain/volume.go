@@ -27,7 +27,7 @@ type Volume struct {
 	JobCount    int32      // Number of jobs currently using this volume
 }
 
-// ParseSize converts human-readable size to bytes
+// ParseSize converts readable size to bytes
 func ParseSize(sizeStr string) (int64, error) {
 	if sizeStr == "" {
 		return 0, errors.New("size cannot be empty")
@@ -78,7 +78,7 @@ func ParseSize(sizeStr string) (int64, error) {
 	return int64(size * float64(multiplier)), nil
 }
 
-// FormatSize converts bytes to human-readable format
+// FormatSize converts bytes to readable format
 func FormatSize(bytes int64) string {
 	const (
 		KB = 1024

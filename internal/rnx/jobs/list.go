@@ -45,7 +45,7 @@ Examples:
 
 // runList executes the job or workflow listing command.
 // Connects to the Joblet server, retrieves all jobs or workflows, and displays them
-// in either human-readable table format or JSON format based on flags.
+// in either readable table format or JSON format based on flags.
 func runList(cmd *cobra.Command, args []string) error {
 	if listWorkflow {
 		return listWorkflows()
@@ -86,6 +86,7 @@ func runList(cmd *cobra.Command, args []string) error {
 func formatJobList(jobs []*pb.Job) {
 	maxIDWidth := len("ID")
 	maxNameWidth := len("NAME")
+	maxNodeIDWidth := len("NODE ID")
 	maxStatusWidth := len("STATUS")
 
 	// find the maximum width needed for each column
@@ -100,6 +101,13 @@ func formatJobList(jobs []*pb.Job) {
 		if len(jobName) > maxNameWidth {
 			maxNameWidth = len(jobName)
 		}
+		nodeId := job.NodeId
+		if nodeId == "" {
+			nodeId = "-"
+		}
+		if len(nodeId) > maxNodeIDWidth {
+			maxNodeIDWidth = len(nodeId)
+		}
 		if len(job.Status) > maxStatusWidth {
 			maxStatusWidth = len(job.Status)
 		}
@@ -109,20 +117,23 @@ func formatJobList(jobs []*pb.Job) {
 	// UUID width should accommodate full UUIDs (36 chars) plus padding
 	maxIDWidth = min(maxIDWidth+2, 38) // Full UUID width
 	maxNameWidth = min(maxNameWidth+2, 25)
+	maxNodeIDWidth = min(maxNodeIDWidth+2, 38) // Node ID width (also UUID)
 	maxStatusWidth += 2
 
 	// header
-	fmt.Printf("%-*s %-*s %-*s %-19s %s\n",
+	fmt.Printf("%-*s %-*s %-*s %-*s %-19s %s\n",
 		maxIDWidth, "ID",
 		maxNameWidth, "NAME",
+		maxNodeIDWidth, "NODE ID",
 		maxStatusWidth, "STATUS",
 		"START TIME",
 		"COMMAND")
 
 	// separator line
-	fmt.Printf("%s %s %s %s %s\n",
+	fmt.Printf("%s %s %s %s %s %s\n",
 		strings.Repeat("-", maxIDWidth),
 		strings.Repeat("-", maxNameWidth),
+		strings.Repeat("-", maxNodeIDWidth),
 		strings.Repeat("-", maxStatusWidth),
 		strings.Repeat("-", 19), // length of "START TIME"
 		strings.Repeat("-", 7))  // length of "COMMAND"
@@ -150,12 +161,22 @@ func formatJobList(jobs []*pb.Job) {
 			jobName = jobName[:maxNameWidth-5] + "..."
 		}
 
+		// Format node ID
+		nodeId := job.NodeId
+		if nodeId == "" {
+			nodeId = "-"
+		}
+		if len(nodeId) > maxNodeIDWidth-2 {
+			nodeId = nodeId[:maxNodeIDWidth-5] + "..."
+		}
+
 		// Get status color
 		statusColor, resetColor := getStatusColor(job.Status)
 
-		fmt.Printf("%-*s %-*s %s%-*s%s %-19s %s\n",
+		fmt.Printf("%-*s %-*s %-*s %s%-*s%s %-19s %s\n",
 			maxIDWidth, job.Uuid,
 			maxNameWidth, jobName,
+			maxNodeIDWidth, nodeId,
 			statusColor, maxStatusWidth, job.Status, resetColor,
 			displayTime,
 			command)
@@ -206,6 +227,7 @@ func outputJobsJSON(jobs []*pb.Job) error {
 	type jsonJob struct {
 		ID            string   `json:"id"`
 		Name          string   `json:"name,omitempty"`
+		NodeID        string   `json:"node_id,omitempty"`
 		Status        string   `json:"status"`
 		StartTime     string   `json:"start_time"`
 		EndTime       string   `json:"end_time,omitempty"`
@@ -224,6 +246,7 @@ func outputJobsJSON(jobs []*pb.Job) error {
 		jsonJobs[i] = jsonJob{
 			ID:            job.Uuid,
 			Name:          job.Name,
+			NodeID:        job.NodeId,
 			Status:        job.Status,
 			StartTime:     job.StartTime,
 			EndTime:       job.EndTime,

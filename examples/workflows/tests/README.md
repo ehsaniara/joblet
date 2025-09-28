@@ -44,7 +44,7 @@ workflow system.
 
 ## Testing Job Names Feature
 
-The job names feature allows workflow jobs to have human-readable names derived from YAML job keys:
+The job names feature allows workflow jobs to have names derived from YAML job keys:
 
 ### Expected CLI Output Format
 
@@ -63,7 +63,7 @@ JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES
 ### Key Distinctions
 
 - **JOB ID**: Actual unique identifier for started jobs (e.g., "42", "43"), "0" for non-started jobs
-- **JOB NAME**: Human-readable name from YAML (e.g., "setup-data", "process-data")
+- **JOB NAME**: Name from YAML (e.g., "setup-data", "process-data")
 - **DEPENDENCIES**: Lists job names for clarity (not job IDs)
 
 ## Running Tests

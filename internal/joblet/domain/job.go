@@ -40,14 +40,14 @@ var (
 // Job represents a job with value objects replacing primitive obsession.
 //
 // JOB NAMES FEATURE:
-// The Name field provides human-readable identification for jobs within workflows.
+// The Name field provides readable identification for jobs within workflows.
 // - For workflow jobs: Contains the job name from YAML (e.g., "setup-data", "process-data")
 // - For individual jobs: Empty string (only Id is used for identification)
 // This enables better workflow visibility and dependency tracking in CLI tools.
 type Job struct {
 	// Core identifiers
 	Uuid string // Unique identifier for job tracking (kept as string for backward compatibility)
-	Name string // Human-readable job name (workflow jobs only, empty for individual jobs)
+	Name string // Readable job name (workflow jobs only, empty for individual jobs)
 
 	// Execution details
 	Command string   // Executable command path
@@ -89,6 +89,9 @@ type Job struct {
 	GPUIndices  []int32 // Which GPUs are allocated to this job
 	GPUCount    int32   // Number of GPUs requested/allocated
 	GPUMemoryMB int64   // GPU memory requirement in MB
+
+	// Node identification
+	NodeId string // Unique identifier of the Joblet node that executed this job
 
 	// Legacy fields for backward compatibility
 	StartedAt   time.Time // Alias for StartTime (used by monitoring)
@@ -375,7 +378,7 @@ func (j *Job) Copy() *Job {
 // - Provides thread-safe job duplication for concurrent operations
 //
 // JOB NAMES INTEGRATION:
-// - Preserves the Name field which contains human-readable job names for workflow jobs
+// - Preserves the Name field which contains readable job names for workflow jobs
 // - Maintains job identity information for proper workflow status display
 // - Ensures copied jobs retain their workflow context and naming information
 //
@@ -432,6 +435,9 @@ func (j *Job) DeepCopy() *Job {
 		GPUIndices:  make([]int32, len(j.GPUIndices)),
 		GPUCount:    j.GPUCount,
 		GPUMemoryMB: j.GPUMemoryMB,
+
+		// Node identification
+		NodeId: j.NodeId,
 
 		// Legacy fields
 		StartedAt:   j.StartedAt,

@@ -142,7 +142,7 @@ Ethical AI development requires adherence to key principles:
 
 5. Robustness: Build resilient systems that handle edge cases and adversarial inputs gracefully.
 
-6. Human Oversight: Maintain meaningful human control over critical AI decisions.""",
+6. Oversight: Maintain meaningful control over critical AI decisions.""",
                 'metadata': {'category': 'ai_ethics', 'author': 'Ethics Committee', 'date': '2024-02-01'}
             },
             {
@@ -297,7 +297,7 @@ This guidance is synthesized from the most relevant documentation in our knowled
 - Regular bias auditing of training data and model outputs
 - Implement interpretability and explainability features
 - Establish clear accountability chains for AI decisions
-- Maintain meaningful human oversight for critical decisions
+- Maintain meaningful oversight for critical decisions
 
 **Privacy & Security:**
 - Use privacy-preserving techniques like differential privacy

@@ -60,6 +60,7 @@ type ServerConfig struct {
 	Mode          string        `yaml:"mode" json:"mode"`
 	Timeout       time.Duration `yaml:"timeout" json:"timeout"`
 	MinTLSVersion string        `yaml:"minTlsVersion" json:"minTlsVersion"`
+	NodeId        string        `yaml:"nodeId" json:"nodeId"`
 }
 
 // SecurityConfig holds all certificates as embedded PEM content

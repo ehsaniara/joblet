@@ -7,7 +7,7 @@ import (
 // StartJobRequest encapsulates all parameters needed to start a job
 type StartJobRequest struct {
 	// Job identification
-	Name string // Human-readable job name (for workflows, empty for individual jobs)
+	Name string // readable job name (for workflows, empty for individual jobs)
 
 	// Command and arguments
 	Command string

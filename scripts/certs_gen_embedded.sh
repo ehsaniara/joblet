@@ -178,8 +178,13 @@ if [ -f "$SERVER_TEMPLATE" ]; then
     # Copy template
     cp "$SERVER_TEMPLATE" "$SERVER_CONFIG"
 
-    # Update server address in the config
+    # Generate unique nodeId UUID
+    NODE_ID=$(uuidgen 2>/dev/null || python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || openssl rand -hex 16 | sed 's/\(..\)/\1-/g; s/.\{8\}-\(.\{4\}\)-\(.\{4\}\)-\(.\{4\}\)-/&/; s/-$//')
+    print_info "Generated nodeId: $NODE_ID"
+
+    # Update server address and nodeId in the config
     sed -i "s/address: \".*\"/address: \"$SERVER_ADDRESS\"/" "$SERVER_CONFIG"
+    sed -i "s/nodeId: \"\"/nodeId: \"$NODE_ID\"/" "$SERVER_CONFIG"
 
     # Append security section with embedded certificates
     cat >> "$SERVER_CONFIG" << EOF

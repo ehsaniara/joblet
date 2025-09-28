@@ -169,7 +169,7 @@ func TestStatusCommandOutputFormats(t *testing.T) {
 
 	// Test that output formats are documented
 	expectedFormats := []string{
-		"Default: Human-readable formatted output with sections",
+		"Default: Readable formatted output with sections",
 		"--json: Machine-readable JSON with all available fields",
 	}
 

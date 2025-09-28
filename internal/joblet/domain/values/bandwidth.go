@@ -88,7 +88,7 @@ func (b Bandwidth) IsUnlimited() bool {
 	return b.bytesPerSecond == 0
 }
 
-// String returns a human-readable string
+// String returns a readable string
 func (b Bandwidth) String() string {
 	if b.bytesPerSecond == 0 {
 		return "unlimited"

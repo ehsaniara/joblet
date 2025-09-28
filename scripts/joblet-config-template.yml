@@ -6,6 +6,7 @@ server:
   mode: "server"
   timeout: "10s"
   minTlsVersion: "1.3"
+  nodeId: ""  # Will be generated during setup
 
 joblet:
   defaultCpuLimit: 0            # No CPU limit by default (0 = unlimited)
