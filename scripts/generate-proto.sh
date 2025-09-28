@@ -9,16 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 GEN_DIR="${PROJECT_ROOT}/api/gen"
 
-# Read proto version from centralized file
-PROTO_VERSION_FILE="${PROJECT_ROOT}/PROTO_VERSION"
-if [ ! -f "${PROTO_VERSION_FILE}" ]; then
-    echo "❌ Error: PROTO_VERSION file not found at ${PROTO_VERSION_FILE}"
-    exit 1
-fi
-
-PROTO_VERSION=$(cat "${PROTO_VERSION_FILE}" | tr -d '[:space:]')
+# Extract proto version from go.mod (single source of truth)
+cd "${PROJECT_ROOT}"
+PROTO_VERSION=$(go list -m github.com/ehsaniara/joblet-proto | awk '{print $2}')
 if [ -z "${PROTO_VERSION}" ]; then
-    echo "❌ Error: PROTO_VERSION file is empty"
+    echo "❌ Error: Could not extract joblet-proto version from go.mod"
+    echo "Make sure github.com/ehsaniara/joblet-proto is in go.mod"
     exit 1
 fi
 

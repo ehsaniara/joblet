@@ -14,7 +14,6 @@ all: proto
 
 proto:
 	@echo "Generating proto files..."
-	@go mod download
 	@go generate ./api
 	@echo "✅ Proto generation complete"
 
@@ -46,9 +45,8 @@ help:
 	@echo "  make test    - Run tests"
 	@echo ""
 	@echo "Proto Version Management:"
-	@echo "  Version is centrally managed in PROTO_VERSION file"
-	@echo "  Current version: $(shell cat PROTO_VERSION 2>/dev/null || echo 'not found')"
-	@echo "  Note: go.mod version is independent and used only for compilation"
+	@echo "  Version is managed in go.mod (single source of truth)"
+	@echo "  Current version: $(shell go list -m github.com/ehsaniara/joblet-proto 2>/dev/null | awk '{print $$2}' || echo 'not found')"
 	@echo ""
 	@echo "Configuration:"
 	@echo "  REMOTE_HOST=$(REMOTE_HOST)"
