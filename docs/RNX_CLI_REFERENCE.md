@@ -1034,18 +1034,42 @@ rnx nodes [flags]
 |----------|-----------------------|---------|
 | `--json` | Output in JSON format | false   |
 
+#### Output Information
+
+- **Node Name**: Configuration name (default, production, etc.)
+- **Address**: Server connection address (host:port)
+- **Node ID**: Unique identifier of the Joblet node (if configured)
+- **Certificate Status**: Shows "***" if certificates are configured
+
 #### Examples
 
 ```bash
-# List all nodes
+# List all nodes with details
 rnx nodes
+
+# Example output:
+# Available nodes from configuration:
+#
+# * default
+#    Address: localhost:50051
+#    Node ID: 8f94c5b2-1234-5678-9abc-def012345678
+#    Cert:    ***
+#    Key:     ***
+#    CA:      ***
+#
+#  production
+#    Address: prod.example.com:50051
+#    Node ID: a1b2c3d4-5678-9abc-def0-123456789012
+#    Cert:    ***
+#    Key:     ***
+#    CA:      ***
 
 # JSON output
 rnx nodes --json
 
 # Use specific node for commands
-rnx --node=production list
-rnx --node=staging run echo "test"
+rnx --node=production job list
+rnx --node=staging job run echo "test"
 ```
 
 ### `rnx admin`

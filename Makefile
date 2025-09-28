@@ -18,6 +18,7 @@ proto:
 	@go generate ./api
 	@echo "✅ Proto generation complete"
 
+
 clean:
 	rm -rf bin/ dist/ api/gen/ admin/ui/dist/ admin/ui/node_modules/
 
@@ -43,6 +44,11 @@ help:
 	@echo "  make clean   - Remove build artifacts"
 	@echo "  make deploy  - Deploy to remote server"
 	@echo "  make test    - Run tests"
+	@echo ""
+	@echo "Proto Version Management:"
+	@echo "  Version is centrally managed in PROTO_VERSION file"
+	@echo "  Current version: $(shell cat PROTO_VERSION 2>/dev/null || echo 'not found')"
+	@echo "  Note: go.mod version is independent and used only for compilation"
 	@echo ""
 	@echo "Configuration:"
 	@echo "  REMOTE_HOST=$(REMOTE_HOST)"

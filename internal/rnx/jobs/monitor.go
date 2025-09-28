@@ -294,6 +294,22 @@ func displaySystemStatus(status *pb.SystemStatusRes) {
 		fmt.Printf("  Architecture: %s\n", status.Host.Architecture)
 		fmt.Printf("  Uptime:       %s\n", formatDurationFromSeconds(status.Host.Uptime))
 		fmt.Printf("  Boot Time:    %s\n", status.Host.BootTime)
+
+		// Display Node ID if available
+		if status.Host.NodeId != "" {
+			fmt.Printf("  Node ID:      %s\n", status.Host.NodeId)
+		}
+
+		// Display Server IPs if available
+		if len(status.Host.ServerIPs) > 0 {
+			fmt.Printf("  Server IPs:   %s\n", strings.Join(status.Host.ServerIPs, ", "))
+		}
+
+		// Display MAC Addresses if available
+		if len(status.Host.MacAddresses) > 0 {
+			fmt.Printf("  MAC Addresses: %s\n", strings.Join(status.Host.MacAddresses, ", "))
+		}
+
 		fmt.Println()
 	}
 
@@ -749,14 +765,17 @@ type UIFormat struct {
 }
 
 type UIHostInfo struct {
-	Hostname      string `json:"hostname"`
-	Platform      string `json:"platform"`
-	Arch          string `json:"arch"`
-	Release       string `json:"release"`
-	Uptime        int64  `json:"uptime"`
-	CloudProvider string `json:"cloudProvider"`
-	InstanceType  string `json:"instanceType"`
-	Region        string `json:"region"`
+	Hostname      string   `json:"hostname"`
+	Platform      string   `json:"platform"`
+	Arch          string   `json:"arch"`
+	Release       string   `json:"release"`
+	Uptime        int64    `json:"uptime"`
+	CloudProvider string   `json:"cloudProvider"`
+	InstanceType  string   `json:"instanceType"`
+	Region        string   `json:"region"`
+	NodeId        string   `json:"nodeId,omitempty"`
+	ServerIPs     []string `json:"serverIPs,omitempty"`
+	MacAddresses  []string `json:"macAddresses,omitempty"`
 }
 
 type UICPUInfo struct {
@@ -963,6 +982,9 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 			CloudProvider: resp.Cloud.Provider,
 			InstanceType:  resp.Cloud.InstanceType,
 			Region:        resp.Cloud.Region,
+			NodeId:        resp.Host.NodeId,
+			ServerIPs:     resp.Host.ServerIPs,
+			MacAddresses:  resp.Host.MacAddresses,
 		},
 		CPUInfo: UICPUInfo{
 			Cores:        resp.Cpu.Cores,

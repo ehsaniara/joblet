@@ -10,6 +10,7 @@ version: "3.0"
 # nodes:
 #   default:
 #     address: "SERVER_ADDRESS:50051"
+#     nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Optional: Joblet node identifier for display
 #     cert: |
 #       -----BEGIN CERTIFICATE-----
 #       [admin certificate content]
@@ -25,6 +26,7 @@ version: "3.0"
 #
 #   viewer:
 #     address: "SERVER_ADDRESS:50051"
+#     nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Optional: Joblet node identifier for display
 #     cert: |
 #       -----BEGIN CERTIFICATE-----
 #       [viewer certificate content]

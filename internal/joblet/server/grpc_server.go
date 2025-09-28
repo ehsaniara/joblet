@@ -89,7 +89,7 @@ func StartGRPCServer(jobStore adapters.JobStorer, joblet interfaces.Joblet, cfg 
 	pb.RegisterVolumeServiceServer(grpcServer, volumeService)
 
 	// Create and register monitoring service
-	monitoringGrpcService := NewMonitoringServiceServer(monitoringService)
+	monitoringGrpcService := NewMonitoringServiceServer(monitoringService, cfg)
 	pb.RegisterMonitoringServiceServer(grpcServer, monitoringGrpcService)
 
 	// Create and register runtime service with direct installation capabilities (no job system)

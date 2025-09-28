@@ -216,6 +216,7 @@ version: "3.0"
 nodes:
   default:
     address: "$SERVER_ADDRESS:50051"
+    nodeId: "$NODE_ID"
     cert: |
 $(read_cert_for_yaml admin-client-cert.pem "      ")
     key: |
@@ -225,6 +226,7 @@ $(read_cert_for_yaml ca-cert.pem "      ")
 
   viewer:
     address: "$SERVER_ADDRESS:50051"
+    nodeId: "$NODE_ID"
     cert: |
 $(read_cert_for_yaml viewer-client-cert.pem "      ")
     key: |

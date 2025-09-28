@@ -144,9 +144,10 @@ type ClientConfig struct {
 // Node represents a single server configuration with embedded certificates
 type Node struct {
 	Address string `yaml:"address"`
-	Cert    string `yaml:"cert"` // Embedded PEM certificate
-	Key     string `yaml:"key"`  // Embedded PEM private key
-	CA      string `yaml:"ca"`   // Embedded PEM CA certificate
+	NodeId  string `yaml:"nodeId,omitempty"` // Unique identifier of the Joblet node (optional, for display purposes)
+	Cert    string `yaml:"cert"`             // Embedded PEM certificate
+	Key     string `yaml:"key"`              // Embedded PEM private key
+	CA      string `yaml:"ca"`               // Embedded PEM CA certificate
 }
 
 // BuffersConfig holds consolidated buffer and pub-sub configuration

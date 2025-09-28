@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"net"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -10,6 +12,7 @@ import (
 	pb "joblet/api/gen"
 	"joblet/internal/joblet/monitoring"
 	"joblet/internal/joblet/monitoring/domain"
+	"joblet/pkg/config"
 	"joblet/pkg/logger"
 	"joblet/pkg/version"
 )
@@ -18,13 +21,15 @@ import (
 type MonitoringServiceServer struct {
 	pb.UnimplementedMonitoringServiceServer
 	monitor *monitoring.Service
+	config  *config.Config
 	logger  *logger.Logger
 }
 
 // NewMonitoringServiceServer creates a new monitoring service server
-func NewMonitoringServiceServer(monitor *monitoring.Service) *MonitoringServiceServer {
+func NewMonitoringServiceServer(monitor *monitoring.Service, cfg *config.Config) *MonitoringServiceServer {
 	return &MonitoringServiceServer{
 		monitor: monitor,
+		config:  cfg,
 		logger:  logger.WithField("component", "monitoring-grpc"),
 	}
 }
@@ -163,6 +168,12 @@ func (s *MonitoringServiceServer) systemMetricsToProto(metrics *domain.SystemMet
 }
 
 func (s *MonitoringServiceServer) hostInfoToProto(h domain.HostInfo) *pb.HostInfo {
+	// Collect server IP addresses
+	serverIPs := s.collectServerIPs()
+
+	// Collect MAC addresses
+	macAddresses := s.collectMACAddresses()
+
 	return &pb.HostInfo{
 		Hostname:        h.Hostname,
 		Os:              h.OS,
@@ -176,6 +187,9 @@ func (s *MonitoringServiceServer) hostInfoToProto(h domain.HostInfo) *pb.HostInf
 		TotalMemory:     0, // Not available in domain model
 		BootTime:        h.BootTime.Format(time.RFC3339),
 		Uptime:          int64(h.Uptime.Seconds()),
+		NodeId:          s.config.Server.NodeId,
+		ServerIPs:       serverIPs,
+		MacAddresses:    macAddresses,
 	}
 }
 
@@ -335,4 +349,65 @@ func (s *MonitoringServiceServer) serverVersionToProto() *pb.ServerVersionInfo {
 		ProtoCommit: buildInfo.ProtoCommit,
 		ProtoTag:    buildInfo.ProtoTag,
 	}
+}
+
+// collectServerIPs collects all non-loopback IP addresses from network interfaces
+func (s *MonitoringServiceServer) collectServerIPs() []string {
+	var ips []string
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		s.logger.Debug("failed to get network interfaces", "error", err)
+		return ips
+	}
+
+	for _, iface := range interfaces {
+		// Skip loopback and down interfaces
+		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			if ipNet, ok := addr.(*net.IPNet); ok {
+				ip := ipNet.IP
+				// Skip loopback IPs and only include IPv4 for now
+				if !ip.IsLoopback() && ip.To4() != nil {
+					ips = append(ips, ip.String())
+				}
+			}
+		}
+	}
+
+	return ips
+}
+
+// collectMACAddresses collects MAC addresses from network interfaces
+func (s *MonitoringServiceServer) collectMACAddresses() []string {
+	var macs []string
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		s.logger.Debug("failed to get network interfaces", "error", err)
+		return macs
+	}
+
+	for _, iface := range interfaces {
+		// Skip loopback interfaces and interfaces without MAC addresses
+		if iface.Flags&net.FlagLoopback != 0 || len(iface.HardwareAddr) == 0 {
+			continue
+		}
+
+		// Add MAC address if it's not all zeros
+		mac := iface.HardwareAddr.String()
+		if mac != "" && !strings.HasPrefix(mac, "00:00:00:00:00:00") {
+			macs = append(macs, mac)
+		}
+	}
+
+	return macs
 }

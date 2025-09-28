@@ -2407,6 +2407,9 @@ type HostInfo struct {
 	TotalMemory     int64                  `protobuf:"varint,10,opt,name=totalMemory,proto3" json:"totalMemory,omitempty"`
 	BootTime        string                 `protobuf:"bytes,11,opt,name=bootTime,proto3" json:"bootTime,omitempty"`
 	Uptime          int64                  `protobuf:"varint,12,opt,name=uptime,proto3" json:"uptime,omitempty"`
+	NodeId          string                 `protobuf:"bytes,13,opt,name=nodeId,proto3" json:"nodeId,omitempty"`             // Unique node identifier (UUID)
+	ServerIPs       []string               `protobuf:"bytes,14,rep,name=serverIPs,proto3" json:"serverIPs,omitempty"`       // Server IP addresses (can have multiple interfaces)
+	MacAddresses    []string               `protobuf:"bytes,15,rep,name=macAddresses,proto3" json:"macAddresses,omitempty"` // MAC addresses for network interfaces
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -2523,6 +2526,27 @@ func (x *HostInfo) GetUptime() int64 {
 		return x.Uptime
 	}
 	return 0
+}
+
+func (x *HostInfo) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *HostInfo) GetServerIPs() []string {
+	if x != nil {
+		return x.ServerIPs
+	}
+	return nil
+}
+
+func (x *HostInfo) GetMacAddresses() []string {
+	if x != nil {
+		return x.MacAddresses
+	}
+	return nil
 }
 
 type CPUMetrics struct {
@@ -5835,7 +5859,7 @@ const file_joblet_proto_rawDesc = "" +
 	"\x05cloud\x18\t \x01(\v2\x11.joblet.CloudInfoR\x05cloud\"^\n" +
 	"\x10StreamMetricsReq\x12(\n" +
 	"\x0fintervalSeconds\x18\x01 \x01(\x05R\x0fintervalSeconds\x12 \n" +
-	"\vmetricTypes\x18\x02 \x03(\tR\vmetricTypes\"\x80\x03\n" +
+	"\vmetricTypes\x18\x02 \x03(\tR\vmetricTypes\"\xda\x03\n" +
 	"\bHostInfo\x12\x1a\n" +
 	"\bhostname\x18\x01 \x01(\tR\bhostname\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x1a\n" +
@@ -5851,7 +5875,10 @@ const file_joblet_proto_rawDesc = "" +
 	"\vtotalMemory\x18\n" +
 	" \x01(\x03R\vtotalMemory\x12\x1a\n" +
 	"\bbootTime\x18\v \x01(\tR\bbootTime\x12\x16\n" +
-	"\x06uptime\x18\f \x01(\x03R\x06uptime\"\xa2\x02\n" +
+	"\x06uptime\x18\f \x01(\x03R\x06uptime\x12\x16\n" +
+	"\x06nodeId\x18\r \x01(\tR\x06nodeId\x12\x1c\n" +
+	"\tserverIPs\x18\x0e \x03(\tR\tserverIPs\x12\"\n" +
+	"\fmacAddresses\x18\x0f \x03(\tR\fmacAddresses\"\xa2\x02\n" +
 	"\n" +
 	"CPUMetrics\x12\x14\n" +
 	"\x05cores\x18\x01 \x01(\x05R\x05cores\x12\"\n" +

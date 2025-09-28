@@ -1,60 +1,89 @@
 #!/bin/bash
-# Standalone proto generation script
-# This script generates proto files from the external joblet-proto repository
+# Generate protocol buffer code from joblet-proto Go module
+# This ensures we use the exact version that includes nodeId, serverIPs, and macAddresses
 
-set -e
+set -euo pipefail
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROTO_REPO="$PROJECT_ROOT/../joblet-proto"
-PROTO_GEN_DIR="$PROJECT_ROOT/api/gen"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+GEN_DIR="${PROJECT_ROOT}/api/gen"
 
-echo "📦 Generating proto files from joblet-proto repository..."
-
-# Check if joblet-proto repository exists, clone if not
-if [ ! -d "$PROTO_REPO" ]; then
-    echo "🔄 Cloning joblet-proto repository..."
-    git clone https://github.com/ehsaniara/joblet-proto.git "$PROTO_REPO"
-fi
-
-# Ensure we're on main branch with latest changes
-echo "🔄 Ensuring we're on main branch with latest changes..."
-cd "$PROTO_REPO" && git fetch && git checkout main && git reset --hard origin/main
-
-# Check if generate.sh exists and is executable
-if [ ! -f "$PROTO_REPO/generate.sh" ]; then
-    echo "❌ Error: generate.sh not found in $PROTO_REPO"
-    echo "This might indicate the repository is in an unexpected state."
-    ls -la "$PROTO_REPO/"
+# Read proto version from centralized file
+PROTO_VERSION_FILE="${PROJECT_ROOT}/PROTO_VERSION"
+if [ ! -f "${PROTO_VERSION_FILE}" ]; then
+    echo "❌ Error: PROTO_VERSION file not found at ${PROTO_VERSION_FILE}"
     exit 1
 fi
 
-if [ ! -x "$PROTO_REPO/generate.sh" ]; then
-    echo "Making generate.sh executable..."
-    chmod +x "$PROTO_REPO/generate.sh"
-fi
-
-# Generate Go proto files
-echo "Generating Go proto files..."
-cd "$PROTO_REPO"
-./generate.sh go
-
-# Check if generated files exist
-if [ ! -d "$PROTO_REPO/gen" ] || [ -z "$(ls -A "$PROTO_REPO/gen" 2>/dev/null)" ]; then
-    echo "❌ Error: No generated files found in $PROTO_REPO/gen"
+PROTO_VERSION=$(cat "${PROTO_VERSION_FILE}" | tr -d '[:space:]')
+if [ -z "${PROTO_VERSION}" ]; then
+    echo "❌ Error: PROTO_VERSION file is empty"
     exit 1
 fi
 
-# Copy generated files to project
-echo "📋 Copying generated proto files to project..."
-mkdir -p "$PROTO_GEN_DIR"
-cp "$PROTO_REPO"/gen/*.pb.go "$PROTO_GEN_DIR/"
+PROTO_MODULE="github.com/ehsaniara/joblet-proto@${PROTO_VERSION}"
 
-echo "✅ Proto files generated and copied successfully to $PROTO_GEN_DIR/"
+echo "📦 Generating protobuf code from ${PROTO_MODULE}..."
 
-# Proto version will be read directly from git during build
+# Ensure we're in the project root
+cd "${PROJECT_ROOT}"
 
-# List generated files
+# Download the specific proto version directly (ignoring go.mod version)
+echo "🔄 Downloading proto module ${PROTO_MODULE}..."
+go mod download "${PROTO_MODULE}"
+
+# Get the module cache path
+GOMODCACHE=$(go env GOMODCACHE)
+PROTO_PATH="${GOMODCACHE}/${PROTO_MODULE}"
+
+# Verify the proto module exists
+if [ ! -d "${PROTO_PATH}" ]; then
+    echo "❌ Error: Proto module not found at ${PROTO_PATH}"
+    echo "Please run 'go mod download' first"
+    exit 1
+fi
+
+# Verify proto file exists
+PROTO_FILE="${PROTO_PATH}/proto/joblet.proto"
+if [ ! -f "${PROTO_FILE}" ]; then
+    echo "❌ Error: Proto file not found at ${PROTO_FILE}"
+    exit 1
+fi
+
+# Check if protoc is available
+if ! command -v protoc &> /dev/null; then
+    echo "❌ Error: protoc is not installed or not in PATH"
+    echo "Please install protobuf compiler: https://grpc.io/docs/protoc-installation/"
+    exit 1
+fi
+
+# Clean and create output directory
+echo "🧹 Cleaning output directory..."
+rm -rf "${GEN_DIR}"
+mkdir -p "${GEN_DIR}"
+
+# Generate Go code
+echo "⚙️  Generating Go protobuf code..."
+protoc \
+    --proto_path="${PROTO_PATH}/proto" \
+    --go_out="${GEN_DIR}" \
+    --go_opt=paths=source_relative \
+    --go-grpc_out="${GEN_DIR}" \
+    --go-grpc_opt=paths=source_relative \
+    "${PROTO_FILE}"
+
+# Verify generation succeeded
+if [ ! -f "${GEN_DIR}/joblet.pb.go" ]; then
+    echo "❌ Error: Proto generation failed - joblet.pb.go not found"
+    exit 1
+fi
+
+if [ ! -f "${GEN_DIR}/joblet_grpc.pb.go" ]; then
+    echo "❌ Error: Proto generation failed - joblet_grpc.pb.go not found"
+    exit 1
+fi
+
+echo "✅ Protocol buffer generation complete from ${PROTO_VERSION}"
 echo "Generated files:"
-ls -la "$PROTO_GEN_DIR"/*.pb.go
+ls -la "${GEN_DIR}"/*.go
