@@ -72,11 +72,11 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	// Display result with appropriate formatting
 	if response.Success {
-		fmt.Printf("✅ Job deleted successfully:\n")
+		fmt.Printf("Job deleted successfully:\n")
 		fmt.Printf("ID: %s\n", response.Uuid)
 		fmt.Printf("Message: %s\n", response.Message)
 	} else {
-		fmt.Printf("❌ Job deletion failed:\n")
+		fmt.Printf("Job deletion failed:\n")
 		fmt.Printf("ID: %s\n", response.Uuid)
 		fmt.Printf("Sorry, there was an issue: %s\n", response.Message)
 		return fmt.Errorf("couldn't delete the job: %s", response.Message)

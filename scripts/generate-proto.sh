@@ -20,13 +20,13 @@ fi
 
 PROTO_MODULE="github.com/ehsaniara/joblet-proto@${PROTO_VERSION}"
 
-echo "📦 Generating protobuf code from ${PROTO_MODULE}..."
+echo "Generating protobuf code from ${PROTO_MODULE}..."
 
 # Ensure we're in the project root
 cd "${PROJECT_ROOT}"
 
 # Download the specific proto version directly (ignoring go.mod version)
-echo "🔄 Downloading proto module ${PROTO_MODULE}..."
+echo "Downloading proto module ${PROTO_MODULE}..."
 go mod download "${PROTO_MODULE}"
 
 # Get the module cache path
@@ -55,12 +55,12 @@ if ! command -v protoc &> /dev/null; then
 fi
 
 # Clean and create output directory
-echo "🧹 Cleaning output directory..."
+echo "Cleaning output directory..."
 rm -rf "${GEN_DIR}"
 mkdir -p "${GEN_DIR}"
 
 # Generate Go code
-echo "⚙️  Generating Go protobuf code..."
+echo "Generating Go protobuf code..."
 protoc \
     --proto_path="${PROTO_PATH}/proto" \
     --go_out="${GEN_DIR}" \
@@ -80,6 +80,6 @@ if [ ! -f "${GEN_DIR}/joblet_grpc.pb.go" ]; then
     exit 1
 fi
 
-echo "✅ Protocol buffer generation complete from ${PROTO_VERSION}"
+echo "Protocol buffer generation complete from ${PROTO_VERSION}"
 echo "Generated files:"
 ls -la "${GEN_DIR}"/*.go

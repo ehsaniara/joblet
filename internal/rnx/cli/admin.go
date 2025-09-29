@@ -123,10 +123,10 @@ Possible solutions:
 			return fmt.Errorf("failed to output JSON: %v", err)
 		}
 	} else {
-		fmt.Printf("🚀 Starting Joblet Admin Server...\n")
-		fmt.Printf("📂 Server directory: %s\n", adminServerDir)
-		fmt.Printf("🌐 Address: http://%s:%d\n", bindAddress, port)
-		fmt.Printf("⏹️  Press Ctrl+C to stop\n\n")
+		fmt.Printf("Starting Joblet Admin Server...\n")
+		fmt.Printf("Server directory: %s\n", adminServerDir)
+		fmt.Printf("Address: http://%s:%d\n", bindAddress, port)
+		fmt.Printf("Press Ctrl+C to stop\n\n")
 
 		// Try to open browser automatically (like Kiali does)
 		url := fmt.Sprintf("http://localhost:%d", port)
@@ -146,7 +146,7 @@ Possible solutions:
 
 			if openCmd != nil {
 				_ = openCmd.Run() // Ignore errors - browser opening is optional
-				fmt.Printf("🌐 Browser opened at %s\n", url)
+				fmt.Printf("Browser opened at %s\n", url)
 			}
 		}()
 	}

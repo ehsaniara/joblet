@@ -292,7 +292,7 @@ func runRuntimeTest(cmd *cobra.Command, args []string) error {
 	}
 
 	if resp.Success {
-		fmt.Printf("✓ Runtime test passed\n")
+		fmt.Printf("Runtime test passed\n")
 		if resp.Output != "" {
 			fmt.Printf("Output: %s\n", resp.Output)
 		}
@@ -424,7 +424,7 @@ func runRuntimeInstall(cmd *cobra.Command, runtimeSpec string, force bool, githu
 
 	// If github-repo flag is provided, install from GitHub
 	if githubRepo != "" {
-		fmt.Printf("📦 Installing from GitHub repository: %s\n", githubRepo)
+		fmt.Printf("Installing from GitHub repository: %s\n", githubRepo)
 		return runGitHubRuntimeInstall(ctx, client, runtimeSpec, githubRepo, force)
 	}
 
@@ -432,7 +432,7 @@ func runRuntimeInstall(cmd *cobra.Command, runtimeSpec string, force bool, githu
 	localPath := findLocalRuntime(runtimeSpec)
 	if localPath != "" {
 		fmt.Printf("📁 Found local runtime: %s\n", localPath)
-		fmt.Printf("📦 Starting local runtime installation with real-time logs...\n\n")
+		fmt.Printf("Starting local runtime installation with real-time logs...\n\n")
 
 		// Upload and install with streaming
 		return runStreamingLocalRuntimeInstall(ctx, client, runtimeSpec, localPath, force)
@@ -490,7 +490,7 @@ func runRuntimeValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	if resp.Valid {
-		fmt.Printf("✅ Runtime specification is valid\n")
+		fmt.Printf("Runtime specification is valid\n")
 		fmt.Printf("Original: %s\n", runtimeSpec)
 		fmt.Printf("Normalized: %s\n", resp.NormalizedSpec)
 
@@ -506,7 +506,7 @@ func runRuntimeValidate(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  Architecture: %s\n", resp.SpecInfo.Architecture)
 		}
 	} else {
-		fmt.Printf("❌ Runtime specification is invalid\n")
+		fmt.Printf("Runtime specification is invalid\n")
 		fmt.Printf("Error: %s\n", resp.Message)
 		return fmt.Errorf("invalid runtime specification")
 	}
@@ -554,7 +554,7 @@ func runRuntimeRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if resp.Success {
-		fmt.Printf("✅ Runtime removed successfully\n")
+		fmt.Printf("Runtime removed successfully\n")
 		if resp.Message != "" {
 			fmt.Printf("Message: %s\n", resp.Message)
 		}
@@ -562,7 +562,7 @@ func runRuntimeRemove(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Freed space: %s\n", formatSize(resp.FreedSpaceBytes))
 		}
 	} else {
-		fmt.Printf("❌ Failed to remove runtime\n")
+		fmt.Printf("Failed to remove runtime\n")
 		if resp.Message != "" {
 			fmt.Printf("Error: %s\n", resp.Message)
 		}
@@ -580,7 +580,7 @@ func runGitHubRuntimeList(githubRepo string) error {
 		return fmt.Errorf("failed to parse GitHub repository: %w", err)
 	}
 
-	fmt.Printf("📦 Fetching runtime manifest from GitHub repository: %s\n", githubRepo)
+	fmt.Printf("Fetching runtime manifest from GitHub repository: %s\n", githubRepo)
 	fmt.Printf("📋 Repository: %s\n", repository)
 	fmt.Printf("📋 Branch: %s\n", branch)
 	fmt.Printf("📋 Path: %s\n", path)
@@ -593,14 +593,14 @@ func runGitHubRuntimeList(githubRepo string) error {
 	// Download and parse manifest
 	manifest, err := fetchGitHubManifest(manifestURL)
 	if err != nil {
-		fmt.Printf("❌ Failed to fetch runtime manifest: %v\n", err)
+		fmt.Printf("Failed to fetch runtime manifest: %v\n", err)
 		fmt.Println()
 		fmt.Println("This repository may not support the new manifest-based runtime system.")
 		fmt.Printf("Repository maintainers: Please create a runtime-manifest.json file at: %s\n", manifestURL)
 		return fmt.Errorf("failed to fetch runtime manifest")
 	}
 
-	fmt.Printf("✅ Successfully fetched manifest (version %s)\n", manifest.Version)
+	fmt.Printf("Successfully fetched manifest (version %s)\n", manifest.Version)
 	fmt.Printf("📅 Generated: %s\n", manifest.Generated)
 	fmt.Println()
 
@@ -761,7 +761,7 @@ func runGitHubRuntimeInstall(ctx context.Context, client *client.JobClient, runt
 	fmt.Printf("📋 Repository: %s\n", repository)
 	fmt.Printf("📋 Branch: %s\n", branch)
 	fmt.Printf("📋 Path: %s\n", path)
-	fmt.Printf("📦 Starting GitHub runtime installation...\n\n")
+	fmt.Printf("Starting GitHub runtime installation...\n\n")
 
 	// Create streaming installation request with GitHub source
 	req := &pb.InstallRuntimeRequest{
@@ -811,7 +811,7 @@ func runGitHubRuntimeInstall(ctx context.Context, client *client.JobClient, runt
 		}
 	}
 
-	fmt.Printf("\n✅ GitHub runtime installation completed successfully!\n")
+	fmt.Printf("\nGitHub runtime installation completed successfully!\n")
 	return nil
 }
 
@@ -1010,7 +1010,7 @@ func runStreamingLocalRuntimeInstall(ctx context.Context, client *client.JobClie
 				}
 				return nil
 			} else {
-				fmt.Printf("\n❌ %s\n", result.Message)
+				fmt.Printf("\nError: %s\n", result.Message)
 				return fmt.Errorf("local runtime installation failed")
 			}
 		}

@@ -82,7 +82,7 @@ func runCancel(cmd *cobra.Command, args []string) error {
 		return outputCancelJobJSON(stopResponse)
 	}
 
-	fmt.Printf("✅ Scheduled job canceled successfully:\n")
+	fmt.Printf("Scheduled job canceled successfully:\n")
 	fmt.Printf("ID: %s\n", stopResponse.Uuid)
 	// Display status with color coding (should be CANCELED)
 	statusColor, resetColor := getStatusColor(stopResponse.Status)

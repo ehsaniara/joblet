@@ -71,12 +71,12 @@ func runDeleteAll(cmd *cobra.Command, args []string) error {
 
 	// Display result with appropriate formatting
 	if response.Success {
-		fmt.Printf("✅ Jobs deleted successfully:\n")
+		fmt.Printf("Jobs deleted successfully:\n")
 		fmt.Printf("Deleted count: %d\n", response.DeletedCount)
 		fmt.Printf("Skipped count: %d (running/scheduled)\n", response.SkippedCount)
 		fmt.Printf("Message: %s\n", response.Message)
 	} else {
-		fmt.Printf("❌ Job deletion failed:\n")
+		fmt.Printf("Job deletion failed:\n")
 		fmt.Printf("Error: %s\n", response.Message)
 		return fmt.Errorf("couldn't delete all jobs: %s", response.Message)
 	}

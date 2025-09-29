@@ -79,7 +79,7 @@ func runNodes(jsonOutput bool) error {
 	for _, name := range nodeNames {
 		node, err := common.NodeConfig.GetNode(name)
 		if err != nil {
-			fmt.Printf("❌ %s: Error - %v\n", name, err)
+			fmt.Printf("Error: %s - %v\n", name, err)
 			continue
 		}
 

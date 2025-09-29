@@ -93,7 +93,7 @@ build_component() {
     # Build with version injection
     go build -a -ldflags="$ldflags" -o "$OUTPUT_DIR/$output_name" "$cmd_path"
 
-    echo "✓ Built $component -> $OUTPUT_DIR/$output_name"
+    echo "Built $component -> $OUTPUT_DIR/$output_name"
 }
 
 # Main build function

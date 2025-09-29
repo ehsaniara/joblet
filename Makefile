@@ -10,12 +10,12 @@ all: proto
 	@./scripts/build-version.sh rnx bin
 	@GOOS=linux GOARCH=amd64 ./scripts/build-version.sh joblet bin
 	@cd admin/ui && npm install && npm run build
-	@echo "✅ Build complete"
+	@echo "Build complete"
 
 proto:
 	@echo "Generating proto files..."
 	@go generate ./api
-	@echo "✅ Proto generation complete"
+	@echo "Proto generation complete"
 
 
 clean:
@@ -29,12 +29,12 @@ deploy: all
 		sudo cp /tmp/joblet/build/* /opt/joblet/ && \
 		sudo chmod +x /opt/joblet/* && \
 		sudo systemctl start joblet.service'
-	@echo "✅ Deployment complete"
+	@echo "Deployment complete"
 
 test:
 	@echo "Running tests..."
 	@go test ./...
-	@echo "✅ Tests complete"
+	@echo "Tests complete"
 
 help:
 	@echo "Usage:"

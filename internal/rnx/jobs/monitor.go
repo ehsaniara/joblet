@@ -368,7 +368,7 @@ func displaySystemStatus(status *pb.SystemStatusRes) {
 				formatBytes(net.BytesReceived), net.PacketsReceived, net.ErrorsIn)
 			fmt.Printf("    TX: %s (%d packets, %d errors)\n",
 				formatBytes(net.BytesSent), net.PacketsSent, net.ErrorsOut)
-			fmt.Printf("    Rate: ↓ %s/s ↑ %s/s\n",
+			fmt.Printf("    Rate: RX %s/s TX %s/s\n",
 				formatBytes(int64(net.ReceiveRate)), formatBytes(int64(net.TransmitRate)))
 		}
 		fmt.Println()
@@ -493,7 +493,7 @@ func displaySystemMetrics(metrics *pb.SystemMetricsRes) {
 				// Format packet info
 				packetInfo := ""
 				if net.PacketsReceived > 0 || net.PacketsSent > 0 {
-					packetInfo = fmt.Sprintf("%d↓ %d↑", net.PacketsReceived, net.PacketsSent)
+					packetInfo = fmt.Sprintf("%d rx %d tx", net.PacketsReceived, net.PacketsSent)
 				} else {
 					packetInfo = "─"
 				}
@@ -501,7 +501,7 @@ func displaySystemMetrics(metrics *pb.SystemMetricsRes) {
 				// Format error info
 				errorInfo := ""
 				if net.ErrorsIn > 0 || net.ErrorsOut > 0 {
-					errorInfo = fmt.Sprintf("⚠ %d↓ %d↑", net.ErrorsIn, net.ErrorsOut)
+					errorInfo = fmt.Sprintf("Errors: %d rx %d tx", net.ErrorsIn, net.ErrorsOut)
 				} else {
 					errorInfo = "─"
 				}
@@ -617,7 +617,7 @@ func displaySystemMetricsWithOptions(metrics *pb.SystemMetricsRes, compact bool)
 					if count > 0 {
 						fmt.Printf(" | ")
 					}
-					fmt.Printf("%s: ↓%s/s ↑%s/s",
+					fmt.Printf("%s: RX %s/s TX %s/s",
 						net.Interface,
 						formatBytes(int64(net.ReceiveRate)),
 						formatBytes(int64(net.TransmitRate)))
@@ -645,7 +645,7 @@ func displaySystemMetricsWithOptions(metrics *pb.SystemMetricsRes, compact bool)
 					// Format packet info
 					packetInfo := ""
 					if net.PacketsReceived > 0 || net.PacketsSent > 0 {
-						packetInfo = fmt.Sprintf("%d↓ %d↑", net.PacketsReceived, net.PacketsSent)
+						packetInfo = fmt.Sprintf("%d rx %d tx", net.PacketsReceived, net.PacketsSent)
 					} else {
 						packetInfo = "─"
 					}
@@ -653,7 +653,7 @@ func displaySystemMetricsWithOptions(metrics *pb.SystemMetricsRes, compact bool)
 					// Format error info
 					errorInfo := ""
 					if net.ErrorsIn > 0 || net.ErrorsOut > 0 {
-						errorInfo = fmt.Sprintf("⚠ %d↓ %d↑", net.ErrorsIn, net.ErrorsOut)
+						errorInfo = fmt.Sprintf("Errors: %d rx %d tx", net.ErrorsIn, net.ErrorsOut)
 					} else {
 						errorInfo = "─"
 					}
@@ -780,13 +780,13 @@ type UIHostInfo struct {
 
 type UICPUInfo struct {
 	Cores        int32     `json:"cores"`
-	Threads      int32     `json:"threads"`
-	Model        string    `json:"model"`
-	Frequency    int32     `json:"frequency"`
+	Threads      int32     `json:"threads,omitempty"`   // Only show if available
+	Model        string    `json:"model,omitempty"`     // Only show if available
+	Frequency    int32     `json:"frequency,omitempty"` // Only show if available
 	Usage        float64   `json:"usage"`
 	LoadAverage  []float64 `json:"loadAverage"`
 	PerCoreUsage []float64 `json:"perCoreUsage"`
-	Temperature  int32     `json:"temperature"`
+	Temperature  int32     `json:"temperature,omitempty"` // Only show if available
 }
 
 type UIMemoryInfo struct {
@@ -819,9 +819,9 @@ type UIDiskInfo struct {
 	Used       int64   `json:"used"`
 	Available  int64   `json:"available"`
 	Percent    float64 `json:"percent"`
-	ReadBps    int64   `json:"readBps"`
-	WriteBps   int64   `json:"writeBps"`
-	IOPS       int64   `json:"iops"`
+	ReadBps    int64   `json:"readBps,omitempty"`  // Only show if available
+	WriteBps   int64   `json:"writeBps,omitempty"` // Only show if available
+	IOPS       int64   `json:"iops,omitempty"`     // Only show if available
 }
 
 type UINetworkInfo struct {
@@ -834,10 +834,10 @@ type UINetworkInterface struct {
 	Name        string   `json:"name"`
 	Type        string   `json:"type"`
 	Status      string   `json:"status"`
-	Speed       int32    `json:"speed"`
-	MTU         int32    `json:"mtu"`
+	Speed       int32    `json:"speed,omitempty"` // Only show if available
+	MTU         int32    `json:"mtu,omitempty"`   // Only show if available
 	IPAddresses []string `json:"ipAddresses"`
-	MacAddress  string   `json:"macAddress"`
+	MacAddress  string   `json:"macAddress,omitempty"` // Only show if available
 	RxBytes     int64    `json:"rxBytes"`
 	TxBytes     int64    `json:"txBytes"`
 	RxPackets   int64    `json:"rxPackets"`
@@ -855,13 +855,13 @@ type UIProcessInfo struct {
 	PID         int32   `json:"pid"`
 	Name        string  `json:"name"`
 	Command     string  `json:"command"`
-	User        string  `json:"user"`
+	User        string  `json:"user,omitempty"` // Only show if available
 	CPU         float64 `json:"cpu"`
 	Memory      float64 `json:"memory"`
 	MemoryBytes int64   `json:"memoryBytes"`
 	Status      string  `json:"status"`
 	StartTime   string  `json:"startTime"`
-	Threads     int32   `json:"threads"`
+	Threads     int32   `json:"threads,omitempty"` // Only show if available
 }
 
 // transformToUIFormat converts the protobuf response to UI-expected format
@@ -893,9 +893,7 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 				Used:       disk.UsedBytes,
 				Available:  disk.FreeBytes,
 				Percent:    disk.UsagePercent,
-				ReadBps:    0, // TODO: Calculate actual read BPS from metrics
-				WriteBps:   0, // TODO: Calculate actual write BPS from metrics
-				IOPS:       0, // TODO: Calculate actual IOPS from metrics
+				// ReadBps, WriteBps, IOPS not available from current metrics - omitted via omitempty
 			})
 		}
 	}
@@ -903,11 +901,17 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 	// Volume statistics are now provided by the server-side monitoring service
 	// and included in the disk metrics above
 
-	// Calculate total network bytes
+	// Calculate total network bytes and collect interface details
 	var totalRxBytes, totalTxBytes int64
 	uiInterfaces := []UINetworkInterface{}
 
-	for _, net := range resp.Networks {
+	// Note: Per-interface IP/MAC details not available from server response
+	// We'll use a heuristic to assign IPs/MACs to interfaces
+
+	// For primary physical interface (usually ens*, eth*, enp*), assign the first IP and MAC
+	primaryInterfaceAssigned := false
+
+	for i, net := range resp.Networks {
 		totalRxBytes += net.BytesReceived
 		totalTxBytes += net.BytesSent
 
@@ -919,14 +923,58 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 				interfaceType = "wireless"
 			}
 
+			// Heuristic: Assign host IPs and MACs to interfaces
+			var ipAddresses []string
+			var macAddress string = "" // Empty if not available
+
+			// Check if this is likely a physical interface
+			isPhysicalInterface := strings.HasPrefix(net.Interface, "ens") ||
+				strings.HasPrefix(net.Interface, "eth") ||
+				strings.HasPrefix(net.Interface, "enp") ||
+				strings.HasPrefix(net.Interface, "wlan")
+
+			// Assign the first IP and MAC to the first physical interface
+			if isPhysicalInterface && !primaryInterfaceAssigned && resp.Host != nil {
+				if len(resp.Host.ServerIPs) > 0 {
+					// Filter out bridge/docker IPs (usually 172.x.x.x or 10.x.x.x)
+					for _, ip := range resp.Host.ServerIPs {
+						if !strings.HasPrefix(ip, "172.") && !strings.HasPrefix(ip, "10.") {
+							ipAddresses = append(ipAddresses, ip)
+							break // Take first non-docker IP
+						}
+					}
+					// If no non-docker IP found, take the first one
+					if len(ipAddresses) == 0 && len(resp.Host.ServerIPs) > 0 {
+						ipAddresses = []string{resp.Host.ServerIPs[0]}
+					}
+				}
+				if len(resp.Host.MacAddresses) > 0 {
+					macAddress = resp.Host.MacAddresses[0]
+				}
+				primaryInterfaceAssigned = true
+			} else if strings.HasPrefix(net.Interface, "joblet") || strings.HasPrefix(net.Interface, "docker") {
+				// For virtual interfaces, try to find matching docker/bridge IPs
+				if resp.Host != nil {
+					for _, ip := range resp.Host.ServerIPs {
+						if strings.HasPrefix(ip, "172.") || strings.HasPrefix(ip, "10.") {
+							ipAddresses = []string{ip}
+							break
+						}
+					}
+					// Assign second MAC if available for virtual interfaces
+					if i > 0 && len(resp.Host.MacAddresses) > i {
+						macAddress = resp.Host.MacAddresses[i]
+					}
+				}
+			}
+
 			uiInterfaces = append(uiInterfaces, UINetworkInterface{
-				Name:        net.Interface,
-				Type:        interfaceType,
-				Status:      "up",
-				Speed:       1000,       // TODO: Get actual interface speed
-				MTU:         1500,       // TODO: Get actual MTU
-				IPAddresses: []string{}, // TODO: Get actual IP addresses
-				MacAddress:  "unknown",  // TODO: Get actual MAC address
+				Name:   net.Interface,
+				Type:   interfaceType,
+				Status: "up",
+				// Speed and MTU not available from server - omitted via omitempty
+				IPAddresses: ipAddresses,
+				MacAddress:  macAddress,
 				RxBytes:     net.BytesReceived,
 				TxBytes:     net.BytesSent,
 				RxPackets:   net.PacketsReceived,
@@ -953,16 +1001,16 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 		}
 
 		uiProcesses = append(uiProcesses, UIProcessInfo{
-			PID:         proc.Pid,
-			Name:        proc.Name,
-			Command:     proc.Command,
-			User:        "unknown", // TODO: Get actual process user
+			PID:     proc.Pid,
+			Name:    proc.Name,
+			Command: proc.Command,
+			// User not available from server - omitted via omitempty
 			CPU:         proc.CpuPercent,
 			Memory:      proc.MemoryPercent,
 			MemoryBytes: proc.MemoryBytes,
 			Status:      status,
 			StartTime:   proc.StartTime,
-			Threads:     0, // TODO: Get actual thread count
+			// Threads not available from server - omitted via omitempty
 		})
 	}
 
@@ -987,14 +1035,11 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 			MacAddresses:  resp.Host.MacAddresses,
 		},
 		CPUInfo: UICPUInfo{
-			Cores:        resp.Cpu.Cores,
-			Threads:      resp.Cpu.Cores * 2,            // Placeholder assumption
-			Model:        "Intel Core i7",               // Placeholder
-			Frequency:    2400,                          // Placeholder
+			Cores: resp.Cpu.Cores,
+			// Threads, Model, Frequency, Temperature not available from server - omitted via omitempty
 			Usage:        resp.Cpu.UsagePercent / 100.0, // Convert to 0-1 range
 			LoadAverage:  resp.Cpu.LoadAverage,
 			PerCoreUsage: resp.Cpu.PerCoreUsage,
-			Temperature:  45, // Placeholder
 		},
 		MemoryInfo: UIMemoryInfo{
 			Total:     resp.Memory.TotalBytes,
