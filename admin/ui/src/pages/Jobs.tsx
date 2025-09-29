@@ -176,7 +176,8 @@ const Jobs: React.FC = () => {
                     workflowUUID: statusData.workflow_uuid || statusData.workflowUUID,
                     gpuIndices: statusData.gpu_indices || statusData.gpuIndices,
                     gpuCount: statusData.gpu_count || statusData.gpuCount,
-                    gpuMemoryMb: statusData.gpu_memory_mb || statusData.gpuMemoryMb
+                    gpuMemoryMb: statusData.gpu_memory_mb || statusData.gpuMemoryMb,
+                    nodeId: statusData.nodeId
                 };
                 setSelectedJob(enhancedJob);
             } catch (statusError) {
@@ -958,6 +959,22 @@ rnx job delete-all
                                                                 </dd>
                                                             </div>
                                                         )}
+                                                    </dl>
+                                                </div>
+                                            )}
+
+                                            {/* Node Information */}
+                                            {selectedJob.nodeId && (
+                                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Node
+                                                        Information</h4>
+                                                    <dl className="grid grid-cols-1 gap-4">
+                                                        <div>
+                                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Execution
+                                                                Node
+                                                            </dt>
+                                                            <dd className="mt-1 text-sm text-gray-900 dark:text-white font-mono">{selectedJob.nodeId}</dd>
+                                                        </div>
                                                     </dl>
                                                 </div>
                                             )}

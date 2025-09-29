@@ -1,4 +1,3 @@
-// React import not needed with modern JSX transform
 import {Activity, Network, Wifi} from 'lucide-react';
 
 interface NetworkCardProps {
@@ -61,6 +60,7 @@ const NetworkCard: React.FC<NetworkCardProps> = ({networkInfo}) => {
                 <Network className="h-6 w-6 text-indigo-600 mr-3"/>
                 <h3 className="text-lg font-semibold text-white">Network Interfaces</h3>
             </div>
+
 
             <div className="space-y-4">
                 {networkInfo.interfaces && networkInfo.interfaces.length > 0 ? (

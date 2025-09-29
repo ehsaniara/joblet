@@ -12,6 +12,9 @@ interface HostInfoCardProps {
         cloudProvider?: string;
         region?: string;
         instanceType?: string;
+        nodeId?: string;
+        serverIPs?: string[];
+        macAddresses?: string[];
     };
 }
 
@@ -39,6 +42,12 @@ const HostInfoCard: React.FC<HostInfoCardProps> = ({hostInfo}) => {
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-3">
+                    {hostInfo.nodeId && (
+                        <div>
+                            <span className="text-sm text-gray-400">Node ID</span>
+                            <div className="font-medium text-white font-mono">{hostInfo.nodeId}</div>
+                        </div>
+                    )}
                     <div>
                         <span className="text-sm text-gray-400">Hostname</span>
                         <div className="font-medium text-white">{hostInfo.hostname || 'Unknown'}</div>

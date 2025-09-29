@@ -26,7 +26,10 @@ router.get('/system-info', async (req, res) => {
                 uptime: monitorData.hostInfo?.uptime,
                 cloudProvider: monitorData.hostInfo?.cloudProvider,
                 instanceType: monitorData.hostInfo?.instanceType,
-                region: monitorData.hostInfo?.region
+                region: monitorData.hostInfo?.region,
+                nodeId: monitorData.hostInfo?.nodeId,
+                serverIPs: monitorData.hostInfo?.serverIPs,
+                macAddresses: monitorData.hostInfo?.macAddresses
             },
             cpuInfo: {
                 cores: monitorData.cpuInfo?.cores,
@@ -64,7 +67,21 @@ router.get('/system-info', async (req, res) => {
                 usedSpace: monitorData.disksInfo?.usedSpace
             },
             networkInfo: {
-                interfaces: monitorData.networkInfo?.interfaces || [],
+                interfaces: monitorData.networkInfo?.interfaces?.map(iface => ({
+                    name: iface.name,
+                    type: iface.type || 'ethernet',
+                    status: iface.status || iface.state || 'unknown',
+                    speed: iface.speed || iface.link_speed,
+                    mtu: iface.mtu,
+                    ipAddresses: iface.ipAddresses || iface.ip_addresses || iface.addresses || (iface.ipv4 ? [iface.ipv4] : []),
+                    macAddress: iface.macAddress || iface.mac_address || iface.mac || iface.hwaddr,
+                    rxBytes: iface.rxBytes || iface.rx_bytes || iface.bytes_recv,
+                    txBytes: iface.txBytes || iface.tx_bytes || iface.bytes_sent,
+                    rxPackets: iface.rxPackets || iface.rx_packets || iface.packets_recv,
+                    txPackets: iface.txPackets || iface.tx_packets || iface.packets_sent,
+                    rxErrors: iface.rxErrors || iface.rx_errors || iface.errin,
+                    txErrors: iface.txErrors || iface.tx_errors || iface.errout
+                })) || [],
                 totalRxBytes: monitorData.networkInfo?.totalRxBytes,
                 totalTxBytes: monitorData.networkInfo?.totalTxBytes
             },

@@ -42,6 +42,8 @@ export interface Job {
     gpuIndices?: number[];
     gpuCount?: number;
     gpuMemoryMb?: number;
+    // Node identification
+    nodeId?: string;
 }
 
 // Extended interface for workflow jobs with additional fields

@@ -40,6 +40,9 @@ export interface DetailedSystemInfo {
         cloudProvider?: string;
         instanceType?: string;
         region?: string;
+        nodeId?: string;
+        serverIPs?: string[];
+        macAddresses?: string[];
     };
     cpuInfo: {
         cores?: number;
