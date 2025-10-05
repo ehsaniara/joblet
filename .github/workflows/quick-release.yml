@@ -70,40 +70,6 @@ jobs:
           echo "tag_version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           echo "Building version: $CLEAN_VERSION (from $VERSION)"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            admin/server/package-lock.json
-            admin/ui/package-lock.json
-
-      - name: Build Admin UI for Distribution
-        run: |
-          echo "🚀 Building Admin UI..."
-          cd admin/ui
-          npm ci
-          npm run build
-          
-          # Verify the build succeeded
-          if [ ! -f "dist/index.html" ]; then
-            echo "❌ Admin UI build failed - dist/index.html not found"
-            exit 1
-          fi
-          echo "✅ Admin UI build successful"
-          
-          echo "🚀 Installing Admin Server dependencies..."
-          cd ../server
-          npm ci --omit=dev
-          
-          # Verify server dependencies installed
-          if [ ! -d "node_modules" ]; then
-            echo "❌ Server dependencies installation failed"
-            exit 1
-          fi
-          echo "✅ Server dependencies installed"
-
       - name: Build all binaries
         run: |
           echo "🚀 Building joblet server binaries..."
@@ -131,33 +97,24 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev build-essential rpm
-          
-          # Backup admin directory before package building (critical for Homebrew)
-          echo "🔄 Backing up admin directory..."
-          if [ -d "admin" ]; then
-            cp -r admin admin-backup
-            echo "✅ Admin directory backed up"
-          else
-            echo "⚠️ No admin directory to backup"
-          fi
-          
+
           # Make scripts executable
           chmod +x scripts/build-deb.sh
           chmod +x scripts/build-rpm.sh
-          
+
           # Build packages for both architectures
           for arch in amd64 arm64; do
             echo "📦 Building packages for $arch..."
-          
+
             # Copy binaries for this architecture
             rm -rf joblet rnx  # Remove existing directories/files to avoid conflicts
             cp joblet-linux-$arch joblet
             cp rnx-server-linux-$arch rnx
             chmod +x joblet rnx
-          
+
             # Build Debian package
             ./scripts/build-deb.sh $arch ${{ steps.version.outputs.version }}
-          
+
             # Build RPM package
             rpm_arch=$arch
             if [ "$arch" = "arm64" ]; then
@@ -166,103 +123,15 @@ jobs:
               rpm_arch="x86_64"
             fi
             ./scripts/build-rpm.sh $rpm_arch ${{ steps.version.outputs.version }}
-          
+
             # Rename to avoid conflicts
             mv *.deb joblet_${{ steps.version.outputs.version }}_$arch.deb || true
             mv *.rpm joblet-${{ steps.version.outputs.version }}-1.$rpm_arch.rpm || true
           done
-          
-          # Restore admin directory after package building
-          echo "🔄 Restoring admin directory..."
-          if [ -d "admin-backup" ]; then
-            rm -rf admin 2>/dev/null || true
-            mv admin-backup admin
-            echo "✅ Admin directory restored"
-          else
-            echo "⚠️ No admin backup to restore"
-          fi
-
-      - name: Package RNX with Admin UI for Homebrew
-        run: |
-          echo "🍺 Packaging RNX with Admin UI for Homebrew distribution..."
-          
-          # Debug: Check if admin files exist before packaging
-          echo "🔍 Checking admin directory structure..."
-          ls -la admin/ || echo "❌ admin directory not found"
-          ls -la admin/ui/ || echo "❌ admin/ui directory not found"
-          ls -la admin/ui/dist/ || echo "❌ admin/ui/dist directory not found"
-          ls -la admin/server/ || echo "❌ admin/server directory not found"
-          
-          # Critical check: Verify admin UI build exists
-          if [ ! -f "admin/ui/dist/index.html" ]; then
-            echo "❌ CRITICAL ERROR: Admin UI build not found!"
-            echo "🔍 Searching for admin UI files..."
-            find . -name "index.html" -type f 2>/dev/null || echo "No index.html found anywhere"
-            echo "🔍 Admin directory contents:"
-            find admin/ -type f 2>/dev/null | head -20 || echo "Admin directory is empty or missing"
-            exit 1
-          fi
-          
-          # Critical check: Verify admin server files exist
-          if [ ! -f "admin/server/package.json" ]; then
-            echo "❌ CRITICAL ERROR: Admin server files not found!"
-            echo "🔍 Server directory contents:"
-            find admin/server/ -type f 2>/dev/null | head -20 || echo "Server directory is empty or missing"
-            exit 1
-          fi
-          
-          echo "✅ All admin files verified successfully"
-          
-          # Create macOS packages with admin UI
-          for arch in amd64 arm64; do
-            echo "📦 Creating macOS $arch package with admin UI..."
-            mkdir -p "rnx-darwin-$arch-release"
-            cp "rnx-darwin-$arch" "rnx-darwin-$arch-release/rnx"
-          
-            # Copy admin UI files (built UI and server dependencies)
-            echo "📁 Copying admin directory..."
-            cp -r admin "rnx-darwin-$arch-release/"
-          
-            # Debug: Check what was actually copied
-            echo "🔍 Verifying copied files..."
-            ls -la "rnx-darwin-$arch-release/admin/" || echo "❌ No admin directory copied"
-            ls -la "rnx-darwin-$arch-release/admin/ui/" || echo "❌ No admin/ui directory copied"
-            ls -la "rnx-darwin-$arch-release/admin/ui/dist/" || echo "❌ No admin/ui/dist directory copied"
-          
-            # Verify admin files were copied
-            if [ ! -f "rnx-darwin-$arch-release/admin/ui/dist/index.html" ]; then
-              echo "❌ Admin UI files not found in package for $arch"
-              echo "🔍 Contents of admin/ui/dist:"
-              find rnx-darwin-$arch-release/admin/ui/dist/ -type f 2>/dev/null || echo "Directory doesn't exist"
-              exit 1
-            fi
-            if [ ! -f "rnx-darwin-$arch-release/admin/server/package.json" ]; then
-              echo "❌ Admin server files not found in package for $arch"
-              exit 1
-            fi
-            echo "✅ Admin UI files copied successfully for $arch"
-          
-            # Remove dev dependencies but keep built assets
-            rm -rf "rnx-darwin-$arch-release/admin/ui/node_modules"
-          
-            # Create Homebrew-compatible archive
-            echo "📦 Creating tar archive for $arch..."
-            echo "🔍 Contents to be archived:"
-            find "rnx-darwin-$arch-release" -type f | head -20
-            echo "🔍 Full directory structure:"
-            ls -laR "rnx-darwin-$arch-release/"
-          
-            tar -czf "rnx-v${{ steps.version.outputs.version }}-darwin-$arch.tar.gz" \
-              -C "rnx-darwin-$arch-release" .
-          
-            # Verify archive was created correctly
-            echo "🔍 Verifying archive contents:"
-            tar -tzf "rnx-v${{ steps.version.outputs.version }}-darwin-$arch.tar.gz" | head -20
-          done
 
       - name: Create archives
         run: |
-          # Create CLI-only archives for non-macOS platforms
+          # Create CLI-only archives for all platforms
           tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-amd64.tar.gz rnx-linux-amd64
           tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-arm64.tar.gz rnx-linux-arm64
           tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-386.tar.gz rnx-linux-386
@@ -314,8 +183,8 @@ jobs:
           files: |
             *.deb
             *.rpm
-            rnx-v${{ steps.version.outputs.version }}-*.tar.gz
-            rnx-v${{ steps.version.outputs.version }}-*.zip
+            rnx-${{ steps.version.outputs.tag_version }}-*.tar.gz
+            rnx-${{ steps.version.outputs.tag_version }}-*.zip
             joblet-v${{ steps.version.outputs.version }}-checksums.txt
           body: |
             ** 🚀 Complete Joblet release** ${{ github.ref_name }} with both Linux server packages and cross-platform RNX CLI.
@@ -428,41 +297,37 @@ jobs:
             rnx run --max-cpu=50 --max-memory=512 python3 script.py
             rnx log <job-id>
             ```
-            
+
+            ---
+
+            ## 🎨 Admin UI (Separate Repository)
+
+            The Admin UI is now available as a separate project:
+
+            **Repository**: https://github.com/ehsaniara/joblet-admin
+
+            The Admin UI provides a web-based dashboard for managing Joblet servers, monitoring jobs, and viewing system metrics.
+
+            ---
+
             ## 🔐 Package Verification
-            
+
             ```bash
             # Verify all checksums
             curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ steps.version.outputs.tag_version }}-checksums.txt
             sha256sum -c joblet-v${{ steps.version.outputs.version }}-checksums.txt
             ```
-            
+
             ---
-            
+
             ## 📊 Architecture Support Matrix
-            
+
             | Package Type | AMD64/x86_64 | ARM64/aarch64 | i386 |
             |-------------|--------------|---------------|------|
             | **Debian (.deb)** | ✅ | ✅ | ❌ |
             | **RPM (.rpm)** | ✅ | ✅ | ❌ |
             | **RNX CLI** | ✅ | ✅ | ✅ |
-            
+
             Perfect for modern cloud environments including **AWS Graviton**, **Azure ARM**, and traditional **Intel/AMD** servers.
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-
-      - name: Display Homebrew Instructions
-        if: ${{ !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'alpha') }}
-        run: |
-          echo "🍺 Homebrew Formula Update Instructions"
-          echo "========================================"
-          echo ""
-          echo "The Homebrew formula needs to be updated with the new release."
-          echo ""
-          echo "After this release completes, update Formula/rnx.rb with:"
-          echo "  - AMD64 URL: https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.tag_version }}/rnx-v${{ steps.version.outputs.version }}-darwin-amd64.tar.gz"
-          echo "  - ARM64 URL: https://github.com/ehsaniara/joblet/releases/download/${{ steps.version.outputs.tag_version }}/rnx-v${{ steps.version.outputs.version }}-darwin-arm64.tar.gz"
-          echo ""
-          echo "Users can then install with:"
-          echo "  brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet"
-          echo "  brew install rnx"
