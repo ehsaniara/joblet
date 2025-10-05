@@ -8,12 +8,13 @@ operations.
 
 - [Global Options](#global-options)
 - [Job Commands](#job-commands)
-    - [run](#rnx-run)
-    - [list](#rnx-list)
-    - [status](#rnx-status)
-    - [log](#rnx-log)
-    - [stop](#rnx-stop)
-    - [delete](#rnx-delete)
+    - [run](#rnx-job-run)
+    - [list](#rnx-job-list)
+    - [status](#rnx-job-status)
+    - [log](#rnx-job-log)
+    - [metrics](#rnx-job-metrics)
+    - [stop](#rnx-job-stop)
+    - [delete](#rnx-job-delete)
 - [Volume Commands](#volume-commands)
     - [volume create](#rnx-volume-create)
     - [volume list](#rnx-volume-list)
@@ -448,6 +449,78 @@ rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 | grep ERROR
 
 # Save logs to file
 rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
+```
+
+### `rnx job metrics`
+
+View resource usage metrics for a job as time-series data.
+
+```bash
+rnx job metrics <job-uuid>
+```
+
+Shows CPU, memory, I/O, network, and process metrics collected during job execution.
+Metrics are stored as time-series data, allowing complete historical replay of resource usage.
+
+#### Parameters
+
+| Parameter  | Description                                           |
+|------------|-------------------------------------------------------|
+| `--json`   | Output in JSON format (global flag: `rnx --json`)   |
+
+#### Behavior
+
+Similar to `rnx job log`, this command streams all metrics from job start:
+- **For completed jobs**: Shows all metrics from start to finish, then exits
+- **For running jobs**: Shows all metrics from start to current, then continues streaming live until job completes or Ctrl+C
+
+Works with both running and completed jobs. Supports short UUIDs (first 8 characters).
+
+#### Metrics Collected
+
+| Category | Metrics                                                     |
+|----------|-------------------------------------------------------------|
+| CPU      | Usage %, user/system time, throttling                       |
+| Memory   | Current/peak usage, anonymous/file cache, page faults       |
+| I/O      | Read/write bandwidth, IOPS, total bytes                     |
+| Network  | RX/TX bytes/packets, bandwidth                              |
+| Process  | Count, threads, open file descriptors                       |
+| GPU      | Utilization, memory, temperature, power (if GPUs allocated) |
+
+#### Examples
+
+```bash
+# View metrics for a completed job (shows complete history then exits)
+rnx job metrics f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+# Monitor a running job (shows history + live stream until completion)
+rnx job metrics a1b2c3d4
+
+# Output as JSON (one sample per line)
+rnx --json job metrics f47ac10b
+
+# Filter JSON output with jq
+rnx --json job metrics f47ac10b | jq -c '{timestamp, cpu: .cpu.usagePercent, memory: .memory.current}'
+
+# Analyze metrics from a job
+rnx --json job metrics f47ac10b > metrics.jsonl
+cat metrics.jsonl | jq -r '[.timestamp, .cpu.usagePercent, .memory.current] | @csv' > metrics.csv
+```
+
+#### Storage Location
+
+Metrics are stored on the server as gzipped JSON Lines files:
+- Path: `/opt/joblet/metrics/<job-uuid>/<timestamp>.jsonl.gz`
+- Format: One JSON object per line (JSONL)
+- Compression: gzip (approximately 10x reduction)
+
+You can also read metrics files directly on the server:
+```bash
+# Decompress and view metrics
+gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | head -10
+
+# Parse with jq
+gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | jq -c '{timestamp, cpu: .cpu.usage_percent}'
 ```
 
 ### `rnx job stop`

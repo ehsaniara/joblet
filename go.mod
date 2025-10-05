@@ -3,7 +3,7 @@ module joblet
 go 1.24.0
 
 require (
-	github.com/ehsaniara/joblet-proto v1.0.6
+	github.com/ehsaniara/joblet-proto v1.0.7
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1

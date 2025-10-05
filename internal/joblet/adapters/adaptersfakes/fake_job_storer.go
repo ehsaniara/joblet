@@ -98,6 +98,19 @@ type FakeJobStorer struct {
 		result2 bool
 		result3 error
 	}
+	ResolveJobUUIDStub        func(string) (string, error)
+	resolveJobUUIDMutex       sync.RWMutex
+	resolveJobUUIDArgsForCall []struct {
+		arg1 string
+	}
+	resolveJobUUIDReturns struct {
+		result1 string
+		result2 error
+	}
+	resolveJobUUIDReturnsOnCall map[int]struct {
+		result1 string
+		result2 error
+	}
 	SendUpdatesToClientStub        func(context.Context, string, interfaces.DomainStreamer) error
 	sendUpdatesToClientMutex       sync.RWMutex
 	sendUpdatesToClientArgsForCall []struct {
@@ -579,6 +592,70 @@ func (fake *FakeJobStorer) OutputReturnsOnCall(i int, result1 []byte, result2 bo
 		result2 bool
 		result3 error
 	}{result1, result2, result3}
+}
+
+func (fake *FakeJobStorer) ResolveJobUUID(arg1 string) (string, error) {
+	fake.resolveJobUUIDMutex.Lock()
+	ret, specificReturn := fake.resolveJobUUIDReturnsOnCall[len(fake.resolveJobUUIDArgsForCall)]
+	fake.resolveJobUUIDArgsForCall = append(fake.resolveJobUUIDArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ResolveJobUUIDStub
+	fakeReturns := fake.resolveJobUUIDReturns
+	fake.recordInvocation("ResolveJobUUID", []interface{}{arg1})
+	fake.resolveJobUUIDMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeJobStorer) ResolveJobUUIDCallCount() int {
+	fake.resolveJobUUIDMutex.RLock()
+	defer fake.resolveJobUUIDMutex.RUnlock()
+	return len(fake.resolveJobUUIDArgsForCall)
+}
+
+func (fake *FakeJobStorer) ResolveJobUUIDCalls(stub func(string) (string, error)) {
+	fake.resolveJobUUIDMutex.Lock()
+	defer fake.resolveJobUUIDMutex.Unlock()
+	fake.ResolveJobUUIDStub = stub
+}
+
+func (fake *FakeJobStorer) ResolveJobUUIDArgsForCall(i int) string {
+	fake.resolveJobUUIDMutex.RLock()
+	defer fake.resolveJobUUIDMutex.RUnlock()
+	argsForCall := fake.resolveJobUUIDArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeJobStorer) ResolveJobUUIDReturns(result1 string, result2 error) {
+	fake.resolveJobUUIDMutex.Lock()
+	defer fake.resolveJobUUIDMutex.Unlock()
+	fake.ResolveJobUUIDStub = nil
+	fake.resolveJobUUIDReturns = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeJobStorer) ResolveJobUUIDReturnsOnCall(i int, result1 string, result2 error) {
+	fake.resolveJobUUIDMutex.Lock()
+	defer fake.resolveJobUUIDMutex.Unlock()
+	fake.ResolveJobUUIDStub = nil
+	if fake.resolveJobUUIDReturnsOnCall == nil {
+		fake.resolveJobUUIDReturnsOnCall = make(map[int]struct {
+			result1 string
+			result2 error
+		})
+	}
+	fake.resolveJobUUIDReturnsOnCall[i] = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeJobStorer) SendUpdatesToClient(arg1 context.Context, arg2 string, arg3 interfaces.DomainStreamer) error {

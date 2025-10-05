@@ -25,6 +25,7 @@ import (
 func StartGRPCServerWithRegistry(serviceComponents *core.ServiceComponents, cfg *config.Config, platform platform.Platform) (*grpc.Server, error) {
 	return StartGRPCServer(
 		serviceComponents.JobStore,
+		serviceComponents.MetricsStore,
 		serviceComponents.Joblet,
 		cfg,
 		serviceComponents.NetworkStore,
@@ -36,7 +37,7 @@ func StartGRPCServerWithRegistry(serviceComponents *core.ServiceComponents, cfg 
 
 // StartGRPCServer initializes and starts the main Joblet gRPC server.
 // DEPRECATED: Use StartGRPCServerWithRegistry for new implementations
-func StartGRPCServer(jobStore adapters.JobStorer, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStorer, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
+func StartGRPCServer(jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStorer, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -77,7 +78,7 @@ func StartGRPCServer(jobStore adapters.JobStorer, joblet interfaces.Joblet, cfg 
 
 	// Create workflow manager and unified job service with validation
 	workflowManager := workflow.NewWorkflowManager()
-	jobService := NewWorkflowServiceServer(auth, jobStore, joblet, workflowManager, volumeManager, runtimeResolver)
+	jobService := NewWorkflowServiceServer(auth, jobStore, metricsStore, joblet, workflowManager, volumeManager, runtimeResolver)
 	pb.RegisterJobServiceServer(grpcServer, jobService)
 
 	// Create and register network service

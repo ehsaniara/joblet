@@ -209,10 +209,8 @@ Available on macOS via Homebrew with `--with-admin` option:
 
 ## 🔗 Related Projects
 
-- **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)** 
-
-- **[Joblet Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)** 
-
+- **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)**
+- **[Joblet Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)**
 - **[Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server)**  
 
 **Developing a custom client?** Start with the [protocol definitions](https://github.com/ehsaniara/joblet-proto) to

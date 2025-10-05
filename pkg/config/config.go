@@ -27,6 +27,7 @@ type Config struct {
 	Volumes    VolumesConfig    `yaml:"volumes" json:"volumes"`
 	Runtime    RuntimeConfig    `yaml:"runtime" json:"runtime"`
 	GPU        GPUConfig        `yaml:"gpu" json:"gpu"`
+	JobMetrics JobMetricsConfig `yaml:"job_metrics" json:"job_metrics"`
 }
 
 type NetworkConfig struct {
@@ -202,6 +203,14 @@ type GPUConfig struct {
 	AllocationStrategy string   `yaml:"allocation_strategy" json:"allocation_strategy"` // GPU allocation strategy (first-fit, pack, spread, best-fit)
 }
 
+// JobMetricsConfig holds job metrics collection configuration
+type JobMetricsConfig struct {
+	Enabled           bool          `yaml:"enabled" json:"enabled"`
+	DefaultSampleRate time.Duration `yaml:"default_sample_rate" json:"default_sample_rate"`
+	StorageDir        string        `yaml:"storage_dir" json:"storage_dir"`
+	RetentionDays     int           `yaml:"retention_days" json:"retention_days"`
+}
+
 // DefaultConfig provides default configuration values
 var DefaultConfig = Config{
 	Version: "3.0",
@@ -333,6 +342,12 @@ var DefaultConfig = Config{
 			"/usr/local/cuda",
 			"/opt/cuda",
 		},
+	},
+	JobMetrics: JobMetricsConfig{
+		Enabled:           true,            // Enabled by default
+		DefaultSampleRate: 5 * time.Second, // Sample every 5 seconds
+		StorageDir:        "/opt/joblet/metrics",
+		RetentionDays:     7, // Keep metrics for 7 days
 	},
 }
 

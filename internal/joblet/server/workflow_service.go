@@ -17,6 +17,7 @@ import (
 	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/mappers"
+	metricsdomain "joblet/internal/joblet/metrics/domain"
 	"joblet/internal/joblet/runtime"
 	"joblet/internal/joblet/workflow"
 	"joblet/internal/joblet/workflow/types"
@@ -45,6 +46,7 @@ type WorkflowServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth              auth2.GRPCAuthorization
 	jobStore          adapters.JobStorer
+	metricsStore      *adapters.MetricsStoreAdapter
 	joblet            interfaces.Joblet
 	workflowManager   *workflow.WorkflowManager
 	workflowValidator *validation.WorkflowValidator
@@ -59,13 +61,14 @@ type WorkflowServiceServer struct {
 // This server handles workflow creation, status monitoring, and job orchestration.
 // It requires authentication, job store access, joblet interface for job execution,
 // a workflow manager for dependency tracking and job coordination, and managers for validation.
-func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, joblet interfaces.Joblet, workflowManager *workflow.WorkflowManager, volumeManager *volume.Manager, runtimeResolver *runtime.Resolver) *WorkflowServiceServer {
+func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, workflowManager *workflow.WorkflowManager, volumeManager *volume.Manager, runtimeResolver *runtime.Resolver) *WorkflowServiceServer {
 	// Create workflow validator with concrete managers (no adapter pattern needed)
 	workflowValidator := validation.NewWorkflowValidator(volumeManager, runtimeResolver)
 
 	return &WorkflowServiceServer{
 		auth:              auth,
 		jobStore:          jobStore,
+		metricsStore:      metricsStore,
 		joblet:            joblet,
 		workflowManager:   workflowManager,
 		workflowValidator: workflowValidator,
@@ -1568,4 +1571,115 @@ func getFileKeys(files map[string][]byte) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+// StreamJobMetrics streams real-time metrics for a running job
+func (s *WorkflowServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stream pb.JobService_StreamJobMetricsServer) error {
+	log := s.logger.WithFields("operation", "StreamJobMetrics", "uuid", req.Uuid)
+	log.Debug("stream job metrics request received")
+
+	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return err
+	}
+
+	if req.Uuid == "" {
+		return status.Errorf(codes.InvalidArgument, "uuid is required")
+	}
+
+	// Resolve short UUID to full UUID (supports both short and full UUIDs)
+	resolvedUUID, err := s.jobStore.ResolveJobUUID(req.Uuid)
+	if err != nil {
+		log.Warn("failed to resolve UUID", "input", req.Uuid, "error", err)
+		// If resolution fails, try using the UUID as-is (might be full UUID of completed job)
+		resolvedUUID = req.Uuid
+	}
+
+	// Stream metrics using the metrics store
+	err = s.metricsStore.StreamMetrics(stream.Context(), resolvedUUID, func(sample *metricsdomain.JobMetricsSample) error {
+		pbSample := convertMetricsSampleToProto(sample)
+		if err := stream.Send(pbSample); err != nil {
+			log.Warn("failed to send metrics sample", "error", err)
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error("metrics streaming failed", "error", err)
+		return status.Errorf(codes.Internal, "failed to stream metrics: %v", err)
+	}
+
+	log.Debug("metrics streaming completed")
+	return nil
+}
+
+// GetJobMetricsHistory retrieves historical metrics for a job
+func (s *WorkflowServiceServer) GetJobMetricsHistory(ctx context.Context, req *pb.JobMetricsHistoryRequest) (*pb.JobMetricsHistoryResponse, error) {
+	log := s.logger.WithFields("operation", "GetJobMetricsHistory", "uuid", req.Uuid)
+	log.Debug("get job metrics history request received")
+
+	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	if req.Uuid == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "uuid is required")
+	}
+
+	// Check if job exists
+	_, exists := s.jobStore.Job(req.Uuid)
+	if !exists {
+		log.Warn("job not found")
+		return nil, status.Errorf(codes.NotFound, "job not found")
+	}
+
+	// Convert timestamps to time.Time
+	fromTime := time.Unix(req.FromTimestamp, 0)
+	toTime := time.Unix(req.ToTimestamp, 0)
+
+	// Get historical metrics from the store
+	samples, err := s.metricsStore.GetHistoricalMetrics(req.Uuid, fromTime, toTime)
+	if err != nil {
+		log.Error("failed to retrieve historical metrics", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to retrieve metrics: %v", err)
+	}
+
+	// Convert to protobuf
+	pbSamples := make([]*pb.JobMetricsSample, len(samples))
+	for i, sample := range samples {
+		pbSamples[i] = convertMetricsSampleToProto(sample)
+	}
+
+	log.Debug("historical metrics retrieved", "sampleCount", len(pbSamples))
+	return &pb.JobMetricsHistoryResponse{
+		Samples: pbSamples,
+	}, nil
+}
+
+// GetJobMetricsSummary returns aggregated metrics summary for a job
+func (s *WorkflowServiceServer) GetJobMetricsSummary(ctx context.Context, req *pb.JobMetricsSummaryRequest) (*pb.JobMetricsSummaryResponse, error) {
+	log := s.logger.WithFields("operation", "GetJobMetricsSummary", "uuid", req.Uuid)
+	log.Debug("get job metrics summary request received")
+
+	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	if req.Uuid == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "uuid is required")
+	}
+
+	// Check if job exists
+	_, exists := s.jobStore.Job(req.Uuid)
+	if !exists {
+		log.Warn("job not found")
+		return nil, status.Errorf(codes.NotFound, "job not found")
+	}
+
+	// TODO: Implement aggregation logic
+	log.Info("metrics summary requested - aggregation not yet implemented")
+	return nil, status.Errorf(codes.Unimplemented, "metrics aggregation not yet implemented")
 }

@@ -21,6 +21,7 @@ import (
 	"joblet/internal/joblet/core/upload"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/gpu"
+	metricsdomain "joblet/internal/joblet/metrics/domain"
 	"joblet/internal/joblet/scheduler"
 	"joblet/pkg/config"
 	"joblet/pkg/logger"
@@ -34,10 +35,11 @@ import (
 // resource allocation, execution, and cleanup for all job types.
 type Joblet struct {
 	// Core dependencies
-	store    adapters.JobStorer
-	config   *config.Config
-	logger   *logger.Logger
-	platform platform.Platform
+	store        adapters.JobStorer
+	metricsStore *adapters.MetricsStoreAdapter
+	config       *config.Config
+	logger       *logger.Logger
+	platform     platform.Platform
 
 	// Specialized services
 	jobBuilder      *job.Builder
@@ -50,7 +52,7 @@ type Joblet struct {
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components.
 // Initializes all core services, starts the scheduler, and begins periodic cleanup.
 // Returns a fully configured joblet ready for job execution.
-func NewPlatformJoblet(store adapters.JobStorer, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
+func NewPlatformJoblet(store adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, cfg *config.Config, networkStoreAdapter adapters.NetworkStorer) interfaces.Joblet {
 	platformInterface := platform.NewPlatform()
 	jobletLogger := logger.New().WithField("component", "linux-joblet")
 
@@ -60,6 +62,7 @@ func NewPlatformJoblet(store adapters.JobStorer, cfg *config.Config, networkStor
 	// Create the joblet
 	j := &Joblet{
 		store:           store,
+		metricsStore:    metricsStore,
 		config:          cfg,
 		logger:          jobletLogger,
 		platform:        platformInterface,
@@ -249,6 +252,44 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 
 	// Update job state
 	j.updateJobRunning(job, cmd)
+
+	// Start metrics collection if enabled
+	if j.metricsStore != nil && j.config.JobMetrics.Enabled {
+		sampleInterval := j.config.JobMetrics.DefaultSampleRate
+		if sampleInterval == 0 {
+			sampleInterval = 5 * time.Second // Default to 5 seconds
+		}
+
+		// Get GPU indices from job if allocated
+		var gpuIndices []int
+		if len(job.GPUIndices) > 0 {
+			gpuIndices = make([]int, len(job.GPUIndices))
+			for i, idx := range job.GPUIndices {
+				gpuIndices[i] = int(idx)
+			}
+		}
+
+		// Convert job limits to metrics domain limits
+		metricsLimits := &metricsdomain.ResourceLimits{
+			CPU:    job.Limits.CPU.Value(),
+			Memory: job.Limits.Memory.Bytes(),
+			IO:     int32(job.Limits.IOBandwidth.BytesPerSecond()),
+		}
+
+		err := j.metricsStore.StartCollector(
+			job.Uuid,
+			job.CgroupPath,
+			sampleInterval,
+			metricsLimits,
+			gpuIndices,
+		)
+		if err != nil {
+			log.Warn("failed to start metrics collector", "error", err)
+			// Don't fail the job if metrics collection fails
+		} else {
+			log.Debug("metrics collector started", "sampleInterval", sampleInterval)
+		}
+	}
 
 	// Monitor asynchronously
 	go j.monitorJob(ctx, cmd, job)
@@ -504,6 +545,15 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 
 	// Update state
 	j.store.UpdateJob(job)
+
+	// Stop metrics collection if enabled
+	if j.metricsStore != nil {
+		if err := j.metricsStore.StopCollector(job.Uuid); err != nil {
+			log.Warn("failed to stop metrics collector", "error", err)
+		} else {
+			log.Debug("metrics collector stopped")
+		}
+	}
 
 	// Cleanup resources - but handle runtime build jobs specially
 	if job.Type.IsRuntimeBuild() {

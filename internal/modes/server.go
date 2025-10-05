@@ -10,7 +10,9 @@ import (
 	"joblet/internal/joblet"
 	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/core/volume"
+	metricsdomain "joblet/internal/joblet/metrics/domain"
 	"joblet/internal/joblet/monitoring"
+	"joblet/internal/joblet/pubsub"
 	"joblet/internal/joblet/server"
 	"joblet/internal/modes/isolation"
 	"joblet/internal/modes/jobexec"
@@ -71,6 +73,30 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 
+	// Create metrics store adapter with config
+	var metricsConfig *metricsdomain.MetricsConfig
+	if cfg.JobMetrics.Enabled {
+		metricsConfig = &metricsdomain.MetricsConfig{
+			Enabled:           cfg.JobMetrics.Enabled,
+			DefaultSampleRate: cfg.JobMetrics.DefaultSampleRate,
+			Storage: metricsdomain.StorageConfig{
+				Directory: cfg.JobMetrics.StorageDir,
+				Retention: metricsdomain.RetentionConfig{
+					Days: cfg.JobMetrics.RetentionDays,
+				},
+			},
+		}
+	}
+
+	// Create pub-sub for metrics events to enable live streaming
+	metricsPubSub := pubsub.NewPubSub[adapters.MetricsEvent]()
+
+	metricsStoreAdapter := adapters.NewMetricsStoreAdapter(
+		metricsPubSub,
+		metricsConfig,
+		logger.WithField("component", "metrics-store"),
+	)
+
 	// Create volume manager using the new adapter
 	if cfg.Volumes.BasePath == "" {
 		return fmt.Errorf("volumes base path not configured")
@@ -84,7 +110,7 @@ func RunServer(cfg *config.Config) error {
 	}
 
 	// Create joblet with configuration using new adapters directly
-	jobletInstance := joblet.NewJoblet(jobStoreAdapter, cfg, networkStoreAdapter)
+	jobletInstance := joblet.NewJoblet(jobStoreAdapter, metricsStoreAdapter, cfg, networkStoreAdapter)
 	if jobletInstance == nil {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
@@ -108,7 +134,7 @@ func RunServer(cfg *config.Config) error {
 	log.Info("monitoring service started successfully")
 
 	// Start gRPC server with configuration using new adapters
-	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
+	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, metricsStoreAdapter, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}

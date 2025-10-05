@@ -5,6 +5,8 @@ github.com/ehsaniara/joblet-proto v1.0.5 h1:5aKt/3tgS9MOKA4r5v+JkWacyMTHmaabFa8Y
 github.com/ehsaniara/joblet-proto v1.0.5/go.mod h1:EO7ShOX6BLYPWegEiJ13F2MRJ/8riG13kEQx4cJvqEQ=
 github.com/ehsaniara/joblet-proto v1.0.6 h1:yxA5v7/Ksg9psImNQilfjiktEp9sm9ZHLiIwZctWW6k=
 github.com/ehsaniara/joblet-proto v1.0.6/go.mod h1:EO7ShOX6BLYPWegEiJ13F2MRJ/8riG13kEQx4cJvqEQ=
+github.com/ehsaniara/joblet-proto v1.0.7 h1:w84XcsGHpLcrsHAJUW7sZBs0ozBuO1Ey0wyIC1Hrd9Y=
+github.com/ehsaniara/joblet-proto v1.0.7/go.mod h1:EO7ShOX6BLYPWegEiJ13F2MRJ/8riG13kEQx4cJvqEQ=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

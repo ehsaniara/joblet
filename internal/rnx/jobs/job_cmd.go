@@ -16,6 +16,7 @@ Available subcommands:
   list       List all jobs or workflows
   status     Show status of a specific job
   log        Stream logs from a job
+  metrics    View resource usage metrics for a job
   stop       Stop a running job
   cancel     Cancel a scheduled job (status becomes CANCELED)
   delete     Delete a specific job
@@ -27,6 +28,7 @@ Available subcommands:
 	cmd.AddCommand(NewListCmd())
 	cmd.AddCommand(NewStatusCmd())
 	cmd.AddCommand(NewLogCmd())
+	cmd.AddCommand(NewMetricsCmd())
 	cmd.AddCommand(NewStopCmd())
 	cmd.AddCommand(NewCancelCmd())
 	cmd.AddCommand(NewDeleteCmd())

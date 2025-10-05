@@ -122,6 +122,13 @@ monitoring:
   process_interval: "30s"
   cloud_detection: true
 
+# Job Metrics Configuration - Resource usage tracking for jobs
+job_metrics:
+  enabled: true                       # Enabled by default
+  default_sample_rate: "5s"           # How often to sample metrics (e.g., 5s, 10s, 30s)
+  storage_dir: "/opt/joblet/metrics"  # Where to store metrics files
+  retention_days: 7                   # Keep metrics for 7 days
+
 # Runtime System Configuration
 runtime:
   base_path: "/opt/joblet/runtimes"

@@ -15,6 +15,7 @@ import (
 func showVersion() {
 	fmt.Printf("rnx %s\n", version.GetShortVersion())
 
+	// Try to get server version from default node
 	if serverVersion := getServerVersion(); serverVersion != "" {
 		fmt.Printf("joblet %s\n", serverVersion)
 	}
@@ -35,8 +36,11 @@ func showJSONVersion() {
 		},
 	}
 
-	if serverInfo := getServerVersionDetails(); serverInfo != nil {
-		data["joblet"] = serverInfo
+	// Try to get server version from default node
+	if serverVersion := getServerVersion(); serverVersion != "" {
+		data["joblet"] = map[string]interface{}{
+			"version": serverVersion,
+		}
 	}
 
 	jsonOutput, _ := json.MarshalIndent(data, "", "  ")
@@ -63,37 +67,6 @@ func getServerVersion() string {
 	}
 
 	return version.FormatVersion(systemStatus.ServerVersion.Version, systemStatus.ServerVersion.GitCommit)
-}
-
-func getServerVersionDetails() map[string]interface{} {
-	if common.NodeConfig == nil {
-		return nil
-	}
-
-	client, err := common.NewJobClient()
-	if err != nil {
-		return nil
-	}
-	defer client.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	systemStatus, err := client.GetSystemStatus(ctx)
-	if err != nil || systemStatus.ServerVersion == nil {
-		return nil
-	}
-
-	sv := systemStatus.ServerVersion
-	return map[string]interface{}{
-		"version":      version.FormatVersion(sv.Version, sv.GitCommit),
-		"git_commit":   sv.GitCommit,
-		"git_tag":      sv.GitTag,
-		"build_date":   sv.BuildDate,
-		"go_version":   sv.GoVersion,
-		"platform":     sv.Platform,
-		"proto_commit": sv.ProtoCommit,
-	}
 }
 
 // AddVersionFlag adds a --version flag to the root command

@@ -19,6 +19,7 @@ type JobStorer interface {
 	UpdateJob(job *domain.Job)
 	Job(id string) (*domain.Job, bool)
 	JobByPrefix(prefix string) (*domain.Job, bool)
+	ResolveJobUUID(idOrPrefix string) (string, error)
 	ListJobs() []*domain.Job
 	WriteToBuffer(jobID string, chunk []byte)
 	Output(id string) ([]byte, bool, error)
@@ -68,6 +69,21 @@ type NetworkStorer interface {
 	// IP address management
 	AllocateIP(networkName string) (string, error)
 	ReleaseIP(networkName, ip string) error
+
+	// Lifecycle management
+	Close() error
+}
+
+// MetricsStorer handles job metrics collection and storage.
+// Manages collectors that gather resource usage data and persist metrics.
+//
+//counterfeiter:generate . MetricsStorer
+type MetricsStorer interface {
+	// StreamMetrics streams real-time metrics for a job
+	StreamMetrics(ctx context.Context, jobID string) (<-chan interface{}, error)
+
+	// GetHistoricalMetrics retrieves historical metrics for a job
+	GetHistoricalMetrics(jobID string, startTime, endTime int64) ([]interface{}, error)
 
 	// Lifecycle management
 	Close() error

@@ -8,6 +8,7 @@ import (
 	"joblet/internal/joblet/core/volume"
 	"joblet/internal/joblet/events"
 	"joblet/internal/joblet/monitoring"
+	"joblet/internal/joblet/pubsub"
 	"joblet/internal/joblet/runtime"
 	"joblet/internal/joblet/workflow"
 	"joblet/pkg/config"
@@ -35,6 +36,7 @@ type ServiceComponents struct {
 	JobStore          adapters.JobStorer
 	NetworkStore      adapters.NetworkStorer
 	VolumeStore       adapters.VolumeStorer
+	MetricsStore      *adapters.MetricsStoreAdapter
 	EventBus          events.EventBus
 }
 
@@ -76,8 +78,10 @@ func (f *ComponentFactory) CreateServices() (*ServiceComponents, error) {
 
 	f.configureVolumeMonitoring(monitoringService, volumeManager)
 
+	metricsStore := f.createMetricsStore()
+
 	eventBus := events.NewInMemoryEventBus()
-	joblet := NewJoblet(jobStore, f.config, networkStore)
+	joblet := NewJoblet(jobStore, metricsStore, f.config, networkStore)
 
 	f.logger.Info("all application services initialized successfully")
 
@@ -90,6 +94,7 @@ func (f *ComponentFactory) CreateServices() (*ServiceComponents, error) {
 		JobStore:          jobStore,
 		NetworkStore:      networkStore,
 		VolumeStore:       volumeStore,
+		MetricsStore:      metricsStore,
 		EventBus:          eventBus,
 	}, nil
 }
@@ -178,4 +183,25 @@ func (f *ComponentFactory) configureVolumeMonitoring(monitoringService *monitori
 
 	monitoringService.SetVolumeManager(volumeManager, basePath)
 	f.logger.Info("volume monitoring integration configured", "volumeBasePath", basePath)
+}
+
+// createMetricsStore sets up our job metrics collection store that tracks
+// resource usage (CPU, memory, I/O, network, GPU) for each job.
+func (f *ComponentFactory) createMetricsStore() *adapters.MetricsStoreAdapter {
+	f.logger.Debug("creating metrics store adapter")
+
+	// Create a pub-sub for metrics events
+	metricsPubSub := pubsub.NewPubSub[adapters.MetricsEvent]()
+
+	// Convert config to domain config
+	metricsConfig := f.config.JobMetrics.ToMetricsConfig()
+
+	metricsStore := adapters.NewMetricsStoreAdapter(
+		metricsPubSub,
+		metricsConfig,
+		logger.WithField("component", "metrics-store"),
+	)
+
+	f.logger.Info("metrics store adapter created successfully", "enabled", metricsConfig.Enabled)
+	return metricsStore
 }

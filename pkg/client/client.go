@@ -135,6 +135,14 @@ func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_Ge
 	return stream, nil
 }
 
+func (c *JobClient) StreamJobMetrics(ctx context.Context, id string) (pb.JobService_StreamJobMetricsClient, error) {
+	stream, err := c.jobClient.StreamJobMetrics(ctx, &pb.JobMetricsRequest{Uuid: id})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start metrics stream: %v", err)
+	}
+	return stream, nil
+}
+
 func (c *JobClient) CreateNetwork(ctx context.Context, req *pb.CreateNetworkReq) (*pb.CreateNetworkRes, error) {
 	return c.networkClient.CreateNetwork(ctx, req)
 }

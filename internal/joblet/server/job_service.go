@@ -3,15 +3,18 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	pb "joblet/api/gen"
 	"joblet/internal/joblet/adapters"
 	auth2 "joblet/internal/joblet/auth"
 	"joblet/internal/joblet/core/interfaces"
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/mappers"
+	metricsdomain "joblet/internal/joblet/metrics/domain"
 	"joblet/pkg/errors"
 	"joblet/pkg/logger"
-	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,19 +28,21 @@ import (
 // Deprecated: Use WorkflowServiceServer for all job operations
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
-	auth     auth2.GRPCAuthorization
-	jobStore adapters.JobStorer // Uses the new adapter interface
-	joblet   interfaces.Joblet  // Uses the new interface
-	logger   *logger.Logger
+	auth         auth2.GRPCAuthorization
+	jobStore     adapters.JobStorer            // Uses the new adapter interface
+	metricsStore *adapters.MetricsStoreAdapter // Job metrics collection
+	joblet       interfaces.Joblet             // Uses the new interface
+	logger       *logger.Logger
 }
 
 // NewJobServiceServer creates a new job service that uses request objects
-func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, joblet interfaces.Joblet) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet) *JobServiceServer {
 	return &JobServiceServer{
-		auth:     auth,
-		jobStore: jobStore,
-		joblet:   joblet,
-		logger:   logger.WithField("component", "job-grpc"),
+		auth:         auth,
+		jobStore:     jobStore,
+		metricsStore: metricsStore,
+		joblet:       joblet,
+		logger:       logger.WithField("component", "job-grpc"),
 	}
 }
 
@@ -662,4 +667,114 @@ func (s *JobServiceServer) ExecuteScheduledJob(ctx context.Context, jobID string
 
 	log.Info("scheduled job executed successfully", "jobId", jobID)
 	return nil
+}
+
+// StreamJobMetrics streams real-time job metrics to the client
+func (s *JobServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stream pb.JobService_StreamJobMetricsServer) error {
+	log := s.logger.WithFields("operation", "StreamJobMetrics", "jobUuid", req.GetUuid())
+	log.Debug("stream job metrics request received")
+
+	// Authorization check
+	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return err
+	}
+
+	if s.metricsStore == nil {
+		log.Warn("metrics store not available")
+		return status.Errorf(codes.Unimplemented, "metrics collection not enabled")
+	}
+
+	// Stream metrics using the metrics store
+	err := s.metricsStore.StreamMetrics(stream.Context(), req.GetUuid(), func(sample *metricsdomain.JobMetricsSample) error {
+		pbSample := convertMetricsSampleToProto(sample)
+		if err := stream.Send(pbSample); err != nil {
+			log.Warn("failed to send metrics sample", "error", err)
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error("metrics streaming failed", "error", err)
+		if err.Error() == "job not found" || strings.Contains(err.Error(), "not found") {
+			return status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
+		}
+		return status.Errorf(codes.Internal, "failed to stream metrics: %v", err)
+	}
+
+	log.Debug("metrics streaming completed", "jobUuid", req.GetUuid())
+	return nil
+}
+
+// GetJobMetricsHistory retrieves historical metrics for a job within a time range
+func (s *JobServiceServer) GetJobMetricsHistory(ctx context.Context, req *pb.JobMetricsHistoryRequest) (*pb.JobMetricsHistoryResponse, error) {
+	log := s.logger.WithFields("operation", "GetJobMetricsHistory", "jobUuid", req.GetUuid())
+	log.Debug("get job metrics history request received", "from", req.FromTimestamp, "to", req.ToTimestamp)
+
+	// Authorization check
+	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	if s.metricsStore == nil {
+		log.Warn("metrics store not available")
+		return nil, status.Errorf(codes.Unimplemented, "metrics collection not enabled")
+	}
+
+	// Convert timestamps to time.Time
+	fromTime := time.Unix(req.FromTimestamp, 0)
+	toTime := time.Unix(req.ToTimestamp, 0)
+
+	// Get historical metrics
+	samples, err := s.metricsStore.GetHistoricalMetrics(req.GetUuid(), fromTime, toTime)
+	if err != nil {
+		log.Error("failed to get historical metrics", "error", err)
+		if strings.Contains(err.Error(), "not found") {
+			return nil, status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
+		}
+		if strings.Contains(err.Error(), "not yet implemented") {
+			return nil, status.Errorf(codes.Unimplemented, "historical metrics not yet implemented")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get metrics: %v", err)
+	}
+
+	// Convert to protobuf
+	response := &pb.JobMetricsHistoryResponse{
+		Samples: make([]*pb.JobMetricsSample, len(samples)),
+	}
+
+	for i, sample := range samples {
+		response.Samples[i] = convertMetricsSampleToProto(sample)
+	}
+
+	log.Debug("returned historical metrics", "jobUuid", req.GetUuid(), "sampleCount", len(samples))
+	return response, nil
+}
+
+// GetJobMetricsSummary returns aggregated metrics summary for a job
+func (s *JobServiceServer) GetJobMetricsSummary(ctx context.Context, req *pb.JobMetricsSummaryRequest) (*pb.JobMetricsSummaryResponse, error) {
+	log := s.logger.WithFields("operation", "GetJobMetricsSummary", "jobUuid", req.GetUuid())
+	log.Debug("get job metrics summary request received", "periodSeconds", req.PeriodSeconds)
+
+	// Authorization check
+	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
+	}
+
+	if s.metricsStore == nil {
+		log.Warn("metrics store not available")
+		return nil, status.Errorf(codes.Unimplemented, "metrics collection not enabled")
+	}
+
+	// TODO: Implement metrics aggregation
+	// This would involve:
+	// 1. Getting all samples for the job
+	// 2. Calculating min, max, avg, p50, p95, p99 for each metric type
+	// 3. Returning the aggregated results
+
+	log.Warn("metrics summary not yet implemented")
+	return nil, status.Errorf(codes.Unimplemented, "metrics summary not yet implemented")
 }

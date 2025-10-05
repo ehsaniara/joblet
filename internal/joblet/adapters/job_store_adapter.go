@@ -561,6 +561,12 @@ func (a *jobStoreAdapter) resolveJobUuid(jobID string, operation string) (string
 	return resolvedUuid, nil
 }
 
+// ResolveJobUUID resolves a job ID (short or full UUID) to a full UUID
+// Implements the JobStorer interface
+func (a *jobStoreAdapter) ResolveJobUUID(idOrPrefix string) (string, error) {
+	return a.resolveJobUuid(idOrPrefix, "ResolveJobUUID")
+}
+
 // validateAndResolveJob resolves a job ID to UUID and retrieves the job, used across multiple operations
 func (a *jobStoreAdapter) validateAndResolveJob(jobID string, operation string) (string, *domain.Job, error) {
 	resolvedUuid, err := a.resolveJobUuid(jobID, operation)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	pb "joblet/api/gen"
+	"joblet/internal/joblet/adapters"
 	"joblet/internal/joblet/adapters/adaptersfakes"
 	"joblet/internal/joblet/auth/authfakes"
 	"joblet/internal/joblet/core/interfaces/interfacesfakes"
@@ -14,9 +15,10 @@ import (
 func TestNewJobServiceServer(t *testing.T) {
 	mockAuth := &authfakes.FakeGRPCAuthorization{}
 	mockStore := &adaptersfakes.FakeJobStorer{}
+	mockMetricsStore := (*adapters.MetricsStoreAdapter)(nil)
 	mockJoblet := &interfacesfakes.FakeJoblet{}
 
-	server := NewJobServiceServer(mockAuth, mockStore, mockJoblet)
+	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet)
 
 	if server == nil {
 		t.Fatal("NewJobServiceServer returned nil")
@@ -30,6 +32,10 @@ func TestNewJobServiceServer(t *testing.T) {
 		t.Error("jobStore not set correctly")
 	}
 
+	if server.metricsStore != mockMetricsStore {
+		t.Error("metricsStore not set correctly")
+	}
+
 	if server.joblet != mockJoblet {
 		t.Error("joblet not set correctly")
 	}
@@ -38,9 +44,10 @@ func TestNewJobServiceServer(t *testing.T) {
 func TestListJobs_EmptyStore(t *testing.T) {
 	mockAuth := &authfakes.FakeGRPCAuthorization{}
 	mockStore := &adaptersfakes.FakeJobStorer{}
+	mockMetricsStore := (*adapters.MetricsStoreAdapter)(nil)
 	mockJoblet := &interfacesfakes.FakeJoblet{}
 
-	server := NewJobServiceServer(mockAuth, mockStore, mockJoblet)
+	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet)
 
 	// Mock successful authorization
 	mockAuth.AuthorizedReturns(nil)
@@ -67,9 +74,10 @@ func TestListJobs_EmptyStore(t *testing.T) {
 func TestListJobs_WithJobs(t *testing.T) {
 	mockAuth := &authfakes.FakeGRPCAuthorization{}
 	mockStore := &adaptersfakes.FakeJobStorer{}
+	mockMetricsStore := (*adapters.MetricsStoreAdapter)(nil)
 	mockJoblet := &interfacesfakes.FakeJoblet{}
 
-	server := NewJobServiceServer(mockAuth, mockStore, mockJoblet)
+	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet)
 
 	// Create a test job
 	testJob := &domain.Job{
