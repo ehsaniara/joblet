@@ -1,7 +1,8 @@
 # Joblet Web Admin UI
 
 The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs, monitoring system performance,
-and visualizing workflows. Available on macOS via Homebrew installation with the `--with-admin` option.
+and visualizing workflows. The admin UI is now available as a standalone package in the [joblet-admin repository](https://github.com/ehsaniara/joblet-admin),
+connecting directly to the Joblet server via gRPC.
 
 ## Table of Contents
 
@@ -18,33 +19,41 @@ and visualizing workflows. Available on macOS via Homebrew installation with the
 
 ### Prerequisites
 
-- **macOS**: 10.15 or later
-- **Node.js**: 18.x or later (for optional web UI)
+- **Operating System**: Linux, macOS, or Windows
+- **Node.js**: 18.x or later
 - **Joblet Server**: Running and accessible from the admin UI host
+- **Configuration**: Valid `~/.rnx/rnx-config.yml` with mTLS certificates
 
-### Install via Homebrew
+### Standalone Installation
 
-```bash
-# Add the Joblet tap
-brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
-
-# Install with admin UI support
-brew install ehsaniara/joblet/rnx --with-admin
-
-# Verify installation
-rnx admin --help
-```
-
-### Manual Installation
+The Admin UI is now available as a separate package from the joblet-admin repository:
 
 ```bash
-# 1. Install RNX CLI (see main README)
-# 2. Install Node.js dependencies
-cd /opt/homebrew/share/rnx/admin
+# Clone the joblet-admin repository
+git clone https://github.com/ehsaniara/joblet-admin
+cd joblet-admin
+
+# Install dependencies
 npm install
 
-# 3. Configure connection to Joblet server
-cp ~/.rnx/rnx-config.yml ./config/
+# Start the admin interface
+npm run dev
+
+# Access at http://localhost:3000
+```
+
+**Note**: The admin UI connects directly to the Joblet server via gRPC.
+
+### Production Installation
+
+```bash
+# Build the application
+npm run build
+
+# Start in production mode
+npm start
+
+# Or deploy the built files from dist/ directory
 ```
 
 ## Getting Started
@@ -52,17 +61,20 @@ cp ~/.rnx/rnx-config.yml ./config/
 ### Launch the Admin UI
 
 ```bash
-# Start the web interface
-rnx admin
+# Development mode (recommended)
+npm run dev
+# UI: http://localhost:3000
+# API: http://localhost:5175
 
-# Alternative: specify custom port
-rnx admin --port 8080
+# Production mode
+npm run build
+npm start
 
-# Alternative: specify custom host
-rnx admin --host 0.0.0.0 --port 5173
+# Development with custom ports
+JOBLET_ADMIN_PORT=8080 npm run dev:server
 ```
 
-The admin UI will be available at `http://localhost:5173` by default.
+The admin UI will be available at `http://localhost:3000` by default.
 
 ### First Login
 
@@ -403,11 +415,13 @@ Monitor and manage runtime environments:
 #### Admin UI Won't Start
 
 ```bash
-# Check if port is already in use
-lsof -i :5173
+# Check if ports are already in use
+lsof -i :3000  # UI port
+lsof -i :5175  # API port
 
-# Try a different port
-rnx admin --port 8080
+# Try different ports
+JOBLET_ADMIN_PORT=8080 npm run dev:server
+PORT=8081 npm run dev:ui
 
 # Check Node.js installation
 node --version
@@ -425,6 +439,10 @@ cat ~/.rnx/rnx-config.yml
 
 # Test server connection
 rnx monitor status
+
+# Check admin server logs
+npm run dev:server
+# Look for gRPC connection errors
 ```
 
 #### Performance Issues
@@ -438,8 +456,13 @@ rnx monitor status
 #### Admin UI Logs
 
 ```bash
-# View admin UI logs
-rnx admin --verbose
+# View admin server logs
+npm run dev:server
+# Server logs will show gRPC connection status
+
+# View UI development logs
+npm run dev:ui
+# React development server logs
 
 # Check browser console
 # Open browser developer tools (F12)
@@ -458,15 +481,15 @@ rnx monitor status
 
 ### Getting Help
 
-- **GitHub Issues**: [Report bugs](https://github.com/ehsaniara/joblet/issues)
+- **Admin UI Issues**: [Report bugs](https://github.com/ehsaniara/joblet-admin/issues)
+- **Server Issues**: [Report bugs](https://github.com/ehsaniara/joblet/issues)
 - **Documentation**: [Complete docs](https://github.com/ehsaniara/joblet/tree/main/docs)
-- **CLI Help**: `rnx admin --help`
 
 ### Feature Requests
 
 The admin UI is actively developed. To request new features:
 
-1. Check existing [GitHub issues](https://github.com/ehsaniara/joblet/issues)
+1. Check existing [GitHub issues](https://github.com/ehsaniara/joblet-admin/issues)
 2. Create a new feature request with detailed description
 3. Include use cases and expected behavior
 4. Add mockups or wireframes if applicable

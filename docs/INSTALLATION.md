@@ -637,23 +637,37 @@ rnx job run echo "Hello from AWS EC2!"
 # Add Joblet tap
 brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
 
-# Install RNX client with Admin UI (default)
+# Install RNX client
 brew install rnx
-
-# Or install CLI only without Admin UI
-brew install rnx --cli-only
 ```
 
 The Homebrew installation includes:
 - **RNX CLI**: Command-line interface for job management
-- **Admin UI** (default): Web-based interface at http://localhost:5173
-- **Node.js** (if needed): Automatically installed if not present or upgraded if version < 18
 
-**Behavior:**
-- **Default**: Installs RNX CLI + Admin UI (requires Node.js 18+)
-- **With `--cli-only`**: Installs only RNX CLI (skips Admin UI and Node.js)
-- If Node.js is already installed with version 18+, it will be reused
-- If Node.js is missing or too old, Homebrew will install/upgrade it automatically
+### Joblet Admin UI (Standalone Package)
+
+The Admin UI is now available as a separate repository. After installing the RNX CLI, you can optionally install the admin interface:
+
+```bash
+# Clone the joblet-admin repository
+git clone https://github.com/ehsaniara/joblet-admin
+cd joblet-admin
+
+# Install dependencies
+npm install
+
+# Start the admin interface
+npm run dev
+
+# Access at http://localhost:3000
+```
+
+**Requirements for Admin UI:**
+- Node.js 18+ required
+- Requires configured RNX client with valid connection to Joblet server
+- Connects directly to Joblet server via gRPC
+
+**Learn more**: See the [Admin UI Documentation](./ADMIN_UI.md) for complete setup and usage instructions.
 
 ### Manual Binary Installation
 

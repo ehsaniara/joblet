@@ -129,11 +129,8 @@ and manage jobs.
 # Add the Joblet tap
 brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
 
-# Install RNX with Admin UI support
-brew install ehsaniara/joblet/rnx --with-admin
-
-# Or install CLI only (without Admin UI)
-# brew install ehsaniara/joblet/rnx --without-admin
+# Install RNX CLI
+brew install ehsaniara/joblet/rnx
 
 # Verify installation
 rnx --version
@@ -182,12 +179,11 @@ rnx job run echo "Hello from macOS client!"
 
 ## Part 3: Running the Admin UI
 
-The Admin UI provides a beautiful web interface for managing jobs, viewing logs, and monitoring your Joblet cluster.
+The Admin UI provides a beautiful web interface for managing jobs, viewing logs, and monitoring your Joblet cluster. It's now available as a standalone package that connects directly to the Joblet server via gRPC.
 
 ### Prerequisites
 
-If you installed RNX via Homebrew with `--with-admin`, the Admin UI is already set up. For manual installation, you'll
-need Node.js 18+:
+You'll need Node.js 18+ to run the Admin UI:
 
 ```bash
 # Check if Node.js is installed
@@ -197,18 +193,23 @@ node --version
 brew install node
 ```
 
-### Starting the Admin UI
+### Installing and Starting the Admin UI
 
 ```bash
-# Start the Admin UI (default port 5173)
-rnx admin
+# Clone the joblet-admin repository (separate from main Joblet repo)
+git clone https://github.com/ehsaniara/joblet-admin
+cd joblet-admin
 
-# Or specify a custom port
-rnx admin --port 8080
+# Install dependencies
+npm install
 
-# The UI will open automatically in your browser
-# If not, navigate to http://localhost:5173
+# Start the admin interface
+npm run dev
+
+# The UI will be available at http://localhost:3000
 ```
+
+**Note**: The Admin UI connects directly to the Joblet server via gRPC using the protobuf definitions from [joblet-proto](https://github.com/ehsaniara/joblet-proto).
 
 ### Admin UI Features
 

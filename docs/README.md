@@ -39,8 +39,8 @@ seamless integration with existing infrastructure through a unified gRPC API and
 
 - **RNX Command-Line Interface**: Cross-platform client supporting Linux, macOS, and Windows environments with full
   feature parity
-- **Administrative Web Console**: React-based management dashboard providing real-time system monitoring and job
-  orchestration capabilities
+- **Joblet Admin UI**: [Standalone React-based management dashboard](https://github.com/ehsaniara/joblet-admin) providing real-time system monitoring and job
+  orchestration capabilities via direct gRPC connectivity
 - **Log Aggregation**: Streaming log infrastructure with advanced filtering, pattern matching, and retention policies
 - **Runtime Catalog**: Curated collection of production-ready runtime environments including Python, Python ML with CUDA
   libraries, and JVM-based platforms
@@ -205,7 +205,7 @@ rnx job run --max-memory=1024 --runtime=python-3.11-ml \
 - [**Runtime System**](./RUNTIME_SYSTEM.md) - Pre-built environments for instant execution
 - [**Volume Management**](./VOLUME_MANAGEMENT.md) - Persistent and temporary storage
 - [**Network Management**](./NETWORK_MANAGEMENT.md) - Network isolation and custom networks
-- [**Web Admin UI**](./ADMIN_UI.md) - React-based interface for visual management
+- [**Joblet Admin UI**](./ADMIN_UI.md) - [Standalone React-based interface](https://github.com/ehsaniara/joblet-admin) for visual management with direct gRPC connectivity
 
 ### Advanced Topics
 

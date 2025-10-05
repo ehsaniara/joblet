@@ -9,7 +9,6 @@ all: proto
 	@go mod download
 	@./scripts/build-version.sh rnx bin
 	@GOOS=linux GOARCH=amd64 ./scripts/build-version.sh joblet bin
-	@cd admin/ui && npm install && npm run build
 	@echo "Build complete"
 
 proto:
@@ -19,7 +18,7 @@ proto:
 
 
 clean:
-	rm -rf bin/ dist/ api/gen/ admin/ui/dist/ admin/ui/node_modules/
+	rm -rf bin/ dist/ api/gen/
 
 deploy: all
 	@echo "Deploying to $(REMOTE_USER)@$(REMOTE_HOST)..."
@@ -38,7 +37,7 @@ test:
 
 help:
 	@echo "Usage:"
-	@echo "  make all     - Build everything (rnx, joblet, admin-ui)"
+	@echo "  make all     - Build everything (rnx, joblet)"
 	@echo "  make proto   - Generate proto files"
 	@echo "  make clean   - Remove build artifacts"
 	@echo "  make deploy  - Deploy to remote server"

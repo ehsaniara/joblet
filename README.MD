@@ -30,7 +30,6 @@ letting you focus on your applications rather than infrastructure complexity.
   access control
 - **🐍 Runtime Environments**: Pre-configured Python ML, Java, and GraalVM environments eliminate container image
   management
-- **🎨 Management Interface**: Modern React-based web UI for comprehensive system administration and monitoring
 
 ## 📦 Getting Started
 
@@ -68,14 +67,12 @@ sudo systemctl start joblet
 ```bash
 # Add the Joblet tap
 brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
-brew install rnx              # Installs RNX CLI + Admin UI (default, requires Node.js 18+)
-brew install rnx --cli-only   # CLI only (without Admin UI and Node.js)
+brew install rnx              # Installs RNX CLI
 
 # Copy configuration from server
 scp user@joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
-**Note**: Admin UI requires Node.js 18+. If not installed or version is too old, Homebrew will automatically install/upgrade it.
 
 #### Windows
 
@@ -99,8 +96,6 @@ rnx job list                           # List current jobs
 rnx job run echo "Hello from Joblet!" # Execute a simple test job
 rnx monitor status                     # Check server health
 
-# Launch Web UI (if installed with --with-admin):
-rnx admin                              # Opens dashboard at http://localhost:5173
 ```
 
 ### D. Python SDK Usage (Alternative to CLI)
@@ -173,12 +168,28 @@ rnx job run --schedule="2025-12-25T00:00:00" maintenance.py
 
 ## 🎨 Web Administration Interface
 
-Available on macOS via Homebrew with `--with-admin` option:
+The Joblet Admin UI is available as a standalone package at [joblet-admin repository](https://github.com/ehsaniara/joblet-admin):
 
 - **📊 System Monitoring**: Real-time CPU, memory, disk, and network metrics with visual dashboards
 - **🎮 Job Management**: Comprehensive job listing, filtering, control, and log streaming capabilities
 - **🔗 Workflow Visualization**: Interactive dependency graphs and execution timelines
 - **⚙️ System Administration**: Intuitive volume, network, and runtime environment management
+- **⚡ Direct gRPC**: Connects directly to Joblet server via gRPC
+
+To use the admin interface:
+```bash
+# Clone the joblet-admin repository
+git clone https://github.com/ehsaniara/joblet-admin
+cd joblet-admin
+
+# Install and run
+npm install
+npm run dev
+
+# Access at http://localhost:3000
+```
+
+**Learn more**: See the [Admin UI Documentation](docs/ADMIN_UI.md)
 
 ## 📊 System Requirements
 

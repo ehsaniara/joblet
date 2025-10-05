@@ -34,7 +34,6 @@ operations.
     - [version](#rnx-version)
     - [monitor](#rnx-monitor)
     - [nodes](#rnx-nodes)
-    - [admin](#rnx-admin)
     - [config-help](#rnx-config-help)
     - [help](#rnx-help)
 
@@ -1145,33 +1144,6 @@ rnx --node=production job list
 rnx --node=staging job run echo "test"
 ```
 
-### `rnx admin`
-
-Launch the Joblet Admin UI server.
-
-```bash
-rnx admin [flags]
-```
-
-#### Flags
-
-| Flag             | Description                   | Default   |
-|------------------|-------------------------------|-----------|
-| `--port, -p`     | Port to run the admin server  | 5173      |
-| `--bind-address` | Address to bind the server to | "0.0.0.0" |
-
-#### Examples
-
-```bash
-# Start admin UI with default settings
-rnx admin
-
-# Use custom port
-rnx admin --port 8080
-
-# Bind to all interfaces
-rnx admin --bind-address 0.0.0.0 --port 5173
-```
 
 ### `rnx config-help`
 

@@ -97,7 +97,6 @@ func init() {
 	rootCmd.AddCommand(resources.NewNetworkCmd())
 	rootCmd.AddCommand(resources.NewVolumeCmd())
 	rootCmd.AddCommand(resources.NewRuntimeCmd())
-	rootCmd.AddCommand(NewAdminCmd())
 	// Add --version flag support
 	AddVersionFlag(rootCmd)
 }

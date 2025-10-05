@@ -1,1 +1,0 @@
-export {ResourceAvailability} from './ResourceAvailability';
