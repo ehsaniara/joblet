@@ -1,5 +1,7 @@
 import express from 'express';
 import {execRnx} from '../utils/rnxExecutor.js';
+import {spawn} from 'child_process';
+import {config} from '../config.js';
 
 const router = express.Router();
 
@@ -288,6 +290,161 @@ router.delete('/', async (req, res) => {
         res.status(500).json({
             error: 'Failed to delete all jobs',
             message: error.message
+        });
+    }
+});
+
+// Get job metrics
+router.get('/:jobId/metrics', async (req, res) => {
+    try {
+        const {jobId} = req.params;
+        const node = req.query.node;
+
+        // For HTTP endpoint, we only want a quick snapshot of recent metrics
+        // Use spawn to get the first few samples and then kill the process
+        const args = ['job', 'metrics', jobId, '--json'];
+
+        // Add node parameter if provided
+        if (node && node !== 'default') {
+            args.unshift('--node', node);
+        }
+
+        const process = spawn(config.RNX_PATH, args, {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        let buffer = '';
+        let error = '';
+        const samples = [];
+        let hasStarted = false;
+        let responseSet = false;
+        const maxSamples = 1; // Get just the first sample for HTTP endpoint
+
+        process.stdout.on('data', (data) => {
+            hasStarted = true;
+            buffer += data.toString();
+
+            // Try to parse complete JSON objects from the buffer as data streams in
+            let braceCount = 0;
+            let jsonStart = -1;
+
+            for (let i = 0; i < buffer.length; i++) {
+                const char = buffer[i];
+
+                if (char === '{') {
+                    if (braceCount === 0) {
+                        jsonStart = i;
+                    }
+                    braceCount++;
+                } else if (char === '}') {
+                    braceCount--;
+
+                    if (braceCount === 0 && jsonStart >= 0) {
+                        // Found complete JSON object
+                        const jsonStr = buffer.substring(jsonStart, i + 1);
+
+                        try {
+                            const metricData = JSON.parse(jsonStr);
+                            samples.push(metricData);
+
+                            // For HTTP endpoint, return immediately after first sample
+                            if (samples.length >= maxSamples && !responseSet) {
+                                responseSet = true;
+                                clearTimeout(timeout);
+                                process.kill();
+                                res.json(samples);
+                                return;
+                            }
+                        } catch (e) {
+                            // Continue looking for valid JSON
+                        }
+
+                        // Remove processed JSON from buffer
+                        buffer = buffer.substring(i + 1);
+                        i = -1; // Reset loop
+                        jsonStart = -1;
+                    }
+                }
+            }
+        });
+
+        process.stderr.on('data', (data) => {
+            error += data.toString();
+        });
+
+        // Set a longer timeout to wait for metrics to start
+        const timeout = setTimeout(() => {
+            if (!hasStarted && samples.length === 0) {
+                console.log('Metrics stream timeout - no data received for job:', jobId);
+            }
+            process.kill();
+        }, 30000); // 30 second timeout for initial data
+
+        process.on('close', (code) => {
+            clearTimeout(timeout);
+
+            // Only send response if we haven't already sent one
+            if (!responseSet) {
+                // Try to parse any remaining buffer content after process closes
+                if (buffer && buffer.trim()) {
+                    try {
+                        // Use the same JSON parsing logic as WebSocket handler
+                        let braceCount = 0;
+                        let jsonStart = -1;
+
+                        for (let i = 0; i < buffer.length; i++) {
+                            const char = buffer[i];
+
+                            if (char === '{') {
+                                if (braceCount === 0) {
+                                    jsonStart = i;
+                                }
+                                braceCount++;
+                            } else if (char === '}') {
+                                braceCount--;
+
+                                if (braceCount === 0 && jsonStart >= 0) {
+                                    // Found complete JSON object
+                                    const jsonStr = buffer.substring(jsonStart, i + 1);
+
+                                    try {
+                                        const metricData = JSON.parse(jsonStr);
+                                        samples.push(metricData);
+                                        // For HTTP endpoint, just get the first sample
+                                        break;
+                                    } catch (e) {
+                                        // Continue looking for valid JSON
+                                    }
+
+                                    jsonStart = -1;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse accumulated metrics output:', e.message);
+                    }
+                }
+
+                if (samples.length > 0) {
+                    res.json(samples);
+                } else if (error.includes('no metrics available')) {
+                    res.json([]);
+                } else {
+                    res.status(500).json({
+                        error: 'Failed to get job metrics',
+                        message: error || 'No metrics data received',
+                        id: jobId
+                    });
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error(`Failed to get job metrics for ${req.params.jobId}:`, error);
+        res.status(500).json({
+            error: 'Failed to get job metrics',
+            message: error.message,
+            id: req.params.jobId
         });
     }
 });

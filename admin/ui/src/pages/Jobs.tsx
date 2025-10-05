@@ -6,6 +6,7 @@ import {apiService} from '../services/apiService';
 import {Job} from '../types/job';
 import {ChevronLeft, ChevronRight, FileText, Play, Plus, Square, Trash2, X, XCircle} from 'lucide-react';
 import {SimpleJobBuilder} from '../components/JobBuilder/SimpleJobBuilder';
+import {JobMetrics} from '../components/JobMetrics/JobMetrics';
 
 const Jobs: React.FC = () => {
     const {t} = useTranslation();
@@ -26,7 +27,7 @@ const Jobs: React.FC = () => {
         deleteAllJobs
     } = useJobs();
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'logs' | 'details'>('logs');
+    const [activeTab, setActiveTab] = useState<'logs' | 'details' | 'metrics'>('logs');
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [jobLoading, setJobLoading] = useState<boolean>(false);
     const [stoppingJobId, setStoppingJobId] = useState<string | null>(null);
@@ -697,6 +698,16 @@ rnx job delete-all
                                 >
                                     Details
                                 </button>
+                                <button
+                                    onClick={() => setActiveTab('metrics')}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                        activeTab === 'metrics'
+                                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                                    }`}
+                                >
+                                    Metrics
+                                </button>
                             </nav>
                         </div>
 
@@ -1145,6 +1156,11 @@ rnx job delete-all
                                         </div>
                                     )}
                                 </div>
+                            )}
+
+                            {/* Metrics Tab */}
+                            {activeTab === 'metrics' && selectedJobId && (
+                                <JobMetrics jobId={selectedJobId} />
                             )}
                         </div>
                     </div>

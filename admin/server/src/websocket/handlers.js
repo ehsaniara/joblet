@@ -305,6 +305,118 @@ export function handleRuntimeInstallStream(ws, buildJobId, node) {
     });
 }
 
+export function handleJobMetricsStream(ws, jobId) {
+    let isAlive = true;
+    let metricsProcess = null;
+    let buffer = '';
+
+    ws.send(JSON.stringify({
+        type: 'connection',
+        message: `Connected to metrics stream for job ${jobId}`,
+        jobId: jobId,
+        time: new Date().toISOString()
+    }));
+
+    // Start the metrics streaming process - this will show historical data first,
+    // then continue with live streaming for running jobs
+    metricsProcess = spawn(config.RNX_PATH, ['job', 'metrics', jobId, '--json'], {
+        stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    metricsProcess.stdout.on('data', (data) => {
+        if (!isAlive) return;
+
+        buffer += data.toString();
+
+        // Try to parse complete JSON objects from the buffer
+        let braceCount = 0;
+        let jsonStart = -1;
+
+        for (let i = 0; i < buffer.length; i++) {
+            const char = buffer[i];
+
+            if (char === '{') {
+                if (braceCount === 0) {
+                    jsonStart = i;
+                }
+                braceCount++;
+            } else if (char === '}') {
+                braceCount--;
+
+                if (braceCount === 0 && jsonStart >= 0) {
+                    // Found complete JSON object
+                    const jsonStr = buffer.substring(jsonStart, i + 1);
+
+                    try {
+                        const metricData = JSON.parse(jsonStr);
+                        ws.send(JSON.stringify({
+                            type: 'metrics',
+                            jobId: jobId,
+                            data: metricData,
+                            time: new Date().toISOString()
+                        }));
+                    } catch (e) {
+                        // Skip invalid JSON
+                        console.warn('Failed to parse metrics JSON:', e.message);
+                    }
+
+                    // Remove processed JSON from buffer
+                    buffer = buffer.substring(i + 1);
+                    i = -1; // Reset loop
+                    jsonStart = -1;
+                }
+            }
+        }
+    });
+
+    metricsProcess.stderr.on('data', (data) => {
+        if (!isAlive) return;
+
+        const errorOutput = data.toString();
+        console.error('Metrics stream error for job', jobId, ':', errorOutput);
+
+        // Check if it's the "no metrics available" error
+        if (errorOutput.includes('no metrics available')) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                jobId: jobId,
+                message: 'No metrics available for this job. Metrics collection may not be enabled.',
+                time: new Date().toISOString()
+            }));
+        } else {
+            // Send other errors
+            const errorLines = errorOutput.split('\n').filter(line => line.trim());
+            errorLines.forEach(line => {
+                ws.send(JSON.stringify({
+                    type: 'error',
+                    jobId: jobId,
+                    message: line,
+                    time: new Date().toISOString()
+                }));
+            });
+        }
+    });
+
+    metricsProcess.on('close', (code) => {
+        if (!isAlive) return;
+
+        ws.send(JSON.stringify({
+            type: 'connection',
+            message: `Metrics stream for job ${jobId} ended (exit code: ${code})`,
+            jobId: jobId,
+            time: new Date().toISOString()
+        }));
+    });
+
+    // Cleanup on WebSocket close
+    ws.on('close', () => {
+        isAlive = false;
+        if (metricsProcess && !metricsProcess.killed) {
+            metricsProcess.kill();
+        }
+    });
+}
+
 export function handleMonitorStream(ws, node) {
     const interval = setInterval(async () => {
         try {

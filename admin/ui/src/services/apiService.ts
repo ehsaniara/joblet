@@ -30,7 +30,7 @@ interface Node {
 }
 
 export const API_BASE_URL = (import.meta as any).env?.DEV
-    ? 'http://localhost:5173'
+    ? 'http://localhost:5174'
     : '';
 
 class APIService {
@@ -160,6 +160,11 @@ class APIService {
 
     async getJobLogs(jobId: string): Promise<{ logs: string[] }> {
         return this.request<{ logs: string[] }>(`/jobs/${jobId}/logs`);
+    }
+
+    async getJobMetrics(jobId: string, watch = false): Promise<any[]> {
+        const url = watch ? `/jobs/${jobId}/metrics?watch=true` : `/jobs/${jobId}/metrics`;
+        return this.request<any[]>(url);
     }
 
     // System monitoring

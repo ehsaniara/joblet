@@ -1,5 +1,6 @@
 import {WebSocketServer} from 'ws';
 import {
+    handleJobMetricsStream,
     handleLogStream,
     handleMonitorStream,
     handleRuntimeInstallStream,
@@ -32,6 +33,10 @@ export function setupWebSocket(server) {
             const buildJobId = pathname.replace('/ws/runtime-install/', '');
             const node = searchParams.get('node');
             handleRuntimeInstallStream(ws, buildJobId, node);
+        } else if (pathname.startsWith('/ws/metrics/')) {
+            // Job metrics streaming
+            const jobId = pathname.replace('/ws/metrics/', '');
+            handleJobMetricsStream(ws, jobId);
         } else {
             ws.close(1000, 'Unknown WebSocket endpoint');
         }
