@@ -104,8 +104,8 @@ func (f *ComponentFactory) CreateServices() (*ServiceComponents, error) {
 func (f *ComponentFactory) createJobStore() (adapters.JobStorer, error) {
 	f.logger.Debug("creating job store adapter")
 
-	// We're using a straightforward approach here - no need to overcomplicate things
-	adapter := adapters.NewJobStore(f.logger)
+	// Create job store with buffer configuration for pub-sub and log persistence
+	adapter := adapters.NewJobStore(&f.config.Buffers, f.logger)
 
 	f.logger.Info("job store adapter created successfully")
 	return adapter, nil

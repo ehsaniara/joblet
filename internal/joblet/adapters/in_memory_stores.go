@@ -6,27 +6,35 @@ import (
 
 	"joblet/internal/joblet/domain"
 	"joblet/internal/joblet/pubsub"
+	"joblet/pkg/config"
 	"joblet/pkg/logger"
 )
 
 // Direct constructors to replace the over-engineered factory pattern
 
-// NewJobStore creates a simplified job store directly without factory abstraction
-func NewJobStore(logger *logger.Logger) JobStorer {
-	// Use existing complex adapter for now - simplification would require more extensive changes
-	// The complexity is needed for log streaming and pub-sub functionality
+// NewJobStore creates a job store with buffer configuration and log persistence
+func NewJobStore(cfg *config.BuffersConfig, logger *logger.Logger) JobStorer {
 	store := &SimpleJobStore{
 		jobs:   make(map[string]*domain.Job),
 		logger: logger.WithField("component", "job-store"),
 	}
 
-	// Simple pub-sub without complex configuration
+	// Use configured pubsub buffer size
+	bufferSize := 10000 // Default
+	if cfg != nil && cfg.PubsubBufferSize > 0 {
+		bufferSize = cfg.PubsubBufferSize
+	}
+
 	pubsubSystem := pubsub.NewPubSub[JobEvent](
-		pubsub.WithBufferSize[JobEvent](10000), // Reasonable default
+		pubsub.WithBufferSize[JobEvent](bufferSize),
 	)
 
-	// Simple log manager without abstraction layers
 	logMgr := NewSimpleLogManager()
+
+	// Create with log persistence if configured
+	if cfg != nil && cfg.LogPersistence.Directory != "" {
+		return NewJobStorerWithLogPersistence(store, logMgr, pubsubSystem, &cfg.LogPersistence, logger)
+	}
 
 	return NewJobStorer(store, logMgr, pubsubSystem, logger)
 }

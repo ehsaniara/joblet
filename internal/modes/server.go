@@ -66,7 +66,7 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 
-	jobStoreAdapter := adapters.NewJobStore(log)
+	jobStoreAdapter := adapters.NewJobStore(&cfg.Buffers, log)
 	defer func() {
 		if closeErr := jobStoreAdapter.Close(); closeErr != nil {
 			log.Error("error closing job store adapter", "error", closeErr)
@@ -451,7 +451,7 @@ func writeFileInChunks(path string, content []byte, mode os.FileMode, logger *lo
 	defer file.Close()
 
 	// Get chunk size from configuration
-	chunkSize := cfg.Buffers.DefaultConfig.ChunkSize
+	chunkSize := cfg.Buffers.ChunkSize
 	if chunkSize <= 0 {
 		return fmt.Errorf("invalid chunk size in configuration: %d", chunkSize)
 	}

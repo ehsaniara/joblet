@@ -141,23 +141,11 @@ type Node struct {
 	CA      string `yaml:"ca"`               // Embedded PEM CA certificate
 }
 
-// BuffersConfig holds consolidated buffer and pub-sub configuration
+// BuffersConfig holds buffer and pub-sub configuration
 type BuffersConfig struct {
-	DefaultConfig  BufferDefaultConfig  `yaml:"default_config" json:"default_config"`
-	LogPersistence LogPersistenceConfig `yaml:"log_persistence" json:"log_persistence"`
-}
-
-// BufferDefaultConfig holds default buffer configuration (consolidated with pub-sub settings)
-type BufferDefaultConfig struct {
-	Type                 string        `yaml:"type" json:"type"`
-	InitialCapacity      int64         `yaml:"initial_capacity" json:"initial_capacity"`
-	MaxCapacity          int64         `yaml:"max_capacity" json:"max_capacity"`
-	MaxSubscribers       int           `yaml:"max_subscribers" json:"max_subscribers"`
-	SubscriberBufferSize int           `yaml:"subscriber_buffer_size" json:"subscriber_buffer_size"`
-	PubsubBufferSize     int           `yaml:"pubsub_buffer_size" json:"pubsub_buffer_size"`
-	EnableMetrics        bool          `yaml:"enable_metrics" json:"enable_metrics"`
-	UploadTimeout        time.Duration `yaml:"upload_timeout" json:"upload_timeout"`
-	ChunkSize            int           `yaml:"chunk_size" json:"chunk_size"`
+	PubsubBufferSize int                  `yaml:"pubsub_buffer_size" json:"pubsub_buffer_size"` // Pub-sub channel buffer size
+	ChunkSize        int                  `yaml:"chunk_size" json:"chunk_size"`                 // Chunk size for streaming
+	LogPersistence   LogPersistenceConfig `yaml:"log_persistence" json:"log_persistence"`       // Log persistence config
 }
 
 // LogPersistenceConfig holds configuration for job log persistence to disk
@@ -277,17 +265,8 @@ var DefaultConfig = Config{
 		CloudDetection:  true,
 	},
 	Buffers: BuffersConfig{
-		DefaultConfig: BufferDefaultConfig{
-			Type:                 "memory",
-			InitialCapacity:      2097152,          // 2MB initial buffer for high-throughput
-			MaxCapacity:          0,                // Unlimited for production
-			MaxSubscribers:       0,                // Unlimited for production
-			SubscriberBufferSize: 1000,             // Large channel buffer for high concurrency
-			PubsubBufferSize:     10000,            // Large pub-sub channel buffer (consolidated from pubsub section)
-			EnableMetrics:        false,            // Disabled for maximum performance
-			UploadTimeout:        10 * time.Minute, // Extended timeout for large uploads
-			ChunkSize:            1048576,          // 1MB chunks for optimal streaming
-		},
+		PubsubBufferSize: 10000,   // Large pub-sub channel buffer for high-throughput
+		ChunkSize:        1048576, // 1MB chunks for optimal streaming
 		LogPersistence: LogPersistenceConfig{
 			Directory:         "/opt/joblet/logs",
 			RetentionDays:     7,

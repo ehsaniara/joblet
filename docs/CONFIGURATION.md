@@ -10,6 +10,7 @@ Comprehensive guide to configuring Joblet server and RNX client.
     - [Network Configuration](#network-configuration)
     - [Volume Configuration](#volume-configuration)
     - [Security Settings](#security-settings)
+    - [Buffer and Log Persistence Configuration](#buffer-and-log-persistence-configuration)
     - [Logging Configuration](#logging-configuration)
 - [Client Configuration](#client-configuration)
     - [Single Node Setup](#single-node-setup)
@@ -257,6 +258,45 @@ security:
     log_failed_auth: true
     log_job_operations: true
 ```
+
+### Buffer and Log Persistence Configuration
+
+```yaml
+buffers:
+  # Pub-sub configuration for job events and log streaming
+  pubsub_buffer_size: 10000      # Pub-sub channel buffer for high-throughput (default: 10000)
+  chunk_size: 1048576            # 1MB chunks for optimal streaming performance (default: 1MB)
+
+  # Job log persistence to disk - provides durable logs that survive server restarts
+  log_persistence:
+    directory: "/opt/joblet/logs"       # Directory to store job log files
+    retention_days: 7                   # Number of days to keep log files before cleanup
+    rotation_size_bytes: 2097152        # 2MB - rotate log file when it reaches this size
+
+    # Async log system configuration - HPC-optimized for high throughput
+    queue_size: 100000                  # Async queue size for rate decoupling (100k default)
+    memory_limit: 1073741824            # 1GB memory limit for overflow protection
+    batch_size: 100                     # Batch size for efficient disk writes
+    flush_interval: "100ms"             # Periodic flush interval for low latency
+    overflow_strategy: "compress"       # Options: compress, spill, sample, alert
+```
+
+**Buffer System Tuning:**
+
+- `pubsub_buffer_size`: Channel buffer size for job event streaming (default: 10000)
+- `chunk_size`: Chunk size for upload/download streaming operations (default: 1MB)
+
+**Log Persistence Tuning:**
+
+- `queue_size`: Larger values handle bigger bursts (100k = ~100MB at 1KB/chunk)
+- `memory_limit`: Total system memory for overflow protection (default: 1GB)
+- `batch_size`: Larger batches = more efficient disk I/O, higher latency
+- `flush_interval`: Lower values = lower latency, higher CPU overhead
+- `overflow_strategy`: Choose based on requirements:
+  - `compress`: Best for memory efficiency (default)
+  - `spill`: Best for guaranteed complete logs
+  - `sample`: Best for extreme burst scenarios
+  - `alert`: Best for debugging/monitoring
 
 ### Logging Configuration
 
