@@ -142,13 +142,13 @@ func (nm *NetworkMonitor) collectStats() {
 	nm.mutex.Lock()
 	defer nm.mutex.Unlock()
 
-	// TODO: Implement actual network statistics collection
-	// - Read network interface statistics from /proc/net/dev or /sys/class/net
-	// - Parse namespace-specific statistics
-	// - Calculate bandwidth usage per job and network
-	// - Update the stats maps
+	// NOTE: Real network statistics collection not yet implemented
+	// Feature: Read actual stats from /proc/net/dev or /sys/class/net
+	// Impact: Current stats are simulated/fake - not suitable for production monitoring
+	// Workaround: Use external monitoring tools (prometheus node_exporter, etc.)
+	// Priority: High - required for accurate network billing/monitoring
 
-	// Currently simulating stats collection for development
+	// Currently using simulated stats for development/testing
 	for jobID := range nm.limits {
 		if nm.jobStats[jobID] == nil {
 			nm.jobStats[jobID] = &BandwidthStats{
@@ -167,9 +167,11 @@ func (nm *NetworkMonitor) collectStats() {
 
 // applyBandwidthLimits applies traffic control limits
 func (nm *NetworkMonitor) applyBandwidthLimits(jobID string, limits *NetworkLimits) error {
-	// TODO: Implement actual bandwidth limiting with traffic control
-	// - Use tc (traffic control) commands to set ingress/egress limits
-	// - Configure qdisc (queuing discipline) for the job's veth interface
+	// NOTE: Traffic control (tc) bandwidth limiting not yet implemented
+	// Feature: Use Linux tc command to enforce ingress/egress rate limits
+	// Impact: Network limits are currently not enforced - jobs can use unlimited bandwidth
+	// Workaround: Rely on external firewalls or network policies
+	// Priority: High - required for multi-tenant environments
 	// - Set up token bucket filters for burst handling
 	// - Handle IPv4/IPv6 traffic separately if needed
 

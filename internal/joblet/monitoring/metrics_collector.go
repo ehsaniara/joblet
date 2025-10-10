@@ -513,3 +513,8 @@ func (s *Service) collectAndStoreSystemMetrics() {
 	s.mu.Unlock()
 
 }
+
+// GetCloudDetector returns the cloud detector instance
+func (s *Service) GetCloudDetector() *cloud.Detector {
+	return s.cloudDetector
+}

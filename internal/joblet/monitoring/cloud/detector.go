@@ -28,7 +28,7 @@ func NewDetector() *Detector {
 	return &Detector{
 		logger: logger.WithField("component", "cloud-detector"),
 		client: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: DefaultDetectionTimeout,
 		},
 	}
 }
@@ -36,7 +36,7 @@ func NewDetector() *Detector {
 // DetectCloudEnvironment detects the current cloud environment
 func (d *Detector) DetectCloudEnvironment(ctx context.Context) (*domain.CloudInfo, error) {
 	// Cache results for 1 hour since cloud metadata doesn't change
-	if d.cached != nil && time.Since(d.lastScan) < time.Hour {
+	if d.cached != nil && time.Since(d.lastScan) < DetectionCacheDuration {
 		return d.cached, nil
 	}
 
@@ -92,11 +92,12 @@ func (d *Detector) detectAWS(ctx context.Context) (*domain.CloudInfo, error) {
 
 // getAWSToken gets an IMDSv2 token
 func (d *Detector) getAWSToken(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "PUT", "http://169.254.169.254/latest/api/token", nil)
+	req, err := http.NewRequestWithContext(ctx, "PUT",
+		fmt.Sprintf("%s/%s/api/token", AWSIMDSEndpoint, AWSIMDSAPIVersion), nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+	req.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", AWSIMDSTokenTTL)
 
 	resp, err := d.client.Do(req)
 	if err != nil {
@@ -118,7 +119,7 @@ func (d *Detector) getAWSToken(ctx context.Context) (string, error) {
 
 // getAWSMetadata retrieves AWS instance metadata
 func (d *Detector) getAWSMetadata(ctx context.Context, token string) (*domain.CloudInfo, error) {
-	baseURL := "http://169.254.169.254/latest/meta-data"
+	baseURL := fmt.Sprintf("%s/%s/meta-data", AWSIMDSEndpoint, AWSIMDSAPIVersion)
 
 	instanceID := d.getMetadataField(ctx, token, baseURL+"/instance-id")
 	instanceType := d.getMetadataField(ctx, token, baseURL+"/instance-type")
@@ -126,7 +127,7 @@ func (d *Detector) getAWSMetadata(ctx context.Context, token string) (*domain.Cl
 	zone := d.getMetadataField(ctx, token, baseURL+"/placement/availability-zone")
 
 	cloudInfo := &domain.CloudInfo{
-		Provider:     "AWS",
+		Provider:     ProviderAWS,
 		Region:       region,
 		Zone:         zone,
 		InstanceID:   instanceID,
@@ -146,7 +147,8 @@ func (d *Detector) getAWSMetadata(ctx context.Context, token string) (*domain.Cl
 
 // detectAzure detects Azure environment
 func (d *Detector) detectAzure(ctx context.Context) (*domain.CloudInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://169.254.169.254/metadata/instance?api-version=2021-02-01", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET",
+		fmt.Sprintf("%s/metadata/instance?api-version=%s", AzureIMDSEndpoint, AzureIMDSAPIVersion), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +182,7 @@ func (d *Detector) detectAzure(ctx context.Context) (*domain.CloudInfo, error) {
 	}
 
 	return &domain.CloudInfo{
-		Provider:       "Azure",
+		Provider:       ProviderAzure,
 		Region:         metadata.Compute.Location,
 		Zone:           metadata.Compute.Zone,
 		InstanceID:     metadata.Compute.VMId,
@@ -469,4 +471,9 @@ func (d *Detector) IsVirtualized() bool {
 	}
 
 	return false
+}
+
+// GetCachedInfo returns cached cloud information without re-detection
+func (d *Detector) GetCachedInfo() *domain.CloudInfo {
+	return d.cached
 }

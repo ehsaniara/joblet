@@ -91,6 +91,7 @@ buffers:
 
   # Job log persistence to disk - provides durable logs that survive server restarts
   log_persistence:
+    enabled: true                 # Enable local disk persistence (set to false for EC2/CloudWatch-only)
     directory: "/opt/joblet/logs" # Directory to store job log files
     retention_days: 7            # Number of days to keep log files before cleanup
     rotation_size_bytes: 2097152  # 2MB - rotate log file when it reaches this size
@@ -101,6 +102,25 @@ buffers:
     batch_size: 100              # Batch size for efficient disk writes
     flush_interval: "100ms"      # Periodic flush interval for low latency
     overflow_strategy: "compress" # Options: compress, spill, sample, alert
+
+  # AWS CloudWatch Logs integration - cloud-native log management
+  aws_cloudwatch:
+    enabled: false               # Disabled by default (auto-enabled for EC2 deployment)
+    region: ""                   # AWS region (auto-detected from EC2 metadata if empty)
+    auth_method: "iam_role"      # Auth method: iam_role, credentials, profile
+    log_group: "/aws/joblet/"    # CloudWatch log group (instance ID appended if on EC2)
+    log_stream_prefix: "job-"    # Log stream prefix (job ID will be appended)
+    create_log_group: true       # Auto-create log group if it doesn't exist
+    batch_max_events: 10000      # Max events per batch (CloudWatch limit: 10000)
+    batch_interval: "1s"         # Batch flush interval
+    compression: true            # Enable compression before upload
+    sampling_enabled: false      # Enable log sampling for cost optimization
+    sample_debug_rate: 0.1       # Debug log sampling rate (0.1 = 10%)
+    sample_trace_rate: 0.01      # Trace log sampling rate (0.01 = 1%)
+    retention_days: 30           # CloudWatch log retention in days (0 = never expire)
+    queue_size: 10000            # Async queue size for rate decoupling
+    max_retries: 3               # Max retries for failed uploads
+    retry_interval: "5s"         # Retry interval for failed uploads
 
 # Volume management configuration
 volumes:

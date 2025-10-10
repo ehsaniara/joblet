@@ -110,8 +110,11 @@ func NewAsyncMetricsSystem(config *domain.MetricsConfig, logger *logger.Logger) 
 		logger.Error("failed to create metrics directory", "error", err, "dir", baseDir)
 	}
 
-	// TODO: Implement retention cleanup - delete metrics files older than config.Storage.Retention.Days
-	// This should run periodically (e.g., daily) to clean up old metrics and prevent disk space issues
+	// NOTE: Retention cleanup is not yet implemented
+	// Feature: Automatic deletion of metrics files older than config.Storage.Retention.Days
+	// Impact: Without this, old metrics accumulate and may fill disk over time
+	// Workaround: Manual cleanup or external log rotation (e.g., logrotate)
+	// Priority: Medium - implement when disk usage becomes an issue
 
 	// Start background workers
 	system.startWorkers()

@@ -31,8 +31,8 @@ func NewJobStore(cfg *config.BuffersConfig, logger *logger.Logger) JobStorer {
 
 	logMgr := NewSimpleLogManager()
 
-	// Create with log persistence if configured
-	if cfg != nil && cfg.LogPersistence.Directory != "" {
+	// Create with log persistence if enabled and configured
+	if cfg != nil && cfg.LogPersistence.Enabled && cfg.LogPersistence.Directory != "" {
 		return NewJobStorerWithLogPersistence(store, logMgr, pubsubSystem, &cfg.LogPersistence, logger)
 	}
 

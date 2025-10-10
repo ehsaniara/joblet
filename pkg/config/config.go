@@ -146,10 +146,12 @@ type BuffersConfig struct {
 	PubsubBufferSize int                  `yaml:"pubsub_buffer_size" json:"pubsub_buffer_size"` // Pub-sub channel buffer size
 	ChunkSize        int                  `yaml:"chunk_size" json:"chunk_size"`                 // Chunk size for streaming
 	LogPersistence   LogPersistenceConfig `yaml:"log_persistence" json:"log_persistence"`       // Log persistence config
+	AWSCloudWatch    AWSCloudWatchConfig  `yaml:"aws_cloudwatch" json:"aws_cloudwatch"`         // AWS CloudWatch integration
 }
 
 // LogPersistenceConfig holds configuration for job log persistence to disk
 type LogPersistenceConfig struct {
+	Enabled           bool   `yaml:"enabled" json:"enabled"` // Enable local disk persistence (default: true for on-prem, false for EC2)
 	Directory         string `yaml:"directory" json:"directory"`
 	RetentionDays     int    `yaml:"retention_days" json:"retention_days"`
 	RotationSizeBytes int64  `yaml:"rotation_size_bytes" json:"rotation_size_bytes"`
@@ -160,6 +162,26 @@ type LogPersistenceConfig struct {
 	BatchSize        int           `yaml:"batch_size" json:"batch_size"`               // Batch size for disk writes
 	FlushInterval    time.Duration `yaml:"flush_interval" json:"flush_interval"`       // Periodic flush interval
 	OverflowStrategy string        `yaml:"overflow_strategy" json:"overflow_strategy"` // compress, spill, sample, alert
+}
+
+// AWSCloudWatchConfig holds AWS CloudWatch Logs integration configuration
+type AWSCloudWatchConfig struct {
+	Enabled         bool          `yaml:"enabled" json:"enabled"`                     // Enable CloudWatch integration
+	Region          string        `yaml:"region" json:"region"`                       // AWS region (auto-detected from EC2 metadata if empty)
+	AuthMethod      string        `yaml:"auth_method" json:"auth_method"`             // Auth method: iam_role, credentials, profile
+	LogGroup        string        `yaml:"log_group" json:"log_group"`                 // CloudWatch log group name
+	LogStreamPrefix string        `yaml:"log_stream_prefix" json:"log_stream_prefix"` // Log stream prefix (job ID will be appended)
+	CreateLogGroup  bool          `yaml:"create_log_group" json:"create_log_group"`   // Auto-create log group if missing
+	BatchMaxEvents  int           `yaml:"batch_max_events" json:"batch_max_events"`   // Max events per batch (max 10000)
+	BatchInterval   time.Duration `yaml:"batch_interval" json:"batch_interval"`       // Batch flush interval
+	Compression     bool          `yaml:"compression" json:"compression"`             // Enable compression before upload
+	SamplingEnabled bool          `yaml:"sampling_enabled" json:"sampling_enabled"`   // Enable log sampling for cost optimization
+	SampleDebugRate float64       `yaml:"sample_debug_rate" json:"sample_debug_rate"` // Debug log sampling rate (0.0-1.0)
+	SampleTraceRate float64       `yaml:"sample_trace_rate" json:"sample_trace_rate"` // Trace log sampling rate (0.0-1.0)
+	RetentionDays   int           `yaml:"retention_days" json:"retention_days"`       // CloudWatch log retention in days (0 = never expire)
+	QueueSize       int           `yaml:"queue_size" json:"queue_size"`               // Async queue size for rate decoupling
+	MaxRetries      int           `yaml:"max_retries" json:"max_retries"`             // Max retries for failed uploads
+	RetryInterval   time.Duration `yaml:"retry_interval" json:"retry_interval"`       // Retry interval for failed uploads
 }
 
 // VolumesConfig holds volume management configuration
@@ -268,6 +290,7 @@ var DefaultConfig = Config{
 		PubsubBufferSize: 10000,   // Large pub-sub channel buffer for high-throughput
 		ChunkSize:        1048576, // 1MB chunks for optimal streaming
 		LogPersistence: LogPersistenceConfig{
+			Enabled:           true, // Enabled by default (set to false for EC2/CloudWatch-only)
 			Directory:         "/opt/joblet/logs",
 			RetentionDays:     7,
 			RotationSizeBytes: 2097152, // 2MB per file before rotation
@@ -278,6 +301,24 @@ var DefaultConfig = Config{
 			BatchSize:        100,                    // 100 chunks per batch
 			FlushInterval:    100 * time.Millisecond, // Fast flush for low latency
 			OverflowStrategy: "compress",             // Compress by default
+		},
+		AWSCloudWatch: AWSCloudWatchConfig{
+			Enabled:         false,           // Disabled by default (auto-enabled for EC2)
+			Region:          "",              // Auto-detect from EC2 metadata
+			AuthMethod:      "iam_role",      // Use IAM instance profile
+			LogGroup:        "/aws/joblet/",  // Will append instance ID if on EC2
+			LogStreamPrefix: "job-",          // Prefix for log streams
+			CreateLogGroup:  true,            // Auto-create log group
+			BatchMaxEvents:  10000,           // Max CloudWatch batch size
+			BatchInterval:   1 * time.Second, // 1 second batch interval
+			Compression:     true,            // Enable compression
+			SamplingEnabled: false,           // Disabled by default
+			SampleDebugRate: 0.1,             // 10% debug sampling
+			SampleTraceRate: 0.01,            // 1% trace sampling
+			RetentionDays:   30,              // 30 days retention
+			QueueSize:       10000,           // 10k event queue
+			MaxRetries:      3,               // 3 retries for failed uploads
+			RetryInterval:   5 * time.Second, // 5s retry interval
 		},
 	},
 	Volumes: VolumesConfig{

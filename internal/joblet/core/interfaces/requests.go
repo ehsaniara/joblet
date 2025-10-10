@@ -43,7 +43,7 @@ type StartJobRequest struct {
 	GPUMemoryMB int64 // Minimum GPU memory requirement in MB (0 = any)
 
 	// Workflow integration
-	WorkflowUuid     string   // UUID of parent workflow (empty for individual jobs)
+	WorkflowUUID     string   // UUID of parent workflow (empty for individual jobs)
 	WorkingDirectory string   // Execution directory path
 	Dependencies     []string // Job names this job depends on (workflow jobs only)
 }

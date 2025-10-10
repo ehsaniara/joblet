@@ -4,6 +4,20 @@ set -e
 # Source debconf library
 . /usr/share/debconf/confmodule
 
+# ============================================================================
+# Configuration Constants
+# ============================================================================
+
+# AWS EC2 Metadata Service Configuration
+readonly AWS_IMDS_ENDPOINT="${AWS_IMDS_ENDPOINT:-http://169.254.169.254}"
+readonly AWS_IMDS_TIMEOUT="${AWS_IMDS_TIMEOUT:-2}"  # Timeout in seconds
+
+# Detection Timeout Configuration
+readonly DETECTION_TIMEOUT="${DETECTION_TIMEOUT:-1}"  # Quick detection timeout
+
+# System Paths for Cloud Detection
+readonly HYPERVISOR_UUID_PATH="${HYPERVISOR_UUID_PATH:-/sys/hypervisor/uuid}"
+
 detect_internal_ip() {
     # Try multiple methods to get the most reliable internal IP
     local ip=""
@@ -25,13 +39,14 @@ detect_internal_ip() {
 }
 
 is_ec2_instance() {
-    if curl -s --max-time 1 --connect-timeout 1 http://169.254.169.254/latest/dynamic/instance-identity/document >/dev/null 2>&1; then
+    if curl -s --max-time ${DETECTION_TIMEOUT} --connect-timeout ${DETECTION_TIMEOUT} \
+        ${AWS_IMDS_ENDPOINT}/latest/dynamic/instance-identity/document >/dev/null 2>&1; then
         return 0
     fi
 
     # Check hypervisor UUID if exists
-    if [ -r /sys/hypervisor/uuid ]; then
-        if grep -qi "^ec2" /sys/hypervisor/uuid 2>/dev/null; then
+    if [ -r "${HYPERVISOR_UUID_PATH}" ]; then
+        if grep -qi "^ec2" "${HYPERVISOR_UUID_PATH}" 2>/dev/null; then
             return 0
         fi
     fi
@@ -50,7 +65,8 @@ is_ec2_instance() {
 
 get_ec2_metadata() {
     local metadata_item="$1"
-    local result=$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/$metadata_item 2>/dev/null)
+    local result=$(curl -s --max-time ${AWS_IMDS_TIMEOUT} \
+        ${AWS_IMDS_ENDPOINT}/latest/meta-data/$metadata_item 2>/dev/null)
     echo "$result"
 }
 

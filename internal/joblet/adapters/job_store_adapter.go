@@ -888,3 +888,8 @@ func (t *taskWrapper) cleanupSubscribers() {
 	// after job completion. The buffer will be closed when the entire
 	// adapter is shut down.
 }
+
+// GetPubSub returns the pubsub system for external subscribers (e.g., CloudWatch)
+func (a *jobStoreAdapter) GetPubSub() pubsub.PubSub[JobEvent] {
+	return a.pubsub
+}

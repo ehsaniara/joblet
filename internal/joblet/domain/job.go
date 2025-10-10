@@ -76,7 +76,7 @@ type Job struct {
 	Runtime string   // Runtime specification (kept as string for backward compatibility)
 
 	// Workflow integration
-	WorkflowUuid     string       // UUID of parent workflow (empty for individual jobs)
+	WorkflowUUID     string       // UUID of parent workflow (empty for individual jobs)
 	WorkingDirectory string       // Execution directory path
 	Uploads          []FileUpload // Files uploaded with the job
 	Dependencies     []string     // Job names this job depends on (workflow jobs only)

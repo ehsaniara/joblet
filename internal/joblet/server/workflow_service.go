@@ -1204,7 +1204,7 @@ func (s *WorkflowServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJob
 		WorkDir:           job.WorkingDirectory,
 		Uploads:           s.convertUploadsToStringArray(job.Uploads),
 		Dependencies:      job.Dependencies,
-		WorkflowUuid:      job.WorkflowUuid,
+		WorkflowUuid:      job.WorkflowUUID,
 		NodeId:            job.NodeId, // Unique identifier of the Joblet node
 	}, nil
 }

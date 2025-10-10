@@ -43,7 +43,7 @@ type BuildRequest struct {
 	Environment       map[string]string
 	SecretEnvironment map[string]string
 	JobType           domain.JobType
-	WorkflowUuid      string
+	WorkflowUUID      string
 	WorkingDirectory  string
 	Uploads           []domain.FileUpload
 	Dependencies      []string
@@ -56,9 +56,9 @@ type BuildRequest struct {
 // applies resource defaults, and validates configuration.
 func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	// Generate UUID
-	jobUuid := b.idGenerator.Next()
+	jobUUID := b.idGenerator.Next()
 
-	b.logger.Debug("building job", "jobUuid", jobUuid, "command", req.Command)
+	b.logger.Debug("building job", "jobUUID", jobUUID, "command", req.Command)
 
 	// Create job - debug all field values
 	volumes := b.copyStrings(req.Volumes)
@@ -66,7 +66,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	runtime := req.Runtime
 
 	b.logger.Debug("building job with all fields",
-		"jobUuid", jobUuid,
+		"jobUUID", jobUUID,
 		"network", network,
 		"volumes", volumes,
 		"runtime", runtime,
@@ -75,19 +75,19 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		"hasRuntime", runtime != "")
 
 	job := &domain.Job{
-		Uuid:              jobUuid,
+		Uuid:              jobUUID,
 		Command:           req.Command,
 		Args:              b.copyStrings(req.Args),
 		Type:              b.determineJobType(req), // Set job type
 		Status:            domain.StatusInitializing,
-		CgroupPath:        b.generateCgroupPath(jobUuid),
+		CgroupPath:        b.generateCgroupPath(jobUUID),
 		StartTime:         time.Now(),
 		Network:           req.Network,
 		Volumes:           volumes,
 		Runtime:           req.Runtime,
 		Environment:       b.copyEnvironment(req.Environment),
 		SecretEnvironment: b.copyEnvironment(req.SecretEnvironment),
-		WorkflowUuid:      req.WorkflowUuid,
+		WorkflowUUID:      req.WorkflowUUID,
 		WorkingDirectory:  req.WorkingDirectory,
 		Uploads:           req.Uploads,
 		Dependencies:      b.copyStrings(req.Dependencies),
@@ -109,7 +109,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	}
 
 	b.logger.Debug("job built successfully",
-		"jobUuid", jobUuid,
+		"jobUUID", jobUUID,
 		"cpu", job.Limits.CPU.Value(),
 		"memory", job.Limits.Memory.Megabytes(),
 		"io", job.Limits.IOBandwidth.BytesPerSecond())

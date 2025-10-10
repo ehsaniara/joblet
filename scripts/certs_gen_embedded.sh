@@ -2,7 +2,29 @@
 
 set -e
 
+# ============================================================================
+# Configuration Constants
+# ============================================================================
+
+# AWS EC2 Metadata Service (IMDS) Configuration
+readonly AWS_IMDS_ENDPOINT="${AWS_IMDS_ENDPOINT:-http://169.254.169.254}"
+readonly AWS_IMDS_TOKEN_TTL="${AWS_IMDS_TOKEN_TTL:-21600}"  # 6 hours in seconds
+readonly AWS_IMDS_TIMEOUT="${AWS_IMDS_TIMEOUT:-2}"          # Timeout in seconds
+
+# Detection Timeout Configuration
+readonly DETECTION_TIMEOUT="${DETECTION_TIMEOUT:-2}"        # General detection timeout in seconds
+
+# System Paths for Cloud Detection
+readonly HYPERVISOR_UUID_PATH="${HYPERVISOR_UUID_PATH:-/sys/hypervisor/uuid}"
+readonly DMI_VENDOR_PATHS="${DMI_VENDOR_PATHS:-/sys/class/dmi/id/sys_vendor /sys/class/dmi/id/bios_vendor /sys/class/dmi/id/board_vendor}"
+
+# Environment Type Constants
+readonly ENV_TYPE_AWS_EC2="AWS_EC2"
+readonly ENV_TYPE_ON_PREMISES="ON_PREMISES"
+
+# ============================================================================
 # Colors for output
+# ============================================================================
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -169,6 +191,46 @@ read_cert_for_yaml() {
     done < "$file"
 }
 
+# AWS EC2 Detection and Auto-Configuration
+detect_aws_ec2() {
+    print_info "Detecting cloud environment..."
+
+    # Try IMDSv2 (most reliable method for EC2)
+    local TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: ${AWS_IMDS_TOKEN_TTL}" \
+            --max-time ${AWS_IMDS_TIMEOUT} --silent --fail \
+            ${AWS_IMDS_ENDPOINT}/latest/api/token 2>/dev/null)
+
+    if [ -n "$TOKEN" ]; then
+        local INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+                      --max-time ${AWS_IMDS_TIMEOUT} --silent --fail \
+                      ${AWS_IMDS_ENDPOINT}/latest/meta-data/instance-id 2>/dev/null)
+
+        if [ -n "$INSTANCE_ID" ]; then
+            local REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+                          --max-time ${AWS_IMDS_TIMEOUT} --silent --fail \
+                          ${AWS_IMDS_ENDPOINT}/latest/meta-data/placement/region 2>/dev/null)
+
+            echo "${ENV_TYPE_AWS_EC2}|$INSTANCE_ID|$REGION"
+            return 0
+        fi
+    fi
+
+    # Fallback: Check system files
+    if [ -f "${HYPERVISOR_UUID_PATH}" ] && grep -q "^ec2" "${HYPERVISOR_UUID_PATH}" 2>/dev/null; then
+        echo "${ENV_TYPE_AWS_EC2}|unknown|"
+        return 0
+    fi
+
+    echo "${ENV_TYPE_ON_PREMISES}||"
+    return 1
+}
+
+# Detect environment
+ENV_INFO=$(detect_aws_ec2)
+ENV_TYPE=$(echo "$ENV_INFO" | cut -d'|' -f1)
+INSTANCE_ID=$(echo "$ENV_INFO" | cut -d'|' -f2)
+AWS_REGION=$(echo "$ENV_INFO" | cut -d'|' -f3)
+
 # Update server configuration with embedded certificates
 print_info "Updating server configuration with embedded certificates..."
 SERVER_TEMPLATE="$TEMPLATE_DIR/joblet-config-template.yml"
@@ -185,6 +247,42 @@ if [ -f "$SERVER_TEMPLATE" ]; then
     # Update server address and nodeId in the config
     sed -i "s/address: \".*\"/address: \"$SERVER_ADDRESS\"/" "$SERVER_CONFIG"
     sed -i "s/nodeId: \"\"/nodeId: \"$NODE_ID\"/" "$SERVER_CONFIG"
+
+    # Auto-configure based on environment
+    if [ "$ENV_TYPE" = "${ENV_TYPE_AWS_EC2}" ]; then
+        print_success "AWS EC2 environment detected!"
+        echo "  Instance ID: ${INSTANCE_ID:-unknown}"
+        echo "  Region: ${AWS_REGION:-auto-detect}"
+
+        print_info "Applying cloud-optimized configuration..."
+
+        # Disable local log persistence (optimize EBS usage)
+        sed -i 's/^\(\s*\)enabled: true\s*# Enable local disk persistence.*/\1enabled: false                # Disabled for EC2 (using CloudWatch)/' "$SERVER_CONFIG"
+
+        # Enable CloudWatch
+        sed -i 's/^\(\s*\)enabled: false\s*# Disabled by default (auto-enabled for EC2.*/\1enabled: true                # Auto-enabled for EC2 deployment/' "$SERVER_CONFIG"
+
+        # Set region if detected
+        if [ -n "$AWS_REGION" ]; then
+            sed -i "s|^\(\s*\)region: \"\".*# AWS region|\1region: \"$AWS_REGION\"         # Auto-detected from EC2 metadata|" "$SERVER_CONFIG"
+        fi
+
+        # Update log group with instance ID
+        if [ -n "$INSTANCE_ID" ]; then
+            sed -i "s|log_group: \"/aws/joblet/\".*|log_group: \"/aws/joblet/$INSTANCE_ID\" # Instance-specific log group|" "$SERVER_CONFIG"
+        fi
+
+        print_success "Cloud-optimized configuration applied:"
+        echo "  ✓ Local disk logs: DISABLED (optimize EBS usage)"
+        echo "  ✓ CloudWatch Logs: ENABLED"
+        echo "  ✓ Region: ${AWS_REGION:-auto-detect at runtime}"
+        echo "  ✓ Log Group: /aws/joblet/${INSTANCE_ID:-[instance-id]}"
+    else
+        print_info "On-premises environment detected"
+        print_info "Using standard configuration:"
+        echo "  ✓ Local disk logs: ENABLED (/opt/joblet/logs)"
+        echo "  ✗ CloudWatch Logs: DISABLED"
+    fi
 
     # Append security section with embedded certificates
     cat >> "$SERVER_CONFIG" << EOF

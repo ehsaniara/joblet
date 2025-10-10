@@ -133,6 +133,45 @@ func RunServer(cfg *config.Config) error {
 	}()
 	log.Info("monitoring service started successfully")
 
+	// Initialize CloudWatch collector if enabled
+	var cloudWatchCollector *adapters.CloudWatchCollector
+	if cfg.Buffers.AWSCloudWatch.Enabled {
+		cloudDetector := monitoringService.GetCloudDetector()
+		if cloudDetector != nil {
+			collector, err := adapters.NewCloudWatchCollector(
+				&cfg.Buffers.AWSCloudWatch,
+				cloudDetector,
+				log,
+			)
+			if err != nil {
+				log.Warn("failed to create CloudWatch collector", "error", err)
+			} else {
+				cloudWatchCollector = collector
+
+				// Subscribe to job log pub-sub
+				if jobStoreWithPubSub, ok := jobStoreAdapter.(interface {
+					GetPubSub() pubsub.PubSub[adapters.JobEvent]
+				}); ok {
+					if err := cloudWatchCollector.SubscribeToPubSub(jobStoreWithPubSub.GetPubSub()); err != nil {
+						log.Error("failed to subscribe CloudWatch to pub-sub", "error", err)
+					} else {
+						log.Info("CloudWatch log collector started successfully",
+							"logGroup", cfg.Buffers.AWSCloudWatch.LogGroup,
+							"region", cfg.Buffers.AWSCloudWatch.Region)
+					}
+				}
+
+				defer func() {
+					if closeErr := cloudWatchCollector.Close(); closeErr != nil {
+						log.Error("error closing CloudWatch collector", "error", closeErr)
+					}
+				}()
+			}
+		} else {
+			log.Warn("CloudWatch enabled but cloud detector not available")
+		}
+	}
+
 	// Start gRPC server with configuration using new adapters
 	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, metricsStoreAdapter, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
 	if err != nil {

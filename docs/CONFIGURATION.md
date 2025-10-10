@@ -298,6 +298,106 @@ buffers:
   - `sample`: Best for extreme burst scenarios
   - `alert`: Best for debugging/monitoring
 
+**AWS CloudWatch Logs Integration:**
+
+CloudWatch integration provides cloud-native log management for AWS deployments:
+
+```yaml
+buffers:
+  aws_cloudwatch:
+    enabled: false               # Disabled by default (auto-enabled for EC2 deployment)
+    region: ""                   # AWS region (auto-detected from EC2 metadata if empty)
+    auth_method: "iam_role"      # Auth method: iam_role, credentials, profile
+    log_group: "/aws/joblet/"    # CloudWatch log group (instance ID appended if on EC2)
+    log_stream_prefix: "job-"    # Log stream prefix (job ID will be appended)
+    create_log_group: true       # Auto-create log group if it doesn't exist
+    batch_max_events: 10000      # Max events per batch (CloudWatch limit: 10000)
+    batch_interval: "1s"         # Batch flush interval
+    compression: true            # Enable compression before upload
+    sampling_enabled: false      # Enable log sampling for cost optimization
+    sample_debug_rate: 0.1       # Debug log sampling rate (0.1 = 10%)
+    sample_trace_rate: 0.01      # Trace log sampling rate (0.01 = 1%)
+    retention_days: 30           # CloudWatch log retention in days (0 = never expire)
+    queue_size: 10000            # Async queue size for rate decoupling
+    max_retries: 3               # Max retries for failed uploads
+    retry_interval: "5s"         # Retry interval for failed uploads
+```
+
+**CloudWatch Configuration:**
+
+- `enabled`: Enable CloudWatch integration (auto-enabled for EC2 instances)
+- `region`: AWS region (auto-detected from EC2 metadata if not specified)
+- `auth_method`: Authentication method
+  - `iam_role`: Use EC2 instance profile (recommended for EC2)
+  - `credentials`: Use AWS credentials file
+  - `profile`: Use specific AWS profile
+- `log_group`: CloudWatch log group name (instance ID auto-appended on EC2)
+- `log_stream_prefix`: Prefix for log streams (job ID appended)
+- `create_log_group`: Auto-create log group if missing
+- `batch_max_events`: Max events per batch (CloudWatch limit: 10000)
+- `batch_interval`: How often to flush batches to CloudWatch
+- `compression`: Compress logs before upload (reduces costs)
+- `sampling_enabled`: Enable log sampling to reduce costs
+  - `sample_debug_rate`: Sampling rate for DEBUG logs (0.0-1.0)
+  - `sample_trace_rate`: Sampling rate for TRACE logs (0.0-1.0)
+  - INFO, WARN, ERROR logs are never sampled
+- `retention_days`: CloudWatch log retention (0 = never expire)
+- `queue_size`: Async queue for rate decoupling from AWS API
+- `max_retries`: Retry failed uploads
+- `retry_interval`: Wait time between retries
+
+**Log Persistence Configuration:**
+
+The `log_persistence` section now supports an explicit `enabled` flag:
+
+```yaml
+buffers:
+  log_persistence:
+    enabled: true                 # Enable/disable local disk persistence
+    directory: "/opt/joblet/logs" # Directory for log files
+    retention_days: 7
+    rotation_size_bytes: 2097152
+    queue_size: 100000
+    memory_limit: 1073741824
+    batch_size: 100
+    flush_interval: "100ms"
+    overflow_strategy: "compress"
+```
+
+**Deployment Modes:**
+
+1. **On-Premises (Local Logs Only):**
+   ```yaml
+   buffers:
+     log_persistence:
+       enabled: true
+       directory: "/opt/joblet/logs"
+     aws_cloudwatch:
+       enabled: false
+   ```
+
+2. **AWS EC2 (CloudWatch Only):**
+   ```yaml
+   buffers:
+     log_persistence:
+       enabled: false  # Disable local logs to optimize EBS usage
+     aws_cloudwatch:
+       enabled: true
+       region: ""  # Auto-detected from EC2 metadata
+       auth_method: "iam_role"
+   ```
+
+3. **Hybrid Mode (Both Local and CloudWatch):**
+   ```yaml
+   buffers:
+     log_persistence:
+       enabled: true
+       directory: "/opt/joblet/logs"
+     aws_cloudwatch:
+       enabled: true
+       region: "us-west-2"
+   ```
+
 ### Logging Configuration
 
 ```yaml

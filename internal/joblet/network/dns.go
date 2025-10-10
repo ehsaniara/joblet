@@ -199,12 +199,20 @@ func (dm *DNSManager) ResolveName(hostname string) (net.IP, error) {
 	if ip := net.ParseIP(hostname); ip != nil {
 		return ip, nil
 	}
-	// For a full implementation, this would check hosts files or DNS
+	// NOTE: Full DNS resolution not implemented
+	// Feature: Resolve arbitrary hostnames via DNS or custom hosts file
+	// Impact: Only IP addresses and registered container names work
+	// Workaround: Use IP addresses directly or register containers with AddHost
+	// Priority: Low - basic functionality covers most use cases
 	return nil, fmt.Errorf("hostname resolution not implemented: %s", hostname)
 }
 
 // GetHostname returns the hostname for an IP address
 func (dm *DNSManager) GetHostname(ip net.IP) (string, error) {
-	// Simple implementation - reverse lookup not implemented
+	// NOTE: Reverse DNS lookup not implemented
+	// Feature: Reverse lookup IP → hostname via PTR records
+	// Impact: Cannot resolve IP addresses back to hostnames
+	// Workaround: Track hostnames separately if needed
+	// Priority: Low - rarely needed in container environments
 	return "", fmt.Errorf("reverse hostname lookup not implemented for %s", ip.String())
 }
