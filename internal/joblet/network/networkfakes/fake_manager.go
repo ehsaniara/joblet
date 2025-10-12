@@ -3,8 +3,9 @@ package networkfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/network"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/network"
 )
 
 type FakeManager struct {

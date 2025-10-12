@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 # Use single binary that auto-detects execution mode
-ExecStart=/opt/joblet/joblet
+ExecStart=/opt/joblet/bin/joblet
 Restart=always
 RestartSec=10s
 
@@ -47,7 +47,7 @@ StandardError=journal
 # Environment variables for the main service
 Environment="JOBLET_MODE=server"
 Environment="LOG_LEVEL=INFO"
-Environment="JOBLET_CONFIG_PATH=/opt/joblet/config/server-config.yml"
+Environment="JOBLET_CONFIG_PATH=/opt/joblet/config/joblet-config.yml"
 
 # Cleanup job cgroups on service stop
 ExecStopPost=/bin/bash -c 'find /sys/fs/cgroup/joblet.slice/joblet.service -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true'

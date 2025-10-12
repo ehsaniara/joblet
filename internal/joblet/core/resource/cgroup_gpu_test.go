@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

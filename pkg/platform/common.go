@@ -1,8 +1,8 @@
 package platform
 
 import (
+	"github.com/ehsaniara/joblet/pkg/logger"
 	"io"
-	"joblet/pkg/logger"
 	"os"
 	"os/exec"
 	"syscall"

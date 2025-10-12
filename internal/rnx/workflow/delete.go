@@ -1,7 +1,7 @@
 package workflow
 
 import (
-	"joblet/internal/rnx/jobs"
+	"github.com/ehsaniara/joblet/internal/rnx/jobs"
 
 	"github.com/spf13/cobra"
 )

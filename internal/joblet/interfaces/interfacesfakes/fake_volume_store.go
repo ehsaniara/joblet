@@ -2,9 +2,10 @@
 package interfacesfakes
 
 import (
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/interfaces"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
 )
 
 type FakeVolumeStore struct {

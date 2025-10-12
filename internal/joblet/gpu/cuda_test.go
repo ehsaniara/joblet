@@ -3,7 +3,7 @@ package gpu
 import (
 	"testing"
 
-	"joblet/pkg/platform/platformfakes"
+	"github.com/ehsaniara/joblet/pkg/platform/platformfakes"
 
 	"github.com/stretchr/testify/assert"
 )

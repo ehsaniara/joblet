@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"joblet/internal/rnx/jobs"
+	"github.com/ehsaniara/joblet/internal/rnx/jobs"
 
 	"github.com/spf13/cobra"
 )

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // IOCollector collects system-wide I/O metrics from /proc/diskstats

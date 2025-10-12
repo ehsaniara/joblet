@@ -2,8 +2,9 @@
 package gpufakes
 
 import (
-	"joblet/internal/joblet/gpu"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 )
 
 type FakeGPUDiscoveryInterface struct {

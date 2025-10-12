@@ -2,8 +2,9 @@
 package domainfakes
 
 import (
-	"joblet/internal/joblet/domain"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 type FakeUploadStreamer struct {

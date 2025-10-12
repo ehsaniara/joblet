@@ -2,7 +2,7 @@ package network
 
 import (
 	"fmt"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/logger"
 	"os/exec"
 	"strconv"
 )

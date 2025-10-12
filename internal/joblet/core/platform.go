@@ -5,10 +5,10 @@ package core
 import (
 	"context"
 	"fmt"
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/config"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
 )
 
 // linuxJoblet is a thin wrapper around the Linux joblet

@@ -4,15 +4,15 @@ package isolation
 
 import (
 	"fmt"
-	"joblet/internal/joblet/core/filesystem"
+	"github.com/ehsaniara/joblet/internal/joblet/core/filesystem"
 	"runtime"
 	"strconv"
 	"strings"
 
-	"joblet/pkg/config"
-	"joblet/pkg/errors"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/errors"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // Isolator provides job isolation functionality

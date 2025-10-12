@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

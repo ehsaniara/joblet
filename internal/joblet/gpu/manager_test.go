@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"joblet/internal/joblet/gpu"
-	"joblet/internal/joblet/gpu/gpufakes"
-	"joblet/pkg/config"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu/gpufakes"
+	"github.com/ehsaniara/joblet/pkg/config"
 )
 
 func TestManager_AllocateGPUs_NoGPUsAvailable(t *testing.T) {

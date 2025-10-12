@@ -1,8 +1,8 @@
 package server
 
 import (
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/metrics/domain"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 )
 
 // convertMetricsSampleToProto converts domain JobMetricsSample to protobuf

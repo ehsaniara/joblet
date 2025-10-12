@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/pubsub"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Direct constructors to replace the over-engineered factory pattern

@@ -2,7 +2,7 @@ package interfaces
 
 import (
 	"context"
-	"joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

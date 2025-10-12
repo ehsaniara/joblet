@@ -7,19 +7,20 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"joblet/internal/joblet"
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/core/volume"
-	metricsdomain "joblet/internal/joblet/metrics/domain"
-	"joblet/internal/joblet/monitoring"
-	"joblet/internal/joblet/pubsub"
-	"joblet/internal/joblet/server"
-	"joblet/internal/modes/isolation"
-	"joblet/internal/modes/jobexec"
-	"joblet/pkg/config"
-	"joblet/pkg/constants"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
+	"github.com/ehsaniara/joblet/internal/joblet/ipc"
+	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/internal/joblet/server"
+	"github.com/ehsaniara/joblet/internal/modes/isolation"
+	"github.com/ehsaniara/joblet/internal/modes/jobexec"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/constants"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -115,6 +116,38 @@ func RunServer(cfg *config.Config) error {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
+	// Initialize IPC manager for joblet-persist integration (logs and metrics)
+	var ipcManager *ipc.Manager
+	if cfg.IPC.Enabled {
+		ipcConfig := &ipc.ManagerConfig{
+			Enabled:        cfg.IPC.Enabled,
+			Socket:         cfg.IPC.Socket,
+			BufferSize:     cfg.IPC.BufferSize,
+			ReconnectDelay: cfg.IPC.ReconnectDelay,
+			MaxReconnects:  cfg.IPC.MaxReconnects,
+		}
+
+		var err error
+		// Pass both log and metrics pub/sub instances
+		ipcManager, err = ipc.NewManager(
+			ipcConfig,
+			jobStoreAdapter.PubSub(), // Log pub/sub
+			metricsPubSub,            // Metrics pub/sub
+			log,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create IPC manager: %w", err)
+		}
+
+		if err := ipcManager.Start(); err != nil {
+			return fmt.Errorf("failed to start IPC manager: %w", err)
+		}
+
+		log.Info("IPC manager started successfully (logs and metrics)", "socket", cfg.IPC.Socket)
+	} else {
+		log.Debug("IPC disabled in configuration")
+	}
+
 	// Initialize default networks from configuration
 	if e := initializeDefaultNetworks(networkStoreAdapter, cfg, log); e != nil {
 		log.Error("failed to initialize default networks", "error", e)
@@ -154,6 +187,16 @@ func RunServer(cfg *config.Config) error {
 
 	// Graceful shutdown
 	grpcServer.GracefulStop()
+
+	// Stop IPC manager if it was started
+	if ipcManager != nil {
+		if err := ipcManager.Stop(); err != nil {
+			log.Error("error stopping IPC manager", "error", err)
+		} else {
+			log.Info("IPC manager stopped successfully")
+		}
+	}
+
 	log.Info("server stopped gracefully")
 
 	return nil

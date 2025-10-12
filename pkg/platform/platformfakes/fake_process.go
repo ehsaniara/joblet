@@ -2,8 +2,9 @@
 package platformfakes
 
 import (
-	"joblet/pkg/platform"
 	"sync"
+
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 type FakeProcess struct {

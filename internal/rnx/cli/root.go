@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"joblet/internal/rnx/common"
-	"joblet/internal/rnx/jobs"
-	"joblet/internal/rnx/resources"
-	"joblet/internal/rnx/workflow"
-	"joblet/pkg/config"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
+	"github.com/ehsaniara/joblet/internal/rnx/jobs"
+	"github.com/ehsaniara/joblet/internal/rnx/resources"
+	"github.com/ehsaniara/joblet/internal/rnx/workflow"
+	"github.com/ehsaniara/joblet/pkg/config"
 
 	"github.com/spf13/cobra"
 )

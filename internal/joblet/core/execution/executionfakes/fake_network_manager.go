@@ -3,8 +3,9 @@ package executionfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/core/execution"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
 )
 
 type FakeNetworkManager struct {

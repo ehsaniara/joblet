@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	pb "joblet/api/gen"
-	"joblet/internal/rnx/common"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"os"
 	"time"
 

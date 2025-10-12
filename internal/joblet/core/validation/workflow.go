@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"joblet/internal/joblet/core/volume"
-	"joblet/internal/joblet/runtime"
-	"joblet/internal/joblet/workflow/types"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
+	"github.com/ehsaniara/joblet/internal/joblet/runtime"
+	"github.com/ehsaniara/joblet/internal/joblet/workflow/types"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // WorkflowValidator provides comprehensive validation of workflow definitions

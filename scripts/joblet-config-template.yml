@@ -1,4 +1,11 @@
+# Unified Joblet Configuration
+# This file configures both joblet (main service) and joblet-persist (persistence service)
+
 version: "3.0"
+
+# ============================================================================
+# JOBLET MAIN SERVICE CONFIGURATION
+# ============================================================================
 
 server:
   address: "0.0.0.0"
@@ -56,7 +63,7 @@ filesystem:
     - "/usr/lib64"
     # Network configuration files
     - "/etc/resolv.conf"        # DNS resolver configuration
-    - "/etc/hosts"              # Local hostname resolution  
+    - "/etc/hosts"              # Local hostname resolution
     - "/etc/nsswitch.conf"      # Name service switch configuration
     # SSL certificate directories
     - "/etc/ssl"
@@ -132,3 +139,104 @@ runtime:
 
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
+
+# ============================================================================
+# JOBLET-PERSIST SERVICE CONFIGURATION
+# This section configures the persistence service for historical logs/metrics
+# ============================================================================
+
+persist:
+  server:
+    grpc_address: ":50052"
+    max_connections: 500
+    base_path: "/opt/joblet"
+
+    tls:
+      enabled: false
+      cert_file: "/opt/joblet/config/certs/persist-server.crt"
+      key_file: "/opt/joblet/config/certs/persist-server.key"
+      ca_file: "/opt/joblet/config/certs/ca.crt"
+      client_auth: true
+
+  ipc:
+    socket: "/opt/joblet/run/persist.sock"
+    max_connections: 10
+    max_message_size: 10485760  # 10MB
+    read_buffer: 8388608  # 8MB
+    write_buffer: 8388608  # 8MB
+
+  storage:
+    type: "local"  # "local", "cloudwatch" (v2.0), "s3" (v2.0)
+    base_dir: "/opt/joblet"
+
+    local:
+      logs:
+        directory: "/opt/joblet/logs"
+        format: "jsonl"
+        rotation:
+          max_size_mb: 100
+          max_files: 10
+          compress_rotated: true
+
+      metrics:
+        directory: "/opt/joblet/metrics"
+        format: "jsonl.gz"
+        rotation:
+          max_size_mb: 50
+          max_files: 5
+          compress_rotated: true
+
+      index:
+        enabled: true
+        file: "/opt/joblet/job_index.json"
+        save_interval: "5m"
+
+    retention:
+      logs_days: 7
+      metrics_days: 30
+      cleanup_schedule: "0 2 * * *"  # 2 AM daily
+      archive_before_delete: false
+
+    compression:
+      enabled: true
+      algorithm: "gzip"
+      level: 6
+      compress_extensions:
+        - ".log"
+        - ".jsonl"
+
+  writer:
+    buffer_size: 10485760  # 10MB
+    batch_size: 100
+    flush_interval: "1s"
+    workers: 4
+
+  query:
+    cache:
+      enabled: true
+      max_size_mb: 500
+      ttl: "5m"
+
+    stream:
+      buffer_size: 1000
+      timeout: "30s"
+
+  monitoring:
+    prometheus:
+      enabled: true
+      port: 9092
+      path: "/metrics"
+
+    health:
+      port: 9093
+      path: "/health"
+
+  logging:
+    level: "info"  # debug, info, warn, error
+    format: "json"  # json, text
+    output: "file"  # stdout, file, syslog
+    file:
+      path: "/opt/joblet/joblet-persist.log"
+      max_size: "100MB"
+      max_backups: 3
+      compress: true

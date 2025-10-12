@@ -2,9 +2,10 @@
 package platformfakes
 
 import (
-	"joblet/pkg/platform"
 	"sync"
 	"syscall"
+
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 type FakeCommand struct {

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/domain"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 // JobMapper handles mapping between domain and protobuf with value object support

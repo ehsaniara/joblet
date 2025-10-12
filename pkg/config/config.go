@@ -28,6 +28,7 @@ type Config struct {
 	Runtime    RuntimeConfig    `yaml:"runtime" json:"runtime"`
 	GPU        GPUConfig        `yaml:"gpu" json:"gpu"`
 	JobMetrics JobMetricsConfig `yaml:"job_metrics" json:"job_metrics"`
+	IPC        IPCConfig        `yaml:"ipc" json:"ipc"`
 }
 
 type NetworkConfig struct {
@@ -134,11 +135,12 @@ type ClientConfig struct {
 
 // Node represents a single server configuration with embedded certificates
 type Node struct {
-	Address string `yaml:"address"`
-	NodeId  string `yaml:"nodeId,omitempty"` // Unique identifier of the Joblet node (optional, for display purposes)
-	Cert    string `yaml:"cert"`             // Embedded PEM certificate
-	Key     string `yaml:"key"`              // Embedded PEM private key
-	CA      string `yaml:"ca"`               // Embedded PEM CA certificate
+	Address        string `yaml:"address"`
+	PersistAddress string `yaml:"persistAddress,omitempty"` // joblet-persist service address (optional, defaults to port 50052 on same host)
+	NodeId         string `yaml:"nodeId,omitempty"`         // Unique identifier of the Joblet node (optional, for display purposes)
+	Cert           string `yaml:"cert"`                     // Embedded PEM certificate
+	Key            string `yaml:"key"`                      // Embedded PEM private key
+	CA             string `yaml:"ca"`                       // Embedded PEM CA certificate
 }
 
 // BuffersConfig holds buffer and pub-sub configuration
@@ -187,6 +189,15 @@ type JobMetricsConfig struct {
 	DefaultSampleRate time.Duration `yaml:"default_sample_rate" json:"default_sample_rate"`
 	StorageDir        string        `yaml:"storage_dir" json:"storage_dir"`
 	RetentionDays     int           `yaml:"retention_days" json:"retention_days"`
+}
+
+// IPCConfig holds IPC configuration for joblet-persist integration
+type IPCConfig struct {
+	Enabled        bool          `yaml:"enabled" json:"enabled"`                 // Enable IPC to joblet-persist
+	Socket         string        `yaml:"socket" json:"socket"`                   // Unix socket path
+	BufferSize     int           `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
+	ReconnectDelay time.Duration `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
+	MaxReconnects  int           `yaml:"max_reconnects" json:"max_reconnects"`   // Max reconnection attempts (0 = infinite)
 }
 
 // DefaultConfig provides default configuration values
@@ -307,6 +318,13 @@ var DefaultConfig = Config{
 		DefaultSampleRate: 5 * time.Second, // Sample every 5 seconds
 		StorageDir:        "/opt/joblet/metrics",
 		RetentionDays:     7, // Keep metrics for 7 days
+	},
+	IPC: IPCConfig{
+		Enabled:        false, // Disabled by default - opt-in for joblet-persist integration
+		Socket:         "/opt/joblet/run/persist.sock",
+		BufferSize:     10000,           // 10k message buffer
+		ReconnectDelay: 5 * time.Second, // Retry every 5 seconds
+		MaxReconnects:  0,               // Infinite retries
 	},
 }
 

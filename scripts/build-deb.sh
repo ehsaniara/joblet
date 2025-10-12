@@ -19,30 +19,43 @@ fi
 
 echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 
+# Build all binaries first
+echo "📦 Building all binaries..."
+make all || {
+    echo "❌ Build failed!"
+    exit 1
+}
+
 # Clean and create build directory
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 # Create directory structure
 mkdir -p "$BUILD_DIR/DEBIAN"
-mkdir -p "$BUILD_DIR/opt/joblet"
+mkdir -p "$BUILD_DIR/opt/joblet/bin"
 mkdir -p "$BUILD_DIR/opt/joblet/config"
 mkdir -p "$BUILD_DIR/opt/joblet/scripts"
 mkdir -p "$BUILD_DIR/etc/systemd/system"
 mkdir -p "$BUILD_DIR/usr/local/bin"
 
-# Copy binaries
-if [ ! -f "./joblet" ]; then
+# Copy binaries to /opt/joblet/bin
+if [ ! -f "./bin/joblet" ]; then
     echo "❌ Joblet binary not found!"
     exit 1
 fi
-cp ./joblet "$BUILD_DIR/opt/joblet/"
+cp ./bin/joblet "$BUILD_DIR/opt/joblet/bin/"
 
-if [ ! -f "./rnx" ]; then
+if [ ! -f "./bin/rnx" ]; then
     echo "❌ RNX CLI binary not found!"
     exit 1
 fi
-cp ./rnx "$BUILD_DIR/opt/joblet/"
+cp ./bin/rnx "$BUILD_DIR/opt/joblet/bin/"
+
+if [ ! -f "./bin/joblet-persist" ]; then
+    echo "❌ joblet-persist binary not found!"
+    exit 1
+fi
+cp ./bin/joblet-persist "$BUILD_DIR/opt/joblet/bin/"
 
 # Copy template files (NOT actual configs with certificates)
 if [ -f "./scripts/joblet-config-template.yml" ]; then
@@ -61,8 +74,23 @@ else
     exit 1
 fi
 
-# Copy service file
+# Copy joblet-persist installation script
+if [ -f "./debian/joblet-persist-install.sh" ]; then
+    cp ./debian/joblet-persist-install.sh "$BUILD_DIR/opt/joblet/scripts/"
+    chmod +x "$BUILD_DIR/opt/joblet/scripts/joblet-persist-install.sh"
+    echo "✅ Copied joblet-persist-install.sh"
+else
+    echo "⚠️  Warning: joblet-persist-install.sh not found - persistence layer won't be installed"
+fi
+
+# Copy service files
 cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"
+
+# Copy joblet-persist service file if it exists
+if [ -f "./scripts/joblet-persist.service" ]; then
+    cp ./scripts/joblet-persist.service "$BUILD_DIR/opt/joblet/scripts/"
+    echo "✅ Copied joblet-persist.service"
+fi
 
 # Copy certificate generation script (embedded version)
 cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"

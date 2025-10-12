@@ -3,17 +3,17 @@ package core
 import (
 	"path/filepath"
 
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/core/volume"
-	"joblet/internal/joblet/events"
-	"joblet/internal/joblet/monitoring"
-	"joblet/internal/joblet/pubsub"
-	"joblet/internal/joblet/runtime"
-	"joblet/internal/joblet/workflow"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
+	"github.com/ehsaniara/joblet/internal/joblet/events"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/internal/joblet/runtime"
+	"github.com/ehsaniara/joblet/internal/joblet/workflow"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // ComponentFactory is like a smart assembler that knows how to build and connect

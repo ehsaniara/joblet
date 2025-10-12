@@ -3,10 +3,11 @@ package executionfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/core/execution"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/gpu"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 )
 
 type FakeGPUManager struct {

@@ -5,12 +5,12 @@ import (
 	"sync"
 	"time"
 
-	volumeDomain "joblet/internal/joblet/domain"
-	"joblet/internal/joblet/monitoring/cloud"
-	"joblet/internal/joblet/monitoring/collectors"
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
+	volumeDomain "github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/cloud"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/collectors"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // VolumeManagerAdapter is a bridge that lets our monitoring system

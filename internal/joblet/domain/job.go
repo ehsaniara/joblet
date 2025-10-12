@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"joblet/internal/joblet/domain/values"
+	"github.com/ehsaniara/joblet/internal/joblet/domain/values"
 )
 
 // JobStatus represents the current state of a job
@@ -24,12 +24,15 @@ const (
 )
 
 // Legacy constants for backwards compatibility
+//
+// Deprecated: Use Status* constants instead (StatusRunning, StatusCompleted, etc.)
+// These aliases will be removed in v5.0.0. See docs/DEPRECATION.md
 const (
-	JobStatusRunning   = StatusRunning
-	JobStatusCompleted = StatusCompleted
-	JobStatusFailed    = StatusFailed
-	JobStatusScheduled = StatusScheduled
-	JobStatusStopping  = StatusStopping
+	JobStatusRunning   = StatusRunning   // Deprecated: Use StatusRunning
+	JobStatusCompleted = StatusCompleted // Deprecated: Use StatusCompleted
+	JobStatusFailed    = StatusFailed    // Deprecated: Use StatusFailed
+	JobStatusScheduled = StatusScheduled // Deprecated: Use StatusScheduled
+	JobStatusStopping  = StatusStopping  // Deprecated: Use StatusStopping
 )
 
 var (

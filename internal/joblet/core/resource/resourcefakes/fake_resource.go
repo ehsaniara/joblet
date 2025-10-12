@@ -2,8 +2,9 @@
 package resourcefakes
 
 import (
-	"joblet/internal/joblet/core/resource"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/resource"
 )
 
 type FakeResource struct {

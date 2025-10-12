@@ -585,11 +585,135 @@ for field in $REQUIRED_FIELDS; do
 done
 ```
 
+### 7. Persist Service Monitoring
+
+The persist service handles historical log and metric storage. Monitor its health and performance:
+
+```bash
+# Check persist service status (on server)
+ssh server "systemctl status joblet-persist"
+
+# View persist service logs
+ssh server "journalctl -u joblet-persist -n 100 -f"
+
+# Check IPC socket connectivity
+ssh server "ls -la /opt/joblet/run/persist.sock"
+
+# Monitor storage usage for logs and metrics
+ssh server "du -sh /opt/joblet/logs /opt/joblet/metrics"
+
+# Check for persist service errors
+ssh server "journalctl -u joblet-persist --since '1 hour ago' | grep -i error"
+```
+
+**Persist Service Metrics:**
+
+The persist service exposes its own metrics for monitoring:
+
+```bash
+# Persist service health (if gRPC endpoint is enabled)
+curl http://server:9093/health
+
+# Prometheus metrics (if enabled)
+curl http://server:9092/metrics | grep persist_
+```
+
+**Key Metrics to Monitor:**
+
+- **IPC Write Latency**: Average time to write logs/metrics via Unix socket
+- **Storage Usage**: Disk space consumed by `/opt/joblet/logs` and `/opt/joblet/metrics`
+- **Compression Ratio**: Efficiency of gzip compression (typically ~80%)
+- **Query Latency**: Time to retrieve historical logs/metrics
+- **Error Rate**: Failed writes or storage errors
+
+**Storage Management:**
+
+```bash
+# Check current storage usage
+ssh server "df -h /opt/joblet"
+
+# Find largest log directories
+ssh server "du -sh /opt/joblet/logs/* | sort -hr | head -10"
+
+# Check metric storage
+ssh server "du -sh /opt/joblet/metrics/* | sort -hr | head -10"
+
+# Monitor storage growth rate
+ssh server "watch -n 60 'du -sh /opt/joblet/logs /opt/joblet/metrics'"
+```
+
+**Automated Monitoring:**
+
+```bash
+# Log persist metrics to JSONL for analysis
+while true; do
+  ssh server "du -sk /opt/joblet/logs /opt/joblet/metrics" | \
+    awk '{print "{\"timestamp\":" systime() ",\"path\":\"" $2 "\",\"size_kb\":" $1 "}"}' >> persist-metrics.jsonl
+  sleep 300  # Every 5 minutes
+done
+
+# Alert on high storage usage
+THRESHOLD=80  # Alert at 80% usage
+USAGE=$(ssh server "df /opt/joblet | tail -1 | awk '{print \$5}' | sed 's/%//'")
+if [ "$USAGE" -gt "$THRESHOLD" ]; then
+  echo "ALERT: Persist storage at ${USAGE}% (threshold: ${THRESHOLD}%)"
+fi
+```
+
+**Performance Tuning:**
+
+Monitor persist service performance and adjust configuration:
+
+```yaml
+# In /opt/joblet/config/joblet-config.yml
+persist:
+  writer:
+    flush_interval: "1s"      # Increase to reduce I/O, decrease for lower latency
+    batch_size: 100           # Higher = better throughput, more memory
+
+  query:
+    cache:
+      ttl: "5m"               # Cache query results to reduce disk I/O
+    stream:
+      buffer_size: 1024       # Buffer size for streaming queries
+```
+
+**Troubleshooting Persist Service:**
+
+```bash
+# Service not running
+ssh server "sudo systemctl restart joblet-persist"
+
+# Check if socket exists
+ssh server "sudo ls -la /opt/joblet/run/persist.sock"
+
+# Verify socket permissions (should be 600)
+ssh server "sudo stat /opt/joblet/run/persist.sock"
+
+# Test IPC connectivity from joblet service
+ssh server "sudo lsof | grep persist.sock"
+
+# Check for disk space issues
+ssh server "df -h /opt/joblet && df -i /opt/joblet"
+```
+
+**Best Practices:**
+
+1. **Monitor Storage Growth**: Set up alerts for storage thresholds
+2. **Regular Cleanup**: Configure retention policies to auto-delete old data
+3. **Performance Baseline**: Establish normal IPC latency and query times
+4. **Backup Strategy**: Include `/opt/joblet/logs` and `/opt/joblet/metrics` in backups
+5. **Log Rotation**: Ensure persist service logs don't fill up disk
+
+---
+
 ## Related Documentation
 
 - [RNX CLI Reference](./RNX_CLI_REFERENCE.md) - Complete CLI command reference
 - [Volume Management](./VOLUME_MANAGEMENT.md) - Managing persistent volumes
 - [Troubleshooting](./TROUBLESHOOTING.md) - Common issues and solutions
 - [Admin UI](./ADMIN_UI.md) - Web-based monitoring interface
+- [Persist Service Testing](../tests/e2e/PERSIST_TESTING.md) - E2E testing for persist service
+- [Architecture](./ARCHITECTURE.md) - Persist service architecture and communication
 
 For additional help, run `rnx monitor --help` or see the [troubleshooting guide](./TROUBLESHOOTING.md).

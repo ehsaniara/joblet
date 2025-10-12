@@ -5,12 +5,12 @@ package jobexec
 import (
 	"context"
 	"fmt"
-	"joblet/internal/joblet/core/environment"
-	"joblet/internal/joblet/core/upload"
-	"joblet/pkg/config"
-	"joblet/pkg/errors"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
+	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/errors"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 	"os"
 	"path/filepath"
 )

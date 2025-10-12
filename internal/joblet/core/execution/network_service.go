@@ -6,8 +6,8 @@ import (
 	"net"
 	"time"
 
-	"joblet/internal/joblet/network"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/network"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

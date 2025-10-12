@@ -2,9 +2,10 @@ package adapters
 
 import (
 	"context"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/interfaces"
-	"joblet/internal/joblet/network"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/network"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -30,6 +31,9 @@ type JobStorer interface {
 
 	// Cleanup - get rid of jobs and all their stuff when we're done
 	DeleteJob(jobID string) error
+
+	// PubSub access for IPC integration
+	PubSub() pubsub.PubSub[JobEvent]
 
 	// Shutting down gracefully
 	Close() error

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/constants"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/constants"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // ProcessCollector collects process metrics from /proc

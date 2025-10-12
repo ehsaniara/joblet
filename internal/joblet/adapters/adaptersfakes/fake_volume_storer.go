@@ -2,9 +2,10 @@
 package adaptersfakes
 
 import (
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/domain"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 type FakeVolumeStorer struct {

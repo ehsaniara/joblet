@@ -2,9 +2,10 @@
 package networkfakes
 
 import (
-	"joblet/internal/joblet/network"
 	"net"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/network"
 )
 
 type FakeIPPool struct {

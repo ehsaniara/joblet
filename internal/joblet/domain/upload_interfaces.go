@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

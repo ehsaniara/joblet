@@ -26,8 +26,9 @@ type WorkflowYAML struct {
 
 	// DEPRECATED: These fields are kept for backward compatibility but are no longer used
 	// Jobs should define their own environment variables directly
-	Environment       map[string]string `yaml:"environment,omitempty"`        // Deprecated
-	SecretEnvironment map[string]string `yaml:"secret_environment,omitempty"` // Deprecated
+	// See docs/DEPRECATION.md for migration guide. Removal Timeline: v5.0.0
+	Environment       map[string]string `yaml:"environment,omitempty"`        // Deprecated: Use job-level environment
+	SecretEnvironment map[string]string `yaml:"secret_environment,omitempty"` // Deprecated: Use job-level environment
 }
 
 // JobSpec defines the complete specification for a single job within a workflow.
@@ -55,7 +56,8 @@ type JobSpec struct {
 	Environment map[string]string `yaml:"environment,omitempty"`
 
 	// DEPRECATED: Kept for backward compatibility
-	SecretEnvironment map[string]string `yaml:"secret_environment,omitempty"` // Deprecated - use Environment
+	// See docs/DEPRECATION.md. Removal Timeline: v5.0.0
+	SecretEnvironment map[string]string `yaml:"secret_environment,omitempty"` // Deprecated: Merge into Environment field
 }
 
 // JobUploads specifies which files should be uploaded to the job's execution environment.

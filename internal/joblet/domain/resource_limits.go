@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"joblet/internal/joblet/domain/values"
+	"github.com/ehsaniara/joblet/internal/joblet/domain/values"
 )
 
 // ResourceLimits represents resource constraints using proper value objects

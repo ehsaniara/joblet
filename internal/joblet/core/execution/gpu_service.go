@@ -3,9 +3,9 @@ package execution
 import (
 	"context"
 
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/gpu"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // GPUManager defines the interface for GPU resource management within the execution coordinator

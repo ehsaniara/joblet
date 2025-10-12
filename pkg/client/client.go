@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	pb "joblet/api/gen"
-	"joblet/pkg/config"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/pkg/config"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

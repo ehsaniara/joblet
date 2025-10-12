@@ -2,9 +2,10 @@
 package platformfakes
 
 import (
-	"joblet/pkg/platform"
 	"os"
 	"sync"
+
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 type FakeOSOperations struct {

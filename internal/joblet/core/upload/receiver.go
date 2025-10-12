@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // Receiver handles incoming file uploads through pipes

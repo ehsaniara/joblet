@@ -2,8 +2,9 @@
 package executionfakes
 
 import (
-	"joblet/internal/joblet/core/execution"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
 )
 
 type FakeIsolationManager struct {

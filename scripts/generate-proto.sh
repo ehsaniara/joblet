@@ -11,27 +11,24 @@ GEN_DIR="${PROJECT_ROOT}/api/gen"
 
 # Extract proto version from go.mod (single source of truth)
 cd "${PROJECT_ROOT}"
-PROTO_VERSION=$(go list -m github.com/ehsaniara/joblet-proto | awk '{print $2}')
+PROTO_VERSION=$(go list -m github.com/ehsaniara/joblet-proto 2>/dev/null | awk '{print $2}')
 if [ -z "${PROTO_VERSION}" ]; then
-    echo "❌ Error: Could not extract joblet-proto version from go.mod"
-    echo "Make sure github.com/ehsaniara/joblet-proto is in go.mod"
-    exit 1
+    PROTO_VERSION="local"
 fi
 
-PROTO_MODULE="github.com/ehsaniara/joblet-proto@${PROTO_VERSION}"
-
-echo "Generating protobuf code from ${PROTO_MODULE}..."
+echo "Generating protobuf code from joblet-proto ${PROTO_VERSION}..."
 
 # Ensure we're in the project root
 cd "${PROJECT_ROOT}"
 
-# Download the specific proto version directly (ignoring go.mod version)
-echo "Downloading proto module ${PROTO_MODULE}..."
-go mod download "${PROTO_MODULE}"
+# Download from module cache
+echo "Downloading proto module from cache..."
+go mod download github.com/ehsaniara/joblet-proto
 
 # Get the module cache path
 GOMODCACHE=$(go env GOMODCACHE)
-PROTO_PATH="${GOMODCACHE}/${PROTO_MODULE}"
+PROTO_MODULE_PATH=$(go list -m -f '{{.Path}}@{{.Version}}' github.com/ehsaniara/joblet-proto)
+PROTO_PATH="${GOMODCACHE}/${PROTO_MODULE_PATH}"
 
 # Verify the proto module exists
 if [ ! -d "${PROTO_PATH}" ]; then

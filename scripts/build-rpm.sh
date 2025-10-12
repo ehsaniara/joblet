@@ -37,6 +37,13 @@ fi
 
 echo "🔨 Building RPM package for $PACKAGE_NAME v$CLEAN_VERSION ($RPM_ARCH)..."
 
+# Build all binaries first
+echo "📦 Building all binaries..."
+make all || {
+    echo "❌ Build failed!"
+    exit 1
+}
+
 # Get the current date for changelog
 CHANGELOG_DATE=$(date '+%a %b %d %Y')
 
@@ -48,17 +55,23 @@ mkdir -p "$BUILD_DIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 mkdir -p "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}"
 
 # Copy binaries
-if [ ! -f "./joblet" ]; then
+if [ ! -f "./bin/joblet" ]; then
     echo "❌ Joblet binary not found!"
     exit 1
 fi
-cp ./joblet "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
+cp ./bin/joblet "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
 
-if [ ! -f "./rnx" ]; then
+if [ ! -f "./bin/rnx" ]; then
     echo "❌ RNX CLI binary not found!"
     exit 1
 fi
-cp ./rnx "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
+cp ./bin/rnx "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
+
+if [ ! -f "./bin/joblet-persist" ]; then
+    echo "❌ joblet-persist binary not found!"
+    exit 1
+fi
+cp ./bin/joblet-persist "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
 
 # Copy scripts and configs
 cp -r ./scripts "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/" || {
@@ -79,6 +92,20 @@ for file in joblet-config-template.yml rnx-config-template.yml joblet.service ce
         fi
     fi
 done
+
+# Copy joblet-persist installation script and service
+if [ -f "./debian/joblet-persist-install.sh" ]; then
+    cp ./debian/joblet-persist-install.sh "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
+    chmod +x "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/joblet-persist-install.sh"
+    echo "✅ Copied joblet-persist-install.sh"
+else
+    echo "⚠️  Warning: joblet-persist-install.sh not found - persistence layer won't be installed"
+fi
+
+if [ -f "./scripts/joblet-persist.service" ]; then
+    cp ./scripts/joblet-persist.service "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
+    echo "✅ Copied joblet-persist.service"
+fi
 
 # Create the spec file with network support
 cat > "$BUILD_DIR/SPECS/${PACKAGE_NAME}.spec" << EOF
@@ -133,20 +160,30 @@ management, and network isolation features (bridge, isolated, and custom network
 rm -rf \$RPM_BUILD_ROOT
 
 # Create directories
-mkdir -p \$RPM_BUILD_ROOT/opt/joblet
+mkdir -p \$RPM_BUILD_ROOT/opt/joblet/bin
 mkdir -p \$RPM_BUILD_ROOT/opt/joblet/scripts
 mkdir -p \$RPM_BUILD_ROOT/etc/systemd/system
 mkdir -p \$RPM_BUILD_ROOT/usr/local/bin
 mkdir -p \$RPM_BUILD_ROOT/var/lib/joblet
 mkdir -p \$RPM_BUILD_ROOT/etc/modules-load.d
 
-# Install binaries
-cp joblet \$RPM_BUILD_ROOT/opt/joblet/
-cp rnx \$RPM_BUILD_ROOT/opt/joblet/
+# Install binaries to /opt/joblet/bin
+cp joblet \$RPM_BUILD_ROOT/opt/joblet/bin/
+cp rnx \$RPM_BUILD_ROOT/opt/joblet/bin/
+cp joblet-persist \$RPM_BUILD_ROOT/opt/joblet/bin/
 
 # Install config templates and scripts
 cp scripts/joblet-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/rnx-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
+
+# Install joblet-persist installation script and service
+if [ -f scripts/joblet-persist-install.sh ]; then
+    cp scripts/joblet-persist-install.sh \$RPM_BUILD_ROOT/opt/joblet/scripts/
+    chmod +x \$RPM_BUILD_ROOT/opt/joblet/scripts/joblet-persist-install.sh
+fi
+if [ -f scripts/joblet-persist.service ]; then
+    cp scripts/joblet-persist.service \$RPM_BUILD_ROOT/opt/joblet/scripts/
+fi
 
 # Install systemd service
 cp scripts/joblet.service \$RPM_BUILD_ROOT/etc/systemd/system/
@@ -156,7 +193,7 @@ cp scripts/certs_gen_embedded.sh \$RPM_BUILD_ROOT/usr/local/bin/
 chmod +x \$RPM_BUILD_ROOT/usr/local/bin/certs_gen_embedded.sh
 
 # Create symlinks for system-wide commands
-ln -sf /opt/joblet/rnx \$RPM_BUILD_ROOT/usr/local/bin/rnx
+ln -sf /opt/joblet/bin/rnx \$RPM_BUILD_ROOT/usr/local/bin/rnx
 
 # Create br_netfilter module loading config
 cat > \$RPM_BUILD_ROOT/etc/modules-load.d/joblet.conf << 'MODULESEOF'
@@ -183,6 +220,12 @@ echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-joblet.conf
 %post
 # Reload systemd to pick up the service file
 systemctl daemon-reload
+
+# Install joblet-persist companion service
+if [ -f /opt/joblet/scripts/joblet-persist-install.sh ]; then
+    echo "📦 Installing joblet-persist companion service..."
+    /bin/bash /opt/joblet/scripts/joblet-persist-install.sh || echo "⚠️  joblet-persist installation failed"
+fi
 
 # Enable and start the service
 echo "To start Joblet service, run:"
@@ -242,16 +285,20 @@ fi
 
 %files
 %defattr(-,root,root,-)
-/opt/joblet/joblet
-/opt/joblet/rnx
+/opt/joblet/bin/joblet
+/opt/joblet/bin/rnx
+/opt/joblet/bin/joblet-persist
 /opt/joblet/scripts/joblet-config-template.yml
 /opt/joblet/scripts/rnx-config-template.yml
+%attr(0755,root,root) /opt/joblet/scripts/joblet-persist-install.sh
+/opt/joblet/scripts/joblet-persist.service
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
 /usr/local/bin/rnx
 /etc/modules-load.d/joblet.conf
 
 %dir /opt/joblet
+%dir /opt/joblet/bin
 %dir /opt/joblet/scripts
 %dir /var/lib/joblet
 %dir /etc/modules-load.d

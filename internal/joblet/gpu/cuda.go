@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // CUDAVersion represents a CUDA version

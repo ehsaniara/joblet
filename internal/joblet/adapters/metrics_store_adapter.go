@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"joblet/internal/joblet/metrics"
-	"joblet/internal/joblet/metrics/domain"
-	"joblet/internal/joblet/pubsub"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // MetricsStoreAdapter implements metrics storage with pub-sub capabilities

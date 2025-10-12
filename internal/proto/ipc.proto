@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+option go_package = "github.com/ehsaniara/joblet/internal/proto/gen/ipc";
+
+package joblet.ipc;
+
+// IPC Message Types for Unix Socket Communication
+// Used for communication between joblet-core and joblet-persist
+
+// IPCMessage is the wire format for IPC communication
+message IPCMessage {
+  uint32 version = 1;        // Protocol version (currently 1)
+  MessageType type = 2;      // Message type
+  string job_id = 3;         // Job UUID
+  int64 timestamp = 4;       // Unix nanoseconds
+  uint64 sequence = 5;       // Message sequence number
+  bytes data = 6;            // Serialized payload (LogLine or Metric)
+}
+
+// MessageType indicates the type of message
+enum MessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+  MESSAGE_TYPE_LOG = 1;
+  MESSAGE_TYPE_METRIC = 2;
+}
+
+// LogLine represents a single log line from a job
+message LogLine {
+  string job_id = 1;
+  StreamType stream = 2;     // stdout or stderr
+  int64 timestamp = 3;       // Unix nanoseconds
+  uint64 sequence = 4;       // Sequence number
+  bytes content = 5;         // Log line content
+}
+
+// StreamType indicates stdout or stderr
+enum StreamType {
+  STREAM_TYPE_UNSPECIFIED = 0;
+  STREAM_TYPE_STDOUT = 1;
+  STREAM_TYPE_STDERR = 2;
+}
+
+// Metric represents a metrics sample from a job
+message Metric {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  MetricData data = 4;       // Metric values
+}
+
+// MetricData contains the actual metric values
+message MetricData {
+  double cpu_usage = 1;           // CPU usage (0.0 - cores)
+  int64 memory_usage = 2;         // Memory usage in bytes
+  double gpu_usage = 3;           // GPU usage (0.0 - 1.0)
+  DiskIO disk_io = 4;             // Disk I/O statistics
+  NetworkIO network_io = 5;       // Network I/O statistics
+}
+
+// DiskIO represents disk I/O statistics
+message DiskIO {
+  int64 read_bytes = 1;
+  int64 write_bytes = 2;
+  int64 read_ops = 3;
+  int64 write_ops = 4;
+}
+
+// NetworkIO represents network I/O statistics
+message NetworkIO {
+  int64 rx_bytes = 1;
+  int64 tx_bytes = 2;
+  int64 rx_packets = 3;
+  int64 tx_packets = 4;
+}

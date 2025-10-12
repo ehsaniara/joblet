@@ -2,8 +2,8 @@ package interfaces
 
 import (
 	"context"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 // ServiceRegistry centralizes service dependencies to avoid circular imports

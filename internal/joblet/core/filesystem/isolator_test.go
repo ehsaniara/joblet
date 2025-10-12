@@ -3,9 +3,9 @@
 package filesystem
 
 import (
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 	"os"
 	"path/filepath"
 	"strings"

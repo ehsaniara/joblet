@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
+	"github.com/ehsaniara/joblet/pkg/client"
 	"io"
-	"joblet/internal/rnx/common"
-	"joblet/pkg/client"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,7 +14,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	pb "joblet/api/gen"
+	pb "github.com/ehsaniara/joblet/api/gen"
 
 	"github.com/spf13/cobra"
 )

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
 )
 
 // TestIntegration_FullMonitoringWorkflow tests the complete monitoring workflow

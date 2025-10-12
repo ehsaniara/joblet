@@ -3,10 +3,12 @@ package adaptersfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/interfaces"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
 )
 
 type FakeJobStorer struct {
@@ -97,6 +99,16 @@ type FakeJobStorer struct {
 		result1 []byte
 		result2 bool
 		result3 error
+	}
+	PubSubStub        func() pubsub.PubSub[adapters.JobEvent]
+	pubSubMutex       sync.RWMutex
+	pubSubArgsForCall []struct {
+	}
+	pubSubReturns struct {
+		result1 pubsub.PubSub[adapters.JobEvent]
+	}
+	pubSubReturnsOnCall map[int]struct {
+		result1 pubsub.PubSub[adapters.JobEvent]
 	}
 	ResolveJobUUIDStub        func(string) (string, error)
 	resolveJobUUIDMutex       sync.RWMutex
@@ -592,6 +604,59 @@ func (fake *FakeJobStorer) OutputReturnsOnCall(i int, result1 []byte, result2 bo
 		result2 bool
 		result3 error
 	}{result1, result2, result3}
+}
+
+func (fake *FakeJobStorer) PubSub() pubsub.PubSub[adapters.JobEvent] {
+	fake.pubSubMutex.Lock()
+	ret, specificReturn := fake.pubSubReturnsOnCall[len(fake.pubSubArgsForCall)]
+	fake.pubSubArgsForCall = append(fake.pubSubArgsForCall, struct {
+	}{})
+	stub := fake.PubSubStub
+	fakeReturns := fake.pubSubReturns
+	fake.recordInvocation("PubSub", []interface{}{})
+	fake.pubSubMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJobStorer) PubSubCallCount() int {
+	fake.pubSubMutex.RLock()
+	defer fake.pubSubMutex.RUnlock()
+	return len(fake.pubSubArgsForCall)
+}
+
+func (fake *FakeJobStorer) PubSubCalls(stub func() pubsub.PubSub[adapters.JobEvent]) {
+	fake.pubSubMutex.Lock()
+	defer fake.pubSubMutex.Unlock()
+	fake.PubSubStub = stub
+}
+
+func (fake *FakeJobStorer) PubSubReturns(result1 pubsub.PubSub[adapters.JobEvent]) {
+	fake.pubSubMutex.Lock()
+	defer fake.pubSubMutex.Unlock()
+	fake.PubSubStub = nil
+	fake.pubSubReturns = struct {
+		result1 pubsub.PubSub[adapters.JobEvent]
+	}{result1}
+}
+
+func (fake *FakeJobStorer) PubSubReturnsOnCall(i int, result1 pubsub.PubSub[adapters.JobEvent]) {
+	fake.pubSubMutex.Lock()
+	defer fake.pubSubMutex.Unlock()
+	fake.PubSubStub = nil
+	if fake.pubSubReturnsOnCall == nil {
+		fake.pubSubReturnsOnCall = make(map[int]struct {
+			result1 pubsub.PubSub[adapters.JobEvent]
+		})
+	}
+	fake.pubSubReturnsOnCall[i] = struct {
+		result1 pubsub.PubSub[adapters.JobEvent]
+	}{result1}
 }
 
 func (fake *FakeJobStorer) ResolveJobUUID(arg1 string) (string, error) {

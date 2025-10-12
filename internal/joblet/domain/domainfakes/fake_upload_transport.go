@@ -3,8 +3,9 @@ package domainfakes
 
 import (
 	"io"
-	"joblet/internal/joblet/domain"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 type FakeUploadTransport struct {

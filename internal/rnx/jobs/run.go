@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"joblet/internal/rnx/common"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/workflow/types"
-	"joblet/internal/rnx/workflows"
-	pkgconfig "joblet/pkg/config"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/workflow/types"
+	"github.com/ehsaniara/joblet/internal/rnx/workflows"
+	pkgconfig "github.com/ehsaniara/joblet/pkg/config"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"

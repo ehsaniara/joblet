@@ -3,8 +3,8 @@ package resource
 import (
 	"context"
 	"fmt"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 	"os"
 	"path/filepath"
 	"strconv"

@@ -4,8 +4,8 @@ import (
 	"math"
 	"sort"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/metrics/domain"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 )
 
 // aggregateCPUMetrics calculates aggregate statistics for CPU usage

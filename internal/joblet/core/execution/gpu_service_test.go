@@ -5,11 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"joblet/internal/joblet/core/execution"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/gpu"
-	"joblet/internal/joblet/gpu/gpufakes"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu/gpufakes"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 func TestGPUService_AllocateGPU_DisabledGPU(t *testing.T) {

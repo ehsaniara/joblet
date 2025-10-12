@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // ExecutionCoordinator coordinates different execution services.

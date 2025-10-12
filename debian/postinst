@@ -219,8 +219,9 @@ case "$1" in
         # Set basic permissions first
         chown -R root:root /opt/joblet
         chmod 755 /opt/joblet
-        chmod 755 /opt/joblet/joblet
-        chmod 755 /opt/joblet/rnx
+        chmod 755 /opt/joblet/bin
+        chmod 755 /opt/joblet/bin/joblet
+        chmod 755 /opt/joblet/bin/rnx
         chmod 755 /opt/joblet/scripts
         chmod 644 /opt/joblet/scripts/joblet-config-template.yml
         chmod 644 /opt/joblet/scripts/rnx-config-template.yml
@@ -231,11 +232,11 @@ case "$1" in
 
         # Create symlinks
         if [ ! -L /usr/bin/rnx ]; then
-            ln -sf /opt/joblet/rnx /usr/bin/rnx
+            ln -sf /opt/joblet/bin/rnx /usr/bin/rnx
         fi
 
         if [ ! -L /usr/local/bin/rnx ]; then
-            ln -sf /opt/joblet/rnx /usr/local/bin/rnx
+            ln -sf /opt/joblet/bin/rnx /usr/local/bin/rnx
         fi
 
         get_configuration
@@ -307,7 +308,20 @@ case "$1" in
             echo "+cpu +memory +io +pids +cpuset" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
         fi
 
-        # Enable systemd service
+        # Install joblet-persist companion service
+        print_info "📦 Installing joblet-persist companion service..."
+        if [ -f /opt/joblet/scripts/joblet-persist-install.sh ]; then
+            source /opt/joblet/scripts/joblet-persist-install.sh
+            if install_joblet_persist; then
+                print_success "joblet-persist installed successfully"
+            else
+                print_warning "joblet-persist installation failed - joblet will work but without persistence"
+            fi
+        else
+            print_warning "joblet-persist installer not found - skipping persistence layer"
+        fi
+
+        # Enable systemd services
         systemctl daemon-reload
         systemctl enable joblet.service
 
@@ -353,7 +367,7 @@ case "$1" in
                 mkdir -p "$USER_HOME/.rnx"
 
                 # Copy rnx binary
-                cp /opt/joblet/rnx "$USER_HOME/.rnx/"
+                cp /opt/joblet/bin/rnx "$USER_HOME/.rnx/"
                 chmod 755 "$USER_HOME/.rnx/rnx"
 
                 # Copy config if it exists

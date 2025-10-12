@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"joblet/internal/rnx/common"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

@@ -3,10 +3,10 @@
 package joblet
 
 import (
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/core"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/pkg/config"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/core"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/pkg/config"
 )
 
 // NewJoblet creates a platform-specific joblet implementation

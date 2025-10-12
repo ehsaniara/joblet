@@ -79,6 +79,12 @@ build_component() {
     local output_name="$component"
     local ldflags
 
+    # Check if it's in the persist module
+    if [ "$component" = "joblet-persist" ]; then
+        cmd_path="./persist/cmd/joblet-persist"
+        output_name="joblet-persist"
+    fi
+
     if [ ! -d "$cmd_path" ]; then
         echo "Error: Component '$component' not found at $cmd_path"
         return 1
@@ -91,7 +97,12 @@ build_component() {
     mkdir -p "$OUTPUT_DIR"
 
     # Build with version injection
-    go build -a -ldflags="$ldflags" -o "$OUTPUT_DIR/$output_name" "$cmd_path"
+    if [ "$component" = "joblet-persist" ]; then
+        # Build from persist module
+        (cd persist && go build -a -ldflags="$ldflags" -o "../$OUTPUT_DIR/$output_name" "./cmd/joblet-persist")
+    else
+        go build -a -ldflags="$ldflags" -o "$OUTPUT_DIR/$output_name" "$cmd_path"
+    fi
 
     echo "Built $component -> $OUTPUT_DIR/$output_name"
 }
@@ -114,6 +125,9 @@ main() {
         "joblet")
             build_component "joblet"
             ;;
+        "joblet-persist")
+            build_component "joblet-persist"
+            ;;
         "api")
             if [ -d "./cmd/api" ]; then
                 build_component "api"
@@ -125,13 +139,14 @@ main() {
             echo "Building all components..."
             build_component "rnx"
             build_component "joblet"
+            build_component "joblet-persist"
             if [ -d "./cmd/api" ]; then
                 build_component "api"
             fi
             ;;
         *)
             echo "Error: Unknown component '$COMPONENT'"
-            echo "Available components: rnx, joblet, api, all"
+            echo "Available components: rnx, joblet, joblet-persist, api, all"
             exit 1
             ;;
     esac

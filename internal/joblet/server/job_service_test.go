@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/adapters/adaptersfakes"
-	"joblet/internal/joblet/auth/authfakes"
-	"joblet/internal/joblet/core/interfaces/interfacesfakes"
-	"joblet/internal/joblet/domain"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters/adaptersfakes"
+	"github.com/ehsaniara/joblet/internal/joblet/auth/authfakes"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces/interfacesfakes"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 func TestNewJobServiceServer(t *testing.T) {

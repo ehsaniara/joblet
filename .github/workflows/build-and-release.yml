@@ -100,6 +100,14 @@ jobs:
             -o rnx-${{ matrix.arch }} \
             ./cmd/rnx
 
+      - name: Build joblet-persist binary
+        run: |
+          cd persist
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
+            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
+            -o ../joblet-persist-${{ matrix.arch }} \
+            ./cmd/joblet-persist
+
       - name: Upload joblet binary
         uses: actions/upload-artifact@v4
         with:
@@ -111,6 +119,12 @@ jobs:
         with:
           name: rnx-binary-${{ matrix.arch }}
           path: rnx-${{ matrix.arch }}
+
+      - name: Upload joblet-persist binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: joblet-persist-binary-${{ matrix.arch }}
+          path: joblet-persist-${{ matrix.arch }}
 
   build-cross-platform-cli:
     needs: test
@@ -227,6 +241,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Download joblet binary
         uses: actions/download-artifact@v4
         with:
@@ -237,6 +256,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: rnx-binary-amd64
+          path: ./
+
+      - name: Download joblet-persist binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-persist-binary-amd64
           path: ./
 
       - name: Debug - List downloaded files
@@ -304,7 +329,12 @@ jobs:
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev build-essential devscripts
+          sudo apt-get install -y dpkg-dev build-essential devscripts protobuf-compiler
+
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
       - name: Set version from previous job
         run: |
@@ -330,6 +360,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Download joblet binary
         uses: actions/download-artifact@v4
         with:
@@ -340,6 +375,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: rnx-binary-arm64
+          path: ./
+
+      - name: Download joblet-persist binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-persist-binary-arm64
           path: ./
 
       - name: Debug - List downloaded files
@@ -407,7 +448,12 @@ jobs:
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev build-essential devscripts
+          sudo apt-get install -y dpkg-dev build-essential devscripts protobuf-compiler
+
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
       - name: Set version from previous job
         run: |
@@ -433,6 +479,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Download joblet binary
         uses: actions/download-artifact@v4
         with:
@@ -443,6 +494,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: rnx-binary-amd64
+          path: ./
+
+      - name: Download joblet-persist binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-persist-binary-amd64
           path: ./
 
       - name: Debug - List downloaded files
@@ -504,7 +561,12 @@ jobs:
       - name: Install RPM build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm build-essential
+          sudo apt-get install -y rpm build-essential protobuf-compiler
+
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
       - name: Set version from previous job
         run: |
@@ -530,6 +592,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Download joblet binary
         uses: actions/download-artifact@v4
         with:
@@ -540,6 +607,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: rnx-binary-arm64
+          path: ./
+
+      - name: Download joblet-persist binary
+        uses: actions/download-artifact@v4
+        with:
+          name: joblet-persist-binary-arm64
           path: ./
 
       - name: Debug - List downloaded files
@@ -601,19 +674,24 @@ jobs:
       - name: Install RPM build tools with enhanced cross-compilation support
         run: |
           sudo apt-get update
-          
+
           # Install core RPM build tools
-          sudo apt-get install -y rpm build-essential
-          
+          sudo apt-get install -y rpm build-essential protobuf-compiler
+
           # Install QEMU for emulation support (helps with architecture detection)
           sudo apt-get install -y qemu-user-static
-          
+
           # Add architecture support for cross-compilation
           sudo dpkg --add-architecture arm64
-          
+
           # Install cross-compilation tools if available
           sudo apt-get install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available, proceeding with binary packaging"
-          
+
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
           # Configure binfmt to handle aarch64 binaries (helps RPM understand the architecture)
           sudo update-binfmts --display || echo "binfmt configuration not available"
 

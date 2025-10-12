@@ -3,8 +3,9 @@ package authfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/auth"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/auth"
 )
 
 type FakeGRPCAuthorization struct {

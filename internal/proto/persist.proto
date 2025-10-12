@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+option go_package = "github.com/ehsaniara/joblet/internal/proto/gen/persist";
+
+package joblet.persist;
+
+import "ipc.proto";
+
+// PersistService handles historical log and metrics queries from disk storage
+// This service is provided by joblet-persist
+service PersistService {
+  // Query logs for a job from disk storage
+  rpc QueryLogs(QueryLogsRequest) returns (stream joblet.ipc.LogLine);
+
+  // Query metrics for a job from disk storage
+  rpc QueryMetrics(QueryMetricsRequest) returns (stream joblet.ipc.Metric);
+}
+
+// QueryLogsRequest specifies parameters for log queries
+message QueryLogsRequest {
+  string job_id = 1;
+
+  // Stream filter
+  joblet.ipc.StreamType stream = 2;  // STDOUT, STDERR, or both (UNSPECIFIED)
+
+  // Time range (optional)
+  int64 start_time = 3;  // Unix nanoseconds
+  int64 end_time = 4;    // Unix nanoseconds
+
+  // Pagination
+  int32 limit = 5;       // Max lines to return (0 = all)
+  int32 offset = 6;      // Skip lines
+}
+
+// QueryMetricsRequest specifies parameters for metrics queries
+message QueryMetricsRequest {
+  string job_id = 1;
+
+  // Time range (optional)
+  int64 start_time = 2;  // Unix nanoseconds
+  int64 end_time = 3;    // Unix nanoseconds
+
+  // Pagination
+  int32 limit = 5;       // Max samples to return (0 = all)
+  int32 offset = 6;      // Skip samples
+}

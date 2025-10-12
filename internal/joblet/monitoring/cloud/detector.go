@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Detector provides cloud environment detection capabilities

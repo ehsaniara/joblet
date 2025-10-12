@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // MemoryCollector collects memory metrics from /proc/meminfo

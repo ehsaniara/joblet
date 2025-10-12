@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/auth/authfakes"
-	"joblet/pkg/config"
-	"joblet/pkg/platform"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/auth/authfakes"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

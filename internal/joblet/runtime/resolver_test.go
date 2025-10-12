@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

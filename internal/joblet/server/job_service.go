@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/adapters"
-	auth2 "joblet/internal/joblet/auth"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/mappers"
-	metricsdomain "joblet/internal/joblet/metrics/domain"
-	"joblet/pkg/errors"
-	"joblet/pkg/logger"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/mappers"
+	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/pkg/errors"
+	"github.com/ehsaniara/joblet/pkg/logger"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,9 +23,11 @@ import (
 // JobServiceServer is LEGACY - kept only for test compatibility
 // Production uses WorkflowServiceServer which implements the unified architecture
 // where all jobs (individual and workflow) are handled through a single service
-// DO NOT USE FOR NEW CODE - will be removed in future versions
+// DO NOT USE FOR NEW CODE - will be removed in v5.0.0
 //
-// Deprecated: Use WorkflowServiceServer for all job operations
+// Deprecated: Use WorkflowServiceServer for all job operations.
+// See docs/DEPRECATION.md for migration guide.
+// Removal Timeline: v5.0.0 (Q1-Q2 2026)
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
 	auth         auth2.GRPCAuthorization
@@ -36,6 +38,8 @@ type JobServiceServer struct {
 }
 
 // NewJobServiceServer creates a new job service that uses request objects
+//
+// Deprecated: Use NewWorkflowServiceServer instead. See docs/DEPRECATION.md
 func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet) *JobServiceServer {
 	return &JobServiceServer{
 		auth:         auth,
@@ -707,51 +711,8 @@ func (s *JobServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stream pb
 	return nil
 }
 
-// GetJobMetricsHistory retrieves historical metrics for a job within a time range
-func (s *JobServiceServer) GetJobMetricsHistory(ctx context.Context, req *pb.JobMetricsHistoryRequest) (*pb.JobMetricsHistoryResponse, error) {
-	log := s.logger.WithFields("operation", "GetJobMetricsHistory", "jobUuid", req.GetUuid())
-	log.Debug("get job metrics history request received", "from", req.FromTimestamp, "to", req.ToTimestamp)
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if s.metricsStore == nil {
-		log.Warn("metrics store not available")
-		return nil, status.Errorf(codes.Unimplemented, "metrics collection not enabled")
-	}
-
-	// Convert timestamps to time.Time
-	fromTime := time.Unix(req.FromTimestamp, 0)
-	toTime := time.Unix(req.ToTimestamp, 0)
-
-	// Get historical metrics
-	samples, err := s.metricsStore.GetHistoricalMetrics(req.GetUuid(), fromTime, toTime)
-	if err != nil {
-		log.Error("failed to get historical metrics", "error", err)
-		if strings.Contains(err.Error(), "not found") {
-			return nil, status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
-		}
-		if strings.Contains(err.Error(), "not yet implemented") {
-			return nil, status.Errorf(codes.Unimplemented, "historical metrics not yet implemented")
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get metrics: %v", err)
-	}
-
-	// Convert to protobuf
-	response := &pb.JobMetricsHistoryResponse{
-		Samples: make([]*pb.JobMetricsSample, len(samples)),
-	}
-
-	for i, sample := range samples {
-		response.Samples[i] = convertMetricsSampleToProto(sample)
-	}
-
-	log.Debug("returned historical metrics", "jobUuid", req.GetUuid(), "sampleCount", len(samples))
-	return response, nil
-}
+// NOTE: GetJobMetricsHistory has been removed - historical metrics are now handled
+// by joblet-persist service. Use the persist QueryMetrics RPC instead.
 
 // GetJobMetricsSummary returns aggregated metrics summary for a job
 func (s *JobServiceServer) GetJobMetricsSummary(ctx context.Context, req *pb.JobMetricsSummaryRequest) (*pb.JobMetricsSummaryResponse, error) {

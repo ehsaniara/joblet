@@ -5,18 +5,18 @@ package cleanup
 import (
 	"context"
 	"fmt"
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/network"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/network"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"joblet/internal/joblet/core/process"
-	"joblet/internal/joblet/core/resource"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/core/process"
+	"github.com/ehsaniara/joblet/internal/joblet/core/resource"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // Coordinator coordinates all cleanup operations for jobs.

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 )
 
 // ToMetricsConfig converts the pkg/config JobMetricsConfig to the internal domain MetricsConfig

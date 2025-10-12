@@ -7,10 +7,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/adapters"
-	auth2 "joblet/internal/joblet/auth"
-	"joblet/pkg/logger"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // NetworkServiceServer implements the gRPC network service

@@ -3,9 +3,10 @@ package schedulerfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/scheduler"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/scheduler"
 )
 
 type FakeJobExecutor struct {

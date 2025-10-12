@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // GPUMetrics represents GPU performance and utilization metrics

@@ -5,15 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"io"
-	pb "joblet/api/gen"
-	"joblet/internal/rnx/common"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	ipcpb "github.com/ehsaniara/joblet/internal/proto/gen/ipc"
+	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -75,6 +78,20 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
+	sampleCount := 0
+
+	// Step 1: Try to fetch historical metrics from joblet-persist first
+	historicalCount, err := streamHistoricalMetrics(ctx, jobID)
+	if err != nil {
+		// If persist is unavailable or has no data, that's OK - we'll just stream live metrics
+		// Only fail if it's a critical error (e.g., config issue)
+		if !errors.Is(err, io.EOF) && !isUnavailableError(err) {
+			fmt.Fprintf(os.Stderr, "⚠️  Warning: couldn't fetch historical metrics: %v\n", err)
+		}
+	}
+	sampleCount += historicalCount
+
+	// Step 2: Stream live metrics from joblet-core
 	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("couldn't connect to joblet server: %w", err)
@@ -85,8 +102,6 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't start reading metrics: %v", err)
 	}
-
-	sampleCount := 0
 
 	for {
 		sample, e := stream.Recv()
@@ -269,4 +284,120 @@ func formatBytesFloat(bytes float64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", bytes/div, "KMGTPE"[exp])
+}
+
+// streamHistoricalMetrics fetches and displays historical metrics from joblet-persist
+// Returns the count of metrics samples displayed
+func streamHistoricalMetrics(ctx context.Context, jobID string) (int, error) {
+	persistClient, err := common.NewPersistClient()
+	if err != nil {
+		return 0, fmt.Errorf("couldn't connect to joblet-persist: %w", err)
+	}
+	defer persistClient.Close()
+
+	// Query all historical metrics (no limit)
+	req := &persistpb.QueryMetricsRequest{
+		JobId:  jobID,
+		Limit:  0, // No limit - fetch all
+		Offset: 0,
+	}
+
+	stream, err := persistClient.QueryMetrics(ctx, req)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't query historical metrics: %w", err)
+	}
+
+	sampleCount := 0
+
+	// Read all historical metrics
+	for {
+		metricSample, e := stream.Recv()
+		if e == io.EOF {
+			// End of historical metrics - this is expected
+			return sampleCount, nil
+		}
+		if e != nil {
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return sampleCount, nil
+			}
+			// Check if it's a "not found" error - means no historical metrics exist
+			if s, ok := status.FromError(e); ok && s.Code() == codes.NotFound {
+				return sampleCount, nil // Silently continue to live metrics
+			}
+			return sampleCount, fmt.Errorf("error receiving historical metrics: %v", e)
+		}
+
+		sampleCount++
+
+		// Convert IPC metric to joblet metric format
+		sample := convertIPCMetricToJobMetric(metricSample)
+
+		// Output the historical metric sample
+		if common.JSONOutput {
+			if err := outputMetricsJSON(sample); err != nil {
+				return sampleCount, fmt.Errorf("couldn't format metric as JSON: %v", err)
+			}
+		} else {
+			outputMetricsHuman(sample)
+		}
+	}
+}
+
+// convertIPCMetricToJobMetric converts an IPC Metric to joblet JobMetricsSample
+// The IPC Metric format is simpler - just CPU, memory, GPU, disk, and network basics
+func convertIPCMetricToJobMetric(ipcMetric *ipcpb.Metric) *pb.JobMetricsSample {
+	sample := &pb.JobMetricsSample{
+		JobId:                 ipcMetric.JobId,
+		Timestamp:             ipcMetric.Timestamp / 1000000, // Convert nanoseconds to seconds
+		SampleIntervalSeconds: 1,                             // IPC metrics don't include interval, default to 1s
+	}
+
+	if ipcMetric.Data == nil {
+		return sample
+	}
+
+	// Convert CPU metrics
+	if ipcMetric.Data.CpuUsage > 0 {
+		sample.Cpu = &pb.JobCPUMetrics{
+			UsagePercent: ipcMetric.Data.CpuUsage * 100, // Convert cores to percentage
+		}
+	}
+
+	// Convert Memory metrics
+	if ipcMetric.Data.MemoryUsage > 0 {
+		sample.Memory = &pb.JobMemoryMetrics{
+			Current: uint64(ipcMetric.Data.MemoryUsage),
+		}
+	}
+
+	// Convert GPU metrics (simple format from IPC)
+	if ipcMetric.Data.GpuUsage > 0 {
+		sample.Gpu = []*pb.JobGPUMetrics{
+			{
+				Index:       0,
+				Name:        "GPU",
+				Utilization: ipcMetric.Data.GpuUsage * 100, // Convert 0-1 to percentage
+			},
+		}
+	}
+
+	// Convert I/O metrics
+	if ipcMetric.Data.DiskIo != nil {
+		sample.Io = &pb.JobIOMetrics{
+			TotalReadBytes:  uint64(ipcMetric.Data.DiskIo.ReadBytes),
+			TotalWriteBytes: uint64(ipcMetric.Data.DiskIo.WriteBytes),
+		}
+	}
+
+	// Convert Network metrics
+	if ipcMetric.Data.NetworkIo != nil {
+		sample.Network = &pb.JobNetworkMetrics{
+			TotalRxBytes:   uint64(ipcMetric.Data.NetworkIo.RxBytes),
+			TotalTxBytes:   uint64(ipcMetric.Data.NetworkIo.TxBytes),
+			TotalRxPackets: uint64(ipcMetric.Data.NetworkIo.RxPackets),
+			TotalTxPackets: uint64(ipcMetric.Data.NetworkIo.TxPackets),
+		}
+	}
+
+	return sample
 }

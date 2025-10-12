@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        component: [rnx, joblet]
+        component: [rnx, joblet, joblet-persist]
 
     steps:
       - name: Checkout code

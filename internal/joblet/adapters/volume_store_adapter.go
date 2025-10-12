@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Local interface definitions to avoid import cycles with pkg/store

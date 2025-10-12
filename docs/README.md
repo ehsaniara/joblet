@@ -4,6 +4,35 @@ Joblet is a comprehensive Linux-native job execution platform designed for enter
 namespaces and cgroups v2 to provide robust process isolation, resource management, and secure multi-tenant execution
 environments without the overhead of containerization.
 
+## 📚 Documentation Index
+
+### Getting Started
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide
+- **[INSTALLATION.md](INSTALLATION.md)** - Installation instructions
+- **[RNX_CLI_REFERENCE.md](RNX_CLI_REFERENCE.md)** - CLI command reference
+
+### Architecture & Design
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture overview
+- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Developer workflows and build instructions
+- **[CONFIG_GUIDE.md](CONFIG_GUIDE.md)** - Configuration reference
+- **[DESIGN.md](DESIGN.md)** - Design principles
+- **[API.md](API.md)** - gRPC API documentation
+
+### Features
+- **[GPU_SUPPORT.md](GPU_SUPPORT.md)** - GPU acceleration
+- **[WORKFLOWS.md](WORKFLOWS.md)** - Workflow orchestration
+- **[NETWORK_MANAGEMENT.md](NETWORK_MANAGEMENT.md)** - Network isolation
+- **[VOLUME_MANAGEMENT.md](VOLUME_MANAGEMENT.md)** - Storage management
+- **[RUNTIME_SYSTEM.md](RUNTIME_SYSTEM.md)** - Runtime environments
+- **[MONITORING.md](MONITORING.md)** - Metrics and observability
+
+### Operations
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment guide
+- **[SECURITY.md](SECURITY.md)** - Security considerations
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+
+---
+
 ## Executive Summary
 
 Joblet delivers enterprise-grade job execution capabilities by combining native Linux kernel features with modern
@@ -25,6 +54,8 @@ seamless integration with existing infrastructure through a unified gRPC API and
 - **Node Identification**: Unique node identification for distributed deployments with automatic UUID generation and job tracking
 - **Observability**: Real-time metrics collection, structured logging, and comprehensive audit trails for compliance
   requirements
+- **Data Persistence**: Dedicated persistence service (`joblet-persist`) providing high-performance log and metric storage with
+  gzip compression, Unix socket IPC, and historical query capabilities
 
 ### Security Architecture
 

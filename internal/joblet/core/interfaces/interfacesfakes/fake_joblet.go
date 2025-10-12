@@ -3,9 +3,10 @@ package interfacesfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/domain"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 type FakeJoblet struct {

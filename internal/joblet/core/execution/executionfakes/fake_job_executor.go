@@ -3,9 +3,10 @@ package executionfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/core/execution"
-	"joblet/pkg/platform"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 type FakeJobExecutor struct {

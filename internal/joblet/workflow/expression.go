@@ -5,7 +5,7 @@ package workflow
 // AST-based parser that was unused.
 
 import (
-	"joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"strings"
 )
 

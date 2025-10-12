@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"joblet/internal/joblet/metrics/domain"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 func TestNewMetricsStoreAdapter(t *testing.T) {

@@ -3,8 +3,9 @@ package interfacesfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/interfaces"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
 )
 
 type FakeDomainStreamer struct {

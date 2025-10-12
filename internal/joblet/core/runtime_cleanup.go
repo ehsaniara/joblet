@@ -4,8 +4,8 @@ package core
 
 import (
 	"fmt"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 	"os"
 	"path/filepath"
 	"strings"

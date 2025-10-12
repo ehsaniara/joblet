@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"joblet/internal/rnx/cli"
+	"github.com/ehsaniara/joblet/internal/rnx/cli"
 )
 
 func main() {

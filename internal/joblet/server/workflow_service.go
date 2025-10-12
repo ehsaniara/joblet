@@ -9,19 +9,19 @@ import (
 	"sync"
 	"time"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/adapters"
-	auth2 "joblet/internal/joblet/auth"
-	"joblet/internal/joblet/core/interfaces"
-	"joblet/internal/joblet/core/validation"
-	"joblet/internal/joblet/core/volume"
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/mappers"
-	metricsdomain "joblet/internal/joblet/metrics/domain"
-	"joblet/internal/joblet/runtime"
-	"joblet/internal/joblet/workflow"
-	"joblet/internal/joblet/workflow/types"
-	"joblet/pkg/logger"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
+	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
+	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/mappers"
+	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/runtime"
+	"github.com/ehsaniara/joblet/internal/joblet/workflow"
+	"github.com/ehsaniara/joblet/internal/joblet/workflow/types"
+	"github.com/ehsaniara/joblet/pkg/logger"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -1608,49 +1608,8 @@ func (s *WorkflowServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stre
 	return nil
 }
 
-// GetJobMetricsHistory retrieves historical metrics for a job
-func (s *WorkflowServiceServer) GetJobMetricsHistory(ctx context.Context, req *pb.JobMetricsHistoryRequest) (*pb.JobMetricsHistoryResponse, error) {
-	log := s.logger.WithFields("operation", "GetJobMetricsHistory", "uuid", req.Uuid)
-	log.Debug("get job metrics history request received")
-
-	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if req.Uuid == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "uuid is required")
-	}
-
-	// Check if job exists
-	_, exists := s.jobStore.Job(req.Uuid)
-	if !exists {
-		log.Warn("job not found")
-		return nil, status.Errorf(codes.NotFound, "job not found")
-	}
-
-	// Convert timestamps to time.Time
-	fromTime := time.Unix(req.FromTimestamp, 0)
-	toTime := time.Unix(req.ToTimestamp, 0)
-
-	// Get historical metrics from the store
-	samples, err := s.metricsStore.GetHistoricalMetrics(req.Uuid, fromTime, toTime)
-	if err != nil {
-		log.Error("failed to retrieve historical metrics", "error", err)
-		return nil, status.Errorf(codes.Internal, "failed to retrieve metrics: %v", err)
-	}
-
-	// Convert to protobuf
-	pbSamples := make([]*pb.JobMetricsSample, len(samples))
-	for i, sample := range samples {
-		pbSamples[i] = convertMetricsSampleToProto(sample)
-	}
-
-	log.Debug("historical metrics retrieved", "sampleCount", len(pbSamples))
-	return &pb.JobMetricsHistoryResponse{
-		Samples: pbSamples,
-	}, nil
-}
+// NOTE: GetJobMetricsHistory has been removed - historical metrics are now handled
+// by joblet-persist service. Use the persist QueryMetrics RPC instead.
 
 // GetJobMetricsSummary returns aggregated metrics summary for a job
 func (s *WorkflowServiceServer) GetJobMetricsSummary(ctx context.Context, req *pb.JobMetricsSummaryRequest) (*pb.JobMetricsSummaryResponse, error) {

@@ -34,6 +34,9 @@ func NewUUIDGenerator(prefix, nodeID string) *UUIDGenerator {
 }
 
 // NewSequentialIDGenerator creates a legacy sequential ID generator for backward compatibility
+//
+// Deprecated: Use NewUUIDGenerator instead. Sequential IDs have race condition risks.
+// See docs/DEPRECATION.md. Removal Timeline: v5.0.0
 func NewSequentialIDGenerator(prefix, nodeID string) *UUIDGenerator {
 	return &UUIDGenerator{
 		prefix:   prefix,
@@ -129,6 +132,8 @@ func (g *UUIDGenerator) generateSequentialID() string {
 }
 
 // NextWithTimestamp generates a UUID with timestamp (legacy method for compatibility)
+//
+// Deprecated: Use Next() instead. Removal Timeline: v5.0.0
 func (g *UUIDGenerator) NextWithTimestamp() string {
 	if g.useUUID {
 		// For UUID mode, just return a standard UUID since it already includes randomness
@@ -146,6 +151,8 @@ func (g *UUIDGenerator) SetUUIDMode(enabled bool) {
 }
 
 // SetHighPrecision enables nanosecond timestamps (legacy - no effect in UUID mode)
+//
+// Deprecated: No replacement needed. UUID mode renders this obsolete. Removal Timeline: v5.0.0
 func (g *UUIDGenerator) SetHighPrecision(enabled bool) {
 	g.useNanos = enabled
 }

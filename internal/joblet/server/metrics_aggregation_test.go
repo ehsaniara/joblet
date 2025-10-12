@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"joblet/internal/joblet/metrics/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 )
 
 func TestCalculateAggregate(t *testing.T) {

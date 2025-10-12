@@ -3,9 +3,9 @@ package execution_test
 import (
 	"testing"
 
-	"joblet/internal/joblet/core/execution"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/platform/platformfakes"
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/platform/platformfakes"
 )
 
 func TestStartProcessOptions(t *testing.T) {

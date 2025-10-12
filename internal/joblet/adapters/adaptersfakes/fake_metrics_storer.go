@@ -3,8 +3,9 @@ package adaptersfakes
 
 import (
 	"context"
-	"joblet/internal/joblet/adapters"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 )
 
 type FakeMetricsStorer struct {

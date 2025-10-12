@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 // DependencyResolver manages job dependencies and workflow execution

@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"joblet/internal/joblet/core/environment"
-	"joblet/internal/joblet/core/upload"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
+	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // EnvironmentService handles job environment setup and management

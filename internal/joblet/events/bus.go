@@ -2,8 +2,8 @@ package events
 
 import (
 	"context"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/errors"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/errors"
 	"sync"
 )
 

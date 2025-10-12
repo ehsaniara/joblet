@@ -2,9 +2,10 @@
 package adaptersfakes
 
 import (
-	"joblet/internal/joblet/adapters"
-	"joblet/internal/joblet/network"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/network"
 )
 
 type FakeNetworkStorer struct {

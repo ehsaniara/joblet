@@ -2,8 +2,9 @@
 package networkfakes
 
 import (
-	"joblet/internal/joblet/network"
 	"sync"
+
+	"github.com/ehsaniara/joblet/internal/joblet/network"
 )
 
 type FakeNetworkStoreInterface struct {

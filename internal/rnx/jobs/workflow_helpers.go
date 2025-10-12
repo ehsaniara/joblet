@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	pb "joblet/api/gen"
-	"joblet/internal/rnx/common"
-	"joblet/internal/rnx/workflows"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
+	"github.com/ehsaniara/joblet/internal/rnx/workflows"
 )
 
 // ExecuteWorkflow runs a workflow from a YAML file

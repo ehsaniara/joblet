@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/constants"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/constants"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // VolumeManager interface for accessing volume information

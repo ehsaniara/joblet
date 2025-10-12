@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"github.com/stretchr/testify/assert"
 )

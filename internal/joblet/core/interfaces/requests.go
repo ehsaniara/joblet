@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 // StartJobRequest encapsulates all parameters needed to start a job

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Manager implements the GPUManagerInterface for managing GPU resources

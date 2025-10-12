@@ -1,7 +1,7 @@
 package core
 
 import (
-	"joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 )
 
 // OutputWriter provides an io.Writer implementation that streams job output

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/workflow"
-	"joblet/internal/rnx/workflows"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/workflow"
+	"github.com/ehsaniara/joblet/internal/rnx/workflows"
 )
 
 func main() {

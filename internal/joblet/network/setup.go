@@ -3,8 +3,8 @@ package network
 import (
 	"bytes"
 	"fmt"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 	"net"
 	"strings"
 )

@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"joblet/internal/joblet/core/filesystem"
-	"joblet/internal/joblet/core/resource"
-	"joblet/internal/joblet/core/upload"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/internal/joblet/core/filesystem"
+	"github.com/ehsaniara/joblet/internal/joblet/core/resource"
+	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // ResourceManager handles all resource-related operations for jobs.

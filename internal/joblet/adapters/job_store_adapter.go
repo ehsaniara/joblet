@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"joblet/internal/joblet/domain"
-	"joblet/internal/joblet/interfaces"
-	"joblet/internal/joblet/pubsub"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Local interface definitions to avoid import cycles with pkg/store
@@ -497,6 +497,11 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 	// Subscribe to job events for real-time updates
 	// This will block until the subscription ends
 	return a.subscribeToJobUpdates(ctx, id, task, stream)
+}
+
+// PubSub returns the pub-sub instance for external integration (e.g., IPC)
+func (a *jobStoreAdapter) PubSub() pubsub.PubSub[JobEvent] {
+	return a.pubsub
 }
 
 // Close gracefully shuts down the adapter and releases resources.

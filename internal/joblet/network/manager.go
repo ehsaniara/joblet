@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // NetworkManager implements the Manager interface

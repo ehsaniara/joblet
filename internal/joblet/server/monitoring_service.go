@@ -9,12 +9,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "joblet/api/gen"
-	"joblet/internal/joblet/monitoring"
-	"joblet/internal/joblet/monitoring/domain"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
-	"joblet/pkg/version"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
+	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/version"
 )
 
 // MonitoringServiceServer implements the gRPC monitoring service

@@ -4,12 +4,13 @@ package main
 
 import (
 	"fmt"
-	"joblet/internal/modes"
-	"joblet/pkg/config"
-	"joblet/pkg/logger"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/ehsaniara/joblet/internal/modes"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 func main() {

@@ -6,11 +6,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "joblet/api/gen"
-	auth2 "joblet/internal/joblet/auth"
-	"joblet/internal/joblet/core/volume"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/logger"
+	pb "github.com/ehsaniara/joblet/api/gen"
+	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
+	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // VolumeServiceServer implements the gRPC volume service

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"joblet/internal/joblet/core/execution"
-	"joblet/internal/joblet/core/execution/executionfakes"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/logger"
-	"joblet/pkg/platform/platformfakes"
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
+	"github.com/ehsaniara/joblet/internal/joblet/core/execution/executionfakes"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform/platformfakes"
 )
 
 // Test ExecutionCoordinator with unified logging - runtime jobs use joblet binary

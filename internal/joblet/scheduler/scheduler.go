@@ -2,8 +2,8 @@ package scheduler
 
 import (
 	"context"
-	"joblet/internal/joblet/domain"
-	"joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 	"sync"
 	"time"
 )
