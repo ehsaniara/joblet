@@ -19,12 +19,24 @@ fi
 
 echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 
-# Build all binaries first
-echo "📦 Building all binaries..."
-make all || {
-    echo "❌ Build failed!"
-    exit 1
-}
+# Check if binaries already exist (CI mode)
+if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./joblet-persist" ]; then
+    echo "📦 Using pre-built binaries from root directory (CI mode)..."
+    mkdir -p ./bin
+    cp ./joblet ./bin/joblet
+    cp ./rnx ./bin/rnx
+    cp ./joblet-persist ./bin/joblet-persist
+    chmod +x ./bin/joblet ./bin/rnx ./bin/joblet-persist
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/joblet-persist" ]; then
+    # Build all binaries if they don't exist
+    echo "📦 Building all binaries..."
+    make all || {
+        echo "❌ Build failed!"
+        exit 1
+    }
+else
+    echo "📦 Using existing binaries from ./bin/..."
+fi
 
 # Clean and create build directory
 rm -rf "$BUILD_DIR"
