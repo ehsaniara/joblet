@@ -23,18 +23,6 @@ const (
 	StatusStopping     JobStatus = "STOPPING"
 )
 
-// Legacy constants for backwards compatibility
-//
-// Deprecated: Use Status* constants instead (StatusRunning, StatusCompleted, etc.)
-// These aliases will be removed in v5.0.0. See docs/DEPRECATION.md
-const (
-	JobStatusRunning   = StatusRunning   // Deprecated: Use StatusRunning
-	JobStatusCompleted = StatusCompleted // Deprecated: Use StatusCompleted
-	JobStatusFailed    = StatusFailed    // Deprecated: Use StatusFailed
-	JobStatusScheduled = StatusScheduled // Deprecated: Use StatusScheduled
-	JobStatusStopping  = StatusStopping  // Deprecated: Use StatusStopping
-)
-
 var (
 	// ErrInvalidCommand is returned when job command is empty
 	ErrInvalidCommand = errors.New("job command cannot be empty")
@@ -49,7 +37,7 @@ var (
 // This enables better workflow visibility and dependency tracking in CLI tools.
 type Job struct {
 	// Core identifiers
-	Uuid string // Unique identifier for job tracking (kept as string for backward compatibility)
+	Uuid string // Unique identifier for job tracking
 	Name string // Readable job name (workflow jobs only, empty for individual jobs)
 
 	// Execution details
@@ -59,11 +47,11 @@ type Job struct {
 
 	// Resource management
 	Limits     ResourceLimits // CPU/memory/IO constraints using value objects
-	CgroupPath string         // Filesystem path for resource limits (kept as string for backward compatibility)
+	CgroupPath string         // Filesystem path for resource limits
 
 	// State tracking
 	Status JobStatus // Current execution state
-	Pid    int32     // Process ID when running (kept as int32 for backward compatibility)
+	Pid    int32     // Process ID when running
 
 	// Timing
 	StartTime     time.Time  // Job creation timestamp
@@ -74,9 +62,9 @@ type Job struct {
 	ExitCode int32 // Process exit status
 
 	// Infrastructure
-	Network string   // Network name (kept as string for backward compatibility)
-	Volumes []string // Volume names to mount (kept as string slice for backward compatibility)
-	Runtime string   // Runtime specification (kept as string for backward compatibility)
+	Network string   // Network name
+	Volumes []string // Volume names to mount
+	Runtime string   // Runtime specification
 
 	// Workflow integration
 	WorkflowUuid     string       // UUID of parent workflow (empty for individual jobs)
@@ -85,8 +73,8 @@ type Job struct {
 	Dependencies     []string     // Job names this job depends on (workflow jobs only)
 
 	// Environment
-	Environment       map[string]string // Environment variables (kept as map for backward compatibility)
-	SecretEnvironment map[string]string // Secret environment variables (kept as map for backward compatibility)
+	Environment       map[string]string // Environment variables
+	SecretEnvironment map[string]string // Secret environment variables
 
 	// GPU allocation
 	GPUIndices  []int32 // Which GPUs are allocated to this job
@@ -95,10 +83,6 @@ type Job struct {
 
 	// Node identification
 	NodeId string // Unique identifier of the Joblet node that executed this job
-
-	// Legacy fields for backward compatibility
-	StartedAt   time.Time // Alias for StartTime (used by monitoring)
-	CompletedAt time.Time // Populated when job completes
 
 	// Value object accessors (for new code to use value objects)
 	jobID       *values.JobID       // Cached value object for UUID
@@ -441,10 +425,6 @@ func (j *Job) DeepCopy() *Job {
 
 		// Node identification
 		NodeId: j.NodeId,
-
-		// Legacy fields
-		StartedAt:   j.StartedAt,
-		CompletedAt: j.CompletedAt,
 	}
 
 	// Copy slices

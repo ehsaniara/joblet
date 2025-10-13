@@ -27,7 +27,6 @@ type Config struct {
 	Volumes    VolumesConfig    `yaml:"volumes" json:"volumes"`
 	Runtime    RuntimeConfig    `yaml:"runtime" json:"runtime"`
 	GPU        GPUConfig        `yaml:"gpu" json:"gpu"`
-	JobMetrics JobMetricsConfig `yaml:"job_metrics" json:"job_metrics"`
 	IPC        IPCConfig        `yaml:"ipc" json:"ipc"`
 }
 
@@ -145,23 +144,8 @@ type Node struct {
 
 // BuffersConfig holds buffer and pub-sub configuration
 type BuffersConfig struct {
-	PubsubBufferSize int                  `yaml:"pubsub_buffer_size" json:"pubsub_buffer_size"` // Pub-sub channel buffer size
-	ChunkSize        int                  `yaml:"chunk_size" json:"chunk_size"`                 // Chunk size for streaming
-	LogPersistence   LogPersistenceConfig `yaml:"log_persistence" json:"log_persistence"`       // Log persistence config
-}
-
-// LogPersistenceConfig holds configuration for job log persistence to disk
-type LogPersistenceConfig struct {
-	Directory         string `yaml:"directory" json:"directory"`
-	RetentionDays     int    `yaml:"retention_days" json:"retention_days"`
-	RotationSizeBytes int64  `yaml:"rotation_size_bytes" json:"rotation_size_bytes"`
-
-	// Async log system configuration
-	QueueSize        int           `yaml:"queue_size" json:"queue_size"`               // Async queue size
-	MemoryLimit      int64         `yaml:"memory_limit" json:"memory_limit"`           // Memory limit for overflow protection
-	BatchSize        int           `yaml:"batch_size" json:"batch_size"`               // Batch size for disk writes
-	FlushInterval    time.Duration `yaml:"flush_interval" json:"flush_interval"`       // Periodic flush interval
-	OverflowStrategy string        `yaml:"overflow_strategy" json:"overflow_strategy"` // compress, spill, sample, alert
+	PubsubBufferSize int `yaml:"pubsub_buffer_size" json:"pubsub_buffer_size"` // Pub-sub channel buffer size
+	ChunkSize        int `yaml:"chunk_size" json:"chunk_size"`                 // Chunk size for streaming
 }
 
 // VolumesConfig holds volume management configuration
@@ -181,14 +165,6 @@ type GPUConfig struct {
 	Enabled            bool     `yaml:"enabled" json:"enabled"`                         // Enable GPU support (off by default)
 	CUDAPaths          []string `yaml:"cuda_paths" json:"cuda_paths"`                   // CUDA installation paths
 	AllocationStrategy string   `yaml:"allocation_strategy" json:"allocation_strategy"` // GPU allocation strategy (first-fit, pack, spread, best-fit)
-}
-
-// JobMetricsConfig holds job metrics collection configuration
-type JobMetricsConfig struct {
-	Enabled           bool          `yaml:"enabled" json:"enabled"`
-	DefaultSampleRate time.Duration `yaml:"default_sample_rate" json:"default_sample_rate"`
-	StorageDir        string        `yaml:"storage_dir" json:"storage_dir"`
-	RetentionDays     int           `yaml:"retention_days" json:"retention_days"`
 }
 
 // IPCConfig holds IPC configuration for joblet-persist integration
@@ -276,20 +252,8 @@ var DefaultConfig = Config{
 		CloudDetection:  true,
 	},
 	Buffers: BuffersConfig{
-		PubsubBufferSize: 10000,   // Large pub-sub channel buffer for high-throughput
-		ChunkSize:        1048576, // 1MB chunks for optimal streaming
-		LogPersistence: LogPersistenceConfig{
-			Directory:         "/opt/joblet/logs",
-			RetentionDays:     7,
-			RotationSizeBytes: 2097152, // 2MB per file before rotation
-
-			// HPC-optimized async system defaults
-			QueueSize:        100000,                 // Large queue for high throughput
-			MemoryLimit:      1073741824,             // 1GB memory limit
-			BatchSize:        100,                    // 100 chunks per batch
-			FlushInterval:    100 * time.Millisecond, // Fast flush for low latency
-			OverflowStrategy: "compress",             // Compress by default
-		},
+		PubsubBufferSize: 10000,   // Pub-sub buffer for real-time streaming
+		ChunkSize:        1048576, // 1MB chunks
 	},
 	Volumes: VolumesConfig{
 		BasePath:              "/opt/joblet/volumes",
@@ -312,12 +276,6 @@ var DefaultConfig = Config{
 			"/usr/local/cuda",
 			"/opt/cuda",
 		},
-	},
-	JobMetrics: JobMetricsConfig{
-		Enabled:           true,            // Enabled by default
-		DefaultSampleRate: 5 * time.Second, // Sample every 5 seconds
-		StorageDir:        "/opt/joblet/metrics",
-		RetentionDays:     7, // Keep metrics for 7 days
 	},
 	IPC: IPCConfig{
 		Enabled:        false, // Disabled by default - opt-in for joblet-persist integration

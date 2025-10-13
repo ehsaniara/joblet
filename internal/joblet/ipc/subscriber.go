@@ -43,8 +43,8 @@ func NewSubscriber(writer *Writer, ps pubsub.PubSub[adapters.JobEvent], log *log
 
 // Start begins subscribing to all job events
 func (s *Subscriber) Start() error {
-	// Subscribe to all job events using wildcard topic
-	updates, unsubscribe, err := s.pubsub.Subscribe(s.ctx, "job:*")
+	// Subscribe to the single "jobs" topic (all jobs publish here)
+	updates, unsubscribe, err := s.pubsub.Subscribe(s.ctx, "jobs")
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (s *Subscriber) processEvents(updates <-chan pubsub.Message[adapters.JobEve
 					"chunkSize", len(event.LogChunk))
 			} else {
 				s.logsSent.Add(1)
-				s.logger.Debug("Forwarded log chunk to IPC",
+				s.logger.Info("Forwarded log chunk to IPC",
 					"jobID", jobID,
 					"sequence", seq,
 					"size", len(event.LogChunk))

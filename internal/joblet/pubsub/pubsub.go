@@ -175,7 +175,7 @@ func (p *memoryPubSub[T]) Publish(ctx context.Context, topicName string, message
 		t.stats.LastMessageTime = &now
 	}()
 
-	// Deliver to subscribers (non-blocking)
+	// Deliver to subscribers (blocking with timeout to avoid dropping messages)
 	for _, sub := range subscribers {
 		select {
 		case sub.channel <- msg:
@@ -184,8 +184,12 @@ func (p *memoryPubSub[T]) Publish(ctx context.Context, topicName string, message
 			sub.stats.MessagesReceived++
 			sub.stats.LastMessageTime = &now
 			sub.statsMutex.Unlock()
-		default:
-			// Channel is full, skip this subscriber
+		case <-time.After(100 * time.Millisecond):
+			// Timeout - subscriber is too slow, log and skip
+			// This prevents blocking the publisher but gives subscribers time to catch up
+		case <-ctx.Done():
+			// Context cancelled, stop publishing
+			return ctx.Err()
 		}
 	}
 

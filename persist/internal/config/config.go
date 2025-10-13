@@ -16,24 +16,25 @@ type Config struct {
 	Writer     WriterConfig     `yaml:"writer"`
 	Query      QueryConfig      `yaml:"query"`
 	Monitoring MonitoringConfig `yaml:"monitoring"`
-	Logging    LoggingConfig    `yaml:"logging"`
+	// Note: Logging config is now read from the root level (shared with main joblet)
 }
 
 // ServerConfig contains gRPC server settings
 type ServerConfig struct {
-	GRPCAddress    string    `yaml:"grpc_address"`
-	MaxConnections int       `yaml:"max_connections"`
-	BasePath       string    `yaml:"base_path"`
-	TLS            TLSConfig `yaml:"tls"`
+	GRPCAddress    string     `yaml:"grpc_address"`
+	MaxConnections int        `yaml:"max_connections"`
+	BasePath       string     `yaml:"base_path"`
+	TLS            *TLSConfig `yaml:"tls,omitempty"` // Optional: defaults to inherited security
 }
 
 // TLSConfig contains TLS/mTLS settings
+// TLS is MANDATORY for persist service (authentication requires it)
 type TLSConfig struct {
-	Enabled    bool   `yaml:"enabled"`
-	CertFile   string `yaml:"cert_file"`
-	KeyFile    string `yaml:"key_file"`
-	CAFile     string `yaml:"ca_file"`
-	ClientAuth bool   `yaml:"client_auth"`
+	// Enabled is removed - TLS is always enabled
+	CertFile   string `yaml:"cert_file"`   // Empty = inherit from parent's security section
+	KeyFile    string `yaml:"key_file"`    // Empty = inherit from parent's security section
+	CAFile     string `yaml:"ca_file"`     // Empty = inherit from parent's security section
+	ClientAuth string `yaml:"client_auth"` // "none", "request", "require" (default: "require")
 }
 
 // IPCConfig contains Unix socket IPC settings
@@ -167,14 +168,32 @@ type LogFileConfig struct {
 	Compress   bool   `yaml:"compress"`
 }
 
+// SecurityConfig contains embedded TLS certificates (inherited from parent)
+type SecurityConfig struct {
+	ServerCert string `yaml:"serverCert"`
+	ServerKey  string `yaml:"serverKey"`
+	CACert     string `yaml:"caCert"`
+}
+
 // RootConfig wraps the persist config to support nested structure
+// and includes shared configurations from parent (joblet)
 type RootConfig struct {
-	Persist *Config `yaml:"persist"`
+	Persist  *Config        `yaml:"persist"`
+	Logging  LoggingConfig  `yaml:"logging"`  // Inherited logging config
+	Security SecurityConfig `yaml:"security"` // Inherited TLS certificates
+}
+
+// LoadResult contains persist config and inherited parent configurations
+type LoadResult struct {
+	Config   *Config
+	Logging  LoggingConfig  // Inherited from parent
+	Security SecurityConfig // Inherited from parent (TLS certificates)
 }
 
 // Load loads configuration from a YAML file
 // Supports both standalone persist config and nested config within joblet-config.yml
-func Load(path string) (*Config, error) {
+// Returns both persist config and the shared logging configuration
+func Load(path string) (*LoadResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -183,11 +202,22 @@ func Load(path string) (*Config, error) {
 	// Try loading as nested config first (persist section within joblet-config.yml)
 	rootCfg := &RootConfig{}
 	if err := yaml.Unmarshal(data, rootCfg); err == nil && rootCfg.Persist != nil {
-		// Found persist section in joblet-config.yml
+		// Found persist section in joblet-config.yml - inherit parent configs
 		if err := rootCfg.Persist.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid persist configuration: %w", err)
 		}
-		return rootCfg.Persist, nil
+
+		// Set default ClientAuth if TLS section exists but ClientAuth not specified
+		if rootCfg.Persist.Server.TLS != nil && rootCfg.Persist.Server.TLS.ClientAuth == "" {
+			rootCfg.Persist.Server.TLS.ClientAuth = "require"
+		}
+		// If TLS section is nil, it means fully inherited (handled in server code)
+
+		return &LoadResult{
+			Config:   rootCfg.Persist,
+			Logging:  rootCfg.Logging,
+			Security: rootCfg.Security,
+		}, nil
 	}
 
 	// Fall back to standalone persist config
@@ -200,7 +230,21 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	return cfg, nil
+	// Use default configs for standalone (no inheritance)
+	return &LoadResult{
+		Config: cfg,
+		Logging: LoggingConfig{
+			Level:  "info",
+			Format: "text",
+			Output: "stdout",
+		},
+		Security: SecurityConfig{
+			// Standalone mode requires external cert files
+			ServerCert: "",
+			ServerKey:  "",
+			CACert:     "",
+		},
+	}, nil
 }
 
 // DefaultConfig returns default configuration
@@ -210,10 +254,7 @@ func DefaultConfig() *Config {
 			GRPCAddress:    ":50052",
 			MaxConnections: 500,
 			BasePath:       "/opt/joblet",
-			TLS: TLSConfig{
-				Enabled:    false,
-				ClientAuth: false,
-			},
+			TLS:            nil, // nil = fully inherited from parent's security section
 		},
 		IPC: IPCConfig{
 			Socket:         "/opt/joblet/run/persist.sock",
@@ -291,17 +332,7 @@ func DefaultConfig() *Config {
 				Path: "/health",
 			},
 		},
-		Logging: LoggingConfig{
-			Level:  "info",
-			Format: "json",
-			Output: "file",
-			File: LogFileConfig{
-				Path:       "/opt/joblet/joblet-persist.log",
-				MaxSize:    "100MB",
-				MaxBackups: 3,
-				Compress:   true,
-			},
-		},
+		// Note: Logging config now comes from root level (shared with main joblet)
 	}
 }
 

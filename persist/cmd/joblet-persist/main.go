@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ehsaniara/joblet/internal/joblet/auth"
 	"github.com/ehsaniara/joblet/persist/internal/config"
 	"github.com/ehsaniara/joblet/persist/internal/ipc"
 	"github.com/ehsaniara/joblet/persist/internal/server"
@@ -24,24 +25,31 @@ var (
 func main() {
 	flag.Parse()
 
-	// Initialize logger
+	// Initialize logger with defaults first
 	log := logger.New().WithMode("persist")
 	log.Info("Starting joblet-persist",
 		"version", version,
 		"commit", commit,
 		"buildTime", buildTime)
 
-	// Load configuration
-	cfg, err := config.Load(*configPath)
+	// Load configuration (includes shared logging config)
+	result, err := config.Load(*configPath)
 	if err != nil {
 		log.Error("Failed to load configuration", "error", err)
 		os.Exit(1)
+	}
+	cfg := result.Config
+
+	// Apply logging configuration from config file
+	if logLevel, err := logger.ParseLevel(result.Logging.Level); err == nil {
+		log.SetLevel(logLevel)
 	}
 
 	log.Info("Configuration loaded",
 		"socket", cfg.IPC.Socket,
 		"grpcAddress", cfg.Server.GRPCAddress,
-		"storageType", cfg.Storage.Type)
+		"storageType", cfg.Storage.Type,
+		"logLevel", result.Logging.Level)
 
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
@@ -67,15 +75,22 @@ func main() {
 
 	log.Info("IPC server started", "socket", cfg.IPC.Socket)
 
-	// Initialize gRPC server
-	grpcServer := server.NewGRPCServer(&cfg.Server, backend, log)
+	// Initialize authorization
+	authorization := auth.NewGRPCAuthorization()
+	log.Info("Authorization initialized")
+
+	// Initialize gRPC server with inherited security config
+	grpcServer := server.NewGRPCServer(&cfg.Server, backend, log, authorization, &result.Security)
 	if err := grpcServer.Start(ctx); err != nil {
 		log.Error("Failed to start gRPC server", "error", err)
 		os.Exit(1)
 	}
 	defer grpcServer.Stop()
 
-	log.Info("gRPC server started", "address", cfg.Server.GRPCAddress)
+	log.Info("gRPC server started", "address", cfg.Server.GRPCAddress, "tlsEnabled", true)
+
+	// Ignore SIGPIPE to prevent crashes when stdout/stderr are closed
+	signal.Ignore(syscall.SIGPIPE)
 
 	// Wait for signals
 	sigChan := make(chan os.Signal, 1)

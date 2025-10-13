@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/ehsaniara/joblet/internal/joblet/auth"
 	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/persist/internal/config"
 	"github.com/ehsaniara/joblet/persist/internal/storage"
@@ -18,7 +20,9 @@ import (
 // GRPCServer is the gRPC server for persist service
 type GRPCServer struct {
 	persistpb.UnimplementedPersistServiceServer
+	auth     auth.GRPCAuthorization
 	config   *config.ServerConfig
+	security *config.SecurityConfig // Inherited TLS certificates
 	backend  storage.Backend
 	logger   *logger.Logger
 	grpcSrv  *grpc.Server
@@ -26,11 +30,13 @@ type GRPCServer struct {
 }
 
 // NewGRPCServer creates a new gRPC server
-func NewGRPCServer(cfg *config.ServerConfig, backend storage.Backend, log *logger.Logger) *GRPCServer {
+func NewGRPCServer(cfg *config.ServerConfig, backend storage.Backend, log *logger.Logger, authorization auth.GRPCAuthorization, security *config.SecurityConfig) *GRPCServer {
 	return &GRPCServer{
-		config:  cfg,
-		backend: backend,
-		logger:  log.WithField("component", "grpc-server"),
+		auth:     authorization,
+		config:   cfg,
+		security: security,
+		backend:  backend,
+		logger:   log.WithField("component", "grpc-server"),
 	}
 }
 
@@ -43,32 +49,58 @@ func (s *GRPCServer) Start(ctx context.Context) error {
 
 	s.listener = listener
 
-	// Create gRPC server with TLS if enabled
+	// Create gRPC server with TLS (MANDATORY)
 	opts := []grpc.ServerOption{
 		grpc.MaxConcurrentStreams(uint32(s.config.MaxConnections)),
 	}
 
-	// Add TLS credentials if enabled
-	if s.config.TLS.Enabled {
+	// TLS is MANDATORY - configure with inherited or explicit certificates
+	var tlsConfig *tls.Config
+
+	// Determine ClientAuth mode (default to "require")
+	clientAuthRequired := true
+	clientAuthMode := "require"
+	if s.config.TLS != nil {
+		if s.config.TLS.ClientAuth != "" {
+			clientAuthMode = s.config.TLS.ClientAuth
+		}
+		clientAuthRequired = clientAuthMode == "require" || clientAuthMode == ""
+	}
+
+	// If TLS config exists and cert files are specified, use file-based loading
+	if s.config.TLS != nil && s.config.TLS.CertFile != "" && s.config.TLS.KeyFile != "" {
 		tlsCfg := security.TLSConfig{
-			Enabled:    s.config.TLS.Enabled,
+			Enabled:    true,
 			CertFile:   s.config.TLS.CertFile,
 			KeyFile:    s.config.TLS.KeyFile,
 			CAFile:     s.config.TLS.CAFile,
-			ClientAuth: s.config.TLS.ClientAuth,
+			ClientAuth: clientAuthRequired,
 		}
-
-		tlsConfig, err := security.LoadServerTLSConfig(tlsCfg)
+		var err error
+		tlsConfig, err = security.LoadServerTLSConfig(tlsCfg)
 		if err != nil {
-			return fmt.Errorf("failed to load TLS credentials: %w", err)
+			return fmt.Errorf("failed to load TLS credentials from files: %w", err)
 		}
-
-		creds := credentials.NewTLS(tlsConfig)
-		opts = append(opts, grpc.Creds(creds))
-		s.logger.Info("TLS enabled", "clientAuth", s.config.TLS.ClientAuth)
+		s.logger.Info("TLS ENABLED (from files)", "clientAuth", clientAuthMode)
+	} else if s.security != nil && s.security.ServerCert != "" {
+		// Use inherited embedded certificates from parent
+		var err error
+		tlsConfig, err = security.LoadServerTLSConfigFromPEM(
+			[]byte(s.security.ServerCert),
+			[]byte(s.security.ServerKey),
+			[]byte(s.security.CACert),
+			clientAuthRequired,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to load inherited TLS credentials: %w", err)
+		}
+		s.logger.Info("TLS ENABLED (inherited from parent)", "clientAuth", clientAuthMode)
 	} else {
-		s.logger.Warn("TLS is DISABLED - server running without encryption")
+		return fmt.Errorf("TLS is mandatory but no certificates configured (neither files nor inherited)")
 	}
+
+	creds := credentials.NewTLS(tlsConfig)
+	opts = append(opts, grpc.Creds(creds))
 
 	s.grpcSrv = grpc.NewServer(opts...)
 	persistpb.RegisterPersistServiceServer(s.grpcSrv, s)
@@ -103,6 +135,11 @@ func (s *GRPCServer) Stop() error {
 
 // QueryLogs implements the QueryLogs RPC
 func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb.PersistService_QueryLogsServer) error {
+	// Check authorization
+	if err := s.auth.Authorized(stream.Context(), auth.QueryLogsOp); err != nil {
+		return err
+	}
+
 	s.logger.Debug("QueryLogs request", "jobID", req.JobId)
 
 	// TODO: Implement log querying
@@ -111,6 +148,11 @@ func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb
 
 // QueryMetrics implements the QueryMetrics RPC
 func (s *GRPCServer) QueryMetrics(req *persistpb.QueryMetricsRequest, stream persistpb.PersistService_QueryMetricsServer) error {
+	// Check authorization
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
 	s.logger.Debug("QueryMetrics request", "jobID", req.JobId)
 
 	// TODO: Implement metrics querying

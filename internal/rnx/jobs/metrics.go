@@ -74,7 +74,7 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		<-sigCh
-		fmt.Fprintln(os.Stderr, "\nℹ️  Stopping metrics stream...")
+		fmt.Fprintln(os.Stderr, "\nStopping metrics stream...")
 		cancel()
 	}()
 

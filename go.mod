@@ -28,5 +28,3 @@ require (
 )
 
 tool github.com/maxbrunsfeld/counterfeiter/v6
-
-replace github.com/ehsaniara/joblet/persist => ./persist

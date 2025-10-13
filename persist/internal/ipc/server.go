@@ -274,7 +274,7 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 				log.Error("Failed to write logs", "jobID", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Debug("Wrote logs", "jobID", jobID, "count", len(jobBatch.Logs))
+				log.Info("Wrote logs", "jobID", jobID, "count", len(jobBatch.Logs))
 			}
 		}
 
@@ -283,7 +283,7 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 				log.Error("Failed to write metrics", "jobID", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Debug("Wrote metrics", "jobID", jobID, "count", len(jobBatch.Metrics))
+				log.Info("Wrote metrics", "jobID", jobID, "count", len(jobBatch.Metrics))
 			}
 		}
 	}

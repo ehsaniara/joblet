@@ -11,13 +11,13 @@ func TestWorkflowYAML_Parse(t *testing.T) {
 	yamlData := `
 name: "test-workflow"
 description: "A simple test workflow"
-environment:
-  NODE_ENV: "production"
 jobs:
   job1:
     command: "echo"
     args: ["hello"]
     runtime: "ubuntu"
+    environment:
+      NODE_ENV: "production"
 `
 
 	var workflow WorkflowYAML
@@ -32,10 +32,6 @@ jobs:
 
 	if workflow.Description != "A simple test workflow" {
 		t.Errorf("Description = %q, want %q", workflow.Description, "A simple test workflow")
-	}
-
-	if workflow.Environment["NODE_ENV"] != "production" {
-		t.Errorf("Environment[NODE_ENV] = %q, want %q", workflow.Environment["NODE_ENV"], "production")
 	}
 
 	if len(workflow.Jobs) != 1 {
@@ -53,6 +49,10 @@ jobs:
 
 	if len(job1.Args) != 1 || job1.Args[0] != "hello" {
 		t.Errorf("job1.Args = %v, want [hello]", job1.Args)
+	}
+
+	if job1.Environment["NODE_ENV"] != "production" {
+		t.Errorf("job1.Environment[NODE_ENV] = %q, want %q", job1.Environment["NODE_ENV"], "production")
 	}
 }
 
@@ -72,8 +72,7 @@ requires:
 environment:
   NODE_ENV: "production"
   DEBUG: "false"
-secret_environment:
-  API_KEY: "secret123"
+  SECRET_API_KEY: "secret123"
 uploads:
   files:
     - "script.py"
@@ -122,13 +121,13 @@ uploads:
 		t.Errorf("len(Requires) = %d, want 2", len(jobSpec.Requires))
 	}
 
-	// Test environment variables
+	// Test environment variables (including secrets using naming convention)
 	if jobSpec.Environment["NODE_ENV"] != "production" {
 		t.Errorf("Environment[NODE_ENV] = %q, want production", jobSpec.Environment["NODE_ENV"])
 	}
 
-	if jobSpec.SecretEnvironment["API_KEY"] != "secret123" {
-		t.Errorf("SecretEnvironment[API_KEY] = %q, want secret123", jobSpec.SecretEnvironment["API_KEY"])
+	if jobSpec.Environment["SECRET_API_KEY"] != "secret123" {
+		t.Errorf("Environment[SECRET_API_KEY] = %q, want secret123", jobSpec.Environment["SECRET_API_KEY"])
 	}
 
 	// Test upload files

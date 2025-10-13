@@ -1380,48 +1380,37 @@ func (s *WorkflowServiceServer) mergeEnvironmentVariables(workflowYAML *Workflow
 	mergedEnvironment := make(map[string]string)
 	mergedSecretEnvironment := make(map[string]string)
 
-	// Copy global workflow environment variables
-	if workflowYAML.Environment != nil {
-		for key, value := range workflowYAML.Environment {
-			// Apply basic templating to global variables
-			processedValue := s.processEnvironmentTemplating(value, workflowYAML.Environment, workflowYAML.SecretEnvironment)
-			mergedEnvironment[key] = processedValue
-			log.Debug("inherited global environment variable", "key", key, "value", processedValue)
-		}
-	}
-
-	// Copy global workflow secret environment variables
-	if workflowYAML.SecretEnvironment != nil {
-		for key, value := range workflowYAML.SecretEnvironment {
-			// Apply basic templating to global secret variables
-			processedValue := s.processEnvironmentTemplating(value, workflowYAML.Environment, workflowYAML.SecretEnvironment)
-			mergedSecretEnvironment[key] = processedValue
-			log.Debug("inherited global secret environment variable", "key", key)
-		}
-	}
-
-	// Override with job-specific environment variables
+	// Process job-specific environment variables
 	if jobSpec.Environment != nil {
 		for key, value := range jobSpec.Environment {
-			// Apply templating to job-specific variables (can reference global vars)
-			processedValue := s.processEnvironmentTemplating(value, mergedEnvironment, mergedSecretEnvironment)
-			mergedEnvironment[key] = processedValue
-			log.Debug("job-specific environment variable", "key", key, "value", processedValue, "overrode_global", workflowYAML.Environment != nil && workflowYAML.Environment[key] != "")
-		}
-	}
-
-	// Override with job-specific secret environment variables
-	if jobSpec.SecretEnvironment != nil {
-		for key, value := range jobSpec.SecretEnvironment {
-			// Apply templating to job-specific secret variables
-			processedValue := s.processEnvironmentTemplating(value, mergedEnvironment, mergedSecretEnvironment)
-			mergedSecretEnvironment[key] = processedValue
-			log.Debug("job-specific secret environment variable", "key", key, "overrode_global", workflowYAML.SecretEnvironment != nil && workflowYAML.SecretEnvironment[key] != "")
+			// Separate secrets from regular environment variables based on naming convention
+			if isSecretKey(key) {
+				// Apply templating to secret variables
+				processedValue := s.processEnvironmentTemplating(value, mergedEnvironment, mergedSecretEnvironment)
+				mergedSecretEnvironment[key] = processedValue
+				log.Debug("job secret environment variable", "key", key)
+			} else {
+				// Apply templating to regular variables
+				processedValue := s.processEnvironmentTemplating(value, mergedEnvironment, mergedSecretEnvironment)
+				mergedEnvironment[key] = processedValue
+				log.Debug("job environment variable", "key", key, "value", processedValue)
+			}
 		}
 	}
 
 	log.Info("environment variables merged", "total_env_vars", len(mergedEnvironment), "total_secret_vars", len(mergedSecretEnvironment))
 	return mergedEnvironment, mergedSecretEnvironment
+}
+
+// isSecretKey determines if an environment variable key represents a secret based on naming conventions.
+// Keys starting with "SECRET_" or ending with "_TOKEN", "_KEY", "_PASSWORD", "_SECRET" are considered secrets.
+func isSecretKey(key string) bool {
+	key = strings.ToUpper(key)
+	return strings.HasPrefix(key, "SECRET_") ||
+		strings.HasSuffix(key, "_TOKEN") ||
+		strings.HasSuffix(key, "_KEY") ||
+		strings.HasSuffix(key, "_PASSWORD") ||
+		strings.HasSuffix(key, "_SECRET")
 }
 
 // processEnvironmentTemplating processes basic environment variable templating.

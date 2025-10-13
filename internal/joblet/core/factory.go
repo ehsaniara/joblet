@@ -190,18 +190,14 @@ func (f *ComponentFactory) configureVolumeMonitoring(monitoringService *monitori
 func (f *ComponentFactory) createMetricsStore() *adapters.MetricsStoreAdapter {
 	f.logger.Debug("creating metrics store adapter")
 
-	// Create a pub-sub for metrics events
+	// Create a pub-sub for metrics events (live streaming + IPC forwarding)
 	metricsPubSub := pubsub.NewPubSub[adapters.MetricsEvent]()
-
-	// Convert config to domain config
-	metricsConfig := f.config.JobMetrics.ToMetricsConfig()
 
 	metricsStore := adapters.NewMetricsStoreAdapter(
 		metricsPubSub,
-		metricsConfig,
 		logger.WithField("component", "metrics-store"),
 	)
 
-	f.logger.Info("metrics store adapter created successfully", "enabled", metricsConfig.Enabled)
+	f.logger.Info("metrics store adapter created successfully")
 	return metricsStore
 }

@@ -385,16 +385,6 @@ func (wv *WorkflowValidator) validateEnvironmentVariables(workflow types.Workflo
 		if err := wv.validateEnvironmentVariableMap(job.Environment, jobName, "environment", jobLog); err != nil {
 			return err
 		}
-
-		// Validate secret environment variables
-		if err := wv.validateEnvironmentVariableMap(job.SecretEnvironment, jobName, "secret_environment", jobLog); err != nil {
-			return err
-		}
-
-		// Check for conflicts between regular and secret environment variables
-		if err := wv.validateEnvironmentVariableConflicts(job.Environment, job.SecretEnvironment, jobName, jobLog); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -424,28 +414,6 @@ func (wv *WorkflowValidator) validateEnvironmentVariableMap(envVars map[string]s
 		}
 
 		jobLog.Debug("environment variable validated", "type", envType, "key", key, "valueLength", len(value))
-	}
-
-	return nil
-}
-
-// validateEnvironmentVariableConflicts checks for conflicts between regular and secret environment variables
-func (wv *WorkflowValidator) validateEnvironmentVariableConflicts(regularEnv, secretEnv map[string]string, jobName string, jobLog *logger.Logger) error {
-	if regularEnv == nil || secretEnv == nil {
-		return nil
-	}
-
-	// Check for duplicate keys between regular and secret environment variables
-	var conflicts []string
-	for key := range regularEnv {
-		if _, exists := secretEnv[key]; exists {
-			conflicts = append(conflicts, key)
-		}
-	}
-
-	if len(conflicts) > 0 {
-		jobLog.Error("environment variable conflicts detected", "conflicts", conflicts)
-		return fmt.Errorf("job '%s': environment variable conflicts detected - the following variables are defined in both environment and secret_environment: %v", jobName, conflicts)
 	}
 
 	return nil

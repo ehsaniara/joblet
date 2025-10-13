@@ -10,6 +10,7 @@
 - ✅ **Time-Series Storage**: Metrics stored as gzipped JSON Lines files in `/opt/joblet/metrics/`
 - ✅ **Historical Replay**: Complete metrics timeline available for completed jobs
 - ✅ **Live Streaming**: Real-time metrics streaming via gRPC with pub/sub
+- ✅ **Streaming Completeness**: Drain mode ensures final metrics samples are captured (v5.0.0)
 - ✅ **Short UUID Support**: Commands work with both full and short (8-char) UUIDs
 - ✅ **CLI Commands**: `rnx job metrics` streams historical + live metrics (no flags needed)
 - ⏳ **Retention Cleanup**: Automatic cleanup based on retention period (TODO)

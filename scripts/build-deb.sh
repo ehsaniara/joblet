@@ -74,23 +74,9 @@ else
     exit 1
 fi
 
-# Copy joblet-persist installation script
-if [ -f "./debian/joblet-persist-install.sh" ]; then
-    cp ./debian/joblet-persist-install.sh "$BUILD_DIR/opt/joblet/scripts/"
-    chmod +x "$BUILD_DIR/opt/joblet/scripts/joblet-persist-install.sh"
-    echo "✅ Copied joblet-persist-install.sh"
-else
-    echo "⚠️  Warning: joblet-persist-install.sh not found - persistence layer won't be installed"
-fi
-
 # Copy service files
+# Note: joblet-persist now runs as subprocess, no separate service needed
 cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"
-
-# Copy joblet-persist service file if it exists
-if [ -f "./scripts/joblet-persist.service" ]; then
-    cp ./scripts/joblet-persist.service "$BUILD_DIR/opt/joblet/scripts/"
-    echo "✅ Copied joblet-persist.service"
-fi
 
 # Copy certificate generation script (embedded version)
 cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"

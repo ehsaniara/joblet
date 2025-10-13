@@ -834,17 +834,18 @@ openssl x509 -req -in client.csr -CA ca-cert.pem -CAkey ca-key.pem \
 
 ## 🚀 Systemd Service Setup
 
-Joblet requires two systemd services: the main execution service and the persistence service.
+Joblet uses a single systemd service. The persistence layer (joblet-persist) runs as an embedded subprocess.
 
 ### Create Joblet Service File
+
+**Note:** joblet-persist now runs as a subprocess of joblet. Only one service is needed.
 
 ```bash
 sudo tee /etc/systemd/system/joblet.service > /dev/null <<EOF
 [Unit]
-Description=Joblet Job Execution Service
-After=network-online.target joblet-persist.service
+Description=Joblet Job Execution Service with Embedded Persistence
+After=network-online.target
 Wants=network-online.target
-Requires=joblet-persist.service
 
 [Service]
 Type=simple
@@ -869,59 +870,24 @@ WantedBy=multi-user.target
 EOF
 ```
 
-### Create Joblet-Persist Service File
-
-```bash
-sudo tee /etc/systemd/system/joblet-persist.service > /dev/null <<EOF
-[Unit]
-Description=Joblet Persistence Service
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=root
-Group=root
-ExecStart=/usr/local/bin/joblet-persist
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=joblet-persist
-Environment="JOBLET_CONFIG_PATH=/opt/joblet/config/joblet-config.yml"
-
-# Security settings
-NoNewPrivileges=false
-PrivateTmp=false
-ProtectSystem=false
-ProtectHome=false
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
-
-### Enable and Start Services
+### Enable and Start Service
 
 ```bash
 # Reload systemd
 sudo systemctl daemon-reload
 
-# Enable both services
-sudo systemctl enable joblet-persist
+# Enable and start joblet service
 sudo systemctl enable joblet
-
-# Start persist service first (joblet depends on it)
-sudo systemctl start joblet-persist
 sudo systemctl start joblet
 
-# Check status of both services
-sudo systemctl status joblet-persist
+# Check status
 sudo systemctl status joblet
 
-# View logs
-sudo journalctl -u joblet-persist -f
+# View logs (includes both joblet and persist subprocess logs)
 sudo journalctl -u joblet -f
+
+# View only persist subprocess logs
+sudo journalctl -u joblet -f | grep '\[PERSIST\]'
 ```
 
 ## 🖥️ Development Environment Setup

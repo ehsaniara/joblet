@@ -243,14 +243,13 @@ Two scripts handle proto generation:
 ## Deployment
 
 ### Systemd Services
-Two systemd services:
+
+Single systemd service:
 1. **joblet.service**
    - Binary: `/opt/joblet/bin/joblet`
    - Config: `/opt/joblet/config/joblet-config.yml`
-
-2. **joblet-persist.service**
-   - Binary: `/opt/joblet/bin/joblet-persist`
-   - Config: `/opt/joblet/config/joblet-config.yml` (same file!)
+   - Automatically spawns joblet-persist as a subprocess
+   - joblet-persist uses the same config file (persist: section)
 
 ### Deployment Command
 ```bash

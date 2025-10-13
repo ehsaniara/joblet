@@ -7,11 +7,21 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os/exec"
+
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
 	"github.com/ehsaniara/joblet/internal/joblet"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
 	"github.com/ehsaniara/joblet/internal/joblet/ipc"
-	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
 	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
 	"github.com/ehsaniara/joblet/internal/joblet/server"
@@ -21,14 +31,31 @@ import (
 	"github.com/ehsaniara/joblet/pkg/constants"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"syscall"
-	"time"
 )
+
+// prefixWriter wraps an io.Writer and adds a prefix to each line (thread-safe)
+type prefixWriter struct {
+	prefix string
+	writer io.Writer
+	mu     sync.Mutex
+}
+
+func (pw *prefixWriter) Write(p []byte) (n int, err error) {
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+
+	// Add prefix and write
+	prefixed := append([]byte(pw.prefix), p...)
+	written, err := pw.writer.Write(prefixed)
+	if err != nil {
+		return 0, err
+	}
+	// Return original length to satisfy io.Writer interface
+	if written >= len(pw.prefix) {
+		return written - len(pw.prefix), nil
+	}
+	return 0, nil
+}
 
 // RunServer starts and runs the Joblet server with the provided configuration.
 // Initializes all required components including storage adapters, volume management,
@@ -74,27 +101,11 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 
-	// Create metrics store adapter with config
-	var metricsConfig *metricsdomain.MetricsConfig
-	if cfg.JobMetrics.Enabled {
-		metricsConfig = &metricsdomain.MetricsConfig{
-			Enabled:           cfg.JobMetrics.Enabled,
-			DefaultSampleRate: cfg.JobMetrics.DefaultSampleRate,
-			Storage: metricsdomain.StorageConfig{
-				Directory: cfg.JobMetrics.StorageDir,
-				Retention: metricsdomain.RetentionConfig{
-					Days: cfg.JobMetrics.RetentionDays,
-				},
-			},
-		}
-	}
-
-	// Create pub-sub for metrics events to enable live streaming
+	// Create pub-sub for metrics events to enable live streaming and IPC forwarding
 	metricsPubSub := pubsub.NewPubSub[adapters.MetricsEvent]()
 
 	metricsStoreAdapter := adapters.NewMetricsStoreAdapter(
 		metricsPubSub,
-		metricsConfig,
 		logger.WithField("component", "metrics-store"),
 	)
 
@@ -165,6 +176,15 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 	log.Info("monitoring service started successfully")
+
+	// Start joblet-persist subprocess if enabled
+	var persistCmd *exec.Cmd
+	if cfg.IPC.Enabled {
+		persistCmd = startPersistSubprocess(cfg, log)
+		if persistCmd != nil {
+			defer stopPersistSubprocess(persistCmd, log)
+		}
+	}
 
 	// Start gRPC server with configuration using new adapters
 	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, metricsStoreAdapter, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
@@ -536,54 +556,15 @@ func writeFileInChunks(path string, content []byte, mode os.FileMode, logger *lo
 //
 // Returns: Error if network synchronization fails or times out
 func waitForNetworkReady(logger *logger.Logger, platform platform.Platform) error {
-	// Check for legacy FD-based approach (for backward compatibility)
-	networkReadyFD := platform.Getenv("NETWORK_READY_FD")
 	networkReadyFile := platform.Getenv("NETWORK_READY_FILE")
 
-	if networkReadyFD == "" && networkReadyFile == "" {
-		logger.Debug("NETWORK_READY_FD and NETWORK_READY_FILE not set, skipping network wait")
+	if networkReadyFile == "" {
+		logger.Debug("NETWORK_READY_FILE not set, skipping network wait")
 		return nil
 	}
 
-	// Use file-based approach if available
-	if networkReadyFile != "" {
-		// Waiting for network setup via file
-		return waitForNetworkReadyFile(logger, networkReadyFile)
-	}
-
-	// Fall back to FD-based approach
-	// Waiting for network setup via FD
-
-	fd, err := strconv.Atoi(networkReadyFD)
-	if err != nil {
-		return fmt.Errorf("invalid network ready FD: %w", err)
-	}
-
-	// Open the file descriptor passed from parent
-	file := os.NewFile(uintptr(fd), "network-ready")
-	if file == nil {
-		return fmt.Errorf("failed to open network ready FD %d", fd)
-	}
-	defer file.Close()
-
-	// Note: Pipes don't support deadlines, so we skip setting one
-	// The parent process signals immediately after network setup, so this is safe
-
-	// Read one byte - this blocks until network is ready
-	buf := make([]byte, 1)
-	// Blocking on network ready signal
-
-	n, err := file.Read(buf)
-	if err != nil {
-		return fmt.Errorf("failed to read network ready signal: %w", err)
-	}
-
-	if n != 1 {
-		return fmt.Errorf("unexpected read size from network ready FD: %d", n)
-	}
-
-	logger.Debug("network ready")
-	return nil
+	// Wait for network setup via file
+	return waitForNetworkReadyFile(logger, networkReadyFile)
 }
 
 // waitForNetworkReadyFile waits for the network ready signal file to be created
@@ -752,4 +733,100 @@ func initializeDefaultNetworks(networkStore adapters.NetworkStorer, cfg *config.
 
 	log.Info("default network initialization completed", "count", len(cfg.Network.Networks))
 	return nil
+}
+
+// startPersistSubprocess starts joblet-persist as a subprocess with unified logging
+func startPersistSubprocess(cfg *config.Config, log *logger.Logger) *exec.Cmd {
+	log.Info("[INIT] Starting joblet-persist subprocess...")
+
+	// Find persist binary
+	persistBinary := "/opt/joblet/bin/joblet-persist"
+	if _, err := os.Stat(persistBinary); os.IsNotExist(err) {
+		// Try relative path for development
+		persistBinary = "./bin/joblet-persist"
+		if _, err := os.Stat(persistBinary); os.IsNotExist(err) {
+			log.Warn("[INIT] joblet-persist binary not found, running without persist service")
+			return nil
+		}
+	}
+
+	// Find config file path (same search order as joblet)
+	configPath := "/opt/joblet/config/joblet-config.yml"
+	if envPath := os.Getenv("JOBLET_CONFIG_PATH"); envPath != "" {
+		configPath = envPath
+	} else if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// Try relative paths for development
+		for _, path := range []string{"./config/joblet-config.yml", "./joblet-config.yml"} {
+			if _, err := os.Stat(path); err == nil {
+				configPath = path
+				break
+			}
+		}
+	}
+
+	cmd := exec.Command(persistBinary, "-config", configPath)
+
+	// Unified logging with [PERSIST] prefix
+	cmd.Stdout = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stdout}
+	cmd.Stderr = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stderr}
+
+	// Keep subprocess in same process group and inherit stdin
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: false, // Keep in same process group
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.Error("[INIT] Failed to start joblet-persist subprocess", "error", err)
+		return nil
+	}
+
+	log.Info("[INIT] joblet-persist subprocess started", "pid", cmd.Process.Pid)
+
+	// Monitor subprocess in background
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			log.Error("[PERSIST] Subprocess exited with error", "error", err, "pid", cmd.Process.Pid)
+		} else {
+			log.Info("[PERSIST] Subprocess exited cleanly", "pid", cmd.Process.Pid)
+		}
+	}()
+
+	return cmd
+}
+
+// stopPersistSubprocess gracefully stops the joblet-persist subprocess
+func stopPersistSubprocess(cmd *exec.Cmd, log *logger.Logger) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+
+	pid := cmd.Process.Pid
+	log.Info("[INIT] Stopping joblet-persist subprocess...", "pid", pid)
+
+	// Send SIGTERM for graceful shutdown
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		log.Warn("[INIT] Failed to send SIGTERM to persist subprocess", "error", err, "pid", pid)
+		return
+	}
+
+	// Wait for graceful shutdown with timeout
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		log.Warn("[INIT] Persist subprocess did not exit gracefully, force killing", "pid", pid)
+		if err := cmd.Process.Kill(); err != nil {
+			log.Error("[INIT] Failed to kill persist subprocess", "error", err, "pid", pid)
+		}
+	case err := <-done:
+		if err != nil {
+			log.Warn("[INIT] Persist subprocess stopped with error", "error", err, "pid", pid)
+		} else {
+			log.Info("[INIT] Persist subprocess stopped gracefully", "pid", pid)
+		}
+	}
 }

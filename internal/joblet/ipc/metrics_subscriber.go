@@ -43,8 +43,8 @@ func NewMetricsSubscriber(writer *Writer, ps pubsub.PubSub[adapters.MetricsEvent
 
 // Start begins subscribing to metrics events
 func (s *MetricsSubscriber) Start() error {
-	// Subscribe to all metrics events using wildcard topic
-	updates, unsubscribe, err := s.pubsub.Subscribe(s.ctx, "metrics.job.*")
+	// Subscribe to the single "metrics" topic (all jobs publish here)
+	updates, unsubscribe, err := s.pubsub.Subscribe(s.ctx, "metrics")
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (s *MetricsSubscriber) processEvents(updates <-chan pubsub.Message[adapters
 					"error", err)
 			} else {
 				s.metricsSent.Add(1)
-				s.logger.Debug("Forwarded metrics sample to IPC",
+				s.logger.Info("Forwarded metrics sample to IPC persist",
 					"jobID", jobID,
 					"sequence", seq,
 					"timestamp", event.Sample.Timestamp)

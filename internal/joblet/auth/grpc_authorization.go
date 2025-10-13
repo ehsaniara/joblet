@@ -42,6 +42,10 @@ const (
 	CreateVolumeOp Operation = "create_volume"
 	ListVolumesOp  Operation = "list_volumes"
 	RemoveVolumeOp Operation = "remove_volume"
+
+	// Persist operations (historical data queries)
+	QueryLogsOp    Operation = "query_logs"
+	QueryMetricsOp Operation = "query_metrics"
 )
 
 //counterfeiter:generate . GRPCAuthorization
@@ -109,6 +113,9 @@ func (s *grpcAuthorization) isOperationAllowed(role ClientRole, operation Operat
 			return true
 		case CreateVolumeOp, RemoveVolumeOp:
 			return false
+		// Persist operations - viewers can query historical data (read-only)
+		case QueryLogsOp, QueryMetricsOp:
+			return true
 		default:
 			return false
 		}

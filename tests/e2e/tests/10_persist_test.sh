@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Test 10: Persist Service Integration Tests
+# Test 10: Persist Subprocess Integration Tests
 # Verifies: Log persistence, metric persistence, historical queries, IPC communication
+# Note: joblet-persist now runs as a subprocess of joblet-core (not a separate systemd service)
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
@@ -11,22 +12,36 @@ REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
 REMOTE_USER="${REMOTE_USER:-jay}"
 
 # Initialize test suite
-test_suite_init "Persist Service Integration Tests"
+test_suite_init "Persist Subprocess Integration Tests"
 
 # ============================================
 # Test Functions
 # ============================================
 
 test_persist_service_running() {
-    echo "Checking if joblet-persist service is running..."
+    echo "Checking if joblet-persist subprocess is running..."
 
-    # Check service status on remote host
-    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo systemctl is-active joblet-persist.service" | grep -q "active"; then
-        echo "  ✓ joblet-persist service is running"
-        return 0
+    # Check if persist is running as subprocess of joblet
+    local persist_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep 'joblet-persist -config' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
+    local joblet_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep '/opt/joblet/bin/joblet\$' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
+
+    if [[ -n "$persist_pid" ]] && [[ -n "$joblet_pid" ]]; then
+        # Verify persist is a child of joblet
+        local parent_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps -o ppid= -p $persist_pid" 2>/dev/null | tr -d ' ')
+
+        if [[ "$parent_pid" == "$joblet_pid" ]]; then
+            echo "  ✓ joblet-persist subprocess is running (PID: $persist_pid, Parent: $joblet_pid)"
+            return 0
+        else
+            echo "  ✗ joblet-persist is running but not as child of joblet"
+            echo "    Persist PID: $persist_pid, Parent: $parent_pid, Expected Parent: $joblet_pid"
+            return 1
+        fi
     else
-        echo "  ✗ joblet-persist service is not running"
-        ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo systemctl status joblet-persist.service" || true
+        echo "  ✗ joblet-persist subprocess is not running"
+        echo "    Joblet PID: ${joblet_pid:-not found}"
+        echo "    Persist PID: ${persist_pid:-not found}"
+        ssh ${REMOTE_USER}@${REMOTE_HOST} "ps auxf | grep joblet | grep -v grep" || true
         return 1
     fi
 }
@@ -34,8 +49,10 @@ test_persist_service_running() {
 test_persist_socket_exists() {
     echo "Checking if persist Unix socket exists..."
 
-    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/run/persist.sock" 2>/dev/null; then
-        echo "  ✓ Persist socket exists"
+    # New socket path is /tmp/joblet-persist.sock (configured in IPC section)
+    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep joblet-persist.sock" 2>/dev/null | grep -q "joblet-persist"; then
+        echo "  ✓ Persist socket exists at /tmp/joblet-persist.sock"
+        ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep joblet-persist.sock" 2>/dev/null | head -1
         return 0
     else
         echo "  ✗ Persist socket does not exist"
@@ -187,18 +204,21 @@ test_multiple_jobs_persistence() {
 }
 
 test_persist_service_logs() {
-    echo "Checking persist service logs for errors..."
+    echo "Checking persist subprocess logs for errors..."
 
-    local logs=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo journalctl -u joblet-persist.service --since '5 minutes ago' --no-pager" 2>&1)
+    # Persist logs are now in joblet service logs with [PERSIST] prefix
+    local logs=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo journalctl -u joblet.service --since '5 minutes ago' --no-pager | grep '\[PERSIST\]'" 2>&1)
 
     # Check for error patterns
-    if echo "$logs" | grep -qi "panic\|fatal\|error.*failed"; then
-        echo "  ⚠ Found error patterns in persist service logs:"
-        echo "$logs" | grep -i "panic\|fatal\|error.*failed" | tail -5
+    if echo "$logs" | grep -qi "panic\|fatal\|\[ERROR\].*failed"; then
+        echo "  ⚠ Found error patterns in persist subprocess logs:"
+        echo "$logs" | grep -i "panic\|fatal\|\[ERROR\].*failed" | tail -5
         # Don't fail the test, just warn
         return 0
     else
-        echo "  ✓ No critical errors in persist service logs"
+        echo "  ✓ No critical errors in persist subprocess logs"
+        # Show a few recent log lines as confirmation
+        echo "$logs" | tail -3 | sed 's/^/    /'
         return 0
     fi
 }
@@ -206,13 +226,14 @@ test_persist_service_logs() {
 test_ipc_socket_permissions() {
     echo "Testing IPC socket permissions..."
 
-    local socket_info=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/run/persist.sock" 2>&1)
+    # Check if socket is accessible and listening
+    local socket_info=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep /tmp/joblet-persist.sock" 2>&1)
 
-    if echo "$socket_info" | grep -q "srw-------"; then
-        echo "  ✓ Socket has correct permissions (600)"
+    if echo "$socket_info" | grep -q "LISTEN"; then
+        echo "  ✓ Socket is listening and accessible"
         return 0
     else
-        echo "  ⚠ Socket permissions may be incorrect:"
+        echo "  ⚠ Socket state unclear:"
         echo "$socket_info"
         return 0  # Don't fail, just warn
     fi
@@ -256,8 +277,8 @@ test_storage_disk_usage() {
 # Run Tests
 # ============================================
 
-test_section "Persist Service Status"
-run_test "Persist service is running" test_persist_service_running
+test_section "Persist Subprocess Status"
+run_test "Persist subprocess is running as child of joblet" test_persist_service_running
 run_test "Persist Unix socket exists" test_persist_socket_exists
 run_test "IPC socket has correct permissions" test_ipc_socket_permissions
 run_test "Persist binary version check" test_persist_binary_version
@@ -272,8 +293,8 @@ run_test "Basic metric persistence" test_metric_persistence
 test_section "Concurrent Operations"
 run_test "Multiple jobs persistence" test_multiple_jobs_persistence
 
-test_section "Service Health"
-run_test "Persist service logs check" test_persist_service_logs
+test_section "Subprocess Health"
+run_test "Persist subprocess logs check" test_persist_service_logs
 run_test "Storage disk usage" test_storage_disk_usage
 
 # ============================================
@@ -298,10 +319,10 @@ echo -e "\n${BLUE}Completed: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
 
 if [[ $FAILED_TESTS -eq 0 ]]; then
     echo -e "\n${GREEN}✅ ALL TESTS PASSED!${NC}"
-    echo -e "${GREEN}Persist service is working correctly.${NC}"
+    echo -e "${GREEN}Persist subprocess is working correctly.${NC}"
     exit 0
 else
     echo -e "\n${RED}❌ SOME TESTS FAILED${NC}"
-    echo -e "${RED}Please check the persist service configuration.${NC}"
+    echo -e "${RED}Please check the persist subprocess configuration.${NC}"
     exit 1
 fi

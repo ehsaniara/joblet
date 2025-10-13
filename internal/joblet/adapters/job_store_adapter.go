@@ -10,7 +10,6 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
-	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
@@ -35,19 +34,13 @@ func IsConflictError(err error) bool {
 }
 
 // jobStoreAdapter implements JobStorer using the new generic packages.
-// It provides job storage with buffer management and pub-sub capabilities
-// while using pluggable backends internally.
+// It provides job storage with buffer management and pub-sub capabilities.
+// Logs are buffered in-memory for real-time streaming and forwarded to persist via IPC.
 type jobStoreAdapter struct {
 	// Generic storage backends
 	jobStore jobStore[string, *domain.Job]
 	logMgr   *SimpleLogManager
 	pubsub   pubsub.PubSub[JobEvent]
-
-	// Configuration for log persistence
-	logPersistenceConfig *config.LogPersistenceConfig
-
-	// Async log system for rate-decoupled logging
-	asyncLogSystem *AsyncLogSystem
 
 	// Task management (maintains compatibility with current Task-based approach)
 	tasks      map[string]*taskWrapper
@@ -109,37 +102,6 @@ func NewJobStorer(
 		tasks:    make(map[string]*taskWrapper),
 		logger:   logger,
 	}
-}
-
-// NewJobStorerWithLogPersistence creates a new job store adapter with log persistence
-func NewJobStorerWithLogPersistence(
-	store jobStore[string, *domain.Job],
-	logMgr *SimpleLogManager,
-	pubsub pubsub.PubSub[JobEvent],
-	logPersistenceConfig *config.LogPersistenceConfig,
-	logger *logger.Logger,
-) JobStorer {
-	if logger == nil {
-		logger = logger.WithField("component", "job-store-adapter")
-	}
-
-	adapter := &jobStoreAdapter{
-		jobStore:             store,
-		logMgr:               logMgr,
-		pubsub:               pubsub,
-		logPersistenceConfig: logPersistenceConfig,
-		tasks:                make(map[string]*taskWrapper),
-		logger:               logger,
-	}
-
-	// Initialize async log system for rate-decoupled logging
-	if logPersistenceConfig != nil {
-		adapter.asyncLogSystem = NewAsyncLogSystem(logPersistenceConfig, logger)
-	}
-
-	// Automatic log cleanup disabled - logs preserved until manually deleted
-
-	return adapter
 }
 
 // CreateNewJob adds a new job to the store with complete initialization.
@@ -240,10 +202,11 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 		a.logger.Warn("failed to publish job update event", "jobId", job.Uuid, "error", err)
 	}
 
-	// Clean up completed jobs
+	// Don't cleanup subscribers immediately - let them drain final log chunks
+	// Subscribers will terminate themselves after receiving UPDATED event and draining
 	if job.IsCompleted() {
-		a.logger.Debug("job completed, cleaning up subscribers", "jobId", job.Uuid, "finalStatus", newStatus)
-		task.cleanupSubscribers()
+		a.logger.Debug("job completed, subscribers will drain and cleanup", "jobId", job.Uuid, "finalStatus", newStatus)
+		// Cleanup will happen automatically after drain deadline in subscribeToJobUpdates
 	}
 
 	a.logger.Debug("job updated successfully", "jobId", job.Uuid, "oldStatus", oldStatus, "newStatus", newStatus)
@@ -354,8 +317,8 @@ func (a *jobStoreAdapter) ListJobs() []*domain.Job {
 }
 
 // WriteToBuffer appends log data to the specified job's output buffer.
-// Writes to both in-memory buffer (for real-time streaming) and async log system
-// (for persistence). Publishes log chunk events and supports UUID prefix resolution.
+// Writes to in-memory buffer for real-time streaming and publishes log chunk events
+// for IPC forwarding to persist. Supports UUID prefix resolution.
 func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 	if len(chunk) == 0 {
 		return
@@ -389,11 +352,7 @@ func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 		a.logger.Warn("no buffer available for job - logs will not be stored", "jobId", resolvedUuid, "chunkSize", len(chunk))
 	}
 
-	// Write to async log system for rate-decoupled persistence
-	if a.asyncLogSystem != nil {
-		a.asyncLogSystem.WriteLog(resolvedUuid, chunk)
-	}
-
+	// Logs are forwarded to persist via IPC (LogSubscriber listens to pubsub)
 	// Publish log chunk event
 	if err := a.publishEvent(JobEvent{
 		Type:      "LOG_CHUNK",
@@ -496,7 +455,7 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 
 	// Subscribe to job events for real-time updates
 	// This will block until the subscription ends
-	return a.subscribeToJobUpdates(ctx, id, task, stream)
+	return a.subscribeToJobUpdates(ctx, resolvedUuid, task, stream)
 }
 
 // PubSub returns the pub-sub instance for external integration (e.g., IPC)
@@ -505,8 +464,8 @@ func (a *jobStoreAdapter) PubSub() pubsub.PubSub[JobEvent] {
 }
 
 // Close gracefully shuts down the adapter and releases resources.
-// Stops cleanup routines, closes all subscriptions, shuts down async log system,
-// and closes all backend resources (buffer manager, pubsub, job store).
+// Stops cleanup routines, closes all subscriptions, and closes all backend
+// resources (buffer manager, pubsub, job store).
 func (a *jobStoreAdapter) Close() error {
 	a.closeMutex.Lock()
 	defer a.closeMutex.Unlock()
@@ -525,12 +484,7 @@ func (a *jobStoreAdapter) Close() error {
 	a.tasks = make(map[string]*taskWrapper)
 	a.tasksMutex.Unlock()
 
-	if a.asyncLogSystem != nil {
-		if err := a.asyncLogSystem.Close(); err != nil {
-			a.logger.Error("failed to close async log system", "error", err)
-		}
-	}
-
+	// Logs managed by IPC → persist subprocess (no async system to close)
 	// Simple log manager doesn't need explicit closing - just clear resources
 	// All buffers are cleaned up through job cleanup process
 
@@ -669,13 +623,7 @@ func (a *jobStoreAdapter) DeleteJobLogs(jobID string) error {
 		return fmt.Errorf("failed to delete job logs: %w", err)
 	}
 
-	// Also delete log files from disk
-	if a.asyncLogSystem != nil {
-		if err := a.asyncLogSystem.DeleteJobLogFiles(resolvedUuid); err != nil {
-			a.logger.Warn("failed to delete log files from disk", "jobId", resolvedUuid, "error", err)
-			// Don't return error as buffer cleanup succeeded
-		}
-	}
+	// Log files are managed by persist subprocess - deletion should be requested from persist gRPC service
 
 	return nil
 }
@@ -751,11 +699,12 @@ func (a *jobStoreAdapter) resolveUuidByPrefix(prefix string) (string, error) {
 }
 
 // publishEvent publishes a job event to the pub-sub system.
-// Uses job-specific topics ("job.{jobId}") for targeted subscriptions.
+// Uses a single "jobs" topic for all jobs. Subscribers filter by JobID.
 // Logs success/failure for debugging and monitoring.
 func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 	ctx := context.Background()
-	topic := fmt.Sprintf("job.%s", event.JobID)
+	// Publish to single "jobs" topic for all jobs
+	topic := "jobs"
 	a.logger.Debug("publishing event", "jobId", event.JobID, "eventType", event.Type, "topic", topic, "chunkSize", len(event.LogChunk))
 
 	err := a.pubsub.Publish(ctx, topic, event)
@@ -772,8 +721,8 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 // Handles LOG_CHUNK events by streaming data to client, and UPDATED events by checking
 // for job completion. Manages subscription lifecycle and cleanup automatically.
 func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, task *taskWrapper, stream interfaces.DomainStreamer) error {
-	// Subscribe to job-specific events
-	topic := fmt.Sprintf("job.%s", jobID)
+	// Subscribe to single "jobs" topic (filter by JobID in loop)
+	topic := "jobs"
 	a.logger.Debug("subscribing to job events for streaming", "jobId", jobID, "topic", topic)
 
 	updates, unsubscribe, err := a.pubsub.Subscribe(ctx, topic)
@@ -821,7 +770,24 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 			close(done)
 		}()
 
+		jobCompleted := false
+		drainDeadline := time.Time{}
+
 		for {
+			// If job completed, check if we've exceeded drain deadline
+			if jobCompleted && time.Now().After(drainDeadline) {
+				a.logger.Debug("drain deadline exceeded, ending stream", "jobId", jobID)
+				done <- nil
+				return
+			}
+
+			// Compute select timeout based on whether we're draining
+			var selectTimeout <-chan time.Time
+			if jobCompleted {
+				// During drain, use short timeout to check deadline frequently
+				selectTimeout = time.After(50 * time.Millisecond)
+			}
+
 			select {
 			case <-subCtx.Done():
 				a.logger.Debug("subscription context cancelled", "jobId", jobID, "subId", subID)
@@ -831,6 +797,9 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 				a.logger.Debug("stream context cancelled", "jobId", jobID, "subId", subID)
 				done <- nil
 				return
+			case <-selectTimeout:
+				// Timeout during drain phase - continue to check deadline
+				continue
 			case msg, ok := <-updates:
 				if !ok {
 					a.logger.Debug("updates channel closed", "jobId", jobID, "subId", subID)
@@ -839,6 +808,12 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 				}
 
 				event := msg.Payload
+
+				// Filter events for this specific job (all jobs use the same topic)
+				if event.JobID != jobID {
+					continue
+				}
+
 				a.logger.Debug("received event from pubsub", "jobId", jobID, "eventType", event.Type, "chunkSize", len(event.LogChunk))
 
 				// Handle different event types
@@ -855,11 +830,14 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 					}
 				case "UPDATED":
 					a.logger.Debug("received job status update", "jobId", jobID, "status", event.Status)
-					// Status updates don't need to send data, just keep the connection alive
+					// When job reaches final status, enter drain mode instead of immediately terminating
 					if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
-						a.logger.Debug("job completed, ending stream", "jobId", jobID, "finalStatus", event.Status)
-						done <- nil
-						return // Job completed, end the stream
+						if !jobCompleted {
+							jobCompleted = true
+							// Set drain deadline to allow final log chunks to arrive
+							drainDeadline = time.Now().Add(500 * time.Millisecond)
+							a.logger.Debug("job completed, entering drain mode", "jobId", jobID, "finalStatus", event.Status, "drainDeadline", drainDeadline)
+						}
 					}
 				}
 			}

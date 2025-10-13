@@ -42,13 +42,11 @@ deploy: all
 	@scp bin/joblet bin/rnx bin/joblet-persist $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "Stopping services..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service || true'
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet-persist.service || true'
 	@echo "Installing binaries..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp /tmp/joblet/build/* /opt/joblet/bin/ && sudo chmod +x /opt/joblet/bin/*'
 	@echo "Starting services..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl start joblet.service'
-	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl start joblet-persist.service || echo "⚠️  joblet-persist service not configured yet"'
-	@echo "✅ Deployment complete"
+	@echo "✅ Deployment complete (joblet-persist runs as subprocess)"
 
 test:
 	@echo "Running tests..."

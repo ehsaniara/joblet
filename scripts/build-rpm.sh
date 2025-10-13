@@ -93,19 +93,7 @@ for file in joblet-config-template.yml rnx-config-template.yml joblet.service ce
     fi
 done
 
-# Copy joblet-persist installation script and service
-if [ -f "./debian/joblet-persist-install.sh" ]; then
-    cp ./debian/joblet-persist-install.sh "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
-    chmod +x "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/joblet-persist-install.sh"
-    echo "✅ Copied joblet-persist-install.sh"
-else
-    echo "⚠️  Warning: joblet-persist-install.sh not found - persistence layer won't be installed"
-fi
-
-if [ -f "./scripts/joblet-persist.service" ]; then
-    cp ./scripts/joblet-persist.service "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
-    echo "✅ Copied joblet-persist.service"
-fi
+# Note: joblet-persist now runs as a subprocess of joblet, no separate service needed
 
 # Create the spec file with network support
 cat > "$BUILD_DIR/SPECS/${PACKAGE_NAME}.spec" << EOF
@@ -176,14 +164,7 @@ cp joblet-persist \$RPM_BUILD_ROOT/opt/joblet/bin/
 cp scripts/joblet-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/rnx-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 
-# Install joblet-persist installation script and service
-if [ -f scripts/joblet-persist-install.sh ]; then
-    cp scripts/joblet-persist-install.sh \$RPM_BUILD_ROOT/opt/joblet/scripts/
-    chmod +x \$RPM_BUILD_ROOT/opt/joblet/scripts/joblet-persist-install.sh
-fi
-if [ -f scripts/joblet-persist.service ]; then
-    cp scripts/joblet-persist.service \$RPM_BUILD_ROOT/opt/joblet/scripts/
-fi
+# joblet-persist runs as subprocess, no separate service needed
 
 # Install systemd service
 cp scripts/joblet.service \$RPM_BUILD_ROOT/etc/systemd/system/
@@ -221,14 +202,8 @@ echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-joblet.conf
 # Reload systemd to pick up the service file
 systemctl daemon-reload
 
-# Install joblet-persist companion service
-if [ -f /opt/joblet/scripts/joblet-persist-install.sh ]; then
-    echo "📦 Installing joblet-persist companion service..."
-    /bin/bash /opt/joblet/scripts/joblet-persist-install.sh || echo "⚠️  joblet-persist installation failed"
-fi
-
 # Enable and start the service
-echo "To start Joblet service, run:"
+echo "To start Joblet service (includes joblet-persist as subprocess), run:"
 echo "  sudo systemctl start joblet"
 echo "  sudo systemctl enable joblet"
 echo ""
@@ -290,8 +265,6 @@ fi
 /opt/joblet/bin/joblet-persist
 /opt/joblet/scripts/joblet-config-template.yml
 /opt/joblet/scripts/rnx-config-template.yml
-%attr(0755,root,root) /opt/joblet/scripts/joblet-persist-install.sh
-/opt/joblet/scripts/joblet-persist.service
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
 /usr/local/bin/rnx

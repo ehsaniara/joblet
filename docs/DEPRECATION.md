@@ -8,17 +8,19 @@ As Joblet evolves, certain features become obsolete or are replaced by better al
 
 ## Deprecation Policy
 
-- **Current Version (v4.7.3)**: Features are marked as deprecated but remain functional
-- **Next Major Version (v5.0.0)**: Deprecated features will be removed with migration guide
-- **Grace Period**: All deprecated features have been documented with migration paths
+- **Current Version (v5.0.0)**: All previously deprecated features have been removed
+- **Clean Codebase**: No backward compatibility code remains
+- **Breaking Changes**: v5.0.0 is a major release with breaking changes (see V5_CLEANUP_SUMMARY.md)
 
 ---
 
-## Deprecated Features
+## Removed Features (v5.0.0)
 
-### 1. JobServiceServer (High Priority)
+All features listed below have been **REMOVED** in v5.0.0. See migration guide at the end.
 
-**Status**: 🔴 **DEPRECATED** - Will be removed in v5.0.0
+### 1. JobServiceServer
+
+**Status**: ✅ **REMOVED** in v5.0.0
 
 **Current Location**: `internal/joblet/server/job_service.go`
 
@@ -66,42 +68,37 @@ pb.RegisterJobServiceServer(grpcServer, jobService)
 
 ### 2. Legacy Job Status Constants
 
-**Status**: 🟡 **DEPRECATED** - Backward compatible aliases
+**Status**: ✅ **REMOVED** in v5.0.0
 
-**Current Location**: `internal/joblet/domain/job.go:26-33`
-
-**Deprecated Constants**:
+**Removed Constants**:
 ```go
+// REMOVED - No longer available
 const (
-    JobStatusRunning   = StatusRunning    // Use StatusRunning
-    JobStatusCompleted = StatusCompleted  // Use StatusCompleted
-    JobStatusFailed    = StatusFailed     // Use StatusFailed
-    JobStatusScheduled = StatusScheduled  // Use StatusScheduled
-    JobStatusStopping  = StatusStopping   // Use StatusStopping
+    JobStatusRunning   = StatusRunning    // ❌ REMOVED
+    JobStatusCompleted = StatusCompleted  // ❌ REMOVED
+    JobStatusFailed    = StatusFailed     // ❌ REMOVED
+    JobStatusScheduled = StatusScheduled  // ❌ REMOVED
+    JobStatusStopping  = StatusStopping   // ❌ REMOVED
 )
 ```
 
-**Migration Path**:
+**Migration** (Required for v5.0.0):
 
-#### Before (Deprecated):
+#### Before (v4.x):
 ```go
 if job.Status == domain.JobStatusRunning {
     // ...
 }
 ```
 
-#### After (Current):
+#### After (v5.0.0):
 ```go
 if job.Status == domain.StatusRunning {
     // ...
 }
 ```
 
-**Removal Plan**:
-1. **v4.7.3** (Current): Both forms work (aliases maintained)
-2. **v5.0.0**: Remove `JobStatus*` aliases, keep only `Status*` constants
-
-**Impact**: Low - Simple find/replace migration
+**Impact**: Low - Simple find/replace migration (breaking change)
 
 ---
 
@@ -193,17 +190,15 @@ initPath, err := envService.GetRuntimeInitPath(ctx, "python-3.11")
 
 ### 5. Workflow-Level Environment Variables
 
-**Status**: 🟡 **DEPRECATED** - Use job-level environment variables
+**Status**: ✅ **REMOVED** in v5.0.0
 
-**Current Location**: `internal/joblet/workflow/types/yaml.go:27-31`
-
-**Deprecated Fields**:
+**Removed Fields**:
 ```yaml
-# workflow.yaml (OLD - Deprecated)
+# workflow.yaml (OLD - No longer supported)
 version: "1.0"
-environment:              # ❌ Deprecated
+environment:              # ❌ REMOVED
   GLOBAL_VAR: "value"
-secret_environment:       # ❌ Deprecated
+secret_environment:       # ❌ REMOVED
   API_KEY: "secret"
 jobs:
   my-job:
@@ -211,146 +206,143 @@ jobs:
     args: [script.py]
 ```
 
-**Migration Path**:
+**Migration** (Required for v5.0.0):
 
 Define environment variables directly in each job specification.
 
-#### After (Current):
+#### After (v5.0.0 - Required):
 ```yaml
-# workflow.yaml (NEW - Current)
+# workflow.yaml (NEW - Required)
 version: "1.0"
 jobs:
   my-job:
     command: python3
     args: [script.py]
-    environment:          # ✅ Job-level environment
+    environment:          # ✅ Job-level environment (REQUIRED)
       GLOBAL_VAR: "value"
-      SECRET_API_KEY: "secret"  # Use naming conventions for secrets
+      SECRET_API_KEY: "secret"  # Auto-detected as secret by naming
 ```
 
-**Best Practices**:
-- Use job-level `environment` field for all variables
-- Use naming conventions for secrets (e.g., `SECRET_*`, `*_TOKEN`, `*_KEY`)
-- No separate `secret_environment` field needed
+**Secret Detection** (New in v5.0.0):
+Secrets are automatically detected by naming convention:
+- `SECRET_*` prefix (e.g., `SECRET_DATABASE_PASSWORD`)
+- `*_TOKEN` suffix (e.g., `GITHUB_TOKEN`)
+- `*_KEY` suffix (e.g., `API_KEY`)
+- `*_PASSWORD` suffix (e.g., `DATABASE_PASSWORD`)
+- `*_SECRET` suffix (e.g., `OAUTH_SECRET`)
 
-**Removal Plan**:
-1. **v4.7.3** (Current): Fields ignored if present, no effect
-2. **v5.0.0**: Remove fields from YAML schema entirely
-
-**Impact**: Low - Already ignored, job-level environment is standard
+**Impact**: High - Breaking change, workflow YAML files must be updated
 
 ---
 
 ### 6. Job-Level SecretEnvironment Field
 
-**Status**: 🟡 **DEPRECATED** - Merged into environment field
+**Status**: ✅ **REMOVED** in v5.0.0
 
-**Current Location**: `internal/joblet/workflow/types/yaml.go:57-59`
-
-**Deprecated Field**:
+**Removed Field**:
 ```yaml
-# Job specification (OLD - Deprecated)
+# Job specification (OLD - No longer supported)
 jobs:
   my-job:
     command: python3
     environment:
       NORMAL_VAR: "value"
-    secret_environment:    # ❌ Deprecated
+    secret_environment:    # ❌ REMOVED
       API_KEY: "secret"
 ```
 
-**Migration Path**:
+**Migration** (Required for v5.0.0):
 
 Merge all variables into a single `environment` field with naming conventions.
 
-#### After (Current):
+#### After (v5.0.0 - Required):
 ```yaml
-# Job specification (NEW - Current)
+# Job specification (NEW - Required)
 jobs:
   my-job:
     command: python3
     environment:
       NORMAL_VAR: "value"
-      SECRET_API_KEY: "secret"  # Use naming convention
+      SECRET_API_KEY: "secret"  # Auto-detected by naming
+      DATABASE_PASSWORD: "pass"  # Auto-detected by naming
 ```
 
-**Naming Conventions for Secrets**:
+**Automatic Secret Detection** (v5.0.0):
+Variables matching these patterns are automatically treated as secrets:
 - Prefix: `SECRET_*` (e.g., `SECRET_DATABASE_PASSWORD`)
 - Suffix: `*_TOKEN` (e.g., `GITHUB_TOKEN`)
 - Suffix: `*_KEY` (e.g., `API_KEY`)
+- Suffix: `*_PASSWORD` (e.g., `DATABASE_PASSWORD`)
 - Suffix: `*_SECRET` (e.g., `OAUTH_SECRET`)
 
-**Removal Plan**:
-1. **v4.7.3** (Current): Field parsed but merged into environment
-2. **v5.0.0**: Remove `secret_environment` from JobSpec
-
-**Impact**: Low - Already merged internally, simple YAML update
+**Impact**: Medium - Breaking change, requires YAML update
 
 ---
 
 ## Migration Timeline
 
-### Current Version (v4.7.3)
-- All deprecated features are marked but remain functional
-- Backward compatibility is maintained
-- No breaking changes
-- Migration documentation provided
+### v5.0.0 (Released: 2025-10-13)
+**Status**: ✅ **RELEASED**
 
-### Next Major Version (v5.0.0)
-**Target: Q1-Q2 2026**
-
-Breaking Changes:
-- Remove `internal/joblet/server/job_service.go`
-- Remove legacy `JobStatus*` constants
-- Remove sequential ID generator methods
-- Remove `GetRuntimeInitPath` method
-- Remove workflow-level environment fields from YAML schema
-- Remove `secret_environment` field from JobSpec
+Breaking Changes Applied:
+- ✅ Removed `internal/joblet/server/job_service.go`
+- ✅ Removed legacy `JobStatus*` constants
+- ✅ Removed sequential ID generator methods
+- ✅ Removed `GetRuntimeInitPath` method
+- ✅ Removed workflow-level environment fields from YAML schema
+- ✅ Removed `secret_environment` field from JobSpec
+- ✅ Removed network ready FD fallback (`NETWORK_READY_FD`)
+- ✅ Removed legacy Job struct fields (`StartedAt`, `CompletedAt` aliases)
+- ✅ Added automatic secret detection by naming convention
 
 Migration Support:
-- Complete migration guide in this document
-- Automated migration scripts provided
-- All replacements documented with examples
+- ✅ Complete migration guide in V5_CLEANUP_SUMMARY.md
+- ✅ Migration script available (see below)
+- ✅ All replacements documented with examples
 
 ---
 
-## How to Prepare for v5.0.0
+## How to Migrate to v5.0.0
 
 ### 1. Audit Your Code
 ```bash
-# Search for deprecated constants
+# Search for removed constants (will cause compile errors)
 grep -r "JobStatusRunning\|JobStatusCompleted\|JobStatusFailed" .
 
-# Search for deprecated ID generator
+# Search for removed ID generator (will cause compile errors)
 grep -r "NewSequentialIDGenerator\|NextWithTimestamp" .
 
-# Search for deprecated runtime method
+# Search for removed runtime method (will cause compile errors)
 grep -r "GetRuntimeInitPath" .
 ```
 
 ### 2. Audit Your Workflows
 ```bash
-# Search for deprecated YAML fields
+# Search for removed YAML fields (will cause parsing errors)
 grep -r "secret_environment" workflows/
 
-# Check workflow-level environment (should be empty)
+# Check workflow-level environment (will be ignored)
 grep -A5 "^environment:" workflows/*.yaml
 ```
 
 ### 3. Update Code
 
-Use automated migration tool:
+Automated migration (Python script):
 ```bash
-# Run migration script (available in v5.0.0 release)
-./scripts/migrate-to-v5.sh --dry-run
-./scripts/migrate-to-v5.sh --apply
+# Download migration script
+curl -O https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/migrate-to-v5.py
+
+# Run migration script
+python3 migrate-to-v5.py --dry-run workflows/
+python3 migrate-to-v5.py --apply workflows/
 ```
 
 Or manual updates:
-- Replace `JobStatus*` → `Status*`
+- Replace `JobStatus*` → `Status*` in Go code
 - Replace `NewSequentialIDGenerator` → `NewUUIDGenerator`
-- Move workflow-level environment → job-level environment
-- Merge `secret_environment` → `environment`
+- Move workflow-level `environment` → job-level `environment`
+- Merge `secret_environment` → `environment` with naming conventions
+- Update `NETWORK_READY_FD` → `NETWORK_READY_FILE` in deployment scripts
 
 ### 4. Test Changes
 ```bash
@@ -360,16 +352,27 @@ go test ./...
 # Run E2E tests
 ./tests/e2e/run_tests.sh
 
-# Verify workflows
+# Verify workflows parse correctly
 rnx workflow validate workflows/*.yaml
+```
+
+### 5. Update Deployment
+```bash
+# If using NETWORK_READY_FD, switch to NETWORK_READY_FILE
+# OLD:
+export NETWORK_READY_FD=3
+
+# NEW:
+export NETWORK_READY_FILE=/tmp/network-ready
 ```
 
 ---
 
 ## Additional Resources
 
+- [V5 Cleanup Summary](../V5_CLEANUP_SUMMARY.md) - Complete v5.0.0 changes and migration guide
+- [V5 Deployment Status](../V5_DEPLOYMENT_STATUS.md) - Deployment verification and testing
 - [API Documentation](./API.md) - Current API reference
-- [Migration Scripts](../scripts/migrate-to-v5.sh) - Automated migration tools (coming in v5.0.0)
 - [GitHub Issues](https://github.com/ehsaniara/joblet/issues) - Report migration problems
 - [Changelog](../CHANGELOG.md) - Version-specific changes
 
@@ -377,19 +380,21 @@ rnx workflow validate workflows/*.yaml
 
 ## Questions or Issues?
 
-If you encounter problems migrating away from deprecated features:
+If you encounter problems migrating to v5.0.0:
 
-1. Check this guide for migration instructions
-2. Review the [API Documentation](./API.md)
-3. Search [existing GitHub issues](https://github.com/ehsaniara/joblet/issues)
-4. Open a new issue with:
-   - Current version
-   - Deprecated feature being used
-   - Migration blocker description
-   - Proposed workaround (if any)
+1. Check [V5_CLEANUP_SUMMARY.md](../V5_CLEANUP_SUMMARY.md) for detailed migration guide
+2. Review this document for all removed features
+3. Review the [API Documentation](./API.md)
+4. Search [existing GitHub issues](https://github.com/ehsaniara/joblet/issues)
+5. Open a new issue with:
+   - Source version (e.g., v4.7.3)
+   - Target version (v5.0.0)
+   - Specific feature causing issues
+   - Error messages
+   - Attempted workaround
 
 ---
 
-**Last Updated**: 2025-10-12
-**Document Version**: 1.0
-**Joblet Version**: v4.7.3
+**Last Updated**: 2025-10-13
+**Document Version**: 2.0
+**Joblet Version**: v5.0.0

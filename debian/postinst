@@ -308,18 +308,8 @@ case "$1" in
             echo "+cpu +memory +io +pids +cpuset" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
         fi
 
-        # Install joblet-persist companion service
-        print_info "📦 Installing joblet-persist companion service..."
-        if [ -f /opt/joblet/scripts/joblet-persist-install.sh ]; then
-            source /opt/joblet/scripts/joblet-persist-install.sh
-            if install_joblet_persist; then
-                print_success "joblet-persist installed successfully"
-            else
-                print_warning "joblet-persist installation failed - joblet will work but without persistence"
-            fi
-        else
-            print_warning "joblet-persist installer not found - skipping persistence layer"
-        fi
+        # Note: joblet-persist now runs as a subprocess of joblet (no separate service needed)
+        print_info "joblet-persist will run as a subprocess of joblet-core"
 
         # Enable systemd services
         systemctl daemon-reload

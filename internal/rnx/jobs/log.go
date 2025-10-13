@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	pb "github.com/ehsaniara/joblet/api/gen"
-	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	pb "github.com/ehsaniara/joblet/api/gen"
 	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -60,15 +61,15 @@ func runLog(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		<-sigCh
-		fmt.Println("\nℹ️ Stopping log stream...")
+		fmt.Println("\nStopping log stream...")
 		cancel()
 	}()
 
 	// Step 1: Try to fetch historical logs from joblet-persist first
 	if err := streamHistoricalLogs(ctx, jobID); err != nil {
-		// If persist is unavailable or has no data, that's OK - we'll just stream live logs
-		// Only fail if it's a critical error (e.g., config issue)
-		if !errors.Is(err, io.EOF) && !isUnavailableError(err) {
+		// If persist is unavailable, not implemented, or has no data, that's OK - we'll just stream live logs
+		// Only show warning for unexpected errors
+		if !errors.Is(err, io.EOF) && !isUnavailableError(err) && !isNotImplementedError(err) {
 			fmt.Fprintf(os.Stderr, "⚠️  Warning: couldn't fetch historical logs: %v\n", err)
 		}
 	}
@@ -156,9 +157,21 @@ func streamHistoricalLogs(ctx context.Context, jobID string) error {
 			if errors.Is(ctx.Err(), context.Canceled) {
 				return nil
 			}
-			// Check if it's a "not found" error - means no historical logs exist
-			if s, ok := status.FromError(e); ok && s.Code() == codes.NotFound {
-				return nil // Silently continue to live logs
+			// Check for expected/non-critical errors
+			if s, ok := status.FromError(e); ok {
+				switch s.Code() {
+				case codes.NotFound:
+					// No historical logs exist - silently continue to live logs
+					return nil
+				case codes.Unimplemented:
+					// QueryLogs not implemented yet - silently continue to live logs
+					return nil
+				case codes.Unknown:
+					// Check if it's the "not implemented yet" message
+					if strings.Contains(s.Message(), "not implemented") {
+						return nil
+					}
+				}
 			}
 			return fmt.Errorf("error receiving historical log: %v", e)
 		}
@@ -188,4 +201,18 @@ func isUnavailableError(err error) bool {
 	}
 	s, ok := status.FromError(err)
 	return ok && s.Code() == codes.Unavailable
+}
+
+// isNotImplementedError checks if the error is due to feature not being implemented
+func isNotImplementedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s, ok := status.FromError(err)
+	if !ok {
+		return false
+	}
+	// Check for Unimplemented code or Unknown with "not implemented" message
+	return s.Code() == codes.Unimplemented ||
+		(s.Code() == codes.Unknown && strings.Contains(s.Message(), "not implemented"))
 }

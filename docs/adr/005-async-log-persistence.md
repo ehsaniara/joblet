@@ -112,6 +112,39 @@ Here's a before and after from that HPC workload:
 
 The jobs ran nearly 4x faster, just by fixing log I/O. That's the power of decoupling.
 
+### Streaming Completeness - The Drain Mode Fix (v5.0.0)
+
+Early in production, we discovered a subtle race condition in real-time log streaming. When a job completed, final log lines were sometimes missing from the live stream - appearing only when querying historical logs. The issue affected the last 3-4 lines of output, which often contained critical information like final results or error messages.
+
+The root cause was a timing issue between job completion and log delivery:
+
+1. Job process completes and pipes close
+2. Final log chunks are still being published to pubsub asynchronously
+3. Job status updates to COMPLETED
+4. Stream subscribers receive the COMPLETED event and terminate immediately
+5. **Final log chunks arrive too late** - the stream has already closed
+
+We implemented a **drain mode** solution that mirrors TCP connection teardown:
+
+```go
+When COMPLETED event received:
+1. Enter drain mode (don't terminate immediately)
+2. Continue processing LOG_CHUNK events for 500ms
+3. Terminate only after drain deadline expires
+```
+
+This ensures that:
+- All final logs are delivered before stream termination
+- No logs are lost due to async pub-sub delivery timing
+- Clients receive complete output even for short-lived jobs
+
+The fix also addressed related issues:
+- **Pubsub blocking**: Changed from non-blocking send (which silently dropped messages) to blocking send with 100ms timeout
+- **Immediate cleanup**: Removed force-cancellation of subscriptions on job completion
+- **UUID filtering**: Fixed subscription filtering to use full UUIDs instead of prefixes
+
+The same drain mode pattern was applied to metrics streaming, ensuring final metrics samples are captured even after the collector stops.
+
 ## Learn More
 
 See [DESIGN.md](/docs/DESIGN.md#51-async-log-persistence-system) for implementation details

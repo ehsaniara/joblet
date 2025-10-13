@@ -57,6 +57,38 @@ func LoadServerTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+// LoadServerTLSConfigFromPEM loads TLS configuration from PEM-encoded certificates (embedded certs)
+// This supports config inheritance where persist inherits certificates from parent
+func LoadServerTLSConfigFromPEM(serverCertPEM, serverKeyPEM, caCertPEM []byte, clientAuthRequired bool) (*tls.Config, error) {
+	// Load server certificate and key from PEM bytes
+	cert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse server certificate: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	// If client authentication is required, set up CA certificate pool
+	if clientAuthRequired {
+		if len(caCertPEM) == 0 {
+			return nil, fmt.Errorf("client auth required but CA certificate not provided")
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(caCertPEM) {
+			return nil, fmt.Errorf("failed to add CA certificate to pool")
+		}
+
+		tlsConfig.ClientCAs = certPool
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	return tlsConfig, nil
+}
+
 // LoadClientTLSConfig loads TLS configuration for gRPC client
 func LoadClientTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	if !cfg.Enabled {
