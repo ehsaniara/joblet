@@ -122,7 +122,7 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 	// 6. Always use joblet binary as init for unified pub/sub logging
 	// The joblet binary runs in init mode, sets up runtime environment, then exec's to the actual command
 	// This ensures all jobs (runtime and default) use the same logging mechanism
-	initPath := "/opt/joblet/joblet"
+	initPath := "/opt/joblet/bin/joblet"
 	log.Debug("using joblet binary as init for namespace isolation and unified logging", "initPath", initPath)
 
 	// 7. Create network ready file for coordination if networking is enabled

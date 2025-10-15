@@ -8084,7 +8084,7 @@ const file_joblet_proto_rawDesc = "" +
 	"\x03avg\x18\x03 \x01(\x01R\x03avg\x12\x10\n" +
 	"\x03p50\x18\x04 \x01(\x01R\x03p50\x12\x10\n" +
 	"\x03p95\x18\x05 \x01(\x01R\x03p95\x12\x10\n" +
-	"\x03p99\x18\x06 \x01(\x01R\x03p992\xe1\a\n" +
+	"\x03p99\x18\x06 \x01(\x01R\x03p992\xff\x06\n" +
 	"\n" +
 	"JobService\x129\n" +
 	"\x06RunJob\x12\x15.joblet.RunJobRequest\x1a\x16.joblet.RunJobResponse\"\x00\x12B\n" +
@@ -8095,9 +8095,8 @@ const file_joblet_proto_rawDesc = "" +
 	"\rDeleteAllJobs\x12\x18.joblet.DeleteAllJobsReq\x1a\x18.joblet.DeleteAllJobsRes\"\x00\x128\n" +
 	"\n" +
 	"GetJobLogs\x12\x15.joblet.GetJobLogsReq\x1a\x11.joblet.DataChunk0\x01\x120\n" +
-	"\bListJobs\x12\x14.joblet.EmptyRequest\x1a\f.joblet.Jobs\"\x00\x12K\n" +
-	"\x10StreamJobMetrics\x12\x19.joblet.JobMetricsRequest\x1a\x18.joblet.JobMetricsSample\"\x000\x01\x12]\n" +
-	"\x14GetJobMetricsSummary\x12 .joblet.JobMetricsSummaryRequest\x1a!.joblet.JobMetricsSummaryResponse\"\x00\x12H\n" +
+	"\bListJobs\x12\x14.joblet.EmptyRequest\x1a\f.joblet.Jobs\"\x00\x12H\n" +
+	"\rGetJobMetrics\x12\x19.joblet.JobMetricsRequest\x1a\x18.joblet.JobMetricsSample\"\x000\x01\x12H\n" +
 	"\vRunWorkflow\x12\x1a.joblet.RunWorkflowRequest\x1a\x1b.joblet.RunWorkflowResponse\"\x00\x12Z\n" +
 	"\x11GetWorkflowStatus\x12 .joblet.GetWorkflowStatusRequest\x1a!.joblet.GetWorkflowStatusResponse\"\x00\x12N\n" +
 	"\rListWorkflows\x12\x1c.joblet.ListWorkflowsRequest\x1a\x1d.joblet.ListWorkflowsResponse\"\x00\x12T\n" +
@@ -8312,62 +8311,60 @@ var file_joblet_proto_depIdxs = []int32{
 	12, // 70: joblet.JobService.DeleteAllJobs:input_type -> joblet.DeleteAllJobsReq
 	14, // 71: joblet.JobService.GetJobLogs:input_type -> joblet.GetJobLogsReq
 	2,  // 72: joblet.JobService.ListJobs:input_type -> joblet.EmptyRequest
-	76, // 73: joblet.JobService.StreamJobMetrics:input_type -> joblet.JobMetricsRequest
-	77, // 74: joblet.JobService.GetJobMetricsSummary:input_type -> joblet.JobMetricsSummaryRequest
-	56, // 75: joblet.JobService.RunWorkflow:input_type -> joblet.RunWorkflowRequest
-	58, // 76: joblet.JobService.GetWorkflowStatus:input_type -> joblet.GetWorkflowStatusRequest
-	60, // 77: joblet.JobService.ListWorkflows:input_type -> joblet.ListWorkflowsRequest
-	62, // 78: joblet.JobService.GetWorkflowJobs:input_type -> joblet.GetWorkflowJobsRequest
-	20, // 79: joblet.NetworkService.CreateNetwork:input_type -> joblet.CreateNetworkReq
-	2,  // 80: joblet.NetworkService.ListNetworks:input_type -> joblet.EmptyRequest
-	22, // 81: joblet.NetworkService.RemoveNetwork:input_type -> joblet.RemoveNetworkReq
-	26, // 82: joblet.VolumeService.CreateVolume:input_type -> joblet.CreateVolumeReq
-	2,  // 83: joblet.VolumeService.ListVolumes:input_type -> joblet.EmptyRequest
-	28, // 84: joblet.VolumeService.RemoveVolume:input_type -> joblet.RemoveVolumeReq
-	2,  // 85: joblet.MonitoringService.GetSystemStatus:input_type -> joblet.EmptyRequest
-	34, // 86: joblet.MonitoringService.StreamSystemMetrics:input_type -> joblet.StreamMetricsReq
-	2,  // 87: joblet.RuntimeService.ListRuntimes:input_type -> joblet.EmptyRequest
-	49, // 88: joblet.RuntimeService.GetRuntimeInfo:input_type -> joblet.RuntimeInfoReq
-	51, // 89: joblet.RuntimeService.TestRuntime:input_type -> joblet.RuntimeTestReq
-	67, // 90: joblet.RuntimeService.InstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
-	69, // 91: joblet.RuntimeService.InstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
-	67, // 92: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
-	69, // 93: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
-	71, // 94: joblet.RuntimeService.ValidateRuntimeSpec:input_type -> joblet.ValidateRuntimeSpecRequest
-	73, // 95: joblet.RuntimeService.RemoveRuntime:input_type -> joblet.RuntimeRemoveReq
-	54, // 96: joblet.JobService.RunJob:output_type -> joblet.RunJobResponse
-	5,  // 97: joblet.JobService.GetJobStatus:output_type -> joblet.GetJobStatusRes
-	7,  // 98: joblet.JobService.StopJob:output_type -> joblet.StopJobRes
-	9,  // 99: joblet.JobService.CancelJob:output_type -> joblet.CancelJobRes
-	11, // 100: joblet.JobService.DeleteJob:output_type -> joblet.DeleteJobRes
-	13, // 101: joblet.JobService.DeleteAllJobs:output_type -> joblet.DeleteAllJobsRes
-	15, // 102: joblet.JobService.GetJobLogs:output_type -> joblet.DataChunk
-	0,  // 103: joblet.JobService.ListJobs:output_type -> joblet.Jobs
-	79, // 104: joblet.JobService.StreamJobMetrics:output_type -> joblet.JobMetricsSample
-	78, // 105: joblet.JobService.GetJobMetricsSummary:output_type -> joblet.JobMetricsSummaryResponse
-	57, // 106: joblet.JobService.RunWorkflow:output_type -> joblet.RunWorkflowResponse
-	59, // 107: joblet.JobService.GetWorkflowStatus:output_type -> joblet.GetWorkflowStatusResponse
-	61, // 108: joblet.JobService.ListWorkflows:output_type -> joblet.ListWorkflowsResponse
-	63, // 109: joblet.JobService.GetWorkflowJobs:output_type -> joblet.GetWorkflowJobsResponse
-	21, // 110: joblet.NetworkService.CreateNetwork:output_type -> joblet.CreateNetworkRes
-	25, // 111: joblet.NetworkService.ListNetworks:output_type -> joblet.Networks
-	23, // 112: joblet.NetworkService.RemoveNetwork:output_type -> joblet.RemoveNetworkRes
-	27, // 113: joblet.VolumeService.CreateVolume:output_type -> joblet.CreateVolumeRes
-	31, // 114: joblet.VolumeService.ListVolumes:output_type -> joblet.Volumes
-	29, // 115: joblet.VolumeService.RemoveVolume:output_type -> joblet.RemoveVolumeRes
-	32, // 116: joblet.MonitoringService.GetSystemStatus:output_type -> joblet.SystemStatusRes
-	33, // 117: joblet.MonitoringService.StreamSystemMetrics:output_type -> joblet.SystemMetricsRes
-	46, // 118: joblet.RuntimeService.ListRuntimes:output_type -> joblet.RuntimesRes
-	50, // 119: joblet.RuntimeService.GetRuntimeInfo:output_type -> joblet.RuntimeInfoRes
-	52, // 120: joblet.RuntimeService.TestRuntime:output_type -> joblet.RuntimeTestRes
-	68, // 121: joblet.RuntimeService.InstallRuntimeFromGithub:output_type -> joblet.InstallRuntimeResponse
-	68, // 122: joblet.RuntimeService.InstallRuntimeFromLocal:output_type -> joblet.InstallRuntimeResponse
-	16, // 123: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:output_type -> joblet.RuntimeInstallationChunk
-	16, // 124: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:output_type -> joblet.RuntimeInstallationChunk
-	72, // 125: joblet.RuntimeService.ValidateRuntimeSpec:output_type -> joblet.ValidateRuntimeSpecResponse
-	74, // 126: joblet.RuntimeService.RemoveRuntime:output_type -> joblet.RuntimeRemoveRes
-	96, // [96:127] is the sub-list for method output_type
-	65, // [65:96] is the sub-list for method input_type
+	76, // 73: joblet.JobService.GetJobMetrics:input_type -> joblet.JobMetricsRequest
+	56, // 74: joblet.JobService.RunWorkflow:input_type -> joblet.RunWorkflowRequest
+	58, // 75: joblet.JobService.GetWorkflowStatus:input_type -> joblet.GetWorkflowStatusRequest
+	60, // 76: joblet.JobService.ListWorkflows:input_type -> joblet.ListWorkflowsRequest
+	62, // 77: joblet.JobService.GetWorkflowJobs:input_type -> joblet.GetWorkflowJobsRequest
+	20, // 78: joblet.NetworkService.CreateNetwork:input_type -> joblet.CreateNetworkReq
+	2,  // 79: joblet.NetworkService.ListNetworks:input_type -> joblet.EmptyRequest
+	22, // 80: joblet.NetworkService.RemoveNetwork:input_type -> joblet.RemoveNetworkReq
+	26, // 81: joblet.VolumeService.CreateVolume:input_type -> joblet.CreateVolumeReq
+	2,  // 82: joblet.VolumeService.ListVolumes:input_type -> joblet.EmptyRequest
+	28, // 83: joblet.VolumeService.RemoveVolume:input_type -> joblet.RemoveVolumeReq
+	2,  // 84: joblet.MonitoringService.GetSystemStatus:input_type -> joblet.EmptyRequest
+	34, // 85: joblet.MonitoringService.StreamSystemMetrics:input_type -> joblet.StreamMetricsReq
+	2,  // 86: joblet.RuntimeService.ListRuntimes:input_type -> joblet.EmptyRequest
+	49, // 87: joblet.RuntimeService.GetRuntimeInfo:input_type -> joblet.RuntimeInfoReq
+	51, // 88: joblet.RuntimeService.TestRuntime:input_type -> joblet.RuntimeTestReq
+	67, // 89: joblet.RuntimeService.InstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
+	69, // 90: joblet.RuntimeService.InstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
+	67, // 91: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:input_type -> joblet.InstallRuntimeRequest
+	69, // 92: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:input_type -> joblet.InstallRuntimeFromLocalRequest
+	71, // 93: joblet.RuntimeService.ValidateRuntimeSpec:input_type -> joblet.ValidateRuntimeSpecRequest
+	73, // 94: joblet.RuntimeService.RemoveRuntime:input_type -> joblet.RuntimeRemoveReq
+	54, // 95: joblet.JobService.RunJob:output_type -> joblet.RunJobResponse
+	5,  // 96: joblet.JobService.GetJobStatus:output_type -> joblet.GetJobStatusRes
+	7,  // 97: joblet.JobService.StopJob:output_type -> joblet.StopJobRes
+	9,  // 98: joblet.JobService.CancelJob:output_type -> joblet.CancelJobRes
+	11, // 99: joblet.JobService.DeleteJob:output_type -> joblet.DeleteJobRes
+	13, // 100: joblet.JobService.DeleteAllJobs:output_type -> joblet.DeleteAllJobsRes
+	15, // 101: joblet.JobService.GetJobLogs:output_type -> joblet.DataChunk
+	0,  // 102: joblet.JobService.ListJobs:output_type -> joblet.Jobs
+	79, // 103: joblet.JobService.GetJobMetrics:output_type -> joblet.JobMetricsSample
+	57, // 104: joblet.JobService.RunWorkflow:output_type -> joblet.RunWorkflowResponse
+	59, // 105: joblet.JobService.GetWorkflowStatus:output_type -> joblet.GetWorkflowStatusResponse
+	61, // 106: joblet.JobService.ListWorkflows:output_type -> joblet.ListWorkflowsResponse
+	63, // 107: joblet.JobService.GetWorkflowJobs:output_type -> joblet.GetWorkflowJobsResponse
+	21, // 108: joblet.NetworkService.CreateNetwork:output_type -> joblet.CreateNetworkRes
+	25, // 109: joblet.NetworkService.ListNetworks:output_type -> joblet.Networks
+	23, // 110: joblet.NetworkService.RemoveNetwork:output_type -> joblet.RemoveNetworkRes
+	27, // 111: joblet.VolumeService.CreateVolume:output_type -> joblet.CreateVolumeRes
+	31, // 112: joblet.VolumeService.ListVolumes:output_type -> joblet.Volumes
+	29, // 113: joblet.VolumeService.RemoveVolume:output_type -> joblet.RemoveVolumeRes
+	32, // 114: joblet.MonitoringService.GetSystemStatus:output_type -> joblet.SystemStatusRes
+	33, // 115: joblet.MonitoringService.StreamSystemMetrics:output_type -> joblet.SystemMetricsRes
+	46, // 116: joblet.RuntimeService.ListRuntimes:output_type -> joblet.RuntimesRes
+	50, // 117: joblet.RuntimeService.GetRuntimeInfo:output_type -> joblet.RuntimeInfoRes
+	52, // 118: joblet.RuntimeService.TestRuntime:output_type -> joblet.RuntimeTestRes
+	68, // 119: joblet.RuntimeService.InstallRuntimeFromGithub:output_type -> joblet.InstallRuntimeResponse
+	68, // 120: joblet.RuntimeService.InstallRuntimeFromLocal:output_type -> joblet.InstallRuntimeResponse
+	16, // 121: joblet.RuntimeService.StreamingInstallRuntimeFromGithub:output_type -> joblet.RuntimeInstallationChunk
+	16, // 122: joblet.RuntimeService.StreamingInstallRuntimeFromLocal:output_type -> joblet.RuntimeInstallationChunk
+	72, // 123: joblet.RuntimeService.ValidateRuntimeSpec:output_type -> joblet.ValidateRuntimeSpecResponse
+	74, // 124: joblet.RuntimeService.RemoveRuntime:output_type -> joblet.RuntimeRemoveRes
+	95, // [95:125] is the sub-list for method output_type
+	65, // [65:95] is the sub-list for method input_type
 	65, // [65:65] is the sub-list for extension type_name
 	65, // [65:65] is the sub-list for extension extendee
 	0,  // [0:65] is the sub-list for field type_name

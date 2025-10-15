@@ -61,6 +61,22 @@ func NewGRPCAuthorization() GRPCAuthorization {
 	return &grpcAuthorization{}
 }
 
+// noOpAuthorization is a no-op authorization that allows all operations
+// Used for internal services (like persist) that run on Unix sockets without TLS
+type noOpAuthorization struct {
+}
+
+// NewNoOpAuthorization creates a no-op authorization that trusts all requests
+// This should ONLY be used for internal IPC via Unix domain sockets
+func NewNoOpAuthorization() GRPCAuthorization {
+	return &noOpAuthorization{}
+}
+
+func (n *noOpAuthorization) Authorized(ctx context.Context, operation Operation) error {
+	// Always allow - trust is established by Unix socket file permissions
+	return nil
+}
+
 func (s *grpcAuthorization) extractClientRole(ctx context.Context) (ClientRole, error) {
 	p, ok := peer.FromContext(ctx)
 	if !ok {

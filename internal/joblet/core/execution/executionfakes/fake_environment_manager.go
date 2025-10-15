@@ -2,7 +2,6 @@
 package executionfakes
 
 import (
-	"context"
 	"sync"
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/execution"
@@ -55,20 +54,6 @@ type FakeEnvironmentManager struct {
 	}
 	getCUDAEnvironmentReturnsOnCall map[int]struct {
 		result1 map[string]string
-	}
-	GetRuntimeInitPathStub        func(context.Context, string) (string, error)
-	getRuntimeInitPathMutex       sync.RWMutex
-	getRuntimeInitPathArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	getRuntimeInitPathReturns struct {
-		result1 string
-		result2 error
-	}
-	getRuntimeInitPathReturnsOnCall map[int]struct {
-		result1 string
-		result2 error
 	}
 	PrepareWorkspaceStub        func(string, []domain.FileUpload) (string, error)
 	prepareWorkspaceMutex       sync.RWMutex
@@ -326,71 +311,6 @@ func (fake *FakeEnvironmentManager) GetCUDAEnvironmentReturnsOnCall(i int, resul
 	fake.getCUDAEnvironmentReturnsOnCall[i] = struct {
 		result1 map[string]string
 	}{result1}
-}
-
-func (fake *FakeEnvironmentManager) GetRuntimeInitPath(arg1 context.Context, arg2 string) (string, error) {
-	fake.getRuntimeInitPathMutex.Lock()
-	ret, specificReturn := fake.getRuntimeInitPathReturnsOnCall[len(fake.getRuntimeInitPathArgsForCall)]
-	fake.getRuntimeInitPathArgsForCall = append(fake.getRuntimeInitPathArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
-	stub := fake.GetRuntimeInitPathStub
-	fakeReturns := fake.getRuntimeInitPathReturns
-	fake.recordInvocation("GetRuntimeInitPath", []interface{}{arg1, arg2})
-	fake.getRuntimeInitPathMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2)
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeEnvironmentManager) GetRuntimeInitPathCallCount() int {
-	fake.getRuntimeInitPathMutex.RLock()
-	defer fake.getRuntimeInitPathMutex.RUnlock()
-	return len(fake.getRuntimeInitPathArgsForCall)
-}
-
-func (fake *FakeEnvironmentManager) GetRuntimeInitPathCalls(stub func(context.Context, string) (string, error)) {
-	fake.getRuntimeInitPathMutex.Lock()
-	defer fake.getRuntimeInitPathMutex.Unlock()
-	fake.GetRuntimeInitPathStub = stub
-}
-
-func (fake *FakeEnvironmentManager) GetRuntimeInitPathArgsForCall(i int) (context.Context, string) {
-	fake.getRuntimeInitPathMutex.RLock()
-	defer fake.getRuntimeInitPathMutex.RUnlock()
-	argsForCall := fake.getRuntimeInitPathArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
-}
-
-func (fake *FakeEnvironmentManager) GetRuntimeInitPathReturns(result1 string, result2 error) {
-	fake.getRuntimeInitPathMutex.Lock()
-	defer fake.getRuntimeInitPathMutex.Unlock()
-	fake.GetRuntimeInitPathStub = nil
-	fake.getRuntimeInitPathReturns = struct {
-		result1 string
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeEnvironmentManager) GetRuntimeInitPathReturnsOnCall(i int, result1 string, result2 error) {
-	fake.getRuntimeInitPathMutex.Lock()
-	defer fake.getRuntimeInitPathMutex.Unlock()
-	fake.GetRuntimeInitPathStub = nil
-	if fake.getRuntimeInitPathReturnsOnCall == nil {
-		fake.getRuntimeInitPathReturnsOnCall = make(map[int]struct {
-			result1 string
-			result2 error
-		})
-	}
-	fake.getRuntimeInitPathReturnsOnCall[i] = struct {
-		result1 string
-		result2 error
-	}{result1, result2}
 }
 
 func (fake *FakeEnvironmentManager) PrepareWorkspace(arg1 string, arg2 []domain.FileUpload) (string, error) {

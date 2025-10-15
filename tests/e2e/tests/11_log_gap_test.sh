@@ -50,7 +50,7 @@ test_completed_job() {
     trap "rm -f $JOB_OUTPUT" EXIT
 
     echo "Submitting job that outputs 100 numbered lines..."
-    JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..100}; do echo "Line $i"; done' --name log-gap-test-1 | grep -oP '(?<=Job UUID: )[a-f0-9-]+' || echo "")
+    JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..100}; do echo "Line $i"; done' --name log-gap-test-1 2>&1 | grep -oP 'ID: \K[a-f0-9-]+' | head -1 || echo "")
 
     if [ -z "$JOB_ID" ]; then
         echo "❌ Failed to get job ID"
@@ -139,7 +139,7 @@ test_running_job() {
 
     # Run a job that produces 200 lines over 10 seconds
     echo "Submitting long-running job (200 lines over 10 seconds)..."
-    JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..200}; do echo "Line $i"; sleep 0.05; done' --name log-gap-test-2 | grep -oP '(?<=Job UUID: )[a-f0-9-]+' || echo "")
+    JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..200}; do echo "Line $i"; sleep 0.05; done' --name log-gap-test-2 2>&1 | grep -oP 'ID: \K[a-f0-9-]+' | head -1 || echo "")
 
     if [ -z "$JOB_ID" ]; then
         echo "❌ Failed to get job ID"
@@ -200,7 +200,7 @@ test_rapid_logs() {
 
     # Generate 1000 lines very quickly
     echo "Submitting rapid log generation job (1000 lines)..."
-    JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..1000}; do echo "Line $i"; done' --name log-gap-test-3 | grep -oP '(?<=Job UUID: )[a-f0-9-]+' || echo "")
+    JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..1000}; do echo "Line $i"; done' --name log-gap-test-3 2>&1 | grep -oP 'ID: \K[a-f0-9-]+' | head -1 || echo "")
 
     if [ -z "$JOB_ID" ]; then
         echo "❌ Failed to get job ID"

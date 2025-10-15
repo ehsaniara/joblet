@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-	"time"
 )
 
 // UUIDGenerator generates unique job UUIDs using Linux kernel's native UUID generation
@@ -131,30 +130,9 @@ func (g *UUIDGenerator) generateSequentialID() string {
 	return fmt.Sprintf("%d", count)
 }
 
-// NextWithTimestamp generates a UUID with timestamp (legacy method for compatibility)
-//
-// Deprecated: Use Next() instead. Removal Timeline: v5.0.0
-func (g *UUIDGenerator) NextWithTimestamp() string {
-	if g.useUUID {
-		// For UUID mode, just return a standard UUID since it already includes randomness
-		return g.generateKernelUUID()
-	}
-	// Legacy sequential with timestamp
-	count := atomic.AddInt64(&g.counter, 1)
-	timestamp := time.Now().Format("20060102-150405")
-	return fmt.Sprintf("%s-%s-%d", g.prefix, timestamp, count)
-}
-
 // SetUUIDMode enables or disables UUID generation
 func (g *UUIDGenerator) SetUUIDMode(enabled bool) {
 	g.useUUID = enabled
-}
-
-// SetHighPrecision enables nanosecond timestamps (legacy - no effect in UUID mode)
-//
-// Deprecated: No replacement needed. UUID mode renders this obsolete. Removal Timeline: v5.0.0
-func (g *UUIDGenerator) SetHighPrecision(enabled bool) {
-	g.useNanos = enabled
 }
 
 // Reset resets the counter (only affects sequential mode, used for testing)

@@ -141,9 +141,9 @@ joblet:
 # Persist service config (nested)
 persist:
   server:
-    grpc_address: ":50052"
+    grpc_socket: "/opt/joblet/run/persist-grpc.sock"  # Unix socket for gRPC queries
   ipc:
-    socket: "/opt/joblet/run/persist.sock"
+    socket: "/opt/joblet/run/persist-ipc.sock"  # Unix socket for log/metric writes
   # ... other persist config
 ```
 
@@ -228,7 +228,8 @@ Two scripts handle proto generation:
 ├── config/                 # Configuration
 │   └── joblet-config.yml   # Unified config (both services)
 ├── run/                    # Runtime files
-│   └── persist.sock        # IPC socket
+│   ├── persist-ipc.sock    # IPC socket (log/metric writes)
+│   └── persist-grpc.sock   # gRPC socket (historical queries)
 ├── jobs/                   # Job workspaces
 │   └── {job-uuid}/         # Per-job directory
 ├── logs/                   # Historical logs

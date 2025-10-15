@@ -13,9 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	persistpb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -79,25 +77,16 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 
 	sampleCount := 0
 
-	// Step 1: Try to fetch historical metrics from joblet-persist first
-	historicalCount, err := streamHistoricalMetrics(ctx, jobID)
-	if err != nil {
-		// If persist is unavailable or has no data, that's OK - we'll just stream live metrics
-		// Only fail if it's a critical error (e.g., config issue)
-		if !errors.Is(err, io.EOF) && !isUnavailableError(err) {
-			fmt.Fprintf(os.Stderr, "⚠️  Warning: couldn't fetch historical metrics: %v\n", err)
-		}
-	}
-	sampleCount += historicalCount
-
-	// Step 2: Stream live metrics from joblet-core
+	// Connect to joblet server
+	// Note: GetJobMetrics automatically streams BOTH historical (from persist) and live metrics
+	// The server handles fetching history first, then streaming live updates seamlessly
 	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("couldn't connect to joblet server: %w", err)
 	}
 	defer jobClient.Close()
 
-	stream, err := jobClient.StreamJobMetrics(ctx, jobID)
+	stream, err := jobClient.GetJobMetrics(ctx, jobID)
 	if err != nil {
 		return fmt.Errorf("couldn't start reading metrics: %v", err)
 	}
@@ -283,120 +272,4 @@ func formatBytesFloat(bytes float64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", bytes/div, "KMGTPE"[exp])
-}
-
-// streamHistoricalMetrics fetches and displays historical metrics from joblet-persist
-// Returns the count of metrics samples displayed
-func streamHistoricalMetrics(ctx context.Context, jobID string) (int, error) {
-	persistClient, err := common.NewPersistClient()
-	if err != nil {
-		return 0, fmt.Errorf("couldn't connect to joblet-persist: %w", err)
-	}
-	defer persistClient.Close()
-
-	// Query all historical metrics (no limit)
-	req := &persistpb.QueryMetricsRequest{
-		JobId:  jobID,
-		Limit:  0, // No limit - fetch all
-		Offset: 0,
-	}
-
-	stream, err := persistClient.QueryMetrics(ctx, req)
-	if err != nil {
-		return 0, fmt.Errorf("couldn't query historical metrics: %w", err)
-	}
-
-	sampleCount := 0
-
-	// Read all historical metrics
-	for {
-		metricSample, e := stream.Recv()
-		if e == io.EOF {
-			// End of historical metrics - this is expected
-			return sampleCount, nil
-		}
-		if e != nil {
-			if errors.Is(ctx.Err(), context.Canceled) {
-				return sampleCount, nil
-			}
-			// Check if it's a "not found" error - means no historical metrics exist
-			if s, ok := status.FromError(e); ok && s.Code() == codes.NotFound {
-				return sampleCount, nil // Silently continue to live metrics
-			}
-			return sampleCount, fmt.Errorf("error receiving historical metrics: %v", e)
-		}
-
-		sampleCount++
-
-		// Convert persist metric to joblet metric format
-		sample := convertPersistMetricToJobMetric(metricSample)
-
-		// Output the historical metric sample
-		if common.JSONOutput {
-			if err := outputMetricsJSON(sample); err != nil {
-				return sampleCount, fmt.Errorf("couldn't format metric as JSON: %v", err)
-			}
-		} else {
-			outputMetricsHuman(sample)
-		}
-	}
-}
-
-// convertPersistMetricToJobMetric converts a Persist Metric to joblet JobMetricsSample
-// This is used for historical metrics from joblet-persist
-func convertPersistMetricToJobMetric(persistMetric *persistpb.Metric) *pb.JobMetricsSample {
-	sample := &pb.JobMetricsSample{
-		JobId:                 persistMetric.JobId,
-		Timestamp:             persistMetric.Timestamp / 1000000, // Convert nanoseconds to seconds
-		SampleIntervalSeconds: 1,                                 // Persist metrics don't include interval, default to 1s
-	}
-
-	if persistMetric.Data == nil {
-		return sample
-	}
-
-	// Convert CPU metrics
-	if persistMetric.Data.CpuUsage > 0 {
-		sample.Cpu = &pb.JobCPUMetrics{
-			UsagePercent: persistMetric.Data.CpuUsage * 100, // Convert cores to percentage
-		}
-	}
-
-	// Convert Memory metrics
-	if persistMetric.Data.MemoryUsage > 0 {
-		sample.Memory = &pb.JobMemoryMetrics{
-			Current: uint64(persistMetric.Data.MemoryUsage),
-		}
-	}
-
-	// Convert GPU metrics (simple format from persist)
-	if persistMetric.Data.GpuUsage > 0 {
-		sample.Gpu = []*pb.JobGPUMetrics{
-			{
-				Index:       0,
-				Name:        "GPU",
-				Utilization: persistMetric.Data.GpuUsage * 100, // Convert 0-1 to percentage
-			},
-		}
-	}
-
-	// Convert I/O metrics
-	if persistMetric.Data.DiskIo != nil {
-		sample.Io = &pb.JobIOMetrics{
-			TotalReadBytes:  uint64(persistMetric.Data.DiskIo.ReadBytes),
-			TotalWriteBytes: uint64(persistMetric.Data.DiskIo.WriteBytes),
-		}
-	}
-
-	// Convert Network metrics
-	if persistMetric.Data.NetworkIo != nil {
-		sample.Network = &pb.JobNetworkMetrics{
-			TotalRxBytes:   uint64(persistMetric.Data.NetworkIo.RxBytes),
-			TotalTxBytes:   uint64(persistMetric.Data.NetworkIo.TxBytes),
-			TotalRxPackets: uint64(persistMetric.Data.NetworkIo.RxPackets),
-			TotalTxPackets: uint64(persistMetric.Data.NetworkIo.TxPackets),
-		}
-	}
-
-	return sample
 }

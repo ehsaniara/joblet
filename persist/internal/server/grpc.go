@@ -122,65 +122,93 @@ func NewGRPCServer(cfg *config.ServerConfig, backend storage.Backend, log *logge
 
 // Start starts the gRPC server
 func (s *GRPCServer) Start(ctx context.Context) error {
-	listener, err := net.Listen("tcp", s.config.GRPCAddress)
-	if err != nil {
-		return fmt.Errorf("failed to listen: %w", err)
+	// Decide which listener to use (Unix socket or TCP)
+	var listener net.Listener
+	var err error
+	var isUnixSocket bool
+
+	if s.config.GRPCSocket != "" {
+		// Prefer Unix socket for internal IPC
+		listener, err = net.Listen("unix", s.config.GRPCSocket)
+		if err != nil {
+			return fmt.Errorf("failed to listen on unix socket: %w", err)
+		}
+		isUnixSocket = true
+		s.logger.Info("gRPC server listening on Unix socket", "socket", s.config.GRPCSocket)
+	} else if s.config.GRPCAddress != "" {
+		// Fallback to TCP
+		listener, err = net.Listen("tcp", s.config.GRPCAddress)
+		if err != nil {
+			return fmt.Errorf("failed to listen on TCP: %w", err)
+		}
+		s.logger.Info("gRPC server listening on TCP", "address", s.config.GRPCAddress)
+	} else {
+		return fmt.Errorf("either grpc_socket or grpc_address must be configured")
 	}
 
 	s.listener = listener
 
-	// Create gRPC server with TLS (MANDATORY)
+	// Create gRPC server options
+	// Set large message sizes for streaming historical logs/metrics (128MB each direction)
 	opts := []grpc.ServerOption{
 		grpc.MaxConcurrentStreams(uint32(s.config.MaxConnections)),
+		grpc.MaxRecvMsgSize(134217728), // 128MB - handle large query requests
+		grpc.MaxSendMsgSize(134217728), // 128MB - handle large historical data streams
 	}
 
-	// TLS is MANDATORY - configure with inherited or explicit certificates
-	var tlsConfig *tls.Config
+	// TLS configuration: MANDATORY for TCP, optional for Unix socket
+	if !isUnixSocket {
+		// TLS is MANDATORY for TCP connections
+		var tlsConfig *tls.Config
 
-	// Determine ClientAuth mode (default to "require")
-	clientAuthRequired := true
-	clientAuthMode := "require"
-	if s.config.TLS != nil {
-		if s.config.TLS.ClientAuth != "" {
-			clientAuthMode = s.config.TLS.ClientAuth
+		// Determine ClientAuth mode (default to "require")
+		clientAuthRequired := true
+		clientAuthMode := "require"
+		if s.config.TLS != nil {
+			if s.config.TLS.ClientAuth != "" {
+				clientAuthMode = s.config.TLS.ClientAuth
+			}
+			clientAuthRequired = clientAuthMode == "require" || clientAuthMode == ""
 		}
-		clientAuthRequired = clientAuthMode == "require" || clientAuthMode == ""
-	}
 
-	// If TLS config exists and cert files are specified, use file-based loading
-	if s.config.TLS != nil && s.config.TLS.CertFile != "" && s.config.TLS.KeyFile != "" {
-		tlsCfg := security.TLSConfig{
-			Enabled:    true,
-			CertFile:   s.config.TLS.CertFile,
-			KeyFile:    s.config.TLS.KeyFile,
-			CAFile:     s.config.TLS.CAFile,
-			ClientAuth: clientAuthRequired,
+		// If TLS config exists and cert files are specified, use file-based loading
+		if s.config.TLS != nil && s.config.TLS.CertFile != "" && s.config.TLS.KeyFile != "" {
+			tlsCfg := security.TLSConfig{
+				Enabled:    true,
+				CertFile:   s.config.TLS.CertFile,
+				KeyFile:    s.config.TLS.KeyFile,
+				CAFile:     s.config.TLS.CAFile,
+				ClientAuth: clientAuthRequired,
+			}
+			var err error
+			tlsConfig, err = security.LoadServerTLSConfig(tlsCfg)
+			if err != nil {
+				return fmt.Errorf("failed to load TLS credentials from files: %w", err)
+			}
+			s.logger.Info("TLS ENABLED (from files)", "clientAuth", clientAuthMode)
+		} else if s.security != nil && s.security.ServerCert != "" {
+			// Use inherited embedded certificates from parent
+			var err error
+			tlsConfig, err = security.LoadServerTLSConfigFromPEM(
+				[]byte(s.security.ServerCert),
+				[]byte(s.security.ServerKey),
+				[]byte(s.security.CACert),
+				clientAuthRequired,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to load inherited TLS credentials: %w", err)
+			}
+			s.logger.Info("TLS ENABLED (inherited from parent)", "clientAuth", clientAuthMode)
+		} else {
+			return fmt.Errorf("TLS is mandatory for TCP but no certificates configured (neither files nor inherited)")
 		}
-		var err error
-		tlsConfig, err = security.LoadServerTLSConfig(tlsCfg)
-		if err != nil {
-			return fmt.Errorf("failed to load TLS credentials from files: %w", err)
-		}
-		s.logger.Info("TLS ENABLED (from files)", "clientAuth", clientAuthMode)
-	} else if s.security != nil && s.security.ServerCert != "" {
-		// Use inherited embedded certificates from parent
-		var err error
-		tlsConfig, err = security.LoadServerTLSConfigFromPEM(
-			[]byte(s.security.ServerCert),
-			[]byte(s.security.ServerKey),
-			[]byte(s.security.CACert),
-			clientAuthRequired,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to load inherited TLS credentials: %w", err)
-		}
-		s.logger.Info("TLS ENABLED (inherited from parent)", "clientAuth", clientAuthMode)
+
+		creds := credentials.NewTLS(tlsConfig)
+		opts = append(opts, grpc.Creds(creds))
 	} else {
-		return fmt.Errorf("TLS is mandatory but no certificates configured (neither files nor inherited)")
+		// Unix socket - no TLS needed (pure Linux IPC)
+		s.logger.Info("Unix socket IPC - TLS disabled (native Linux IPC)")
 	}
-
-	creds := credentials.NewTLS(tlsConfig)
-	opts = append(opts, grpc.Creds(creds))
 
 	s.grpcSrv = grpc.NewServer(opts...)
 	persistpb.RegisterPersistServiceServer(s.grpcSrv, s)

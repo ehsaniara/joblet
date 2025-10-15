@@ -21,7 +21,8 @@ type Config struct {
 
 // ServerConfig contains gRPC server settings
 type ServerConfig struct {
-	GRPCAddress    string     `yaml:"grpc_address"`
+	GRPCAddress    string     `yaml:"grpc_address"` // TCP address (optional, can be empty to disable)
+	GRPCSocket     string     `yaml:"grpc_socket"`  // Unix socket for internal IPC (e.g., /opt/joblet/run/persist-grpc.sock)
 	MaxConnections int        `yaml:"max_connections"`
 	BasePath       string     `yaml:"base_path"`
 	TLS            *TLSConfig `yaml:"tls,omitempty"` // Optional: defaults to inherited security
@@ -59,7 +60,6 @@ type StorageConfig struct {
 type LocalConfig struct {
 	Logs    LogStorageConfig    `yaml:"logs"`
 	Metrics MetricStorageConfig `yaml:"metrics"`
-	Index   IndexConfig         `yaml:"index"`
 }
 
 // LogStorageConfig contains log storage settings
@@ -81,13 +81,6 @@ type RotationConfig struct {
 	MaxSizeMB       int  `yaml:"max_size_mb"`
 	MaxFiles        int  `yaml:"max_files"`
 	CompressRotated bool `yaml:"compress_rotated"`
-}
-
-// IndexConfig contains indexing settings
-type IndexConfig struct {
-	Enabled      bool   `yaml:"enabled"`
-	File         string `yaml:"file"`
-	SaveInterval string `yaml:"save_interval"`
 }
 
 // RetentionConfig contains data retention policies
@@ -251,17 +244,18 @@ func Load(path string) (*LoadResult, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			GRPCAddress:    ":50052",
+			GRPCAddress:    "",                                  // TCP disabled - using Unix socket
+			GRPCSocket:     "/opt/joblet/run/persist-grpc.sock", // Unix socket for gRPC queries
 			MaxConnections: 500,
 			BasePath:       "/opt/joblet",
 			TLS:            nil, // nil = fully inherited from parent's security section
 		},
 		IPC: IPCConfig{
-			Socket:         "/opt/joblet/run/persist.sock",
+			Socket:         "/opt/joblet/run/persist-ipc.sock", // Unix socket for log/metric writes
 			MaxConnections: 10,
-			MaxMessageSize: 10485760, // 10MB
-			ReadBuffer:     8388608,  // 8MB
-			WriteBuffer:    8388608,  // 8MB
+			MaxMessageSize: 134217728, // 128MB - handle large historical data streams
+			ReadBuffer:     8388608,   // 8MB
+			WriteBuffer:    8388608,   // 8MB
 		},
 		Storage: StorageConfig{
 			Type:    "local",
@@ -284,11 +278,6 @@ func DefaultConfig() *Config {
 						MaxFiles:        5,
 						CompressRotated: true,
 					},
-				},
-				Index: IndexConfig{
-					Enabled:      true,
-					File:         "/opt/joblet/job_index.json",
-					SaveInterval: "5m",
 				},
 			},
 			Retention: RetentionConfig{
@@ -365,12 +354,6 @@ func (c *Config) Validate() error {
 
 	if _, err := time.ParseDuration(c.Query.Stream.Timeout); err != nil {
 		return fmt.Errorf("invalid query.stream.timeout: %w", err)
-	}
-
-	if c.Storage.Local.Index.Enabled {
-		if _, err := time.ParseDuration(c.Storage.Local.Index.SaveInterval); err != nil {
-			return fmt.Errorf("invalid storage.local.index.save_interval: %w", err)
-		}
 	}
 
 	return nil

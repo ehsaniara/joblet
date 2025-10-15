@@ -25,7 +25,6 @@ type EnvironmentManager interface {
 	BuildEnvironment(job *domain.Job, phase string) []string
 	PrepareWorkspace(jobID string, uploads []domain.FileUpload) (string, error)
 	CleanupWorkspace(jobID string) error
-	GetRuntimeInitPath(ctx context.Context, runtimeSpec string) (string, error)
 	DetectCUDA() ([]string, error)
 	GetCUDAEnvironment(cudaPath string) map[string]string
 }

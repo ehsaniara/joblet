@@ -11,6 +11,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
 	"github.com/ehsaniara/joblet/internal/joblet/runtime"
 	"github.com/ehsaniara/joblet/internal/joblet/workflow"
+	"github.com/ehsaniara/joblet/pkg/client"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
@@ -76,9 +77,21 @@ func StartGRPCServer(jobStore adapters.JobStorer, metricsStore *adapters.Metrics
 	serverLogger.Info("initializing runtime resolver for workflow validation", "basePath", cfg.Runtime.BasePath)
 	runtimeResolver := runtime.NewResolver(cfg.Runtime.BasePath, platform)
 
+	// Create persist client for historical queries via Unix socket IPC
+	persistSocketPath := "/opt/joblet/run/persist-grpc.sock"
+	persistClient, err := client.NewPersistClientUnix(persistSocketPath)
+	if err != nil {
+		serverLogger.Warn("failed to connect to persist service, historical queries will be unavailable",
+			"socket", persistSocketPath,
+			"error", err)
+		persistClient = nil // Continue without persist client
+	} else {
+		serverLogger.Info("connected to persist service via Unix socket", "socket", persistSocketPath)
+	}
+
 	// Create workflow manager and unified job service with validation
 	workflowManager := workflow.NewWorkflowManager()
-	jobService := NewWorkflowServiceServer(auth, jobStore, metricsStore, joblet, workflowManager, volumeManager, runtimeResolver)
+	jobService := NewWorkflowServiceServer(auth, jobStore, metricsStore, joblet, workflowManager, volumeManager, runtimeResolver, persistClient)
 	pb.RegisterJobServiceServer(grpcServer, jobService)
 
 	// Create and register network service

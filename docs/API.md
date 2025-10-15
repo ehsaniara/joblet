@@ -48,7 +48,7 @@ access control for organizational deployment scenarios.
 - **Message Serialization**: Protocol Buffers (internal proto definitions)
 - **Storage Backend**: Local filesystem with gzip compression (cloud backends planned)
 - **Query Capabilities**: Historical log retrieval, metric queries, streaming support
-- **IPC Communication**: Unix domain socket at `/opt/joblet/run/persist.sock`
+- **IPC Communication**: Unix domain socket at `/opt/joblet/run/persist-ipc.sock`
 
 ### Base Configuration Parameters
 
@@ -62,8 +62,8 @@ Platform: Linux server required for job execution
 
 **Persist Service:**
 ```text
-Server Address: <host>:50052 (optional, gRPC queries)
-IPC Socket: /opt/joblet/run/persist.sock (internal communication)
+Unix Socket: /opt/joblet/run/persist-grpc.sock (optional, gRPC queries)
+IPC Socket: /opt/joblet/run/persist-ipc.sock (internal communication)
 TLS: Optional (disabled by default for localhost)
 Platform: Linux server required
 ```
@@ -849,7 +849,7 @@ The persist service uses two communication channels:
 
 ```text
 Joblet Service → Unix Socket → Persist Service
-                 (/opt/joblet/run/persist.sock)
+                 (/opt/joblet/run/persist-ipc.sock)
 ```
 
 **Protocol**: Custom IPC protocol (defined in `internal/proto/ipc.proto`)
@@ -863,7 +863,7 @@ Joblet Service → Unix Socket → Persist Service
 ```yaml
 persist:
   ipc:
-    socket: "/opt/joblet/run/persist.sock"
+    socket: "/opt/joblet/run/persist-ipc.sock"
     max_message_size: 10485760  # 10MB
 ```
 
@@ -871,7 +871,7 @@ persist:
 **Purpose**: Historical queries from RNX clients
 
 ```text
-RNX Client → gRPC (port 50052) → Persist Service
+RNX Client → gRPC (Unix socket) → Persist Service
 ```
 
 **Protocol**: gRPC (defined in `internal/proto/persist.proto`)
@@ -882,7 +882,7 @@ RNX Client → gRPC (port 50052) → Persist Service
 ```yaml
 persist:
   server:
-    grpc_address: ":50052"
+    grpc_socket: "/opt/joblet/run/persist-grpc.sock"
     tls:
       enabled: false  # Optional for external access
 ```

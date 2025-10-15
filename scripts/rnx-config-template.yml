@@ -9,8 +9,7 @@ version: "3.0"
 #
 # nodes:
 #   default:
-#     address: "SERVER_ADDRESS:50051"               # joblet-core gRPC service (job execution, live streams)
-#     persistAddress: "SERVER_ADDRESS:50052"        # joblet-persist gRPC service (historical logs, metrics)
+#     address: "SERVER_ADDRESS:50051"               # joblet gRPC service (job execution, logs, metrics)
 #     nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Optional: Joblet node identifier for display
 #     cert: |
 #       -----BEGIN CERTIFICATE-----
@@ -26,8 +25,7 @@ version: "3.0"
 #       -----END CERTIFICATE-----
 #
 #   viewer:
-#     address: "SERVER_ADDRESS:50051"               # joblet-core gRPC service (job execution, live streams)
-#     persistAddress: "SERVER_ADDRESS:50052"        # joblet-persist gRPC service (historical logs, metrics)
+#     address: "SERVER_ADDRESS:50051"               # joblet gRPC service (job execution, logs, metrics)
 #     nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Optional: Joblet node identifier for display
 #     cert: |
 #       -----BEGIN CERTIFICATE-----

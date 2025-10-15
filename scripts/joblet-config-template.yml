@@ -95,6 +95,14 @@ buffers:
   pubsub_buffer_size: 10000   # Pub-sub channel buffer for high-throughput production traffic
   chunk_size: 1048576         # 1MB chunks for optimal streaming performance
 
+# IPC configuration for joblet-persist integration
+ipc:
+  enabled: true                                   # Enable IPC to persist service
+  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket for log/metric writes
+  buffer_size: 10000                              # Message buffer size
+  reconnect_delay: "5s"                           # Reconnection retry delay
+  max_reconnects: 0                               # Max reconnection attempts (0 = infinite)
+
 # Volume management configuration
 volumes:
   base_path: "/opt/joblet/volumes"  # Base directory for all volumes
@@ -131,18 +139,17 @@ runtime:
 
 persist:
   server:
-    grpc_address: ":50052"     # Override: Different port than parent
-    max_connections: 500        # Override: Different connection limit
+    grpc_socket: "/opt/joblet/run/persist-grpc.sock"  # Unix socket for gRPC queries (TCP disabled)
+    max_connections: 500       # Override: Different connection limit
     base_path: "/opt/joblet"   # Inherited from parent's filesystem
-    # TLS: Inherited from 'security' section (serverCert, serverKey, caCert)
-    #      Authentication requires mTLS - always enabled, client certs validated
+    # TLS: Disabled for Unix socket (pure Linux IPC)
 
   ipc:
-    socket: "/tmp/joblet-persist.sock"  # Unix socket for parent-child IPC
+    socket: "/opt/joblet/run/persist-ipc.sock"  # Unix socket for log/metric writes
     max_connections: 10
-    max_message_size: 10485760  # 10MB
-    read_buffer: 8388608        # 8MB
-    write_buffer: 8388608       # 8MB
+    max_message_size: 134217728  # 128MB - handle large batches
+    read_buffer: 8388608         # 8MB
+    write_buffer: 8388608        # 8MB
 
   storage:
     type: "local"

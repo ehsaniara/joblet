@@ -19,20 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	JobService_RunJob_FullMethodName               = "/joblet.JobService/RunJob"
-	JobService_GetJobStatus_FullMethodName         = "/joblet.JobService/GetJobStatus"
-	JobService_StopJob_FullMethodName              = "/joblet.JobService/StopJob"
-	JobService_CancelJob_FullMethodName            = "/joblet.JobService/CancelJob"
-	JobService_DeleteJob_FullMethodName            = "/joblet.JobService/DeleteJob"
-	JobService_DeleteAllJobs_FullMethodName        = "/joblet.JobService/DeleteAllJobs"
-	JobService_GetJobLogs_FullMethodName           = "/joblet.JobService/GetJobLogs"
-	JobService_ListJobs_FullMethodName             = "/joblet.JobService/ListJobs"
-	JobService_StreamJobMetrics_FullMethodName     = "/joblet.JobService/StreamJobMetrics"
-	JobService_GetJobMetricsSummary_FullMethodName = "/joblet.JobService/GetJobMetricsSummary"
-	JobService_RunWorkflow_FullMethodName          = "/joblet.JobService/RunWorkflow"
-	JobService_GetWorkflowStatus_FullMethodName    = "/joblet.JobService/GetWorkflowStatus"
-	JobService_ListWorkflows_FullMethodName        = "/joblet.JobService/ListWorkflows"
-	JobService_GetWorkflowJobs_FullMethodName      = "/joblet.JobService/GetWorkflowJobs"
+	JobService_RunJob_FullMethodName            = "/joblet.JobService/RunJob"
+	JobService_GetJobStatus_FullMethodName      = "/joblet.JobService/GetJobStatus"
+	JobService_StopJob_FullMethodName           = "/joblet.JobService/StopJob"
+	JobService_CancelJob_FullMethodName         = "/joblet.JobService/CancelJob"
+	JobService_DeleteJob_FullMethodName         = "/joblet.JobService/DeleteJob"
+	JobService_DeleteAllJobs_FullMethodName     = "/joblet.JobService/DeleteAllJobs"
+	JobService_GetJobLogs_FullMethodName        = "/joblet.JobService/GetJobLogs"
+	JobService_ListJobs_FullMethodName          = "/joblet.JobService/ListJobs"
+	JobService_GetJobMetrics_FullMethodName     = "/joblet.JobService/GetJobMetrics"
+	JobService_RunWorkflow_FullMethodName       = "/joblet.JobService/RunWorkflow"
+	JobService_GetWorkflowStatus_FullMethodName = "/joblet.JobService/GetWorkflowStatus"
+	JobService_ListWorkflows_FullMethodName     = "/joblet.JobService/ListWorkflows"
+	JobService_GetWorkflowJobs_FullMethodName   = "/joblet.JobService/GetWorkflowJobs"
 )
 
 // JobServiceClient is the client API for JobService service.
@@ -50,9 +49,8 @@ type JobServiceClient interface {
 	DeleteAllJobs(ctx context.Context, in *DeleteAllJobsReq, opts ...grpc.CallOption) (*DeleteAllJobsRes, error)
 	GetJobLogs(ctx context.Context, in *GetJobLogsReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataChunk], error)
 	ListJobs(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*Jobs, error)
-	// Job metrics operations (live streaming only - historical metrics via persist.QueryMetrics)
-	StreamJobMetrics(ctx context.Context, in *JobMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JobMetricsSample], error)
-	GetJobMetricsSummary(ctx context.Context, in *JobMetricsSummaryRequest, opts ...grpc.CallOption) (*JobMetricsSummaryResponse, error)
+	// Job metrics operations
+	GetJobMetrics(ctx context.Context, in *JobMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JobMetricsSample], error)
 	// Workflow operations
 	RunWorkflow(ctx context.Context, in *RunWorkflowRequest, opts ...grpc.CallOption) (*RunWorkflowResponse, error)
 	GetWorkflowStatus(ctx context.Context, in *GetWorkflowStatusRequest, opts ...grpc.CallOption) (*GetWorkflowStatusResponse, error)
@@ -157,9 +155,9 @@ func (c *jobServiceClient) ListJobs(ctx context.Context, in *EmptyRequest, opts 
 	return out, nil
 }
 
-func (c *jobServiceClient) StreamJobMetrics(ctx context.Context, in *JobMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JobMetricsSample], error) {
+func (c *jobServiceClient) GetJobMetrics(ctx context.Context, in *JobMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JobMetricsSample], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &JobService_ServiceDesc.Streams[1], JobService_StreamJobMetrics_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &JobService_ServiceDesc.Streams[1], JobService_GetJobMetrics_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -174,17 +172,7 @@ func (c *jobServiceClient) StreamJobMetrics(ctx context.Context, in *JobMetricsR
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type JobService_StreamJobMetricsClient = grpc.ServerStreamingClient[JobMetricsSample]
-
-func (c *jobServiceClient) GetJobMetricsSummary(ctx context.Context, in *JobMetricsSummaryRequest, opts ...grpc.CallOption) (*JobMetricsSummaryResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JobMetricsSummaryResponse)
-	err := c.cc.Invoke(ctx, JobService_GetJobMetricsSummary_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
+type JobService_GetJobMetricsClient = grpc.ServerStreamingClient[JobMetricsSample]
 
 func (c *jobServiceClient) RunWorkflow(ctx context.Context, in *RunWorkflowRequest, opts ...grpc.CallOption) (*RunWorkflowResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -241,9 +229,8 @@ type JobServiceServer interface {
 	DeleteAllJobs(context.Context, *DeleteAllJobsReq) (*DeleteAllJobsRes, error)
 	GetJobLogs(*GetJobLogsReq, grpc.ServerStreamingServer[DataChunk]) error
 	ListJobs(context.Context, *EmptyRequest) (*Jobs, error)
-	// Job metrics operations (live streaming only - historical metrics via persist.QueryMetrics)
-	StreamJobMetrics(*JobMetricsRequest, grpc.ServerStreamingServer[JobMetricsSample]) error
-	GetJobMetricsSummary(context.Context, *JobMetricsSummaryRequest) (*JobMetricsSummaryResponse, error)
+	// Job metrics operations
+	GetJobMetrics(*JobMetricsRequest, grpc.ServerStreamingServer[JobMetricsSample]) error
 	// Workflow operations
 	RunWorkflow(context.Context, *RunWorkflowRequest) (*RunWorkflowResponse, error)
 	GetWorkflowStatus(context.Context, *GetWorkflowStatusRequest) (*GetWorkflowStatusResponse, error)
@@ -283,11 +270,8 @@ func (UnimplementedJobServiceServer) GetJobLogs(*GetJobLogsReq, grpc.ServerStrea
 func (UnimplementedJobServiceServer) ListJobs(context.Context, *EmptyRequest) (*Jobs, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListJobs not implemented")
 }
-func (UnimplementedJobServiceServer) StreamJobMetrics(*JobMetricsRequest, grpc.ServerStreamingServer[JobMetricsSample]) error {
-	return status.Errorf(codes.Unimplemented, "method StreamJobMetrics not implemented")
-}
-func (UnimplementedJobServiceServer) GetJobMetricsSummary(context.Context, *JobMetricsSummaryRequest) (*JobMetricsSummaryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetJobMetricsSummary not implemented")
+func (UnimplementedJobServiceServer) GetJobMetrics(*JobMetricsRequest, grpc.ServerStreamingServer[JobMetricsSample]) error {
+	return status.Errorf(codes.Unimplemented, "method GetJobMetrics not implemented")
 }
 func (UnimplementedJobServiceServer) RunWorkflow(context.Context, *RunWorkflowRequest) (*RunWorkflowResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunWorkflow not implemented")
@@ -459,34 +443,16 @@ func _JobService_ListJobs_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _JobService_StreamJobMetrics_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _JobService_GetJobMetrics_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(JobMetricsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(JobServiceServer).StreamJobMetrics(m, &grpc.GenericServerStream[JobMetricsRequest, JobMetricsSample]{ServerStream: stream})
+	return srv.(JobServiceServer).GetJobMetrics(m, &grpc.GenericServerStream[JobMetricsRequest, JobMetricsSample]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type JobService_StreamJobMetricsServer = grpc.ServerStreamingServer[JobMetricsSample]
-
-func _JobService_GetJobMetricsSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(JobMetricsSummaryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(JobServiceServer).GetJobMetricsSummary(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: JobService_GetJobMetricsSummary_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(JobServiceServer).GetJobMetricsSummary(ctx, req.(*JobMetricsSummaryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
+type JobService_GetJobMetricsServer = grpc.ServerStreamingServer[JobMetricsSample]
 
 func _JobService_RunWorkflow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RunWorkflowRequest)
@@ -596,10 +562,6 @@ var JobService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _JobService_ListJobs_Handler,
 		},
 		{
-			MethodName: "GetJobMetricsSummary",
-			Handler:    _JobService_GetJobMetricsSummary_Handler,
-		},
-		{
 			MethodName: "RunWorkflow",
 			Handler:    _JobService_RunWorkflow_Handler,
 		},
@@ -623,8 +585,8 @@ var JobService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "StreamJobMetrics",
-			Handler:       _JobService_StreamJobMetrics_Handler,
+			StreamName:    "GetJobMetrics",
+			Handler:       _JobService_GetJobMetrics_Handler,
 			ServerStreams: true,
 		},
 	},

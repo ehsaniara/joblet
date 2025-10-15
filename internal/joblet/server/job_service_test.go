@@ -18,7 +18,7 @@ func TestNewJobServiceServer(t *testing.T) {
 	mockMetricsStore := (*adapters.MetricsStoreAdapter)(nil)
 	mockJoblet := &interfacesfakes.FakeJoblet{}
 
-	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet)
+	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet, nil)
 
 	if server == nil {
 		t.Fatal("NewJobServiceServer returned nil")
@@ -47,7 +47,7 @@ func TestListJobs_EmptyStore(t *testing.T) {
 	mockMetricsStore := (*adapters.MetricsStoreAdapter)(nil)
 	mockJoblet := &interfacesfakes.FakeJoblet{}
 
-	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet)
+	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet, nil)
 
 	// Mock successful authorization
 	mockAuth.AuthorizedReturns(nil)
@@ -77,7 +77,7 @@ func TestListJobs_WithJobs(t *testing.T) {
 	mockMetricsStore := (*adapters.MetricsStoreAdapter)(nil)
 	mockJoblet := &interfacesfakes.FakeJoblet{}
 
-	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet)
+	server := NewJobServiceServer(mockAuth, mockStore, mockMetricsStore, mockJoblet, nil)
 
 	// Create a test job
 	testJob := &domain.Job{

@@ -11,10 +11,10 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/mappers"
-	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 	"github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -29,23 +29,25 @@ import (
 // Removal Timeline: v5.0.0 (Q1-Q2 2026)
 type JobServiceServer struct {
 	pb.UnimplementedJobServiceServer
-	auth         auth2.GRPCAuthorization
-	jobStore     adapters.JobStorer            // Uses the new adapter interface
-	metricsStore *adapters.MetricsStoreAdapter // Job metrics collection
-	joblet       interfaces.Joblet             // Uses the new interface
-	logger       *logger.Logger
+	auth          auth2.GRPCAuthorization
+	jobStore      adapters.JobStorer            // Uses the new adapter interface
+	metricsStore  *adapters.MetricsStoreAdapter // Job metrics collection
+	joblet        interfaces.Joblet             // Uses the new interface
+	persistClient pb.PersistServiceClient       // Client for historical queries
+	logger        *logger.Logger
 }
 
 // NewJobServiceServer creates a new job service that uses request objects
 //
 // Deprecated: Use NewWorkflowServiceServer instead. See docs/DEPRECATION.md
-func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, persistClient pb.PersistServiceClient) *JobServiceServer {
 	return &JobServiceServer{
-		auth:         auth,
-		jobStore:     jobStore,
-		metricsStore: metricsStore,
-		joblet:       joblet,
-		logger:       logger.WithField("component", "job-grpc"),
+		auth:          auth,
+		jobStore:      jobStore,
+		metricsStore:  metricsStore,
+		joblet:        joblet,
+		persistClient: persistClient,
+		logger:        logger.WithField("component", "job-grpc"),
 	}
 }
 
@@ -672,44 +674,6 @@ func (s *JobServiceServer) ExecuteScheduledJob(ctx context.Context, jobID string
 	return nil
 }
 
-// StreamJobMetrics streams real-time job metrics to the client
-func (s *JobServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stream pb.JobService_StreamJobMetricsServer) error {
-	log := s.logger.WithFields("operation", "StreamJobMetrics", "jobUuid", req.GetUuid())
-	log.Debug("stream job metrics request received")
-
-	// Authorization check
-	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return err
-	}
-
-	if s.metricsStore == nil {
-		log.Warn("metrics store not available")
-		return status.Errorf(codes.Unimplemented, "metrics collection not enabled")
-	}
-
-	// Stream metrics using the metrics store
-	err := s.metricsStore.StreamMetrics(stream.Context(), req.GetUuid(), func(sample *metricsdomain.JobMetricsSample) error {
-		pbSample := convertMetricsSampleToProto(sample)
-		if err := stream.Send(pbSample); err != nil {
-			log.Warn("failed to send metrics sample", "error", err)
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
-		log.Error("metrics streaming failed", "error", err)
-		if err.Error() == "job not found" || strings.Contains(err.Error(), "not found") {
-			return status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
-		}
-		return status.Errorf(codes.Internal, "failed to stream metrics: %v", err)
-	}
-
-	log.Debug("metrics streaming completed", "jobUuid", req.GetUuid())
-	return nil
-}
-
 // NOTE: GetJobMetricsHistory has been removed - historical metrics are now handled
 // by joblet-persist service. Use the persist QueryMetrics RPC instead.
 
@@ -745,4 +709,88 @@ func (s *JobServiceServer) GetJobMetricsSummary(ctx context.Context, req *pb.Job
 		"GetJobMetricsSummary is not yet implemented. "+
 			"Use StreamJobMetrics RPC to get raw metrics and aggregate client-side, "+
 			"or query persist.QueryMetrics for historical data.")
+}
+
+// QueryLogs proxies historical log queries to joblet-persist service
+func (s *JobServiceServer) QueryLogs(req *pb.QueryLogsRequest, stream grpc.ServerStreamingServer[pb.LogLine]) error {
+	log := s.logger.WithFields("operation", "QueryLogs", "jobId", req.GetJobId())
+	log.Debug("query logs request received")
+
+	// Authorization check
+	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return err
+	}
+
+	if s.persistClient == nil {
+		log.Warn("persist client not available")
+		return status.Errorf(codes.Unavailable, "historical query service not available")
+	}
+
+	// Proxy to persist service
+	persistStream, err := s.persistClient.QueryLogs(stream.Context(), req)
+	if err != nil {
+		log.Error("failed to start persist query", "error", err)
+		return status.Errorf(codes.Internal, "failed to query historical logs: %v", err)
+	}
+
+	// Stream results back to client
+	for {
+		logLine, err := persistStream.Recv()
+		if err != nil {
+			if err.Error() == "EOF" {
+				log.Debug("log query stream completed")
+				return nil
+			}
+			log.Error("persist stream error", "error", err)
+			return status.Errorf(codes.Internal, "persist stream error: %v", err)
+		}
+
+		if err := stream.Send(logLine); err != nil {
+			log.Error("failed to send log line to client", "error", err)
+			return status.Errorf(codes.Internal, "failed to send log line: %v", err)
+		}
+	}
+}
+
+// QueryMetrics proxies historical metrics queries to joblet-persist service
+func (s *JobServiceServer) QueryMetrics(req *pb.QueryMetricsRequest, stream grpc.ServerStreamingServer[pb.Metric]) error {
+	log := s.logger.WithFields("operation", "QueryMetrics", "jobId", req.GetJobId())
+	log.Debug("query metrics request received")
+
+	// Authorization check
+	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return err
+	}
+
+	if s.persistClient == nil {
+		log.Warn("persist client not available")
+		return status.Errorf(codes.Unavailable, "historical query service not available")
+	}
+
+	// Proxy to persist service
+	persistStream, err := s.persistClient.QueryMetrics(stream.Context(), req)
+	if err != nil {
+		log.Error("failed to start persist query", "error", err)
+		return status.Errorf(codes.Internal, "failed to query historical metrics: %v", err)
+	}
+
+	// Stream results back to client
+	for {
+		metric, err := persistStream.Recv()
+		if err != nil {
+			if err.Error() == "EOF" {
+				log.Debug("metrics query stream completed")
+				return nil
+			}
+			log.Error("persist stream error", "error", err)
+			return status.Errorf(codes.Internal, "persist stream error: %v", err)
+		}
+
+		if err := stream.Send(metric); err != nil {
+			log.Error("failed to send metric to client", "error", err)
+			return status.Errorf(codes.Internal, "failed to send metric: %v", err)
+		}
+	}
 }

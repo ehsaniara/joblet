@@ -23,6 +23,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/workflow/types"
 	"github.com/ehsaniara/joblet/pkg/logger"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v3"
@@ -50,6 +51,7 @@ type WorkflowServiceServer struct {
 	joblet            interfaces.Joblet
 	workflowManager   *workflow.WorkflowManager
 	workflowValidator *validation.WorkflowValidator
+	persistClient     pb.PersistServiceClient // Client for historical queries via Unix socket IPC
 	logger            *logger.Logger
 
 	// UUID to workflow ID mapping
@@ -61,7 +63,7 @@ type WorkflowServiceServer struct {
 // This server handles workflow creation, status monitoring, and job orchestration.
 // It requires authentication, job store access, joblet interface for job execution,
 // a workflow manager for dependency tracking and job coordination, and managers for validation.
-func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, workflowManager *workflow.WorkflowManager, volumeManager *volume.Manager, runtimeResolver *runtime.Resolver) *WorkflowServiceServer {
+func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, workflowManager *workflow.WorkflowManager, volumeManager *volume.Manager, runtimeResolver *runtime.Resolver, persistClient pb.PersistServiceClient) *WorkflowServiceServer {
 	// Create workflow validator with concrete managers (no adapter pattern needed)
 	workflowValidator := validation.NewWorkflowValidator(volumeManager, runtimeResolver)
 
@@ -71,6 +73,7 @@ func NewWorkflowServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.Jo
 		metricsStore:      metricsStore,
 		joblet:            joblet,
 		workflowManager:   workflowManager,
+		persistClient:     persistClient,
 		workflowValidator: workflowValidator,
 		logger:            logger.WithField("component", "workflow-grpc"),
 		workflowUuidMap:   make(map[string]int),
@@ -1331,10 +1334,50 @@ func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobS
 		return err
 	}
 
-	// Create a domain streamer adapter
+	// Step 1: Fetch and stream historical logs from persist (if available)
+	if s.persistClient != nil {
+		log.Debug("fetching historical logs from persist")
+
+		persistReq := &pb.QueryLogsRequest{
+			JobId:  req.GetUuid(),
+			Stream: pb.StreamType_STREAM_TYPE_UNSPECIFIED, // Both stdout and stderr
+		}
+
+		persistStream, err := s.persistClient.QueryLogs(stream.Context(), persistReq)
+		if err != nil {
+			// Log warning but continue with live streaming
+			log.Warn("failed to query historical logs from persist", "error", err)
+		} else {
+			// Stream historical logs to client
+			historicalCount := 0
+			for {
+				logLine, err := persistStream.Recv()
+				if err != nil {
+					if err.Error() == "EOF" {
+						log.Debug("historical logs streaming completed", "count", historicalCount)
+						break
+					}
+					// Log warning but continue with live streaming
+					log.Warn("error reading historical logs", "error", err)
+					break
+				}
+
+				// Send historical log line to client as DataChunk
+				if err := stream.Send(&pb.DataChunk{Payload: logLine.Content}); err != nil {
+					log.Error("failed to send historical log to client", "error", err)
+					return status.Errorf(codes.Internal, "failed to send historical log: %v", err)
+				}
+				historicalCount++
+			}
+		}
+	} else {
+		log.Debug("persist client not available, skipping historical logs")
+	}
+
+	// Step 2: Stream live logs using the job store
+	log.Debug("starting live log streaming")
 	streamer := &workflowGrpcToDomainStreamer{stream: stream}
 
-	// Stream logs using the job store
 	err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetUuid(), streamer)
 	if err != nil {
 		log.Error("failed to stream logs", "error", err)
@@ -1556,10 +1599,11 @@ func getFileKeys(files map[string][]byte) []string {
 	return keys
 }
 
-// StreamJobMetrics streams real-time metrics for a running job
-func (s *WorkflowServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stream pb.JobService_StreamJobMetricsServer) error {
-	log := s.logger.WithFields("operation", "StreamJobMetrics", "uuid", req.Uuid)
-	log.Debug("stream job metrics request received")
+// GetJobMetrics streams historical metrics followed by live metrics for a job
+// This is the recommended method for getting complete metrics (history + live streaming)
+func (s *WorkflowServiceServer) GetJobMetrics(req *pb.JobMetricsRequest, stream grpc.ServerStreamingServer[pb.JobMetricsSample]) error {
+	log := s.logger.WithFields("operation", "GetJobMetrics", "uuid", req.Uuid)
+	log.Debug("get job metrics request received")
 
 	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
@@ -1578,7 +1622,48 @@ func (s *WorkflowServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stre
 		resolvedUUID = req.Uuid
 	}
 
-	// Stream metrics using the metrics store
+	// Step 1: Fetch and stream historical metrics from persist (if available)
+	if s.persistClient != nil {
+		log.Debug("fetching historical metrics from persist")
+
+		persistReq := &pb.QueryMetricsRequest{
+			JobId: resolvedUUID,
+		}
+
+		persistStream, err := s.persistClient.QueryMetrics(stream.Context(), persistReq)
+		if err != nil {
+			// Log warning but continue with live streaming
+			log.Warn("failed to query historical metrics from persist", "error", err)
+		} else {
+			// Stream historical metrics to client
+			historicalCount := 0
+			for {
+				metric, err := persistStream.Recv()
+				if err != nil {
+					if err.Error() == "EOF" {
+						log.Debug("historical metrics streaming completed", "count", historicalCount)
+						break
+					}
+					// Log warning but continue with live streaming
+					log.Warn("error reading historical metrics", "error", err)
+					break
+				}
+
+				// Convert persist Metric to JobMetricsSample proto format
+				pbSample := convertPersistMetricToProto(metric)
+				if err := stream.Send(pbSample); err != nil {
+					log.Error("failed to send historical metric to client", "error", err)
+					return status.Errorf(codes.Internal, "failed to send historical metric: %v", err)
+				}
+				historicalCount++
+			}
+		}
+	} else {
+		log.Debug("persist client not available, skipping historical metrics")
+	}
+
+	// Step 2: Stream live metrics using the metrics store
+	log.Debug("starting live metrics streaming")
 	err = s.metricsStore.StreamMetrics(stream.Context(), resolvedUUID, func(sample *metricsdomain.JobMetricsSample) error {
 		pbSample := convertMetricsSampleToProto(sample)
 		if err := stream.Send(pbSample); err != nil {
@@ -1595,44 +1680,4 @@ func (s *WorkflowServiceServer) StreamJobMetrics(req *pb.JobMetricsRequest, stre
 
 	log.Debug("metrics streaming completed")
 	return nil
-}
-
-// NOTE: GetJobMetricsHistory has been removed - historical metrics are now handled
-// by joblet-persist service. Use the persist QueryMetrics RPC instead.
-
-// GetJobMetricsSummary returns aggregated metrics summary for a job
-func (s *WorkflowServiceServer) GetJobMetricsSummary(ctx context.Context, req *pb.JobMetricsSummaryRequest) (*pb.JobMetricsSummaryResponse, error) {
-	log := s.logger.WithFields("operation", "GetJobMetricsSummary", "uuid", req.Uuid)
-	log.Debug("get job metrics summary request received")
-
-	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if req.Uuid == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "uuid is required")
-	}
-
-	// Check if job exists
-	jobID := req.Uuid
-	_, exists := s.jobStore.Job(jobID)
-	if !exists {
-		log.Warn("job not found")
-		return nil, status.Errorf(codes.NotFound, "job not found")
-	}
-
-	if s.metricsStore == nil {
-		log.Warn("metrics store not available")
-		return nil, status.Errorf(codes.Unimplemented, "metrics collection not enabled")
-	}
-
-	// TODO: Implement metrics aggregation
-	// For now, clients should use StreamJobMetrics and aggregate client-side
-	// See: internal/joblet/server/workflow_metrics_aggregation.go for aggregation logic
-	log.Warn("GetJobMetricsSummary not yet implemented - use StreamJobMetrics instead")
-	return nil, status.Errorf(codes.Unimplemented,
-		"GetJobMetricsSummary is not yet implemented. "+
-			"Use StreamJobMetrics RPC to get raw metrics and aggregate client-side, "+
-			"or query persist.QueryMetrics for historical data.")
 }

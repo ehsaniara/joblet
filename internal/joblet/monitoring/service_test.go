@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// skipCI skips test if in CI or not on Linux
+func skipCI(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Requires Linux")
+	}
+	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		t.Skip("Disabled in CI")
+	}
+}
+
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
@@ -20,10 +30,6 @@ func TestDefaultConfig(t *testing.T) {
 
 	if config.Collection.SystemInterval <= 0 {
 		t.Error("Expected positive system interval")
-	}
-
-	if config.Collection.ProcessInterval <= 0 {
-		t.Error("Expected positive process interval")
 	}
 
 	if !config.Collection.CloudDetection {
@@ -95,19 +101,9 @@ func TestNewService_NilConfig(t *testing.T) {
 }
 
 func TestService_IsRunning(t *testing.T) {
-	// Skip on non-Linux platforms
-	if runtime.GOOS != "linux" {
-		t.Skip("Monitoring system requires Linux")
-	}
+	skipCI(t)
 
-	// Skip in CI environments to avoid resource constraints
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" || os.Getenv("SKIP_MONITORING_INTEGRATION_TESTS") == "true" {
-		t.Skip("Monitoring service tests disabled in CI environments")
-	}
-
-	// Use config with cloud detection disabled to avoid network timeouts
-	config := DefaultConfig()
-	config.Collection.CloudDetection = false
+	config := testConfig()
 	service := NewService(config)
 	defer func() { _ = service.Stop() }()
 
@@ -140,17 +136,10 @@ func TestService_IsRunning(t *testing.T) {
 }
 
 func TestService_StartStop(t *testing.T) {
-	// Skip on non-Linux platforms
-	if runtime.GOOS != "linux" {
-		t.Skip("Monitoring system requires Linux")
-	}
+	skipCI(t)
 
-	// Skip in CI environments to avoid resource constraints
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" || os.Getenv("SKIP_MONITORING_INTEGRATION_TESTS") == "true" {
-		t.Skip("Monitoring service tests disabled in CI environments")
-	}
-
-	service := NewService(DefaultConfig())
+	config := testConfig()
+	service := NewService(config)
 
 	// Test starting
 	err := service.Start()
@@ -199,17 +188,10 @@ func TestService_DisabledService(t *testing.T) {
 }
 
 func TestService_GetLatestMetrics(t *testing.T) {
-	// Skip on non-Linux platforms
-	if runtime.GOOS != "linux" {
-		t.Skip("Monitoring system requires Linux")
-	}
+	skipCI(t)
 
-	// Skip in CI environments to avoid resource constraints
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" || os.Getenv("SKIP_MONITORING_INTEGRATION_TESTS") == "true" {
-		t.Skip("Monitoring service tests disabled in CI environments")
-	}
-
-	service := NewService(DefaultConfig())
+	config := testConfig()
+	service := NewService(config)
 	defer func() { _ = service.Stop() }()
 
 	// Initially no metrics
@@ -218,13 +200,13 @@ func TestService_GetLatestMetrics(t *testing.T) {
 		t.Error("Expected nil metrics initially")
 	}
 
-	// Start service and wait a bit for collection
+	// Start service and wait for collection
 	_ = service.Start()
 	time.Sleep(100 * time.Millisecond)
 
 	// Should have metrics now (might still be nil if collection hasn't completed)
 	_ = service.GetLatestMetrics()
-	// We can't guarantee metrics will be available immediately, so just check it doesn't crash
+	// Can't guarantee metrics available immediately, just check no crash
 }
 
 func TestService_GetSystemStatus(t *testing.T) {
@@ -243,8 +225,7 @@ func TestService_GetSystemStatus(t *testing.T) {
 
 	// Initially should not be available (no metrics collected yet)
 	if status.Available {
-		// This might be true if collection happens very quickly
-		// Just verify the structure is there
+		// Might be true if collection is very fast
 		if status.Host.Hostname == "" && status.Host.OS == "" {
 			t.Error("If available=true, should have host info")
 		}
@@ -259,8 +240,7 @@ func TestService_GetCloudInfo(t *testing.T) {
 	// Initially no cloud info
 	cloudInfo := service.GetCloudInfo()
 	if cloudInfo != nil {
-		// Cloud info might be available if detection is very fast
-		// Just verify it's structured correctly
+		// Might be available if detection is fast
 		if cloudInfo.Provider == "" {
 			t.Error("If cloud info is available, should have provider")
 		}
@@ -269,17 +249,10 @@ func TestService_GetCloudInfo(t *testing.T) {
 
 // Test concurrent access to service methods
 func TestService_ConcurrentAccess(t *testing.T) {
-	// Skip on non-Linux platforms
-	if runtime.GOOS != "linux" {
-		t.Skip("Monitoring system requires Linux")
-	}
+	skipCI(t)
 
-	// Skip in CI environments to avoid resource constraints
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" || os.Getenv("SKIP_MONITORING_INTEGRATION_TESTS") == "true" {
-		t.Skip("Monitoring service tests disabled in CI environments")
-	}
-
-	service := NewService(DefaultConfig())
+	config := testConfig()
+	service := NewService(config)
 	defer func() { _ = service.Stop() }()
 
 	// Start service
@@ -328,19 +301,10 @@ func TestService_ConcurrentAccess(t *testing.T) {
 
 // Test service with fast collection intervals
 func TestService_FastCollection(t *testing.T) {
-	// Skip on non-Linux platforms
-	if runtime.GOOS != "linux" {
-		t.Skip("Monitoring system requires Linux")
-	}
+	skipCI(t)
 
-	// Skip in CI environments to avoid resource constraints
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" || os.Getenv("SKIP_MONITORING_INTEGRATION_TESTS") == "true" {
-		t.Skip("Monitoring service tests disabled in CI environments")
-	}
-
-	config := DefaultConfig()
+	config := testConfig()
 	config.Collection.SystemInterval = 10 * time.Millisecond
-	config.Collection.ProcessInterval = 50 * time.Millisecond
 
 	service := NewService(config)
 	defer func() { _ = service.Stop() }()
@@ -354,23 +318,20 @@ func TestService_FastCollection(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Should have collected some metrics
-	latest := service.GetLatestMetrics()
-	// Might have metrics if collection is working
-	_ = latest
+	_ = service.GetLatestMetrics()
 }
 
 // Benchmark service operations
 func BenchmarkService_GetLatestMetrics(b *testing.B) {
-	// Skip on non-Linux platforms
 	if runtime.GOOS != "linux" {
-		b.Skip("Monitoring system requires Linux")
+		b.Skip("Requires Linux")
 	}
 
 	service := NewService(DefaultConfig())
 	defer func() { _ = service.Stop() }()
 
 	_ = service.Start()
-	time.Sleep(50 * time.Millisecond) // Let it collect some data
+	time.Sleep(50 * time.Millisecond)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -379,16 +340,15 @@ func BenchmarkService_GetLatestMetrics(b *testing.B) {
 }
 
 func BenchmarkService_GetSystemStatus(b *testing.B) {
-	// Skip on non-Linux platforms
 	if runtime.GOOS != "linux" {
-		b.Skip("Monitoring system requires Linux")
+		b.Skip("Requires Linux")
 	}
 
 	service := NewService(DefaultConfig())
 	defer func() { _ = service.Stop() }()
 
 	_ = service.Start()
-	time.Sleep(50 * time.Millisecond) // Let it collect some data
+	time.Sleep(50 * time.Millisecond)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -76,8 +76,10 @@ func main() {
 	log.Info("IPC server started", "socket", cfg.IPC.Socket)
 
 	// Initialize authorization
-	authorization := auth.NewGRPCAuthorization()
-	log.Info("Authorization initialized")
+	// Use no-op authorization for Unix socket (internal IPC without TLS)
+	// Trust is established by Unix socket file permissions
+	authorization := auth.NewNoOpAuthorization()
+	log.Info("Authorization initialized (no-op for Unix socket IPC)")
 
 	// Initialize gRPC server with inherited security config
 	grpcServer := server.NewGRPCServer(&cfg.Server, backend, log, authorization, &result.Security)

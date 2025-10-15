@@ -78,8 +78,8 @@ func TestExecutionCoordinator_StartJob_DefaultRuntime(t *testing.T) {
 	}
 
 	_, launchConfig := processManager.LaunchProcessArgsForCall(0)
-	if launchConfig.InitPath != "/opt/joblet/joblet" {
-		t.Errorf("Expected init path '/opt/joblet/joblet', got '%s'", launchConfig.InitPath)
+	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
+		t.Errorf("Expected init path '/opt/joblet/bin/joblet', got '%s'", launchConfig.InitPath)
 	}
 	if launchConfig.JobID != "test-job-123" {
 		t.Errorf("Expected job ID 'test-job-123', got '%s'", launchConfig.JobID)
@@ -151,8 +151,8 @@ func TestExecutionCoordinator_StartJob_RuntimeJob(t *testing.T) {
 	}
 
 	_, launchConfig := processManager.LaunchProcessArgsForCall(0)
-	if launchConfig.InitPath != "/opt/joblet/joblet" {
-		t.Errorf("Expected init path '/opt/joblet/joblet' for unified logging, got '%s'", launchConfig.InitPath)
+	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
+		t.Errorf("Expected init path '/opt/joblet/bin/joblet' for unified logging, got '%s'", launchConfig.InitPath)
 	}
 
 	// Verify runtime information is still passed through environment
@@ -166,11 +166,6 @@ func TestExecutionCoordinator_StartJob_RuntimeJob(t *testing.T) {
 	}
 	if phaseArg != "execute" {
 		t.Errorf("Expected phase 'execute', got '%s'", phaseArg)
-	}
-
-	// Critical: Should not try to resolve runtime init path
-	if envManager.GetRuntimeInitPathCallCount() != 0 {
-		t.Errorf("Expected GetRuntimeInitPath NOT to be called, but it was called %d times", envManager.GetRuntimeInitPathCallCount())
 	}
 }
 
@@ -246,8 +241,8 @@ func TestExecutionCoordinator_StartJob_WithNetworking(t *testing.T) {
 
 	// Still use joblet binary for unified logging
 	_, launchConfig := processManager.LaunchProcessArgsForCall(0)
-	if launchConfig.InitPath != "/opt/joblet/joblet" {
-		t.Errorf("Expected init path '/opt/joblet/joblet' even with networking, got '%s'", launchConfig.InitPath)
+	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
+		t.Errorf("Expected init path '/opt/joblet/bin/joblet' even with networking, got '%s'", launchConfig.InitPath)
 	}
 }
 

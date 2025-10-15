@@ -21,8 +21,6 @@ type Backend interface {
 
 	// Management operations
 	DeleteJob(jobID string) error
-	ListJobs(filter *JobFilter) ([]string, error)
-	GetJobInfo(jobID string) (*JobInfo, error)
 
 	// Lifecycle
 	Close() error
@@ -47,24 +45,6 @@ type MetricQuery struct {
 	Aggregation string
 	Limit       int
 	Offset      int
-}
-
-// JobFilter for listing jobs
-type JobFilter struct {
-	Since  *int64
-	Until  *int64
-	Limit  int
-	Offset int
-}
-
-// JobInfo contains job metadata
-type JobInfo struct {
-	JobID       string
-	CreatedAt   int64
-	LastUpdated int64
-	LogCount    int64
-	MetricCount int64
-	SizeBytes   int64
 }
 
 // LogReader provides streaming access to logs

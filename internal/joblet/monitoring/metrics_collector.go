@@ -138,25 +138,23 @@ func NewServiceFromConfig(cfg *config.MonitoringConfig) *Service {
 	domainConfig := &domain.MonitoringConfig{
 		Enabled: cfg.Enabled,
 		Collection: domain.CollectionConfig{
-			SystemInterval:  cfg.SystemInterval,
-			ProcessInterval: cfg.ProcessInterval,
-			CloudDetection:  cfg.CloudDetection,
+			SystemInterval: cfg.SystemInterval,
+			CloudDetection: cfg.CloudDetection,
 		},
 	}
 	return NewService(domainConfig)
 }
 
 // DefaultConfig returns a default monitoring configuration with sensible defaults.
-// Sets system metrics collection interval to 10 seconds, process metrics to 60 seconds,
+// Sets system metrics collection interval to 10 seconds,
 // enables cloud detection, and activates monitoring by default.
 // Used as fallback configuration when no specific config is provided.
 func DefaultConfig() *domain.MonitoringConfig {
 	return &domain.MonitoringConfig{
 		Enabled: true,
 		Collection: domain.CollectionConfig{
-			SystemInterval:  10 * time.Second,
-			ProcessInterval: 60 * time.Second,
-			CloudDetection:  true,
+			SystemInterval: 10 * time.Second,
+			CloudDetection: true,
 		},
 	}
 }
@@ -194,10 +192,6 @@ func (s *Service) Start() error {
 	// Start system metrics collection
 	s.wg.Add(1)
 	go s.collectSystemMetrics()
-
-	// Start process metrics collection (less frequent)
-	s.wg.Add(1)
-	go s.collectProcessMetrics()
 
 	s.running = true
 	s.logger.Info("monitoring service started")
@@ -384,32 +378,6 @@ func (s *Service) collectSystemMetrics() {
 			s.collectAndStoreSystemMetrics()
 		case <-s.ctx.Done():
 			s.logger.Debug("stopping system metrics collection")
-			return
-		}
-	}
-}
-
-// collectProcessMetrics runs the process-specific metrics collection loop.
-// Currently placeholder for future process-specific collection at different intervals.
-// Process metrics are collected as part of system metrics collection for now.
-// Could be extended to collect detailed per-process statistics less frequently
-// than system metrics to reduce overhead.
-// Handles context cancellation for graceful shutdown.
-func (s *Service) collectProcessMetrics() {
-	defer s.wg.Done()
-
-	ticker := time.NewTicker(s.config.Collection.ProcessInterval)
-	defer ticker.Stop()
-
-	s.logger.Info("started process metrics collection", "interval", s.config.Collection.ProcessInterval)
-
-	for {
-		select {
-		case <-ticker.C:
-			// Process metrics are collected as part of system metrics
-			// This could be separated if needed for different intervals
-		case <-s.ctx.Done():
-			s.logger.Debug("stopping process metrics collection")
 			return
 		}
 	}

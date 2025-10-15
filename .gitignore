@@ -40,3 +40,9 @@ examples/packages/*.tar.gz
 # Release build artifacts
 /release
 
+# Package build artifacts (DEB/RPM)
+joblet-deb-*/
+rpmbuild/
+*.deb
+*.rpm
+

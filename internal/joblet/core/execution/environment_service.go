@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -162,11 +161,6 @@ func (es *EnvironmentService) processUploads(uploads []domain.FileUpload, workDi
 	}
 
 	return nil
-}
-
-// GetRuntimeInitPath is deprecated - runtime functionality is now handled by filesystem isolator
-func (es *EnvironmentService) GetRuntimeInitPath(ctx context.Context, runtimeSpec string) (string, error) {
-	return "", fmt.Errorf("runtime init path resolution is deprecated - handled by filesystem isolator")
 }
 
 // DetectCUDA detects available CUDA installations on the system

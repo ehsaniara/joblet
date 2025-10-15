@@ -27,9 +27,6 @@ type LocalBackend struct {
 	logFiles    map[string]*logFile
 	metricFiles map[string]*metricFile
 	filesMu     sync.RWMutex
-
-	// Index
-	index *jobIndex
 }
 
 type logFile struct {
@@ -54,7 +51,6 @@ func NewLocalBackend(cfg *config.StorageConfig, log *logger.Logger) (*LocalBacke
 		baseDir:     cfg.BaseDir,
 		logFiles:    make(map[string]*logFile),
 		metricFiles: make(map[string]*metricFile),
-		index:       newJobIndex(filepath.Join(cfg.BaseDir, "job_index.json")),
 	}
 
 	// Create base directories
@@ -64,11 +60,6 @@ func NewLocalBackend(cfg *config.StorageConfig, log *logger.Logger) (*LocalBacke
 
 	if err := os.MkdirAll(cfg.Local.Metrics.Directory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create metrics directory: %w", err)
-	}
-
-	// Load index
-	if err := backend.index.Load(); err != nil {
-		log.Warn("Failed to load job index, starting fresh", "error", err)
 	}
 
 	log.Info("Local storage backend initialized",
@@ -124,9 +115,6 @@ func (lb *LocalBackend) WriteLogs(jobID string, logs []*ipcpb.LogLine) error {
 		return err
 	}
 
-	// Update index
-	lb.index.UpdateJob(jobID, int64(len(logs)), 0)
-
 	return nil
 }
 
@@ -161,9 +149,6 @@ func (lb *LocalBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) erro
 	if err := mf.file.Sync(); err != nil {
 		return err
 	}
-
-	// Update index
-	lb.index.UpdateJob(jobID, 0, int64(len(metrics)))
 
 	return nil
 }
@@ -575,22 +560,9 @@ func (lb *LocalBackend) DeleteJob(jobID string) error {
 		return fmt.Errorf("failed to delete metrics directory: %w", err)
 	}
 
-	// Remove from index
-	lb.index.DeleteJob(jobID)
-
 	lb.logger.Info("Deleted job data", "jobID", jobID)
 
 	return nil
-}
-
-// ListJobs lists all jobs matching the filter
-func (lb *LocalBackend) ListJobs(filter *JobFilter) ([]string, error) {
-	return lb.index.ListJobs(filter)
-}
-
-// GetJobInfo returns information about a job
-func (lb *LocalBackend) GetJobInfo(jobID string) (*JobInfo, error) {
-	return lb.index.GetJobInfo(jobID)
 }
 
 // Close closes the backend and all open files
@@ -612,11 +584,6 @@ func (lb *LocalBackend) Close() error {
 		mf.gzWriter.Close()
 		mf.file.Close()
 		lb.logger.Debug("Closed metric file", "jobID", jobID)
-	}
-
-	// Save index
-	if err := lb.index.Save(); err != nil {
-		lb.logger.Error("Failed to save index", "error", err)
 	}
 
 	lb.logger.Info("Local storage backend closed")

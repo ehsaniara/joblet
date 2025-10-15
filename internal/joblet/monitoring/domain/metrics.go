@@ -149,7 +149,6 @@ type MonitoringConfig struct {
 
 // CollectionConfig represents collection settings
 type CollectionConfig struct {
-	SystemInterval  time.Duration `json:"system_interval" yaml:"system_interval"`
-	ProcessInterval time.Duration `json:"process_interval" yaml:"process_interval"`
-	CloudDetection  bool          `json:"cloud_detection" yaml:"cloud_detection"`
+	SystemInterval time.Duration `json:"system_interval" yaml:"system_interval"`
+	CloudDetection bool          `json:"cloud_detection" yaml:"cloud_detection"`
 }

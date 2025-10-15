@@ -217,3 +217,98 @@ func convertGPUMetricsToProto(gpu *domain.GPUMetrics) *pb.JobGPUMetrics {
 		ComputeMode:       gpu.ComputeMode,
 	}
 }
+
+// convertPersistMetricToProto converts persist.Metric to JobMetricsSample
+// This is used for streaming historical metrics from persist storage
+func convertPersistMetricToProto(metric *pb.Metric) *pb.JobMetricsSample {
+	if metric == nil || metric.Data == nil {
+		return nil
+	}
+
+	data := metric.Data
+
+	// Convert timestamp from nanoseconds to seconds
+	timestampSec := metric.Timestamp / 1_000_000_000
+
+	// Safely extract IO metrics with nil check
+	var ioReadBytes, ioWriteBytes, ioReadOps, ioWriteOps uint64
+	if data.DiskIo != nil {
+		ioReadBytes = uint64(data.DiskIo.ReadBytes)
+		ioWriteBytes = uint64(data.DiskIo.WriteBytes)
+		ioReadOps = uint64(data.DiskIo.ReadOps)
+		ioWriteOps = uint64(data.DiskIo.WriteOps)
+	}
+
+	// Safely extract Network metrics with nil check
+	var netRxBytes, netTxBytes, netRxPackets, netTxPackets uint64
+	if data.NetworkIo != nil {
+		netRxBytes = uint64(data.NetworkIo.RxBytes)
+		netTxBytes = uint64(data.NetworkIo.TxBytes)
+		netRxPackets = uint64(data.NetworkIo.RxPackets)
+		netTxPackets = uint64(data.NetworkIo.TxPackets)
+	}
+
+	pbSample := &pb.JobMetricsSample{
+		JobId:                 metric.JobId,
+		Timestamp:             timestampSec,
+		SampleIntervalSeconds: 1, // Default interval for historical data
+		Cpu: &pb.JobCPUMetrics{
+			UsagePercent: data.CpuUsage * 100, // Convert 0.0-cores to percentage
+		},
+		Memory: &pb.JobMemoryMetrics{
+			Current:      uint64(data.MemoryUsage),
+			UsagePercent: 0, // Not available in persist data
+		},
+		Io: &pb.JobIOMetrics{
+			Devices:           make(map[string]*pb.DeviceIOMetrics),
+			TotalReadBytes:    ioReadBytes,
+			TotalWriteBytes:   ioWriteBytes,
+			TotalReadOps:      ioReadOps,
+			TotalWriteOps:     ioWriteOps,
+			TotalDiscardBytes: 0,
+			TotalDiscardOps:   0,
+			ReadBPS:           0,
+			WriteBPS:          0,
+			ReadIOPS:          0,
+			WriteIOPS:         0,
+		},
+		Network: &pb.JobNetworkMetrics{
+			Interfaces:     make(map[string]*pb.NetworkInterfaceMetrics),
+			TotalRxBytes:   netRxBytes,
+			TotalTxBytes:   netTxBytes,
+			TotalRxPackets: netRxPackets,
+			TotalTxPackets: netTxPackets,
+			TotalRxErrors:  0,
+			TotalTxErrors:  0,
+			TotalRxDropped: 0,
+			TotalTxDropped: 0,
+			RxBPS:          0,
+			TxBPS:          0,
+		},
+		Process: &pb.JobProcessMetrics{
+			Current:  0,
+			Max:      0,
+			Events:   0,
+			Threads:  0,
+			Running:  0,
+			Sleeping: 0,
+			Stopped:  0,
+			Zombie:   0,
+			OpenFDs:  0,
+			MaxFDs:   0,
+		},
+		CgroupPath:    "",
+		GpuAllocation: []int32{},
+	}
+
+	// Add GPU metrics if available
+	if data.GpuUsage > 0 {
+		pbSample.Gpu = []*pb.JobGPUMetrics{
+			{
+				Utilization: data.GpuUsage * 100, // Convert 0.0-1.0 to percentage
+			},
+		}
+	}
+
+	return pbSample
+}

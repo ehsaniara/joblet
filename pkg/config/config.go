@@ -120,10 +120,9 @@ type LoggingConfig struct {
 
 // MonitoringConfig holds monitoring system configuration
 type MonitoringConfig struct {
-	Enabled         bool          `yaml:"enabled" json:"enabled"`
-	SystemInterval  time.Duration `yaml:"system_interval" json:"system_interval"`
-	ProcessInterval time.Duration `yaml:"process_interval" json:"process_interval"`
-	CloudDetection  bool          `yaml:"cloud_detection" json:"cloud_detection"`
+	Enabled        bool          `yaml:"enabled" json:"enabled"`
+	SystemInterval time.Duration `yaml:"system_interval" json:"system_interval"`
+	CloudDetection bool          `yaml:"cloud_detection" json:"cloud_detection"`
 }
 
 // ClientConfig represents the client-side configuration with multiple nodes
@@ -134,12 +133,11 @@ type ClientConfig struct {
 
 // Node represents a single server configuration with embedded certificates
 type Node struct {
-	Address        string `yaml:"address"`
-	PersistAddress string `yaml:"persistAddress,omitempty"` // joblet-persist service address (optional, defaults to port 50052 on same host)
-	NodeId         string `yaml:"nodeId,omitempty"`         // Unique identifier of the Joblet node (optional, for display purposes)
-	Cert           string `yaml:"cert"`                     // Embedded PEM certificate
-	Key            string `yaml:"key"`                      // Embedded PEM private key
-	CA             string `yaml:"ca"`                       // Embedded PEM CA certificate
+	Address string `yaml:"address"`
+	NodeId  string `yaml:"nodeId,omitempty"` // Unique identifier of the Joblet node (optional, for display purposes)
+	Cert    string `yaml:"cert"`             // Embedded PEM certificate
+	Key     string `yaml:"key"`              // Embedded PEM private key
+	CA      string `yaml:"ca"`               // Embedded PEM CA certificate
 }
 
 // BuffersConfig holds buffer and pub-sub configuration
@@ -246,10 +244,9 @@ var DefaultConfig = Config{
 		},
 	},
 	Monitoring: MonitoringConfig{
-		Enabled:         true,
-		SystemInterval:  10 * time.Second,
-		ProcessInterval: 30 * time.Second,
-		CloudDetection:  true,
+		Enabled:        true,
+		SystemInterval: 10 * time.Second,
+		CloudDetection: true,
 	},
 	Buffers: BuffersConfig{
 		PubsubBufferSize: 10000,   // Pub-sub buffer for real-time streaming
@@ -279,7 +276,7 @@ var DefaultConfig = Config{
 	},
 	IPC: IPCConfig{
 		Enabled:        false, // Disabled by default - opt-in for joblet-persist integration
-		Socket:         "/opt/joblet/run/persist.sock",
+		Socket:         "/opt/joblet/run/persist-ipc.sock",
 		BufferSize:     10000,           // 10k message buffer
 		ReconnectDelay: 5 * time.Second, // Retry every 5 seconds
 		MaxReconnects:  0,               // Infinite retries

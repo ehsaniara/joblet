@@ -69,18 +69,13 @@ func TestExecutionCoordinator_RuntimeInitPathResolution(t *testing.T) {
 		t.Fatalf("Expected command result, got: %v", result)
 	}
 
-	// CRITICAL: Runtime init path resolution should NOT be called for unified logging
-	if fakeEnvManager.GetRuntimeInitPathCallCount() != 0 {
-		t.Errorf("Expected GetRuntimeInitPath NOT to be called for unified logging, got: %d", fakeEnvManager.GetRuntimeInitPathCallCount())
-	}
-
 	// Verify launch config uses joblet binary for unified logging
 	if fakeProcessManager.LaunchProcessCallCount() != 1 {
 		t.Errorf("Expected LaunchProcess to be called once, got: %d", fakeProcessManager.LaunchProcessCallCount())
 	}
 	_, launchConfig := fakeProcessManager.LaunchProcessArgsForCall(0)
-	if launchConfig.InitPath != "/opt/joblet/joblet" {
-		t.Errorf("Expected InitPath to be '/opt/joblet/joblet' for unified logging, got: %s", launchConfig.InitPath)
+	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
+		t.Errorf("Expected InitPath to be '/opt/joblet/bin/joblet' for unified logging, got: %s", launchConfig.InitPath)
 	}
 }
 
@@ -129,15 +124,10 @@ func TestExecutionCoordinator_NoRuntimeFallback(t *testing.T) {
 		t.Fatalf("Expected command result, got: %v", result)
 	}
 
-	// Verify runtime init path was NOT called for non-runtime jobs
-	if fakeEnvManager.GetRuntimeInitPathCallCount() != 0 {
-		t.Errorf("Expected GetRuntimeInitPath not to be called for non-runtime jobs, got: %d", fakeEnvManager.GetRuntimeInitPathCallCount())
-	}
-
 	// Verify launch config uses joblet binary for two-stage execution (not command path)
 	_, launchConfig := fakeProcessManager.LaunchProcessArgsForCall(0)
-	if launchConfig.InitPath != "/opt/joblet/joblet" {
-		t.Errorf("Expected InitPath to be '/opt/joblet/joblet' for two-stage execution, got: %s", launchConfig.InitPath)
+	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
+		t.Errorf("Expected InitPath to be '/opt/joblet/bin/joblet' for two-stage execution, got: %s", launchConfig.InitPath)
 	}
 }
 
@@ -190,19 +180,14 @@ func TestExecutionCoordinator_RuntimeJobsSucceedWithoutRuntimeResolution(t *test
 		t.Fatalf("Expected command result, got: %v", result)
 	}
 
-	// Verify runtime init path was NOT called (unified logging approach)
-	if fakeEnvManager.GetRuntimeInitPathCallCount() != 0 {
-		t.Errorf("Expected GetRuntimeInitPath NOT to be called for unified logging, got: %d", fakeEnvManager.GetRuntimeInitPathCallCount())
-	}
-
 	// Verify process was launched with joblet binary
 	if fakeProcessManager.LaunchProcessCallCount() != 1 {
 		t.Errorf("Expected LaunchProcess to be called once, got: %d", fakeProcessManager.LaunchProcessCallCount())
 	}
 
 	_, launchConfig := fakeProcessManager.LaunchProcessArgsForCall(0)
-	if launchConfig.InitPath != "/opt/joblet/joblet" {
-		t.Errorf("Expected InitPath to be '/opt/joblet/joblet' for unified logging, got: %s", launchConfig.InitPath)
+	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
+		t.Errorf("Expected InitPath to be '/opt/joblet/bin/joblet' for unified logging, got: %s", launchConfig.InitPath)
 	}
 }
 

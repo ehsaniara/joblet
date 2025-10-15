@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
@@ -46,60 +45,6 @@ func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 	pbJob.ScheduledTime = job.FormattedScheduledTime() // Use job's formatting method
 
 	return pbJob
-}
-
-// ProtobufToDomain converts protobuf Job to domain Job
-func (m *JobMapper) ProtobufToDomain(pbJob *pb.Job) (*domain.Job, error) {
-	// Create resource limits with simple approach
-	limits := domain.NewResourceLimitsFromParams(
-		pbJob.MaxCPU,
-		pbJob.CpuCores,
-		pbJob.MaxMemory,
-		int64(pbJob.MaxIOBPS),
-	)
-
-	job := &domain.Job{
-		Uuid:              pbJob.Uuid,
-		Name:              pbJob.Name, // Include job name
-		Command:           pbJob.Command,
-		Args:              pbJob.Args,
-		Limits:            *limits,
-		Status:            domain.JobStatus(pbJob.Status),
-		ExitCode:          pbJob.ExitCode,
-		Runtime:           pbJob.Runtime,
-		Environment:       pbJob.Environment,
-		SecretEnvironment: pbJob.SecretEnvironment,
-		CgroupPath:        "",                       // Not in protobuf
-		Pid:               0,                        // Not in protobuf
-		GPUIndices:        pbJob.GpuIndices,         // GPU allocation info
-		GPUCount:          pbJob.GpuCount,           // GPU requirements
-		GPUMemoryMB:       int64(pbJob.GpuMemoryMb), // GPU memory requirement
-		NodeId:            pbJob.NodeId,             // Unique identifier of the Joblet node
-	}
-
-	// Parse times
-	if pbJob.StartTime != "" {
-		startTime, err := parseTime(pbJob.StartTime)
-		if err == nil {
-			job.StartTime = startTime
-		}
-	}
-
-	if pbJob.EndTime != "" {
-		endTime, err := parseTime(pbJob.EndTime)
-		if err == nil {
-			job.EndTime = &endTime
-		}
-	}
-
-	if pbJob.ScheduledTime != "" {
-		scheduledTime, err := parseTime(pbJob.ScheduledTime)
-		if err == nil {
-			job.ScheduledTime = &scheduledTime
-		}
-	}
-
-	return job, nil
 }
 
 // DomainToRunJobResponse converts domain Job to RunJobResponse
@@ -265,9 +210,4 @@ func (m *JobMapper) StartJobRequestToProtobuf(req *interfaces.StartJobRequest) *
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 	}
-}
-
-// Helper to parse time strings
-func parseTime(timeStr string) (time.Time, error) {
-	return time.Parse("2006-01-02T15:04:05Z07:00", timeStr)
 }
