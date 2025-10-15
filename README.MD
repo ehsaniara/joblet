@@ -73,7 +73,6 @@ brew install rnx              # Installs RNX CLI
 scp user@joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
-
 #### Windows
 
 ```powershell
@@ -168,7 +167,8 @@ rnx job run --schedule="2025-12-25T00:00:00" maintenance.py
 
 ## 🎨 Web Administration Interface
 
-The Joblet Admin UI is available as a standalone package at [joblet-admin repository](https://github.com/ehsaniara/joblet-admin):
+The Joblet Admin UI is available as a standalone package
+at [joblet-admin repository](https://github.com/ehsaniara/joblet-admin):
 
 - **📊 System Monitoring**: Real-time CPU, memory, disk, and network metrics with visual dashboards
 - **🎮 Job Management**: Comprehensive job listing, filtering, control, and log streaming capabilities
@@ -177,6 +177,7 @@ The Joblet Admin UI is available as a standalone package at [joblet-admin reposi
 - **⚡ Direct gRPC**: Connects directly to Joblet server via gRPC
 
 To use the admin interface:
+
 ```bash
 # Clone the joblet-admin repository
 git clone https://github.com/ehsaniara/joblet-admin
@@ -222,7 +223,7 @@ npm run dev
 
 - **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)**
 - **[Joblet Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)**
-- **[Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server)**  
+- **[Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server)**
 
 **Developing a custom client?** Start with the [protocol definitions](https://github.com/ehsaniara/joblet-proto) to
 generate language-specific bindings.

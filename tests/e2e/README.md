@@ -29,6 +29,32 @@ team-configurable parameters.
 # ... etc
 ```
 
+## Local vs Remote Testing
+
+Tests can run **locally** (default) or against a **remote joblet instance**:
+
+```bash
+# Local testing (default) - No SSH needed, works in CI
+./run_tests.sh
+
+# Remote testing - Useful for integration testing across machines
+JOBLET_TEST_HOST=192.168.1.161 ./run_tests.sh
+
+# Run specific test remotely
+JOBLET_TEST_HOST=192.168.1.161 ./tests/11_metrics_gap_test.sh
+```
+
+**Environment Variables**:
+
+- `JOBLET_TEST_HOST` - Remote host to test (default: localhost)
+- `JOBLET_TEST_USER` - SSH user for remote host (default: $USER)
+- `JOBLET_TEST_USE_SSH` - Force SSH usage (auto-detected based on host)
+
+**Why Both Modes?**
+
+- **Local**: Fast iteration, works in CI, no SSH configuration needed
+- **Remote**: Test deployment, verify real-world behavior, integration testing
+
 ## Configuration
 
 Set environment variables to customize for your team:

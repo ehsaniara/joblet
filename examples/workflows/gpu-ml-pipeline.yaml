@@ -9,9 +9,9 @@ jobs:
   # Data preprocessing - CPU-only task
   data-preprocessing:
     command: "python3"
-    args: ["preprocess_data.py", "--input", "/data/raw", "--output", "/data/processed"]
+    args: [ "preprocess_data.py", "--input", "/data/raw", "--output", "/data/processed" ]
     runtime: "python-3.11-ml"
-    volumes: ["ml-data"]
+    volumes: [ "ml-data" ]
     resources:
       max_memory: 4096      # 4GB RAM for data processing
       max_cpu: 200          # 200% CPU (2 cores)
@@ -23,9 +23,9 @@ jobs:
   # Model training - GPU-accelerated
   gpu-model-training:
     command: "python3"
-    args: ["train_model.py", "--data", "/data/processed", "--output", "/models", "--epochs", "100"]
+    args: [ "train_model.py", "--data", "/data/processed", "--output", "/models", "--epochs", "100" ]
     runtime: "python-3.11-ml"
-    volumes: ["ml-data", "model-storage"]
+    volumes: [ "ml-data", "model-storage" ]
     requires:
       - data-preprocessing: "COMPLETED"
     resources:
@@ -43,9 +43,9 @@ jobs:
   # Model evaluation - GPU for inference
   model-evaluation:
     command: "python3"
-    args: ["evaluate_model.py", "--model", "/models/latest", "--test-data", "/data/test"]
+    args: [ "evaluate_model.py", "--model", "/models/latest", "--test-data", "/data/test" ]
     runtime: "python-3.11-ml"
-    volumes: ["ml-data", "model-storage"]
+    volumes: [ "ml-data", "model-storage" ]
     requires:
       - gpu-model-training: "COMPLETED"
     resources:
@@ -61,9 +61,9 @@ jobs:
   # Distributed training example - Multi-GPU
   distributed-training:
     command: "python3"
-    args: ["distributed_train.py", "--world-size", "2", "--data", "/data/processed"]
+    args: [ "distributed_train.py", "--world-size", "2", "--data", "/data/processed" ]
     runtime: "python-3.11-ml"
-    volumes: ["ml-data", "model-storage"]
+    volumes: [ "ml-data", "model-storage" ]
     requires:
       - data-preprocessing: "COMPLETED"
     resources:

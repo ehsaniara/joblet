@@ -3,13 +3,14 @@ package upload
 import (
 	"context"
 	"fmt"
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
-	"github.com/ehsaniara/joblet/pkg/logger"
-	"github.com/ehsaniara/joblet/pkg/platform"
 	"os"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // Constants for upload streaming

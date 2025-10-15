@@ -100,62 +100,6 @@ func TestUUIDGeneratorPerformance(t *testing.T) {
 	t.Logf("Generated %d UUIDs in %v (avg: %v per UUID)", iterations, duration, avgTime)
 }
 
-func TestSequentialIDGenerator(t *testing.T) {
-	generator := NewSequentialIDGenerator("", "")
-
-	// Should generate sequential numbers
-	id1 := generator.Next()
-	id2 := generator.Next()
-	id3 := generator.Next()
-
-	if id1 != "1" || id2 != "2" || id3 != "3" {
-		t.Errorf("Expected sequential IDs 1,2,3 but got %s,%s,%s", id1, id2, id3)
-	}
-}
-
-func TestUUIDGeneratorModeSwitch(t *testing.T) {
-	generator := NewUUIDGenerator("", "")
-
-	// Should start in UUID mode
-	if !generator.IsUUIDMode() {
-		t.Error("Expected generator to start in UUID mode")
-	}
-
-	uuid := generator.Next()
-	uuidRegex := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	if !uuidRegex.MatchString(uuid) {
-		t.Errorf("Expected UUID format, got: %s", uuid)
-	}
-
-	// Switch to sequential mode
-	generator.SetUUIDMode(false)
-	if generator.IsUUIDMode() {
-		t.Error("Expected generator to be in sequential mode after SetUUIDMode(false)")
-	}
-
-	// Reset counter and test sequential
-	generator.Reset()
-	seqID := generator.Next()
-	if seqID != "1" {
-		t.Errorf("Expected sequential ID '1', got '%s'", seqID)
-	}
-}
-
-func TestBackwardCompatibility(t *testing.T) {
-	// Test that legacy NewIDGenerator still works
-	generator := NewIDGenerator("test", "node1")
-
-	// Should be in sequential mode for backward compatibility
-	if generator.IsUUIDMode() {
-		t.Error("Legacy NewIDGenerator should start in sequential mode")
-	}
-
-	id := generator.Next()
-	if id != "1" {
-		t.Errorf("Expected sequential ID '1', got '%s'", id)
-	}
-}
-
 func TestGeneratorCleanup(t *testing.T) {
 	generator := NewUUIDGenerator("", "")
 
@@ -171,15 +115,6 @@ func TestGeneratorCleanup(t *testing.T) {
 
 func BenchmarkUUIDGeneration(b *testing.B) {
 	generator := NewUUIDGenerator("", "")
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		generator.Next()
-	}
-}
-
-func BenchmarkSequentialGeneration(b *testing.B) {
-	generator := NewSequentialIDGenerator("", "")
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

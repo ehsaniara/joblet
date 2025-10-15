@@ -114,7 +114,9 @@ The jobs ran nearly 4x faster, just by fixing log I/O. That's the power of decou
 
 ### Streaming Completeness - The Drain Mode Fix (v5.0.0)
 
-Early in production, we discovered a subtle race condition in real-time log streaming. When a job completed, final log lines were sometimes missing from the live stream - appearing only when querying historical logs. The issue affected the last 3-4 lines of output, which often contained critical information like final results or error messages.
+Early in production, we discovered a subtle race condition in real-time log streaming. When a job completed, final log
+lines were sometimes missing from the live stream - appearing only when querying historical logs. The issue affected the
+last 3-4 lines of output, which often contained critical information like final results or error messages.
 
 The root cause was a timing issue between job completion and log delivery:
 
@@ -134,16 +136,20 @@ When COMPLETED event received:
 ```
 
 This ensures that:
+
 - All final logs are delivered before stream termination
 - No logs are lost due to async pub-sub delivery timing
 - Clients receive complete output even for short-lived jobs
 
 The fix also addressed related issues:
-- **Pubsub blocking**: Changed from non-blocking send (which silently dropped messages) to blocking send with 100ms timeout
+
+- **Pubsub blocking**: Changed from non-blocking send (which silently dropped messages) to blocking send with 100ms
+  timeout
 - **Immediate cleanup**: Removed force-cancellation of subscriptions on job completion
 - **UUID filtering**: Fixed subscription filtering to use full UUIDs instead of prefixes
 
-The same drain mode pattern was applied to metrics streaming, ensuring final metrics samples are captured even after the collector stops.
+The same drain mode pattern was applied to metrics streaming, ensuring final metrics samples are captured even after the
+collector stops.
 
 ## Learn More
 

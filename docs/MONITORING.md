@@ -148,12 +148,13 @@ Displays comprehensive **remote server** status including all server resources a
 **Enhanced Display (v4.7.2+):**
 
 The status command now includes:
+
 1. **Joblet Server Version Information** - Shows version, git tag, commit, build date, Go version
 2. **Network Interface Details** - Each interface displays:
-   - IP address (intelligently mapped to interfaces)
-   - MAC address (hardware address)
-   - RX/TX statistics with real-time rates
-   - Packet counts and error tracking
+    - IP address (intelligently mapped to interfaces)
+    - MAC address (hardware address)
+    - RX/TX statistics with real-time rates
+    - Packet counts and error tracking
 
 **Usage:**
 
@@ -279,6 +280,7 @@ rnx monitor watch --json --interval=10       # JSON server streaming
 
 **NetworkCollector Implementation:**
 The monitoring system uses a dedicated NetworkCollector that:
+
 - Reads interface statistics from `/proc/net/dev` for bandwidth metrics
 - Retrieves actual IP addresses and MAC addresses directly from each interface using Go's `net` package
 - Calculates real-time throughput metrics

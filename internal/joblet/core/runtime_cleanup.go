@@ -4,11 +4,12 @@ package core
 
 import (
 	"fmt"
-	"github.com/ehsaniara/joblet/pkg/logger"
-	"github.com/ehsaniara/joblet/pkg/platform"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 // RuntimeCleanup handles post-installation cleanup of runtimes to ensure

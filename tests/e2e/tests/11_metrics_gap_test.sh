@@ -2,13 +2,26 @@
 # Test: Metrics streaming with no gaps (persist → live transition)
 # This tests that the metrics buffer prevents gaps when transitioning from
 # historical (persist) to live streaming
+#
+# Environment Variables (optional):
+#   JOBLET_TEST_HOST - Remote joblet host to test (default: localhost)
+#   JOBLET_TEST_USER - SSH user for remote host (default: current user)
+#
+# Examples:
+#   ./11_metrics_gap_test.sh                                    # Test locally
+#   JOBLET_TEST_HOST=192.168.1.161 ./11_metrics_gap_test.sh   # Test remote host
 
 # Source test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration
-REMOTE_HOST="192.168.1.161"
-REMOTE_USER="jay"
+# Remote host configuration (consistent with other tests)
+REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
+REMOTE_USER="${REMOTE_USER:-jay}"
+
+# Set JOBLET_TEST_HOST for test framework's run_rnx_command to work
+export JOBLET_TEST_HOST="$REMOTE_HOST"
+export JOBLET_TEST_USER="$REMOTE_USER"
+export JOBLET_TEST_USE_SSH="true"
 
 # Test configuration
 # Note: Metrics collection is automatic, no interval flag needed
@@ -17,10 +30,12 @@ REMOTE_USER="jay"
 # Helper Functions
 # ============================================
 
-# Run command on remote host via SSH
+# Run command on remote host via SSH (for host-level verification)
 run_ssh_command() {
     local command="$1"
-    ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+    local timeout="${2:-10}"
+
+    timeout "$timeout" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
         "$REMOTE_USER@$REMOTE_HOST" "$command" 2>/dev/null || echo "SSH_FAILED"
 }
 
@@ -28,10 +43,8 @@ run_ssh_command() {
 start_metrics_job() {
     local duration="$1"
 
-    # Use timeout to get job ID then let it run in background
-    # The command outputs job ID immediately, then waits - we only need the ID
-    local output=$(timeout 2 ssh "$REMOTE_USER@$REMOTE_HOST" \
-        "rnx job run 'for i in \$(seq 1 $duration); do echo \"Iteration \$i\"; sleep 1; done' 2>&1" || true)
+    # Run job and extract ID (job runs in background on server)
+    local output=$(run_rnx_command "job run 'for i in \$(seq 1 $duration); do echo \"Iteration \$i\"; sleep 1; done'" 2>&1)
 
     echo "$output" | grep "ID:" | awk '{print $2}' | head -1
 }
@@ -39,10 +52,12 @@ start_metrics_job() {
 # Get metrics for a job
 get_metrics() {
     local job_id="$1"
-    local timeout="${2:-10}"
+    local timeout_duration="${2:-10}"
 
-    ssh "$REMOTE_USER@$REMOTE_HOST" \
-        "timeout $timeout rnx job metrics '$job_id' 2>&1" || true
+    # Use timeout on the entire SSH command, not on the function
+    (
+        timeout "$timeout_duration" bash -c "$(declare -f run_rnx_command); run_rnx_command \"job metrics '$job_id'\"" 2>&1 || true
+    )
 }
 
 # Count metrics samples in output

@@ -1,9 +1,10 @@
 package mappers
 
 import (
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"testing"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 func TestDomainToProtobuf(t *testing.T) {

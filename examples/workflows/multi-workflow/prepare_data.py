@@ -8,7 +8,7 @@ import os
 
 def main():
     print("Starting ML data preparation...")
-    
+
     # Create sample ML dataset
     dataset = {
         "features": [
@@ -25,14 +25,15 @@ def main():
             "preparation_timestamp": "2025-08-11T18:00:00Z"
         }
     }
-    
+
     # Write prepared data
     os.makedirs("ml_data", exist_ok=True)
     with open("ml_data/prepared_dataset.json", "w") as f:
         json.dump(dataset, f, indent=2)
-    
+
     print(f"Prepared {len(dataset['features'])} samples")
     print("Data preparation completed successfully!")
+
 
 if __name__ == "__main__":
     main()

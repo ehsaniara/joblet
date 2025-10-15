@@ -6,10 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
-	"github.com/ehsaniara/joblet/pkg/config"
-	"github.com/ehsaniara/joblet/pkg/platform"
 	"io"
 	"os"
 	"os/exec"
@@ -18,6 +14,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"github.com/ehsaniara/joblet/pkg/logger"
 )

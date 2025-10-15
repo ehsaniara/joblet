@@ -8,8 +8,6 @@ import (
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 // Manager defines the interface for network management operations
-//
-//counterfeiter:generate . Manager
 type Manager interface {
 	// Core network operations
 	CreateNetwork(name string, config *NetworkConfig) error
@@ -41,8 +39,6 @@ type Manager interface {
 
 // Validator defines interface for network validation
 // Kept minimal - only essential validation methods
-//
-//counterfeiter:generate . Validator
 type Validator interface {
 	ValidateNetworkName(name string) error
 	ValidateCIDR(cidr string) error
@@ -52,8 +48,6 @@ type Validator interface {
 
 // Monitor defines interface for network monitoring
 // Optional component - can be nil if monitoring not needed
-//
-//counterfeiter:generate . Monitor
 type Monitor interface {
 	StartMonitoring(ctx context.Context) error
 	StopMonitoring() error
@@ -63,8 +57,6 @@ type Monitor interface {
 }
 
 // IPPool defines interface for IP address pool management
-//
-//counterfeiter:generate . IPPool
 type IPPool interface {
 	AllocateIP(networkName string) (net.IP, error)
 	ReleaseIP(networkName string, ip net.IP) error
@@ -74,8 +66,6 @@ type IPPool interface {
 }
 
 // Setup defines interface for network infrastructure operations
-//
-//counterfeiter:generate . Setup
 type Setup interface {
 	CreateBridge(bridgeName, cidr string) error
 	DeleteBridge(bridgeName string) error
@@ -88,11 +78,7 @@ type Setup interface {
 }
 
 // DNS defines interface for DNS operations
-//
-//counterfeiter:generate . DNS
 type DNS interface {
 	SetupDNS(jobID, hostname string, ip net.IP) error
 	CleanupDNS(jobID string) error
-	ResolveName(hostname string) (net.IP, error)
-	GetHostname(ip net.IP) (string, error)
 }

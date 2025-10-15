@@ -5,14 +5,15 @@ package jobexec
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
-	"os"
-	"path/filepath"
 )
 
 // JobExecutor handles job execution in init mode with consolidated environment handling

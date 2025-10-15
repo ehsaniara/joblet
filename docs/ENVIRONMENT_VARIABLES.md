@@ -1,6 +1,7 @@
 # Environment Variables
 
-Joblet provides comprehensive support for environment variables in both CLI jobs and workflow-based jobs. Environment variables allow you to pass configuration, secrets, and runtime parameters to your jobs in a secure and flexible manner.
+Joblet provides comprehensive support for environment variables in both CLI jobs and workflow-based jobs. Environment
+variables allow you to pass configuration, secrets, and runtime parameters to your jobs in a secure and flexible manner.
 
 ## Table of Contents
 
@@ -122,13 +123,13 @@ jobs:
 
 Variables matching these patterns are automatically treated as secrets:
 
-| Pattern | Example | Description |
-|---------|---------|-------------|
-| `SECRET_*` | `SECRET_DATABASE_PASSWORD` | Prefix: SECRET_ |
-| `*_TOKEN` | `GITHUB_TOKEN`, `AUTH_TOKEN` | Suffix: _TOKEN |
-| `*_KEY` | `API_KEY`, `ENCRYPTION_KEY` | Suffix: _KEY |
+| Pattern      | Example                               | Description       |
+|--------------|---------------------------------------|-------------------|
+| `SECRET_*`   | `SECRET_DATABASE_PASSWORD`            | Prefix: SECRET_   |
+| `*_TOKEN`    | `GITHUB_TOKEN`, `AUTH_TOKEN`          | Suffix: _TOKEN    |
+| `*_KEY`      | `API_KEY`, `ENCRYPTION_KEY`           | Suffix: _KEY      |
 | `*_PASSWORD` | `DATABASE_PASSWORD`, `ADMIN_PASSWORD` | Suffix: _PASSWORD |
-| `*_SECRET` | `OAUTH_SECRET`, `JWT_SECRET` | Suffix: _SECRET |
+| `*_SECRET`   | `OAUTH_SECRET`, `JWT_SECRET`          | Suffix: _SECRET   |
 
 ### Examples
 
@@ -152,6 +153,7 @@ environment:
 ### Secret Masking
 
 Secrets are automatically masked in:
+
 - Job status output (`***`)
 - Log output (redacted)
 - gRPC responses (masked)
@@ -173,12 +175,14 @@ Environment: 5 variables set
 ### Security Best Practices
 
 ✅ **DO**:
+
 - Use naming conventions for secrets (`SECRET_*`, `*_KEY`, `*_PASSWORD`, `*_TOKEN`, `*_SECRET`)
 - Keep secret values in external secret management systems
 - Rotate secrets regularly
 - Use different secrets per environment
 
 ❌ **DON'T**:
+
 - Commit secrets to version control
 - Use predictable secret values
 - Share secrets in plain text
@@ -189,12 +193,14 @@ Environment: 5 variables set
 Joblet validates environment variables for:
 
 ### Name Validation
+
 - Format: `^[A-Z][A-Z0-9_]*$`
 - Must start with uppercase letter
 - Can contain uppercase letters, numbers, and underscores
 - Maximum length: 256 characters
 
 ### Value Validation
+
 - Maximum size: 32KB per variable
 - No null bytes allowed
 - UTF-8 encoding required
@@ -212,6 +218,7 @@ jobs:
 ### Reserved Variables
 
 Warning issued for system variables:
+
 - `PATH`, `HOME`, `USER`, `SHELL`
 - `PWD`, `OLDPWD`, `LANG`
 - `LC_*` variables

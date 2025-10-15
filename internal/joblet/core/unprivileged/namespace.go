@@ -3,10 +3,11 @@
 package unprivileged
 
 import (
+	"syscall"
+
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
-	"syscall"
 )
 
 type JobIsolation struct {

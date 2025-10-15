@@ -1,11 +1,12 @@
 package platform
 
 import (
-	"github.com/ehsaniara/joblet/pkg/logger"
 	"io"
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // BasePlatform provides common functionality shared across platforms

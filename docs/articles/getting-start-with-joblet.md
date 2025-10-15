@@ -179,7 +179,8 @@ rnx job run echo "Hello from macOS client!"
 
 ## Part 3: Running the Admin UI
 
-The Admin UI provides a beautiful web interface for managing jobs, viewing logs, and monitoring your Joblet cluster. It's now available as a standalone package that connects directly to the Joblet server via gRPC.
+The Admin UI provides a beautiful web interface for managing jobs, viewing logs, and monitoring your Joblet cluster.
+It's now available as a standalone package that connects directly to the Joblet server via gRPC.
 
 ### Prerequisites
 
@@ -209,7 +210,8 @@ npm run dev
 # The UI will be available at http://localhost:3000
 ```
 
-**Note**: The Admin UI connects directly to the Joblet server via gRPC using the protobuf definitions from [joblet-proto](https://github.com/ehsaniara/joblet-proto).
+**Note**: The Admin UI connects directly to the Joblet server via gRPC using the protobuf definitions
+from [joblet-proto](https://github.com/ehsaniara/joblet-proto).
 
 ### Admin UI Features
 

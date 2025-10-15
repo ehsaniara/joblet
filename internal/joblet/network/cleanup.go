@@ -2,11 +2,12 @@ package network
 
 import (
 	"fmt"
-	"github.com/ehsaniara/joblet/pkg/logger"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // NetworkCleaner handles cleanup of orphaned network resources

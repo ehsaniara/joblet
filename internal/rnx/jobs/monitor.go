@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"strings"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 

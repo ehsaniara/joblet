@@ -19,28 +19,28 @@
 ### Key Design Decisions Made
 
 1. **Simplified Configuration**: Reduced from complex nested structure to 4 simple fields:
-   - `enabled` (bool)
-   - `default_sample_rate` (duration)
-   - `storage_dir` (string)
-   - `retention_days` (int)
+    - `enabled` (bool)
+    - `default_sample_rate` (duration)
+    - `storage_dir` (string)
+    - `retention_days` (int)
 
 2. **Storage Format**: JSONL with gzip compression
-   - Provides good compression (~10x) while remaining human-readable
-   - One job metrics file per job: `/opt/joblet/metrics/<uuid>/<timestamp>.jsonl.gz`
+    - Provides good compression (~10x) while remaining human-readable
+    - One job metrics file per job: `/opt/joblet/metrics/<uuid>/<timestamp>.jsonl.gz`
 
 3. **Historical + Live Streaming**: Metrics stream serves historical data first, then live data
-   - Users can replay complete job timeline automatically
-   - For completed jobs: shows all metrics then exits
-   - For running jobs: shows historical metrics then continues streaming live until completion
+    - Users can replay complete job timeline automatically
+    - For completed jobs: shows all metrics then exits
+    - For running jobs: shows historical metrics then continues streaming live until completion
 
 4. **No Pub/Sub for Storage**: Metrics are written directly to disk, pub/sub is optional
-   - Simplifies architecture
-   - Reduces memory overhead
-   - Pub/sub used only for live-streaming to clients
+    - Simplifies architecture
+    - Reduces memory overhead
+    - Pub/sub used only for live-streaming to clients
 
 5. **UUID Resolution**: Disk reader resolves short UUIDs by scanning metrics directory
-   - Allows viewing metrics for completed jobs no longer in memory
-   - Fallback when job store lookup fails
+    - Allows viewing metrics for completed jobs no longer in memory
+    - Fallback when job store lookup fails
 
 ## Context
 
@@ -135,9 +135,10 @@ Historical: Disk Files → Reader → Deserialize → Filter → Response
 Live:       Topic → Stream Subscriber → Filter → Stream Response
 ```
 
-### Configuration Design 
+### Configuration Design
 
 this or similar
+
 ```yaml
 metrics:
   # Global settings

@@ -3,14 +3,15 @@ package resource
 import (
 	"context"
 	"fmt"
-	"github.com/ehsaniara/joblet/pkg/config"
-	"github.com/ehsaniara/joblet/pkg/logger"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -57,7 +58,6 @@ func (c *cgroup) EnsureControllers() error {
 	return nil
 }
 
-//counterfeiter:generate . Resource
 type Resource interface {
 	Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error
 	SetIOLimit(cgroupPath string, ioBPS int) error

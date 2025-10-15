@@ -9,7 +9,7 @@ import sys
 
 def main():
     print("Starting data extraction...")
-    
+
     # Create sample data
     data = {
         "records": [
@@ -20,15 +20,16 @@ def main():
         "timestamp": "2025-08-11T17:45:00Z",
         "source": "joblet-demo"
     }
-    
+
     # Write to shared volume
     volume_path = "/volumes/data-pipeline"
     os.makedirs(volume_path, exist_ok=True)
     with open(f"{volume_path}/raw_data.json", "w") as f:
         json.dump(data, f, indent=2)
-    
+
     print(f"Extracted {len(data['records'])} records to {volume_path}/raw_data.json")
     print("Data extraction completed successfully!")
+
 
 if __name__ == "__main__":
     main()

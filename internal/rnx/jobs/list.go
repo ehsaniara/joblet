@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	pb "github.com/ehsaniara/joblet-proto/v2/gen"
-	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"os"
 	"strings"
 	"time"
+
+	pb "github.com/ehsaniara/joblet-proto/v2/gen"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 
 	"github.com/spf13/cobra"
 )

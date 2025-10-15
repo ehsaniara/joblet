@@ -22,10 +22,22 @@ export JOBLET_ROOT="${JOBLET_ROOT:-/home/jay/joblet/joblet}"
 export RNX_BINARY="${RNX_BINARY:-$JOBLET_ROOT/bin/rnx}"
 export TESTS_DIR="$JOBLET_ROOT/tests/e2e"
 
-# Runtime configuration  
+# Runtime configuration
 export DEFAULT_RUNTIME="openjdk-21"
 export RUNTIME_TIMEOUT=60
 export JOB_TIMEOUT=15
+
+# Remote host configuration (for e2e tests that need remote joblet)
+# Set these environment variables to test against a remote joblet instance
+# If not set, tests will use local joblet instance without SSH
+export JOBLET_TEST_HOST="${JOBLET_TEST_HOST:-}"
+export JOBLET_TEST_USER="${JOBLET_TEST_USER:-$USER}"
+export JOBLET_TEST_USE_SSH="${JOBLET_TEST_USE_SSH:-false}"
+
+# Auto-detect SSH requirement based on host
+if [[ -n "$JOBLET_TEST_HOST" && "$JOBLET_TEST_HOST" != "localhost" && "$JOBLET_TEST_HOST" != "127.0.0.1" ]]; then
+    JOBLET_TEST_USE_SSH="true"
+fi
 
 # ============================================
 # Core Test Functions
@@ -308,9 +320,53 @@ check_prerequisites() {
 cleanup_test_artifacts() {
     # Remove temporary test files
     rm -f /tmp/test_*.txt /tmp/test_*.yaml /tmp/test_*.log 2>/dev/null
-    
+
     # Clean up test jobs if needed
     # Note: Add job cleanup logic here if needed
+}
+
+# ============================================
+# Remote Execution Helpers
+# ============================================
+
+# Execute command on remote host via SSH or locally
+# Usage: run_remote_command "command" [timeout]
+run_remote_command() {
+    local command="$1"
+    local timeout="${2:-10}"
+
+    if [[ "$JOBLET_TEST_USE_SSH" == "true" ]]; then
+        # Remote execution via SSH
+        timeout "$timeout" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+            "$JOBLET_TEST_USER@$JOBLET_TEST_HOST" "$command" 2>/dev/null || echo "SSH_FAILED"
+    else
+        # Local execution
+        timeout "$timeout" bash -c "$command" 2>/dev/null || true
+    fi
+}
+
+# Execute RNX command (remote or local)
+# Usage: run_rnx_command "job run echo test"
+run_rnx_command() {
+    local rnx_args="$1"
+
+    if [[ "$JOBLET_TEST_USE_SSH" == "true" ]]; then
+        # Remote RNX via SSH
+        ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+            "$JOBLET_TEST_USER@$JOBLET_TEST_HOST" "rnx $rnx_args" 2>&1 || true
+    else
+        # Local RNX
+        "$RNX_BINARY" $rnx_args 2>&1 || true
+    fi
+}
+
+# Get test host display name for logging
+get_test_host_display() {
+    if [[ "$JOBLET_TEST_USE_SSH" == "true" ]]; then
+        echo "$JOBLET_TEST_HOST"
+    else
+        echo "localhost"
+    fi
 }
 
 # Export all functions
@@ -319,3 +375,4 @@ export -f assert_equals assert_contains assert_numeric_le assert_file_exists
 export -f run_job run_python_job get_job_logs get_clean_output check_job_status
 export -f runtime_exists ensure_runtime get_runtime_info
 export -f test_suite_summary check_prerequisites cleanup_test_artifacts
+export -f run_remote_command run_rnx_command get_test_host_display

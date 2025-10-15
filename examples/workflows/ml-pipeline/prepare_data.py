@@ -8,7 +8,7 @@ import os
 
 def main():
     print("Starting ML data preparation...")
-    
+
     # Create sample ML dataset
     dataset = {
         "features": [
@@ -25,15 +25,16 @@ def main():
             "preparation_timestamp": "2025-08-11T18:00:00Z"
         }
     }
-    
+
     # Write prepared data to shared volume
     volume_path = "/volumes/ml-pipeline"
     os.makedirs(volume_path, exist_ok=True)
     with open(f"{volume_path}/prepared_dataset.json", "w") as f:
         json.dump(dataset, f, indent=2)
-    
+
     print(f"Prepared {len(dataset['features'])} samples")
     print("Data preparation completed successfully!")
+
 
 if __name__ == "__main__":
     main()

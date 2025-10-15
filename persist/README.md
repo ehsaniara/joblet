@@ -1,10 +1,12 @@
 # Joblet Persist
 
-Dedicated persistence service for the Joblet job execution platform. Handles all log and metrics storage, queries, and lifecycle management.
+Dedicated persistence service for the Joblet job execution platform. Handles all log and metrics storage, queries, and
+lifecycle management.
 
 ## Overview
 
-`joblet-persist` is a separate service that receives logs and metrics from `joblet-core` via Unix domain sockets (IPC) and provides:
+`joblet-persist` is a separate service that receives logs and metrics from `joblet-core` via Unix domain sockets (IPC)
+and provides:
 
 - **Persistent storage** - Local filesystem storage (v1.0) with cloud backends coming in v2.0+
 - **Historical queries** - gRPC API for querying stored logs and metrics
@@ -28,6 +30,7 @@ joblet-persist (storage)
 ## Features
 
 ### v1.0 (Current)
+
 - ✅ IPC server for receiving logs/metrics from joblet-core
 - ✅ Local filesystem storage with compression
 - ✅ File rotation and retention policies
@@ -36,6 +39,7 @@ joblet-persist (storage)
 - ✅ Batch writing for performance
 
 ### v2.0 (Planned)
+
 - [ ] CloudWatch Logs integration
 - [ ] S3 archival
 - [ ] Multi-backend routing
@@ -52,6 +56,7 @@ go build -o bin/joblet-persist ./cmd/joblet-persist
 See `config.example.yml` for a complete configuration example.
 
 Key configuration sections:
+
 - **server** - gRPC server settings
 - **ipc** - Unix socket configuration
 - **storage** - Backend configuration (local/cloudwatch/s3)
@@ -74,6 +79,7 @@ Key configuration sections:
 ### gRPC Services
 
 **PersistService** (port 50052 by default):
+
 - `QueryLogs` - Stream logs for a job
 - `QueryMetrics` - Stream metrics for a job
 - `GetJobInfo` - Get job metadata
@@ -110,6 +116,7 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 - **Health check**: `http://localhost:9093/health`
 
 Key metrics:
+
 - `persist_ipc_messages_received_total`
 - `persist_write_latency_seconds`
 - `persist_storage_bytes_total`
@@ -144,6 +151,7 @@ joblet-persist/
 3. Register in `storage.NewBackend()`
 
 Example:
+
 ```go
 type MyBackend struct { ... }
 

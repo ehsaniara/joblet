@@ -111,7 +111,6 @@ volumes:
 monitoring:
   enabled: true
   system_interval: "10s"
-  process_interval: "30s"
   cloud_detection: true
 
 # Runtime System Configuration
@@ -163,20 +162,3 @@ persist:
       metrics:
         directory: "/opt/joblet/metrics"   # Inherited from parent's metrics dir
         format: "jsonl.gz"                  # Gzip compressed JSON lines
-
-  # Writer configuration (required for validation, uses defaults)
-  writer:
-    buffer_size: 10485760      # 10MB
-    batch_size: 100
-    flush_interval: "1s"
-    workers: 4
-
-  # Query configuration (required for validation, uses defaults)
-  query:
-    cache:
-      enabled: true
-      max_size_mb: 500
-      ttl: "5m"
-    stream:
-      buffer_size: 1000
-      timeout: "30s"

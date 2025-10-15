@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"net"
+
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
@@ -15,7 +17,6 @@ import (
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
-	"net"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

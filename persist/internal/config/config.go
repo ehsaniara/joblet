@@ -10,12 +10,9 @@ import (
 
 // Config represents the complete joblet-persist configuration
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	IPC        IPCConfig        `yaml:"ipc"`
-	Storage    StorageConfig    `yaml:"storage"`
-	Writer     WriterConfig     `yaml:"writer"`
-	Query      QueryConfig      `yaml:"query"`
-	Monitoring MonitoringConfig `yaml:"monitoring"`
+	Server  ServerConfig  `yaml:"server"`
+	IPC     IPCConfig     `yaml:"ipc"`
+	Storage StorageConfig `yaml:"storage"`
 	// Note: Logging config is now read from the root level (shared with main joblet)
 }
 
@@ -97,52 +94,6 @@ type CompressionConfig struct {
 	Algorithm          string   `yaml:"algorithm"` // "gzip"
 	Level              int      `yaml:"level"`     // 1-9
 	CompressExtensions []string `yaml:"compress_extensions"`
-}
-
-// WriterConfig contains write pipeline settings
-type WriterConfig struct {
-	BufferSize    int    `yaml:"buffer_size"`
-	BatchSize     int    `yaml:"batch_size"`
-	FlushInterval string `yaml:"flush_interval"`
-	Workers       int    `yaml:"workers"`
-}
-
-// QueryConfig contains query engine settings
-type QueryConfig struct {
-	Cache  CacheConfig  `yaml:"cache"`
-	Stream StreamConfig `yaml:"stream"`
-}
-
-// CacheConfig contains query cache settings
-type CacheConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	MaxSizeMB int    `yaml:"max_size_mb"`
-	TTL       string `yaml:"ttl"`
-}
-
-// StreamConfig contains streaming settings
-type StreamConfig struct {
-	BufferSize int    `yaml:"buffer_size"`
-	Timeout    string `yaml:"timeout"`
-}
-
-// MonitoringConfig contains monitoring settings
-type MonitoringConfig struct {
-	Prometheus PrometheusConfig `yaml:"prometheus"`
-	Health     HealthConfig     `yaml:"health"`
-}
-
-// PrometheusConfig contains Prometheus metrics settings
-type PrometheusConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Port    int    `yaml:"port"`
-	Path    string `yaml:"path"`
-}
-
-// HealthConfig contains health check settings
-type HealthConfig struct {
-	Port int    `yaml:"port"`
-	Path string `yaml:"path"`
 }
 
 // LoggingConfig contains logging settings
@@ -293,34 +244,6 @@ func DefaultConfig() *Config {
 				CompressExtensions: []string{".log", ".jsonl"},
 			},
 		},
-		Writer: WriterConfig{
-			BufferSize:    10485760, // 10MB
-			BatchSize:     100,
-			FlushInterval: "1s",
-			Workers:       4,
-		},
-		Query: QueryConfig{
-			Cache: CacheConfig{
-				Enabled:   true,
-				MaxSizeMB: 500,
-				TTL:       "5m",
-			},
-			Stream: StreamConfig{
-				BufferSize: 1000,
-				Timeout:    "30s",
-			},
-		},
-		Monitoring: MonitoringConfig{
-			Prometheus: PrometheusConfig{
-				Enabled: true,
-				Port:    9092,
-				Path:    "/metrics",
-			},
-			Health: HealthConfig{
-				Port: 9093,
-				Path: "/health",
-			},
-		},
 		// Note: Logging config now comes from root level (shared with main joblet)
 	}
 }
@@ -339,21 +262,6 @@ func (c *Config) Validate() error {
 		if c.Storage.BaseDir == "" {
 			return fmt.Errorf("storage.base_dir is required for local storage")
 		}
-	}
-
-	// Validate durations
-	if _, err := time.ParseDuration(c.Writer.FlushInterval); err != nil {
-		return fmt.Errorf("invalid writer.flush_interval: %w", err)
-	}
-
-	if c.Query.Cache.Enabled {
-		if _, err := time.ParseDuration(c.Query.Cache.TTL); err != nil {
-			return fmt.Errorf("invalid query.cache.ttl: %w", err)
-		}
-	}
-
-	if _, err := time.ParseDuration(c.Query.Stream.Timeout); err != nil {
-		return fmt.Errorf("invalid query.stream.timeout: %w", err)
 	}
 
 	return nil

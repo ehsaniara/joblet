@@ -5,8 +5,9 @@ package workflow
 // AST-based parser that was unused.
 
 import (
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"strings"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 // SimpleExpressionEvaluator provides basic expression evaluation for job dependencies

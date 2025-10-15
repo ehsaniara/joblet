@@ -2,9 +2,10 @@ package server
 
 import (
 	"fmt"
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"testing"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 func TestSecretEnvironmentVariableMasking(t *testing.T) {

@@ -2,26 +2,26 @@
 import hashlib
 import json
 import logging
+import numpy as np
 import os
 import time
 from datetime import datetime
 from typing import Any, Dict, List
 
-import numpy as np
-
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 class VectorDatabase:
     """Simplified vector database simulation"""
-    
+
     def __init__(self, embedding_dim=384):
         self.embedding_dim = embedding_dim
         self.documents = {}
         self.embeddings = {}
         self.index = {}
-        
+
     def add_document(self, doc_id: str, content: str, metadata: Dict = None):
         """Add document to the database"""
         self.documents[doc_id] = {
@@ -29,44 +29,44 @@ class VectorDatabase:
             'metadata': metadata or {},
             'created_at': datetime.now().isoformat()
         }
-        
+
         # Generate simulated embedding
         embedding = self._generate_embedding(content)
         self.embeddings[doc_id] = embedding
-        
+
         logger.info(f"Added document {doc_id} to vector database")
-    
+
     def _generate_embedding(self, text: str) -> np.ndarray:
         """Generate simulated embedding for text"""
         # Simple hash-based embedding simulation
         hash_obj = hashlib.md5(text.encode())
         hash_bytes = hash_obj.digest()
-        
+
         # Convert to float array and normalize
-        embedding = np.frombuffer(hash_bytes[:self.embedding_dim//8], dtype=np.uint8)
+        embedding = np.frombuffer(hash_bytes[:self.embedding_dim // 8], dtype=np.uint8)
         embedding = embedding.astype(np.float32)
         embedding = embedding / np.linalg.norm(embedding)
-        
+
         # Pad to desired dimension
         if len(embedding) < self.embedding_dim:
             padding = np.random.normal(0, 0.1, self.embedding_dim - len(embedding))
             embedding = np.concatenate([embedding, padding])
-        
+
         return embedding[:self.embedding_dim]
-    
+
     def search(self, query: str, top_k: int = 5) -> List[Dict]:
         """Search for similar documents"""
         query_embedding = self._generate_embedding(query)
-        
+
         # Calculate similarities
         similarities = {}
         for doc_id, doc_embedding in self.embeddings.items():
             similarity = np.dot(query_embedding, doc_embedding)
             similarities[doc_id] = similarity
-        
+
         # Sort by similarity
         sorted_docs = sorted(similarities.items(), key=lambda x: x[1], reverse=True)
-        
+
         # Return top-k results
         results = []
         for doc_id, similarity in sorted_docs[:top_k]:
@@ -76,24 +76,25 @@ class VectorDatabase:
                 'content': self.documents[doc_id]['content'],
                 'metadata': self.documents[doc_id]['metadata']
             })
-        
+
         return results
+
 
 class RAGSystem:
     """Retrieval-Augmented Generation System"""
-    
+
     def __init__(self, config):
         self.config = config
         self.vector_db = VectorDatabase(embedding_dim=config.get('embedding_dim', 384))
         self.cache_dir = '/volumes/ai-cache'
         self.output_dir = '/volumes/ai-outputs'
         self.metrics_dir = '/volumes/ai-metrics'
-        
+
         # Create directories if volumes exist
         for dir_path in [self.cache_dir, self.output_dir, self.metrics_dir]:
             if os.path.exists('/volumes'):
                 os.makedirs(dir_path, exist_ok=True)
-        
+
         self.metrics = {
             'queries_processed': 0,
             'documents_retrieved': 0,
@@ -101,12 +102,12 @@ class RAGSystem:
             'total_response_time': 0,
             'start_time': datetime.now().isoformat()
         }
-        
+
         # Initialize with sample knowledge base
         self._initialize_knowledge_base()
-        
+
         logger.info("RAG System initialized")
-    
+
     def _initialize_knowledge_base(self):
         """Initialize with sample documents"""
         sample_documents = [
@@ -223,37 +224,37 @@ Implementation Considerations:
                 'metadata': {'category': 'agentic_ai', 'author': 'AI Architecture', 'date': '2024-02-15'}
             }
         ]
-        
+
         for doc in sample_documents:
             self.vector_db.add_document(doc['id'], doc['content'], doc['metadata'])
-        
+
         logger.info(f"Initialized knowledge base with {len(sample_documents)} documents")
-    
+
     def retrieve_context(self, query: str, top_k: int = 3) -> List[Dict]:
         """Retrieve relevant context for query"""
         logger.info(f"Retrieving context for query: {query[:50]}...")
-        
+
         start_time = time.time()
         results = self.vector_db.search(query, top_k=top_k)
         retrieval_time = time.time() - start_time
-        
+
         self.metrics['documents_retrieved'] += len(results)
-        
+
         logger.info(f"Retrieved {len(results)} documents in {retrieval_time:.3f}s")
-        
+
         return results
-    
+
     def generate_response(self, query: str, context: List[Dict]) -> Dict:
         """Generate response using retrieved context"""
         logger.info("Generating response with retrieved context...")
-        
+
         # Simulate LLM generation
         time.sleep(1.5)  # Simulate generation time
-        
+
         # Extract relevant information from context
         context_snippets = []
         sources = []
-        
+
         for doc in context:
             # Extract relevant sentences (simplified)
             sentences = doc['content'].split('.')[:3]  # Take first 3 sentences
@@ -263,7 +264,7 @@ Implementation Considerations:
                 'similarity': doc['similarity'],
                 'metadata': doc['metadata']
             })
-        
+
         # Generate contextual response
         if "deployment" in query.lower():
             response_text = f"""Based on the retrieved documentation, here are key considerations for ML model deployment:
@@ -343,7 +344,6 @@ The retrieved documents provide detailed information about AI/ML best practices,
 
 For more specific guidance, please refine your query to focus on particular aspects like deployment, ethics, or technical implementation."""
 
-        
         return {
             'query': query,
             'response': response_text,
@@ -351,44 +351,44 @@ For more specific guidance, please refine your query to focus on particular aspe
             'context_used': len(context),
             'generated_at': datetime.now().isoformat()
         }
-    
+
     def query(self, query: str, top_k: int = 3) -> Dict:
         """Process complete RAG query"""
         start_time = time.time()
-        
+
         # Check cache first
         cache_key = hashlib.md5(f"{query}:{top_k}".encode()).hexdigest()
         cached_response = self._get_cached_response(cache_key)
         if cached_response:
             self.metrics['cache_hits'] += 1
             return cached_response
-        
+
         # Retrieve relevant context
         context = self.retrieve_context(query, top_k)
-        
+
         # Generate response
         response = self.generate_response(query, context)
-        
+
         # Add metadata
         response['processing_time'] = time.time() - start_time
         response['cache_key'] = cache_key
-        
+
         # Cache response
         self._cache_response(cache_key, response)
-        
+
         # Update metrics
         self.metrics['queries_processed'] += 1
         self.metrics['total_response_time'] += response['processing_time']
-        
+
         logger.info(f"Query processed in {response['processing_time']:.2f}s")
-        
+
         return response
-    
+
     def _get_cached_response(self, cache_key: str) -> Dict:
         """Get cached response if available"""
         if not os.path.exists(self.cache_dir):
             return None
-            
+
         cache_file = os.path.join(self.cache_dir, f"rag_{cache_key}.json")
         if os.path.exists(cache_file):
             with open(cache_file, 'r') as f:
@@ -396,18 +396,18 @@ For more specific guidance, please refine your query to focus on particular aspe
                 logger.info(f"Cache hit for query")
                 return cached
         return None
-    
+
     def _cache_response(self, cache_key: str, response: Dict):
         """Cache response for future use"""
         if os.path.exists(self.cache_dir):
             cache_file = os.path.join(self.cache_dir, f"rag_{cache_key}.json")
             with open(cache_file, 'w') as f:
                 json.dump(response, f, indent=2)
-    
+
     def run_demo(self):
         """Run RAG system demonstration"""
         logger.info("Starting RAG System Demo")
-        
+
         # Sample queries for demonstration
         demo_queries = [
             "How should I deploy machine learning models in production?",
@@ -417,16 +417,16 @@ For more specific guidance, please refine your query to focus on particular aspe
             "How do I build an agentic AI system?",
             "What monitoring should I implement for ML models?"
         ]
-        
+
         results = []
         for query in demo_queries:
             logger.info(f"Processing query: {query}")
             result = self.query(query)
             results.append(result)
-            
+
             # Brief pause between queries
             time.sleep(0.5)
-        
+
         # Save results
         demo_results = {
             'demo_id': f"rag_demo_{int(time.time())}",
@@ -435,36 +435,36 @@ For more specific guidance, please refine your query to focus on particular aspe
             'results': results,
             'system_metrics': self.metrics
         }
-        
+
         if os.path.exists(self.output_dir):
             output_file = os.path.join(self.output_dir, f'rag_demo_results_{int(time.time())}.json')
             with open(output_file, 'w') as f:
                 json.dump(demo_results, f, indent=2)
             logger.info(f"Demo results saved to {output_file}")
-        
+
         # Save metrics
         if os.path.exists(self.metrics_dir):
             metrics_file = os.path.join(self.metrics_dir, f'rag_metrics_{int(time.time())}.json')
             with open(metrics_file, 'w') as f:
                 json.dump(self.metrics, f, indent=2)
-        
+
         # Display summary
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("RAG SYSTEM DEMO SUMMARY")
-        print("="*50)
+        print("=" * 50)
         print(f"Queries processed: {self.metrics['queries_processed']}")
         print(f"Documents retrieved: {self.metrics['documents_retrieved']}")
         print(f"Cache hits: {self.metrics['cache_hits']}")
-        
+
         if self.metrics['queries_processed'] > 0:
             avg_time = self.metrics['total_response_time'] / self.metrics['queries_processed']
             print(f"Average response time: {avg_time:.2f}s")
-            
+
             hit_ratio = self.metrics['cache_hits'] / self.metrics['queries_processed'] * 100
             print(f"Cache hit ratio: {hit_ratio:.1f}%")
-        
+
         print(f"Knowledge base size: {len(self.vector_db.documents)} documents")
-        
+
         # Show sample results
         print(f"\nSample Query Result:")
         if results:
@@ -472,8 +472,9 @@ For more specific guidance, please refine your query to focus on particular aspe
             print(f"Q: {sample['query']}")
             print(f"A: {sample['response'][:200]}...")
             print(f"Sources: {len(sample['sources'])} documents")
-        
+
         return demo_results
+
 
 if __name__ == "__main__":
     # Configuration for RAG system
@@ -486,9 +487,9 @@ if __name__ == "__main__":
             'max_results': 10
         }
     }
-    
+
     # Initialize and run RAG system
     rag_system = RAGSystem(config)
     results = rag_system.run_demo()
-    
+
     logger.info("RAG System demo completed successfully")

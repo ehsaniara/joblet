@@ -9,10 +9,10 @@ import time
 
 def main():
     print("Starting batch 3 processing...")
-    
+
     # Simulate processing time
     time.sleep(3)
-    
+
     # Process batch 3 data
     batch_data = {
         "batch_id": 3,
@@ -25,14 +25,15 @@ def main():
         "processing_time": 3.0,
         "status": "completed"
     }
-    
+
     # Write results
     os.makedirs("results", exist_ok=True)
     with open("results/batch3_results.json", "w") as f:
         json.dump(batch_data, f, indent=2)
-    
+
     print(f"Processed {len(batch_data['items'])} items in batch 3")
     print("Batch 3 processing completed successfully!")
+
 
 if __name__ == "__main__":
     main()

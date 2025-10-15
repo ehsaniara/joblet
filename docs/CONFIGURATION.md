@@ -57,7 +57,8 @@ server:
 
 **Key Features:**
 
-- **Automatic Generation**: During Joblet setup, a unique UUID is automatically generated and stored in the configuration
+- **Automatic Generation**: During Joblet setup, a unique UUID is automatically generated and stored in the
+  configuration
 - **Job Tracking**: All jobs executed on a node are tagged with the node's UUID for tracking and debugging
 - **Distributed Visibility**: In multi-node deployments, you can identify which node executed specific jobs
 - **CLI Display**: The node ID is displayed in `rnx job list` and `rnx job status` commands
@@ -293,10 +294,10 @@ buffers:
 - `batch_size`: Larger batches = more efficient disk I/O, higher latency
 - `flush_interval`: Lower values = lower latency, higher CPU overhead
 - `overflow_strategy`: Choose based on requirements:
-  - `compress`: Best for memory efficiency (default)
-  - `spill`: Best for guaranteed complete logs
-  - `sample`: Best for extreme burst scenarios
-  - `alert`: Best for debugging/monitoring
+    - `compress`: Best for memory efficiency (default)
+    - `spill`: Best for guaranteed complete logs
+    - `sample`: Best for extreme burst scenarios
+    - `alert`: Best for debugging/monitoring
 
 ### Logging Configuration
 
@@ -515,7 +516,8 @@ The `nodeId` field in client configuration provides display information about wh
 **Key Features:**
 
 - **Optional Field**: The `nodeId` is optional and used only for display purposes in `rnx nodes` command
-- **Automatic Population**: When using `certs_gen_embedded.sh`, the nodeId is automatically populated from the server's nodeId
+- **Automatic Population**: When using `certs_gen_embedded.sh`, the nodeId is automatically populated from the server's
+  nodeId
 - **Multi-Node Tracking**: Helps identify which physical Joblet server each configuration entry connects to
 - **Job Correlation**: Can be used to correlate job execution with specific nodes when viewing job status
 

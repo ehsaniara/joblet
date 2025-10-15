@@ -3,10 +3,11 @@ package network
 import (
 	"bytes"
 	"fmt"
-	"github.com/ehsaniara/joblet/pkg/logger"
-	"github.com/ehsaniara/joblet/pkg/platform"
 	"net"
 	"strings"
+
+	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -22,8 +23,6 @@ type NetworkSetup struct {
 // This interface is used to avoid circular dependencies between the network setup
 // and network store packages. It provides access to network configuration data
 // needed for bridge and IP address management.
-//
-//counterfeiter:generate . NetworkStoreInterface
 type NetworkStoreInterface interface {
 	GetNetworkConfig(name string) (*NetworkConfig, error)
 }

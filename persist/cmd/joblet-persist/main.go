@@ -12,7 +12,7 @@ import (
 	"github.com/ehsaniara/joblet/persist/internal/ipc"
 	"github.com/ehsaniara/joblet/persist/internal/server"
 	"github.com/ehsaniara/joblet/persist/internal/storage"
-	"github.com/ehsaniara/joblet/persist/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 var (

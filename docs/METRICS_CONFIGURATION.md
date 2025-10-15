@@ -2,11 +2,13 @@
 
 ## Overview
 
-Joblet includes comprehensive job metrics collection to monitor resource usage (CPU, memory, I/O, GPU) for all running jobs. Metrics are collected periodically and can be streamed in real-time or stored for historical analysis.
+Joblet includes comprehensive job metrics collection to monitor resource usage (CPU, memory, I/O, GPU) for all running
+jobs. Metrics are collected periodically and can be streamed in real-time or stored for historical analysis.
 
 ## Current Status
 
-**Metrics are ENABLED by default** (as of the current release). Metrics collection provides comprehensive resource usage tracking with minimal performance overhead. You can customize the configuration in your `joblet-config.yml`.
+**Metrics are ENABLED by default** (as of the current release). Metrics collection provides comprehensive resource usage
+tracking with minimal performance overhead. You can customize the configuration in your `joblet-config.yml`.
 
 ## Configuration Structure
 
@@ -44,21 +46,23 @@ Before enabling metrics, ensure:
    ```
 
 2. **Sufficient disk space**: Metrics can consume significant disk space depending on:
-   - Number of jobs
-   - Sample rate
-   - Retention period
+    - Number of jobs
+    - Sample rate
+    - Retention period
 
 ## What Metrics Are Collected?
 
 For each job, the following metrics are collected at the configured sample interval:
 
 ### CPU Metrics
+
 - Usage percentage
 - User time / System time (microseconds)
 - Throttling (when CPU limit is hit)
 - CPU pressure (PSI - Pressure Stall Information)
 
 ### Memory Metrics
+
 - Current usage and peak usage
 - Anonymous memory (heap, stack)
 - File cache
@@ -67,17 +71,20 @@ For each job, the following metrics are collected at the configured sample inter
 - Memory pressure (PSI)
 
 ### I/O Metrics
+
 - Read/Write bytes and IOPS (per device and aggregated)
 - I/O rates (bytes/sec)
 - I/O pressure (PSI)
 
 ### Process Metrics
+
 - Process count
 - Thread count
 - Open file descriptors
 - Process limit events
 
 ### GPU Metrics (if GPUs allocated)
+
 - GPU utilization percentage
 - GPU memory usage (used/total/free)
 - Temperature
@@ -87,6 +94,7 @@ For each job, the following metrics are collected at the configured sample inter
 - Process count and memory
 
 ### Network Metrics
+
 - RX/TX bytes and packets
 - Network rates (bytes/sec)
 - Errors and drops
@@ -96,6 +104,7 @@ For each job, the following metrics are collected at the configured sample inter
 ### CLI Commands
 
 #### View Metrics for a Job
+
 ```bash
 # Shows all metrics from job start (similar to logs)
 rnx job metrics <job-uuid>
@@ -105,6 +114,7 @@ rnx job metrics f47ac10b
 ```
 
 #### Get Metrics as JSON
+
 ```bash
 # Stream all metrics as JSON (one sample per line)
 rnx --json job metrics <job-uuid>
@@ -114,17 +124,23 @@ rnx --json job metrics <job-uuid>
 
 Joblet provides complete time-series metrics similar to logs:
 
-1. **Historical Metrics First**: The system reads all historical samples from disk (stored as gzipped JSON Lines files in `/opt/joblet/metrics/<job-uuid>/`)
+1. **Historical Metrics First**: The system reads all historical samples from disk (stored as gzipped JSON Lines files
+   in `/opt/joblet/metrics/<job-uuid>/`)
 
-2. **Live Metrics Second**: For running jobs, after replaying all historical data, the stream continues with live real-time metrics until the job completes
+2. **Live Metrics Second**: For running jobs, after replaying all historical data, the stream continues with live
+   real-time metrics until the job completes
 
-3. **Works for Completed Jobs**: You can view complete metrics history even after a job has finished and is no longer in memory
+3. **Works for Completed Jobs**: You can view complete metrics history even after a job has finished and is no longer in
+   memory
 
 **Behavior:**
+
 - **For completed jobs**: Shows all metrics from start to finish, then exits
-- **For running jobs**: Shows all metrics from start to current, then continues streaming live until job completes or Ctrl+C
+- **For running jobs**: Shows all metrics from start to current, then continues streaming live until job completes or
+  Ctrl+C
 
 **Example Usage:**
+
 ```bash
 # View metrics for a completed job (shows complete history then exits)
 rnx job metrics f47ac10b
@@ -180,25 +196,29 @@ GPU:
 ## Performance Impact
 
 Metrics collection has minimal overhead:
+
 - **CPU**: < 0.5% per job
 - **Memory**: ~10MB per active collector
 - **I/O**: Depends on sample rate and storage backend
-  - With 5s sampling and gzip compression: ~10KB/hour per job
+    - With 5s sampling and gzip compression: ~10KB/hour per job
 
 ## Troubleshooting
 
 ### Metrics Not Showing
+
 1. Check if metrics are enabled: `grep "job_metrics" /opt/joblet/joblet-config.yml`
 2. Check if directory exists: `ls -la /opt/joblet/metrics`
 3. Check joblet logs: `journalctl -u joblet.service | grep metrics`
 
 ### Permission Errors
+
 ```bash
 sudo chown -R joblet:joblet /opt/joblet/metrics
 sudo chmod 755 /opt/joblet/metrics
 ```
 
 ### Disk Space Issues
+
 - Reduce retention period
 - Increase compression level
 - Increase rotation file size to reduce file count
@@ -224,6 +244,7 @@ Metrics are stored as gzipped JSON Lines files:
 - **Retention**: Automatically cleaned up after configured retention period
 
 ### File Structure Example
+
 ```
 /opt/joblet/metrics/
 ├── f47ac10b-58cc-4372-a567-0e02b2c3d479/
@@ -233,6 +254,7 @@ Metrics are stored as gzipped JSON Lines files:
 ```
 
 ### Reading Metrics Files Directly
+
 ```bash
 # Decompress and view metrics
 gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | head -5
@@ -254,12 +276,14 @@ rnx job metrics f47ac10b
 ```
 
 The system will resolve the short UUID by:
+
 1. First checking active jobs in memory
 2. Then searching the metrics directory on disk for matching folders
 
 ## Migration from Previous Versions
 
 If upgrading from a version without metrics:
+
 1. Metrics are now enabled by default
 2. Metrics directory will be created automatically
 3. Restart joblet service to apply: `sudo systemctl restart joblet.service`

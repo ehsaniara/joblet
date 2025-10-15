@@ -49,13 +49,17 @@ test_persist_service_running() {
 test_persist_socket_exists() {
     echo "Checking if persist Unix socket exists..."
 
-    # New socket path is /tmp/joblet-persist.sock (configured in IPC section)
-    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep joblet-persist.sock" 2>/dev/null | grep -q "joblet-persist"; then
-        echo "  ✓ Persist socket exists at /tmp/joblet-persist.sock"
-        ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep joblet-persist.sock" 2>/dev/null | head -1
+    # Socket path is /opt/joblet/run/persist-ipc.sock
+    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist-ipc.sock" 2>/dev/null | grep -q "joblet-persist"; then
+        echo "  ✓ Persist IPC socket exists at /opt/joblet/run/persist-ipc.sock"
+        return 0
+    elif ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/run/persist-ipc.sock" 2>/dev/null | grep -q "persist-ipc.sock"; then
+        echo "  ✓ Persist IPC socket file exists at /opt/joblet/run/persist-ipc.sock"
         return 0
     else
         echo "  ✗ Persist socket does not exist"
+        echo "  Checking socket locations:"
+        ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist || echo 'No persist sockets found'" 2>/dev/null
         return 1
     fi
 }
@@ -227,7 +231,7 @@ test_ipc_socket_permissions() {
     echo "Testing IPC socket permissions..."
 
     # Check if socket is accessible and listening
-    local socket_info=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep /tmp/joblet-persist.sock" 2>&1)
+    local socket_info=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist-ipc.sock" 2>&1)
 
     if echo "$socket_info" | grep -q "LISTEN"; then
         echo "  ✓ Socket is listening and accessible"

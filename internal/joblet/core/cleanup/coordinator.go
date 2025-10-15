@@ -5,12 +5,13 @@ package cleanup
 import (
 	"context"
 	"fmt"
-	"github.com/ehsaniara/joblet/internal/joblet/adapters"
-	"github.com/ehsaniara/joblet/internal/joblet/network"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/network"
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
 	"github.com/ehsaniara/joblet/internal/joblet/core/resource"

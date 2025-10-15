@@ -16,13 +16,13 @@ import (
 type Builder struct {
 	config      *config.Config
 	logger      *logger.Logger
-	idGenerator *IDGenerator
+	idGenerator *UUIDGenerator
 }
 
 // NewBuilder creates a new job builder.
 // Initializes builder with configuration, UUID generator, and resource validator
 // for comprehensive job construction with validation.
-func NewBuilder(cfg *config.Config, idGen *IDGenerator) *Builder {
+func NewBuilder(cfg *config.Config, idGen *UUIDGenerator) *Builder {
 	return &Builder{
 		config:      cfg,
 		logger:      logger.New().WithField("component", "job-builder"),

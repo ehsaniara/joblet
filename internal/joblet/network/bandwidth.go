@@ -2,9 +2,10 @@ package network
 
 import (
 	"fmt"
-	"github.com/ehsaniara/joblet/pkg/logger"
 	"os/exec"
 	"strconv"
+
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // BandwidthLimiter handles network bandwidth limiting using tc (traffic control)

@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"context"
+
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 

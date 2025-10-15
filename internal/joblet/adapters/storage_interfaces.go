@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/network"
@@ -41,8 +42,6 @@ type JobStorer interface {
 
 // VolumeStorer handles all our volume storage needs - creating them, tracking them,
 // and cleaning them up when we're done.
-//
-//counterfeiter:generate . VolumeStorer
 type VolumeStorer interface {
 	// All the basic volume operations
 	interfaces.VolumeStore
@@ -53,8 +52,6 @@ type VolumeStorer interface {
 
 // NetworkStorer manages network configurations and job network allocations.
 // Keeps track of which jobs are using which networks and how they're connected.
-//
-//counterfeiter:generate . NetworkStorer
 type NetworkStorer interface {
 	// Setting up and managing network configs
 	CreateNetwork(config *NetworkConfig) error
@@ -80,8 +77,6 @@ type NetworkStorer interface {
 
 // MetricsStorer handles job metrics collection and storage.
 // Manages collectors that gather resource usage data and persist metrics.
-//
-//counterfeiter:generate . MetricsStorer
 type MetricsStorer interface {
 	// StreamMetrics streams real-time metrics for a job
 	StreamMetrics(ctx context.Context, jobID string) (<-chan interface{}, error)

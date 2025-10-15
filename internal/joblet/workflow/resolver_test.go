@@ -1,8 +1,9 @@
 package workflow
 
 import (
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"testing"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 func TestNewDependencyResolver(t *testing.T) {

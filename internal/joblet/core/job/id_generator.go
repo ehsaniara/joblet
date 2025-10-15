@@ -5,54 +5,23 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync/atomic"
 )
 
 // UUIDGenerator generates unique job UUIDs using Linux kernel's native UUID generation
 // This provides complete immunity to race conditions and unlimited concurrency
 type UUIDGenerator struct {
-	// Legacy fields for backward compatibility and testing
-	counter  int64
-	prefix   string
-	nodeID   string
-	useNanos bool
-
-	// UUID generation settings
-	useUUID    bool     // When true, use UUID generation; when false, fall back to sequential
 	fallbackFD *os.File // Fallback to /dev/urandom if /proc/sys/kernel/random/uuid unavailable
 }
 
 // NewUUIDGenerator creates a new UUID generator using Linux kernel native UUID generation
 func NewUUIDGenerator(prefix, nodeID string) *UUIDGenerator {
-	return &UUIDGenerator{
-		prefix:   prefix,
-		nodeID:   nodeID,
-		useNanos: false,
-		useUUID:  true, // Default to UUID generation
-	}
-}
-
-// NewSequentialIDGenerator creates a legacy sequential ID generator for backward compatibility
-//
-// Deprecated: Use NewUUIDGenerator instead. Sequential IDs have race condition risks.
-// See docs/DEPRECATION.md. Removal Timeline: v5.0.0
-func NewSequentialIDGenerator(prefix, nodeID string) *UUIDGenerator {
-	return &UUIDGenerator{
-		prefix:   prefix,
-		nodeID:   nodeID,
-		useNanos: false,
-		useUUID:  false, // Use sequential generation
-	}
+	return &UUIDGenerator{}
 }
 
 // Next generates the next job UUID using Linux kernel's native UUID generation
 // This method provides complete immunity to race conditions and supports unlimited concurrency
 func (g *UUIDGenerator) Next() string {
-	if g.useUUID {
-		return g.generateKernelUUID()
-	}
-	// Fallback to sequential for testing or when UUID is disabled
-	return g.generateSequentialID()
+	return g.generateKernelUUID()
 }
 
 // generateKernelUUID generates a UUID using Linux kernel's native /proc/sys/kernel/random/uuid
@@ -63,13 +32,14 @@ func (g *UUIDGenerator) generateKernelUUID() string {
 		return uuid
 	}
 
-	// Fallback 1: Use /dev/urandom to generate RFC 4122 compliant UUID
-	if uuid, err := g.generateUrandomUUID(); err == nil {
-		return uuid
+	// Fallback: Use /dev/urandom to generate RFC 4122 compliant UUID
+	uuid, err := g.generateUrandomUUID()
+	if err != nil {
+		// Should never happen in production - both kernel UUID and urandom failed
+		panic(fmt.Sprintf("UUID generation failed: %v", err))
 	}
 
-	// Fallback 2: Emergency fallback to sequential (should never happen in production)
-	return g.generateSequentialID()
+	return uuid
 }
 
 // readKernelUUID reads a UUID from the Linux kernel's native UUID generator
@@ -124,39 +94,10 @@ func (g *UUIDGenerator) generateUrandomUUID() (string, error) {
 	return uuid, nil
 }
 
-// generateSequentialID generates a sequential ID for testing/backward compatibility
-func (g *UUIDGenerator) generateSequentialID() string {
-	count := atomic.AddInt64(&g.counter, 1)
-	return fmt.Sprintf("%d", count)
-}
-
-// SetUUIDMode enables or disables UUID generation
-func (g *UUIDGenerator) SetUUIDMode(enabled bool) {
-	g.useUUID = enabled
-}
-
-// Reset resets the counter (only affects sequential mode, used for testing)
-func (g *UUIDGenerator) Reset() {
-	atomic.StoreInt64(&g.counter, 0)
-}
-
 // Close closes any open file descriptors
 func (g *UUIDGenerator) Close() error {
 	if g.fallbackFD != nil {
 		return g.fallbackFD.Close()
 	}
 	return nil
-}
-
-// IsUUIDMode returns true if generator is using UUID mode
-func (g *UUIDGenerator) IsUUIDMode() bool {
-	return g.useUUID
-}
-
-// Legacy type aliases for backward compatibility
-type IDGenerator = UUIDGenerator
-
-// Legacy constructor for backward compatibility
-func NewIDGenerator(prefix, nodeID string) *IDGenerator {
-	return NewSequentialIDGenerator(prefix, nodeID)
 }

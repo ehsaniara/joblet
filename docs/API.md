@@ -8,17 +8,17 @@ implementation examples for client development.
 
 - [Overview](#overview)
 - [Main Joblet Service API](#main-joblet-service-api)
-  - [Authentication](#authentication)
-  - [Service Definition](#service-definition)
-  - [API Methods](#api-methods)
-  - [Message Types](#message-types)
-  - [Error Handling](#error-handling)
-  - [Code Examples](#code-examples)
-  - [CLI Reference](#cli-reference)
+    - [Authentication](#authentication)
+    - [Service Definition](#service-definition)
+    - [API Methods](#api-methods)
+    - [Message Types](#message-types)
+    - [Error Handling](#error-handling)
+    - [Code Examples](#code-examples)
+    - [CLI Reference](#cli-reference)
 - [Persist Service API](#persist-service-api)
-  - [Overview](#persist-service-overview)
-  - [Communication Architecture](#communication-architecture)
-  - [Query API](#persist-query-api)
+    - [Overview](#persist-service-overview)
+    - [Communication Architecture](#communication-architecture)
+    - [Query API](#persist-query-api)
 - [Recent Updates](#recent-updates)
 
 ## API Architecture Overview
@@ -35,6 +35,7 @@ access control for organizational deployment scenarios.
 ### Technical Specifications
 
 **Main Joblet Service:**
+
 - **Communication Protocol**: gRPC over TLS 1.3 with HTTP/2 multiplexing
 - **Message Serialization**: Protocol Buffers (protobuf) for efficient binary encoding
 - **Security Framework**: Mutual TLS authentication with X.509 client certificate validation
@@ -44,6 +45,7 @@ access control for organizational deployment scenarios.
 - **Logging Infrastructure**: Asynchronous log persistence system supporting 5M+ writes per second
 
 **Persist Service:**
+
 - **Communication Protocol**: gRPC (TLS optional, Unix socket IPC for internal communication)
 - **Message Serialization**: Protocol Buffers (internal proto definitions)
 - **Storage Backend**: Local filesystem with gzip compression (cloud backends planned)
@@ -53,6 +55,7 @@ access control for organizational deployment scenarios.
 ### Base Configuration Parameters
 
 **Main Service:**
+
 ```text
 Server Address: <host>:50051
 TLS: Required (mutual authentication)
@@ -61,6 +64,7 @@ Platform: Linux server required for job execution
 ```
 
 **Persist Service:**
+
 ```text
 Unix Socket: /opt/joblet/run/persist-grpc.sock (optional, gRPC queries)
 IPC Socket: /opt/joblet/run/persist-ipc.sock (internal communication)
@@ -819,19 +823,22 @@ rnx job run --workflow=pipeline.yaml
 
 ## Persist Service API
 
-The Persist Service provides historical data storage and querying capabilities for logs and metrics. It operates alongside the main Joblet service to provide durable storage and efficient historical queries.
+The Persist Service provides historical data storage and querying capabilities for logs and metrics. It operates
+alongside the main Joblet service to provide durable storage and efficient historical queries.
 
 ### Persist Service Overview
 
 **Purpose**: Store and query historical job logs and metrics
 
 **Architecture**:
+
 - **Internal Communication**: Unix domain socket IPC for high-throughput writes from main service
 - **External Queries**: Optional gRPC API for historical data retrieval
 - **Storage**: Local filesystem with gzip compression (cloud backends planned)
 - **Performance**: Non-blocking async writes, 5M+ log lines/second
 
 **Deployment**:
+
 ```bash
 # Service runs alongside main joblet service
 systemctl status joblet-persist
@@ -845,6 +852,7 @@ systemctl status joblet-persist
 The persist service uses two communication channels:
 
 #### 1. Unix Socket IPC (Internal)
+
 **Purpose**: High-throughput log and metric writes from main service
 
 ```text
@@ -855,11 +863,13 @@ Joblet Service → Unix Socket → Persist Service
 **Protocol**: Custom IPC protocol (defined in `internal/proto/ipc.proto`)
 
 **Message Types**:
+
 - Log entries (stdout/stderr with timestamps)
 - Metric samples (CPU, memory, I/O, GPU)
 - Batch writes for efficiency
 
 **Configuration**:
+
 ```yaml
 persist:
   ipc:
@@ -868,6 +878,7 @@ persist:
 ```
 
 #### 2. gRPC API (External)
+
 **Purpose**: Historical queries from RNX clients
 
 ```text
@@ -879,6 +890,7 @@ RNX Client → gRPC (Unix socket) → Persist Service
 **Security**: Optional TLS (disabled by default for localhost)
 
 **Configuration**:
+
 ```yaml
 persist:
   server:
@@ -894,6 +906,7 @@ persist:
 Retrieves historical logs for a completed or running job.
 
 **Request**:
+
 ```protobuf
 message QueryLogsRequest {
   string job_id = 1;           // Job UUID (required)
@@ -905,6 +918,7 @@ message QueryLogsRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message QueryLogsResponse {
   repeated LogEntry entries = 1;
@@ -918,6 +932,7 @@ message LogEntry {
 ```
 
 **Storage Location**:
+
 ```
 /opt/joblet/logs/{job_id}/
 ├── stdout.log.gz    # Compressed stdout
@@ -925,6 +940,7 @@ message LogEntry {
 ```
 
 **Example Usage**:
+
 ```bash
 # RNX automatically queries persist service for completed jobs
 rnx job log <job-id>
@@ -937,6 +953,7 @@ rnx job log <job-id>
 Retrieves historical metrics for a job.
 
 **Request**:
+
 ```protobuf
 message QueryMetricsRequest {
   string job_id = 1;           // Job UUID (required)
@@ -948,6 +965,7 @@ message QueryMetricsRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message QueryMetricsResponse {
   repeated MetricSample samples = 1;
@@ -961,18 +979,21 @@ message MetricSample {
 ```
 
 **Storage Location**:
+
 ```
 /opt/joblet/metrics/{job_id}/
 └── metrics.jsonl.gz    # Compressed JSON Lines metrics
 ```
 
 **Metric Types**:
+
 - **CPU**: `cpu_user`, `cpu_system`, `cpu_total`, `cpu_percent`
 - **Memory**: `memory_rss`, `memory_vms`, `memory_percent`
 - **I/O**: `io_read_bytes`, `io_write_bytes`, `io_read_ops`, `io_write_ops`
 - **GPU**: `gpu_utilization`, `gpu_memory_used`, `gpu_temperature` (if available)
 
 **Example Metric Sample**:
+
 ```json
 {
   "timestamp": 1704451200000000000,
@@ -989,6 +1010,7 @@ message MetricSample {
 ### Data Retention and Cleanup
 
 **Storage Management**:
+
 ```yaml
 persist:
   storage:
@@ -999,6 +1021,7 @@ persist:
 ```
 
 **Manual Cleanup**:
+
 ```bash
 # Clean up old job data
 find /opt/joblet/logs -type d -mtime +30 -exec rm -rf {} \;
@@ -1008,12 +1031,14 @@ find /opt/joblet/metrics -type d -mtime +90 -exec rm -rf {} \;
 ### Performance Characteristics
 
 **Write Performance**:
+
 - **Throughput**: 5M+ log lines per second
 - **Latency**: <1ms average IPC write latency
 - **Concurrency**: Handles 1000+ concurrent jobs
 - **Buffering**: Async writes with overflow protection
 
 **Query Performance**:
+
 - **Log Queries**: ~50-500ms depending on file size
 - **Metric Queries**: ~10-100ms for typical job metrics
 - **Compression**: ~80% storage reduction with gzip
@@ -1022,6 +1047,7 @@ find /opt/joblet/metrics -type d -mtime +90 -exec rm -rf {} \;
 ### Future Enhancements
 
 **Planned Features**:
+
 - Cloud storage backends (S3, CloudWatch Logs)
 - Advanced query filters (regex, time ranges)
 - Metric aggregation and rollups
@@ -1030,6 +1056,7 @@ find /opt/joblet/metrics -type d -mtime +90 -exec rm -rf {} \;
 - Data archival to cold storage
 
 **Configuration (Future)**:
+
 ```yaml
 persist:
   storage:

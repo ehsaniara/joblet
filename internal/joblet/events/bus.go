@@ -2,9 +2,10 @@ package events
 
 import (
 	"context"
+	"sync"
+
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/errors"
-	"sync"
 )
 
 // EventType represents different event types in the system

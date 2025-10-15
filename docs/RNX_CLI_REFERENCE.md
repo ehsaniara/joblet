@@ -175,9 +175,9 @@ rnx job list [flags]              # List all jobs
 
 #### Flags
 
-| Flag         | Description                    | Default |
-|--------------|--------------------------------|---------|
-| `--json`     | Output in JSON format          | false   |
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Output Format
 
@@ -435,15 +435,17 @@ Metrics are stored as time-series data, allowing complete historical replay of r
 
 #### Parameters
 
-| Parameter  | Description                                           |
-|------------|-------------------------------------------------------|
-| `--json`   | Output in JSON format (global flag: `rnx --json`)   |
+| Parameter | Description                                       |
+|-----------|---------------------------------------------------|
+| `--json`  | Output in JSON format (global flag: `rnx --json`) |
 
 #### Behavior
 
 Similar to `rnx job log`, this command streams all metrics from job start:
+
 - **For completed jobs**: Shows all metrics from start to finish, then exits
-- **For running jobs**: Shows all metrics from start to current, then continues streaming live until job completes or Ctrl+C
+- **For running jobs**: Shows all metrics from start to current, then continues streaming live until job completes or
+  Ctrl+C
 
 Works with both running and completed jobs. Supports short UUIDs (first 8 characters).
 
@@ -481,11 +483,13 @@ cat metrics.jsonl | jq -r '[.timestamp, .cpu.usagePercent, .memory.current] | @c
 #### Storage Location
 
 Metrics are stored on the server as gzipped JSON Lines files:
+
 - Path: `/opt/joblet/metrics/<job-uuid>/<timestamp>.jsonl.gz`
 - Format: One JSON object per line (JSONL)
 - Compression: gzip (approximately 10x reduction)
 
 You can also read metrics files directly on the server:
+
 ```bash
 # Decompress and view metrics
 gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | head -10
@@ -684,10 +688,10 @@ rnx workflow status --detail <workflow-uuid>  # Include original YAML content
 
 #### Flags
 
-| Flag          | Description                | Default | Notes                    |
-|---------------|----------------------------|---------|--------------------------|
-| `--detail`    | Show original YAML content | false   |                          |
-| `--json`      | Output in JSON format      | false   | Available with --detail  |
+| Flag       | Description                | Default | Notes                   |
+|------------|----------------------------|---------|-------------------------|
+| `--detail` | Show original YAML content | false   |                         |
+| `--json`   | Output in JSON format      | false   | Available with --detail |
 
 #### Examples
 
@@ -1109,7 +1113,9 @@ rnx monitor <subcommand> [flags]
 
 **Network Interface Display (v4.7.3+):**
 
-The `rnx monitor status` command displays accurate network interface information retrieved directly from the joblet server:
+The `rnx monitor status` command displays accurate network interface information retrieved directly from the joblet
+server:
+
 - **IP Addresses**: Actual IP addresses assigned to each interface (not guessed)
 - **MAC Addresses**: Hardware MAC addresses for physical interfaces (not guessed)
 - **Traffic Statistics**: Real-time RX/TX rates, packet counts, and error tracking
@@ -1265,7 +1271,6 @@ rnx nodes --json
 rnx --node=production job list
 rnx --node=staging job run echo "test"
 ```
-
 
 ### `rnx config-help`
 

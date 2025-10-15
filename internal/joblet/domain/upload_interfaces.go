@@ -12,8 +12,6 @@ import (
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 // UploadTransport abstracts the transport mechanism for uploads
-//
-//counterfeiter:generate . UploadTransport
 type UploadTransport interface {
 	// GetWriter returns a writer for the upload data
 	GetWriter() (io.WriteCloser, error)
@@ -26,8 +24,6 @@ type UploadTransport interface {
 }
 
 // UploadStreamer handles streaming file uploads without exposing implementation
-//
-//counterfeiter:generate . UploadStreamer
 type UploadStreamer interface {
 	// Start begins the streaming process
 	Start() error
@@ -46,8 +42,6 @@ type UploadStreamer interface {
 }
 
 // UploadManager handles upload operations with better abstraction
-//
-//counterfeiter:generate . UploadManager
 type UploadManager interface {
 	// PrepareUploadSession prepares an upload session
 	PrepareUploadSession(jobID string, uploads []FileUpload, memoryLimitMB int32) (*UploadSession, error)

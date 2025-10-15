@@ -6,7 +6,7 @@ import (
 
 	ipcpb "github.com/ehsaniara/joblet/internal/proto/gen/ipc"
 	"github.com/ehsaniara/joblet/persist/internal/config"
-	"github.com/ehsaniara/joblet/persist/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Backend is the storage backend interface

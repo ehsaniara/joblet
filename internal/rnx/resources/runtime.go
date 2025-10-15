@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ehsaniara/joblet/internal/rnx/common"
-	"github.com/ehsaniara/joblet/pkg/client"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/rnx/common"
+	"github.com/ehsaniara/joblet/pkg/client"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 

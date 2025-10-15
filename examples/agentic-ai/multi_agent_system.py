@@ -11,6 +11,7 @@ from datetime import datetime
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+
 class Agent:
     def __init__(self, agent_id, agent_type, capabilities):
         self.agent_id = agent_id
@@ -19,18 +20,18 @@ class Agent:
         self.logger = logging.getLogger(f"Agent-{agent_id}")
         self.status = "idle"
         self.task_history = []
-        
+
     def process_task(self, task):
         """Process a task assigned to this agent"""
         self.status = "working"
         self.logger.info(f"Starting task: {task['task_id']}")
-        
+
         start_time = time.time()
-        
+
         try:
             # Simulate task processing based on agent type
             result = self._execute_task(task)
-            
+
             # Record task completion
             task_record = {
                 'task_id': task['task_id'],
@@ -40,13 +41,13 @@ class Agent:
                 'status': 'completed',
                 'result': result
             }
-            
+
             self.task_history.append(task_record)
             self.status = "idle"
             self.logger.info(f"Completed task: {task['task_id']} in {task_record['duration']:.2f}s")
-            
+
             return task_record
-            
+
         except Exception as e:
             self.logger.error(f"Task failed: {task['task_id']} - {str(e)}")
             self.status = "error"
@@ -67,7 +68,7 @@ class Agent:
         """Simulate research task"""
         self.logger.info("Conducting research...")
         time.sleep(2)  # Simulate research time
-        
+
         query = task.get('query', 'general research')
         return {
             'type': 'research_results',
@@ -89,7 +90,7 @@ class Agent:
         """Simulate analysis task"""
         self.logger.info("Performing analysis...")
         time.sleep(1.5)  # Simulate analysis time
-        
+
         data = task.get('data', {})
         return {
             'type': 'analysis_results',
@@ -111,10 +112,10 @@ class Agent:
         """Simulate writing task"""
         self.logger.info("Writing content...")
         time.sleep(2.5)  # Simulate writing time
-        
+
         topic = task.get('topic', 'general topic')
         content_type = task.get('content_type', 'report')
-        
+
         return {
             'type': 'written_content',
             'topic': topic,
@@ -145,13 +146,14 @@ The evidence strongly supports moving forward with the proposed {topic} initiati
         """Simulate generic task"""
         self.logger.info("Processing generic task...")
         time.sleep(1)
-        
+
         return {
             'type': 'generic_result',
             'task_type': task.get('type', 'unknown'),
             'status': 'completed',
             'message': f"Successfully processed {task.get('type', 'generic')} task"
         }
+
 
 class MultiAgentSystem:
     def __init__(self, config):
@@ -168,22 +170,22 @@ class MultiAgentSystem:
         self.logger = logging.getLogger("MultiAgentSystem")
         self.output_dir = '/volumes/ai-outputs'
         self.metrics_dir = '/volumes/ai-metrics'
-        
+
         # Create directories if volumes exist
         for dir_path in [self.output_dir, self.metrics_dir]:
             if os.path.exists('/volumes'):
                 os.makedirs(dir_path, exist_ok=True)
-        
+
         self._initialize_agents()
 
     def _initialize_agents(self):
         """Initialize agents based on configuration"""
         agent_configs = self.config.get('agents', [])
-        
+
         for agent_config in agent_configs:
             agent = Agent(
                 agent_id=agent_config['id'],
-                agent_type=agent_config['type'], 
+                agent_type=agent_config['type'],
                 capabilities=agent_config.get('capabilities', [])
             )
             self.agents[agent.agent_id] = agent
@@ -192,22 +194,22 @@ class MultiAgentSystem:
                 'total_time': 0,
                 'average_time': 0
             }
-            
+
         self.logger.info(f"Initialized {len(self.agents)} agents")
 
     def assign_task(self, task):
         """Assign task to most suitable agent"""
         task['task_id'] = str(uuid.uuid4())
         task['created_at'] = datetime.now().isoformat()
-        
+
         # Find best agent for task
         suitable_agents = self._find_suitable_agents(task)
         if not suitable_agents:
             raise ValueError(f"No suitable agents found for task type: {task.get('type')}")
-        
+
         # Select least busy agent
         selected_agent = min(suitable_agents, key=lambda a: len(a.task_history))
-        
+
         self.logger.info(f"Assigning task {task['task_id']} to agent {selected_agent.agent_id}")
         return selected_agent, task
 
@@ -215,7 +217,7 @@ class MultiAgentSystem:
         """Find agents capable of handling the task"""
         task_type = task.get('type', 'generic')
         suitable_agents = []
-        
+
         for agent in self.agents.values():
             if agent.status in ['idle', 'working']:
                 if task_type == 'research' and agent.agent_type == 'researcher':
@@ -226,13 +228,13 @@ class MultiAgentSystem:
                     suitable_agents.append(agent)
                 elif task_type == 'generic':
                     suitable_agents.append(agent)
-        
+
         return suitable_agents
 
     def process_tasks_parallel(self, tasks):
         """Process multiple tasks in parallel"""
         self.logger.info(f"Processing {len(tasks)} tasks in parallel")
-        
+
         with ThreadPoolExecutor(max_workers=len(self.agents)) as executor:
             # Submit tasks
             future_to_task = {}
@@ -244,7 +246,7 @@ class MultiAgentSystem:
                 except ValueError as e:
                     self.logger.error(str(e))
                     continue
-            
+
             # Collect results
             results = []
             for future in as_completed(future_to_task):
@@ -252,25 +254,25 @@ class MultiAgentSystem:
                 try:
                     result = future.result()
                     results.append(result)
-                    
+
                     # Update metrics
                     self.system_metrics['tasks_processed'] += 1
                     self.system_metrics['total_processing_time'] += result['duration']
-                    
+
                     agent_metrics = self.system_metrics['agent_utilization'][agent.agent_id]
                     agent_metrics['tasks_completed'] += 1
                     agent_metrics['total_time'] += result['duration']
                     agent_metrics['average_time'] = agent_metrics['total_time'] / agent_metrics['tasks_completed']
-                    
+
                 except Exception as e:
                     self.logger.error(f"Task execution failed: {str(e)}")
-        
+
         return results
 
     def run_demo_workflow(self):
         """Run a demonstration workflow with coordinated agents"""
         self.logger.info("Starting multi-agent demo workflow")
-        
+
         # Define a complex workflow
         workflow_tasks = [
             {
@@ -304,12 +306,12 @@ class MultiAgentSystem:
                 'content_type': 'technical_document'
             }
         ]
-        
+
         # Process tasks
         start_time = time.time()
         results = self.process_tasks_parallel(workflow_tasks)
         total_time = time.time() - start_time
-        
+
         # Save results
         workflow_result = {
             'workflow_id': str(uuid.uuid4()),
@@ -319,28 +321,28 @@ class MultiAgentSystem:
             'results': results,
             'system_metrics': self.system_metrics
         }
-        
+
         if os.path.exists(self.output_dir):
             output_file = os.path.join(self.output_dir, f'workflow_results_{int(time.time())}.json')
             with open(output_file, 'w') as f:
                 json.dump(workflow_result, f, indent=2)
             self.logger.info(f"Workflow results saved to {output_file}")
-        
+
         # Save metrics
         if os.path.exists(self.metrics_dir):
             metrics_file = os.path.join(self.metrics_dir, f'agent_metrics_{int(time.time())}.json')
             with open(metrics_file, 'w') as f:
                 json.dump(self.system_metrics, f, indent=2)
             self.logger.info(f"System metrics saved to {metrics_file}")
-        
+
         # Display summary
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("MULTI-AGENT SYSTEM DEMO SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"Workflow completed in: {total_time:.2f} seconds")
         print(f"Tasks processed: {len(results)}")
         print(f"Active agents: {len(self.agents)}")
-        
+
         print("\nAgent Performance:")
         for agent_id, metrics in self.system_metrics['agent_utilization'].items():
             agent = self.agents[agent_id]
@@ -348,12 +350,13 @@ class MultiAgentSystem:
             print(f"    Tasks completed: {metrics['tasks_completed']}")
             print(f"    Average time: {metrics['average_time']:.2f}s")
             print(f"    Status: {agent.status}")
-        
+
         if self.system_metrics['tasks_processed'] > 0:
             avg_time = self.system_metrics['total_processing_time'] / self.system_metrics['tasks_processed']
             print(f"\nOverall average task time: {avg_time:.2f} seconds")
-        
+
         return workflow_result
+
 
 if __name__ == "__main__":
     # Configuration for multi-agent system
@@ -365,7 +368,7 @@ if __name__ == "__main__":
                 'capabilities': ['web_search', 'data_collection', 'source_validation']
             },
             {
-                'id': 'researcher-002', 
+                'id': 'researcher-002',
                 'type': 'researcher',
                 'capabilities': ['academic_research', 'technical_analysis']
             },
@@ -376,7 +379,7 @@ if __name__ == "__main__":
             },
             {
                 'id': 'analyst-002',
-                'type': 'analyst', 
+                'type': 'analyst',
                 'capabilities': ['market_analysis', 'competitive_intelligence']
             },
             {
@@ -391,9 +394,9 @@ if __name__ == "__main__":
             'retry_attempts': 3
         }
     }
-    
+
     # Initialize and run system
     system = MultiAgentSystem(config)
     results = system.run_demo_workflow()
-    
+
     print("\nMulti-agent demo completed successfully!")

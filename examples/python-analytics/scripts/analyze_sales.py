@@ -12,7 +12,7 @@ from datetime import datetime
 
 def analyze_sales():
     print("=== Sales Data Analysis ===")
-    
+
     # Read sales data
     sales = []
     try:
@@ -28,35 +28,35 @@ def analyze_sales():
     except ValueError as e:
         print(f"Error parsing data: {e}")
         return
-    
+
     if not sales:
         print("No sales data found")
         return
-    
+
     # Calculate metrics
     total_revenue = sum(s['amount'] for s in sales)
     total_quantity = sum(s['quantity'] for s in sales)
     avg_order_value = total_revenue / len(sales) if sales else 0
-    
+
     # Product analysis
     product_sales = defaultdict(lambda: {'quantity': 0, 'revenue': 0})
     for sale in sales:
         product = sale['product']
         product_sales[product]['quantity'] += sale['quantity']
         product_sales[product]['revenue'] += sale['amount']
-    
+
     # Top products
-    top_products = sorted(product_sales.items(), 
-                        key=lambda x: x[1]['revenue'], 
-                        reverse=True)[:5]
-    
+    top_products = sorted(product_sales.items(),
+                          key=lambda x: x[1]['revenue'],
+                          reverse=True)[:5]
+
     # Monthly trends (if date field exists)
     monthly_sales = defaultdict(float)
     for sale in sales:
         if 'date' in sale:
             month = sale['date'][:7]  # YYYY-MM
             monthly_sales[month] += sale['amount']
-    
+
     # Prepare report
     report = {
         'summary': {
@@ -79,7 +79,7 @@ def analyze_sales():
         },
         'generated_at': datetime.now().isoformat()
     }
-    
+
     # Save report
     try:
         with open('/volumes/analytics-data/sales_report.json', 'w') as f:
@@ -90,7 +90,7 @@ def analyze_sales():
         with open('sales_report.json', 'w') as f:
             json.dump(report, f, indent=2)
         print("Report saved to sales_report.json")
-    
+
     # Print summary
     print(f"Total Revenue: ${total_revenue:,.2f}")
     print(f"Total Orders: {len(sales)}")
@@ -98,6 +98,7 @@ def analyze_sales():
     print(f"\nTop 3 Products by Revenue:")
     for product, data in top_products[:3]:
         print(f"  - {product}: ${data['revenue']:,.2f}")
+
 
 if __name__ == "__main__":
     analyze_sales()

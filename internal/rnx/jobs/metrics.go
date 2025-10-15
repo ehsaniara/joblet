@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	pb "github.com/ehsaniara/joblet-proto/v2/gen"
-	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"io"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	pb "github.com/ehsaniara/joblet-proto/v2/gen"
+	"github.com/ehsaniara/joblet/internal/rnx/common"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/status"

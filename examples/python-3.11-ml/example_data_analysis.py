@@ -24,6 +24,7 @@ except ImportError as e:
     print("🔧 Make sure to run: pip install -r requirements.txt --target lib/")
     sys.exit(1)
 
+
 def main():
     print("🚀 ML Analysis with python:3.11")
     print("=" * 40)
@@ -144,6 +145,7 @@ def main():
     print(f"📁 Dependencies packaged in: {os.path.join(os.getcwd(), 'lib')}")
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

@@ -192,19 +192,3 @@ func (dm *DNSManager) CleanupDNS(jobID string) error {
 	hostsPath := filepath.Join(dm.stateDir, fmt.Sprintf("hosts-%s", jobID))
 	return os.Remove(hostsPath)
 }
-
-// ResolveName resolves a hostname to an IP address
-func (dm *DNSManager) ResolveName(hostname string) (net.IP, error) {
-	// Simple implementation - check if it's already an IP
-	if ip := net.ParseIP(hostname); ip != nil {
-		return ip, nil
-	}
-	// For a full implementation, this would check hosts files or DNS
-	return nil, fmt.Errorf("hostname resolution not implemented: %s", hostname)
-}
-
-// GetHostname returns the hostname for an IP address
-func (dm *DNSManager) GetHostname(ip net.IP) (string, error) {
-	// Simple implementation - reverse lookup not implemented
-	return "", fmt.Errorf("reverse hostname lookup not implemented for %s", ip.String())
-}

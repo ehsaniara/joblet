@@ -121,7 +121,8 @@ sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/joblet-per
 
 ### Infrastructure as Code Deployment
 
-The following Terraform configuration deploys Joblet on AWS EC2 instances with production-ready security groups, networking, and automated installation.
+The following Terraform configuration deploys Joblet on AWS EC2 instances with production-ready security groups,
+networking, and automated installation.
 
 #### Prerequisites
 
@@ -647,11 +648,13 @@ brew install rnx
 ```
 
 The Homebrew installation includes:
+
 - **RNX CLI**: Command-line interface for job management
 
 ### Joblet Admin UI (Standalone Package)
 
-The Admin UI is now available as a separate repository. After installing the RNX CLI, you can optionally install the admin interface:
+The Admin UI is now available as a separate repository. After installing the RNX CLI, you can optionally install the
+admin interface:
 
 ```bash
 # Clone the joblet-admin repository
@@ -668,6 +671,7 @@ npm run dev
 ```
 
 **Requirements for Admin UI:**
+
 - Node.js 18+ required
 - Requires configured RNX client with valid connection to Joblet server
 - Connects directly to Joblet server via gRPC

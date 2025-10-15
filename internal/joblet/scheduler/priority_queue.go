@@ -2,9 +2,10 @@ package scheduler
 
 import (
 	"container/heap"
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"sync"
 	"time"
+
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 )
 
 // ScheduledJob wraps a job with its scheduled execution time for the priority queue

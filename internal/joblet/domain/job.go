@@ -351,11 +351,6 @@ func (j *Job) SetSecretEnvironmentValue(env values.Environment) {
 	j.secretEnv = &env
 }
 
-// Copy creates a copy of the job (alias for DeepCopy for backward compatibility)
-func (j *Job) Copy() *Job {
-	return j.DeepCopy()
-}
-
 // DeepCopy creates a deep copy of the job including the Name field.
 //
 // RESPONSIBILITY:
