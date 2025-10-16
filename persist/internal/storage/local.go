@@ -19,9 +19,8 @@ import (
 
 // LocalBackend implements storage using local filesystem
 type LocalBackend struct {
-	config  *config.StorageConfig
-	logger  *logger.Logger
-	baseDir string
+	config *config.StorageConfig
+	logger *logger.Logger
 
 	// File handles cache
 	logFiles    map[string]*logFile
@@ -48,7 +47,6 @@ func NewLocalBackend(cfg *config.StorageConfig, log *logger.Logger) (*LocalBacke
 	backend := &LocalBackend{
 		config:      cfg,
 		logger:      log.WithField("backend", "local"),
-		baseDir:     cfg.BaseDir,
 		logFiles:    make(map[string]*logFile),
 		metricFiles: make(map[string]*metricFile),
 	}
@@ -101,19 +99,27 @@ func (lb *LocalBackend) WriteLogs(jobID string, logs []*ipcpb.LogLine) error {
 		}
 	}
 
-	// Flush both writers
-	if err := lf.gzStdout.Flush(); err != nil {
-		return err
+	// Close gzip writers to write trailer (CRC32 + size)
+	// This makes logs immediately readable while allowing future appends
+	if err := lf.gzStdout.Close(); err != nil {
+		return fmt.Errorf("failed to close stdout gzip writer: %w", err)
 	}
-	if err := lf.gzStderr.Flush(); err != nil {
-		return err
+	if err := lf.gzStderr.Close(); err != nil {
+		return fmt.Errorf("failed to close stderr gzip writer: %w", err)
 	}
+
+	// Sync file handles to disk
 	if err := lf.stdout.Sync(); err != nil {
 		return err
 	}
 	if err := lf.stderr.Sync(); err != nil {
 		return err
 	}
+
+	// Recreate gzip writers for next write (creates new gzip stream in file)
+	// Multiple gzip streams in one file is valid and gzip.NewReader handles it
+	lf.gzStdout = gzip.NewWriter(lf.stdout)
+	lf.gzStderr = gzip.NewWriter(lf.stderr)
 
 	return nil
 }
@@ -142,13 +148,19 @@ func (lb *LocalBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) erro
 		}
 	}
 
-	// Flush and sync
-	if err := mf.gzWriter.Flush(); err != nil {
-		return err
+	// Close gzip writer to write trailer (CRC32 + size)
+	// This makes metrics immediately readable while allowing future appends
+	if err := mf.gzWriter.Close(); err != nil {
+		return fmt.Errorf("failed to close metric gzip writer: %w", err)
 	}
+
+	// Sync file handle to disk
 	if err := mf.file.Sync(); err != nil {
 		return err
 	}
+
+	// Recreate gzip writer for next write (creates new gzip stream in file)
+	mf.gzWriter = gzip.NewWriter(mf.file)
 
 	return nil
 }

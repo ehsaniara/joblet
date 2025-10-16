@@ -49,14 +49,15 @@ func main() {
 		"socket", cfg.IPC.Socket,
 		"grpcAddress", cfg.Server.GRPCAddress,
 		"storageType", cfg.Storage.Type,
+		"nodeId", result.NodeID,
 		"logLevel", result.Logging.Level)
 
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize storage backend
-	backend, err := storage.NewBackend(&cfg.Storage, log)
+	// Initialize storage backend (pass nodeID for multi-node CloudWatch deployments)
+	backend, err := storage.NewBackend(&cfg.Storage, result.NodeID, log)
 	if err != nil {
 		log.Error("Failed to initialize storage backend", "error", err)
 		os.Exit(1)

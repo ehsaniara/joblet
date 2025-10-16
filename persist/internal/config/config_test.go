@@ -98,7 +98,6 @@ ipc:
   socket: "/tmp/test.sock"
 storage:
   type: "local"
-  base_dir: "/tmp/data"
   local:
     logs:
       directory: "/tmp/logs"
@@ -150,7 +149,6 @@ persist:
     socket: "/tmp/nested.sock"
   storage:
     type: "local"
-    base_dir: "/tmp/nested-data"
     local:
       logs:
         directory: "/tmp/logs"
@@ -221,4 +219,266 @@ func TestTLSConfig(t *testing.T) {
 	if cfg.Server.TLS.ClientAuth != "require" {
 		t.Errorf("Expected ClientAuth 'require', got '%s'", cfg.Server.TLS.ClientAuth)
 	}
+}
+func TestLoad_WithNodeID(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "joblet-config.yml")
+
+	configContent := `
+version: "3.0"
+
+server:
+  nodeId: "test-node-abc123"
+  address: "0.0.0.0"
+  port: 50051
+
+persist:
+  server:
+    grpc_socket: "/tmp/test-grpc.sock"
+  ipc:
+    socket: "/tmp/test-ipc.sock"
+  storage:
+    type: "local"
+    local:
+      logs:
+        directory: "/tmp/test/logs"
+      metrics:
+        directory: "/tmp/test/metrics"
+
+logging:
+  level: "info"
+  format: "text"
+  output: "stdout"
+
+security:
+  serverCert: "test-cert"
+  serverKey: "test-key"
+  caCert: "test-ca"
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify nodeID is inherited from server section
+	if result.NodeID != "test-node-abc123" {
+		t.Errorf("Expected NodeID 'test-node-abc123', got '%s'", result.NodeID)
+	}
+
+	// Verify config is properly loaded
+	if result.Config.IPC.Socket != "/tmp/test-ipc.sock" {
+		t.Errorf("Expected IPC socket '/tmp/test-ipc.sock', got '%s'", result.Config.IPC.Socket)
+	}
+}
+
+func TestLoad_CloudWatchConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "joblet-cloudwatch-config.yml")
+
+	configContent := `
+version: "3.0"
+
+server:
+  nodeId: "aws-node-456"
+  address: "0.0.0.0"
+  port: 50051
+
+persist:
+  server:
+    grpc_socket: "/opt/joblet/run/persist-grpc.sock"
+  ipc:
+    socket: "/opt/joblet/run/persist-ipc.sock"
+  storage:
+    type: "cloudwatch"
+    cloudwatch:
+      region: "us-west-2"
+      log_group_prefix: "/joblet"
+      log_stream_prefix: "job-"
+      metric_namespace: "Joblet/Production"
+      metric_dimensions:
+        Environment: "production"
+        Cluster: "main"
+      log_batch_size: 200
+      metric_batch_size: 50
+
+logging:
+  level: "debug"
+  format: "json"
+  output: "stdout"
+
+security:
+  serverCert: "cert-data"
+  serverKey: "key-data"
+  caCert: "ca-data"
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify CloudWatch config
+	if result.Config.Storage.Type != "cloudwatch" {
+		t.Errorf("Expected storage type 'cloudwatch', got '%s'", result.Config.Storage.Type)
+	}
+
+	cwConfig := result.Config.Storage.CloudWatch
+
+	// Verify region
+	if cwConfig.Region != "us-west-2" {
+		t.Errorf("Expected region 'us-west-2', got '%s'", cwConfig.Region)
+	}
+
+	// Verify log group prefix
+	if cwConfig.LogGroupPrefix != "/joblet" {
+		t.Errorf("Expected log group prefix '/joblet', got '%s'", cwConfig.LogGroupPrefix)
+	}
+
+	// Verify log stream prefix
+	if cwConfig.LogStreamPrefix != "job-" {
+		t.Errorf("Expected log stream prefix 'job-', got '%s'", cwConfig.LogStreamPrefix)
+	}
+
+	// Verify metric namespace
+	if cwConfig.MetricNamespace != "Joblet/Production" {
+		t.Errorf("Expected metric namespace 'Joblet/Production', got '%s'", cwConfig.MetricNamespace)
+	}
+
+	// Verify batch sizes
+	if cwConfig.LogBatchSize != 200 {
+		t.Errorf("Expected log batch size 200, got %d", cwConfig.LogBatchSize)
+	}
+
+	if cwConfig.MetricBatchSize != 50 {
+		t.Errorf("Expected metric batch size 50, got %d", cwConfig.MetricBatchSize)
+	}
+
+	// Verify metric dimensions
+	if len(cwConfig.MetricDimensions) != 2 {
+		t.Errorf("Expected 2 metric dimensions, got %d", len(cwConfig.MetricDimensions))
+	}
+
+	if cwConfig.MetricDimensions["Environment"] != "production" {
+		t.Errorf("Expected Environment='production', got '%s'", cwConfig.MetricDimensions["Environment"])
+	}
+
+	if cwConfig.MetricDimensions["Cluster"] != "main" {
+		t.Errorf("Expected Cluster='main', got '%s'", cwConfig.MetricDimensions["Cluster"])
+	}
+
+	// Verify nodeID is inherited
+	if result.NodeID != "aws-node-456" {
+		t.Errorf("Expected NodeID 'aws-node-456', got '%s'", result.NodeID)
+	}
+}
+
+func TestLoad_EmptyNodeID(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "no-nodeid-config.yml")
+
+	configContent := `
+version: "3.0"
+
+persist:
+  server:
+    grpc_socket: "/tmp/test-grpc.sock"
+  ipc:
+    socket: "/tmp/test-ipc.sock"
+  storage:
+    type: "local"
+    local:
+      logs:
+        directory: "/tmp/test/logs"
+      metrics:
+        directory: "/tmp/test/metrics"
+
+logging:
+  level: "info"
+
+security:
+  serverCert: ""
+  serverKey: ""
+  caCert: ""
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify nodeID is empty when server section is not present
+	if result.NodeID != "" {
+		t.Errorf("Expected empty NodeID, got '%s'", result.NodeID)
+	}
+}
+
+func TestCloudWatchConfig_Defaults(t *testing.T) {
+	// Test that CloudWatch config gets proper defaults when partially specified
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "cw-defaults-config.yml")
+
+	configContent := `
+version: "3.0"
+
+server:
+  nodeId: "test-node"
+
+persist:
+  ipc:
+    socket: "/tmp/test.sock"
+  storage:
+    type: "cloudwatch"
+    cloudwatch:
+      region: "eu-west-1"
+      # Other fields should get defaults
+
+logging:
+  level: "info"
+
+security:
+  serverCert: ""
+  serverKey: ""
+  caCert: ""
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	cwConfig := result.Config.Storage.CloudWatch
+
+	// Region should be specified
+	if cwConfig.Region != "eu-west-1" {
+		t.Errorf("Expected region 'eu-west-1', got '%s'", cwConfig.Region)
+	}
+
+	// Verify nodeID is set (should be inherited and set during backend creation)
+	if result.NodeID != "test-node" {
+		t.Errorf("Expected NodeID 'test-node', got '%s'", result.NodeID)
+	}
+
+	// Note: Defaults for log_group_prefix, etc. are applied in NewCloudWatchBackend
+	// Config struct just holds what's in the YAML file
 }

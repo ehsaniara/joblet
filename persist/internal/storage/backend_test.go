@@ -12,8 +12,7 @@ func TestNewBackend_Local(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: tmpDir + "/logs",
@@ -26,7 +25,7 @@ func TestNewBackend_Local(t *testing.T) {
 
 	log := logger.New()
 
-	backend, err := NewBackend(cfg, log)
+	backend, err := NewBackend(cfg, "test-node", log)
 	if err != nil {
 		t.Fatalf("Failed to create local backend: %v", err)
 	}
@@ -43,21 +42,24 @@ func TestNewBackend_Local(t *testing.T) {
 	}
 }
 
-func TestNewBackend_CloudWatch_NotImplemented(t *testing.T) {
+func TestNewBackend_CloudWatch_RequiresConfig(t *testing.T) {
+	// CloudWatch backend is now implemented but requires proper configuration
+	// This test verifies it initializes (though it may fail without AWS credentials)
 	cfg := &config.StorageConfig{
 		Type: "cloudwatch",
+		CloudWatch: config.CloudWatchConfig{
+			Region: "us-east-1", // Use specific region to avoid auto-detection
+		},
 	}
 
 	log := logger.New()
 
-	_, err := NewBackend(cfg, log)
-	if err == nil {
-		t.Error("Expected error for CloudWatch backend (not implemented)")
+	// Backend may fail due to missing AWS credentials, but should not return "not implemented"
+	_, err := NewBackend(cfg, "test-node", log)
+	if err != nil && err.Error() == "CloudWatch backend not implemented yet (v2.0)" {
+		t.Error("CloudWatch backend should be implemented")
 	}
-
-	if err.Error() != "CloudWatch backend not implemented yet (v2.0)" {
-		t.Errorf("Expected CloudWatch not implemented error, got: %v", err)
-	}
+	// Note: We don't fail on other errors as they may be due to missing AWS credentials in test environment
 }
 
 func TestNewBackend_S3_NotImplemented(t *testing.T) {
@@ -67,7 +69,7 @@ func TestNewBackend_S3_NotImplemented(t *testing.T) {
 
 	log := logger.New()
 
-	_, err := NewBackend(cfg, log)
+	_, err := NewBackend(cfg, "test-node", log)
 	if err == nil {
 		t.Error("Expected error for S3 backend (not implemented)")
 	}
@@ -84,7 +86,7 @@ func TestNewBackend_Unknown(t *testing.T) {
 
 	log := logger.New()
 
-	_, err := NewBackend(cfg, log)
+	_, err := NewBackend(cfg, "test-node", log)
 	if err == nil {
 		t.Error("Expected error for unknown backend type")
 	}

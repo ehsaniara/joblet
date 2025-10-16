@@ -47,8 +47,8 @@ type IPCConfig struct {
 // StorageConfig contains storage backend settings
 type StorageConfig struct {
 	Type        string            `yaml:"type"` // "local", "cloudwatch", "s3"
-	BaseDir     string            `yaml:"base_dir"`
 	Local       LocalConfig       `yaml:"local"`
+	CloudWatch  CloudWatchConfig  `yaml:"cloudwatch"`
 	Retention   RetentionConfig   `yaml:"retention"`
 	Compression CompressionConfig `yaml:"compression"`
 }
@@ -57,6 +57,23 @@ type StorageConfig struct {
 type LocalConfig struct {
 	Logs    LogStorageConfig    `yaml:"logs"`
 	Metrics MetricStorageConfig `yaml:"metrics"`
+}
+
+// CloudWatchConfig contains AWS CloudWatch storage settings
+// Authentication: Uses AWS default credential chain (IAM roles, environment variables, etc.)
+type CloudWatchConfig struct {
+	Region          string `yaml:"region"`            // AWS region (auto-detected from EC2 metadata if empty)
+	NodeID          string `yaml:"-"`                 // Node ID (inherited from server.nodeId, not from YAML)
+	LogGroupPrefix  string `yaml:"log_group_prefix"`  // Prefix for CloudWatch Logs groups (default: /joblet/jobs)
+	LogStreamPrefix string `yaml:"log_stream_prefix"` // Prefix for log streams (default: job-)
+
+	// Metrics configuration
+	MetricNamespace  string            `yaml:"metric_namespace"`  // CloudWatch Metrics namespace (default: Joblet/Jobs)
+	MetricDimensions map[string]string `yaml:"metric_dimensions"` // Additional dimensions for metrics
+
+	// Batch settings
+	LogBatchSize    int `yaml:"log_batch_size"`    // Max log events per batch (default: 100)
+	MetricBatchSize int `yaml:"metric_batch_size"` // Max metric data points per batch (default: 20)
 }
 
 // LogStorageConfig contains log storage settings
@@ -119,9 +136,15 @@ type SecurityConfig struct {
 	CACert     string `yaml:"caCert"`
 }
 
+// ServerInfo contains server-level configuration inherited from parent
+type ServerInfo struct {
+	NodeID string `yaml:"nodeId"` // Node identifier for distributed deployments
+}
+
 // RootConfig wraps the persist config to support nested structure
 // and includes shared configurations from parent (joblet)
 type RootConfig struct {
+	Server   ServerInfo     `yaml:"server"` // Server info (nodeId)
 	Persist  *Config        `yaml:"persist"`
 	Logging  LoggingConfig  `yaml:"logging"`  // Inherited logging config
 	Security SecurityConfig `yaml:"security"` // Inherited TLS certificates
@@ -130,6 +153,7 @@ type RootConfig struct {
 // LoadResult contains persist config and inherited parent configurations
 type LoadResult struct {
 	Config   *Config
+	NodeID   string         // Inherited from parent (server.nodeId)
 	Logging  LoggingConfig  // Inherited from parent
 	Security SecurityConfig // Inherited from parent (TLS certificates)
 }
@@ -159,6 +183,7 @@ func Load(path string) (*LoadResult, error) {
 
 		return &LoadResult{
 			Config:   rootCfg.Persist,
+			NodeID:   rootCfg.Server.NodeID,
 			Logging:  rootCfg.Logging,
 			Security: rootCfg.Security,
 		}, nil
@@ -209,8 +234,7 @@ func DefaultConfig() *Config {
 			WriteBuffer:    8388608,   // 8MB
 		},
 		Storage: StorageConfig{
-			Type:    "local",
-			BaseDir: "/opt/joblet",
+			Type: "local",
 			Local: LocalConfig{
 				Logs: LogStorageConfig{
 					Directory: "/opt/joblet/logs",
@@ -256,12 +280,6 @@ func (c *Config) Validate() error {
 
 	if c.Storage.Type == "" {
 		return fmt.Errorf("storage.type is required")
-	}
-
-	if c.Storage.Type == "local" {
-		if c.Storage.BaseDir == "" {
-			return fmt.Errorf("storage.base_dir is required for local storage")
-		}
 	}
 
 	return nil

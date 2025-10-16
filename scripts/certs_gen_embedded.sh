@@ -186,6 +186,36 @@ if [ -f "$SERVER_TEMPLATE" ]; then
     sed -i "s/address: \".*\"/address: \"$SERVER_ADDRESS\"/" "$SERVER_CONFIG"
     sed -i "s/nodeId: \"\"/nodeId: \"$NODE_ID\"/" "$SERVER_CONFIG"
 
+    # Check if running on AWS EC2 and configure CloudWatch backend automatically
+    if [ -f /tmp/joblet-ec2-info ]; then
+        source /tmp/joblet-ec2-info
+        if [ "$IS_EC2" = "true" ]; then
+            print_info "🌩️  AWS EC2 detected - configuring CloudWatch backend"
+
+            # Update persist storage type to cloudwatch
+            sed -i '/persist:/,/^  storage:/ {
+                /type: "local"/ s/type: "local"/type: "cloudwatch"/
+            }' "$SERVER_CONFIG"
+
+            # Comment out local storage configuration (lines between "local:" and next top-level key)
+            awk '
+            /^    local:/ { in_local=1; print "    # local:"; next }
+            in_local && /^    [a-z]/ && !/^      / { in_local=0 }
+            in_local { print "    #" $0; next }
+            { print }
+            ' "$SERVER_CONFIG" > "${SERVER_CONFIG}.tmp" && mv "${SERVER_CONFIG}.tmp" "$SERVER_CONFIG"
+
+            # Set region if detected
+            if [ -n "$EC2_REGION" ]; then
+                sed -i "/region: \"\"/s/region: \"\"/region: \"$EC2_REGION\"/" "$SERVER_CONFIG"
+            fi
+
+            print_success "CloudWatch backend configured (region: ${EC2_REGION:-auto-detect})"
+            print_info "Logs will be stored in CloudWatch Logs under /joblet/$NODE_ID/jobs/"
+            print_warning "Ensure IAM role with CloudWatch Logs permissions is attached to this EC2 instance"
+        fi
+    fi
+
     # Append security section with embedded certificates
     cat >> "$SERVER_CONFIG" << EOF
 

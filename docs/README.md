@@ -27,6 +27,7 @@ environments without the overhead of containerization.
 - **[NETWORK_MANAGEMENT.md](NETWORK_MANAGEMENT.md)** - Network isolation
 - **[VOLUME_MANAGEMENT.md](VOLUME_MANAGEMENT.md)** - Storage management
 - **[RUNTIME_SYSTEM.md](RUNTIME_SYSTEM.md)** - Runtime environments
+- **[PERSISTENCE.md](PERSISTENCE.md)** - Log and metric persistence (Local, CloudWatch)
 - **[MONITORING.md](MONITORING.md)** - Metrics and observability
 
 ### Operations
@@ -59,9 +60,7 @@ seamless integration with existing infrastructure through a unified gRPC API and
   tracking
 - **Observability**: Real-time metrics collection, structured logging, and comprehensive audit trails for compliance
   requirements
-- **Data Persistence**: Dedicated persistence service (`joblet-persist`) providing high-performance log and metric
-  storage with
-  gzip compression, Unix socket IPC, and historical query capabilities
+- **Data Persistence**: Dedicated persistence service (`joblet-persist`) with multiple storage backends including local filesystem and AWS CloudWatch Logs for cloud-native deployments, featuring multi-node support, high-performance log and metric storage with gzip compression, Unix socket IPC, and historical query capabilities
 
 ### Security Architecture
 

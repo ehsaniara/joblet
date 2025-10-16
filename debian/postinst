@@ -243,10 +243,12 @@ case "$1" in
 
         # Check for EC2-specific information
         EC2_INFO=""
+        EC2_CLOUDWATCH_CONFIGURED=false
         if [ -f /tmp/joblet-ec2-info ]; then
             source /tmp/joblet-ec2-info
             if [ "$IS_EC2" = "true" ]; then
                 EC2_INFO=" (AWS EC2 Instance)"
+                EC2_CLOUDWATCH_CONFIGURED=true
                 print_info "🌩️  AWS EC2 instance detected!"
                 if [ -n "$EC2_INSTANCE_ID" ]; then
                     echo "  Instance ID: $EC2_INSTANCE_ID"
@@ -254,6 +256,11 @@ case "$1" in
                 if [ -n "$EC2_REGION" ]; then
                     echo "  Region: $EC2_REGION"
                 fi
+                echo
+                print_info "📊  CloudWatch Logs backend enabled automatically"
+                echo "  Logs will be stored in AWS CloudWatch Logs"
+                echo "  Log group format: /joblet/{nodeId}/jobs/{jobId}"
+                echo "  Ensure EC2 instance has IAM role with CloudWatch Logs permissions"
                 echo
             fi
         fi
@@ -326,6 +333,9 @@ case "$1" in
         print_info "🚀 Quick Start:"
         echo "  sudo systemctl start joblet    # Start the service"
         echo "  sudo rnx job list              # Test local connection"
+        if [ "$EC2_CLOUDWATCH_CONFIGURED" = "true" ]; then
+            echo "  sudo rnx job run echo 'Hello CloudWatch'  # Test job with CloudWatch logging"
+        fi
         echo
         print_info "📱 Remote Access:"
         echo "  The service accepts connections on: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
@@ -346,6 +356,16 @@ case "$1" in
         echo "  Copy /opt/joblet/config/rnx-config.yml to client machines"
         echo "  Or use: scp root@$JOBLET_CERT_PRIMARY:/opt/joblet/config/rnx-config.yml ~/.rnx/"
         echo
+
+        # CloudWatch-specific information
+        if [ "$EC2_CLOUDWATCH_CONFIGURED" = "true" ]; then
+            print_info "🌩️  AWS CloudWatch Logs Configuration:"
+            echo "  View logs in AWS Console: CloudWatch → Logs → /joblet"
+            echo "  Query logs: aws logs filter-log-events --log-group-name-prefix '/joblet/'"
+            echo "  Configuration: /opt/joblet/config/joblet-config.yml (persist.storage.type: cloudwatch)"
+            echo "  For more info: https://docs.aws.amazon.com/cloudwatch/"
+            echo
+        fi
 
         # Setup user-local rnx installation
         if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then

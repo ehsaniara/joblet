@@ -7,6 +7,8 @@ certificate management, systemd service configuration, and operational procedure
 
 - [System Requirements](#system-requirements)
 - [Architecture Deployment](#architecture-deployment)
+  - [Deployment Topologies](#deployment-topologies)
+  - [AWS EC2 Deployment with CloudWatch](#aws-ec2-deployment-with-cloudwatch)
 - [Installation Methods](#installation-methods)
 - [Service Configuration](#service-configuration)
 - [Certificate Management](#certificate-management)
@@ -63,6 +65,251 @@ systemctl --version
 ```
 
 ## Architecture Deployment
+
+### Deployment Topologies
+
+Joblet supports multiple deployment architectures depending on your infrastructure requirements:
+
+#### 1. Single Node (On-Premises / VM)
+- **Use Case**: Development, testing, small-scale production
+- **Storage Backend**: Local filesystem
+- **Scaling**: Vertical only (add more resources to single node)
+
+#### 2. Multi-Node Cluster (On-Premises / VM)
+- **Use Case**: High-availability, distributed workloads
+- **Storage Backend**: Local filesystem per node + external backup
+- **Scaling**: Horizontal (add more nodes)
+
+#### 3. AWS EC2 Deployment (Cloud-Native)
+- **Use Case**: Cloud deployments, AWS integration, centralized logging
+- **Storage Backend**: AWS CloudWatch Logs
+- **Scaling**: Auto-scaling groups, spot instances
+- **Benefits**:
+  - Automatic region detection
+  - IAM role authentication (no credentials in config)
+  - Multi-node support with nodeID-based log isolation
+  - Integration with AWS monitoring ecosystem
+
+### AWS EC2 Deployment with CloudWatch
+
+For cloud-native deployments on AWS, Joblet can use CloudWatch Logs for centralized log and metric storage across multiple nodes.
+
+#### Prerequisites
+
+1. **EC2 Instance Requirements:**
+   - Amazon Linux 2, Ubuntu 20.04+, or Red Hat Enterprise Linux 8+
+   - Instance type: t3.medium or larger (2 vCPU, 4GB RAM minimum)
+   - Storage: 20GB+ EBS volume
+
+2. **IAM Role Configuration:**
+
+Create an IAM role with CloudWatch Logs permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents",
+        "logs:DeleteLogGroup",
+        "logs:DeleteLogStream",
+        "ec2:DescribeRegions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Attach this role to your EC2 instances.
+
+#### Installation Steps
+
+```bash
+# 1. Launch EC2 instance with IAM role
+aws ec2 run-instances \
+  --image-id ami-xxxxx \
+  --instance-type t3.medium \
+  --iam-instance-profile Name=joblet-cloudwatch-role \
+  --user-data file://install-joblet.sh
+
+# 2. SSH into instance
+ssh ec2-user@<instance-ip>
+
+# 3. Install Joblet (using Debian package or binary)
+wget https://github.com/ehsaniara/joblet/releases/latest/download/joblet_1.0.0_amd64.deb
+sudo dpkg -i joblet_1.0.0_amd64.deb
+
+# 4. Configure CloudWatch backend
+sudo vi /opt/joblet/joblet-config.yml
+```
+
+**Configuration for CloudWatch:**
+
+```yaml
+version: "3.0"
+
+server:
+  nodeId: "prod-node-1"  # REQUIRED: Unique ID for this node
+  address: "0.0.0.0"
+  port: 50051
+
+# Persistence service configuration
+persist:
+  server:
+    grpc_socket: "/opt/joblet/run/persist-grpc.sock"
+
+  ipc:
+    socket: "/opt/joblet/run/persist-ipc.sock"
+
+  storage:
+    type: "cloudwatch"  # Enable CloudWatch backend
+
+    cloudwatch:
+      region: ""  # Auto-detect from EC2 metadata
+      log_group_prefix: "/joblet"  # Logs at: /joblet/{nodeId}/jobs/{jobId}
+      log_stream_prefix: "job-"
+      metric_namespace: "Joblet/Production"
+
+      # Optional: Add custom dimensions for filtering
+      metric_dimensions:
+        Environment: "production"
+        Cluster: "main"
+
+      # Batch settings (tune based on load)
+      log_batch_size: 100
+      metric_batch_size: 20
+
+# Other joblet configuration...
+logging:
+  level: "INFO"
+```
+
+```bash
+# 5. Start Joblet service
+sudo systemctl start joblet
+sudo systemctl enable joblet
+
+# 6. Verify CloudWatch integration
+sudo journalctl -u joblet -f | grep -i cloudwatch
+
+# Expected output:
+# [INFO] CloudWatch backend initialized successfully
+# [INFO] Region set to: us-east-1
+# [INFO] Log group prefix: /joblet
+```
+
+#### Multi-Node AWS Deployment
+
+For distributed deployments across multiple EC2 instances:
+
+**Node 1:**
+```yaml
+server:
+  nodeId: "cluster-node-1"  # Unique per node
+  address: "10.0.1.10"
+```
+
+**Node 2:**
+```yaml
+server:
+  nodeId: "cluster-node-2"  # Unique per node
+  address: "10.0.1.11"
+```
+
+**CloudWatch Log Organization:**
+```
+/joblet/cluster-node-1/jobs/job-abc
+/joblet/cluster-node-1/jobs/job-def
+/joblet/cluster-node-2/jobs/job-ghi
+/joblet/cluster-node-2/jobs/job-jkl
+```
+
+#### Monitoring CloudWatch Logs
+
+**AWS Console:**
+```
+CloudWatch → Logs → Log Groups → /joblet
+```
+
+**AWS CLI:**
+```bash
+# View all log groups
+aws logs describe-log-groups --log-group-name-prefix "/joblet/"
+
+# Get logs for specific job on node-1
+aws logs get-log-events \
+  --log-group-name "/joblet/cluster-node-1/jobs/job-abc" \
+  --log-stream-name "job-job-abc-stdout"
+
+# Search logs across all nodes
+aws logs filter-log-events \
+  --log-group-name-prefix "/joblet/" \
+  --filter-pattern "ERROR" \
+  --start-time 1640995200000
+```
+
+#### Cost Optimization
+
+CloudWatch Logs pricing (as of 2024):
+- **Ingestion**: $0.50 per GB
+- **Storage**: $0.03 per GB/month
+- **Insights queries**: $0.005 per GB scanned
+
+**Example calculation:**
+- 1,000 jobs/day × 10 MB logs = 10 GB/day = 300 GB/month
+- Ingestion: 300 GB × $0.50 = $150/month
+- Storage: 300 GB × $0.03 = $9/month
+- **Total**: ~$160/month
+
+**Cost saving strategies:**
+1. Set log retention policies (7 days, 30 days, etc.)
+2. Use log filtering to reduce ingestion volume
+3. Archive old logs to S3 (future feature)
+
+#### Troubleshooting AWS Deployment
+
+**Issue: "Access Denied" errors**
+```bash
+# Verify IAM role attached to instance
+aws ec2 describe-instances --instance-ids i-xxxxx \
+  --query 'Reservations[0].Instances[0].IamInstanceProfile'
+
+# Test CloudWatch permissions
+aws logs describe-log-groups --log-group-name-prefix "/joblet/"
+```
+
+**Issue: Region auto-detection failed**
+```bash
+# Check EC2 metadata service
+curl http://169.254.169.254/latest/meta-data/placement/region
+
+# If fails, set region explicitly in config
+persist:
+  storage:
+    cloudwatch:
+      region: "us-east-1"  # Explicit region
+```
+
+**Issue: Logs not appearing**
+```bash
+# Check persist service status
+sudo journalctl -u joblet -f | grep persist
+
+# Enable debug logging
+logging:
+  level: "DEBUG"
+
+# Restart service
+sudo systemctl restart joblet
+```
 
 ## Installation Methods
 

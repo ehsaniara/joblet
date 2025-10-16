@@ -16,8 +16,7 @@ func TestNewLocalBackend(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -55,8 +54,7 @@ func TestLocalBackend_WriteLogs(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -115,8 +113,7 @@ func TestLocalBackend_WriteMetrics(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -176,8 +173,7 @@ func TestLocalBackend_ReadLogs(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -268,8 +264,7 @@ func TestLocalBackend_ReadMetrics(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -353,8 +348,7 @@ func TestLocalBackend_DeleteJob(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -431,8 +425,7 @@ func TestLocalBackend_Close(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
@@ -459,8 +452,7 @@ func TestLocalBackend_EmptyJobID(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{
-		Type:    "local",
-		BaseDir: tmpDir,
+		Type: "local",
 		Local: config.LocalConfig{
 			Logs: config.LogStorageConfig{
 				Directory: filepath.Join(tmpDir, "logs"),
