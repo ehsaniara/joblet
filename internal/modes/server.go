@@ -754,7 +754,6 @@ type persistSubprocessSupervisor struct {
 	cfg           *config.Config
 	log           *logger.Logger
 	persistBinary string
-	configPath    string
 
 	// Process management
 	cmd   *exec.Cmd
@@ -786,19 +785,11 @@ func startPersistSupervisor(cfg *config.Config, log *logger.Logger) *persistSubp
 		}
 	}
 
-	// Find config file path (same search order as joblet)
-	configPath := "/opt/joblet/config/joblet-config.yml"
-	if envPath := os.Getenv("JOBLET_CONFIG_PATH"); envPath != "" {
-		configPath = envPath
-	} else if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Try relative paths for development
-		for _, path := range []string{"./config/joblet-config.yml", "./joblet-config.yml"} {
-			if _, err := os.Stat(path); err == nil {
-				configPath = path
-				break
-			}
-		}
-	}
+	// Note: Config path not needed - persist binary uses well-known default locations:
+	// 1. JOBLET_CONFIG_PATH env var (if set)
+	// 2. /opt/joblet/config/joblet-config.yml (production default)
+	// 3. ./config/joblet-config.yml (development fallback)
+	// Same search order as main joblet binary
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -806,7 +797,6 @@ func startPersistSupervisor(cfg *config.Config, log *logger.Logger) *persistSubp
 		cfg:             cfg,
 		log:             log.WithField("component", "persist-supervisor"),
 		persistBinary:   persistBinary,
-		configPath:      configPath,
 		ctx:             ctx,
 		cancel:          cancel,
 		minRestartDelay: 1 * time.Second,
@@ -891,7 +881,8 @@ func (s *persistSubprocessSupervisor) startProcess() error {
 	s.cmdMu.Lock()
 	defer s.cmdMu.Unlock()
 
-	cmd := exec.Command(s.persistBinary, "-config", s.configPath)
+	// /opt/joblet/config/joblet-config.yml (or JOBLET_CONFIG_PATH env var if set)
+	cmd := exec.Command(s.persistBinary)
 
 	// Unified logging with [PERSIST] prefix
 	cmd.Stdout = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stdout}
