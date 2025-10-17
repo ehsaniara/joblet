@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.9
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.58.2
 	github.com/ehsaniara/joblet v0.0.0-00010101000000-000000000000
-	github.com/ehsaniara/joblet-proto/v2 v2.2.1
+	github.com/ehsaniara/joblet-proto/v2 v2.2.2
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
@@ -34,5 +34,3 @@ require (
 )
 
 replace github.com/ehsaniara/joblet => ../
-
-replace github.com/ehsaniara/joblet-proto/v2 => ../../joblet-proto
