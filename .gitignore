@@ -37,6 +37,9 @@ tmp
 # Runtime packages (store in releases instead)
 examples/packages/*.tar.gz
 
+# Persist binary
+persist/joblet-persist
+
 # Release build artifacts
 /release
 

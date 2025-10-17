@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -418,5 +419,14 @@ func (s *GRPCServer) DeleteJob(ctx context.Context, req *persistpb.DeleteJobRequ
 	return &persistpb.DeleteJobResponse{
 		Success: true,
 		Message: "Job deleted successfully",
+	}, nil
+}
+
+// Ping implements the health check RPC
+func (s *GRPCServer) Ping(ctx context.Context, req *persistpb.PingRequest) (*persistpb.PingResponse, error) {
+	// No authorization check for ping - it's a health check
+	return &persistpb.PingResponse{
+		Healthy:   true,
+		Timestamp: time.Now().UnixNano(),
 	}, nil
 }

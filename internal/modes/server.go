@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -190,12 +191,12 @@ func RunServer(cfg *config.Config) error {
 	}()
 	log.Info("monitoring service started successfully")
 
-	// Start joblet-persist subprocess if enabled
-	var persistCmd *exec.Cmd
+	// Start joblet-persist subprocess supervisor if enabled
+	var persistSupervisor *persistSubprocessSupervisor
 	if cfg.IPC.Enabled {
-		persistCmd = startPersistSubprocess(cfg, log)
-		if persistCmd != nil {
-			defer stopPersistSubprocess(persistCmd, log)
+		persistSupervisor = startPersistSupervisor(cfg, log)
+		if persistSupervisor != nil {
+			defer persistSupervisor.Stop()
 		}
 	}
 
@@ -748,9 +749,31 @@ func initializeDefaultNetworks(networkStore adapters.NetworkStorer, cfg *config.
 	return nil
 }
 
-// startPersistSubprocess starts joblet-persist as a subprocess with unified logging
-func startPersistSubprocess(cfg *config.Config, log *logger.Logger) *exec.Cmd {
-	log.Info("[INIT] Starting joblet-persist subprocess...")
+// persistSubprocessSupervisor manages the persist subprocess with auto-restart capability
+type persistSubprocessSupervisor struct {
+	cfg           *config.Config
+	log           *logger.Logger
+	persistBinary string
+	configPath    string
+
+	// Process management
+	cmd   *exec.Cmd
+	cmdMu sync.Mutex
+
+	// Lifecycle
+	ctx          context.Context
+	cancel       context.CancelFunc
+	stopped      atomic.Bool
+	restartCount atomic.Uint64
+
+	// Restart configuration
+	minRestartDelay time.Duration
+	maxRestartDelay time.Duration
+}
+
+// startPersistSupervisor starts the persist subprocess supervisor with auto-restart
+func startPersistSupervisor(cfg *config.Config, log *logger.Logger) *persistSubprocessSupervisor {
+	log.Info("[INIT] Starting joblet-persist subprocess supervisor...")
 
 	// Find persist binary
 	persistBinary := "/opt/joblet/bin/joblet-persist"
@@ -777,69 +800,163 @@ func startPersistSubprocess(cfg *config.Config, log *logger.Logger) *exec.Cmd {
 		}
 	}
 
-	cmd := exec.Command(persistBinary, "-config", configPath)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	supervisor := &persistSubprocessSupervisor{
+		cfg:             cfg,
+		log:             log.WithField("component", "persist-supervisor"),
+		persistBinary:   persistBinary,
+		configPath:      configPath,
+		ctx:             ctx,
+		cancel:          cancel,
+		minRestartDelay: 1 * time.Second,
+		maxRestartDelay: 30 * time.Second,
+	}
+
+	// Start supervision loop
+	go supervisor.supervisionLoop()
+
+	return supervisor
+}
+
+// supervisionLoop monitors and auto-restarts the persist subprocess
+func (s *persistSubprocessSupervisor) supervisionLoop() {
+	restartDelay := s.minRestartDelay
+
+	for {
+		// Check if we should stop
+		if s.stopped.Load() {
+			s.log.Info("Supervision loop stopping (shutdown requested)")
+			return
+		}
+
+		// Start persist subprocess
+		if err := s.startProcess(); err != nil {
+			s.log.Error("Failed to start persist subprocess", "error", err)
+
+			// Wait before retry with exponential backoff
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-time.After(restartDelay):
+				// Exponential backoff (cap at maxRestartDelay)
+				restartDelay = restartDelay * 2
+				if restartDelay > s.maxRestartDelay {
+					restartDelay = s.maxRestartDelay
+				}
+				continue
+			}
+		}
+
+		// Wait for process to exit
+		err := s.cmd.Wait()
+
+		// Check if this was an intentional shutdown
+		if s.stopped.Load() {
+			s.log.Info("Persist subprocess exited (intentional shutdown)")
+			return
+		}
+
+		// Process crashed or exited unexpectedly
+		s.restartCount.Add(1)
+		restartNum := s.restartCount.Load()
+
+		if err != nil {
+			s.log.Error("Persist subprocess crashed, auto-restarting",
+				"error", err,
+				"restartCount", restartNum,
+				"restartDelay", restartDelay)
+		} else {
+			s.log.Warn("Persist subprocess exited unexpectedly, auto-restarting",
+				"restartCount", restartNum,
+				"restartDelay", restartDelay)
+		}
+
+		// Wait before restart with backoff
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(restartDelay):
+			// Exponential backoff
+			restartDelay = restartDelay * 2
+			if restartDelay > s.maxRestartDelay {
+				restartDelay = s.maxRestartDelay
+			}
+		}
+	}
+}
+
+// startProcess starts the persist subprocess
+func (s *persistSubprocessSupervisor) startProcess() error {
+	s.cmdMu.Lock()
+	defer s.cmdMu.Unlock()
+
+	cmd := exec.Command(s.persistBinary, "-config", s.configPath)
 
 	// Unified logging with [PERSIST] prefix
 	cmd.Stdout = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stdout}
 	cmd.Stderr = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stderr}
 
-	// Keep subprocess in same process group and inherit stdin
+	// Keep subprocess in same process group
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: false, // Keep in same process group
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Error("[INIT] Failed to start joblet-persist subprocess", "error", err)
-		return nil
+		return fmt.Errorf("failed to start persist subprocess: %w", err)
 	}
 
-	log.Info("[INIT] joblet-persist subprocess started", "pid", cmd.Process.Pid)
+	s.cmd = cmd
+	s.log.Info("Persist subprocess started", "pid", cmd.Process.Pid, "restartCount", s.restartCount.Load())
 
-	// Monitor subprocess in background
-	go func() {
-		err := cmd.Wait()
-		if err != nil {
-			log.Error("[PERSIST] Subprocess exited with error", "error", err, "pid", cmd.Process.Pid)
-		} else {
-			log.Info("[PERSIST] Subprocess exited cleanly", "pid", cmd.Process.Pid)
-		}
-	}()
-
-	return cmd
+	return nil
 }
 
-// stopPersistSubprocess gracefully stops the joblet-persist subprocess
-func stopPersistSubprocess(cmd *exec.Cmd, log *logger.Logger) {
-	if cmd == nil || cmd.Process == nil {
-		return
+// Stop gracefully stops the persist supervisor and subprocess
+func (s *persistSubprocessSupervisor) Stop() {
+	if s.stopped.Swap(true) {
+		return // Already stopped
 	}
 
-	pid := cmd.Process.Pid
-	log.Info("[INIT] Stopping joblet-persist subprocess...", "pid", pid)
+	s.log.Info("Stopping persist supervisor...")
 
-	// Send SIGTERM for graceful shutdown
-	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		log.Warn("[INIT] Failed to send SIGTERM to persist subprocess", "error", err, "pid", pid)
-		return
-	}
+	// Cancel context to stop supervision loop
+	s.cancel()
 
-	// Wait for graceful shutdown with timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
+	// Stop current subprocess if running
+	s.cmdMu.Lock()
+	cmd := s.cmd
+	s.cmdMu.Unlock()
 
-	select {
-	case <-time.After(10 * time.Second):
-		log.Warn("[INIT] Persist subprocess did not exit gracefully, force killing", "pid", pid)
-		if err := cmd.Process.Kill(); err != nil {
-			log.Error("[INIT] Failed to kill persist subprocess", "error", err, "pid", pid)
+	if cmd != nil && cmd.Process != nil {
+		pid := cmd.Process.Pid
+
+		// Send SIGTERM for graceful shutdown
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			s.log.Warn("Failed to send SIGTERM to persist subprocess", "error", err, "pid", pid)
+			return
 		}
-	case err := <-done:
-		if err != nil {
-			log.Warn("[INIT] Persist subprocess stopped with error", "error", err, "pid", pid)
-		} else {
-			log.Info("[INIT] Persist subprocess stopped gracefully", "pid", pid)
+
+		// Wait for graceful shutdown with timeout
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		select {
+		case <-time.After(10 * time.Second):
+			s.log.Warn("Persist subprocess did not exit gracefully, force killing", "pid", pid)
+			if err := cmd.Process.Kill(); err != nil {
+				s.log.Error("Failed to kill persist subprocess", "error", err, "pid", pid)
+			}
+		case err := <-done:
+			if err != nil {
+				s.log.Warn("Persist subprocess stopped with error", "error", err, "pid", pid)
+			} else {
+				s.log.Info("Persist subprocess stopped gracefully", "pid", pid)
+			}
 		}
 	}
+
+	s.log.Info("Persist supervisor stopped", "totalRestarts", s.restartCount.Load())
 }

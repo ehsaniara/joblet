@@ -26,6 +26,7 @@ type JobStorer interface {
 	WriteToBuffer(jobID string, chunk []byte)
 	Output(id string) ([]byte, bool, error)
 	SendUpdatesToClient(ctx context.Context, id string, stream interfaces.DomainStreamer) error
+	SendUpdatesToClientWithSkip(ctx context.Context, id string, stream interfaces.DomainStreamer, skipCount int) error
 
 	// Taking care of job logs
 	DeleteJobLogs(jobID string) error

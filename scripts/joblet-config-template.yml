@@ -140,7 +140,6 @@ persist:
   server:
     grpc_socket: "/opt/joblet/run/persist-grpc.sock"  # Unix socket for gRPC queries (TCP disabled)
     max_connections: 500       # Override: Different connection limit
-    base_path: "/opt/joblet"   # Inherited from parent's filesystem
     # TLS: Disabled for Unix socket (pure Linux IPC)
 
   ipc:

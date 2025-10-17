@@ -87,7 +87,7 @@ func TestCalculateAggregate(t *testing.T) {
 }
 
 func TestAggregateCPUMetrics(t *testing.T) {
-	server := &JobServiceServer{}
+	server := &WorkflowServiceServer{}
 
 	samples := []*domain.JobMetricsSample{
 		{
@@ -134,7 +134,7 @@ func TestAggregateCPUMetrics(t *testing.T) {
 }
 
 func TestAggregateMemoryMetrics(t *testing.T) {
-	server := &JobServiceServer{}
+	server := &WorkflowServiceServer{}
 
 	samples := []*domain.JobMetricsSample{
 		{
@@ -178,7 +178,7 @@ func TestAggregateMemoryMetrics(t *testing.T) {
 }
 
 func TestAggregateIOMetrics(t *testing.T) {
-	server := &JobServiceServer{}
+	server := &WorkflowServiceServer{}
 
 	samples := []*domain.JobMetricsSample{
 		{
@@ -215,7 +215,7 @@ func TestAggregateIOMetrics(t *testing.T) {
 }
 
 func TestAggregateNetworkMetrics(t *testing.T) {
-	server := &JobServiceServer{}
+	server := &WorkflowServiceServer{}
 
 	samples := []*domain.JobMetricsSample{
 		{
@@ -258,7 +258,7 @@ func TestAggregateNetworkMetrics(t *testing.T) {
 }
 
 func TestAggregateMetrics_EmptySamples(t *testing.T) {
-	server := &JobServiceServer{}
+	server := &WorkflowServiceServer{}
 
 	result := server.aggregateCPUMetrics([]*domain.JobMetricsSample{})
 	if result != nil {

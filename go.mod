@@ -28,3 +28,5 @@ require (
 )
 
 tool github.com/maxbrunsfeld/counterfeiter/v6
+
+replace github.com/ehsaniara/joblet-proto/v2 => ../joblet-proto

@@ -150,15 +150,6 @@ openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.p
     -CAcreateserial -out admin-client-cert.pem
 print_success "Admin client certificate generated"
 
-# Generate viewer client certificate
-print_info "Generating viewer client certificate..."
-openssl genrsa -out viewer-client-key.pem 2048
-openssl req -new -key viewer-client-key.pem -out viewer-client.csr \
-    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=viewer/CN=viewer-client"
-openssl x509 -req -days 365 -in viewer-client.csr -CA ca-cert.pem -CAkey ca-key.pem \
-    -CAcreateserial -out viewer-client-cert.pem
-print_success "Viewer client certificate generated"
-
 # Function to read and indent certificate content for YAML
 read_cert_for_yaml() {
     local file="$1"
@@ -253,16 +244,6 @@ $(read_cert_for_yaml admin-client-cert.pem "      ")
 $(read_cert_for_yaml admin-client-key.pem "      ")
     ca: |
 $(read_cert_for_yaml ca-cert.pem "      ")
-
-  viewer:
-    address: "$SERVER_ADDRESS:50051"
-    nodeId: "$NODE_ID"
-    cert: |
-$(read_cert_for_yaml viewer-client-cert.pem "      ")
-    key: |
-$(read_cert_for_yaml viewer-client-key.pem "      ")
-    ca: |
-$(read_cert_for_yaml ca-cert.pem "      ")
 EOF
 
 print_success "Client configuration created with embedded certificates"
@@ -282,13 +263,6 @@ if openssl verify -CAfile ca-cert.pem admin-client-cert.pem > /dev/null 2>&1; th
     print_success "Admin client certificate verified"
 else
     print_error "Admin client certificate verification failed"
-    CERT_ERRORS=$((CERT_ERRORS + 1))
-fi
-
-if openssl verify -CAfile ca-cert.pem viewer-client-cert.pem > /dev/null 2>&1; then
-    print_success "Viewer client certificate verified"
-else
-    print_error "Viewer client certificate verification failed"
     CERT_ERRORS=$((CERT_ERRORS + 1))
 fi
 

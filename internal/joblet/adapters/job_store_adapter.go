@@ -423,6 +423,12 @@ func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 // First sends existing buffer content, then subscribes to real-time updates.
 // Handles completed jobs by sending existing logs and terminating immediately.
 func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, stream interfaces.DomainStreamer) error {
+	return a.SendUpdatesToClientWithSkip(ctx, id, stream, 0)
+}
+
+// SendUpdatesToClientWithSkip sends updates to client, skipping the first skipCount items
+// This is used to avoid duplicates when persist has already sent some items
+func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id string, stream interfaces.DomainStreamer, skipCount int) error {
 	// Resolve UUID by prefix first
 	resolvedUuid, err := a.resolveUuidByPrefix(id)
 	if err != nil {
@@ -439,9 +445,16 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 		return fmt.Errorf("job not found")
 	}
 
-	// Send existing buffer content first
+	// Send existing buffer content, skipping items already sent by persist
 	if task.logBuffer != nil {
-		chunks := task.logBuffer.ReadAll()
+		var chunks [][]byte
+		if skipCount > 0 {
+			chunks = task.logBuffer.ReadAfterSkip(skipCount)
+			a.logger.Debug("reading buffer with skip", "jobId", id, "skipCount", skipCount, "remainingChunks", len(chunks))
+		} else {
+			chunks = task.logBuffer.ReadAll()
+		}
+
 		if len(chunks) > 0 {
 			for _, chunk := range chunks {
 				if err := stream.SendData(chunk); err != nil {
@@ -449,7 +462,7 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 					return err
 				}
 			}
-			a.logger.Debug("sent existing logs", "jobId", id, "chunkCount", len(chunks))
+			a.logger.Debug("sent existing logs", "jobId", id, "chunkCount", len(chunks), "skipped", skipCount)
 		}
 	}
 

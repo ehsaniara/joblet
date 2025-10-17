@@ -191,7 +191,18 @@ func (a *MetricsStoreAdapter) StreamMetrics(
 	jobID string,
 	callback func(*domain.JobMetricsSample) error,
 ) error {
-	a.logger.Debug("starting metrics stream", "jobId", jobID)
+	return a.StreamMetricsWithSkip(ctx, jobID, 0, callback)
+}
+
+// StreamMetricsWithSkip streams metrics, skipping the first skipCount buffered samples
+// This is used to avoid duplicates when persist has already sent some samples
+func (a *MetricsStoreAdapter) StreamMetricsWithSkip(
+	ctx context.Context,
+	jobID string,
+	skipCount int,
+	callback func(*domain.JobMetricsSample) error,
+) error {
+	a.logger.Debug("starting metrics stream", "jobId", jobID, "skipCount", skipCount)
 
 	// Check if there's an active collector for this job
 	a.collectorsMutex.RLock()
@@ -201,11 +212,21 @@ func (a *MetricsStoreAdapter) StreamMetrics(
 	// Track latest timestamp sent to avoid duplicates
 	var lastTimestamp time.Time
 
-	// Step 1: Send buffered samples first (prevents gaps)
+	// Step 1: Send buffered samples first (prevents gaps), skipping items already sent by persist
 	// The buffer contains the last ~100 samples collected for this job
 	// This ensures continuity even if persist hasn't caught up yet
 	if a.buffer != nil {
 		bufferedSamples := a.buffer.GetRecent(jobID, 100)
+
+		// Skip samples already sent by persist
+		if skipCount > 0 && skipCount < len(bufferedSamples) {
+			bufferedSamples = bufferedSamples[skipCount:]
+			a.logger.Debug("skipped buffered samples already sent by persist", "jobId", jobID, "skipped", skipCount, "remaining", len(bufferedSamples))
+		} else if skipCount >= len(bufferedSamples) {
+			bufferedSamples = []*domain.JobMetricsSample{}
+			a.logger.Debug("all buffered samples already sent by persist", "jobId", jobID, "skipped", len(bufferedSamples))
+		}
+
 		if len(bufferedSamples) > 0 {
 			a.logger.Debug("sending buffered metrics samples", "jobId", jobID, "count", len(bufferedSamples))
 			for _, sample := range bufferedSamples {
@@ -218,7 +239,7 @@ func (a *MetricsStoreAdapter) StreamMetrics(
 			}
 			a.logger.Debug("buffered samples sent", "jobId", jobID, "lastTimestamp", lastTimestamp)
 		} else {
-			a.logger.Debug("no buffered samples for job", "jobId", jobID)
+			a.logger.Debug("no buffered samples to send (all skipped or none available)", "jobId", jobID)
 		}
 	}
 

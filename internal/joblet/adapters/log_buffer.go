@@ -47,6 +47,27 @@ func (b *SimpleLogBuffer) ReadAll() [][]byte {
 	return result
 }
 
+// ReadAfterSkip returns buffered data starting after skipCount items
+// This is used to avoid duplicates when persist has already sent the first N items
+func (b *SimpleLogBuffer) ReadAfterSkip(skipCount int) [][]byte {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	// If skip count is greater than or equal to data length, return empty
+	if skipCount >= len(b.data) {
+		return [][]byte{}
+	}
+
+	// Return items after skipCount
+	remaining := b.data[skipCount:]
+	result := make([][]byte, len(remaining))
+	for i, chunk := range remaining {
+		result[i] = make([]byte, len(chunk))
+		copy(result[i], chunk)
+	}
+	return result
+}
+
 // Size returns the number of log chunks
 func (b *SimpleLogBuffer) Size() int {
 	b.mutex.RLock()

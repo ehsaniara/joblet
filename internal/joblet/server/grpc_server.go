@@ -7,7 +7,6 @@ import (
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
-	"github.com/ehsaniara/joblet/internal/joblet/core"
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
@@ -23,22 +22,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
-// StartGRPCServerWithRegistry initializes and starts the main Joblet gRPC server using service registry pattern.
-func StartGRPCServerWithRegistry(serviceComponents *core.ServiceComponents, cfg *config.Config, platform platform.Platform) (*grpc.Server, error) {
-	return StartGRPCServer(
-		serviceComponents.JobStore,
-		serviceComponents.MetricsStore,
-		serviceComponents.Joblet,
-		cfg,
-		serviceComponents.NetworkStore,
-		serviceComponents.VolumeManager,
-		serviceComponents.MonitoringService,
-		platform,
-	)
-}
-
 // StartGRPCServer initializes and starts the main Joblet gRPC server.
-// DEPRECATED: Use StartGRPCServerWithRegistry for new implementations
 func StartGRPCServer(jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStorer, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()

@@ -136,6 +136,20 @@ type FakeJobStorer struct {
 	sendUpdatesToClientReturnsOnCall map[int]struct {
 		result1 error
 	}
+	SendUpdatesToClientWithSkipStub        func(context.Context, string, interfaces.DomainStreamer, int) error
+	sendUpdatesToClientWithSkipMutex       sync.RWMutex
+	sendUpdatesToClientWithSkipArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+		arg3 interfaces.DomainStreamer
+		arg4 int
+	}
+	sendUpdatesToClientWithSkipReturns struct {
+		result1 error
+	}
+	sendUpdatesToClientWithSkipReturnsOnCall map[int]struct {
+		result1 error
+	}
 	UpdateJobStub        func(*domain.Job)
 	updateJobMutex       sync.RWMutex
 	updateJobArgsForCall []struct {
@@ -782,6 +796,70 @@ func (fake *FakeJobStorer) SendUpdatesToClientReturnsOnCall(i int, result1 error
 		})
 	}
 	fake.sendUpdatesToClientReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStorer) SendUpdatesToClientWithSkip(arg1 context.Context, arg2 string, arg3 interfaces.DomainStreamer, arg4 int) error {
+	fake.sendUpdatesToClientWithSkipMutex.Lock()
+	ret, specificReturn := fake.sendUpdatesToClientWithSkipReturnsOnCall[len(fake.sendUpdatesToClientWithSkipArgsForCall)]
+	fake.sendUpdatesToClientWithSkipArgsForCall = append(fake.sendUpdatesToClientWithSkipArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+		arg3 interfaces.DomainStreamer
+		arg4 int
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.SendUpdatesToClientWithSkipStub
+	fakeReturns := fake.sendUpdatesToClientWithSkipReturns
+	fake.recordInvocation("SendUpdatesToClientWithSkip", []interface{}{arg1, arg2, arg3, arg4})
+	fake.sendUpdatesToClientWithSkipMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJobStorer) SendUpdatesToClientWithSkipCallCount() int {
+	fake.sendUpdatesToClientWithSkipMutex.RLock()
+	defer fake.sendUpdatesToClientWithSkipMutex.RUnlock()
+	return len(fake.sendUpdatesToClientWithSkipArgsForCall)
+}
+
+func (fake *FakeJobStorer) SendUpdatesToClientWithSkipCalls(stub func(context.Context, string, interfaces.DomainStreamer, int) error) {
+	fake.sendUpdatesToClientWithSkipMutex.Lock()
+	defer fake.sendUpdatesToClientWithSkipMutex.Unlock()
+	fake.SendUpdatesToClientWithSkipStub = stub
+}
+
+func (fake *FakeJobStorer) SendUpdatesToClientWithSkipArgsForCall(i int) (context.Context, string, interfaces.DomainStreamer, int) {
+	fake.sendUpdatesToClientWithSkipMutex.RLock()
+	defer fake.sendUpdatesToClientWithSkipMutex.RUnlock()
+	argsForCall := fake.sendUpdatesToClientWithSkipArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakeJobStorer) SendUpdatesToClientWithSkipReturns(result1 error) {
+	fake.sendUpdatesToClientWithSkipMutex.Lock()
+	defer fake.sendUpdatesToClientWithSkipMutex.Unlock()
+	fake.SendUpdatesToClientWithSkipStub = nil
+	fake.sendUpdatesToClientWithSkipReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStorer) SendUpdatesToClientWithSkipReturnsOnCall(i int, result1 error) {
+	fake.sendUpdatesToClientWithSkipMutex.Lock()
+	defer fake.sendUpdatesToClientWithSkipMutex.Unlock()
+	fake.SendUpdatesToClientWithSkipStub = nil
+	if fake.sendUpdatesToClientWithSkipReturnsOnCall == nil {
+		fake.sendUpdatesToClientWithSkipReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.sendUpdatesToClientWithSkipReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }

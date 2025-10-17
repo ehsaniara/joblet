@@ -21,14 +21,12 @@ echo "Generating protobuf code from joblet-proto ${PROTO_VERSION}..."
 # Ensure we're in the project root
 cd "${PROJECT_ROOT}"
 
-# Download from module cache
+# Download from module cache (or use local with replace directive)
 echo "Downloading proto module from cache..."
 go mod download github.com/ehsaniara/joblet-proto/v2
 
-# Get the module cache path
-GOMODCACHE=$(go env GOMODCACHE)
-PROTO_MODULE_PATH=$(go list -m -f '{{.Path}}@{{.Version}}' github.com/ehsaniara/joblet-proto/v2)
-PROTO_PATH="${GOMODCACHE}/${PROTO_MODULE_PATH}"
+# Get the actual module path (handles both cache and replace directive)
+PROTO_PATH=$(go list -m -f '{{.Dir}}' github.com/ehsaniara/joblet-proto/v2)
 
 # Verify the proto module exists
 if [ ! -d "${PROTO_PATH}" ]; then

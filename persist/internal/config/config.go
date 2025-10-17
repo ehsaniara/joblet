@@ -21,7 +21,6 @@ type ServerConfig struct {
 	GRPCAddress    string     `yaml:"grpc_address"` // TCP address (optional, can be empty to disable)
 	GRPCSocket     string     `yaml:"grpc_socket"`  // Unix socket for internal IPC (e.g., /opt/joblet/run/persist-grpc.sock)
 	MaxConnections int        `yaml:"max_connections"`
-	BasePath       string     `yaml:"base_path"`
 	TLS            *TLSConfig `yaml:"tls,omitempty"` // Optional: defaults to inherited security
 }
 
@@ -223,7 +222,6 @@ func DefaultConfig() *Config {
 			GRPCAddress:    "",                                  // TCP disabled - using Unix socket
 			GRPCSocket:     "/opt/joblet/run/persist-grpc.sock", // Unix socket for gRPC queries
 			MaxConnections: 500,
-			BasePath:       "/opt/joblet",
 			TLS:            nil, // nil = fully inherited from parent's security section
 		},
 		IPC: IPCConfig{

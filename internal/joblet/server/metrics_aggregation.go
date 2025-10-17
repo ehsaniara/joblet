@@ -9,7 +9,7 @@ import (
 )
 
 // aggregateCPUMetrics calculates aggregate statistics for CPU usage
-func (s *JobServiceServer) aggregateCPUMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
+func (s *WorkflowServiceServer) aggregateCPUMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
 	if len(samples) == 0 {
 		return nil
 	}
@@ -23,7 +23,7 @@ func (s *JobServiceServer) aggregateCPUMetrics(samples []*domain.JobMetricsSampl
 }
 
 // aggregateMemoryMetrics calculates aggregate statistics for memory usage
-func (s *JobServiceServer) aggregateMemoryMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
+func (s *WorkflowServiceServer) aggregateMemoryMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
 	if len(samples) == 0 {
 		return nil
 	}
@@ -37,7 +37,7 @@ func (s *JobServiceServer) aggregateMemoryMetrics(samples []*domain.JobMetricsSa
 }
 
 // aggregateIOMetrics calculates aggregate statistics for I/O throughput (combined read+write BPS)
-func (s *JobServiceServer) aggregateIOMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
+func (s *WorkflowServiceServer) aggregateIOMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
 	if len(samples) == 0 {
 		return nil
 	}
@@ -53,7 +53,7 @@ func (s *JobServiceServer) aggregateIOMetrics(samples []*domain.JobMetricsSample
 }
 
 // aggregateNetworkMetrics calculates aggregate statistics for network throughput (combined RX+TX BPS)
-func (s *JobServiceServer) aggregateNetworkMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
+func (s *WorkflowServiceServer) aggregateNetworkMetrics(samples []*domain.JobMetricsSample) *pb.JobMetricsAggregate {
 	if len(samples) == 0 {
 		return nil
 	}

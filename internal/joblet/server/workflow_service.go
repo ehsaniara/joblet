@@ -275,6 +275,15 @@ func (s *WorkflowServiceServer) runIndividualJob(ctx context.Context, req *pb.Ru
 
 	log.Debug("processing individual job request (original JobService logic)")
 
+	// CRITICAL: Verify persist is healthy before accepting jobs
+	// If persist is down, we'll lose all logs and metrics for this job
+	if s.persistClient != nil {
+		if err := s.checkPersistHealth(ctx); err != nil {
+			log.Error("persist service unavailable, cannot execute job", "error", err)
+			return nil, status.Errorf(codes.Unavailable, "persist service unavailable: %v - cannot execute job to prevent data loss", err)
+		}
+	}
+
 	// Convert protobuf request to domain request object (reuse JobService conversion logic)
 	jobRequest, err := s.convertToIndividualJobRequest(req)
 	if err != nil {
@@ -329,6 +338,15 @@ func (s *WorkflowServiceServer) runIndividualJob(ctx context.Context, req *pb.Ru
 // runExistingWorkflowJob handles jobs that are part of existing workflows
 func (s *WorkflowServiceServer) runExistingWorkflowJob(ctx context.Context, req *pb.RunJobRequest) (*pb.RunJobResponse, error) {
 	log := s.logger.WithField("workflowUuid", req.WorkflowUuid)
+
+	// CRITICAL: Verify persist is healthy before accepting jobs
+	// If persist is down, we'll lose all logs and metrics for this job
+	if s.persistClient != nil {
+		if err := s.checkPersistHealth(ctx); err != nil {
+			log.Error("persist service unavailable, cannot execute job", "error", err)
+			return nil, status.Errorf(codes.Unavailable, "persist service unavailable: %v - cannot execute job to prevent data loss", err)
+		}
+	}
 
 	jobRequest, err := s.convertToWorkflowJobRequest(req)
 	if err != nil {
@@ -1335,6 +1353,8 @@ func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobS
 	}
 
 	// Step 1: Fetch and stream historical logs from persist (if available)
+	// Always query persist first for complete historical data
+	historicalCount := 0
 	if s.persistClient != nil {
 		log.Debug("fetching historical logs from persist")
 
@@ -1349,7 +1369,6 @@ func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobS
 			log.Warn("failed to query historical logs from persist", "error", err)
 		} else {
 			// Stream historical logs to client
-			historicalCount := 0
 			for {
 				logLine, err := persistStream.Recv()
 				if err != nil {
@@ -1375,7 +1394,20 @@ func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobS
 	}
 
 	// Step 2: Stream live logs using the job store
-	log.Debug("starting live log streaming")
+	// For completed jobs with persist data, skip buffer to avoid duplicates
+	// For running jobs or when persist unavailable, use buffer + live subscription
+	if historicalCount > 0 {
+		// Check if job is completed
+		job, exists := s.jobStore.Job(req.GetUuid())
+		if exists && job.IsCompleted() {
+			// Job is completed and persist has data - skip buffer to avoid duplicates
+			log.Debug("job completed with persist data, skipping buffer to avoid duplicates", "historicalCount", historicalCount)
+			return nil
+		}
+	}
+
+	// Job is still running or persist has no data - stream from buffer + live subscription
+	log.Debug("starting live log streaming from buffer")
 	streamer := &workflowGrpcToDomainStreamer{stream: stream}
 
 	err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetUuid(), streamer)
@@ -1387,7 +1419,7 @@ func (s *WorkflowServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobS
 		return status.Errorf(codes.Internal, "failed to stream logs: %v", err)
 	}
 
-	log.Debug("log streaming completed successfully")
+	log.Debug("log streaming completed successfully", "totalFromPersist", historicalCount)
 	return nil
 }
 
@@ -1601,6 +1633,9 @@ func getFileKeys(files map[string][]byte) []string {
 
 // GetJobMetrics streams historical metrics followed by live metrics for a job
 // This is the recommended method for getting complete metrics (history + live streaming)
+// NOTE: Metrics architecture differs from logs:
+// - Logs: Buffer accumulates ALL output → safe to skip persist for running jobs
+// - Metrics: Circular buffer (limited capacity) → MUST use persist for complete history
 func (s *WorkflowServiceServer) GetJobMetrics(req *pb.JobMetricsRequest, stream grpc.ServerStreamingServer[pb.JobMetricsSample]) error {
 	log := s.logger.WithFields("operation", "GetJobMetrics", "uuid", req.Uuid)
 	log.Debug("get job metrics request received")
@@ -1623,6 +1658,8 @@ func (s *WorkflowServiceServer) GetJobMetrics(req *pb.JobMetricsRequest, stream 
 	}
 
 	// Step 1: Fetch and stream historical metrics from persist (if available)
+	// Persist accumulates ALL metrics samples, while buffer is circular (limited capacity)
+	historicalCount := 0
 	if s.persistClient != nil {
 		log.Debug("fetching historical metrics from persist")
 
@@ -1636,7 +1673,6 @@ func (s *WorkflowServiceServer) GetJobMetrics(req *pb.JobMetricsRequest, stream 
 			log.Warn("failed to query historical metrics from persist", "error", err)
 		} else {
 			// Stream historical metrics to client
-			historicalCount := 0
 			for {
 				metric, err := persistStream.Recv()
 				if err != nil {
@@ -1663,7 +1699,20 @@ func (s *WorkflowServiceServer) GetJobMetrics(req *pb.JobMetricsRequest, stream 
 	}
 
 	// Step 2: Stream live metrics using the metrics store
-	log.Debug("starting live metrics streaming")
+	// For completed jobs with persist data, skip buffer to avoid duplicates
+	// For running jobs, use buffer + live subscription (buffer prevents gaps)
+	if historicalCount > 0 {
+		// Check if job is completed
+		job, exists := s.jobStore.Job(resolvedUUID)
+		if exists && job.IsCompleted() {
+			// Job is completed and persist has data - skip buffer to avoid duplicates
+			log.Debug("job completed with persist data, skipping metrics buffer to avoid duplicates", "historicalCount", historicalCount)
+			return nil
+		}
+	}
+
+	// Job is still running or persist has no data - stream from buffer + live subscription
+	log.Debug("starting live metrics streaming from buffer")
 	err = s.metricsStore.StreamMetrics(stream.Context(), resolvedUUID, func(sample *metricsdomain.JobMetricsSample) error {
 		pbSample := convertMetricsSampleToProto(sample)
 		if err := stream.Send(pbSample); err != nil {
@@ -1679,5 +1728,25 @@ func (s *WorkflowServiceServer) GetJobMetrics(req *pb.JobMetricsRequest, stream 
 	}
 
 	log.Debug("metrics streaming completed")
+	return nil
+}
+
+// checkPersistHealth verifies that the persist service is healthy and responsive
+// Returns an error if persist is not reachable or not responding
+func (s *WorkflowServiceServer) checkPersistHealth(ctx context.Context) error {
+	// Create a timeout context for the health check (2 seconds)
+	checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	// Call the Ping RPC
+	resp, err := s.persistClient.Ping(checkCtx, &pb.PingRequest{})
+	if err != nil {
+		return fmt.Errorf("ping failed: %w", err)
+	}
+
+	if !resp.Healthy {
+		return fmt.Errorf("persist reported unhealthy status")
+	}
+
 	return nil
 }
