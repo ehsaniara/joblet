@@ -19,14 +19,13 @@ letting you focus on your applications rather than infrastructure complexity.
 
 - **🔒 Process Isolation**: Jobs run in secure sandboxes with separate namespaces, preventing interference between
   workloads
-- **⚡ GPU Acceleration**: Native NVIDIA GPU support with automatic CUDA environment setup for AI/ML workloads
-- **🎛️ Resource Management**: Comprehensive CPU, memory, I/O, and GPU resource limits with fine-grained control
-- **🌐 Network Isolation**: Flexible networking options from complete isolation to custom networks for secure
+- **⚡ GPU Acceleration**: Native NVIDIA GPU support with automatic CUDA env. setup for AI/ML workloads
+- **🎛️ Resource Management**: CPU, memory, I/O, and GPU resource limits with fine-grained control
+- **🌐 Network Isolation**: Networking options from full isolation to custom networks for secure
   communication
 - **💾 Storage Solutions**: Persistent volumes for data retention and temporary storage with automatic cleanup
-- **⏰ Job Scheduling**: Execute jobs immediately, schedule for specific times, or set delayed execution with simple
-  syntax
-- **🛡️ Enterprise Security**: Production-grade mTLS encryption with certificate-based authentication and role-based
+- **⏰ Job Scheduling**: Execute jobs immediately, schedule for specific times, or set delayed execution
+- **🛡️ Enterprise Security**: mTLS encryption with certificate-based authentication and role-based
   access control
 - **🐍 Runtime Environments**: Pre-configured Python ML, Java, and GraalVM environments eliminate container image
   management

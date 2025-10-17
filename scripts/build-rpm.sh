@@ -92,7 +92,7 @@ cp -r ./scripts "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/" || {
 }
 
 # Ensure required files exist
-for file in joblet-config-template.yml rnx-config-template.yml joblet.service certs_gen_embedded.sh; do
+for file in joblet-config-template.yml rnx-config-template.yml joblet.service certs_gen_embedded.sh common-install-functions.sh; do
     if [ ! -f "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/$file" ]; then
         if [ -f "./scripts/$file" ]; then
             cp "./scripts/$file" "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
@@ -175,6 +175,7 @@ cp joblet-persist \$RPM_BUILD_ROOT/opt/joblet/bin/
 # Install config templates and scripts
 cp scripts/joblet-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/rnx-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
+cp scripts/common-install-functions.sh \$RPM_BUILD_ROOT/opt/joblet/scripts/
 
 # joblet-persist runs as subprocess, no separate service needed
 
@@ -198,40 +199,83 @@ MODULESEOF
 rm -rf \$RPM_BUILD_ROOT
 
 %pre
-# Create joblet user if it doesn't exist
-if ! id joblet >/dev/null 2>&1; then
-    useradd -r -s /sbin/nologin -d /var/lib/joblet -c "Joblet Service User" joblet
+# Source common installation functions
+if [ -f /opt/joblet/scripts/common-install-functions.sh ]; then
+    . /opt/joblet/scripts/common-install-functions.sh
 fi
 
-# Load required kernel modules
-modprobe br_netfilter 2>/dev/null || true
-
-# Enable IP forwarding
-sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
-echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-joblet.conf
+# Note: Most setup happens in %post after files are installed
 
 %post
+# Source common installation functions (now files are installed)
+if [ -f /opt/joblet/scripts/common-install-functions.sh ]; then
+    . /opt/joblet/scripts/common-install-functions.sh
+else
+    echo "ERROR: Common installation functions not found!"
+    echo "Installation may be incomplete."
+fi
+
+# Display system changes warning
+display_system_changes_warning
+
+echo "🔧 Configuring Joblet Service..."
+echo ""
+
+# Get configuration from environment variables
+get_configuration
+
+# Detect AWS environment
+detect_aws_environment
+
+# Display configuration summary
+echo ""
+echo "Configuration Summary:\$EC2_INFO"
+echo "  gRPC Server Bind: \$JOBLET_SERVER_ADDRESS:\$JOBLET_SERVER_PORT"
+echo "  Certificate Primary IP: \$JOBLET_CERT_PRIMARY"
+if [ -n "\$JOBLET_CERT_PUBLIC_IP" ]; then
+    echo "  Certificate Public IP: \$JOBLET_CERT_PUBLIC_IP"
+fi
+if [ -n "\$JOBLET_CERT_DOMAIN" ]; then
+    echo "  Certificate Domain(s): \$JOBLET_CERT_DOMAIN"
+fi
+echo ""
+
+# Generate certificates
+if generate_and_embed_certificates; then
+    # Set secure permissions on config files
+    chmod 600 /opt/joblet/config/joblet-config.yml 2>/dev/null || true
+    chmod 600 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
+
+    # Create convenience copy for local CLI usage
+    if [ -f /opt/joblet/config/rnx-config.yml ]; then
+        mkdir -p /etc/joblet
+        cp /opt/joblet/config/rnx-config.yml /etc/joblet/rnx-config.yml
+        chmod 644 /etc/joblet/rnx-config.yml
+    fi
+fi
+
+# Setup network requirements
+setup_network_requirements
+
+# Create runtime directories
+mkdir -p /var/log/joblet /opt/joblet/logs /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs
+chown root:root /var/log/joblet /opt/joblet/logs /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs
+chmod 755 /var/log/joblet /opt/joblet/logs /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs
+
+# Setup cgroup delegation
+if [ -d /sys/fs/cgroup ]; then
+    mkdir -p /sys/fs/cgroup/joblet.slice
+    echo "+cpu +memory +io +pids +cpuset" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
+fi
+
 # Reload systemd to pick up the service file
 systemctl daemon-reload
 
-# Enable and start the service
-echo "To start Joblet service (includes joblet-persist as subprocess), run:"
-echo "  sudo systemctl start joblet"
-echo "  sudo systemctl enable joblet"
-echo ""
-echo "Network features are now available:"
-echo "  Bridge network: rnx job run --network=bridge <command>"
-echo "  Isolated network: rnx job run --network=isolated <command>"
-echo "  Create custom network: rnx network create <name> --cidr=<cidr>"
+# Enable the service (but don't start automatically)
+systemctl enable joblet.service 2>/dev/null || true
 
-# Ensure kernel modules are loaded
-systemctl restart systemd-modules-load.service >/dev/null 2>&1 || true
-
-# Configure firewall if available
-if command -v firewall-cmd >/dev/null 2>&1; then
-    firewall-cmd --permanent --add-masquerade >/dev/null 2>&1 || true
-    firewall-cmd --reload >/dev/null 2>&1 || true
-fi
+# Display quickstart information
+display_quickstart_info "rpm"
 
 %preun
 # Only stop on actual uninstall, not upgrade
@@ -244,30 +288,87 @@ fi
 %postun
 # Only run on actual uninstall, not upgrade
 if [ \$1 -eq 0 ]; then
+    echo "🧹 Cleaning up Joblet resources..."
+
+    # Clean up cgroup directories
+    if [ -d "/sys/fs/cgroup/joblet.slice" ]; then
+        find /sys/fs/cgroup/joblet.slice -name "job-*" -type d -exec rmdir {} \; 2>/dev/null || true
+    fi
+
     # Clean up network resources
     if command -v ip >/dev/null 2>&1; then
-        # Remove any leftover joblet bridges
-        for bridge in \$(ip link show type bridge | grep -E "joblet[0-9-]+" | awk -F: '{print \$2}' | tr -d ' '); do
-            ip link delete \$bridge 2>/dev/null || true
-        done
+        # Remove joblet bridge
+        ip link delete joblet0 2>/dev/null || true
 
         # Clean up any leftover veth interfaces
-        for veth in \$(ip link show | grep -E "veth[0-9]+" | awk -F: '{print \$2}' | tr -d ' '); do
+        for veth in \$(ip link show | grep -oE "viso[0-9]+" | grep -v '@'); do
             ip link delete \$veth 2>/dev/null || true
         done
     fi
 
-    # Clean up firewall rules if applicable
-    if command -v firewall-cmd >/dev/null 2>&1; then
-        firewall-cmd --permanent --remove-masquerade >/dev/null 2>&1 || true
-        firewall-cmd --reload >/dev/null 2>&1 || true
+    # Detect firewall backend and clean up
+    FIREWALL_BACKEND=""
+    if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active firewalld >/dev/null 2>&1; then
+        FIREWALL_BACKEND="firewalld"
+    elif command -v nft >/dev/null 2>&1 && nft list tables 2>/dev/null | grep -q .; then
+        FIREWALL_BACKEND="nftables"
+    elif command -v iptables >/dev/null 2>&1; then
+        FIREWALL_BACKEND="iptables"
     fi
+
+    case "\$FIREWALL_BACKEND" in
+        firewalld)
+            # Clean up firewalld rules
+            firewall-cmd --permanent --remove-masquerade >/dev/null 2>&1 || true
+            firewall-cmd --permanent --direct --remove-rule ipv4 nat POSTROUTING 0 -s 172.20.0.0/16 -j MASQUERADE 2>/dev/null || true
+            firewall-cmd --permanent --direct --remove-rule ipv4 filter FORWARD 0 -i joblet0 -j ACCEPT 2>/dev/null || true
+            firewall-cmd --permanent --direct --remove-rule ipv4 filter FORWARD 0 -o joblet0 -j ACCEPT 2>/dev/null || true
+            firewall-cmd --reload >/dev/null 2>&1 || true
+            ;;
+        nftables)
+            # Remove nftables table
+            nft delete table inet joblet 2>/dev/null || true
+            # Remove from nftables.conf if it exists
+            if [ -f /etc/nftables.conf ]; then
+                sed -i '/^table inet joblet/,/^}/d' /etc/nftables.conf 2>/dev/null || true
+            fi
+            ;;
+        iptables)
+            # Remove iptables rules
+            iptables -t nat -D POSTROUTING -s 172.20.0.0/16 -j MASQUERADE 2>/dev/null || true
+            iptables -D FORWARD -i joblet0 -j ACCEPT 2>/dev/null || true
+            iptables -D FORWARD -o joblet0 -j ACCEPT 2>/dev/null || true
+            iptables -D FORWARD -i viso+ -j ACCEPT 2>/dev/null || true
+            iptables -D FORWARD -o viso+ -j ACCEPT 2>/dev/null || true
+            # Save if possible
+            if command -v service >/dev/null 2>&1; then
+                service iptables save 2>/dev/null || true
+            fi
+            ;;
+    esac
 
     # Remove sysctl config
     rm -f /etc/sysctl.d/99-joblet.conf
 
+    # Remove module loading config
+    rm -f /etc/modules-load.d/joblet.conf
+
+    # Remove systemd log directory
+    rm -rf /var/log/joblet
+
+    # Remove convenience config copy
+    rm -rf /etc/joblet
+
+    # Note: Job logs in /opt/joblet/logs are preserved
+    if [ -d "/opt/joblet/logs" ] && [ "\$(ls -A /opt/joblet/logs 2>/dev/null)" ]; then
+        echo "ℹ️  Job logs preserved in /opt/joblet/logs"
+        echo "ℹ️  To remove all data: rm -rf /opt/joblet"
+    fi
+
     # Reload systemd
     systemctl daemon-reload
+
+    echo "✅ Joblet uninstalled successfully"
 fi
 
 %files
@@ -277,6 +378,7 @@ fi
 /opt/joblet/bin/joblet-persist
 /opt/joblet/scripts/joblet-config-template.yml
 /opt/joblet/scripts/rnx-config-template.yml
+/opt/joblet/scripts/common-install-functions.sh
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
 /usr/local/bin/rnx
@@ -291,10 +393,15 @@ fi
 %changelog
 * ${CHANGELOG_DATE} Joblet Build System <build@joblet.dev> - ${CLEAN_VERSION}-${RELEASE}
 - Network isolation features (bridge, isolated, custom networks)
-- Automatic network setup during installation
+- Automatic network setup with conflict detection
 - IP forwarding and NAT configuration
-- Support for multiple firewall systems
-- Enhanced cleanup on removal
+- Support for multiple firewall systems (iptables, nftables, firewalld)
+- AWS EC2 environment detection and CloudWatch Logs support
+- Enhanced error handling and user feedback
+- Prominent system modification warnings
+- Improved certificate generation during installation
+- Comprehensive cleanup on removal
+- Shared installation functions for consistency
 EOF
 
 # Create source tarball

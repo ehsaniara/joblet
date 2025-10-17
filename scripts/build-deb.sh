@@ -94,6 +94,10 @@ cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"
 cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
 chmod +x "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
 
+# Copy common installation functions
+cp ./scripts/common-install-functions.sh "$BUILD_DIR/opt/joblet/scripts/"
+chmod 644 "$BUILD_DIR/opt/joblet/scripts/common-install-functions.sh"
+
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
 Package: $PACKAGE_NAME
