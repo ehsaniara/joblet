@@ -587,7 +587,7 @@ func (s *RuntimeServiceServer) installFromRegistryStreaming(req *pb.InstallRunti
 	streamer := &grpcRuntimeStreamer{stream: stream}
 
 	// Send initial progress
-	if err := streamer.SendProgress(fmt.Sprintf("🚀 Starting installation from external registry")); err != nil {
+	if err := streamer.SendProgress("🚀 Starting installation from external registry"); err != nil {
 		return err
 	}
 

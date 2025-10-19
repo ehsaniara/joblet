@@ -23,7 +23,7 @@ func TestDownloader_DownloadAndVerify_Success(t *testing.T) {
 	// Create test HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/gzip")
-		w.Write(testData)
+		_, _ = w.Write(testData)
 	}))
 	defer server.Close()
 
@@ -79,7 +79,7 @@ func TestDownloader_DownloadAndVerify_ChecksumMismatch(t *testing.T) {
 
 	// Create test HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(testData)
+		_, _ = w.Write(testData)
 	}))
 	defer server.Close()
 
@@ -157,7 +157,7 @@ func TestDownloader_DownloadAndVerify_WithProgress(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/gzip")
 		w.Header().Set("Content-Length", "5242880") // 5 MB
-		w.Write(testData)
+		_, _ = w.Write(testData)
 	}))
 	defer server.Close()
 

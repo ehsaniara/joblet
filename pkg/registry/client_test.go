@@ -99,7 +99,7 @@ func TestClient_FetchRegistry(t *testing.T) {
 
 		// Return mock registry
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockReg)
+		_ = json.NewEncoder(w).Encode(mockReg)
 	}))
 	defer server.Close()
 
@@ -154,7 +154,7 @@ func TestClient_FetchRegistry_Caching(t *testing.T) {
 		requestCount++
 		mockReg := mockRegistry()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockReg)
+		_ = json.NewEncoder(w).Encode(mockReg)
 	}))
 	defer server.Close()
 
@@ -203,7 +203,7 @@ func TestClient_FetchRegistry_CacheExpiration(t *testing.T) {
 		requestCount++
 		mockReg := mockRegistry()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockReg)
+		_ = json.NewEncoder(w).Encode(mockReg)
 	}))
 	defer server.Close()
 
@@ -242,7 +242,7 @@ func TestClient_ResolveVersion(t *testing.T) {
 	// Create test HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockReg)
+		_ = json.NewEncoder(w).Encode(mockReg)
 	}))
 	defer server.Close()
 
@@ -329,7 +329,7 @@ func TestClient_ListRuntimes(t *testing.T) {
 	// Create test HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockReg)
+		_ = json.NewEncoder(w).Encode(mockReg)
 	}))
 	defer server.Close()
 
@@ -372,7 +372,7 @@ func TestClient_ListVersions(t *testing.T) {
 	// Create test HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockReg)
+		_ = json.NewEncoder(w).Encode(mockReg)
 	}))
 	defer server.Close()
 

@@ -173,7 +173,7 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 
 	// Send progress update
 	if req.Streamer != nil {
-		req.Streamer.SendProgress(fmt.Sprintf("📦 Parsing runtime specification: %s", req.RuntimeSpec))
+		_ = req.Streamer.SendProgress(fmt.Sprintf("📦 Parsing runtime specification: %s", req.RuntimeSpec))
 	}
 
 	// Parse runtime spec to extract name and version
@@ -191,7 +191,7 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 
 	// Send progress update
 	if req.Streamer != nil {
-		req.Streamer.SendProgress(fmt.Sprintf("📡 Fetching registry from %s", registryURL))
+		_ = req.Streamer.SendProgress(fmt.Sprintf("📡 Fetching registry from %s", registryURL))
 	}
 
 	// Resolve version from registry
@@ -211,9 +211,9 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 	// Send progress update
 	if req.Streamer != nil {
 		if spec.IsLatest() {
-			req.Streamer.SendProgress(fmt.Sprintf("✅ Resolved @latest → %s", resolvedSpec.Version))
+			_ = req.Streamer.SendProgress(fmt.Sprintf("✅ Resolved @latest → %s", resolvedSpec.Version))
 		}
-		req.Streamer.SendProgress(fmt.Sprintf("📥 Downloading: %s (%d MB)", resolvedSpec.FullName(), entry.Size/1024/1024))
+		_ = req.Streamer.SendProgress(fmt.Sprintf("📥 Downloading: %s (%d MB)", resolvedSpec.FullName(), entry.Size/1024/1024))
 	}
 
 	// Determine installation path using nested version structure
@@ -257,7 +257,7 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 
 	progressCallback := func(progress registry.DownloadProgress) {
 		if req.Streamer != nil && progress.Percentage >= 0 {
-			req.Streamer.SendProgress(fmt.Sprintf("⬇️  Downloading: %d%% (%d MB / %d MB)",
+			_ = req.Streamer.SendProgress(fmt.Sprintf("⬇️  Downloading: %d%% (%d MB / %d MB)",
 				progress.Percentage,
 				progress.BytesDownloaded/1024/1024,
 				progress.TotalBytes/1024/1024))
@@ -277,8 +277,8 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 
 	// Send progress update
 	if req.Streamer != nil {
-		req.Streamer.SendProgress("🔐 Checksum verified successfully")
-		req.Streamer.SendProgress("📦 Extracting runtime package...")
+		_ = req.Streamer.SendProgress("🔐 Checksum verified successfully")
+		_ = req.Streamer.SendProgress("📦 Extracting runtime package...")
 	}
 
 	// Create temporary extraction directory for source packages
@@ -314,7 +314,7 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 		ri.logger.Info("pre-built package detected", "path", extractDir)
 
 		if req.Streamer != nil {
-			req.Streamer.SendProgress("📦 Pre-built package detected - installing...")
+			_ = req.Streamer.SendProgress("📦 Pre-built package detected - installing...")
 		}
 
 		// Create installation directory
@@ -345,7 +345,7 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 		ri.logger.Info("source package detected", "path", extractDir)
 
 		if req.Streamer != nil {
-			req.Streamer.SendProgress("📦 Source package detected - building runtime on target server...")
+			_ = req.Streamer.SendProgress("📦 Source package detected - building runtime on target server...")
 		}
 
 		// Execute setup script to build runtime
@@ -383,7 +383,7 @@ func (ri *RuntimeInstaller) InstallFromRegistry(ctx context.Context, req *Runtim
 
 	// Send progress update
 	if req.Streamer != nil {
-		req.Streamer.SendProgress(fmt.Sprintf("✅ Runtime installed: %s", installPath))
+		_ = req.Streamer.SendProgress(fmt.Sprintf("✅ Runtime installed: %s", installPath))
 	}
 
 	return &RuntimeInstallResult{
@@ -938,8 +938,8 @@ func (ri *RuntimeInstaller) executeSetupScriptForRegistry(ctx context.Context, s
 	ri.logger.Info("detected platform", "platform", platform)
 
 	if streamer != nil {
-		streamer.SendProgress(fmt.Sprintf("🖥️  Detected platform: %s", platform))
-		streamer.SendProgress("🔒 Creating isolated chroot environment...")
+		_ = streamer.SendProgress(fmt.Sprintf("🖥️  Detected platform: %s", platform))
+		_ = streamer.SendProgress("🔒 Creating isolated chroot environment...")
 	}
 
 	// Create chroot environment (same as GitHub installation flow)
@@ -952,7 +952,7 @@ func (ri *RuntimeInstaller) executeSetupScriptForRegistry(ctx context.Context, s
 	ri.logger.Info("created chroot environment", "path", chrootDir)
 
 	if streamer != nil {
-		streamer.SendProgress("📦 Copying source package to chroot...")
+		_ = streamer.SendProgress("📦 Copying source package to chroot...")
 	}
 
 	// Copy source package to chroot /tmp
@@ -970,7 +970,7 @@ func (ri *RuntimeInstaller) executeSetupScriptForRegistry(ctx context.Context, s
 	ri.logger.Info("copied source package to chroot", "dest", chrootSourcePath)
 
 	if streamer != nil {
-		streamer.SendProgress("🔨 Running setup script in isolated environment...")
+		_ = streamer.SendProgress("🔨 Running setup script in isolated environment...")
 	}
 
 	// Look for platform-specific setup script first, fallback to generic setup.sh
@@ -1038,8 +1038,8 @@ fi
 	}
 
 	if streamer != nil {
-		streamer.SendProgress("✅ Runtime built successfully in isolated environment")
-		streamer.SendProgress("📁 Moving runtime from chroot to host...")
+		_ = streamer.SendProgress("✅ Runtime built successfully in isolated environment")
+		_ = streamer.SendProgress("📁 Moving runtime from chroot to host...")
 	}
 
 	// Copy runtime from chroot to host (same as GitHub installation flow)
@@ -1048,7 +1048,7 @@ fi
 	}
 
 	if streamer != nil {
-		streamer.SendProgress("📁 Moving to nested version structure...")
+		_ = streamer.SendProgress("📁 Moving to nested version structure...")
 	}
 
 	// Setup scripts install to flat structure: /opt/joblet/runtimes/<name>/
@@ -1085,7 +1085,7 @@ fi
 		// Recreate parent directory
 		if err := os.MkdirAll(flatInstallPath, 0755); err != nil {
 			// Try to restore
-			os.Rename(tempPath, flatInstallPath)
+			_ = os.Rename(tempPath, flatInstallPath)
 			return fmt.Errorf("failed to recreate parent directory: %w", err)
 		}
 
@@ -1093,7 +1093,7 @@ fi
 		if err := os.Rename(tempPath, nestedInstallPath); err != nil {
 			// Try to restore
 			os.RemoveAll(flatInstallPath)
-			os.Rename(tempPath, flatInstallPath)
+			_ = os.Rename(tempPath, flatInstallPath)
 			return fmt.Errorf("failed to move to nested location: %w", err)
 		}
 
@@ -1101,7 +1101,7 @@ fi
 	}
 
 	if streamer != nil {
-		streamer.SendProgress(fmt.Sprintf("✅ Runtime installed at: %s", nestedInstallPath))
+		_ = streamer.SendProgress(fmt.Sprintf("✅ Runtime installed at: %s", nestedInstallPath))
 	}
 
 	return nil
