@@ -874,7 +874,7 @@ rnx network list --json | jq -r '.networks[] | select(.builtin == false) | .name
 
 ### `rnx runtime list`
 
-List all available runtime environments.
+List all installed runtime environments.
 
 ```bash
 rnx runtime list [flags]
@@ -882,19 +882,15 @@ rnx runtime list [flags]
 
 #### Flags
 
-| Flag            | Description                                                        | Default |
-|-----------------|--------------------------------------------------------------------|---------|
-| `--json`        | Output in JSON format                                              | false   |
-| `--github-repo` | List runtimes from GitHub repository (owner/repo/tree/branch/path) | none    |
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Examples
 
 ```bash
-# List locally installed runtimes
+# List installed runtimes
 rnx runtime list
-
-# List available runtimes from GitHub repository
-rnx runtime list --github-repo=owner/repo/tree/main/runtimes
 
 # JSON output
 rnx runtime list --json
@@ -918,44 +914,63 @@ rnx runtime info openjdk:21
 
 ### `rnx runtime install`
 
-Install a runtime environment from GitHub or local files.
+Install a runtime environment from an external registry.
 
 ```bash
 rnx runtime install <runtime-spec> [flags]
 ```
 
+#### Runtime Specification Format
+
+- `<runtime-name>@<version>` - Install specific version (e.g., `python-3.11-ml@1.0.2`)
+- `<runtime-name>@latest` - Install latest version explicitly
+- `<runtime-name>` - Install latest version (implicit `@latest`)
+
 #### Flags
 
-| Flag            | Short | Description                                                  | Default |
-|-----------------|-------|--------------------------------------------------------------|---------|
-| `--force`       | `-f`  | Force reinstall by deleting existing runtime                 | false   |
-| `--github-repo` |       | Install from GitHub repository (owner/repo/tree/branch/path) | none    |
+| Flag              | Short | Description                                                              | Default |
+|-------------------|-------|--------------------------------------------------------------------------|---------|
+| `--force`         | `-f`  | Force reinstall by deleting existing runtime                             | false   |
+| `--registry`  |       | Custom runtime registry URL (default: https://github.com/ehsaniara/joblet-runtimes) | none    |
 
 #### Description
 
-The install command downloads and executes platform-specific setup scripts in a secure builder chroot environment. It
-automatically detects the host platform (Ubuntu, Amazon Linux, RHEL) and architecture (AMD64, ARM64) to run the
-appropriate setup script.
+The install command downloads pre-packaged runtime archives (.tar.gz) from an external registry, verifies checksums, and
+extracts them to versioned installation paths.
+
+**Installation Sources:**
+1. **Default Registry** - `https://github.com/ehsaniara/joblet-runtimes` (public registry)
+2. **Custom Registry** - Specified via `--registry` flag
+3. **Local Fallback** - Local `runtimes/` directory if registry installation fails
+
+**Versioned Installation:**
+Runtimes are installed to: `/opt/joblet/runtimes/{name}-{version}/`
+
+This allows multiple versions of the same runtime to coexist.
 
 When using `--force`, the command will:
 
-1. Delete the existing runtime at `/opt/joblet/runtimes/<runtime-name>` if it exists
+1. Delete the existing runtime at the versioned path if it exists
 2. Proceed with fresh installation
 3. Continue even if deletion fails (with warning)
 
 #### Examples
 
 ```bash
-# Install from local codebase
+# Install latest version from default registry
 rnx runtime install python-3.11-ml
 rnx runtime install openjdk-21
 
-# Install from GitHub repository
-rnx runtime install openjdk-21 --github-repo=ehsaniara/joblet/tree/main/runtimes
-rnx runtime install python-3.11-ml --github-repo=owner/repo/tree/branch/path
+# Install specific version
+rnx runtime install python-3.11-ml@1.0.2
+rnx runtime install openjdk-21@1.0.3
+
+# Install from custom registry
+rnx runtime install custom-runtime --registry=myorg/runtimes
+rnx runtime install custom-runtime@2.0.0 --registry=acme/private-runtimes
 
 # Force reinstall (delete existing runtime first)
-rnx runtime install python-3.11-ml --force
+rnx runtime install python-3.11-ml@1.0.2 --force
 rnx runtime install openjdk-21 -f
 ```
 

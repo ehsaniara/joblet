@@ -37,6 +37,11 @@ tmp
 # Runtime packages (store in releases instead)
 examples/packages/*.tar.gz
 
+# Runtime scripts moved to external joblet-runtimes repository
+# https://github.com/ehsaniara/joblet-runtimes
+# Local runtimes/ directory can be used for development/testing custom runtimes
+runtimes/
+
 # Persist binary
 persist/joblet-persist
 

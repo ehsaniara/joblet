@@ -1,15 +1,11 @@
 #!/bin/bash
 
 # Test 07: GitHub Runtime Installation Tests
-# Tests GitHub repository-based runtime installation features
+# DEPRECATED: This test used the old --github-repo flag which was removed in favor of --registry-url
+# See test 14_registry_runtime_test.sh for registry-based runtime installation tests
 #
-# RESOURCE MANAGEMENT STRATEGY:
-# GitHub runtime installations can be resource-intensive (especially python-3.11-ml)
-# To prevent resource exhaustion on remote test hosts:
-# - Each test cleans up runtimes immediately after verification
-# - Test 8 uses longer timeout (240s) as it runs after multiple heavy installations
-# - Concurrent test includes timeout protection
-# - All cleanup happens in both success and failure paths
+# The --github-repo flag was removed as part of the runtime registry migration.
+# All runtime installations now use the registry system (default or custom via --registry-url).
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
@@ -387,46 +383,15 @@ check_github_prerequisites() {
 # ============================================
 
 main() {
-    # Initialize test suite
-    test_suite_init "GitHub Runtime Installation Tests"
-    
-    # Check prerequisites
-    if ! check_github_prerequisites; then
-        echo -e "${RED}Prerequisites check failed - skipping GitHub runtime tests${NC}"
-        exit 0  # Skip rather than fail
-    fi
-    
-    # Run tests
-    test_section "GitHub Repository Runtime Listing"
-    run_test "GitHub runtime list" test_github_runtime_list
-    
-    if command -v jq >/dev/null 2>&1; then
-        run_test "GitHub runtime list (JSON)" test_github_runtime_list_json
-    else
-        skip_test "GitHub runtime list (JSON)" "jq not available"
-    fi
-    
-    test_section "GitHub Repository Runtime Installation"
-    run_test "GitHub runtime installation" test_github_runtime_install
-    run_test "GitHub manifest validation" test_github_manifest_validation
-    run_test "GitHub archive download" test_github_archive_download
-    
-    test_section "Runtime Execution After GitHub Install"
-    run_test "Runtime execution after GitHub install" test_runtime_execution_after_github_install
-    
-    test_section "Security and Isolation"
-    run_test "Host contamination prevention" test_host_contamination_prevention
-    run_test "Runtime isolation verification" test_runtime_isolation_verification
-    
-    test_section "Error Handling"
-    run_test "Invalid GitHub repository handling" test_invalid_github_repo
-    
-    test_section "Concurrency"
-    run_test "Concurrent GitHub installations" test_concurrent_github_installs
-    
-    # Print summary
-    test_suite_summary
-    exit $?
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}  Test 07: GitHub Runtime Installation Tests${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}⚠️  DEPRECATED: This test suite has been deprecated${NC}\n"
+    echo -e "${YELLOW}The --github-repo flag has been removed in favor of --registry-url${NC}"
+    echo -e "${YELLOW}All runtime installations now use the registry system.${NC}\n"
+    echo -e "${BLUE}See test 14_registry_runtime_test.sh for registry-based runtime tests${NC}\n"
+    echo -e "${GREEN}✓ Test suite skipped (deprecated)${NC}\n"
+    exit 0
 }
 
 # Run if executed directly

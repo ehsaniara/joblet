@@ -448,12 +448,12 @@ description: "Python 3.11 with ML"
 	resolver := NewResolver(runtimesPath, testPlatform)
 
 	// Test finding existing runtime
-	foundPath, err := resolver.findRuntimeDirectory("python-3.11-ml")
+	foundPath, err := resolver.FindRuntimeDirectory("python-3.11-ml")
 	require.NoError(t, err)
 	assert.Equal(t, runtimeDir, foundPath)
 
 	// Test runtime not found
-	_, err = resolver.findRuntimeDirectory("non-existent")
+	_, err = resolver.FindRuntimeDirectory("non-existent")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "runtime not found")
 }

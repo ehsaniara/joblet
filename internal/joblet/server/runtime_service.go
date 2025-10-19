@@ -322,8 +322,31 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 		}, nil
 	}
 
-	// Check if runtime exists
-	runtimePath := filepath.Join(s.runtimesPath, req.Runtime)
+	// Determine the path to remove based on whether version is specified
+	var runtimePath string
+	var removalScope string
+
+	if strings.Contains(req.Runtime, "@") {
+		// Version-specific removal: python-3.11-ml@1.3.1
+		// Use resolver to find the specific version directory
+		resolvedPath, err := s.resolver.FindRuntimeDirectory(req.Runtime)
+		if err != nil {
+			return &pb.RuntimeRemoveRes{
+				Success: false,
+				Message: fmt.Sprintf("Runtime '%s' not found", req.Runtime),
+			}, nil
+		}
+		runtimePath = resolvedPath
+		removalScope = "specific version"
+		log.Info("removing specific runtime version", "spec", req.Runtime, "path", runtimePath)
+	} else {
+		// Remove entire runtime (all versions): python-3.11-ml
+		runtimePath = filepath.Join(s.runtimesPath, req.Runtime)
+		removalScope = "all versions"
+		log.Info("removing all runtime versions", "spec", req.Runtime, "path", runtimePath)
+	}
+
+	// Check if runtime path exists
 	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
 		return &pb.RuntimeRemoveRes{
 			Success: false,
@@ -356,10 +379,10 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 		}, nil
 	}
 
-	log.Info("runtime removed successfully", "freedBytes", totalSize)
+	log.Info("runtime removed successfully", "freedBytes", totalSize, "scope", removalScope)
 	return &pb.RuntimeRemoveRes{
 		Success:         true,
-		Message:         fmt.Sprintf("Runtime '%s' removed successfully", req.Runtime),
+		Message:         fmt.Sprintf("Runtime '%s' removed successfully (%s)", req.Runtime, removalScope),
 		FreedSpaceBytes: totalSize,
 	}, nil
 }
@@ -454,85 +477,6 @@ func (s *RuntimeServiceServer) normalizeRuntimeSpec(specInfo *pb.RuntimeSpecInfo
 	return normalized
 }
 
-// InstallRuntimeFromLocal installs a runtime using files uploaded from local development environment
-func (s *RuntimeServiceServer) InstallRuntimeFromLocal(ctx context.Context, req *pb.InstallRuntimeFromLocalRequest) (*pb.InstallRuntimeResponse, error) {
-	log := s.logger.WithFields(
-		"operation", "InstallRuntimeFromLocal",
-		"runtimeSpec", req.RuntimeSpec,
-		"fileCount", len(req.Files),
-		"forceReinstall", req.ForceReinstall,
-	)
-	log.Info("local runtime installation request received (direct upload)")
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.RunJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if req.RuntimeSpec == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "runtime spec is required")
-	}
-
-	if len(req.Files) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "no runtime files provided")
-	}
-
-	log.Info("executing direct local runtime installation", "files", len(req.Files))
-
-	// Create request for local runtime installer
-	installReq := &core.RuntimeInstallFromLocalRequest{
-		RuntimeSpec:    req.RuntimeSpec,
-		Files:          convertPBFilesToLocal(req.Files),
-		ForceReinstall: req.ForceReinstall,
-	}
-
-	result, err := s.runtimeInstaller.InstallFromLocal(ctx, installReq)
-	if err != nil {
-		log.Error("local runtime installation failed", "error", err)
-		return &pb.InstallRuntimeResponse{
-			BuildJobUuid: "", // No job UUID since this is direct execution
-			RuntimeSpec:  req.RuntimeSpec,
-			Status:       "failed",
-			Message:      fmt.Sprintf("Installation failed: %v", err),
-			Repository:   "local",
-			ResolvedPath: "",
-		}, status.Errorf(codes.Internal, "runtime installation failed: %v", err)
-	}
-
-	var responseStatus string
-	if result.Success {
-		responseStatus = "completed"
-	} else {
-		responseStatus = "failed"
-	}
-
-	response := &pb.InstallRuntimeResponse{
-		BuildJobUuid: "", // No job UUID since this is direct execution
-		RuntimeSpec:  req.RuntimeSpec,
-		Status:       responseStatus,
-		Message:      result.Message,
-		Repository:   "local",
-		ResolvedPath: "",
-	}
-
-	log.Info("local runtime installation response prepared", "status", responseStatus)
-	return response, nil
-}
-
-// convertPBFilesToLocal converts protobuf RuntimeFile to local core type
-func convertPBFilesToLocal(pbFiles []*pb.RuntimeFile) []*core.RuntimeFile {
-	files := make([]*core.RuntimeFile, len(pbFiles))
-	for i, pbFile := range pbFiles {
-		files[i] = &core.RuntimeFile{
-			Path:       pbFile.Path,
-			Content:    pbFile.Content,
-			Executable: pbFile.Executable,
-		}
-	}
-	return files
-}
-
 // StreamingInstallRuntimeFromGithub streams runtime installation from GitHub repository
 func (s *RuntimeServiceServer) StreamingInstallRuntimeFromGithub(req *pb.InstallRuntimeRequest, stream pb.RuntimeService_StreamingInstallRuntimeFromGithubServer) error {
 	log := s.logger.WithFields(
@@ -556,11 +500,16 @@ func (s *RuntimeServiceServer) StreamingInstallRuntimeFromGithub(req *pb.Install
 		return status.Errorf(codes.InvalidArgument, "runtime spec is required")
 	}
 
-	// Set defaults
-	repository := req.Repository
-	if repository == "" {
-		repository = "ehsaniara/joblet"
+	// Route based on Repository field:
+	// - If Repository is empty -> use external registry (DEFAULT)
+	// - If Repository is provided -> use GitHub direct installation
+	if req.Repository == "" {
+		log.Info("no repository specified, using external registry")
+		return s.installFromRegistryStreaming(req, stream)
 	}
+
+	// Set defaults for GitHub installation
+	repository := req.Repository
 
 	branch := req.Branch
 	if branch == "" {
@@ -572,7 +521,7 @@ func (s *RuntimeServiceServer) StreamingInstallRuntimeFromGithub(req *pb.Install
 		resolvedPath = s.autoDetectRuntimePath(req.RuntimeSpec)
 	}
 
-	log.Info("starting streaming runtime installation", "repository", repository, "branch", branch, "resolvedPath", resolvedPath)
+	log.Info("starting streaming runtime installation from GitHub", "repository", repository, "branch", branch, "resolvedPath", resolvedPath)
 
 	// Create streaming adapter
 	streamer := &grpcRuntimeStreamer{stream: stream}
@@ -624,45 +573,38 @@ func (s *RuntimeServiceServer) StreamingInstallRuntimeFromGithub(req *pb.Install
 	return nil
 }
 
-// StreamingInstallRuntimeFromLocal streams runtime installation from local files
-func (s *RuntimeServiceServer) StreamingInstallRuntimeFromLocal(req *pb.InstallRuntimeFromLocalRequest, stream pb.RuntimeService_StreamingInstallRuntimeFromLocalServer) error {
+// installFromRegistryStreaming handles streaming installation from external registry
+func (s *RuntimeServiceServer) installFromRegistryStreaming(req *pb.InstallRuntimeRequest, stream pb.RuntimeService_StreamingInstallRuntimeFromGithubServer) error {
 	log := s.logger.WithFields(
-		"operation", "StreamingInstallRuntimeFromLocal",
+		"operation", "installFromRegistryStreaming",
 		"runtimeSpec", req.RuntimeSpec,
-		"files", len(req.Files),
 		"forceReinstall", req.ForceReinstall,
 	)
 
-	log.Info("streaming local runtime installation request received")
-
-	// Authorization check
-	if err := s.auth.Authorized(stream.Context(), auth.RunJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return err
-	}
-
-	if req.RuntimeSpec == "" {
-		return status.Errorf(codes.InvalidArgument, "runtime spec is required")
-	}
-
-	if len(req.Files) == 0 {
-		return status.Errorf(codes.InvalidArgument, "no runtime files provided")
-	}
-
-	log.Info("executing streaming local runtime installation", "files", len(req.Files))
+	log.Info("installing runtime from external registry with streaming")
 
 	// Create streaming adapter
 	streamer := &grpcRuntimeStreamer{stream: stream}
 
-	// Create request for local runtime installer with streaming
-	installReq := &core.RuntimeInstallFromLocalRequest{
-		RuntimeSpec:    req.RuntimeSpec,
-		Files:          convertPBFilesToLocal(req.Files),
-		ForceReinstall: req.ForceReinstall,
-		Streamer:       streamer, // Add streaming support
+	// Send initial progress
+	if err := streamer.SendProgress(fmt.Sprintf("🚀 Starting installation from external registry")); err != nil {
+		return err
 	}
 
-	result, err := s.runtimeInstaller.InstallFromLocal(stream.Context(), installReq)
+	// Extract registry URL from Branch field (temporary until we add dedicated proto field)
+	// TODO: Add dedicated registry_url field to InstallRuntimeRequest proto
+	registryURL := req.Branch
+
+	// Create registry install request
+	registryReq := &core.RuntimeInstallFromRegistryRequest{
+		RuntimeSpec:    req.RuntimeSpec,
+		ForceReinstall: req.ForceReinstall,
+		RegistryURL:    registryURL, // Custom registry URL (empty = use default)
+		Streamer:       streamer,
+	}
+
+	// Install from registry
+	result, err := s.runtimeInstaller.InstallFromRegistry(stream.Context(), registryReq)
 
 	// Send final result
 	var success bool
@@ -670,9 +612,9 @@ func (s *RuntimeServiceServer) StreamingInstallRuntimeFromLocal(req *pb.InstallR
 	var installPath string
 
 	if err != nil {
-		log.Error("streaming local runtime installation failed", "error", err)
+		log.Error("registry installation failed", "error", err)
 		success = false
-		message = fmt.Sprintf("Local runtime installation failed: %v", err)
+		message = fmt.Sprintf("Runtime installation failed: %v", err)
 	} else {
 		success = result.Success
 		message = result.Message
@@ -695,7 +637,7 @@ func (s *RuntimeServiceServer) StreamingInstallRuntimeFromLocal(req *pb.InstallR
 		return err
 	}
 
-	log.Info("streaming local runtime installation completed")
+	log.Info("streaming registry installation completed", "success", success)
 	return nil
 }
 

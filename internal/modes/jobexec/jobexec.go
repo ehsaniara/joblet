@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
@@ -153,6 +154,14 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	// Get current environment (already set up by parent process)
 	envv := je.platform.Environ()
 
+	// Load and apply runtime environment variables from /etc/runtime.env if it exists
+	runtimeEnv, err := je.loadRuntimeEnvironment()
+	if err == nil && len(runtimeEnv) > 0 {
+		// Apply runtime environment variables
+		envv = append(envv, runtimeEnv...)
+		je.logger.Debug("applied runtime environment variables", "count", len(runtimeEnv))
+	}
+
 	// Executing job command
 	// About to exec to replace init process with job command
 
@@ -215,4 +224,34 @@ func (je *JobExecutor) SetupCgroup(cgroupPath string) error {
 func (je *JobExecutor) HandleSignals(ctx context.Context) {
 	// Signal handling can be added here if needed
 	// Signal handling setup
+}
+
+// loadRuntimeEnvironment loads runtime environment variables from /joblet/runtime.env
+func (je *JobExecutor) loadRuntimeEnvironment() ([]string, error) {
+	runtimeEnvPath := "/joblet/runtime.env"
+
+	// Check if file exists
+	if _, err := je.platform.Stat(runtimeEnvPath); err != nil {
+		// File doesn't exist - no runtime environment variables
+		return nil, err
+	}
+
+	// Read file content
+	content, err := je.platform.ReadFile(runtimeEnvPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read runtime environment file: %w", err)
+	}
+
+	// Parse KEY=VALUE lines
+	var env []string
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		env = append(env, line)
+	}
+
+	return env, nil
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/ehsaniara/joblet/internal/joblet/runtime"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
@@ -41,12 +42,13 @@ type JobFilesystem struct {
 	RootDir       string
 	TmpDir        string
 	WorkDir       string
-	InitPath      string      // Path to the init binary inside the isolated environment
-	Volumes       []string    // Volume names to mount
-	Runtime       string      // Runtime specification
-	RuntimePath   string      // Path to runtime base directory
-	RuntimeConfig interface{} // Runtime configuration data
-	IsBuilder     bool        // True for runtime build jobs requiring full host filesystem access
+	InitPath      string            // Path to the init binary inside the isolated environment
+	Volumes       []string          // Volume names to mount
+	Runtime       string            // Runtime specification
+	RuntimePath   string            // Path to runtime base directory
+	RuntimeConfig interface{}       // Runtime configuration data
+	RuntimeEnv    map[string]string // Runtime environment variables from runtime.yml
+	IsBuilder     bool              // True for runtime build jobs requiring full host filesystem access
 	platform      platform.Platform
 	config        *config.Config
 	logger        *logger.Logger
@@ -1240,10 +1242,15 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 		Environment map[string]string `yaml:"environment"`
 	}
 
-	// Parse runtime spec and find runtime directory
-	// Runtime name directly maps to directory name (e.g., "openjdk-21" -> "/opt/joblet/runtimes/openjdk-21")
-	runtimeDirName := f.Runtime
-	runtimeDir := filepath.Join(runtimeBasePath, runtimeDirName)
+	// Use runtime resolver to find the actual runtime directory
+	// This handles versioned runtimes like python-3.11@1.3.1 -> /opt/joblet/runtimes/python-3.11/1.3.1/
+	runtimeResolver := runtime.NewResolver(runtimeBasePath, f.platform)
+	runtimeDir, err := runtimeResolver.FindRuntimeDirectory(f.Runtime)
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime path for %s: %w", f.Runtime, err)
+	}
+
+	f.logger.Debug("resolved runtime path", "spec", f.Runtime, "path", runtimeDir)
 
 	// Load runtime.yml file
 	configPath := filepath.Join(runtimeDir, "runtime.yml")
@@ -1331,6 +1338,17 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 				return fmt.Errorf("failed to create runtime target file %s: %w", targetPath, err)
 			}
 			f.logger.Debug("created target file for runtime mount", "target", targetPath)
+		}
+	}
+
+	// Store runtime environment variables for later use
+	if config.Environment != nil {
+		f.RuntimeEnv = config.Environment
+		f.logger.Debug("stored runtime environment variables", "count", len(config.Environment))
+
+		// Write runtime environment to a file that init can read
+		if err := f.writeRuntimeEnvironment(config.Environment); err != nil {
+			f.logger.Warn("failed to write runtime environment file", "error", err)
 		}
 	}
 
@@ -1551,5 +1569,31 @@ func (f *JobFilesystem) mountRuntimesDirectory() error {
 	}
 
 	log.Debug("mounted runtimes directory", "host", hostRuntimesPath, "target", targetRuntimesPath)
+	return nil
+}
+
+// writeRuntimeEnvironment writes runtime environment variables to a file for init to read
+func (f *JobFilesystem) writeRuntimeEnvironment(env map[string]string) error {
+	// Use /joblet/runtime.env instead of /etc/runtime.env because /etc might be mounted over
+	envPath := filepath.Join(f.RootDir, "joblet", "runtime.env")
+
+	// Create /joblet directory if it doesn't exist
+	jobletDir := filepath.Join(f.RootDir, "joblet")
+	if err := f.platform.MkdirAll(jobletDir, 0755); err != nil {
+		return fmt.Errorf("failed to create /joblet directory: %w", err)
+	}
+
+	// Write environment variables in KEY=VALUE format
+	var content []byte
+	for key, value := range env {
+		line := fmt.Sprintf("%s=%s\n", key, value)
+		content = append(content, []byte(line)...)
+	}
+
+	if err := f.platform.WriteFile(envPath, content, 0644); err != nil {
+		return fmt.Errorf("failed to write runtime environment file: %w", err)
+	}
+
+	f.logger.Debug("wrote runtime environment file", "path", envPath, "vars", len(env))
 	return nil
 }

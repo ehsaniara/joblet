@@ -7,13 +7,15 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"github.com/ehsaniara/joblet/pkg/client"
+	"github.com/ehsaniara/joblet/pkg/registry"
+	"github.com/ehsaniara/joblet/pkg/runtime"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 
@@ -62,6 +64,7 @@ Examples:
 
 func NewRuntimeListCmd() *cobra.Command {
 	var githubRepo string
+	var registryURL string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -71,20 +74,45 @@ func NewRuntimeListCmd() *cobra.Command {
 Examples:
   # List locally installed runtimes
   rnx runtime list
-  
+
+  # List available runtimes from the default registry
+  rnx runtime list --registry
+
+  # List available runtimes from a custom registry
+  rnx runtime list --registry=myorg/custom-runtimes
+
   # List available runtimes from a GitHub repository
   rnx runtime list --github-repo=owner/repo/tree/main/runtimes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRuntimeList(cmd, args, githubRepo)
+			return runRuntimeList(cmd, args, githubRepo, registryURL)
 		},
 	}
 
 	cmd.Flags().StringVar(&githubRepo, "github-repo", "", "List runtimes from GitHub repository instead of local files. Supports formats: owner/repo, owner/repo/tree/branch/path")
+	cmd.Flags().StringVar(&registryURL, "registry", "", "List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo")
+
+	// Set NoOptDefVal so --registry works without a value
+	cmd.Flags().Lookup("registry").NoOptDefVal = "ehsaniara/joblet-runtimes"
 
 	return cmd
 }
 
-func runRuntimeList(cmd *cobra.Command, args []string, githubRepo string) error {
+func runRuntimeList(cmd *cobra.Command, args []string, githubRepo string, registryURL string) error {
+	// Check for conflicting flags
+	if githubRepo != "" && registryURL != "" {
+		return fmt.Errorf("cannot use both --github-repo and --registry flags together")
+	}
+
+	// If registry flag is provided, list runtimes from registry
+	if cmd.Flags().Changed("registry") {
+		// Normalize and validate registry URL (only GitHub registries allowed)
+		normalizedURL, err := normalizeRegistryURL(registryURL)
+		if err != nil {
+			return fmt.Errorf("invalid registry: %w", err)
+		}
+		return runRegistryRuntimeList(normalizedURL)
+	}
+
 	// If github-repo flag is provided, list runtimes from GitHub manifest
 	if githubRepo != "" {
 		return runGitHubRuntimeList(githubRepo)
@@ -124,8 +152,8 @@ func runRuntimeList(cmd *cobra.Command, args []string, githubRepo string) error 
 
 	// Display runtimes in a table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "RUNTIME\tVERSION\tSIZE\tDESCRIPTION")
-	fmt.Fprintln(w, "-------\t-------\t----\t-----------")
+	fmt.Fprintln(w, "RUNTIME\tVERSION\tSIZE\tREGISTRY\tDESCRIPTION")
+	fmt.Fprintln(w, "-------\t-------\t----\t--------\t-----------")
 
 	for _, rt := range runtimes {
 		// Use runtime name directly (aligned with builder-runtime-final.md design)
@@ -140,10 +168,15 @@ func runRuntimeList(cmd *cobra.Command, args []string, githubRepo string) error 
 			desc = desc[:47] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		// Registry source - for now, all locally installed runtimes show "local"
+		// In the future, this could be tracked in runtime.yml during installation
+		registry := "local"
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			runtimeID,
 			rt.Version,
 			sizeStr,
+			registry,
 			desc,
 		)
 	}
@@ -168,6 +201,12 @@ func NewRuntimeInfoCmd() *cobra.Command {
 func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	runtimeSpec := args[0]
 
+	// Parse runtime spec to extract name and version
+	spec, err := runtime.ParseRuntimeSpec(runtimeSpec)
+	if err != nil {
+		return fmt.Errorf("invalid runtime specification: %w", err)
+	}
+
 	// Create client and connect to server
 	client, err := common.NewJobClient()
 	if err != nil {
@@ -179,26 +218,29 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req := &pb.RuntimeInfoReq{Runtime: runtimeSpec}
+	req := &pb.RuntimeInfoReq{Runtime: spec.Name}
 	resp, err := client.GetRuntimeInfo(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to get runtime info: %w", err)
 	}
 
 	if !resp.Found {
-		return fmt.Errorf("runtime not found: %s", runtimeSpec)
+		return fmt.Errorf("runtime not found: %s", spec.Name)
 	}
 
 	rt := resp.Runtime
 
 	// Check if JSON output is requested
 	if common.JSONOutput {
-		return outputRuntimeInfoJSON(rt, runtimeSpec)
+		return outputRuntimeInfoJSON(rt, spec.String())
 	}
 
 	// Display runtime information
 	fmt.Printf("Runtime: %s\n", rt.Name)
 	fmt.Printf("Version: %s\n", rt.Version)
+	if !spec.IsLatest() {
+		fmt.Printf("Requested Version: %s\n", spec.Version)
+	}
 	fmt.Printf("Description: %s\n", rt.Description)
 
 	// Display requirements
@@ -373,46 +415,70 @@ func formatSize(bytes int64) string {
 
 func NewRuntimeInstallCmd() *cobra.Command {
 	var force bool
-	var githubRepo string
+	var registryURL string
 
 	cmd := &cobra.Command{
 		Use:   "install <runtime-spec>",
-		Short: "Install a runtime environment from local codebase or GitHub",
-		Long: `Install a runtime environment from the local /runtimes directory
-or from a GitHub repository and execute it in a secure builder chroot environment.
+		Short: "Install a runtime environment with optional version",
+		Long: `Install a runtime environment from an external registry.
 
-The runtime can be installed from:
-  - Local codebase: runtimes/<runtime-name>/
-  - GitHub repository: using --github-repo flag
+Runtime Specification Format:
+  - <runtime-name>@<version>  (e.g., python-3.11-ml@1.0.0)
+  - <runtime-name>@latest     (explicitly request latest)
+  - <runtime-name>            (defaults to latest)
+
+The runtime is installed from the GitHub registry:
+  - Default registry: ehsaniara/joblet-runtimes (used by default)
+  - Custom registry: using --registry flag (format: owner/repo)
 
 Examples:
-  # Install from local codebase
-  rnx runtime install openjdk-21
-  
-  # Install from GitHub repository
-  rnx runtime install openjdk-21 --github-repo=ehsaniara/joblet/tree/main/runtimes
-  
-  # Install Python 3.11 ML runtime  
+  # Install specific version from default registry
+  rnx runtime install python-3.11-ml@1.0.0
+
+  # Install latest version from default registry
+  rnx runtime install python-3.11-ml@latest
+
+  # Install from default registry (implicit @latest)
   rnx runtime install python-3.11-ml
-  
+
+  # Use custom registry
+  rnx runtime install python-3.11-ml --registry=myorg/custom-runtimes
+
+  # Install specific version from custom registry
+  rnx runtime install custom-runtime@2.0.0 --registry=myorg/runtimes
+
   # Force reinstall existing runtime
-  rnx runtime install openjdk-21 --force`,
+  rnx runtime install python-3.11-ml@1.0.0 --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRuntimeInstall(cmd, args[0], force, githubRepo)
+			return runRuntimeInstall(cmd, args[0], force, registryURL)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force reinstall if runtime already exists")
-	cmd.Flags().StringVar(&githubRepo, "github-repo", "", "Install from GitHub repository instead of local files. Supports formats: owner/repo, owner/repo/tree/branch/path")
+	cmd.Flags().StringVar(&registryURL, "registry", "", "GitHub runtime registry (default: ehsaniara/joblet-runtimes). Format: owner/repo")
+
+	// Set NoOptDefVal so --registry works without a value
+	cmd.Flags().Lookup("registry").NoOptDefVal = "ehsaniara/joblet-runtimes"
 
 	return cmd
 }
 
-func runRuntimeInstall(cmd *cobra.Command, runtimeSpec string, force bool, githubRepo string) error {
+func runRuntimeInstall(cmd *cobra.Command, runtimeSpec string, force bool, registryURL string) error {
 	ctx := cmd.Context()
 
-	fmt.Printf("🏗️  Installing runtime: %s\n", runtimeSpec)
+	// Parse runtime spec to extract name and version
+	spec, err := runtime.ParseRuntimeSpec(runtimeSpec)
+	if err != nil {
+		return fmt.Errorf("invalid runtime specification: %w", err)
+	}
+
+	// Display what we're installing
+	if spec.IsLatest() {
+		fmt.Printf("🏗️  Installing runtime: %s (latest version)\n", spec.Name)
+	} else {
+		fmt.Printf("🏗️  Installing runtime: %s@%s\n", spec.Name, spec.Version)
+	}
 
 	// Create client and connect to server
 	client, err := common.NewJobClient()
@@ -421,31 +487,15 @@ func runRuntimeInstall(cmd *cobra.Command, runtimeSpec string, force bool, githu
 	}
 	defer client.Close()
 
-	// If github-repo flag is provided, install from GitHub
-	if githubRepo != "" {
-		fmt.Printf("Installing from GitHub repository: %s\n", githubRepo)
-		return runGitHubRuntimeInstall(ctx, client, runtimeSpec, githubRepo, force)
+	// Install from external runtime registry
+	// Normalize and validate registry URL (only GitHub registries allowed)
+	normalizedURL, err := normalizeRegistryURL(registryURL)
+	if err != nil {
+		return fmt.Errorf("invalid registry: %w", err)
 	}
+	fmt.Printf("📦 Installing from external registry: %s\n", normalizedURL)
 
-	// Check for local runtime scripts on client machine
-	localPath := findLocalRuntime(runtimeSpec)
-	if localPath != "" {
-		fmt.Printf("📁 Found local runtime: %s\n", localPath)
-		fmt.Printf("Starting local runtime installation with real-time logs...\n\n")
-
-		// Upload and install with streaming
-		return runStreamingLocalRuntimeInstall(ctx, client, runtimeSpec, localPath, force)
-	} else {
-		// Parse runtime spec for error message
-		var expectedDir string
-		parts := strings.SplitN(runtimeSpec, ":", 2)
-		if len(parts) == 2 {
-			expectedDir = fmt.Sprintf("%s-%s", parts[0], parts[1])
-		} else {
-			expectedDir = runtimeSpec
-		}
-		return fmt.Errorf("runtime '%s' not found in local codebase. Runtime must be present in runtimes/%s/ or use --github-repo flag to install from GitHub", runtimeSpec, expectedDir)
-	}
+	return runStreamingRegistryRuntimeInstall(ctx, client, spec.Original, force, normalizedURL)
 }
 
 func NewRuntimeValidateCmd() *cobra.Command {
@@ -519,12 +569,22 @@ func NewRuntimeRemoveCmd() *cobra.Command {
 		Short: "Remove a runtime environment",
 		Long: `Remove an installed runtime environment and clean up its files.
 
+Removal Behavior:
+  - Without version: Removes ALL versions of the runtime
+  - With @version:   Removes ONLY the specific version
+
 Examples:
-  # Remove Java 21 runtime
+  # Remove ALL versions of Python 3.11 ML runtime
+  rnx runtime remove python-3.11-ml
+
+  # Remove ONLY version 1.3.1 of Python 3.11 ML runtime
+  rnx runtime remove python-3.11-ml@1.3.1
+
+  # Remove ALL versions of Java 21 runtime
   rnx runtime remove openjdk-21
-  
-  # Remove Python 3.11 ML runtime  
-  rnx runtime remove python-3.11-ml`,
+
+  # Remove ONLY version 1.0.0 of Java 21 runtime
+  rnx runtime remove openjdk-21@1.0.0`,
 		Args: cobra.ExactArgs(1),
 		RunE: runRuntimeRemove,
 	}
@@ -649,6 +709,154 @@ func runGitHubRuntimeList(githubRepo string) error {
 	fmt.Printf("Get details with: rnx runtime info <runtime-name> --github-repo=%s\n", githubRepo)
 
 	return nil
+}
+
+// runRegistryRuntimeList lists available runtimes from the runtime registry
+func runRegistryRuntimeList(registryURL string) error {
+	fmt.Printf("📦 Fetching available runtimes from registry: %s\n", registryURL)
+	fmt.Println()
+
+	// Create registry client
+	registryClient := registry.NewClient()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Fetch registry
+	reg, err := registryClient.FetchRegistry(ctx, registryURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch runtime registry: %w", err)
+	}
+
+	// Display registry info
+	fmt.Printf("✓ Registry fetched successfully\n")
+	fmt.Printf("📅 Last updated: %s\n", reg.UpdatedAt.Format("2006-01-02 15:04:05 UTC"))
+	fmt.Println()
+
+	// Check if registry has runtimes
+	if len(reg.Runtimes) == 0 {
+		if common.JSONOutput {
+			fmt.Println("[]")
+		} else {
+			fmt.Println("No runtimes available in this registry.")
+		}
+		return nil
+	}
+
+	// Handle JSON output
+	if common.JSONOutput {
+		return outputRegistryRuntimesJSON(reg)
+	}
+
+	// Display runtimes in a table
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "RUNTIME\tVERSIONS\tLATEST\tPLATFORMS\tDESCRIPTION")
+	fmt.Fprintln(w, "-------\t--------\t------\t---------\t-----------")
+
+	// Sort runtime names for consistent output
+	runtimeNames := make([]string, 0, len(reg.Runtimes))
+	for name := range reg.Runtimes {
+		runtimeNames = append(runtimeNames, name)
+	}
+	sort.Strings(runtimeNames)
+
+	// Display each runtime
+	for _, name := range runtimeNames {
+		versions := reg.Runtimes[name]
+
+		// Get all version numbers
+		versionList := make([]string, 0, len(versions))
+		for version := range versions {
+			versionList = append(versionList, version)
+		}
+		sort.Strings(versionList)
+
+		// Determine latest version (last in sorted list)
+		latestVersion := versionList[len(versionList)-1]
+		latestEntry := versions[latestVersion]
+
+		// Format versions display
+		versionCount := len(versionList)
+		var versionDisplay string
+		if versionCount <= 3 {
+			versionDisplay = strings.Join(versionList, ", ")
+		} else {
+			versionDisplay = fmt.Sprintf("%d versions", versionCount)
+		}
+
+		// Format platforms
+		platformCount := len(latestEntry.Platforms)
+		platformDisplay := fmt.Sprintf("%d platforms", platformCount)
+
+		// Truncate description if too long
+		desc := latestEntry.Description
+		if len(desc) > 50 {
+			desc = desc[:47] + "..."
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			name,
+			versionDisplay,
+			latestVersion,
+			platformDisplay,
+			desc,
+		)
+	}
+
+	w.Flush()
+	fmt.Printf("\nFound %d runtime(s) in registry\n", len(reg.Runtimes))
+	fmt.Println()
+	fmt.Println("Install with: rnx runtime install <runtime>@<version>")
+	fmt.Println("Examples:")
+	fmt.Println("  rnx runtime install python-3.11@1.3.1")
+	fmt.Println("  rnx runtime install python-3.11-ml@latest")
+	fmt.Println()
+	fmt.Println("For custom registry:")
+	fmt.Println("  rnx runtime install <runtime>@<version> --registry=owner/repo")
+
+	return nil
+}
+
+// outputRegistryRuntimesJSON outputs registry runtimes as JSON
+func outputRegistryRuntimesJSON(reg *registry.Registry) error {
+	type RuntimeJSON struct {
+		Name        string   `json:"name"`
+		Versions    []string `json:"versions"`
+		Latest      string   `json:"latest"`
+		Description string   `json:"description"`
+		Platforms   []string `json:"platforms"`
+	}
+
+	runtimes := make([]RuntimeJSON, 0, len(reg.Runtimes))
+
+	for name, versions := range reg.Runtimes {
+		// Get all version numbers
+		versionList := make([]string, 0, len(versions))
+		for version := range versions {
+			versionList = append(versionList, version)
+		}
+		sort.Strings(versionList)
+
+		// Get latest version
+		latestVersion := versionList[len(versionList)-1]
+		latestEntry := versions[latestVersion]
+
+		runtimes = append(runtimes, RuntimeJSON{
+			Name:        name,
+			Versions:    versionList,
+			Latest:      latestVersion,
+			Description: latestEntry.Description,
+			Platforms:   latestEntry.Platforms,
+		})
+	}
+
+	// Sort by name for consistent output
+	sort.Slice(runtimes, func(i, j int) bool {
+		return runtimes[i].Name < runtimes[j].Name
+	})
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(runtimes)
 }
 
 // GitHubManifest represents the runtime manifest structure
@@ -805,6 +1013,63 @@ func runGitHubRuntimeInstall(ctx context.Context, client *client.JobClient, runt
 	return nil
 }
 
+// runStreamingRegistryRuntimeInstall installs runtime from external registry with streaming logs
+func runStreamingRegistryRuntimeInstall(ctx context.Context, client *client.JobClient, runtimeSpec string, force bool, registryURL string) error {
+	fmt.Printf("Starting registry runtime installation...\n\n")
+
+	// Create streaming installation request WITHOUT repository info
+	// Server will detect this and route to registry
+	// Note: We'll use Branch field temporarily to pass registry URL (TODO: add dedicated field to proto)
+	req := &pb.InstallRuntimeRequest{
+		RuntimeSpec:    runtimeSpec,
+		ForceReinstall: force,
+		Branch:         registryURL, // Temporarily use Branch field for registry URL
+		// Repository, Path are empty - signals registry installation
+	}
+
+	stream, err := client.StreamingInstallRuntimeFromGithub(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to start streaming registry runtime installation: %w", err)
+	}
+
+	// Process streaming chunks
+	for {
+		chunk, err := stream.Recv()
+		if err == io.EOF {
+			// Stream completed successfully
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("streaming error: %w", err)
+		}
+
+		switch chunk.ChunkType.(type) {
+		case *pb.RuntimeInstallationChunk_Progress:
+			progress := chunk.GetProgress()
+			fmt.Printf("📊 %s\n", progress.Message)
+
+		case *pb.RuntimeInstallationChunk_Log:
+			log := chunk.GetLog()
+			fmt.Print(string(log.Data))
+
+		case *pb.RuntimeInstallationChunk_Result:
+			result := chunk.GetResult()
+			if result.Success {
+				fmt.Printf("\n🎉 %s\n", result.Message)
+				if result.InstallPath != "" {
+					fmt.Printf("📍 Installed at: %s\n", result.InstallPath)
+				}
+				return nil
+			} else {
+				return fmt.Errorf("registry runtime installation failed: %s", result.Message)
+			}
+		}
+	}
+
+	fmt.Printf("\nRegistry runtime installation completed successfully!\n")
+	return nil
+}
+
 // parseGitHubRepo parses GitHub repository URL in various formats
 // Examples:
 //   - "owner/repo/tree/branch/path" -> ("owner/repo", "branch", "path")
@@ -844,167 +1109,31 @@ func parseGitHubRepo(githubRepo string) (repository, branch, path string, err er
 	return repository, branch, path, nil
 }
 
-// findProjectRoot finds the project root directory by looking for go.mod file
-func findProjectRoot() (string, error) {
-	// Start from current directory
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
+// normalizeRegistryURL converts shorthand GitHub repo format to full URL
+// and validates that only shorthand format (owner/repo) is allowed
+// Examples:
+//   - "ehsaniara/joblet-runtimes" -> "https://github.com/ehsaniara/joblet-runtimes"
+//   - "myorg/custom-runtimes" -> "https://github.com/myorg/custom-runtimes"
+//   - "https://github.com/..." -> error (full URLs not allowed)
+func normalizeRegistryURL(registryURL string) (string, error) {
+	// If empty, return default
+	if registryURL == "" {
+		return "https://github.com/ehsaniara/joblet-runtimes", nil
 	}
 
-	// Walk up the directory tree looking for go.mod
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached root directory without finding go.mod
-			break
-		}
-		dir = parent
+	// Reject full URLs - only shorthand format allowed
+	if strings.HasPrefix(registryURL, "http://") || strings.HasPrefix(registryURL, "https://") {
+		return "", fmt.Errorf("registry flag should not contain http:// or https://. Use shorthand format: owner/repo")
 	}
 
-	return "", fmt.Errorf("go.mod not found in directory tree")
-}
-
-// findLocalRuntime searches for runtime scripts only in the local codebase /runtimes directory
-func findLocalRuntime(runtimeSpec string) string {
-	// Parse runtime spec (e.g., "python:3.11-ml" -> "python-3.11-ml", or "openjdk-21" -> "openjdk-21")
-	var runtimeDir string
-	parts := strings.SplitN(runtimeSpec, ":", 2)
-	if len(parts) == 2 {
-		// Format: "python:3.11-ml" -> "python-3.11-ml"
-		runtimeDir = fmt.Sprintf("%s-%s", parts[0], parts[1])
-	} else {
-		// Format: "openjdk-21" -> "openjdk-21" (use as-is)
-		runtimeDir = runtimeSpec
+	// Validate shorthand GitHub repo format (owner/repo)
+	parts := strings.Split(registryURL, "/")
+	if len(parts) >= 2 {
+		// Extract just owner/repo (in case there are additional path segments)
+		ownerRepo := fmt.Sprintf("%s/%s", parts[0], parts[1])
+		return fmt.Sprintf("https://github.com/%s", ownerRepo), nil
 	}
 
-	// Find project root by looking for go.mod file
-	projectRoot, err := findProjectRoot()
-	if err != nil {
-		return ""
-	}
-
-	// Check local codebase runtimes directory from project root
-	path := filepath.Join(projectRoot, "runtimes", runtimeDir)
-
-	// Check if directory exists
-	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		// Check for common setup script names
-		setupScripts := []string{"setup.sh", "install.sh"}
-		for _, script := range setupScripts {
-			scriptPath := filepath.Join(path, script)
-			if _, err := os.Stat(scriptPath); err == nil {
-				return path
-			}
-		}
-		// Also check for pattern-based scripts
-		matches, _ := filepath.Glob(filepath.Join(path, "setup_*.sh"))
-		if len(matches) > 0 {
-			return path
-		}
-	}
-
-	return ""
-}
-
-// readRuntimeFiles reads all files from the local runtime directory
-func readRuntimeFiles(localPath string) ([]*pb.RuntimeFile, error) {
-	var files []*pb.RuntimeFile
-
-	err := filepath.Walk(localPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip directories and hidden files
-		if info.IsDir() || strings.HasPrefix(info.Name(), ".") {
-			return nil
-		}
-
-		// Read file content
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", path, err)
-		}
-
-		// Get relative path from runtime directory
-		relPath, err := filepath.Rel(localPath, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path: %w", err)
-		}
-
-		files = append(files, &pb.RuntimeFile{
-			Path:       relPath,
-			Content:    content,
-			Executable: info.Mode()&0111 != 0, // Check if file is executable
-		})
-
-		return nil
-	})
-
-	return files, err
-}
-
-// runStreamingLocalRuntimeInstall installs runtime from local files with streaming logs
-func runStreamingLocalRuntimeInstall(ctx context.Context, client *client.JobClient, runtimeSpec, localPath string, force bool) error {
-	// Upload all files from the local runtime directory
-	files, err := readRuntimeFiles(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to read local runtime files: %w", err)
-	}
-
-	fmt.Printf("📤 Uploading %d runtime files...\n", len(files))
-
-	// Send streaming installation request with uploaded files
-	req := &pb.InstallRuntimeFromLocalRequest{
-		RuntimeSpec:    runtimeSpec,
-		Files:          files,
-		ForceReinstall: force,
-	}
-
-	stream, err := client.StreamingInstallRuntimeFromLocal(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to start streaming local runtime installation: %w", err)
-	}
-
-	// Process streaming chunks
-	for {
-		chunk, err := stream.Recv()
-		if err == io.EOF {
-			// Stream completed successfully
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("streaming error: %w", err)
-		}
-
-		switch chunk.ChunkType.(type) {
-		case *pb.RuntimeInstallationChunk_Progress:
-			progress := chunk.GetProgress()
-			fmt.Printf("📊 %s\n", progress.Message)
-
-		case *pb.RuntimeInstallationChunk_Log:
-			log := chunk.GetLog()
-			fmt.Print(string(log.Data))
-
-		case *pb.RuntimeInstallationChunk_Result:
-			result := chunk.GetResult()
-			if result.Success {
-				fmt.Printf("\n🎉 %s\n", result.Message)
-				if result.InstallPath != "" {
-					fmt.Printf("📍 Installed at: %s\n", result.InstallPath)
-				}
-				return nil
-			} else {
-				fmt.Printf("\nError: %s\n", result.Message)
-				return fmt.Errorf("local runtime installation failed")
-			}
-		}
-	}
-
-	return nil
+	// Invalid format
+	return "", fmt.Errorf("invalid registry format. Expected: owner/repo")
 }

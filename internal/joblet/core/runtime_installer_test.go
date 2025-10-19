@@ -119,45 +119,6 @@ func TestRuntimeInstallResult_Fields(t *testing.T) {
 	assert.Equal(t, "Setup completed\nRuntime installed", result.LogOutput)
 }
 
-func TestRuntimeInstallFromLocalRequest_Fields(t *testing.T) {
-	files := []*RuntimeFile{
-		{Path: "setup.sh", Content: []byte("setup"), Executable: true},
-		{Path: "config.yml", Content: []byte("config"), Executable: false},
-	}
-
-	request := RuntimeInstallFromLocalRequest{
-		RuntimeSpec:    "test-runtime",
-		Files:          files,
-		ForceReinstall: true,
-	}
-
-	assert.Equal(t, "test-runtime", request.RuntimeSpec)
-	assert.Len(t, request.Files, 2)
-	assert.True(t, request.ForceReinstall)
-
-	// Check files
-	assert.Equal(t, "setup.sh", request.Files[0].Path)
-	assert.Equal(t, []byte("setup"), request.Files[0].Content)
-	assert.True(t, request.Files[0].Executable)
-
-	assert.Equal(t, "config.yml", request.Files[1].Path)
-	assert.Equal(t, []byte("config"), request.Files[1].Content)
-	assert.False(t, request.Files[1].Executable)
-}
-
-func TestRuntimeFile_Fields(t *testing.T) {
-	content := []byte("#!/bin/bash\necho 'test'")
-	file := RuntimeFile{
-		Path:       "scripts/setup.sh",
-		Content:    content,
-		Executable: true,
-	}
-
-	assert.Equal(t, "scripts/setup.sh", file.Path)
-	assert.Equal(t, content, file.Content)
-	assert.True(t, file.Executable)
-}
-
 // Mock implementation for testing streaming interface
 type mockRuntimeStreamer struct {
 	progressMessages []string
