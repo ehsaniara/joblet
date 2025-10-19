@@ -248,6 +248,37 @@ GRAALVM_EOF
     }
 PYTHON_EOF
                 ;;
+            "python-3.11-pytorch-cuda")
+                cat >> runtime-manifest.json << PYTORCH_EOF
+    "python-3.11-pytorch-cuda": {
+      "name": "python-3.11-pytorch-cuda",
+      "display_name": "Python 3.11 PyTorch CUDA",
+      "version": "3.11.7",
+      "description": "Python 3.11 with PyTorch and CUDA support for GPU-accelerated deep learning",
+      "category": "language-runtime",
+      "language": "python",
+      "platforms": {
+        "ubuntu-amd64": { "supported": true, "archive_url": "$archive_file", "archive_size": $archive_size, "checksum": "sha256:auto-generated", "notes": "Full CUDA 11.8 support" },
+        "ubuntu-arm64": { "supported": true, "archive_url": "$archive_file", "archive_size": $archive_size, "checksum": "sha256:auto-generated", "notes": "CPU-only PyTorch or Jetson builds" },
+        "rhel-amd64": { "supported": true, "archive_url": "$archive_file", "archive_size": $archive_size, "checksum": "sha256:auto-generated", "notes": "Full CUDA 11.8 support" },
+        "rhel-arm64": { "supported": true, "archive_url": "$archive_file", "archive_size": $archive_size, "checksum": "sha256:auto-generated", "notes": "CPU-only PyTorch or Jetson builds" },
+        "amzn-amd64": { "supported": true, "archive_url": "$archive_file", "archive_size": $archive_size, "checksum": "sha256:auto-generated", "notes": "Full CUDA 11.8 support" },
+        "amzn-arm64": { "supported": true, "archive_url": "$archive_file", "archive_size": $archive_size, "checksum": "sha256:auto-generated", "notes": "CPU-only PyTorch or Jetson builds" }
+      },
+      "requirements": { "min_ram_mb": 8192, "min_disk_mb": 5000, "gpu_required": false },
+      "provides": {
+        "executables": ["python", "python3", "pip", "pip3", "nvidia-smi"],
+        "libraries": ["torch", "torchvision", "torchaudio", "numpy", "pandas", "matplotlib", "scipy", "scikit-learn"],
+        "environment_vars": { "PYTHON_PATH": "/usr/lib/python3.11", "PATH": "/usr/local/cuda/bin:/usr/bin:/bin:\$PATH", "LD_LIBRARY_PATH": "/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu", "CUDA_HOME": "/usr/local/cuda", "PYTHONPATH": "/usr/local/lib/python3.11/dist-packages" }
+      },
+      "documentation": {
+        "usage": "Use with: rnx run --runtime=python-3.11-pytorch-cuda --gpu=1 python train.py",
+        "examples": ["rnx run --runtime=python-3.11-pytorch-cuda --gpu=1 python -c 'import torch; print(torch.cuda.is_available())'", "rnx run --runtime=python-3.11-pytorch-cuda --gpu=1 python -c 'import torch; print(torch.__version__)'"]
+      },
+      "tags": ["python", "pytorch", "cuda", "gpu", "deep-learning", "machine-learning", "ai"]
+    }
+PYTORCH_EOF
+                ;;
             *)
                 # Default for unknown runtimes
                 print_warning "No config found for ${runtime_name}, using defaults"
