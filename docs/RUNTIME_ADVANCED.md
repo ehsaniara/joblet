@@ -1,6 +1,7 @@
 # Runtime Advanced Guide
 
-This document consolidates advanced runtime implementation details, security considerations, enterprise deployment patterns, and sophisticated scenarios for production environments.
+This document consolidates advanced runtime implementation details, security considerations, enterprise deployment
+patterns, and sophisticated scenarios for production environments.
 
 ## Table of Contents
 
@@ -20,22 +21,22 @@ The Joblet runtime system provides a sophisticated isolation and mounting archit
 ### Core Components
 
 1. **Runtime Resolver** (`internal/joblet/runtime/resolver.go`)
-   - Parses runtime specifications (e.g., `openjdk-21`, `python-3.11-ml`)
-   - Locates runtime directories and configurations
-   - Validates system compatibility
+    - Parses runtime specifications (e.g., `openjdk-21`, `python-3.11-ml`)
+    - Locates runtime directories and configurations
+    - Validates system compatibility
 
 2. **Filesystem Isolator** (`internal/joblet/core/filesystem/isolator.go`)
-   - Handles mounting of runtime `isolated/` directories into job filesystems
-   - Manages environment variable injection from runtime.yml
-   - Provides complete filesystem isolation using self-contained runtime structures
+    - Handles mounting of runtime `isolated/` directories into job filesystems
+    - Manages environment variable injection from runtime.yml
+    - Provides complete filesystem isolation using self-contained runtime structures
 
 3. **Runtime Types** (`internal/joblet/runtime/types.go`)
-   - Defines data structures for runtime configurations
-   - Simplified structure supporting self-contained runtimes
+    - Defines data structures for runtime configurations
+    - Simplified structure supporting self-contained runtimes
 
 4. **CLI Integration** (`internal/rnx/resources/runtime.go`)
-   - Runtime management commands (`rnx runtime install/list/info`)
-   - Runtime installation using platform-specific setup scripts
+    - Runtime management commands (`rnx runtime install/list/info`)
+    - Runtime installation using platform-specific setup scripts
 
 ### Directory Structure
 
@@ -92,19 +93,19 @@ Runtime installation uses a modular, template-based architecture:
 ### Strategy Pattern Components
 
 1. **Runtime Installer Interface** (`internal/joblet/runtime/installers/interfaces.go`)
-   - Unified interface for all runtime installation types
-   - Standardized InstallSpec and InstallResult structures
-   - Support for GitHub, local, and script-based sources
+    - Unified interface for all runtime installation types
+    - Standardized InstallSpec and InstallResult structures
+    - Support for GitHub, local, and script-based sources
 
 2. **Installer Manager** (`internal/joblet/runtime/installers/manager.go`)
-   - Central coordinator that delegates to appropriate installers
-   - Source type detection and routing
-   - Error handling and validation
+    - Central coordinator that delegates to appropriate installers
+    - Source type detection and routing
+    - Error handling and validation
 
 3. **Template Engine** (`internal/joblet/runtime/installers/base.go`)
-   - Go template rendering with embedded template files
-   - Parameterized shell script generation
-   - Runtime-specific variable substitution
+    - Go template rendering with embedded template files
+    - Parameterized shell script generation
+    - Runtime-specific variable substitution
 
 ## Basic Usage Examples
 
@@ -141,11 +142,13 @@ rnx job run --runtime=python-3.11-ml \
 
 ## Runtime Isolation Cleanup System
 
-The cleanup system transforms builder chroot runtime installations into secure, isolated runtime environments for production jobs.
+The cleanup system transforms builder chroot runtime installations into secure, isolated runtime environments for
+production jobs.
 
 ### Security Problem Statement
 
-When runtimes are built in the builder chroot environment, they initially have access to the full host OS filesystem. This creates a security risk if not properly isolated.
+When runtimes are built in the builder chroot environment, they initially have access to the full host OS filesystem.
+This creates a security risk if not properly isolated.
 
 **Before Cleanup (INSECURE):**
 
@@ -279,6 +282,7 @@ sudo ./runtimes/java-21/setup_java_21.sh
 ```
 
 Each script automatically:
+
 1. Builds the complete runtime environment
 2. Installs all dependencies and packages
 3. Creates deployment package at `/tmp/runtime-deployments/[runtime]-runtime.zip`
@@ -322,12 +326,14 @@ rnx job run --runtime=python-3.11-ml python script.py
 ## Zero-Contamination Guarantee
 
 **Production hosts require NO:**
+
 - Compilers (gcc, g++, javac)
 - Package managers (apt, yum, npm, pip)
 - Build tools (make, cmake, maven)
 - Development headers (python3-dev, etc.)
 
 **Only requirement:**
+
 - Joblet daemon running
 - RNX client with runtime package
 
@@ -515,11 +521,11 @@ rnx job run --runtime=python-3.11-ml python -c "import numpy; print('✅ Runtime
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| `runtime error: invalid zip file` | Ensure zip was created properly, not corrupted during transfer |
-| `could not detect runtime name` | Verify zip contains proper directory structure with metadata |
-| `grpc: received message larger than max` | Use local copy approach for runtimes >128MB |
+| Issue                                    | Solution                                                       |
+|------------------------------------------|----------------------------------------------------------------|
+| `runtime error: invalid zip file`        | Ensure zip was created properly, not corrupted during transfer |
+| `could not detect runtime name`          | Verify zip contains proper directory structure with metadata   |
+| `grpc: received message larger than max` | Use local copy approach for runtimes >128MB                    |
 
 ---
 

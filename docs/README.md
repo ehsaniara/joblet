@@ -60,7 +60,9 @@ seamless integration with existing infrastructure through a unified gRPC API and
   tracking
 - **Observability**: Real-time metrics collection, structured logging, and comprehensive audit trails for compliance
   requirements
-- **Data Persistence**: Dedicated persistence service (`joblet-persist`) with multiple storage backends including local filesystem and AWS CloudWatch Logs for cloud-native deployments, featuring multi-node support, high-performance log and metric storage with gzip compression, Unix socket IPC, and historical query capabilities
+- **Data Persistence**: Dedicated persistence service (`joblet-persist`) with multiple storage backends including local
+  filesystem and AWS CloudWatch Logs for cloud-native deployments, featuring multi-node support, high-performance log
+  and metric storage with gzip compression, Unix socket IPC, and historical query capabilities
 
 ### Security Architecture
 

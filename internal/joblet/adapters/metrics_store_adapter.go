@@ -32,9 +32,10 @@ type MetricsStoreAdapter struct {
 	collectors      map[string]*metrics.Collector
 	collectorsMutex sync.RWMutex
 
-	logger     *logger.Logger
-	closed     bool
-	closeMutex sync.RWMutex
+	logger         *logger.Logger
+	closed         bool
+	persistEnabled bool // If false, skip all buffering (live streaming only)
+	closeMutex     sync.RWMutex
 }
 
 // MetricsEvent represents events published about job metrics
@@ -49,6 +50,7 @@ type MetricsEvent struct {
 func NewMetricsStoreAdapter(
 	pubsub pubsub.PubSub[MetricsEvent],
 	persistClient pb.PersistServiceClient,
+	persistEnabled bool,
 	log *logger.Logger,
 ) *MetricsStoreAdapter {
 	if log == nil {
@@ -56,11 +58,12 @@ func NewMetricsStoreAdapter(
 	}
 
 	adapter := &MetricsStoreAdapter{
-		pubsub:        pubsub,
-		persistClient: persistClient,
-		buffer:        metrics.NewMetricsBuffer(100), // Store last 100 samples per job
-		collectors:    make(map[string]*metrics.Collector),
-		logger:        log,
+		pubsub:         pubsub,
+		persistClient:  persistClient,
+		persistEnabled: persistEnabled,
+		buffer:         metrics.NewMetricsBuffer(100), // Store last 100 samples per job
+		collectors:     make(map[string]*metrics.Collector),
+		logger:         log,
 	}
 
 	// Debug log to verify pubsub is set
@@ -148,17 +151,19 @@ func (a *MetricsStoreAdapter) StopCollector(jobID string) error {
 
 // PublishMetrics implements the MetricsPublisher interface
 // This is called by the Collector to publish metrics samples
-// Metrics are:
-// 1. Stored in buffer for gap-free streaming
-// 2. Published to pubsub for real-time streaming to clients (StreamJobMetrics)
-// 3. IPC forwarding to persist subprocess (MetricsSubscriber listens and forwards)
+// When persist is enabled: Buffers data + publishes to pubsub (for gap prevention, IPC, and live streaming)
+// When persist is disabled: Only publishes to pubsub (live streaming only, no buffering)
 func (a *MetricsStoreAdapter) PublishMetrics(ctx context.Context, sample *domain.JobMetricsSample) error {
-	// Store in buffer first (this prevents gaps during persist→live transition)
-	if a.buffer != nil {
+	// Only store in buffer if persist is enabled (gap prevention)
+	// When persist is disabled, skip buffering to avoid unbounded growth
+	if a.persistEnabled && a.buffer != nil {
 		a.buffer.Add(sample)
+		a.logger.Debug("stored metrics in buffer", "jobId", sample.JobID, "timestamp", sample.Timestamp)
+	} else if !a.persistEnabled {
+		a.logger.Debug("persist disabled - skipping buffer write (live streaming only)", "jobId", sample.JobID, "timestamp", sample.Timestamp)
 	}
 
-	// Publish to pub-sub for real-time streaming and IPC forwarding
+	// Always publish to pubsub for live streaming (and IPC forwarding when enabled)
 	if a.pubsub != nil {
 		event := MetricsEvent{
 			Type:      "METRICS_SAMPLE",
@@ -196,13 +201,14 @@ func (a *MetricsStoreAdapter) StreamMetrics(
 
 // StreamMetricsWithSkip streams metrics, skipping the first skipCount buffered samples
 // This is used to avoid duplicates when persist has already sent some samples
+// When persist is disabled, skips all buffer reads and only does live streaming
 func (a *MetricsStoreAdapter) StreamMetricsWithSkip(
 	ctx context.Context,
 	jobID string,
 	skipCount int,
 	callback func(*domain.JobMetricsSample) error,
 ) error {
-	a.logger.Debug("starting metrics stream", "jobId", jobID, "skipCount", skipCount)
+	a.logger.Debug("starting metrics stream", "jobId", jobID, "skipCount", skipCount, "persistEnabled", a.persistEnabled)
 
 	// Check if there's an active collector for this job
 	a.collectorsMutex.RLock()
@@ -213,9 +219,8 @@ func (a *MetricsStoreAdapter) StreamMetricsWithSkip(
 	var lastTimestamp time.Time
 
 	// Step 1: Send buffered samples first (prevents gaps), skipping items already sent by persist
-	// The buffer contains the last ~100 samples collected for this job
-	// This ensures continuity even if persist hasn't caught up yet
-	if a.buffer != nil {
+	// ONLY when persist is enabled - otherwise skip buffer entirely to avoid stale data
+	if a.persistEnabled && a.buffer != nil {
 		bufferedSamples := a.buffer.GetRecent(jobID, 100)
 
 		// Skip samples already sent by persist
@@ -241,6 +246,8 @@ func (a *MetricsStoreAdapter) StreamMetricsWithSkip(
 		} else {
 			a.logger.Debug("no buffered samples to send (all skipped or none available)", "jobId", jobID)
 		}
+	} else if !a.persistEnabled {
+		a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "jobId", jobID)
 	}
 
 	// If no pubsub, we can't stream live metrics beyond the buffer

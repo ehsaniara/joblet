@@ -141,9 +141,9 @@ func TestParseRuntimeSpec(t *testing.T) {
 
 func TestRuntimeSpec_String(t *testing.T) {
 	tests := []struct {
-		name    string
-		spec    *RuntimeSpec
-		want    string
+		name string
+		spec *RuntimeSpec
+		want string
 	}{
 		{
 			name: "with version",
@@ -212,9 +212,9 @@ func TestRuntimeSpec_IsLatest(t *testing.T) {
 
 func TestRuntimeSpec_FullName(t *testing.T) {
 	tests := []struct {
-		name    string
-		spec    *RuntimeSpec
-		want    string
+		name string
+		spec *RuntimeSpec
+		want string
 	}{
 		{
 			name: "with version",

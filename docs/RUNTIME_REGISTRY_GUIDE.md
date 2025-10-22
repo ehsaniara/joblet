@@ -115,11 +115,13 @@ rnx runtime install custom-runtime@2.0.0 --registry=myorg/runtimes
 ### Key Features
 
 **Version Resolution:**
+
 - `python-3.11-ml` → `python-3.11-ml@latest` → `python-3.11-ml@1.0.3`
 - `python-3.11-ml@1.0.2` → exact version
 - Multiple versions can coexist
 
 **Versioned Paths:**
+
 ```
 /opt/joblet/runtimes/
 ├── python-3.11-ml-1.0.2/
@@ -128,6 +130,7 @@ rnx runtime install custom-runtime@2.0.0 --registry=myorg/runtimes
 ```
 
 **Fallback Behavior:**
+
 1. Try registry installation
 2. If fails → Check local `runtimes/` directory
 3. If not found → Error
@@ -197,18 +200,21 @@ rnx runtime install runtime-b@1.5.0 --registry=acme/runtimes
 ### Use Cases for Custom Registries
 
 **1. Private/Proprietary Runtimes**
+
 ```bash
 # Company-specific Python with internal packages
 rnx runtime install acme-python@2.0.0 --registry=acme-corp/runtimes
 ```
 
 **2. Air-Gapped Environments**
+
 ```bash
 # Self-hosted GitLab/Gitea
 rnx runtime install secure-java # Note: Only GitHub registries are supported (format: owner/repo)
 ```
 
 **3. Pre-release/Development**
+
 ```bash
 # Beta runtimes
 rnx runtime install python-beta@3.0.0-rc1 --registry=myorg/beta-runtimes
@@ -314,6 +320,7 @@ git push origin v1.0.0
 ```
 
 **GitHub Actions will:**
+
 1. Build all runtimes
 2. Create .tar.gz packages
 3. Calculate SHA256 checksums
@@ -374,29 +381,32 @@ Multi-version nested format:
 - `version` - Registry schema version ("1")
 - `updated_at` - ISO 8601 timestamp
 - `runtimes` - Object containing all runtimes
-  - `{runtime-name}` - Runtime identifier
-    - `{version}` - Semantic version number
-      - `version` - Version string
-      - `description` - Human-readable description
-      - `download_url` - Direct download URL for .tar.gz
-      - `checksum` - SHA256 checksum with `sha256:` prefix
-      - `size` - File size in bytes
-      - `platforms` - Array of supported platforms
+    - `{runtime-name}` - Runtime identifier
+        - `{version}` - Semantic version number
+            - `version` - Version string
+            - `description` - Human-readable description
+            - `download_url` - Direct download URL for .tar.gz
+            - `checksum` - SHA256 checksum with `sha256:` prefix
+            - `size` - File size in bytes
+            - `platforms` - Array of supported platforms
 
 ### Platform Identifiers
 
 Format: `{os}-{arch}`
 
 **Operating Systems:**
+
 - `ubuntu` - Ubuntu/Debian
 - `rhel` - RHEL/CentOS/Rocky
 - `amzn` - Amazon Linux
 
 **Architectures:**
+
 - `amd64` - x86_64
 - `arm64` - ARM64/aarch64
 
 **Examples:**
+
 - `ubuntu-amd64`
 - `ubuntu-arm64`
 - `rhel-amd64`
@@ -485,6 +495,7 @@ Error: failed to fetch registry
 ```
 
 **Solutions:**
+
 - Verify registry URL is correct
 - Check `registry.json` exists in repository root
 - Ensure repository is public or access token is configured
@@ -497,6 +508,7 @@ Error: runtime 'my-runtime' not found in registry
 ```
 
 **Solutions:**
+
 - Check runtime name matches exactly
 - Verify `registry.json` includes the runtime
 - Inspect registry: `curl {url}/registry.json | jq '.runtimes | keys'`
@@ -508,6 +520,7 @@ Error: version '1.0.5' not found for runtime 'my-runtime'
 ```
 
 **Solutions:**
+
 - Check available versions: `curl {url}/registry.json | jq '.runtimes["my-runtime"] | keys'`
 - Verify tag was pushed and workflow ran
 - Check GitHub releases for .tar.gz file
@@ -519,6 +532,7 @@ Error: checksum mismatch
 ```
 
 **Solutions:**
+
 - Re-download the runtime
 - Verify file wasn't corrupted
 - Check if .tar.gz file was modified after registry.json generation
@@ -531,6 +545,7 @@ Error: HTTP 404: 404 Not Found
 ```
 
 **Solutions:**
+
 - Verify download URL in registry.json
 - Check GitHub release exists
 - Ensure .tar.gz file was uploaded to release
@@ -541,12 +556,14 @@ Error: HTTP 404: 404 Not Found
 ### Version Management
 
 **✅ Good:**
+
 - Use semantic versioning: `1.0.0`, `1.0.1`, `2.0.0`
 - Tag format: `v1.0.0`, `v2.0.0`
 - One tag per release
 - Immutable releases (don't modify after publishing)
 
 **❌ Avoid:**
+
 - Moving tags (`git tag -f`)
 - Deleting releases
 - Modifying release assets after publication
@@ -554,6 +571,7 @@ Error: HTTP 404: 404 Not Found
 ### Registry Maintenance
 
 **✅ Good:**
+
 ```json
 {
   "runtimes": {
@@ -567,6 +585,7 @@ Error: HTTP 404: 404 Not Found
 ```
 
 **❌ Avoid:**
+
 ```json
 {
   "runtimes": {

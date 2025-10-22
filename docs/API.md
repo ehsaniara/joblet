@@ -473,7 +473,8 @@ Script completed successfully
 
 ### GetJobMetrics
 
-Streams resource usage metrics for a job as time-series data. Shows CPU, memory, I/O, network, process, and GPU metrics collected during job execution.
+Streams resource usage metrics for a job as time-series data. Shows CPU, memory, I/O, network, process, and GPU metrics
+collected during job execution.
 
 **Authorization**: Admin, Viewer
 
@@ -512,6 +513,7 @@ Similar to `GetJobLogs`, this method streams all metrics from job start:
 **Storage**:
 
 Metrics are persisted server-side as gzipped JSONL files at:
+
 - Path: `/opt/joblet/metrics/<job-uuid>/<timestamp>.jsonl.gz`
 - Format: One JSON object per line
 - Compression: gzip (~10x size reduction)

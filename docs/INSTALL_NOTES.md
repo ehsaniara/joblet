@@ -2,11 +2,13 @@
 
 ## Overview
 
-This document provides detailed information about what the Joblet Debian package installer does, including all system modifications, security considerations, and troubleshooting guidance.
+This document provides detailed information about what the Joblet Debian package installer does, including all system
+modifications, security considerations, and troubleshooting guidance.
 
 ## System Requirements
 
 ### Minimum Requirements
+
 - **OS**: Debian 11+ or Ubuntu 20.04+
 - **Kernel**: Linux 4.6+ with cgroups v2 support
 - **Architecture**: x86_64 (amd64) or ARM64
@@ -15,7 +17,9 @@ This document provides detailed information about what the Joblet Debian package
 - **Network**: Available 172.20.0.0/16 IP range (for bridge network)
 
 ### Required Packages
+
 The installer will automatically verify and use:
+
 - `openssl` (>= 1.1.1) - For TLS certificate generation
 - `systemd` - For service management
 - `iptables` or `nftables` - For firewall rules (auto-detected)
@@ -31,13 +35,16 @@ The installation makes the following **permanent** changes to your system:
 #### 1. Network Configuration
 
 **IP Forwarding (Permanent)**
+
 ```bash
 # Added to /etc/sysctl.conf:
 net.ipv4.ip_forward = 1
 ```
+
 This enables packet forwarding between network interfaces, required for job networking.
 
 **Kernel Modules (Auto-load on boot)**
+
 ```bash
 # Added to /etc/modules:
 br_netfilter
@@ -46,6 +53,7 @@ nf_nat
 ```
 
 **Bridge Network**
+
 ```bash
 # Created bridge interface:
 Interface: joblet0
@@ -53,13 +61,15 @@ IP Range: 172.20.0.0/16
 Gateway: 172.20.0.1
 ```
 
-⚠️ **CONFLICT DETECTION**: The installer checks if 172.20.0.0/16 is already in use. If a conflict is detected, a warning is displayed but installation continues. You may need to manually reconfigure the bridge network.
+⚠️ **CONFLICT DETECTION**: The installer checks if 172.20.0.0/16 is already in use. If a conflict is detected, a warning
+is displayed but installation continues. You may need to manually reconfigure the bridge network.
 
 **Firewall Rules**
 
 The installer auto-detects your firewall backend:
 
 **For iptables:**
+
 ```bash
 # NAT rule for job networking
 iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -j MASQUERADE
@@ -72,6 +82,7 @@ iptables -I FORWARD -o viso+ -j ACCEPT
 ```
 
 **For nftables:**
+
 ```bash
 # Creates dedicated joblet table
 nft add table inet joblet
@@ -116,6 +127,7 @@ Rules are automatically persisted if `iptables-persistent` or `/etc/nftables.con
 #### 3. Systemd Service
 
 **Service Configuration:**
+
 ```ini
 [Unit]
 Description=Joblet Service - Process Isolation Platform
@@ -133,6 +145,7 @@ WantedBy=multi-user.target
 ```
 
 **Enabled by default**: The service is enabled but NOT automatically started. You must manually start it:
+
 ```bash
 sudo systemctl start joblet
 ```
@@ -142,12 +155,14 @@ sudo systemctl start joblet
 ### Running as Root
 
 ⚠️ **Joblet runs as root** - This is **required** for:
+
 - Creating and managing Linux namespaces (pid, net, mount, ipc, uts, cgroup)
 - Configuring cgroups v2 for resource limits
 - Creating veth pairs and managing bridge networking
 - Setting up network isolation per job
 
 **Mitigation**:
+
 - Jobs run in isolated namespaces with restricted capabilities
 - Resource limits enforced via cgroups
 - Network isolation via bridge networking
@@ -156,10 +171,12 @@ sudo systemctl start joblet
 ### Certificate Security
 
 **Private keys are embedded** in configuration files:
+
 - `/opt/joblet/config/joblet-config.yml` (chmod 600)
 - `/opt/joblet/config/rnx-config.yml` (chmod 600)
 
 ⚠️ **IMPORTANT**:
+
 - These files contain TLS private keys - protect them accordingly
 - Do NOT commit these files to version control
 - Do NOT share them publicly
@@ -167,6 +184,7 @@ sudo systemctl start joblet
 
 **Certificate Generation:**
 Certificates are auto-generated during installation with:
+
 - 4096-bit RSA keys (CA)
 - 2048-bit RSA keys (server/client)
 - 3-year CA validity, 1-year certificate validity
@@ -175,11 +193,13 @@ Certificates are auto-generated during installation with:
 ### Firewall Security
 
 **Default behavior**:
+
 - Joblet opens port 50051 for gRPC (configurable)
 - Bridge network allows outbound connections from jobs
 - Jobs can access the internet if host has internet access
 
 **Recommendations**:
+
 ```bash
 # Restrict joblet access to specific networks
 sudo ufw allow from 192.168.0.0/16 to any port 50051
@@ -211,19 +231,21 @@ The installer follows this precedence order (highest to lowest):
    ```
 
 3. **Auto-detection** (fallback)
-   - Detects primary network interface IP
-   - Uses 0.0.0.0 for server bind address
-   - Uses 50051 for default port
+    - Detects primary network interface IP
+    - Uses 0.0.0.0 for server bind address
+    - Uses 50051 for default port
 
 ### AWS EC2 Automatic Configuration
 
 On AWS EC2 instances, the installer can automatically:
+
 - Detect EC2 environment via metadata service
 - Configure CloudWatch Logs backend
 - Set up certificates with instance public/private IPs
 - Enable IAM role-based authentication
 
 **Requirements**:
+
 - Create `/tmp/joblet-ec2-info` file before installation:
   ```bash
   cat > /tmp/joblet-ec2-info << EOF
@@ -246,11 +268,13 @@ sudo apt remove joblet
 ```
 
 **What is removed**:
+
 - Binaries and symlinks
 - Systemd service
 - Cgroup directories
 
 **What is preserved**:
+
 - Job logs in `/opt/joblet/logs/`
 - Volumes in `/opt/joblet/volumes/`
 - Configuration in `/opt/joblet/config/`
@@ -263,12 +287,14 @@ sudo apt purge joblet
 ```
 
 **What is removed**:
+
 - Everything from `remove` above
 - All data in `/opt/joblet/`
 - All data in `/var/log/joblet/`
 - Configuration in `/etc/joblet/`
 
 ⚠️ **Manual cleanup still required**:
+
 ```bash
 # Remove IP forwarding (if no longer needed)
 sudo sed -i '/net.ipv4.ip_forward = 1/d' /etc/sysctl.conf
@@ -303,6 +329,7 @@ sudo nft delete table inet joblet
 **Symptom**: Warning about 172.20.0.0/16 already in use
 
 **Solution**:
+
 ```bash
 # Check what's using the range
 ip route | grep 172.20
@@ -320,6 +347,7 @@ ip route | grep 172.20
 **Symptom**: "No firewall backend detected"
 
 **Solution**:
+
 ```bash
 # Install iptables
 sudo apt install iptables
@@ -336,6 +364,7 @@ sudo dpkg-reconfigure joblet
 **Symptom**: "Certificate generation failed"
 
 **Solution**:
+
 ```bash
 # Check OpenSSL is installed
 openssl version
@@ -449,6 +478,7 @@ sudo rnx job log <job-id>
 ### Custom Network Range
 
 Edit `/opt/joblet/config/joblet-config.yml`:
+
 ```yaml
 network:
   bridgeName: "joblet0"
@@ -461,6 +491,7 @@ Update firewall rules accordingly.
 ### Multiple Joblet Instances
 
 Not recommended, but possible:
+
 - Use different ports
 - Use different bridge networks
 - Use different config directories
@@ -486,13 +517,13 @@ sudo systemctl restart joblet
 ## Security Best Practices
 
 1. **Restrict Network Access**
-   - Use firewall rules to limit access to trusted networks
-   - Don't expose port 50051 to the internet without additional protection
+    - Use firewall rules to limit access to trusted networks
+    - Don't expose port 50051 to the internet without additional protection
 
 2. **Protect Configuration Files**
-   - Keep `/opt/joblet/config/` permissions at 600
-   - Don't commit to version control
-   - Use encrypted backups
+    - Keep `/opt/joblet/config/` permissions at 600
+    - Don't commit to version control
+    - Use encrypted backups
 
 3. **Monitor Logs**
    ```bash
@@ -506,13 +537,14 @@ sudo systemctl restart joblet
    ```
 
 5. **Audit Job Execution**
-   - Review job logs regularly
-   - Monitor resource usage
-   - Check for unusual network activity
+    - Review job logs regularly
+    - Monitor resource usage
+    - Check for unusual network activity
 
 ## Support
 
 For issues, documentation, and updates:
+
 - GitHub: https://github.com/ehsaniara/joblet
 - Documentation: /opt/joblet/docs/
 - Logs: `sudo journalctl -u joblet -f`

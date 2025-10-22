@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Joblet Persistence Service (`joblet-persist`) is a dedicated microservice that handles historical storage and querying of job logs and metrics. It runs as a subprocess of the main joblet daemon and provides durable storage with support for multiple storage backends including local filesystem and AWS CloudWatch.
+The Joblet Persistence Service (`joblet-persist`) is a dedicated microservice that handles historical storage and
+querying of job logs and metrics. It runs as a subprocess of the main joblet daemon and provides durable storage with
+support for multiple storage backends including local filesystem and AWS CloudWatch.
 
 ## Architecture
 
@@ -47,16 +49,16 @@ The Joblet Persistence Service (`joblet-persist`) is a dedicated microservice th
 ### Communication Channels
 
 1. **IPC Channel (Write Path)**
-   - Protocol: Custom binary protocol over Unix socket
-   - Socket: `/opt/joblet/run/persist-ipc.sock`
-   - Purpose: High-throughput log and metric writes from job executor
-   - Async, non-blocking writes
+    - Protocol: Custom binary protocol over Unix socket
+    - Socket: `/opt/joblet/run/persist-ipc.sock`
+    - Purpose: High-throughput log and metric writes from job executor
+    - Async, non-blocking writes
 
 2. **gRPC Channel (Query Path)**
-   - Protocol: gRPC over Unix socket
-   - Socket: `/opt/joblet/run/persist-grpc.sock`
-   - Purpose: Historical queries for logs and metrics
-   - Synchronous request-response
+    - Protocol: gRPC over Unix socket
+    - Socket: `/opt/joblet/run/persist-grpc.sock`
+    - Purpose: Historical queries for logs and metrics
+    - Synchronous request-response
 
 ## Storage Backends
 
@@ -65,6 +67,7 @@ The Joblet Persistence Service (`joblet-persist`) is a dedicated microservice th
 File-based storage using gzipped JSON lines format.
 
 **Features:**
+
 - ✅ No external dependencies
 - ✅ Simple deployment
 - ✅ Good for single-node setups
@@ -73,6 +76,7 @@ File-based storage using gzipped JSON lines format.
 - ⚠️ Manual backup required
 
 **Storage Format:**
+
 ```
 /opt/joblet/logs/
 ├── {job-id-1}/
@@ -92,6 +96,7 @@ File-based storage using gzipped JSON lines format.
 ```
 
 **Configuration:**
+
 ```yaml
 persist:
   storage:
@@ -111,6 +116,7 @@ persist:
 Cloud-native storage using AWS CloudWatch Logs for both logs and metrics.
 
 **Features:**
+
 - ✅ Cloud-native, fully managed
 - ✅ Multi-node support with nodeID isolation
 - ✅ Automatic scaling and durability
@@ -121,6 +127,7 @@ Cloud-native storage using AWS CloudWatch Logs for both logs and metrics.
 - ⚠️ API rate limits apply
 
 **Log Organization:**
+
 ```
 CloudWatch Log Groups (one per node):
 └── {log_group_prefix}/{nodeId}/jobs
@@ -146,7 +153,8 @@ CloudWatch Metrics (namespace per deployment):
 
 **Multi-Node Architecture:**
 
-CloudWatch backend supports distributed deployments with multiple joblet nodes. Each node is identified by a unique `nodeId`, ensuring logs from different nodes are properly isolated:
+CloudWatch backend supports distributed deployments with multiple joblet nodes. Each node is identified by a unique
+`nodeId`, ensuring logs from different nodes are properly isolated:
 
 ```
 Log Groups (one per node):
@@ -171,6 +179,7 @@ CloudWatch Metrics (shared namespace across all nodes):
 ```
 
 This allows:
+
 - Multiple nodes to run jobs with the same ID without conflicts
 - Easy filtering by node in CloudWatch Logs
 - Node-level log retention policies
@@ -199,6 +208,7 @@ CloudWatch backend uses AWS default credential chain (secure, no credentials in 
    ```
 
 **Required IAM Permissions:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -227,6 +237,7 @@ CloudWatch backend uses AWS default credential chain (secure, no credentials in 
 ```
 
 **Configuration:**
+
 ```yaml
 server:
   nodeId: "node-1"  # REQUIRED: Unique identifier for this node
@@ -247,7 +258,7 @@ persist:
 
       # Metrics configuration
       metric_namespace: "Joblet/Production"    # CloudWatch Metrics namespace
-      metric_dimensions:                       # Additional custom dimensions
+      metric_dimensions: # Additional custom dimensions
         Environment: "production"
         Cluster: "main-cluster"
 
@@ -272,6 +283,7 @@ CloudWatch Logs retention controls how long your logs are stored:
 - **Cost optimization:** Shorter retention = lower storage costs
 
 Example retention strategies:
+
 ```yaml
 # Development - 1 day retention
 log_retention_days: 1
@@ -291,27 +303,30 @@ log_retention_days: -1
 **Auto-Detection Features:**
 
 1. **Region Detection:**
-   - Queries EC2 metadata service: `http://169.254.169.254/latest/meta-data/placement/region`
-   - Falls back to `us-east-1` if not on EC2
-   - 5-second timeout
+    - Queries EC2 metadata service: `http://169.254.169.254/latest/meta-data/placement/region`
+    - Falls back to `us-east-1` if not on EC2
+    - 5-second timeout
 
 2. **Credential Detection:**
-   - Automatically uses EC2 instance profile if available
-   - No credentials stored in configuration files
+    - Automatically uses EC2 instance profile if available
+    - No credentials stored in configuration files
 
 **Monitoring:**
 
 **View logs in AWS Console:**
+
 ```
 CloudWatch → Log Groups → /joblet/{nodeId}/jobs
 ```
 
 **View metrics in AWS Console:**
+
 ```
 CloudWatch → Metrics → Custom Namespaces → Joblet/Jobs
 ```
 
 **Query logs using AWS CLI:**
+
 ```bash
 # Get logs for a specific job on node-1
 aws logs get-log-events \
@@ -325,6 +340,7 @@ aws logs filter-log-events \
 ```
 
 **Query metrics using AWS CLI:**
+
 ```bash
 # Get CPU usage for a specific job
 aws cloudwatch get-metric-statistics \
@@ -360,7 +376,8 @@ Object storage for long-term archival (v2.1+).
 
 ### Unified Configuration File
 
-The persistence service shares the same configuration file as the main joblet daemon (`/opt/joblet/joblet-config.yml`). Configuration is nested under the `persist:` section:
+The persistence service shares the same configuration file as the main joblet daemon (`/opt/joblet/joblet-config.yml`).
+Configuration is nested under the `persist:` section:
 
 ```yaml
 # /opt/joblet/joblet-config.yml
@@ -375,7 +392,7 @@ server:
 
 # Main joblet configuration
 joblet:
-  # ... main service config ...
+# ... main service config ...
 
 # Persistence service configuration (nested)
 persist:
@@ -394,10 +411,10 @@ persist:
 
     # Backend-specific configuration
     local:
-      # ... local config ...
+    # ... local config ...
 
     cloudwatch:
-      # ... cloudwatch config ...
+    # ... cloudwatch config ...
 
 # Logging (inherited by persist service)
 logging:
@@ -417,26 +434,141 @@ security:
 The persistence service **inherits** several settings from the parent configuration:
 
 1. **Logging Configuration**
-   - `logging.level`
-   - `logging.format`
-   - `logging.output`
+    - `logging.level`
+    - `logging.format`
+    - `logging.output`
 
 2. **Security Settings**
-   - `security.serverCert` (for TLS)
-   - `security.serverKey`
-   - `security.caCert`
+    - `security.serverCert` (for TLS)
+    - `security.serverKey`
+    - `security.caCert`
 
 3. **Node Identity**
-   - `server.nodeId` (for CloudWatch multi-node support)
+    - `server.nodeId` (for CloudWatch multi-node support)
 
 4. **Base Paths**
-   - `persist.storage.base_dir` defaults to parent's base directory
+    - `persist.storage.base_dir` defaults to parent's base directory
+
+### Enabling and Disabling Persistence
+
+**⚠️ IMPORTANT: Persistence configuration affects both storage AND buffering behavior.**
+
+The persistence service is controlled by the `ipc.enabled` setting in the **main** joblet configuration (not under
+`persist:` section):
+
+```yaml
+# Main joblet configuration
+ipc:
+  enabled: true  # Enable persistence + in-memory buffering
+  socket: "/opt/joblet/run/persist-ipc.sock"
+  buffer_size: 10000
+  reconnect_delay: "5s"
+  max_reconnects: 0
+```
+
+#### When Persistence is ENABLED (`ipc.enabled: true`)
+
+**Behavior:**
+
+- ✅ Logs and metrics ARE buffered in memory (gap prevention)
+- ✅ Data forwarded to persist service via IPC
+- ✅ Historical data available via gRPC queries
+- ✅ Seamless historical→live transition for clients
+- ✅ Buffer prevents gaps when persist service is slow or temporarily down
+
+**Use Cases:**
+
+- Production environments requiring audit trails
+- Long-running jobs where historical data is needed
+- Multi-user environments where users connect at different times
+- Compliance requirements for log retention
+
+**Memory Impact:**
+
+- Logs: ~1000 chunks per job (circular buffer, bounded)
+- Metrics: ~100 samples per job (circular buffer, ~8 minutes at 5s interval)
+- Predictable memory usage even for long-running jobs
+
+#### When Persistence is DISABLED (`ipc.enabled: false`)
+
+**Behavior:**
+
+- ❌ NO in-memory buffering (eliminated entirely)
+- ❌ NO historical data storage
+- ✅ Live streaming only via pub-sub
+- ✅ Lower memory footprint
+- ✅ Simpler deployment (no persist subprocess)
+
+**Use Cases:**
+
+- Development and testing environments
+- Real-time monitoring scenarios where history is not needed
+- Resource-constrained environments
+- Temporary jobs where logs are consumed immediately
+
+**Advantages:**
+
+- Zero unbounded memory growth risk
+- Lower CPU overhead (no IPC communication)
+- Simpler operational model
+
+**Limitations:**
+
+- Logs only available while job is running
+- No historical queries after job completes
+- Clients connecting late see only current output (no context from earlier logs)
+
+#### Configuration Example: Disabling Persistence
+
+```yaml
+version: "3.0"
+
+server:
+  nodeId: "dev-node-1"
+  address: "0.0.0.0"
+  port: 50051
+
+# Disable persistence entirely
+ipc:
+  enabled: false  # NO buffering, NO persistence, live streaming only
+
+# The persist: section can be omitted entirely when disabled
+# If present, it will be ignored since ipc.enabled: false
+```
+
+#### Migration: Enabling Persistence on Existing Deployment
+
+```bash
+# 1. Update configuration
+sudo vi /opt/joblet/joblet-config.yml
+
+# Change:
+#   ipc.enabled: false → ipc.enabled: true
+
+# 2. Add persist service configuration
+# (see "Unified Configuration File" section above)
+
+# 3. Restart joblet service
+sudo systemctl restart joblet
+
+# 4. Verify persist subprocess started
+sudo systemctl status joblet
+# Look for: "persist service started successfully"
+
+# 5. Check Unix sockets created
+ls -la /opt/joblet/run/
+# Expected: persist-ipc.sock, persist-grpc.sock
+```
+
+**Note:** Existing running jobs are not affected. The new buffering/persistence behavior applies only to jobs started
+after the configuration change.
 
 ## Deployment Scenarios
 
 ### Single Node (Local Backend)
 
 Best for:
+
 - Development environments
 - Single-server deployments
 - Limited job throughput
@@ -451,6 +583,7 @@ persist:
 ### Single Node (CloudWatch Backend)
 
 Best for:
+
 - AWS EC2 deployments
 - Centralized log management
 - Integration with AWS monitoring
@@ -470,11 +603,13 @@ persist:
 ### Multi-Node Cluster (CloudWatch Backend)
 
 Best for:
+
 - Distributed job execution
 - High-availability setups
 - Large-scale deployments
 
 **Node 1 Configuration:**
+
 ```yaml
 server:
   nodeId: "cluster-node-1"
@@ -492,6 +627,7 @@ persist:
 ```
 
 **Node 2 Configuration:**
+
 ```yaml
 server:
   nodeId: "cluster-node-2"
@@ -509,6 +645,7 @@ persist:
 ```
 
 **Result in CloudWatch:**
+
 ```
 Log Groups:
 /joblet-cluster/cluster-node-1/jobs
@@ -623,16 +760,19 @@ rnx job metrics <job-id> --since="1h" --until="now"
 ### Local Backend
 
 **Write Performance:**
+
 - ~10,000 log lines/sec (sequential writes)
 - Gzip compression (~5x reduction)
 - Async writes (non-blocking)
 
 **Read Performance:**
+
 - ~50,000 log lines/sec (sequential reads)
 - Gzip decompression overhead
 - File system cache benefits
 
 **Disk Usage:**
+
 ```
 Typical job with 10,000 log lines:
 - Raw JSON: ~5 MB
@@ -643,18 +783,21 @@ Typical job with 10,000 log lines:
 ### CloudWatch Backend
 
 **Write Performance:**
+
 - Batch writes (100 events per request)
 - Async, non-blocking
 - Automatic retry with backoff
 - ~5,000 log lines/sec per node
 
 **Read Performance:**
+
 - CloudWatch API limits apply
 - FilterLogEvents: 5 requests/sec per account
 - GetLogEvents: 10 requests/sec per account
 - Use CloudWatch Insights for complex queries
 
 **Cost Considerations:**
+
 ```
 CloudWatch Logs Pricing (prices vary by region):
 - Ingestion: Per GB ingested
@@ -696,6 +839,7 @@ Cost comparison:
 ```
 
 **Rate Limiting:**
+
 ```yaml
 persist:
   storage:
@@ -745,6 +889,7 @@ logging:
 **Problem: "Access Denied" errors**
 
 Verify IAM permissions:
+
 ```bash
 aws iam get-role-policy --role-name joblet-ec2-role --policy-name joblet-logs-policy
 ```
@@ -752,6 +897,7 @@ aws iam get-role-policy --role-name joblet-ec2-role --policy-name joblet-logs-po
 **Problem: Region auto-detection failed**
 
 Explicitly set region:
+
 ```yaml
 persist:
   storage:
@@ -832,26 +978,26 @@ sudo systemctl start joblet
    ```
 
 2. **Disk Encryption:**
-   - Use LUKS or dm-crypt for log directories
-   - Encrypt entire `/opt/joblet` partition
+    - Use LUKS or dm-crypt for log directories
+    - Encrypt entire `/opt/joblet` partition
 
 3. **Log Rotation:**
-   - Implement log rotation to prevent disk exhaustion
-   - Use `logrotate` or custom cleanup scripts
+    - Implement log rotation to prevent disk exhaustion
+    - Use `logrotate` or custom cleanup scripts
 
 ### CloudWatch Backend
 
 1. **IAM Roles:**
-   - Use EC2 instance profiles (never hardcode credentials)
-   - Follow principle of least privilege
-   - Separate roles for different environments
+    - Use EC2 instance profiles (never hardcode credentials)
+    - Follow principle of least privilege
+    - Separate roles for different environments
 
 2. **Log Group Permissions:**
-   - Restrict CloudWatch Logs access via IAM
-   - Use resource-based policies for cross-account access
+    - Restrict CloudWatch Logs access via IAM
+    - Use resource-based policies for cross-account access
 
 3. **Encryption:**
-   - Enable CloudWatch Logs encryption at rest (KMS)
+    - Enable CloudWatch Logs encryption at rest (KMS)
    ```bash
    aws logs associate-kms-key \
      --log-group-name "/joblet" \
@@ -859,8 +1005,8 @@ sudo systemctl start joblet
    ```
 
 4. **VPC Endpoints:**
-   - Use VPC endpoints for CloudWatch API calls
-   - Avoid public internet for log traffic
+    - Use VPC endpoints for CloudWatch API calls
+    - Avoid public internet for log traffic
 
 ## Monitoring
 
@@ -873,11 +1019,13 @@ sudo systemctl start joblet
 ### CloudWatch Backend Metrics
 
 Built-in CloudWatch metrics:
+
 - `IncomingBytes`: Log ingestion volume
 - `IncomingLogEvents`: Number of log events
 - `ThrottledRequests`: Rate limiting
 
 Custom metrics (via CloudWatch Metrics API):
+
 - CPUUsage: CPU cores used by job
 - MemoryUsage: Memory usage in MB
 - GPUUsage: GPU utilization percentage
@@ -886,6 +1034,7 @@ Custom metrics (via CloudWatch Metrics API):
 - NetworkRxBytes/NetworkTxBytes: Network throughput in KB
 
 **CloudWatch Metrics Features:**
+
 - **Automatic Dashboards**: CloudWatch automatically creates dashboards for custom metrics
 - **Alarms**: Set alarms on metric thresholds (e.g., CPU > 90%, Memory > 80%)
 - **Anomaly Detection**: CloudWatch can detect unusual patterns in metrics

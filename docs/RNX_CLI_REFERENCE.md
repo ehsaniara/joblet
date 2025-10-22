@@ -535,6 +535,7 @@ This command is specifically designed for jobs in SCHEDULED status and will:
 3. Preserve the job in history for audit purposes
 
 This provides proper cancel vs stop semantics:
+
 - `rnx job stop` → for RUNNING jobs (status becomes STOPPED)
 - `rnx job cancel` → for SCHEDULED jobs (status becomes CANCELED)
 
@@ -965,10 +966,10 @@ rnx runtime install <runtime-spec> [flags]
 
 #### Flags
 
-| Flag              | Short | Description                                                              | Default |
-|-------------------|-------|--------------------------------------------------------------------------|---------|
-| `--force`         | `-f`  | Force reinstall by deleting existing runtime                             | false   |
-| `--registry`      |       | GitHub runtime registry (format: owner/repo)                             | ehsaniara/joblet-runtimes |
+| Flag         | Short | Description                                  | Default                   |
+|--------------|-------|----------------------------------------------|---------------------------|
+| `--force`    | `-f`  | Force reinstall by deleting existing runtime | false                     |
+| `--registry` |       | GitHub runtime registry (format: owner/repo) | ehsaniara/joblet-runtimes |
 
 #### Description
 
@@ -976,6 +977,7 @@ The install command downloads pre-packaged runtime archives (.tar.gz) from an ex
 extracts them to versioned installation paths.
 
 **Installation Sources:**
+
 1. **Default Registry** - `https://github.com/ehsaniara/joblet-runtimes` (public registry)
 2. **Custom Registry** - Specified via `--registry` flag
 3. **Local Fallback** - Local `runtimes/` directory if registry installation fails

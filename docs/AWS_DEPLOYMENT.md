@@ -2,11 +2,13 @@
 
 ## Overview
 
-This guide shows you how to deploy Joblet on AWS EC2 using the automated user data script. The script automatically installs Joblet, configures TLS certificates, sets up networking, and optionally enables CloudWatch Logs.
+This guide shows you how to deploy Joblet on AWS EC2 using the automated user data script. The script automatically
+installs Joblet, configures TLS certificates, sets up networking, and optionally enables CloudWatch Logs.
 
 **Time to deploy: ~5 minutes**
 
 **Recommended Setup:**
+
 - Port 443 (HTTPS) instead of default 50051 - better firewall compatibility
 - Dedicated EC2 instance (don't run alongside web servers)
 - CloudWatch Logs enabled for production workloads
@@ -23,6 +25,7 @@ This guide shows you how to deploy Joblet on AWS EC2 using the automated user da
 - Basic knowledge of EC2 console or AWS CLI
 
 **Supported Operating Systems:**
+
 - Ubuntu 22.04 LTS (recommended)
 - Ubuntu 20.04 LTS
 - Debian 11/10
@@ -44,22 +47,22 @@ Throughout this guide, `<EC2_USER>` refers to the default SSH user for your AMI:
 1. Go to **EC2 Console** → **Launch Instance**
 
 2. **Configure Instance:**
-   - Name: `joblet-server`
-   - AMI: Ubuntu 22.04 LTS (or Amazon Linux 2023)
-   - Instance type: `t3.medium` (minimum: t3.small)
-   - Key pair: Select your SSH key
+    - Name: `joblet-server`
+    - AMI: Ubuntu 22.04 LTS (or Amazon Linux 2023)
+    - Instance type: `t3.medium` (minimum: t3.small)
+    - Key pair: Select your SSH key
 
 3. **Network Settings:**
-   - VPC: Default or your VPC
-   - Auto-assign public IP: Enable
-   - Security group: Create new (see Security Group section below)
+    - VPC: Default or your VPC
+    - Auto-assign public IP: Enable
+    - Security group: Create new (see Security Group section below)
 
 4. **Storage:**
-   - 30 GB gp3 (minimum: 20 GB)
+    - 30 GB gp3 (minimum: 20 GB)
 
 5. **Advanced Details:**
-   - **IAM instance profile**: Select `JobletCloudWatchRole` (create first - see IAM Setup below)
-   - **User data** - Paste this script:
+    - **IAM instance profile**: Select `JobletCloudWatchRole` (create first - see IAM Setup below)
+    - **User data** - Paste this script:
 
    ```bash
    #!/bin/bash
@@ -236,9 +239,10 @@ echo "Security group created: $SG_ID"
 ```
 
 **Or via Console:**
+
 - Inbound rules:
-  - SSH (22): Your IP only
-  - Custom TCP (443): Your IP or VPC CIDR
+    - SSH (22): Your IP only
+    - Custom TCP (443): Your IP or VPC CIDR
 - Outbound rules: Allow all (default)
 
 **Note:** Port 443 is for gRPC over TLS, not HTTP/HTTPS. This is purely for firewall compatibility.
@@ -263,6 +267,7 @@ rnx job list
 ### Connection Options
 
 The EC2 installation creates certificates with multiple addresses:
+
 - Internal IP: `10.0.1.100` (for VPC access)
 - Public IP: `3.15.123.45` (for external access)
 - EC2 Public DNS: `ec2-3-15-123-45.us-east-1.compute.amazonaws.com`
@@ -286,6 +291,7 @@ nodes:
 ```
 
 **Usage:**
+
 ```bash
 rnx job list                      # Uses default node
 rnx --node=production job list    # Uses production node
@@ -376,17 +382,18 @@ rnx job status <JOB_ID>
 If you enabled CloudWatch, view logs in AWS Console:
 
 1. **CloudWatch Logs** → **Log groups**:
-   - `/joblet/<NODE_ID>/jobs` - All job logs for this node (grouped by node)
-     - Log streams: `<JOB_ID>-stdout`, `<JOB_ID>-stderr`
-   - **Default retention**: 7 days (configurable)
+    - `/joblet/<NODE_ID>/jobs` - All job logs for this node (grouped by node)
+        - Log streams: `<JOB_ID>-stdout`, `<JOB_ID>-stderr`
+    - **Default retention**: 7 days (configurable)
 
 2. **CloudWatch Metrics** → **Custom namespaces** → **Joblet/Jobs**:
-   - `CPUUsage`, `MemoryUsage`, `GPUUsage`
-   - `DiskReadBytes`, `DiskWriteBytes`
-   - `NetworkRxBytes`, `NetworkTxBytes`
-   - **Retention**: 15 months (automatic)
+    - `CPUUsage`, `MemoryUsage`, `GPUUsage`
+    - `DiskReadBytes`, `DiskWriteBytes`
+    - `NetworkRxBytes`, `NetworkTxBytes`
+    - **Retention**: 15 months (automatic)
 
 **Via CLI:**
+
 ```bash
 # List log groups
 aws logs describe-log-groups --log-group-name-prefix /joblet
@@ -421,6 +428,7 @@ For advanced CloudWatch queries and monitoring, see [MONITORING.md](MONITORING.m
 ### Installation Failed
 
 **Check installation log:**
+
 ```bash
 ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
 cat /var/log/joblet-install.log
@@ -428,6 +436,7 @@ grep -i error /var/log/joblet-install.log
 ```
 
 **Common causes:**
+
 - No internet access: Check VPC has internet gateway or NAT gateway
 - Package download failed: Check GitHub is accessible
 - Disk full: Use 30GB or larger volume
@@ -435,12 +444,14 @@ grep -i error /var/log/joblet-install.log
 ### Service Won't Start
 
 **Check service status:**
+
 ```bash
 sudo systemctl status joblet -l
 sudo journalctl -u joblet -n 100 --no-pager
 ```
 
 **Common issues:**
+
 1. **Port 443 already in use:**
    ```bash
    sudo ss -tlnp | grep 443
@@ -462,6 +473,7 @@ sudo journalctl -u joblet -n 100 --no-pager
 ### joblet-persist Not Running
 
 **Check if persist subprocess exists:**
+
 ```bash
 ps aux | grep joblet-persist | grep -v grep
 ls -la /opt/joblet/run/
@@ -470,6 +482,7 @@ ls -la /opt/joblet/run/
 **Most common cause: Missing IAM role or wrong CloudWatch config**
 
 **Fix Option 1 - Attach IAM role:**
+
 ```bash
 # From local machine
 aws ec2 associate-iam-instance-profile \
@@ -481,6 +494,7 @@ sudo systemctl restart joblet
 ```
 
 **Fix Option 2 - Disable CloudWatch:**
+
 ```bash
 # Edit config
 sudo nano /opt/joblet/config/joblet-config.yml
@@ -503,11 +517,13 @@ sudo systemctl restart joblet
 ### Can't Connect from Client
 
 **Check server is listening:**
+
 ```bash
 ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> "sudo ss -tlnp | grep 443"
 ```
 
 **Common issues:**
+
 1. **Security group doesn't allow traffic:**
    ```bash
    aws ec2 authorize-security-group-ingress \
@@ -526,6 +542,7 @@ ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> "sudo ss -tlnp | grep 443"
 ### CloudWatch Logs Not Working
 
 **Check IAM role is attached:**
+
 ```bash
 # From local machine
 aws ec2 describe-instances \
@@ -534,11 +551,13 @@ aws ec2 describe-instances \
 ```
 
 **Check joblet logs for CloudWatch errors:**
+
 ```bash
 sudo journalctl -u joblet | grep -i cloudwatch
 ```
 
 **If no role attached, attach it:**
+
 ```bash
 aws ec2 associate-iam-instance-profile \
   --instance-id i-xxxxxxxxx \
@@ -552,14 +571,15 @@ ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> "sudo systemctl restart joblet
 
 The user data script accepts these environment variables:
 
-| Variable | Description | Default | Recommended |
-|----------|-------------|---------|-------------|
-| `JOBLET_VERSION` | Version to install | `latest` | `latest` |
-| `JOBLET_SERVER_PORT` | gRPC server port | `50051` | `443` |
-| `ENABLE_CLOUDWATCH` | Enable CloudWatch Logs | `true` | `true` |
-| `JOBLET_CERT_DOMAIN` | Custom domain for certificate | (empty) | (optional) |
+| Variable             | Description                   | Default  | Recommended |
+|----------------------|-------------------------------|----------|-------------|
+| `JOBLET_VERSION`     | Version to install            | `latest` | `latest`    |
+| `JOBLET_SERVER_PORT` | gRPC server port              | `50051`  | `443`       |
+| `ENABLE_CLOUDWATCH`  | Enable CloudWatch Logs        | `true`   | `true`      |
+| `JOBLET_CERT_DOMAIN` | Custom domain for certificate | (empty)  | (optional)  |
 
 **Example with custom configuration:**
+
 ```bash
 #!/bin/bash
 export JOBLET_VERSION="v1.2.0"
@@ -667,19 +687,21 @@ scp -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>:/tmp/joblet-backup.tar.gz ./
 
 Key cost factors to consider (prices vary by region):
 
-| Component | Configuration | Notes |
-|-----------|--------------|-------|
-| EC2 Instance | t3.medium (2 vCPU, 4GB RAM) | Main compute cost |
-| EBS Storage | 30 GB gp3 | Storage for jobs and data |
-| CloudWatch Logs | Per GB ingested + stored | 7-day retention (default) |
-| CloudWatch Metrics | Per unique metric | 9 metrics per job |
+| Component          | Configuration               | Notes                     |
+|--------------------|-----------------------------|---------------------------|
+| EC2 Instance       | t3.medium (2 vCPU, 4GB RAM) | Main compute cost         |
+| EBS Storage        | 30 GB gp3                   | Storage for jobs and data |
+| CloudWatch Logs    | Per GB ingested + stored    | 7-day retention (default) |
+| CloudWatch Metrics | Per unique metric           | 9 metrics per job         |
 
 **CloudWatch Logs breakdown (100 jobs/day, 1MB each):**
+
 - Ingestion: 3 GB/day ingested
 - Storage (7-day retention): ~21 GB stored
 - Note: Ingestion costs typically dominate over storage
 
 **Cost optimization strategies:**
+
 - Use t3.small for development environments
 - Stop instance during off-hours (saves ~50%)
 - Disable CloudWatch for dev/test environments
@@ -699,5 +721,5 @@ Key cost factors to consider (prices vary by region):
 - **GitHub**: https://github.com/ehsaniara/joblet
 - **Issues**: https://github.com/ehsaniara/joblet/issues
 - **Installation Notes**:
-  - Debian/Ubuntu: [INSTALL_NOTES.md](INSTALL_NOTES.md)
-  - RHEL/Amazon Linux: [INSTALL_NOTES_RPM.md](INSTALL_NOTES_RPM.md)
+    - Debian/Ubuntu: [INSTALL_NOTES.md](INSTALL_NOTES.md)
+    - RHEL/Amazon Linux: [INSTALL_NOTES_RPM.md](INSTALL_NOTES_RPM.md)

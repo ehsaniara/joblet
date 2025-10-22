@@ -213,6 +213,7 @@ Proto generation uses two approaches:
     - Defined via `//go:generate` directives in `internal/proto/generate.go`
 
 Developers can regenerate protos with:
+
 ```bash
 make proto              # Regenerate all protos
 go generate ./internal/proto  # Regenerate internal protos only

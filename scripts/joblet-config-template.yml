@@ -31,7 +31,7 @@ cgroup:
 # GPU support configuration
 gpu:
   enabled: false               # Enable GPU support (off by default - opt-in only)
-  cuda_paths:                  # CUDA installation paths to search
+  cuda_paths: # CUDA installation paths to search
     - "/usr/local/cuda"
     - "/opt/cuda"
 
@@ -96,8 +96,12 @@ buffers:
   chunk_size: 1048576         # 1MB chunks for optimal streaming performance
 
 # IPC configuration for joblet-persist integration
+# IMPORTANT: This setting controls BOTH persistence AND buffering behavior:
+#   enabled: true  - Logs/metrics buffered in memory + forwarded to persist (gap prevention enabled)
+#   enabled: false - NO buffering (live streaming only, no persistence, no historical data)
+# Disabling persist eliminates unbounded memory growth but loses historical log/metric access
 ipc:
-  enabled: true                                   # Enable IPC to persist service
+  enabled: true                                   # Enable IPC to persist service + in-memory buffering
   socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket for log/metric writes
   buffer_size: 10000                              # Message buffer size
   reconnect_delay: "5s"                           # Reconnection retry delay
@@ -179,8 +183,8 @@ persist:
       log_stream_prefix: "job-"               # CloudWatch Logs stream prefix
       metric_namespace: "Joblet/Jobs"         # CloudWatch Metrics namespace
       metric_dimensions:                      # Additional metric dimensions (optional)
-        # Environment: "production"
-        # Cluster: "main"
+      # Environment: "production"
+      # Cluster: "main"
 
       # Batch settings for CloudWatch API
       log_batch_size: 100                     # Max log events per batch (CloudWatch limit: 10,000)

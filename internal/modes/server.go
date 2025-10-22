@@ -96,7 +96,7 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 
-	jobStoreAdapter := adapters.NewJobStore(&cfg.Buffers, log)
+	jobStoreAdapter := adapters.NewJobStore(&cfg.Buffers, cfg.IPC.Enabled, log)
 	defer func() {
 		if closeErr := jobStoreAdapter.Close(); closeErr != nil {
 			log.Error("error closing job store adapter", "error", closeErr)
@@ -120,6 +120,7 @@ func RunServer(cfg *config.Config) error {
 	metricsStoreAdapter := adapters.NewMetricsStoreAdapter(
 		metricsPubSub,
 		persistClient,
+		cfg.IPC.Enabled,
 		logger.WithField("component", "metrics-store"),
 	)
 

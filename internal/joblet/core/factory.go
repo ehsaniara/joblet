@@ -106,7 +106,7 @@ func (f *ComponentFactory) createJobStore() (adapters.JobStorer, error) {
 	f.logger.Debug("creating job store adapter")
 
 	// Create job store with buffer configuration for pub-sub and log persistence
-	adapter := adapters.NewJobStore(&f.config.Buffers, f.logger)
+	adapter := adapters.NewJobStore(&f.config.Buffers, f.config.IPC.Enabled, f.logger)
 
 	f.logger.Info("job store adapter created successfully")
 	return adapter, nil
@@ -208,6 +208,7 @@ func (f *ComponentFactory) createMetricsStore() *adapters.MetricsStoreAdapter {
 	metricsStore := adapters.NewMetricsStoreAdapter(
 		metricsPubSub,
 		persistClient,
+		f.config.IPC.Enabled,
 		logger.WithField("component", "metrics-store"),
 	)
 

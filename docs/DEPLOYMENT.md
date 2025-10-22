@@ -7,8 +7,8 @@ certificate management, systemd service configuration, and operational procedure
 
 - [System Requirements](#system-requirements)
 - [Architecture Deployment](#architecture-deployment)
-  - [Deployment Topologies](#deployment-topologies)
-  - [AWS EC2 Deployment with CloudWatch](#aws-ec2-deployment-with-cloudwatch)
+    - [Deployment Topologies](#deployment-topologies)
+    - [AWS EC2 Deployment with CloudWatch](#aws-ec2-deployment-with-cloudwatch)
 - [Installation Methods](#installation-methods)
 - [Service Configuration](#service-configuration)
 - [Certificate Management](#certificate-management)
@@ -71,35 +71,39 @@ systemctl --version
 Joblet supports multiple deployment architectures depending on your infrastructure requirements:
 
 #### 1. Single Node (On-Premises / VM)
+
 - **Use Case**: Development, testing, small-scale production
 - **Storage Backend**: Local filesystem
 - **Scaling**: Vertical only (add more resources to single node)
 
 #### 2. Multi-Node Cluster (On-Premises / VM)
+
 - **Use Case**: High-availability, distributed workloads
 - **Storage Backend**: Local filesystem per node + external backup
 - **Scaling**: Horizontal (add more nodes)
 
 #### 3. AWS EC2 Deployment (Cloud-Native)
+
 - **Use Case**: Cloud deployments, AWS integration, centralized logging
 - **Storage Backend**: AWS CloudWatch Logs
 - **Scaling**: Auto-scaling groups, spot instances
 - **Benefits**:
-  - Automatic region detection
-  - IAM role authentication (no credentials in config)
-  - Multi-node support with nodeID-based log isolation
-  - Integration with AWS monitoring ecosystem
+    - Automatic region detection
+    - IAM role authentication (no credentials in config)
+    - Multi-node support with nodeID-based log isolation
+    - Integration with AWS monitoring ecosystem
 
 ### AWS EC2 Deployment with CloudWatch
 
-For cloud-native deployments on AWS, Joblet can use CloudWatch Logs for centralized log and metric storage across multiple nodes.
+For cloud-native deployments on AWS, Joblet can use CloudWatch Logs for centralized log and metric storage across
+multiple nodes.
 
 #### Prerequisites
 
 1. **EC2 Instance Requirements:**
-   - Amazon Linux 2, Ubuntu 20.04+, or Red Hat Enterprise Linux 8+
-   - Instance type: t3.medium or larger (2 vCPU, 4GB RAM minimum)
-   - Storage: 20GB+ EBS volume
+    - Amazon Linux 2, Ubuntu 20.04+, or Red Hat Enterprise Linux 8+
+    - Instance type: t3.medium or larger (2 vCPU, 4GB RAM minimum)
+    - Storage: 20GB+ EBS volume
 
 2. **IAM Role Configuration:**
 
@@ -211,6 +215,7 @@ sudo journalctl -u joblet -f | grep -i cloudwatch
 For distributed deployments across multiple EC2 instances:
 
 **Node 1:**
+
 ```yaml
 server:
   nodeId: "cluster-node-1"  # Unique per node
@@ -218,6 +223,7 @@ server:
 ```
 
 **Node 2:**
+
 ```yaml
 server:
   nodeId: "cluster-node-2"  # Unique per node
@@ -225,6 +231,7 @@ server:
 ```
 
 **CloudWatch Log Organization:**
+
 ```
 /joblet/cluster-node-1/jobs/job-abc
 /joblet/cluster-node-1/jobs/job-def
@@ -235,11 +242,13 @@ server:
 #### Monitoring CloudWatch Logs
 
 **AWS Console:**
+
 ```
 CloudWatch → Logs → Log Groups → /joblet
 ```
 
 **AWS CLI:**
+
 ```bash
 # View all log groups
 aws logs describe-log-groups --log-group-name-prefix "/joblet/"
@@ -259,16 +268,19 @@ aws logs filter-log-events \
 #### Cost Optimization
 
 CloudWatch Logs pricing (prices vary by region):
+
 - **Ingestion**: Per GB ingested
 - **Storage**: Per GB/month stored
 - **Insights queries**: Per GB scanned
 
 **Example resource usage:**
+
 - 1,000 jobs/day × 10 MB logs = 10 GB/day = 300 GB/month ingested
 - Storage with 30-day retention: 300 GB stored
 - Storage with 7-day retention: 70 GB stored (default)
 
 **Cost saving strategies:**
+
 1. Set log retention policies (7 days for dev, 30 days for production, etc.)
 2. Use log filtering to reduce ingestion volume
 3. Archive old logs to S3 (future feature)
@@ -277,6 +289,7 @@ CloudWatch Logs pricing (prices vary by region):
 #### Troubleshooting AWS Deployment
 
 **Issue: "Access Denied" errors**
+
 ```bash
 # Verify IAM role attached to instance
 aws ec2 describe-instances --instance-ids i-xxxxx \
@@ -287,6 +300,7 @@ aws logs describe-log-groups --log-group-name-prefix "/joblet/"
 ```
 
 **Issue: Region auto-detection failed**
+
 ```bash
 # Check EC2 metadata service
 curl http://169.254.169.254/latest/meta-data/placement/region
@@ -299,6 +313,7 @@ persist:
 ```
 
 **Issue: Logs not appearing**
+
 ```bash
 # Check persist service status
 sudo journalctl -u joblet -f | grep persist

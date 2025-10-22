@@ -14,7 +14,7 @@ import (
 // Direct constructors to replace the over-engineered factory pattern
 
 // NewJobStore creates a job store with buffer configuration and log persistence
-func NewJobStore(cfg *config.BuffersConfig, logger *logger.Logger) JobStorer {
+func NewJobStore(cfg *config.BuffersConfig, persistEnabled bool, logger *logger.Logger) JobStorer {
 	store := &SimpleJobStore{
 		jobs:   make(map[string]*domain.Job),
 		logger: logger.WithField("component", "job-store"),
@@ -44,7 +44,7 @@ func NewJobStore(cfg *config.BuffersConfig, logger *logger.Logger) JobStorer {
 	}
 
 	// Logs are buffered in-memory for real-time streaming and forwarded to persist via IPC
-	return NewJobStorer(store, logMgr, pubsubSystem, persistClient, logger)
+	return NewJobStorer(store, logMgr, pubsubSystem, persistClient, persistEnabled, logger)
 }
 
 // NewVolumeStore creates a volume store directly

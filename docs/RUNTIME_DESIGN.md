@@ -1,22 +1,23 @@
 # Runtime System Design and Examples
 
-This comprehensive document covers both the technical design of the Joblet runtime system and practical examples for using it effectively.
+This comprehensive document covers both the technical design of the Joblet runtime system and practical examples for
+using it effectively.
 
 ## Table of Contents
 
 - [Part 1: System Design](#part-1-system-design)
-  - [Overview](#overview)
-  - [Key Design Principles](#key-design-principles)
-  - [Architecture](#architecture)
-  - [Implementation Details](#implementation-details)
-  - [Security Considerations](#security-considerations)
-  - [Performance Optimization](#performance-optimization)
+    - [Overview](#overview)
+    - [Key Design Principles](#key-design-principles)
+    - [Architecture](#architecture)
+    - [Implementation Details](#implementation-details)
+    - [Security Considerations](#security-considerations)
+    - [Performance Optimization](#performance-optimization)
 - [Part 2: Practical Examples](#part-2-practical-examples)
-  - [Basic Runtime Usage](#basic-runtime-usage)
-  - [Advanced Runtime Scenarios](#advanced-runtime-scenarios)
-  - [Development Workflows](#development-workflows)
-  - [Performance Optimization Examples](#performance-optimization-examples)
-  - [Best Practices](#best-practices-examples)
+    - [Basic Runtime Usage](#basic-runtime-usage)
+    - [Advanced Runtime Scenarios](#advanced-runtime-scenarios)
+    - [Development Workflows](#development-workflows)
+    - [Performance Optimization Examples](#performance-optimization-examples)
+    - [Best Practices](#best-practices-examples)
 
 ---
 

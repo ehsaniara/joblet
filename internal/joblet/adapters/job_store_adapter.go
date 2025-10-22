@@ -50,9 +50,10 @@ type jobStoreAdapter struct {
 	tasks      map[string]*taskWrapper
 	tasksMutex sync.RWMutex
 
-	logger     *logger.Logger
-	closed     bool
-	closeMutex sync.RWMutex
+	logger         *logger.Logger
+	closed         bool
+	closeMutex     sync.RWMutex
+	persistEnabled bool // If false, skip all buffering (live streaming only)
 }
 
 // Ensure jobStoreAdapter implements the interfaces
@@ -94,6 +95,7 @@ func NewJobStorer(
 	logMgr *SimpleLogManager,
 	pubsub pubsub.PubSub[JobEvent],
 	persistClient pb.PersistServiceClient,
+	persistEnabled bool,
 	logger *logger.Logger,
 ) JobStorer {
 	if logger == nil {
@@ -101,12 +103,13 @@ func NewJobStorer(
 	}
 
 	return &jobStoreAdapter{
-		jobStore:      store,
-		logMgr:        logMgr,
-		pubsub:        pubsub,
-		persistClient: persistClient,
-		tasks:         make(map[string]*taskWrapper),
-		logger:        logger,
+		jobStore:       store,
+		logMgr:         logMgr,
+		pubsub:         pubsub,
+		persistClient:  persistClient,
+		persistEnabled: persistEnabled,
+		tasks:          make(map[string]*taskWrapper),
+		logger:         logger,
 	}
 }
 
@@ -323,8 +326,9 @@ func (a *jobStoreAdapter) ListJobs() []*domain.Job {
 }
 
 // WriteToBuffer appends log data to the specified job's output buffer.
-// Writes to in-memory buffer for real-time streaming and publishes log chunk events
-// for IPC forwarding to persist. Supports UUID prefix resolution.
+// When persist is enabled: Buffers data + publishes to pubsub (for IPC forwarding and live streaming)
+// When persist is disabled: Only publishes to pubsub (live streaming only, no buffering)
+// Supports UUID prefix resolution.
 func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 	if len(chunk) == 0 {
 		return
@@ -347,19 +351,19 @@ func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 		return
 	}
 
-	// Write to log buffer
-	if task.logBuffer != nil {
+	// Only write to buffer if persist is enabled (gap prevention)
+	// When persist is disabled, skip buffering to avoid unbounded growth
+	if a.persistEnabled && task.logBuffer != nil {
 		if err := task.logBuffer.Write(chunk); err != nil {
 			a.logger.Error("failed to write to job log buffer", "jobId", resolvedUuid, "error", err)
 			return
 		}
 		a.logger.Debug("successfully wrote to buffer", "jobId", resolvedUuid, "chunkSize", len(chunk))
-	} else {
-		a.logger.Warn("no buffer available for job - logs will not be stored", "jobId", resolvedUuid, "chunkSize", len(chunk))
+	} else if !a.persistEnabled {
+		a.logger.Debug("persist disabled - skipping buffer write (live streaming only)", "jobId", resolvedUuid, "chunkSize", len(chunk))
 	}
 
-	// Logs are forwarded to persist via IPC (LogSubscriber listens to pubsub)
-	// Publish log chunk event
+	// Always publish to pubsub for live streaming (and IPC forwarding when enabled)
 	if err := a.publishEvent(JobEvent{
 		Type:      "LOG_CHUNK",
 		JobID:     resolvedUuid,
@@ -428,6 +432,7 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 
 // SendUpdatesToClientWithSkip sends updates to client, skipping the first skipCount items
 // This is used to avoid duplicates when persist has already sent some items
+// When persist is disabled, skips all buffer reads and only does live streaming
 func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id string, stream interfaces.DomainStreamer, skipCount int) error {
 	// Resolve UUID by prefix first
 	resolvedUuid, err := a.resolveUuidByPrefix(id)
@@ -446,7 +451,8 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 	}
 
 	// Send existing buffer content, skipping items already sent by persist
-	if task.logBuffer != nil {
+	// ONLY when persist is enabled - otherwise skip buffer entirely to avoid stale data
+	if a.persistEnabled && task.logBuffer != nil {
 		var chunks [][]byte
 		if skipCount > 0 {
 			chunks = task.logBuffer.ReadAfterSkip(skipCount)
@@ -464,6 +470,8 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 			}
 			a.logger.Debug("sent existing logs", "jobId", id, "chunkCount", len(chunks), "skipped", skipCount)
 		}
+	} else if !a.persistEnabled {
+		a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "jobId", id)
 	}
 
 	// If job is completed, we're done
