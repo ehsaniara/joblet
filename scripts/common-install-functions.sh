@@ -305,18 +305,98 @@ get_configuration() {
     print_success "Configuration loaded successfully"
 }
 
+setup_dynamodb_table() {
+    # Create DynamoDB table for job state persistence
+    # Uses AWS CLI to create table if it doesn't exist
+
+    local TABLE_NAME="${DYNAMODB_TABLE_NAME:-joblet-jobs}"
+    local AWS_REGION="${EC2_REGION:-us-east-1}"
+
+    print_info "Setting up DynamoDB table for state persistence..."
+
+    # Check if AWS CLI is available
+    if ! command -v aws >/dev/null 2>&1; then
+        print_warning "AWS CLI not found - skipping table creation"
+        print_warning "Install AWS CLI: https://aws.amazon.com/cli/"
+        print_warning "Or create table manually using the AWS Console"
+        return 1
+    fi
+
+    # Check if table already exists
+    if aws dynamodb describe-table --table-name "$TABLE_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+        print_success "DynamoDB table '$TABLE_NAME' already exists"
+
+        # Check if TTL is enabled
+        local ttl_status=$(aws dynamodb describe-time-to-live --table-name "$TABLE_NAME" --region "$AWS_REGION" --query 'TimeToLiveDescription.TimeToLiveStatus' --output text 2>/dev/null || echo "")
+        if [ "$ttl_status" != "ENABLED" ]; then
+            print_info "Enabling TTL on existing table..."
+            if aws dynamodb update-time-to-live \
+                --table-name "$TABLE_NAME" \
+                --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
+                --region "$AWS_REGION" >/dev/null 2>&1; then
+                print_success "TTL enabled on table '$TABLE_NAME'"
+            else
+                print_warning "Could not enable TTL (may require additional permissions)"
+            fi
+        else
+            print_success "TTL already enabled on table '$TABLE_NAME'"
+        fi
+        return 0
+    fi
+
+    # Create the table
+    print_info "Creating DynamoDB table: $TABLE_NAME"
+    if aws dynamodb create-table \
+        --table-name "$TABLE_NAME" \
+        --attribute-definitions AttributeName=jobId,AttributeType=S \
+        --key-schema AttributeName=jobId,KeyType=HASH \
+        --billing-mode PAY_PER_REQUEST \
+        --region "$AWS_REGION" \
+        --tags Key=ManagedBy,Value=Joblet Key=Purpose,Value=JobStatePersistence \
+        >/dev/null 2>&1; then
+        print_success "DynamoDB table created successfully"
+
+        # Wait for table to be active
+        print_info "Waiting for table to become active..."
+        if aws dynamodb wait table-exists --table-name "$TABLE_NAME" --region "$AWS_REGION" 2>/dev/null; then
+            print_success "Table is now active"
+
+            # Enable TTL
+            print_info "Enabling TTL for automatic cleanup of old jobs..."
+            if aws dynamodb update-time-to-live \
+                --table-name "$TABLE_NAME" \
+                --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
+                --region "$AWS_REGION" >/dev/null 2>&1; then
+                print_success "TTL enabled - completed jobs will be auto-deleted after 30 days"
+            else
+                print_warning "Could not enable TTL (table created but TTL requires additional permissions)"
+            fi
+        else
+            print_warning "Table created but may still be initializing"
+        fi
+        return 0
+    else
+        print_error "Failed to create DynamoDB table"
+        print_warning "You may need to create it manually or check IAM permissions"
+        print_warning "See: https://docs.aws.amazon.com/cli/latest/reference/dynamodb/create-table.html"
+        return 1
+    fi
+}
+
 detect_aws_environment() {
     # Detect if running on AWS EC2 and load configuration
-    # Sets: EC2_INFO, EC2_CLOUDWATCH_CONFIGURED, EC2_INSTANCE_ID, EC2_REGION
+    # Sets: EC2_INFO, EC2_CLOUDWATCH_CONFIGURED, EC2_DYNAMODB_CONFIGURED, EC2_INSTANCE_ID, EC2_REGION
 
     EC2_INFO=""
     EC2_CLOUDWATCH_CONFIGURED=false
+    EC2_DYNAMODB_CONFIGURED=false
 
     if [ -f /tmp/joblet-ec2-info ]; then
         source /tmp/joblet-ec2-info
         if [ "$IS_EC2" = "true" ]; then
             EC2_INFO=" (AWS EC2 Instance)"
             EC2_CLOUDWATCH_CONFIGURED=true
+            EC2_DYNAMODB_CONFIGURED=true
 
             print_info "🌩️  AWS EC2 Environment Detected"
             if [ -n "$EC2_INSTANCE_ID" ]; then
@@ -329,8 +409,23 @@ detect_aws_environment() {
             print_info "📊  CloudWatch Logs backend will be enabled"
             echo "  Log storage: AWS CloudWatch Logs"
             echo "  Log group format: /joblet/{nodeId}/jobs/{jobId}"
-            echo "  Ensure EC2 instance has IAM role with CloudWatch Logs permissions"
             echo ""
+            print_info "💾  DynamoDB State Persistence will be enabled"
+            echo "  State storage: AWS DynamoDB"
+            echo "  Table: joblet-jobs"
+            echo "  Features: Job state survives restarts, auto-cleanup with TTL"
+            echo ""
+            print_warning "📋  Required IAM Permissions:"
+            echo "  Ensure EC2 instance has IAM role with permissions:"
+            echo "    • CloudWatch Logs: logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents"
+            echo "    • DynamoDB: dynamodb:CreateTable, dynamodb:PutItem, dynamodb:GetItem,"
+            echo "                dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:Scan, dynamodb:Query"
+            echo "                dynamodb:DescribeTable, dynamodb:UpdateTimeToLive"
+            echo ""
+
+            # Setup DynamoDB table
+            setup_dynamodb_table
+
             return 0
         fi
     fi
@@ -348,6 +443,22 @@ display_aws_quickstart() {
         echo "  Config file: /opt/joblet/config/joblet-config.yml"
         echo "  Storage type: persist.storage.type = cloudwatch"
         echo "  Documentation: https://docs.aws.amazon.com/cloudwatch/"
+        echo ""
+    fi
+
+    if [ "$EC2_DYNAMODB_CONFIGURED" = "true" ]; then
+        echo ""
+        print_info "💾  AWS DynamoDB State Persistence Configuration:"
+        echo "  Table: joblet-jobs"
+        echo "  View jobs: AWS Console → DynamoDB → Tables → joblet-jobs"
+        echo "  Query jobs: aws dynamodb scan --table-name joblet-jobs --region ${EC2_REGION:-us-east-1}"
+        echo "  Config file: /opt/joblet/config/joblet-config.yml"
+        echo "  Backend type: state.backend = dynamodb"
+        echo "  Features:"
+        echo "    • Job state persists across restarts"
+        echo "    • Auto-cleanup with TTL (30 days for completed jobs)"
+        echo "    • Pay-per-request billing (< $0.05/month for 100 jobs/day)"
+        echo "  Documentation: https://docs.aws.amazon.com/dynamodb/"
         echo ""
     fi
 }

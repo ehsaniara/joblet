@@ -142,7 +142,7 @@ func RunServer(cfg *config.Config) error {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
-	// Initialize IPC manager for joblet-persist integration (logs and metrics)
+	// Initialize IPC manager for persist integration (logs and metrics)
 	var ipcManager *ipc.Manager
 	if cfg.IPC.Enabled {
 		ipcConfig := &ipc.ManagerConfig{
@@ -192,13 +192,42 @@ func RunServer(cfg *config.Config) error {
 	}()
 	log.Info("monitoring service started successfully")
 
-	// Start joblet-persist subprocess supervisor if enabled
+	// Start persist subprocess supervisor if enabled
 	var persistSupervisor *persistSubprocessSupervisor
 	if cfg.IPC.Enabled {
 		persistSupervisor = startPersistSupervisor(cfg, log)
 		if persistSupervisor != nil {
 			defer persistSupervisor.Stop()
 		}
+	}
+
+	// Start state subprocess supervisor (mandatory - the backbone of joblet)
+	stateSupervisor := startStateSupervisor(cfg, log)
+	if stateSupervisor != nil {
+		defer stateSupervisor.Stop()
+	}
+
+	// Give the state subprocess a moment to start before health checks
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify services are healthy using efficient Ping-based health checks
+	healthCtx, healthCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer healthCancel()
+
+	if healthErr := jobStoreAdapter.HealthCheckServices(healthCtx); healthErr != nil {
+		log.Error("FATAL: service health check failed", "error", healthErr)
+		return fmt.Errorf("service health check failed: %w", healthErr)
+	}
+
+	// Sync jobs from persistent state storage
+	// This is critical - loads all jobs across restarts (the backbone of joblet)
+	syncCtx, syncCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer syncCancel()
+
+	if syncErr := jobStoreAdapter.SyncFromPersistentState(syncCtx); syncErr != nil {
+		log.Warn("failed to sync from persistent state - continuing with empty job list",
+			"error", syncErr)
+		// Don't fail server startup, just log the warning
 	}
 
 	// Start gRPC server with configuration using new adapters
@@ -773,15 +802,15 @@ type persistSubprocessSupervisor struct {
 
 // startPersistSupervisor starts the persist subprocess supervisor with auto-restart
 func startPersistSupervisor(cfg *config.Config, log *logger.Logger) *persistSubprocessSupervisor {
-	log.Info("[INIT] Starting joblet-persist subprocess supervisor...")
+	log.Info("[INIT] Starting persist subprocess supervisor...")
 
 	// Find persist binary
-	persistBinary := "/opt/joblet/bin/joblet-persist"
+	persistBinary := "/opt/joblet/bin/persist"
 	if _, err := os.Stat(persistBinary); os.IsNotExist(err) {
 		// Try relative path for development
-		persistBinary = "./bin/joblet-persist"
+		persistBinary = "./bin/persist"
 		if _, err := os.Stat(persistBinary); os.IsNotExist(err) {
-			log.Warn("[INIT] joblet-persist binary not found, running without persist service")
+			log.Warn("[INIT] persist binary not found, running without persist service")
 			return nil
 		}
 	}
@@ -951,4 +980,200 @@ func (s *persistSubprocessSupervisor) Stop() {
 	}
 
 	s.log.Info("Persist supervisor stopped", "totalRestarts", s.restartCount.Load())
+}
+
+// stateSubprocessSupervisor manages the state subprocess with auto-restart capability
+type stateSubprocessSupervisor struct {
+	cfg         *config.Config
+	log         *logger.Logger
+	stateBinary string
+
+	// Process management
+	cmd   *exec.Cmd
+	cmdMu sync.Mutex
+
+	// Lifecycle
+	ctx          context.Context
+	cancel       context.CancelFunc
+	stopped      atomic.Bool
+	restartCount atomic.Uint64
+
+	// Restart configuration
+	minRestartDelay time.Duration
+	maxRestartDelay time.Duration
+}
+
+// startStateSupervisor starts the state subprocess supervisor with auto-restart
+func startStateSupervisor(cfg *config.Config, log *logger.Logger) *stateSubprocessSupervisor {
+	log.Info("[INIT] Starting state subprocess supervisor...")
+
+	// Find state binary
+	stateBinary := "/opt/joblet/bin/state"
+	if _, err := os.Stat(stateBinary); os.IsNotExist(err) {
+		// Try relative path for development
+		stateBinary := "./bin/state"
+		if _, err := os.Stat(stateBinary); os.IsNotExist(err) {
+			log.Warn("[INIT] state binary not found, running without state service")
+			return nil
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	supervisor := &stateSubprocessSupervisor{
+		cfg:             cfg,
+		log:             log.WithField("component", "state-supervisor"),
+		stateBinary:     stateBinary,
+		ctx:             ctx,
+		cancel:          cancel,
+		minRestartDelay: 1 * time.Second,
+		maxRestartDelay: 30 * time.Second,
+	}
+
+	// Start supervision loop
+	go supervisor.supervisionLoop()
+
+	return supervisor
+}
+
+// supervisionLoop monitors and auto-restarts the state subprocess
+func (s *stateSubprocessSupervisor) supervisionLoop() {
+	restartDelay := s.minRestartDelay
+
+	for {
+		// Check if we should stop
+		if s.stopped.Load() {
+			s.log.Info("Supervision loop stopping (shutdown requested)")
+			return
+		}
+
+		// Start state subprocess
+		if err := s.startProcess(); err != nil {
+			s.log.Error("Failed to start state subprocess", "error", err)
+
+			// Wait before retry with exponential backoff
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-time.After(restartDelay):
+				// Exponential backoff (cap at maxRestartDelay)
+				restartDelay = restartDelay * 2
+				if restartDelay > s.maxRestartDelay {
+					restartDelay = s.maxRestartDelay
+				}
+				continue
+			}
+		}
+
+		// Wait for process to exit
+		err := s.cmd.Wait()
+
+		// Check if this was an intentional shutdown
+		if s.stopped.Load() {
+			s.log.Info("State subprocess exited (intentional shutdown)")
+			return
+		}
+
+		// Process crashed or exited unexpectedly
+		s.restartCount.Add(1)
+		restartNum := s.restartCount.Load()
+
+		if err != nil {
+			s.log.Error("State subprocess crashed, auto-restarting",
+				"error", err,
+				"restartCount", restartNum,
+				"restartDelay", restartDelay)
+		} else {
+			s.log.Warn("State subprocess exited unexpectedly, auto-restarting",
+				"restartCount", restartNum,
+				"restartDelay", restartDelay)
+		}
+
+		// Wait before restart with backoff
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(restartDelay):
+			// Exponential backoff
+			restartDelay = restartDelay * 2
+			if restartDelay > s.maxRestartDelay {
+				restartDelay = s.maxRestartDelay
+			}
+		}
+	}
+}
+
+// startProcess starts the state subprocess
+func (s *stateSubprocessSupervisor) startProcess() error {
+	s.cmdMu.Lock()
+	defer s.cmdMu.Unlock()
+
+	cmd := exec.Command(s.stateBinary)
+
+	// Unified logging with [STATE] prefix
+	cmd.Stdout = &prefixWriter{prefix: "[STATE] ", writer: os.Stdout}
+	cmd.Stderr = &prefixWriter{prefix: "[STATE] ", writer: os.Stderr}
+
+	// Keep subprocess in same process group
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: false, // Keep in same process group
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start state subprocess: %w", err)
+	}
+
+	s.cmd = cmd
+	s.log.Info("State subprocess started", "pid", cmd.Process.Pid, "restartCount", s.restartCount.Load())
+
+	return nil
+}
+
+// Stop gracefully stops the state supervisor and subprocess
+func (s *stateSubprocessSupervisor) Stop() {
+	if s.stopped.Swap(true) {
+		return // Already stopped
+	}
+
+	s.log.Info("Stopping state supervisor...")
+
+	// Cancel context to stop supervision loop
+	s.cancel()
+
+	// Stop current subprocess if running
+	s.cmdMu.Lock()
+	cmd := s.cmd
+	s.cmdMu.Unlock()
+
+	if cmd != nil && cmd.Process != nil {
+		pid := cmd.Process.Pid
+
+		// Send SIGTERM for graceful shutdown
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			s.log.Warn("Failed to send SIGTERM to state subprocess", "error", err, "pid", pid)
+			return
+		}
+
+		// Wait for graceful shutdown with timeout
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		select {
+		case <-time.After(10 * time.Second):
+			s.log.Warn("State subprocess did not exit gracefully, force killing", "pid", pid)
+			if err := cmd.Process.Kill(); err != nil {
+				s.log.Error("Failed to kill state subprocess", "error", err, "pid", pid)
+			}
+		case err := <-done:
+			if err != nil {
+				s.log.Warn("State subprocess stopped with error", "error", err, "pid", pid)
+			} else {
+				s.log.Info("State subprocess stopped gracefully", "pid", pid)
+			}
+		}
+	}
+
+	s.log.Info("State supervisor stopped", "totalRestarts", s.restartCount.Load())
 }

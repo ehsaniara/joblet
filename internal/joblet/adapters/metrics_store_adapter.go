@@ -190,7 +190,7 @@ func (a *MetricsStoreAdapter) PublishMetrics(ctx context.Context, sample *domain
 // This method:
 // 1. First sends buffered samples (prevents gaps during persist→live transition)
 // 2. Then streams live samples from pub-sub
-// Historical metrics are retrieved via joblet-persist gRPC service (not implemented here)
+// Historical metrics are retrieved via persist gRPC service (not implemented here)
 func (a *MetricsStoreAdapter) StreamMetrics(
 	ctx context.Context,
 	jobID string,

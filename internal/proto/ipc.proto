@@ -5,7 +5,7 @@ option go_package = "github.com/ehsaniara/joblet/internal/proto/gen/ipc";
 package joblet.ipc;
 
 // IPC Message Types for Unix Socket Communication
-// Used for communication between joblet-core and joblet-persist
+// Used for communication between joblet-core and persist
 
 // IPCMessage is the wire format for IPC communication
 message IPCMessage {

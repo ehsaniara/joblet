@@ -16,9 +16,15 @@ joblet/
 │   ├── rnx/             # CLI implementation
 │   └── proto/           # Internal protocol buffers (IPC, persist)
 ├── persist/             # Persistence service (sub-module)
-│   ├── cmd/joblet-persist/
+│   ├── cmd/persist/
 │   ├── internal/
 │   └── go.mod           # Separate Go module
+├── state/               # State persistence service (sub-module)
+│   ├── cmd/state/       # State service binary
+│   ├── internal/
+│   │   ├── storage/     # Backend interface (Memory, DynamoDB, Redis)
+│   │   └── ipc/         # IPC server
+│   └── go.mod           # Separate Go module (AWS SDK dependencies)
 ├── api/
 │   └── gen/             # Generated public API (from external joblet-proto)
 ├── pkg/                 # Shared packages
@@ -46,7 +52,7 @@ joblet/
 
 ### 2. Joblet-Persist (Persistence Service)
 
-- **Binary**: `bin/joblet-persist`
+- **Binary**: `bin/persist`
 - **Port**: `:50052` (gRPC)
 - **Purpose**: Historical data persistence and queries
 - **Responsibilities**:
@@ -56,7 +62,23 @@ joblet/
     - Data retention and cleanup
     - Compression and archival
 
-### 3. RNX (CLI Client)
+### 3. State (Job State Persistence Service)
+
+- **Binary**: `bin/state`
+- **Communication**: Unix socket IPC only (`/opt/joblet/run/state-ipc.sock`)
+- **Purpose**: Job metadata persistence across restarts
+- **Responsibilities**:
+    - Persist job state (status, exit code, timestamps) via async IPC
+    - Store to pluggable backends (Memory, DynamoDB, Redis)
+    - Sync jobs on joblet startup
+    - Auto-reconnection and graceful degradation
+    - TTL-based cleanup (DynamoDB)
+- **Backend Support**:
+    - **Memory**: RAM-only (testing, lost on restart)
+    - **DynamoDB**: AWS cloud persistence (production, survives restarts)
+    - **Redis**: Planned for future releases
+
+### 4. RNX (CLI Client)
 
 - **Binary**: `bin/rnx`
 - **Purpose**: Command-line interface
@@ -225,11 +247,14 @@ go generate ./internal/proto  # Regenerate internal protos only
 
 ```
 1. RNX sends RunJob request → Joblet
-2. Joblet creates isolated environment (cgroups, namespaces)
-3. Joblet executes job and streams live logs → RNX
-4. Joblet collects metrics (CPU, memory, GPU, I/O)
-5. Joblet sends logs/metrics → Persist (via IPC)
-6. Persist stores to disk (/opt/joblet/logs, /opt/joblet/metrics)
+2. Joblet creates job record in memory + sends to State (async IPC)
+3. State persists job metadata to backend (Memory/DynamoDB)
+4. Joblet creates isolated environment (cgroups, namespaces)
+5. Joblet executes job and streams live logs → RNX
+6. Joblet collects metrics (CPU, memory, GPU, I/O)
+7. Joblet sends logs/metrics → Persist (via IPC)
+8. Persist stores to disk (/opt/joblet/logs, /opt/joblet/metrics)
+9. Joblet updates job status + sends to State (async IPC)
 ```
 
 ### Historical Query Flow
@@ -240,6 +265,16 @@ go generate ./internal/proto  # Regenerate internal protos only
 3. Persist streams results → RNX
 ```
 
+### State Persistence Flow
+
+```
+1. Joblet job lifecycle events (create, update, complete) → State (async IPC)
+2. State writes to backend (Memory/DynamoDB) with 5s timeout
+3. On joblet restart: Joblet requests job sync → State
+4. State reads from backend → returns all jobs
+5. Joblet populates in-memory cache with persisted jobs
+```
+
 ## Storage Layout
 
 ```
@@ -247,12 +282,14 @@ go generate ./internal/proto  # Regenerate internal protos only
 ├── bin/                    # Binaries
 │   ├── joblet
 │   ├── rnx
-│   └── joblet-persist
+│   ├── persist
+│   └── state               # State persistence service
 ├── config/                 # Configuration
-│   └── joblet-config.yml   # Unified config (both services)
+│   └── joblet-config.yml   # Unified config (all services)
 ├── run/                    # Runtime files
 │   ├── persist-ipc.sock    # IPC socket (log/metric writes)
-│   └── persist-grpc.sock   # gRPC socket (historical queries)
+│   ├── persist-grpc.sock   # gRPC socket (historical queries)
+│   └── state-ipc.sock      # IPC socket (job state persistence)
 ├── jobs/                   # Job workspaces
 │   └── {job-uuid}/         # Per-job directory
 ├── logs/                   # Historical logs
@@ -273,8 +310,9 @@ Single systemd service:
 1. **joblet.service**
     - Binary: `/opt/joblet/bin/joblet`
     - Config: `/opt/joblet/config/joblet-config.yml`
-    - Automatically spawns joblet-persist as a subprocess
-    - joblet-persist uses the same config file (persist: section)
+    - Automatically spawns two subprocesses:
+      - **persist**: Log/metric persistence (persist: section)
+      - **state**: Job state persistence (state: section)
 
 ### Deployment Command
 
@@ -324,6 +362,7 @@ make deploy
 - **Dependencies**:
     - `github.com/ehsaniara/joblet-proto@v1.0.9` (external)
     - `github.com/ehsaniara/joblet/persist` (local replace)
+    - `github.com/ehsaniara/joblet/state` (local replace)
 
 ### Persist Module
 
@@ -331,6 +370,15 @@ make deploy
 - **Go.mod**: `./persist/go.mod`
 - **Dependencies**:
     - `github.com/ehsaniara/joblet` (local replace to parent)
+
+### State Module
+
+- **Path**: `github.com/ehsaniara/joblet/state`
+- **Go.mod**: `./state/go.mod`
+- **Dependencies**:
+    - `github.com/ehsaniara/joblet` (local replace to parent)
+    - `github.com/aws/aws-sdk-go-v2` (DynamoDB backend)
+    - `github.com/aws/aws-sdk-go-v2/service/dynamodb` (DynamoDB client)
 
 ## Design Decisions
 
@@ -348,7 +396,16 @@ make deploy
 - **Performance**: Async IPC prevents blocking main service
 - **Flexibility**: Can swap storage backends without changing main service
 
-### 3. Why Internal Protos?
+### 3. Why Separate State Service?
+
+- **AWS Isolation**: Keeps AWS SDK dependencies (DynamoDB) out of main joblet binary
+- **Fault isolation**: State service crashes don't kill joblet
+- **Independent scaling**: Can upgrade state service independently
+- **Multiple backends**: Easy to add Redis, PostgreSQL, or other backends
+- **Performance**: Async fire-and-forget operations for maximum throughput
+- **Separation of concerns**: Job state distinct from logs/metrics (persist)
+
+### 4. Why Internal Protos?
 
 - **Encapsulation**: IPC and persist protos are implementation details
 - **Versioning**: Internal changes don't affect public API

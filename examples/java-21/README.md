@@ -22,12 +22,12 @@ cutting-edge Java features.
 
 ```bash
 # Run specific Java 21 example using the workflow
-rnx job run --workflow=jobs.yaml:virtual-threads      # Virtual threads demo
-rnx job run --workflow=jobs.yaml:java21-features      # Java 21 language features
-rnx job run --workflow=jobs.yaml:virtual-server       # HTTP server with virtual threads
-rnx job run --workflow=jobs.yaml:thread-comparison    # Platform vs Virtual threads comparison
-rnx job run --workflow=jobs.yaml:structured-concurrency  # Structured concurrency patterns
-rnx job run --workflow=jobs.yaml:graalvm-ready        # GraalVM-optimized application
+rnx workflow run jobs.yaml      # Virtual threads demo
+rnx workflow run jobs.yaml      # Java 21 language features
+rnx workflow run jobs.yaml       # HTTP server with virtual threads
+rnx workflow run jobs.yaml    # Platform vs Virtual threads comparison
+rnx workflow run jobs.yaml  # Structured concurrency patterns
+rnx workflow run jobs.yaml        # GraalVM-optimized application
 ```
 
 ### Prerequisites

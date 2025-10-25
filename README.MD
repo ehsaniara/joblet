@@ -121,13 +121,13 @@ with JobletClient(host="your-joblet-server") as client:
 
 ```bash
 # Execute pre-configured workflows
-rnx job run --workflow=jobs.yaml:ml-analysis      # Python ML analysis
-rnx job run --workflow=jobs.yaml:hello-joblet     # Java application
-rnx job run --workflow=ml-pipeline.yaml           # ML pipeline with GPU support
+rnx workflow run jobs.yaml:ml-analysis      # Python ML analysis
+rnx workflow run jobs.yaml:hello-joblet     # Java application
+rnx workflow run ml-pipeline.yaml           # ML pipeline with GPU support
 
 # Monitor execution status
 rnx job status <job-uuid>
-rnx job status --workflow <workflow-uuid>
+rnx workflow status <workflow-uuid>
 ```
 
 ### Command Line Interface

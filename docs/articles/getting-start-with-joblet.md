@@ -342,13 +342,13 @@ Run the workflow:
 
 ```bash
 # Run a specific job from the workflow
-rnx job run --workflow=jobs.yaml:data-prep
+rnx workflow run jobs.yaml
 
 # Run the entire workflow (all jobs with dependencies)
-rnx job run --workflow=jobs.yaml
+rnx workflow run jobs.yaml
 
 # Check workflow status
-rnx job status --workflow <workflow-id>
+rnx workflow status <workflow-id>
 ```
 
 ### Example 5: Long-running Jobs with Monitoring

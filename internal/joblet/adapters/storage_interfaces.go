@@ -37,6 +37,12 @@ type JobStorer interface {
 	// PubSub access for IPC integration
 	PubSub() pubsub.PubSub[JobEvent]
 
+	// State synchronization - restore jobs from persistent storage
+	SyncFromPersistentState(ctx context.Context) error
+
+	// Health checks for state and persist services using Ping
+	HealthCheckServices(ctx context.Context) error
+
 	// Shutting down gracefully
 	Close() error
 }

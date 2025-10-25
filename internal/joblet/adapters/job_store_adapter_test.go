@@ -20,7 +20,7 @@ func TestWriteToBuffer_PersistEnabled(t *testing.T) {
 	logMgr := NewSimpleLogManager()
 	ps := pubsub.NewPubSub[JobEvent]()
 
-	adapter := NewJobStorer(store, logMgr, ps, nil, true, log) // persistEnabled = true
+	adapter := NewJobStorer(store, logMgr, ps, nil, nil, true, log) // persistClient=nil, stateClient=nil, persistEnabled = true
 	jobStoreAdapter := adapter.(*jobStoreAdapter)
 
 	// Create a test job
@@ -60,7 +60,7 @@ func TestWriteToBuffer_PersistDisabled(t *testing.T) {
 	logMgr := NewSimpleLogManager()
 	ps := pubsub.NewPubSub[JobEvent]()
 
-	adapter := NewJobStorer(store, logMgr, ps, nil, false, log) // persistEnabled = false
+	adapter := NewJobStorer(store, logMgr, ps, nil, nil, false, log) // persistClient=nil, stateClient=nil, persistEnabled = false
 	jobStoreAdapter := adapter.(*jobStoreAdapter)
 
 	// Create a test job
@@ -99,7 +99,7 @@ func TestWriteToBuffer_MultipleWrites_PersistEnabled(t *testing.T) {
 	logMgr := NewSimpleLogManager()
 	ps := pubsub.NewPubSub[JobEvent]()
 
-	adapter := NewJobStorer(store, logMgr, ps, nil, true, log) // persistEnabled = true
+	adapter := NewJobStorer(store, logMgr, ps, nil, nil, true, log) // persistClient=nil, stateClient=nil, persistEnabled = true
 	jobStoreAdapter := adapter.(*jobStoreAdapter)
 
 	// Create a test job
@@ -146,7 +146,7 @@ func TestWriteToBuffer_MultipleWrites_PersistDisabled(t *testing.T) {
 	logMgr := NewSimpleLogManager()
 	ps := pubsub.NewPubSub[JobEvent]()
 
-	adapter := NewJobStorer(store, logMgr, ps, nil, false, log) // persistEnabled = false
+	adapter := NewJobStorer(store, logMgr, ps, nil, nil, false, log) // persistClient=nil, stateClient=nil, persistEnabled = false
 	jobStoreAdapter := adapter.(*jobStoreAdapter)
 
 	// Create a test job

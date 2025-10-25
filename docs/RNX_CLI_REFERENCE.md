@@ -94,7 +94,7 @@ rnx job run [parameters] <command> [arguments...]
 | `--secret-env, -s` | Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
 | `--schedule`       | Schedule job execution (duration or RFC3339 time)          | immediate      |
 
-**Note**: For workflow execution, use the dedicated `rnx workflow run` command instead of `--workflow` flag.
+**Note**: For workflow execution, use the dedicated `rnx workflow run` command.
 
 #### Examples
 
@@ -211,7 +211,7 @@ rnx job list
 # c3d4e5f6-a7b8-9012-cdef-345678901234  -            -                                    SCHEDULED   N/A                  backup.sh
 
 # List all workflows (table format)
-rnx job list --workflow
+rnx workflow list
 
 # Example output:
 # UUID                                 WORKFLOW             STATUS      PROGRESS
@@ -260,8 +260,8 @@ Get detailed status of a specific job or workflow.
 
 ```bash
 rnx job status [flags] <job-uuid>              # Get job status
-rnx job status --workflow <workflow-uuid>      # Get workflow status
-rnx job status --workflow --detail <workflow-uuid>  # Get workflow status with YAML content
+rnx workflow status <workflow-uuid>      # Get workflow status
+rnx workflow status --detail <workflow-uuid>  # Get workflow status with YAML content
 ```
 
 #### Job Status
@@ -286,11 +286,11 @@ rnx job status --workflow --detail <workflow-uuid>  # Get workflow status with Y
 
 #### Flags
 
-| Flag               | Description                    | Default | Notes                            |
-|--------------------|--------------------------------|---------|----------------------------------|
-| `--workflow`, `-w` | Explicitly get workflow status | false   | Required for workflow operations |
-| `--detail`, `-d`   | Show original YAML content     | false   | Only works with `--workflow`     |
-| `--json`           | Output in JSON format          | false   | Available for jobs and workflows |
+| Flag       | Description               | Default | Notes                         |
+|------------|---------------------------|---------|-------------------------------|
+| `--json`   | Output in JSON format     | false   | Available for job status      |
+
+**Note**: For workflow status, use `rnx workflow status` command instead.
 
 #### Examples
 
@@ -299,23 +299,23 @@ rnx job status --workflow --detail <workflow-uuid>  # Get workflow status with Y
 rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Get workflow status
-rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx workflow status a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Get workflow status with original YAML content
-rnx job status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx workflow status --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Get status in JSON format
 rnx job status --json f47ac10b-58cc-4372-a567-0e02b2c3d479    # Job JSON output
-rnx job status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef     # Workflow JSON output
-rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef  # Workflow JSON with YAML content
+rnx workflow status --json a1b2c3d4-e5f6-7890-1234-567890abcdef     # Workflow JSON output
+rnx workflow status --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef  # Workflow JSON with YAML content
 
 # Check multiple jobs/workflows
 for uuid in f47ac10b-58cc-4372-a567-0e02b2c3d479 a1b2c3d4-e5f6-7890-1234-567890abcdef; do rnx job status $uuid; done
 
 # JSON output for scripting
 rnx job status --json f47ac10b-58cc-4372-a567-0e02b2c3d479 | jq .status      # Job status
-rnx job status --workflow --json a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .total_jobs   # Workflow progress
-rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .yaml_content  # Extract YAML content
+rnx workflow status --json a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .total_jobs   # Workflow progress
+rnx workflow status --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef | jq .yaml_content  # Extract YAML content
 
 # Example workflow status output:
 # Workflow UUID: a1b2c3d4-e5f6-7890-1234-567890abcdef
@@ -364,7 +364,7 @@ rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef |
 #### Example Workflow JSON Output with YAML Content
 
 ```bash
-# rnx job status --workflow --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+# rnx workflow status --json --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 {
   "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
   "workflow": "data-pipeline.yaml",
@@ -912,7 +912,7 @@ rnx network list --json | jq -r '.networks[] | select(.builtin == false) | .name
 
 ### `rnx runtime list`
 
-List all installed runtime environments.
+List all installed runtime environments or available runtimes from external sources.
 
 ```bash
 rnx runtime list [flags]
@@ -920,18 +920,36 @@ rnx runtime list [flags]
 
 #### Flags
 
-| Flag     | Description           | Default |
-|----------|-----------------------|---------|
-| `--json` | Output in JSON format | false   |
+| Flag            | Description                                                                                       | Default |
+|-----------------|---------------------------------------------------------------------------------------------------|---------|
+| `--json`        | Output in JSON format                                                                             | false   |
+| `--registry`    | List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo | ""      |
+| `--github-repo` | List runtimes from GitHub repository. Supports formats: owner/repo, owner/repo/tree/branch/path   | ""      |
+
+#### Description
+
+The list command can show:
+1. **Locally installed runtimes** (default) - Shows runtimes already installed on the server
+2. **Available runtimes from registry** (with `--registry` flag) - Shows runtimes available for installation from GitHub registries
+3. **Available runtimes from repository** (with `--github-repo` flag) - Shows runtimes from a custom GitHub repository path
 
 #### Examples
 
 ```bash
-# List installed runtimes
+# List locally installed runtimes
 rnx runtime list
 
-# JSON output
+# JSON output for installed runtimes
 rnx runtime list --json
+
+# List available runtimes from default registry
+rnx runtime list --registry
+
+# List available runtimes from custom registry
+rnx runtime list --registry=myorg/custom-runtimes
+
+# List available runtimes from GitHub repository
+rnx runtime list --github-repo=owner/repo/tree/main/runtimes
 ```
 
 ### `rnx runtime info`

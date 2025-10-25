@@ -437,7 +437,7 @@ jobs:
 **Workflow Network Validation:**
 
 ```bash
-$ rnx job run --workflow=microservices-workflow.yaml
+$ rnx workflow run microservices-workflow.yaml
 🔍 Validating workflow prerequisites...
 ✅ All required networks exist
 ```

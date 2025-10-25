@@ -27,7 +27,7 @@ func main() {
 
 	// Initialize logger with defaults first
 	log := logger.New().WithMode("persist")
-	log.Info("Starting joblet-persist",
+	log.Info("Starting persist",
 		"version", version,
 		"commit", commit,
 		"buildTime", buildTime)
@@ -99,7 +99,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Info("joblet-persist is running. Press Ctrl+C to stop.")
+	log.Info("persist is running. Press Ctrl+C to stop.")
 
 	// Block until signal received
 	sig := <-sigChan
@@ -108,5 +108,5 @@ func main() {
 	// Cancel context to trigger shutdown
 	cancel()
 
-	log.Info("joblet-persist stopped")
+	log.Info("persist stopped")
 }

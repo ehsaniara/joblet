@@ -14,14 +14,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var workflowFlag bool
-var detailFlag bool
-
 func NewStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status <uuid>",
-		Short: "Get comprehensive status and details of a job or workflow by UUID",
-		Long: `Get comprehensive status and details of a job or workflow by UUID.
+		Short: "Get comprehensive status and details of a job by UUID",
+		Long: `Get comprehensive status and details of a job by UUID.
 
 The status command shows complete job information including:
 • Job identification (UUID, name, command, arguments)
@@ -36,35 +33,22 @@ The status command shows complete job information including:
 • Process results (exit code, completion status)
 • Contextual next actions (view logs, stop job, etc.)
 
-Both jobs and workflows use UUIDs (36-character identifiers).
+Jobs use UUIDs (36-character identifiers).
 Short-form UUIDs are supported - you can use just the first 8 characters
-if they uniquely identify a job or workflow.
-Use --workflow flag to explicitly request workflow status.
-Use --detail flag with workflow status to show the original YAML content.
+if they uniquely identify a job.
 
-Job Status Examples:
+Examples:
   # Get comprehensive job status (using full UUID)
   rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
-  
+
   # Get job status (using short-form UUID)
   rnx job status f47ac10b
-  
+
   # Get job status in JSON format (all fields)
   rnx job status --json f47ac10b
 
-Workflow Status Examples:
-  # Get workflow status (using full UUID)
-  rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
-  
-  # Get workflow status (using short-form UUID)
-  rnx job status --workflow a1b2c3d4
-  
-  # Get workflow status with original YAML content
-  rnx job status --workflow --detail a1b2c3d4
-  
-  # Get workflow status in JSON format
-  rnx job status --workflow --json a1b2c3d4
-  rnx job status --workflow --json --detail a1b2c3d4  # JSON with YAML content
+  # For workflow status, use:
+  rnx workflow status <workflow-uuid>
 
 Job Status Information Displayed:
   • Basic Info: Job UUID, name, command with arguments, current status
@@ -88,50 +72,12 @@ Output Formats:
 		RunE: runStatus,
 	}
 
-	cmd.Flags().BoolVarP(&workflowFlag, "workflow", "w", false, "Get workflow status instead of job status")
-	cmd.Flags().BoolVarP(&detailFlag, "detail", "d", false, "Show YAML content when displaying workflow status")
-
 	return cmd
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
 	id := args[0]
-
-	// Validate flag combinations
-	if detailFlag && !workflowFlag {
-		return fmt.Errorf("the --detail option only works with --workflow")
-	}
-
-	// If workflow flag is set, try workflow status directly
-	if workflowFlag {
-		// Workflow UUID can be passed directly
-		return getWorkflowStatus(id)
-	}
-
-	// Try job ID first (for backward compatibility)
-	jobErr := getJobStatus(id)
-	if jobErr == nil {
-		return nil
-	}
-
-	// If job lookup fails, try as workflow UUID
-	workflowErr := getWorkflowStatus(id)
-	if workflowErr == nil {
-		return nil
-	}
-
-	// If both fail, show a helpful error message
-	if strings.Contains(jobErr.Error(), "not found") && strings.Contains(workflowErr.Error(), "not found") {
-		return fmt.Errorf("couldn't find a job or workflow with ID '%s'\n\nTip: Try 'rnx job list' to see all jobs, or 'rnx job list --workflow' to see workflows", id)
-	}
-
-	// If workflow exists but job also exists with same ID, suggest using --workflow flag
-	if !strings.Contains(workflowErr.Error(), "not found") {
-		fmt.Fprintf(os.Stderr, "\nNote: Both job and workflow exist with ID '%s'. Showing job status.\nUse 'rnx job status --workflow %s' to see workflow status.\n\n", id, id)
-		return nil
-	}
-
-	return workflowErr
+	return getJobStatus(id)
 }
 
 func getJobStatus(jobID string) error {
@@ -431,7 +377,7 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 	return encoder.Encode(output)
 }
 
-// getWorkflowStatus retrieves and displays comprehensive workflow status with job names.
+// GetWorkflowStatus retrieves and displays comprehensive workflow status with job names.
 //
 // RESPONSIBILITY:
 // - Fetches detailed workflow status from the joblet server
@@ -469,7 +415,7 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 //
 // RETURNS:
 // - error: If client creation fails, request fails, or formatting errors occur
-func getWorkflowStatus(workflowID string) error {
+func GetWorkflowStatus(workflowID string, showDetail bool) error {
 	client, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("couldn't connect to joblet server: %w", err)
@@ -492,7 +438,7 @@ func getWorkflowStatus(workflowID string) error {
 	}
 
 	if common.JSONOutput {
-		return outputWorkflowStatusJSON(res)
+		return outputWorkflowStatusJSON(res, showDetail)
 	}
 
 	workflow := res.Workflow
@@ -502,7 +448,7 @@ func getWorkflowStatus(workflowID string) error {
 	fmt.Printf("\n")
 
 	// Display YAML content if detail flag is set
-	if detailFlag {
+	if showDetail {
 		if workflow.YamlContent != "" {
 			displayWorkflowYAMLContent(workflow.YamlContent)
 		} else {
@@ -600,7 +546,7 @@ func getWorkflowStatus(workflowID string) error {
 
 	// Show available actions
 	fmt.Printf("\nAvailable Actions:\n")
-	fmt.Printf("  • rnx job list --workflow    # List all workflows\n")
+	fmt.Printf("  • rnx workflow list          # List all workflows\n")
 	if workflow.Status == "RUNNING" {
 		fmt.Printf("  • rnx job status %s          # Refresh workflow status\n", workflow.Uuid)
 	}
@@ -615,7 +561,7 @@ func getWorkflowStatus(workflowID string) error {
 }
 
 // outputWorkflowStatusJSON outputs workflow status in JSON format
-func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse) error {
+func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse, showDetail bool) error {
 	// Convert protobuf workflow status to JSON structure
 	statusData := map[string]interface{}{
 		"uuid":           res.Workflow.Uuid,
@@ -630,7 +576,7 @@ func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse) error {
 	}
 
 	// Include YAML content if detail flag is set and content is available
-	if detailFlag && res.Workflow.YamlContent != "" {
+	if showDetail && res.Workflow.YamlContent != "" {
 		statusData["yaml_content"] = res.Workflow.YamlContent
 	}
 

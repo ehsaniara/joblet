@@ -13,7 +13,7 @@ workflow system.
 
 - **Jobs**: step1 → step2 → step3
 - **Features**: Simple dependency chain, basic commands
-- **Usage**: `rnx job run --workflow=demo-workflow.yaml`
+- **Usage**: `rnx workflow run demo-workflow.yaml`
 
 #### `test-simple-workflow.yaml`
 
@@ -21,7 +21,7 @@ workflow system.
 
 - **Jobs**: job-one → job-two
 - **Features**: Job names display, dependency tracking
-- **Usage**: `rnx job run --workflow=test-simple-workflow.yaml`
+- **Usage**: `rnx workflow run test-simple-workflow.yaml`
 - **Validation**: Tests job ID vs job name display in CLI
 
 ### 🔍 Job Names Feature Tests
@@ -36,7 +36,7 @@ workflow system.
     - Complex dependency relationships
     - Environment variables (regular and secret)
     - Resource limits per job
-- **Usage**: `rnx job run --workflow=test-workflow-names.yaml`
+- **Usage**: `rnx workflow run test-workflow-names.yaml`
 - **Validation**:
     - Job names appear in workflow status display
     - Dependencies show job name relationships
@@ -49,7 +49,7 @@ The job names feature allows workflow jobs to have names derived from YAML job k
 ### Expected CLI Output Format
 
 ```bash
-# rnx job status --workflow 1
+# rnx workflow status 1
 Jobs in Workflow:
 -----------------------------------------------------------------------------------------
 JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
@@ -72,16 +72,16 @@ JOB ID          JOB NAME             STATUS       EXIT CODE  DEPENDENCIES
 
 ```bash
 # Test basic job names with 2 jobs
-rnx job run --workflow=examples/workflows/tests/test-simple-workflow.yaml
-rnx job status --workflow <workflow-id>
+rnx workflow run examples/workflows/tests/test-simple-workflow.yaml
+rnx workflow status <workflow-id>
 
 # Test comprehensive job names with 4 jobs
-rnx job run --workflow=examples/workflows/tests/test-workflow-names.yaml
-rnx job status --workflow <workflow-id>
+rnx workflow run examples/workflows/tests/test-workflow-names.yaml
+rnx workflow status <workflow-id>
 
 # Basic workflow demo
-rnx job run --workflow=examples/workflows/tests/demo-workflow.yaml
-rnx job status --workflow <workflow-id>
+rnx workflow run examples/workflows/tests/demo-workflow.yaml
+rnx workflow status <workflow-id>
 ```
 
 ### Batch Testing
@@ -91,7 +91,7 @@ rnx job status --workflow <workflow-id>
 cd examples/workflows/tests/
 for file in *.yaml; do
     echo "Testing workflow: $file"
-    rnx job run --workflow="$file"
+    rnx workflow run "$file"
     sleep 10  # Allow time for completion
 done
 ```

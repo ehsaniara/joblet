@@ -100,7 +100,7 @@ jobs:
 
 ```bash
 # Run the GPU-enabled workflow
-rnx job run --workflow=ml-training-pipeline.yaml
+rnx workflow run ml-training-pipeline.yaml
 ```
 
 ## GPU Runtime Environment
@@ -233,7 +233,7 @@ rnx job run --max-cpu=400 --max-memory=8192 python preprocess.py
 rnx job run --gpu=1 --gpu-memory=8GB python train.py
 
 # Use workflows for complex pipelines
-rnx job run --workflow=ml-pipeline.yaml
+rnx workflow run ml-pipeline.yaml
 ```
 
 ### Environment-Specific Configuration

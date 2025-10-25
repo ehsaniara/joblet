@@ -25,7 +25,7 @@ source "$(dirname "$0")/../lib/test_framework.sh"
 # Test configuration
 REGISTRY_URL="https://github.com/ehsaniara/joblet-runtimes"
 TEST_RUNTIME_NAME="python-3.11-ml"
-TEST_RUNTIME_VERSION="1.0.2"  # Adjust to actual version in registry
+TEST_RUNTIME_VERSION="1.3.1"  # Adjust to actual version in registry
 TEST_RUNTIME_SPEC="${TEST_RUNTIME_NAME}@${TEST_RUNTIME_VERSION}"
 TEST_RUNTIME_LATEST="${TEST_RUNTIME_NAME}@latest"
 TEST_INVALID_RUNTIME="nonexistent-runtime@1.0.0"
@@ -43,14 +43,8 @@ echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 cleanup_test_runtimes() {
     echo -e "\n${YELLOW}Cleaning up test runtimes...${NC}"
 
-    # Remove specific version
-    "$RNX_BINARY" runtime list 2>/dev/null | grep "${TEST_RUNTIME_NAME}-${TEST_RUNTIME_VERSION}" | awk '{print $1}' | while read runtime; do
-        echo "  Removing: $runtime"
-        "$RNX_BINARY" runtime remove "$runtime" >/dev/null 2>&1 || true
-    done
-
-    # Remove latest version if different
-    "$RNX_BINARY" runtime list 2>/dev/null | grep "${TEST_RUNTIME_NAME}-" | awk '{print $1}' | while read runtime; do
+    # Remove all versions of the test runtime
+    "$RNX_BINARY" runtime list 2>/dev/null | grep "^${TEST_RUNTIME_NAME}" | awk '{print $1}' | while read runtime; do
         echo "  Removing: $runtime"
         "$RNX_BINARY" runtime remove "$runtime" >/dev/null 2>&1 || true
     done
@@ -74,12 +68,12 @@ test_registry_install_specific_version() {
     if [[ $exit_code -eq 0 ]]; then
         echo -e "${GREEN}  ✓ Installation completed${NC}"
 
-        # Verify runtime is listed
+        # Verify runtime is listed (name and version as separate columns)
         local list_output
         list_output=$("$RNX_BINARY" runtime list 2>&1)
 
-        if echo "$list_output" | grep -q "${TEST_RUNTIME_NAME}-${TEST_RUNTIME_VERSION}"; then
-            echo -e "${GREEN}  ✓ Runtime appears in list with versioned name${NC}"
+        if echo "$list_output" | grep "${TEST_RUNTIME_NAME}" | grep -q "${TEST_RUNTIME_VERSION}"; then
+            echo -e "${GREEN}  ✓ Runtime appears in list with correct version${NC}"
             return 0
         else
             echo -e "${RED}  ✗ Runtime not found in list${NC}"
@@ -119,7 +113,7 @@ test_registry_install_latest() {
         local list_output
         list_output=$("$RNX_BINARY" runtime list 2>&1)
 
-        if echo "$list_output" | grep -q "${TEST_RUNTIME_NAME}-"; then
+        if echo "$list_output" | grep -q "${TEST_RUNTIME_NAME}"; then
             echo -e "${GREEN}  ✓ Runtime installed with resolved version${NC}"
             return 0
         else
@@ -197,7 +191,8 @@ test_registry_versioned_path() {
     echo -e "\n${BLUE}Test 5: Verify versioned installation path${NC}"
 
     # Check on server (where runtime is actually installed)
-    local expected_path="/opt/joblet/runtimes/${TEST_RUNTIME_NAME}-${TEST_RUNTIME_VERSION}"
+    # Path structure is /opt/joblet/runtimes/<runtime-name>/<version>/
+    local expected_path="/opt/joblet/runtimes/${TEST_RUNTIME_NAME}/${TEST_RUNTIME_VERSION}"
 
     # If testing locally
     if [[ -d "$expected_path" ]]; then

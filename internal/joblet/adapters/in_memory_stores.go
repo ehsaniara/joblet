@@ -2,16 +2,137 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/internal/joblet/state"
+	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/pkg/client"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // Direct constructors to replace the over-engineered factory pattern
+
+// WaitForStateService waits for state service to be ready with retries (public for server.go)
+// Uses the Ping IPC message for efficient health checking
+func WaitForStateService(client *state.Client, logger *logger.Logger) error {
+	return waitForStateService(client, logger)
+}
+
+// waitForStateService waits for state service to be ready with retries
+// Uses the Ping IPC message for efficient health checking
+func waitForStateService(client *state.Client, logger *logger.Logger) error {
+	const (
+		maxRetries    = 30 // 30 attempts
+		retryDelay    = 1 * time.Second
+		healthTimeout = 2 * time.Second
+	)
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Try to connect
+		if err := client.Connect(); err != nil {
+			logger.Debug("state service connection attempt failed",
+				"attempt", attempt, "maxRetries", maxRetries, "error", err)
+
+			if attempt < maxRetries {
+				time.Sleep(retryDelay)
+				continue
+			}
+			return fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, err)
+		}
+
+		// Connection succeeded, now verify it's healthy with Ping
+		ctx, cancel := context.WithTimeout(context.Background(), healthTimeout)
+		defer cancel()
+
+		// Use Ping IPC message for efficient health check (no backend query overhead)
+		err := client.Ping(ctx)
+		if err != nil {
+			logger.Debug("state service health check (Ping) failed",
+				"attempt", attempt, "error", err)
+
+			// Close the connection and retry
+			client.Close()
+
+			if attempt < maxRetries {
+				time.Sleep(retryDelay)
+				continue
+			}
+			return fmt.Errorf("state service not healthy after %d attempts: %w", maxRetries, err)
+		}
+
+		// Success - connection established and Ping responded
+		logger.Info("state service health check passed (Ping)",
+			"attempts", attempt, "totalTime", time.Duration(attempt-1)*retryDelay)
+		return nil
+	}
+
+	return fmt.Errorf("state service did not become ready within %v", time.Duration(maxRetries)*retryDelay)
+}
+
+// WaitForPersistService waits for persist service to be ready with retries (public for server.go)
+// Uses the Ping RPC for efficient health checking
+func WaitForPersistService(socketPath string, logger *logger.Logger) (persistpb.PersistServiceClient, error) {
+	if err := waitForPersistService(socketPath, logger); err != nil {
+		return nil, err
+	}
+	// Connect and return the client
+	return client.NewPersistClientUnix(socketPath)
+}
+
+// waitForPersistService waits for persist service to be ready with retries
+// Uses the Ping RPC for efficient health checking
+func waitForPersistService(socketPath string, logger *logger.Logger) error {
+	const (
+		maxRetries    = 30 // 30 attempts
+		retryDelay    = 1 * time.Second
+		healthTimeout = 2 * time.Second
+	)
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Try to connect
+		persistClient, err := client.NewPersistClientUnix(socketPath)
+		if err != nil {
+			logger.Debug("persist service connection attempt failed",
+				"attempt", attempt, "maxRetries", maxRetries, "error", err)
+
+			if attempt < maxRetries {
+				time.Sleep(retryDelay)
+				continue
+			}
+			return fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, err)
+		}
+
+		// Connection succeeded, now verify it's healthy with Ping RPC
+		ctx, cancel := context.WithTimeout(context.Background(), healthTimeout)
+
+		// Use Ping RPC for efficient health check (no business logic overhead)
+		_, err = persistClient.Ping(ctx, &persistpb.PingRequest{})
+		cancel()
+
+		if err != nil {
+			logger.Debug("persist service health check (Ping) failed",
+				"attempt", attempt, "error", err)
+
+			if attempt < maxRetries {
+				time.Sleep(retryDelay)
+				continue
+			}
+			return fmt.Errorf("persist service not healthy after %d attempts: %w", maxRetries, err)
+		}
+
+		// Success - connection established and Ping responded
+		logger.Info("persist service health check passed (Ping)",
+			"attempts", attempt, "totalTime", time.Duration(attempt-1)*retryDelay)
+		return nil
+	}
+
+	return fmt.Errorf("persist service did not become ready within %v", time.Duration(maxRetries)*retryDelay)
+}
 
 // NewJobStore creates a job store with buffer configuration and log persistence
 func NewJobStore(cfg *config.BuffersConfig, persistEnabled bool, logger *logger.Logger) JobStorer {
@@ -33,18 +154,28 @@ func NewJobStore(cfg *config.BuffersConfig, persistEnabled bool, logger *logger.
 	logMgr := NewSimpleLogManager()
 
 	// Create persist client for historical log/metric deletion
+	// Health check is deferred - happens after subprocess startup in server.go
 	persistSocketPath := "/opt/joblet/run/persist-grpc.sock"
-	persistClient, err := client.NewPersistClientUnix(persistSocketPath)
-	if err != nil {
-		logger.Warn("failed to connect to persist service - historical data deletion will not work",
-			"socket", persistSocketPath, "error", err)
-		persistClient = nil // Continue without persist client
+	var persistClient persistpb.PersistServiceClient
+
+	if persistEnabled {
+		// Just create the client, no health check yet (will be checked after subprocess starts)
+		logger.Info("persist service enabled - will connect after subprocess starts", "socket", persistSocketPath)
+		persistClient = nil // Will be connected later via WaitForPersistService
 	} else {
-		logger.Info("connected to persist service for historical data deletion", "socket", persistSocketPath)
+		// Persist disabled - don't connect at all
+		persistClient = nil
+		logger.Info("persist service disabled (ipc.enabled=false) - skipping connection")
 	}
 
+	// Create state client for persistent job state across restarts
+	// Health check is deferred - happens after subprocess startup in server.go
+	stateSocketPath := "/opt/joblet/run/state-ipc.sock"
+	stateClient := state.NewClient(stateSocketPath, logger)
+	logger.Info("state client created - will connect after subprocess starts", "socket", stateSocketPath)
+
 	// Logs are buffered in-memory for real-time streaming and forwarded to persist via IPC
-	return NewJobStorer(store, logMgr, pubsubSystem, persistClient, persistEnabled, logger)
+	return NewJobStorer(store, logMgr, pubsubSystem, persistClient, stateClient, persistEnabled, logger)
 }
 
 // NewVolumeStore creates a volume store directly

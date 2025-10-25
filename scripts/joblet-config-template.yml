@@ -1,5 +1,5 @@
 # Unified Joblet Configuration
-# This file configures both joblet (main service) and joblet-persist (persistence service)
+# This file configures both joblet (main service) and persist (persistence service)
 
 version: "3.0"
 
@@ -30,14 +30,12 @@ cgroup:
 
 # GPU support configuration
 gpu:
-  enabled: false               # Enable GPU support (off by default - opt-in only)
   cuda_paths: # CUDA installation paths to search
     - "/usr/local/cuda"
     - "/opt/cuda"
 
 network:
   state_dir: "/opt/joblet/network"
-  enabled: true
   default_network: "bridge"
   allow_custom_networks: true
   max_custom_networks: 0       # No limit on custom networks (0 = unlimited)
@@ -95,13 +93,12 @@ buffers:
   pubsub_buffer_size: 10000   # Pub-sub channel buffer for high-throughput production traffic
   chunk_size: 1048576         # 1MB chunks for optimal streaming performance
 
-# IPC configuration for joblet-persist integration
+# IPC configuration for persist integration
 # IMPORTANT: This setting controls BOTH persistence AND buffering behavior:
 #   enabled: true  - Logs/metrics buffered in memory + forwarded to persist (gap prevention enabled)
 #   enabled: false - NO buffering (live streaming only, no persistence, no historical data)
 # Disabling persist eliminates unbounded memory growth but loses historical log/metric access
 ipc:
-  enabled: true                                   # Enable IPC to persist service + in-memory buffering
   socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket for log/metric writes
   buffer_size: 10000                              # Message buffer size
   reconnect_delay: "5s"                           # Reconnection retry delay
@@ -113,7 +110,6 @@ volumes:
   default_disk_quota_bytes: 1048576  # Default disk quota for jobs without volumes (1MB)
 
 monitoring:
-  enabled: true
   system_interval: "10s"
   cloud_detection: true
 
@@ -202,3 +198,33 @@ persist:
       #   log_retention_days: 30   # Production (standard)
       #   log_retention_days: 365  # Compliance (1 year)
       #   log_retention_days: -1   # Never expire (not recommended)
+
+# Job State Persistence Configuration (Optional - for EC2/Cloud deployments)
+# When enabled, job states survive joblet restarts
+state:
+  backend: "memory"  # Options: "memory", "dynamodb", "redis"
+  socket: "/opt/joblet/run/state-ipc.sock"
+  buffer_size: 10000
+  reconnect_delay: "5s"
+  
+  storage:
+    backend: "dynamodb"
+    
+    # DynamoDB configuration (when backend: "dynamodb")
+    dynamodb:
+      region: ""  # Auto-detect from EC2 metadata if empty
+      table_name: "joblet-jobs"
+      ttl_enabled: true
+      ttl_attribute: "expiresAt"
+      ttl_days: 30  # Auto-delete completed jobs after 30 days
+      read_capacity: 5   # 0 for on-demand pricing
+      write_capacity: 5  # 0 for on-demand pricing
+      batch_size: 25
+      batch_interval: "100ms"
+    
+    # Redis configuration (future - when backend: "redis")
+    # redis:
+    #   endpoint: "localhost:6379"
+    #   password: ""
+    #   db: 0
+    #   ttl_days: 30

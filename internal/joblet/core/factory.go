@@ -136,15 +136,21 @@ func (f *ComponentFactory) createVolumeStore() (adapters.VolumeStorer, error) {
 	return adapter, nil
 }
 
+// getVolumeBasePath returns the base path for volume storage.
+// Uses configured filesystem base directory if available, otherwise defaults to /opt/joblet/volumes.
+func (f *ComponentFactory) getVolumeBasePath() string {
+	if f.config.Filesystem.BaseDir != "" {
+		return filepath.Join(f.config.Filesystem.BaseDir, "volumes")
+	}
+	return "/opt/joblet/volumes"
+}
+
 // createVolumeManager builds the volume manager that actually deals with creating,
 // mounting, and cleaning up volumes on the filesystem.
 func (f *ComponentFactory) createVolumeManager(volumeStore adapters.VolumeStorer) *volume.Manager {
 	f.logger.Debug("creating volume manager")
 
-	basePath := "/opt/joblet/volumes"
-	if f.config.Filesystem.BaseDir != "" {
-		basePath = filepath.Join(f.config.Filesystem.BaseDir, "volumes")
-	}
+	basePath := f.getVolumeBasePath()
 	manager := volume.NewManager(volumeStore, f.platform, basePath)
 
 	f.logger.Info("volume manager created successfully")
@@ -169,7 +175,7 @@ func (f *ComponentFactory) createWorkflowManager() *workflow.WorkflowManager {
 // system health and job performance - basically our system's health checker.
 func (f *ComponentFactory) createMonitoringService() *monitoring.Service {
 	f.logger.Debug("creating monitoring service")
-	return monitoring.NewService(nil)
+	return monitoring.NewServiceFromConfig(&f.config.Monitoring)
 }
 
 // configureVolumeMonitoring connects our volume manager to the monitoring service
@@ -177,10 +183,7 @@ func (f *ComponentFactory) createMonitoringService() *monitoring.Service {
 func (f *ComponentFactory) configureVolumeMonitoring(monitoringService *monitoring.Service, volumeManager *volume.Manager) {
 	f.logger.Debug("configuring volume monitoring integration")
 
-	basePath := "/opt/joblet/volumes"
-	if f.config.Filesystem.BaseDir != "" {
-		basePath = filepath.Join(f.config.Filesystem.BaseDir, "volumes")
-	}
+	basePath := f.getVolumeBasePath()
 
 	monitoringService.SetVolumeManager(volumeManager, basePath)
 	f.logger.Info("volume monitoring integration configured", "volumeBasePath", basePath)

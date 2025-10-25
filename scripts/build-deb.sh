@@ -20,14 +20,14 @@ fi
 echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 
 # Check if binaries already exist (CI mode)
-if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./joblet-persist" ]; then
+if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ]; then
     echo "📦 Using pre-built binaries from root directory (CI mode)..."
     mkdir -p ./bin
     cp ./joblet ./bin/joblet
     cp ./rnx ./bin/rnx
-    cp ./joblet-persist ./bin/joblet-persist
-    chmod +x ./bin/joblet ./bin/rnx ./bin/joblet-persist
-elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/joblet-persist" ]; then
+    cp ./persist ./bin/persist
+    chmod +x ./bin/joblet ./bin/rnx ./bin/persist
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ]; then
     # Build all binaries if they don't exist
     echo "📦 Building all binaries..."
     make all || {
@@ -63,11 +63,11 @@ if [ ! -f "./bin/rnx" ]; then
 fi
 cp ./bin/rnx "$BUILD_DIR/opt/joblet/bin/"
 
-if [ ! -f "./bin/joblet-persist" ]; then
-    echo "❌ joblet-persist binary not found!"
+if [ ! -f "./bin/persist" ]; then
+    echo "❌ persist binary not found!"
     exit 1
 fi
-cp ./bin/joblet-persist "$BUILD_DIR/opt/joblet/bin/"
+cp ./bin/persist "$BUILD_DIR/opt/joblet/bin/"
 
 # Copy template files (NOT actual configs with certificates)
 if [ -f "./scripts/joblet-config-template.yml" ]; then
@@ -87,7 +87,7 @@ else
 fi
 
 # Copy service files
-# Note: joblet-persist now runs as subprocess, no separate service needed
+# Note: persist now runs as subprocess, no separate service needed
 cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"
 
 # Copy certificate generation script (embedded version)

@@ -51,7 +51,7 @@ joblet/ (repo root)
 │   ├── go.sum
 │   │
 │   ├── cmd/
-│   │   └── joblet-persist/    # Persist service binary
+│   │   └── persist/    # Persist service binary
 │   │       └── main.go
 │   │
 │   ├── internal/              # Persist internals (private)
@@ -129,7 +129,7 @@ replace (
 
 **Binaries:**
 
-- `persist/cmd/joblet-persist/` → `bin/joblet-persist`
+- `persist/cmd/persist/` → `bin/persist`
 
 **Dependencies:**
 
@@ -187,7 +187,7 @@ make all
 # Or manually:
 go build -o bin/joblet ./cmd/joblet
 go build -o bin/rnx ./cmd/rnx
-cd persist && go build -o ../bin/joblet-persist ./cmd/joblet-persist
+cd persist && go build -o ../bin/persist ./cmd/persist
 ```
 
 ### Build Individual Binaries
@@ -200,7 +200,7 @@ go build -o bin/joblet ./cmd/joblet
 go build -o bin/rnx ./cmd/rnx
 
 # Persist service (must be in persist/ directory)
-cd persist && go build -o ../bin/joblet-persist ./cmd/joblet-persist
+cd persist && go build -o ../bin/persist ./cmd/persist
 ```
 
 ### Cross-compile for Linux
@@ -208,7 +208,7 @@ cd persist && go build -o ../bin/joblet-persist ./cmd/joblet-persist
 ```bash
 GOOS=linux GOARCH=amd64 go build -o bin/joblet ./cmd/joblet
 GOOS=linux GOARCH=amd64 go build -o bin/rnx ./cmd/rnx
-cd persist && GOOS=linux GOARCH=amd64 go build -o ../bin/joblet-persist ./cmd/joblet-persist
+cd persist && GOOS=linux GOARCH=amd64 go build -o ../bin/persist ./cmd/persist
 ```
 
 ---
@@ -235,7 +235,7 @@ import (
     "github.com/ehsaniara/joblet/persist/pkg/logger"        // ✅ CAN import pkg
 )
 
-// From persist/cmd/joblet-persist (persist module) - can import its own internals
+// From persist/cmd/persist (persist module) - can import its own internals
 import (
     "github.com/ehsaniara/joblet/persist/internal/storage"  // ✅ OK - same module
     "github.com/ehsaniara/joblet/persist/pkg/logger"        // ✅ OK
@@ -264,7 +264,7 @@ import (
 │  joblet/persist                 │
 │  (sub-module)                   │
 │                                 │
-│  cmd/joblet-persist             │
+│  cmd/persist             │
 │  internal/, pkg/                │
 └─────────────────────────────────┘
 ```
@@ -352,7 +352,7 @@ Both binaries are included in the same `.deb` and `.rpm` packages:
 /opt/joblet/bin/
 ├── joblet           # From cmd/joblet
 ├── rnx              # From cmd/rnx
-└── joblet-persist   # From persist/cmd/joblet-persist
+└── persist   # From persist/cmd/persist
 ```
 
 **RPM (.rpm):**
@@ -361,7 +361,7 @@ Both binaries are included in the same `.deb` and `.rpm` packages:
 /opt/joblet/bin/
 ├── joblet
 ├── rnx
-└── joblet-persist
+└── persist
 ```
 
 ---
@@ -405,11 +405,11 @@ joblet/              # One module
 ├── cmd/
 │   ├── joblet/
 │   ├── rnx/
-│   └── joblet-persist/
+│   └── persist/
 ├── internal/
 └── pkg/
 
-joblet-persist/      # Separate repo
+persist/      # Separate repo
 ├── go.mod
 ├── cmd/
 ├── internal/
@@ -430,7 +430,7 @@ joblet/              # Monorepo with 2 modules
 └── persist/         # Sub-module
     ├── go.mod       # Persist module
     ├── cmd/
-    │   └── joblet-persist/
+    │   └── persist/
     ├── internal/
     └── pkg/
 ```
@@ -441,7 +441,7 @@ All imports updated from:
 
 ```go
 import "joblet/internal/..."           // Old
-import "joblet-persist/internal/..."   // Old
+import "persist/internal/..."   // Old
 ```
 
 To:

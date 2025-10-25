@@ -100,13 +100,13 @@ jobs:
             -o rnx-${{ matrix.arch }} \
             ./cmd/rnx
 
-      - name: Build joblet-persist binary
+      - name: Build persist binary
         run: |
           cd persist
           GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
             -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o ../joblet-persist-${{ matrix.arch }} \
-            ./cmd/joblet-persist
+            -o ../persist-${{ matrix.arch }} \
+            ./cmd/persist
 
       - name: Upload joblet binary
         uses: actions/upload-artifact@v4
@@ -120,11 +120,11 @@ jobs:
           name: rnx-binary-${{ matrix.arch }}
           path: rnx-${{ matrix.arch }}
 
-      - name: Upload joblet-persist binary
+      - name: Upload persist binary
         uses: actions/upload-artifact@v4
         with:
-          name: joblet-persist-binary-${{ matrix.arch }}
-          path: joblet-persist-${{ matrix.arch }}
+          name: persist-binary-${{ matrix.arch }}
+          path: persist-${{ matrix.arch }}
 
   build-cross-platform-cli:
     needs: test
@@ -258,10 +258,10 @@ jobs:
           name: rnx-binary-amd64
           path: ./
 
-      - name: Download joblet-persist binary
+      - name: Download persist binary
         uses: actions/download-artifact@v4
         with:
-          name: joblet-persist-binary-amd64
+          name: persist-binary-amd64
           path: ./
 
       - name: Debug - List downloaded files
@@ -377,10 +377,10 @@ jobs:
           name: rnx-binary-arm64
           path: ./
 
-      - name: Download joblet-persist binary
+      - name: Download persist binary
         uses: actions/download-artifact@v4
         with:
-          name: joblet-persist-binary-arm64
+          name: persist-binary-arm64
           path: ./
 
       - name: Debug - List downloaded files
@@ -496,10 +496,10 @@ jobs:
           name: rnx-binary-amd64
           path: ./
 
-      - name: Download joblet-persist binary
+      - name: Download persist binary
         uses: actions/download-artifact@v4
         with:
-          name: joblet-persist-binary-amd64
+          name: persist-binary-amd64
           path: ./
 
       - name: Debug - List downloaded files
@@ -609,10 +609,10 @@ jobs:
           name: rnx-binary-arm64
           path: ./
 
-      - name: Download joblet-persist binary
+      - name: Download persist binary
         uses: actions/download-artifact@v4
         with:
-          name: joblet-persist-binary-arm64
+          name: persist-binary-arm64
           path: ./
 
       - name: Debug - List downloaded files

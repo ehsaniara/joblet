@@ -1027,13 +1027,13 @@ Workflow status commands automatically display job names for better visibility:
 
 ```bash
 # Get workflow status with job names and dependencies
-rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx workflow status a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # List workflows
-rnx job list --workflow
+rnx workflow list
 
 # Execute workflow
-rnx job run --workflow=pipeline.yaml
+rnx workflow run pipeline.yaml
 ```
 
 ---
@@ -1058,7 +1058,7 @@ alongside the main Joblet service to provide durable storage and efficient histo
 
 ```bash
 # Service runs alongside main joblet service
-systemctl status joblet-persist
+systemctl status persist
 
 # Configured via unified config file
 /opt/joblet/config/joblet-config.yml

@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/ehsaniara/joblet/pkg/config"
 )
 
 // skipCI skips test if in CI or not on Linux
@@ -97,6 +99,65 @@ func TestNewService_NilConfig(t *testing.T) {
 	// Should use default config values
 	if !service.config.Enabled {
 		t.Error("Expected default config to have monitoring enabled")
+	}
+}
+
+func TestNewServiceFromConfig(t *testing.T) {
+	// Test with custom config
+	cfg := &config.MonitoringConfig{
+		Enabled:        false,
+		SystemInterval: 30 * time.Second,
+		CloudDetection: false,
+	}
+
+	service := NewServiceFromConfig(cfg)
+
+	if service == nil {
+		t.Fatal("Expected non-nil service")
+	}
+
+	if service.config == nil {
+		t.Fatal("Expected config to be set")
+	}
+
+	// Verify config conversion
+	if service.config.Enabled != false {
+		t.Error("Expected monitoring to be disabled")
+	}
+
+	if service.config.Collection.SystemInterval != 30*time.Second {
+		t.Errorf("Expected SystemInterval to be 30s, got %v", service.config.Collection.SystemInterval)
+	}
+
+	if service.config.Collection.CloudDetection != false {
+		t.Error("Expected CloudDetection to be disabled")
+	}
+}
+
+func TestNewServiceFromConfig_EnabledConfig(t *testing.T) {
+	// Test with enabled monitoring
+	cfg := &config.MonitoringConfig{
+		Enabled:        true,
+		SystemInterval: 5 * time.Second,
+		CloudDetection: true,
+	}
+
+	service := NewServiceFromConfig(cfg)
+
+	if service == nil {
+		t.Fatal("Expected non-nil service")
+	}
+
+	if !service.config.Enabled {
+		t.Error("Expected monitoring to be enabled")
+	}
+
+	if service.config.Collection.SystemInterval != 5*time.Second {
+		t.Errorf("Expected SystemInterval to be 5s, got %v", service.config.Collection.SystemInterval)
+	}
+
+	if !service.config.Collection.CloudDetection {
+		t.Error("Expected CloudDetection to be enabled")
 	}
 }
 

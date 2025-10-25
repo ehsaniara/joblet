@@ -177,8 +177,8 @@ case "$1" in
             echo "+cpu +memory +io +pids +cpuset" > /sys/fs/cgroup/joblet.slice/cgroup.subtree_control 2>/dev/null || true
         fi
 
-        # Note: joblet-persist now runs as a subprocess of joblet (no separate service needed)
-        print_info "joblet-persist will run as a subprocess of joblet-core"
+        # Note: persist now runs as a subprocess of joblet (no separate service needed)
+        print_info "persist will run as a subprocess of joblet-core"
 
         # Enable systemd services
         systemctl daemon-reload

@@ -102,7 +102,7 @@ Example scripts for multi-job workflows demonstrating data processing pipelines.
 Multi-job workflow for compiling and executing Java code:
 
 ```bash
-rnx job run --workflow=examples/workflows/java-complete-test.yaml --upload=examples/java/JavaRuntimeTest.java
+rnx workflow run examples/workflows/java-complete-test.yaml --upload=examples/java/JavaRuntimeTest.java
 ```
 
 ### python-e2e-test.yaml
@@ -110,7 +110,7 @@ rnx job run --workflow=examples/workflows/java-complete-test.yaml --upload=examp
 End-to-end Python runtime test workflow:
 
 ```bash
-rnx job run --workflow=examples/workflows/python-e2e-test.yaml --upload=examples/python/comprehensive-python-test.py
+rnx workflow run examples/workflows/python-e2e-test.yaml --upload=examples/python/comprehensive-python-test.py
 ```
 
 ### multi-job-test.yaml
@@ -118,5 +118,5 @@ rnx job run --workflow=examples/workflows/python-e2e-test.yaml --upload=examples
 Demonstrates volume sharing between Python jobs in a data processing pipeline:
 
 ```bash
-rnx job run --workflow=examples/workflows/multi-job-test.yaml --upload=examples/python/data-processor.py --upload=examples/python/data-analyzer.py
+rnx workflow run examples/workflows/multi-job-test.yaml --upload=examples/python/data-processor.py --upload=examples/python/data-analyzer.py
 ```

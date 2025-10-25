@@ -62,7 +62,7 @@ jobs:
 - Job names are the keys in the `jobs` section (e.g., `job-name`, `previous-job`)
 - Names should be descriptive and unique within the workflow
 - Used for dependency references and monitoring displays
-- Displayed in `rnx job status --workflow` and `rnx job list --workflow` commands
+- Displayed in `rnx workflow status` and `rnx workflow list` commands
 
 ### Job Specification Fields
 
@@ -268,7 +268,7 @@ Joblet performs comprehensive validation before executing workflows:
 ### Validation Output
 
 ```bash
-$ rnx job run --workflow=my-workflow.yaml
+$ rnx workflow run my-workflow.yaml
 🔍 Validating workflow prerequisites...
 ✅ No circular dependencies found
 ✅ All required volumes exist
@@ -281,7 +281,7 @@ $ rnx job run --workflow=my-workflow.yaml
 ### Validation Errors
 
 ```bash
-$ rnx job run --workflow=broken-workflow.yaml
+$ rnx workflow run broken-workflow.yaml
 Error: workflow validation failed: network validation failed: missing networks: [non-existent-network]. Available networks: [bridge isolated none custom-net]
 ```
 

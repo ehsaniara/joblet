@@ -1,9 +1,11 @@
 # Joblet Persistence Service
 
+> **📋 Note:** This document covers **log and metrics persistence** (`persist` service). For **job state persistence** (DynamoDB/memory), see [STATE_PERSISTENCE.md](./STATE_PERSISTENCE.md).
+
 ## Overview
 
-The Joblet Persistence Service (`joblet-persist`) is a dedicated microservice that handles historical storage and
-querying of job logs and metrics. It runs as a subprocess of the main joblet daemon and provides durable storage with
+The Joblet Persistence Service (`persist`) is a dedicated microservice that handles historical storage and
+querying of job **logs and metrics**. It runs as a subprocess of the main joblet daemon and provides durable storage with
 support for multiple storage backends including local filesystem and AWS CloudWatch.
 
 ## Architecture
@@ -489,6 +491,56 @@ ipc:
 - Metrics: ~100 samples per job (circular buffer, ~8 minutes at 5s interval)
 - Predictable memory usage even for long-running jobs
 
+**⚠️ CRITICAL REQUIREMENT: Mandatory Persist Service Health Check**
+
+When persistence is enabled (`ipc.enabled: true`), the persist service **MUST be running and healthy** before joblet can start. This is a **fail-fast** design to prevent joblet from running in a degraded state.
+
+**Startup Behavior:**
+
+1. **Health Check with Retries** (30 attempts × 1 second):
+   - Joblet attempts to connect to persist service via Unix socket
+   - Performs gRPC health check (QueryLogs test)
+   - Retries every second for up to 30 seconds
+
+2. **Success Case:**
+   - Persist service responds to health check
+   - Joblet completes startup
+   - Logs: `"persist service is ready and healthy"`
+
+3. **Failure Case (after 30 seconds):**
+   - Joblet **PANICS** and exits immediately
+   - Error: `"FATAL: persist service is not available but ipc.enabled=true"`
+   - Systemd automatically restarts joblet (will retry)
+
+**Why This Matters:**
+
+- Prevents silent failures (logs/metrics being lost)
+- Makes configuration issues immediately visible
+- Ensures consistent behavior across deployments
+- Avoids runtime surprises when persist service is down
+
+**Troubleshooting Startup Failures:**
+
+```bash
+# Check if persist subprocess started
+ps aux | grep persist
+
+# Check Unix socket exists
+ls -la /opt/joblet/run/persist-grpc.sock
+
+# View startup logs
+journalctl -u joblet -n 50 --no-pager
+
+# Common issues:
+# 1. Persist service crashed on startup (check logs)
+# 2. Unix socket permissions issue (check /opt/joblet/run ownership)
+# 3. Configuration error in persist section (check syntax)
+```
+
+**If You Don't Need Persistence:**
+
+Set `ipc.enabled: false` to disable the requirement entirely. Joblet will skip persist service connection and use live-streaming-only mode (no buffering, no historical data).
+
 #### When Persistence is DISABLED (`ipc.enabled: false`)
 
 **Behavior:**
@@ -854,7 +906,7 @@ persist:
 
 ```bash
 # Check if persist service is running
-ps aux | grep joblet-persist
+ps aux | grep persist
 
 # Check IPC socket
 ls -la /opt/joblet/run/persist-ipc.sock

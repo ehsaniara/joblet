@@ -20,13 +20,13 @@ dependencies. All examples use only Python 3's standard library.
 
 ```bash
 # Run specific analytics examples using the workflow
-rnx job run --workflow=jobs.yaml:sales-analysis        # Sales data statistical analysis
-rnx job run --workflow=jobs.yaml:customer-segmentation # K-means clustering from scratch
-rnx job run --workflow=jobs.yaml:time-series          # Time series data processing
-rnx job run --workflow=jobs.yaml:complete-analytics   # Full analytics pipeline
+rnx workflow run jobs.yaml        # Sales data statistical analysis
+rnx workflow run jobs.yaml # K-means clustering from scratch
+rnx workflow run jobs.yaml          # Time series data processing
+rnx workflow run jobs.yaml   # Full analytics pipeline
 
 # Setup volumes first (handled automatically by templates)
-rnx job run --workflow=jobs.yaml:setup-volumes
+rnx workflow run jobs.yaml
 ```
 
 ### Traditional Method

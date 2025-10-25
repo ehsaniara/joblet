@@ -5,7 +5,7 @@ lifecycle management.
 
 ## Overview
 
-`joblet-persist` is a separate service that receives logs and metrics from `joblet-core` via Unix domain sockets (IPC)
+`persist` is a separate service that receives logs and metrics from `joblet-core` via Unix domain sockets (IPC)
 and provides:
 
 - **Persistent storage** - Local filesystem storage (v1.0) with cloud backends coming in v2.0+
@@ -20,7 +20,7 @@ joblet-core (execution)
      │
      │ IPC (Unix Socket)
      ▼
-joblet-persist (storage)
+persist (storage)
      │
      ├─► Local Filesystem
      ├─► CloudWatch (v2.0)
@@ -48,7 +48,7 @@ joblet-persist (storage)
 ## Building
 
 ```bash
-go build -o bin/joblet-persist ./cmd/joblet-persist
+go build -o bin/persist ./cmd/persist
 ```
 
 ## Configuration
@@ -68,10 +68,10 @@ Key configuration sections:
 
 ```bash
 # With default config
-./bin/joblet-persist
+./bin/persist
 
 # With custom config
-./bin/joblet-persist -config /path/to/config.yml
+./bin/persist -config /path/to/config.yml
 ```
 
 ## API
@@ -127,9 +127,9 @@ Key metrics:
 ### Project Structure
 
 ```
-joblet-persist/
+persist/
 ├── cmd/
-│   └── joblet-persist/    # Main entry point
+│   └── persist/           # Main entry point
 ├── internal/
 │   ├── config/            # Configuration
 │   ├── ipc/              # IPC server

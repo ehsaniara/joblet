@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -59,14 +60,68 @@ func ListWorkflows() error {
 	return nil
 }
 
-// GetWorkflowStatus gets the status of a specific workflow
-func GetWorkflowStatus(workflowUUID string, detail bool) error {
-	// Just call the existing getWorkflowStatus function
-	detailFlag = detail
-	return getWorkflowStatus(workflowUUID)
-}
+// Removed duplicate GetWorkflowStatus - now using the exported one from status.go
 
 // DeleteWorkflow deletes a workflow and its jobs
 func DeleteWorkflow(workflowUUID string) error {
 	return fmt.Errorf("workflow delete not yet implemented - please use 'rnx job delete' for individual jobs")
+}
+
+// formatWorkflowList formats and displays workflows in a table
+func formatWorkflowList(workflows []*pb.WorkflowInfo) {
+	fmt.Printf("UUID                                 STATUS      PROGRESS\n")
+	fmt.Printf("------------------------------------ ----------- ---------\n")
+	for _, workflow := range workflows {
+		// Get status color
+		statusColor, resetColor := getStatusColor(workflow.Status)
+
+		fmt.Printf("%-36s %s%-11s%s %d/%d\n",
+			workflow.Uuid,
+			statusColor, workflow.Status, resetColor,
+			workflow.CompletedJobs,
+			workflow.TotalJobs)
+	}
+}
+
+// outputWorkflowsJSON outputs the workflows in JSON format
+func outputWorkflowsJSON(workflows []*pb.WorkflowInfo) error {
+	// Convert protobuf workflows to a simpler structure for JSON output
+	type jsonWorkflow struct {
+		UUID          string `json:"uuid"`
+		Status        string `json:"status"`
+		TotalJobs     int32  `json:"total_jobs"`
+		CompletedJobs int32  `json:"completed_jobs"`
+		FailedJobs    int32  `json:"failed_jobs"`
+		CreatedAt     string `json:"created_at,omitempty"`
+		StartedAt     string `json:"started_at,omitempty"`
+		CompletedAt   string `json:"completed_at,omitempty"`
+	}
+
+	var jsonWorkflows []jsonWorkflow
+	for _, workflow := range workflows {
+		jsonWf := jsonWorkflow{
+			UUID:          workflow.Uuid,
+			Status:        workflow.Status,
+			TotalJobs:     workflow.TotalJobs,
+			CompletedJobs: workflow.CompletedJobs,
+			FailedJobs:    workflow.FailedJobs,
+		}
+
+		// Convert timestamps if present
+		if workflow.CreatedAt != nil {
+			jsonWf.CreatedAt = time.Unix(workflow.CreatedAt.Seconds, int64(workflow.CreatedAt.Nanos)).Format(time.RFC3339)
+		}
+		if workflow.StartedAt != nil {
+			jsonWf.StartedAt = time.Unix(workflow.StartedAt.Seconds, int64(workflow.StartedAt.Nanos)).Format(time.RFC3339)
+		}
+		if workflow.CompletedAt != nil {
+			jsonWf.CompletedAt = time.Unix(workflow.CompletedAt.Seconds, int64(workflow.CompletedAt.Nanos)).Format(time.RFC3339)
+		}
+
+		jsonWorkflows = append(jsonWorkflows, jsonWf)
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(jsonWorkflows)
 }

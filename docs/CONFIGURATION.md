@@ -10,7 +10,9 @@ Comprehensive guide to configuring Joblet server and RNX client.
     - [Network Configuration](#network-configuration)
     - [Volume Configuration](#volume-configuration)
     - [Security Settings](#security-settings)
-    - [Buffer and Log Persistence Configuration](#buffer-and-log-persistence-configuration)
+    - [Buffer Configuration](#buffer-configuration)
+    - [Persistence Configuration](#persistence-configuration)
+    - [State Persistence Configuration](#state-persistence-configuration)
     - [Logging Configuration](#logging-configuration)
 - [Client Configuration](#client-configuration)
     - [Single Node Setup](#single-node-setup)
@@ -279,7 +281,7 @@ buffers:
 **⚠️ IMPORTANT: `ipc.enabled` controls BOTH persistence AND in-memory buffering behavior.**
 
 ```yaml
-# IPC configuration for joblet-persist integration
+# IPC configuration for persist integration
 # This setting controls BOTH persistence AND buffering:
 #   enabled: true  - Logs/metrics buffered in memory + forwarded to persist (gap prevention enabled)
 #   enabled: false - NO buffering (live streaming only, no persistence, no historical data)
@@ -333,6 +335,58 @@ persist:
 - **Persist disabled**: No buffering at all (live streaming only)
 
 See [PERSISTENCE.md](PERSISTENCE.md) for detailed persistence configuration.
+
+### State Persistence Configuration
+
+Job state persistence ensures job metadata survives system restarts. Unlike persist (which stores logs/metrics), the state service stores job status, exit codes, and metadata.
+
+```yaml
+state:
+  backend: "memory"  # Options: "memory", "dynamodb", "redis" (future)
+  socket: "/opt/joblet/run/state-ipc.sock"      # Unix socket for state operations
+  buffer_size: 10000                             # Message buffer size
+  reconnect_delay: "5s"                          # Reconnection retry delay
+
+  storage:
+    # DynamoDB configuration (when backend: "dynamodb")
+    dynamodb:
+      region: ""  # AWS region (empty = auto-detect from EC2 metadata)
+      table_name: "joblet-jobs"
+      ttl_enabled: true
+      ttl_attribute: "expiresAt"
+      ttl_days: 30  # Auto-delete completed jobs after 30 days
+      read_capacity: 5   # 0 for on-demand pricing
+      write_capacity: 5  # 0 for on-demand pricing
+      batch_size: 25
+      batch_interval: "100ms"
+```
+
+**Backend Options:**
+
+- **memory**: Jobs persist in RAM only (default, lost on restart)
+- **dynamodb**: Jobs persist in AWS DynamoDB (production, survives restarts)
+- **redis**: Planned for future releases
+
+**When to use DynamoDB state persistence:**
+
+✅ Production AWS deployments where jobs must survive restarts
+✅ Auto-scaling EC2 fleets where instances may be replaced
+✅ Disaster recovery scenarios requiring durable state
+✅ Multi-node distributed deployments
+
+❌ Development/testing environments
+❌ Single-node setups where restarts are infrequent
+❌ Cost-sensitive deployments with short-lived jobs
+
+**Performance characteristics:**
+
+All state operations use async fire-and-forget pattern:
+- Non-blocking create/update/delete operations
+- 5-second timeout per operation
+- Automatic reconnection if state service restarts
+- High-throughput regardless of job count
+
+See [STATE_PERSISTENCE.md](./STATE_PERSISTENCE.md) for detailed state persistence documentation including DynamoDB setup, monitoring, and troubleshooting.
 
 ### Logging Configuration
 

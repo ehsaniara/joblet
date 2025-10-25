@@ -314,7 +314,7 @@ watch -n 1 rnx job status <job-uuid>
 watch -n 1 rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Workflow status with job names and dependencies
-rnx job status --workflow <workflow-id>
+rnx workflow status <workflow-id>
 
 # Stream logs (use Ctrl+C to stop)
 rnx job log <job-uuid>

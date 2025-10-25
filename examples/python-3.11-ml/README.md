@@ -18,12 +18,12 @@ This example demonstrates **two different runtime approaches** for the same ML c
 
 ```bash
 # Run ML analysis examples using the workflow
-rnx job run --workflow=jobs.yaml:ml-analysis           # Data analysis with pre-installed ML libs
-rnx job run --workflow=jobs.yaml:ml-packaged           # Same analysis with packaged dependencies
-rnx job run --workflow=jobs.yaml:feature-engineering   # Feature engineering pipeline
-rnx job run --workflow=jobs.yaml:model-training        # Model training and evaluation
-rnx job run --workflow=jobs.yaml:visualization         # Data visualization generation
-rnx job run --workflow=jobs.yaml:ml-pipeline           # Complete ML pipeline
+rnx workflow run jobs.yaml           # Data analysis with pre-installed ML libs
+rnx workflow run jobs.yaml           # Same analysis with packaged dependencies
+rnx workflow run jobs.yaml   # Feature engineering pipeline
+rnx workflow run jobs.yaml        # Model training and evaluation
+rnx workflow run jobs.yaml         # Data visualization generation
+rnx workflow run jobs.yaml           # Complete ML pipeline
 ```
 
 ### Option 1: Heavy Runtime (`python-3.11-ml`)

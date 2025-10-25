@@ -64,13 +64,14 @@ func TestNewStatusCmd(t *testing.T) {
 		t.Error("RunE function is nil")
 	}
 
-	// Check for expected flags
-	expectedFlags := []string{"detail", "workflow"}
+	// Check that no workflow-specific flags exist (removed in favor of rnx workflow command)
 	flags := cmd.Flags()
 
-	for _, flagName := range expectedFlags {
-		if flag := flags.Lookup(flagName); flag == nil {
-			t.Errorf("Expected flag '%s' not found", flagName)
+	// These flags should NOT exist anymore
+	unexpectedFlags := []string{"detail", "workflow"}
+	for _, flagName := range unexpectedFlags {
+		if flag := flags.Lookup(flagName); flag != nil {
+			t.Errorf("Unexpected flag '%s' found (should be removed)", flagName)
 		}
 	}
 }
@@ -91,10 +92,10 @@ func TestStatusCommandEnhancedHelp(t *testing.T) {
 		"Environment variables (regular and secret/masked)",
 		"File uploads and working directory",
 		"Workflow information (UUID, dependencies for workflow jobs)",
-		"Job Status Examples:",
-		"Workflow Status Examples:",
+		"Examples:",
 		"Job Status Information Displayed:",
 		"Output Formats:",
+		"For workflow status, use:",
 	}
 
 	for _, section := range expectedSections {
@@ -107,7 +108,7 @@ func TestStatusCommandEnhancedHelp(t *testing.T) {
 func TestStatusCommandShortDescription(t *testing.T) {
 	cmd := NewStatusCmd()
 
-	expectedShort := "Get comprehensive status and details of a job or workflow by UUID"
+	expectedShort := "Get comprehensive status and details of a job by UUID"
 	if cmd.Short != expectedShort {
 		t.Errorf("Expected Short description '%s', got '%s'", expectedShort, cmd.Short)
 	}
@@ -117,15 +118,12 @@ func TestStatusCommandHelpExamples(t *testing.T) {
 	cmd := NewStatusCmd()
 	helpContent := cmd.Long
 
-	// Test that specific examples are included
+	// Test that specific job examples are included (workflow examples removed)
 	expectedExamples := []string{
 		"rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479",
 		"rnx job status f47ac10b",
 		"rnx job status --json f47ac10b",
-		"rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef",
-		"rnx job status --workflow a1b2c3d4",
-		"rnx job status --workflow --detail a1b2c3d4",
-		"rnx job status --workflow --json a1b2c3d4",
+		"rnx workflow status <workflow-uuid>",
 	}
 
 	for _, example := range expectedExamples {
@@ -199,9 +197,9 @@ func TestNewListCmd(t *testing.T) {
 		t.Error("RunE function is nil")
 	}
 
-	// Check for workflow flag
-	if flag := cmd.Flags().Lookup("workflow"); flag == nil {
-		t.Error("Expected 'workflow' flag not found")
+	// Verify workflow flag is removed (now use: rnx workflow list)
+	if flag := cmd.Flags().Lookup("workflow"); flag != nil {
+		t.Error("Unexpected 'workflow' flag found (should be removed)")
 	}
 }
 
@@ -464,12 +462,12 @@ func TestJobCommandFlags(t *testing.T) {
 		{
 			name:          "status command flags",
 			cmdFunc:       NewStatusCmd,
-			expectedFlags: []string{"detail", "workflow"},
+			expectedFlags: []string{}, // Workflow flags removed - use rnx workflow status
 		},
 		{
 			name:          "list command flags",
 			cmdFunc:       NewListCmd,
-			expectedFlags: []string{"workflow"},
+			expectedFlags: []string{}, // Workflow flags removed - use rnx workflow list
 		},
 		{
 			name:          "log command flags",

@@ -40,8 +40,8 @@ sudo apt install -y curl tar make gcc
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
 sudo mv rnx /usr/local/bin/
-sudo mv joblet-persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/joblet-persist
+sudo mv persist /usr/local/bin/
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
 
 # Create directories
 sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
@@ -50,7 +50,7 @@ sudo mkdir -p /var/log/joblet
 # Verify installation
 joblet --version
 rnx --version
-joblet-persist version
+persist version
 ```
 
 ### Red Hat Enterprise Linux/CentOS/Fedora Installation (Version 8 and Later)
@@ -63,8 +63,8 @@ sudo dnf install -y curl tar make gcc
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
 sudo mv rnx /usr/local/bin/
-sudo mv joblet-persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/joblet-persist
+sudo mv persist /usr/local/bin/
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
 
 # Create directories
 sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
@@ -85,8 +85,8 @@ sudo yum install -y curl tar make gcc
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
 sudo mv rnx /usr/local/bin/
-sudo mv joblet-persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/joblet-persist
+sudo mv persist /usr/local/bin/
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
 
 # Create directories
 sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
@@ -113,8 +113,8 @@ sudo mv rnx /usr/local/bin/
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-arm64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
 sudo mv rnx /usr/local/bin/
-sudo mv joblet-persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/joblet-persist
+sudo mv persist /usr/local/bin/
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
 ```
 
 ## AWS EC2 Deployment with Terraform
@@ -746,7 +746,7 @@ make all
 # Or build manually
 go build -o bin/joblet ./cmd/joblet
 go build -o bin/rnx ./cmd/rnx
-cd persist && go build -o ../bin/joblet-persist ./cmd/joblet-persist
+cd persist && go build -o ../bin/persist ./cmd/persist
 
 # Run tests
 make test
@@ -838,11 +838,11 @@ openssl x509 -req -in client.csr -CA ca-cert.pem -CAkey ca-key.pem \
 
 ## 🚀 Systemd Service Setup
 
-Joblet uses a single systemd service. The persistence layer (joblet-persist) runs as an embedded subprocess.
+Joblet uses a single systemd service. The persistence layer (persist) runs as an embedded subprocess.
 
 ### Create Joblet Service File
 
-**Note:** joblet-persist now runs as a subprocess of joblet. Only one service is needed.
+**Note:** persist now runs as a subprocess of joblet. Only one service is needed.
 
 ```bash
 sudo tee /etc/systemd/system/joblet.service > /dev/null <<EOF
@@ -933,7 +933,7 @@ Joblet provides native Linux process isolation with:
 **Joblet Commands:**
 
 - `rnx job run` - Execute isolated processes
-- `rnx job run --workflow=workflow.yaml` - Run complex workflows
+- `rnx workflow run workflow.yaml` - Run complex workflows
 - `rnx runtime install` - Install pre-built runtime environments
 
 ## ✅ Post-Installation Verification
@@ -942,12 +942,12 @@ Joblet provides native Linux process isolation with:
 
 ```bash
 # Check if both services are running
-sudo systemctl is-active joblet-persist
+sudo systemctl is-active persist
 sudo systemctl is-active joblet
 
 # Test binaries locally
 sudo joblet --version
-sudo joblet-persist version
+sudo persist version
 
 # Check listening ports
 sudo ss -tlnp | grep 50051  # Main joblet service

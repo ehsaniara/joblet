@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the complete joblet-persist configuration
+// Config represents the complete persist configuration
 type Config struct {
 	Server  ServerConfig  `yaml:"server"`
 	IPC     IPCConfig     `yaml:"ipc"`

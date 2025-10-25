@@ -70,20 +70,20 @@ jobs:
 
 ```bash
 # Run a working example
-./bin/rnx job run --workflow=examples/workflows/environment-examples/basic-env.yaml
+./bin/rnx workflow run examples/workflows/environment-examples/basic-env.yaml
 
 # Test validation (should fail with conflict error)
-./bin/rnx job run --workflow=examples/workflows/environment-examples/validation-test.yaml
+./bin/rnx workflow run examples/workflows/environment-examples/validation-test.yaml
 
 # Test with valid variables
-./bin/rnx job run --workflow=examples/workflows/environment-examples/valid-validation-test.yaml
+./bin/rnx workflow run examples/workflows/environment-examples/valid-validation-test.yaml
 ```
 
 ### Check Logs to See Environment Variables
 
 ```bash
 # Check workflow status
-./bin/rnx job status 1 --workflow
+./bin/rnx workflow status <workflow-id>
 
 # View job logs to see environment variable output
 ./bin/rnx job log <job-id>

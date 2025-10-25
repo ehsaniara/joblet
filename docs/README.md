@@ -60,9 +60,12 @@ seamless integration with existing infrastructure through a unified gRPC API and
   tracking
 - **Observability**: Real-time metrics collection, structured logging, and comprehensive audit trails for compliance
   requirements
-- **Data Persistence**: Dedicated persistence service (`joblet-persist`) with multiple storage backends including local
+- **Log/Metric Persistence**: Dedicated persistence service (`persist`) with multiple storage backends including local
   filesystem and AWS CloudWatch Logs for cloud-native deployments, featuring multi-node support, high-performance log
   and metric storage with gzip compression, Unix socket IPC, and historical query capabilities
+- **Job State Persistence**: Separate state service with pluggable backends (Memory, DynamoDB, Redis) ensuring job
+  metadata survives restarts, supporting auto-scaling deployments with async fire-and-forget operations for maximum
+  performance
 
 ### Security Architecture
 
@@ -147,11 +150,11 @@ jobs:
 
 ```bash
 # Execute and monitor workflow with job names
-rnx job run --workflow=ml-pipeline.yaml
-rnx job status --workflow a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx workflow run ml-pipeline.yaml
+rnx workflow status a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # View workflow status with original YAML content (available from any workstation)
-rnx job status --workflow --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
+rnx workflow status --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
 
 # Output shows job names, node identification, and dependencies:
 # JOB UUID        JOB NAME             NODE ID         STATUS       EXIT CODE  DEPENDENCIES
@@ -274,7 +277,7 @@ jobs:
 EOF
 
 # Execute the workflow
-rnx job run --workflow=ml-pipeline.yaml
+rnx workflow run ml-pipeline.yaml
 ```
 
 ## Command Reference

@@ -44,8 +44,8 @@ Key Features:
 
 Quick Examples:
   rnx job run python script.py                    # Run a simple job
-  rnx job run --workflow=pipeline.yaml            # Execute a workflow
-  rnx job list --workflow                         # List all workflows
+  rnx workflow run pipeline.yaml                  # Execute a workflow
+  rnx workflow list                               # List all workflows
   rnx job status <job-uuid>                       # Check job status (supports short UUIDs)
   rnx job log <job-uuid>                          # Stream job logs (supports short UUIDs)
   rnx monitor status                          # View remote server metrics and volumes
@@ -256,12 +256,12 @@ func TestSubcommandFlags(t *testing.T) {
 	}{
 		{
 			command:     "status",
-			validFlags:  []string{"--detail", "-d", "--workflow", "-w"},
+			validFlags:  []string{}, // No job-specific flags (workflow flags removed)
 			description: "Status command flags",
 		},
 		{
 			command:     "list",
-			validFlags:  []string{"--workflow", "-w"},
+			validFlags:  []string{}, // No job-specific flags (workflow flags removed)
 			description: "List command flags",
 		},
 		{
@@ -300,10 +300,8 @@ func TestSubcommandFlags(t *testing.T) {
 				}
 			}
 
-			// Basic validation that we have expected flags
-			if len(tc.validFlags) == 0 {
-				t.Errorf("No flags/subcommands defined for %s", tc.command)
-			}
+			// Note: Some commands may have no command-specific flags (only global flags)
+			// This is valid, so we don't fail on empty validFlags
 		})
 	}
 }
@@ -415,11 +413,7 @@ func TestRunCommandResourceFlags(t *testing.T) {
 			description: "Schedule specification",
 			validValues: []string{"1hour", "30min", "2025-12-31T23:59:59Z"},
 		},
-		{
-			flag:        "--workflow",
-			description: "Workflow file specification",
-			validValues: []string{"pipeline.yaml", "deploy.yaml:production"},
-		},
+		// --workflow flag removed (now use: rnx workflow run <file>)
 	}
 
 	for _, rf := range resourceFlags {

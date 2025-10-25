@@ -28,6 +28,7 @@ type Config struct {
 	Runtime    RuntimeConfig    `yaml:"runtime" json:"runtime"`
 	GPU        GPUConfig        `yaml:"gpu" json:"gpu"`
 	IPC        IPCConfig        `yaml:"ipc" json:"ipc"`
+	State      StateConfig      `yaml:"state" json:"state"`
 }
 
 type NetworkConfig struct {
@@ -165,13 +166,51 @@ type GPUConfig struct {
 	AllocationStrategy string   `yaml:"allocation_strategy" json:"allocation_strategy"` // GPU allocation strategy (first-fit, pack, spread, best-fit)
 }
 
-// IPCConfig holds IPC configuration for joblet-persist integration
+// IPCConfig holds IPC configuration for persist integration
 type IPCConfig struct {
-	Enabled        bool          `yaml:"enabled" json:"enabled"`                 // Enable IPC to joblet-persist
+	Enabled        bool          `yaml:"enabled" json:"enabled"`                 // Enable IPC to persist
 	Socket         string        `yaml:"socket" json:"socket"`                   // Unix socket path
 	BufferSize     int           `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
 	ReconnectDelay time.Duration `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
 	MaxReconnects  int           `yaml:"max_reconnects" json:"max_reconnects"`   // Max reconnection attempts (0 = infinite)
+}
+
+// StateConfig holds job state persistence configuration
+// State is mandatory - it's the backbone of joblet that ensures jobs survive restarts
+// All state operations are async fire-and-forget for maximum performance
+type StateConfig struct {
+	Backend        string             `yaml:"backend" json:"backend"`                 // "memory", "dynamodb", "redis"
+	Socket         string             `yaml:"socket" json:"socket"`                   // Unix socket path
+	BufferSize     int                `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
+	ReconnectDelay time.Duration      `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
+	Storage        StateStorageConfig `yaml:"storage" json:"storage"`                 // Backend-specific configuration
+}
+
+// StateStorageConfig holds backend-specific storage configuration
+type StateStorageConfig struct {
+	DynamoDB *DynamoDBStateConfig `yaml:"dynamodb" json:"dynamodb"` // DynamoDB configuration
+	Redis    *RedisStateConfig    `yaml:"redis" json:"redis"`       // Redis configuration
+}
+
+// DynamoDBStateConfig holds DynamoDB-specific state configuration
+type DynamoDBStateConfig struct {
+	Region        string `yaml:"region" json:"region"`
+	TableName     string `yaml:"table_name" json:"table_name"`
+	TTLEnabled    bool   `yaml:"ttl_enabled" json:"ttl_enabled"`
+	TTLAttribute  string `yaml:"ttl_attribute" json:"ttl_attribute"`
+	TTLDays       int    `yaml:"ttl_days" json:"ttl_days"`
+	ReadCapacity  int64  `yaml:"read_capacity" json:"read_capacity"`
+	WriteCapacity int64  `yaml:"write_capacity" json:"write_capacity"`
+	BatchSize     int    `yaml:"batch_size" json:"batch_size"`
+	BatchInterval string `yaml:"batch_interval" json:"batch_interval"`
+}
+
+// RedisStateConfig holds Redis-specific state configuration
+type RedisStateConfig struct {
+	Endpoint string `yaml:"endpoint" json:"endpoint"`
+	Password string `yaml:"password" json:"password"`
+	DB       int    `yaml:"db" json:"db"`
+	TTLDays  int    `yaml:"ttl_days" json:"ttl_days"`
 }
 
 // DefaultConfig provides default configuration values
@@ -275,7 +314,7 @@ var DefaultConfig = Config{
 		},
 	},
 	IPC: IPCConfig{
-		Enabled:        false, // Disabled by default - opt-in for joblet-persist integration
+		Enabled:        false, // Disabled by default - opt-in for persist integration
 		Socket:         "/opt/joblet/run/persist-ipc.sock",
 		BufferSize:     10000,           // 10k message buffer
 		ReconnectDelay: 5 * time.Second, // Retry every 5 seconds

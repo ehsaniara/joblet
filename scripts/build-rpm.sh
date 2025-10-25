@@ -38,14 +38,14 @@ fi
 echo "🔨 Building RPM package for $PACKAGE_NAME v$CLEAN_VERSION ($RPM_ARCH)..."
 
 # Check if binaries already exist (CI mode)
-if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./joblet-persist" ]; then
+if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ]; then
     echo "📦 Using pre-built binaries from root directory (CI mode)..."
     mkdir -p ./bin
     cp ./joblet ./bin/joblet
     cp ./rnx ./bin/rnx
-    cp ./joblet-persist ./bin/joblet-persist
-    chmod +x ./bin/joblet ./bin/rnx ./bin/joblet-persist
-elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/joblet-persist" ]; then
+    cp ./persist ./bin/persist
+    chmod +x ./bin/joblet ./bin/rnx ./bin/persist
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ]; then
     # Build all binaries if they don't exist
     echo "📦 Building all binaries..."
     make all || {
@@ -79,11 +79,11 @@ if [ ! -f "./bin/rnx" ]; then
 fi
 cp ./bin/rnx "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
 
-if [ ! -f "./bin/joblet-persist" ]; then
-    echo "❌ joblet-persist binary not found!"
+if [ ! -f "./bin/persist" ]; then
+    echo "❌ persist binary not found!"
     exit 1
 fi
-cp ./bin/joblet-persist "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
+cp ./bin/persist "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
 
 # Copy scripts and configs
 cp -r ./scripts "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/" || {
@@ -105,7 +105,7 @@ for file in joblet-config-template.yml rnx-config-template.yml joblet.service ce
     fi
 done
 
-# Note: joblet-persist now runs as a subprocess of joblet, no separate service needed
+# Note: persist now runs as a subprocess of joblet, no separate service needed
 
 # Create the spec file with network support
 cat > "$BUILD_DIR/SPECS/${PACKAGE_NAME}.spec" << EOF
@@ -170,14 +170,14 @@ mkdir -p \$RPM_BUILD_ROOT/etc/modules-load.d
 # Install binaries to /opt/joblet/bin
 cp joblet \$RPM_BUILD_ROOT/opt/joblet/bin/
 cp rnx \$RPM_BUILD_ROOT/opt/joblet/bin/
-cp joblet-persist \$RPM_BUILD_ROOT/opt/joblet/bin/
+cp persist \$RPM_BUILD_ROOT/opt/joblet/bin/
 
 # Install config templates and scripts
 cp scripts/joblet-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/rnx-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/common-install-functions.sh \$RPM_BUILD_ROOT/opt/joblet/scripts/
 
-# joblet-persist runs as subprocess, no separate service needed
+# persist runs as subprocess, no separate service needed
 
 # Install systemd service
 cp scripts/joblet.service \$RPM_BUILD_ROOT/etc/systemd/system/
@@ -375,7 +375,7 @@ fi
 %defattr(-,root,root,-)
 /opt/joblet/bin/joblet
 /opt/joblet/bin/rnx
-/opt/joblet/bin/joblet-persist
+/opt/joblet/bin/persist
 /opt/joblet/scripts/joblet-config-template.yml
 /opt/joblet/scripts/rnx-config-template.yml
 /opt/joblet/scripts/common-install-functions.sh

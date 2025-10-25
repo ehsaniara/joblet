@@ -12,7 +12,7 @@ const (
 	ErrUnavailable ErrorType = "UNAVAILABLE"
 )
 
-// PersistError represents a joblet-persist error
+// PersistError represents a persist error
 type PersistError struct {
 	Type    ErrorType
 	Message string

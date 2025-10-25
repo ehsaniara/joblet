@@ -25,6 +25,48 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+# Detect if running on AWS EC2 by querying metadata service
+detect_ec2() {
+    # Try to get EC2 instance ID with short timeout
+    # Use IMDSv2 (more secure) with fallback to IMDSv1
+    local token
+    token=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
+
+    local instance_id
+    if [ -n "$token" ]; then
+        # IMDSv2
+        instance_id=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+            "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || echo "")
+    else
+        # Fallback to IMDSv1
+        instance_id=$(curl -s -m 2 "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || echo "")
+    fi
+
+    if [ -n "$instance_id" ] && [ "$instance_id" != "" ]; then
+        return 0  # Is EC2
+    else
+        return 1  # Not EC2
+    fi
+}
+
+# Get EC2 metadata value
+get_ec2_metadata() {
+    local path="$1"
+    local token
+    token=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
+
+    if [ -n "$token" ]; then
+        # IMDSv2
+        curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+            "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo ""
+    else
+        # Fallback to IMDSv1
+        curl -s -m 2 "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo ""
+    fi
+}
+
 echo "🔐 Generating certificates and embedding them in config files..."
 
 # Determine working directory
@@ -178,33 +220,83 @@ if [ -f "$SERVER_TEMPLATE" ]; then
     sed -i "s/nodeId: \"\"/nodeId: \"$NODE_ID\"/" "$SERVER_CONFIG"
 
     # Check if running on AWS EC2 and configure CloudWatch backend automatically
+    IS_EC2="false"
+    EC2_REGION=""
+    EC2_INSTANCE_ID=""
+
+    # Method 1: Check for pre-created EC2 info file (from ec2-user-data.sh)
     if [ -f /tmp/joblet-ec2-info ]; then
         source /tmp/joblet-ec2-info
-        if [ "$IS_EC2" = "true" ]; then
-            print_info "🌩️  AWS EC2 detected - configuring CloudWatch backend"
+        print_info "Using EC2 metadata from /tmp/joblet-ec2-info"
+    # Method 2: Direct EC2 detection (for manual package installations on EC2)
+    elif detect_ec2; then
+        IS_EC2="true"
+        EC2_REGION=$(get_ec2_metadata "placement/region")
+        EC2_INSTANCE_ID=$(get_ec2_metadata "instance-id")
+        print_info "EC2 auto-detected via metadata service"
+    fi
 
-            # Update persist storage type to cloudwatch
-            sed -i '/persist:/,/^  storage:/ {
-                /type: "local"/ s/type: "local"/type: "cloudwatch"/
-            }' "$SERVER_CONFIG"
-
-            # Comment out local storage configuration (lines between "local:" and next top-level key)
-            awk '
-            /^    local:/ { in_local=1; print "    # local:"; next }
-            in_local && /^    [a-z]/ && !/^      / { in_local=0 }
-            in_local { print "    #" $0; next }
-            { print }
-            ' "$SERVER_CONFIG" > "${SERVER_CONFIG}.tmp" && mv "${SERVER_CONFIG}.tmp" "$SERVER_CONFIG"
-
-            # Set region if detected
-            if [ -n "$EC2_REGION" ]; then
-                sed -i "/region: \"\"/s/region: \"\"/region: \"$EC2_REGION\"/" "$SERVER_CONFIG"
-            fi
-
-            print_success "CloudWatch backend configured (region: ${EC2_REGION:-auto-detect})"
-            print_info "Logs will be stored in CloudWatch Logs under /joblet/$NODE_ID/jobs/"
-            print_warning "Ensure IAM role with CloudWatch Logs permissions is attached to this EC2 instance"
+    # Configure CloudWatch if running on EC2
+    if [ "$IS_EC2" = "true" ]; then
+        print_info "🌩️  AWS EC2 detected - configuring CloudWatch backend"
+        if [ -n "$EC2_INSTANCE_ID" ]; then
+            echo "  Instance ID: $EC2_INSTANCE_ID"
         fi
+        if [ -n "$EC2_REGION" ]; then
+            echo "  Region: $EC2_REGION"
+        fi
+
+        # Update persist storage type to cloudwatch
+        sed -i '/persist:/,/^  storage:/ {
+            /type: "local"/ s/type: "local"/type: "cloudwatch"/
+        }' "$SERVER_CONFIG"
+
+        # Comment out local storage configuration (lines between "local:" and next top-level key)
+        awk '
+        /^    local:/ { in_local=1; print "    # local:"; next }
+        in_local && /^    [a-z]/ && !/^      / { in_local=0 }
+        in_local { print "    #" $0; next }
+        { print }
+        ' "$SERVER_CONFIG" > "${SERVER_CONFIG}.tmp" && mv "${SERVER_CONFIG}.tmp" "$SERVER_CONFIG"
+
+        # Set region if detected
+        if [ -n "$EC2_REGION" ]; then
+            sed -i "/region: \"\"/s/region: \"\"/region: \"$EC2_REGION\"/" "$SERVER_CONFIG"
+        fi
+
+        print_success "CloudWatch backend configured (region: ${EC2_REGION:-auto-detect})"
+        print_info "Logs will be stored in CloudWatch Logs under /joblet/$NODE_ID/jobs/"
+
+        # Update state backend to DynamoDB
+        print_info "💾  Configuring DynamoDB backend for state persistence"
+        sed -i '/^state:/,/^[^ ]/ {
+            /backend: "memory"/ s/backend: "memory"/backend: "dynamodb"/
+        }' "$SERVER_CONFIG"
+
+        # Add DynamoDB storage configuration if not present
+        if ! grep -q "storage:" "$SERVER_CONFIG" | grep -A 20 "^state:" | grep -q "dynamodb:"; then
+            # Add storage section under state
+            sed -i '/^state:/a\
+  storage:\
+    dynamodb:\
+      region: ""  # Auto-detect from EC2 metadata\
+      table_name: "joblet-jobs"\
+      ttl_enabled: true\
+      ttl_days: 30' "$SERVER_CONFIG"
+        fi
+
+        # Set region in DynamoDB config if detected
+        if [ -n "$EC2_REGION" ]; then
+            sed -i "/^state:/,/^[^ ]/ {
+                /region: \"\"/ s/region: \"\"/region: \"$EC2_REGION\"/
+            }" "$SERVER_CONFIG"
+        fi
+
+        print_success "DynamoDB backend configured (region: ${EC2_REGION:-auto-detect}, table: joblet-jobs)"
+        print_info "Job state will persist in DynamoDB and survive restarts"
+        print_warning "Ensure IAM role with CloudWatch Logs + DynamoDB permissions is attached to this EC2 instance"
+    else
+        print_info "Not running on AWS EC2 - using local filesystem storage"
     fi
 
     # Append security section with embedded certificates

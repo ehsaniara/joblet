@@ -4,14 +4,14 @@ option go_package = "github.com/ehsaniara/joblet/internal/proto/gen/persist";
 
 package joblet.persist;
 
-// PersistService is an INTERNAL service for joblet-core ←→ joblet-persist IPC communication.
+// PersistService is an INTERNAL service for joblet-core ←→ persist IPC communication.
 //
 // ⚠️  DO NOT USE DIRECTLY - This service is for internal communication only via Unix socket.
 //
 // Public API: Use JobService.QueryLogs() and JobService.QueryMetrics()
 //             These methods proxy to this internal service automatically.
 //
-// This service is provided by joblet-persist subprocess and communicates via Unix socket IPC.
+// This service is provided by persist subprocess and communicates via Unix socket IPC.
 service PersistService {
   // Health check - verify persist is running and responsive
   rpc Ping(PingRequest) returns (PingResponse);

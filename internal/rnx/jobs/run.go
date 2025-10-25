@@ -48,14 +48,6 @@ Examples:
   # With other flags
   rnx job run --network=frontend --max-cpu=50 --max-memory=512 node app.js
 
-  # Using YAML workflow for single job
-  rnx job run --workflow=jobs.yaml:analytics
-  rnx job run --workflow=deploy.yaml:production --args="v1.2.3"
-  
-  # Using YAML workflow for multi-job workflow (runs all jobs with dependencies)
-  rnx job run --workflow=ml-pipeline.yaml
-  rnx job run --workflow=workflow.yaml
-
   # Scheduled execution
   rnx job run --schedule="1hour" python3 script.py
   rnx job run --schedule="30min" echo "Hello World"
@@ -118,7 +110,6 @@ Scheduling Formats:
   --schedule="2025-07-18T20:02:48-07:00"     # With timezone
 
 Flags:
-  --workflow=FILE[:JOB] Load job or workflow configuration from YAML file
   --schedule=SPEC     Schedule job for future execution
   --max-cpu=N         Max CPU percentage
   --max-memory=N      Max Memory in MB  
@@ -161,7 +152,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		network       string
 		volumes       []string
 		runtime       string
-		workflow      string
 		envVars       []string
 		secretEnvVars []string
 		gpuCount      int32
@@ -174,12 +164,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		if strings.HasPrefix(arg, "--workflow=") {
-			workflow = strings.TrimPrefix(arg, "--workflow=")
-		} else if arg == "--workflow" && i+1 < len(args) {
-			workflow = args[i+1]
-			i++ // Skip the next argument since we consumed it
-		} else if strings.HasPrefix(arg, "--config=") {
+		if strings.HasPrefix(arg, "--config=") {
 			common.ConfigPath = strings.TrimPrefix(arg, "--config=")
 		} else if arg == "--config" && i+1 < len(args) {
 			common.ConfigPath = args[i+1]
@@ -266,90 +251,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Handle workflow loading if provided
-	if workflow != "" {
-		// Parse workflow spec to separate file and selector
-		workflowParts := strings.SplitN(workflow, ":", 2)
-		workflowFile := workflowParts[0]
-		var workflowSelector string
-		if len(workflowParts) > 1 {
-			workflowSelector = workflowParts[1]
-		}
-
-		// First check if this is a workflow file and no job selector is provided
-		if workflowSelector == "" {
-			mode, _, err := tryWorkflowDetection(workflowFile)
-			if err == nil && mode != workflows.ModeSingleJob {
-				// This is a workflow - handle it differently
-				var cmdArgs []string
-				if commandStartIndex >= 0 && commandStartIndex < len(args) {
-					cmdArgs = args[commandStartIndex:]
-				}
-				return handleWorkflowExecution(workflowFile, mode, "", cmdArgs)
-			}
-		} else {
-			// If selector provided, check if it's a workflow selector in a multi-workflow file
-			config, err := workflows.LoadWorkflowConfig(workflowFile)
-			if err == nil && config.Workflows != nil && len(config.Workflows) > 0 {
-				// Check if selector refers to a workflow name
-				if _, exists := config.Workflows[workflowSelector]; exists {
-					var cmdArgs []string
-					if commandStartIndex >= 0 && commandStartIndex < len(args) {
-						cmdArgs = args[commandStartIndex:]
-					}
-					return handleWorkflowExecution(workflowFile, workflows.ModeNamedWorkflow, workflowSelector, cmdArgs)
-				}
-				// If not a workflow name, let it fall through to regular job execution
-			}
-		}
-
-		// Continue with regular single job workflow handling
-		jobConfig, err := loadWorkflowConfig(workflow)
-		if err != nil {
-			return fmt.Errorf("failed to load workflow: %w", err)
-		}
-
-		// Apply workflow configuration
-		if jobConfig.Resources.MaxCPU > 0 && maxCPU == 0 {
-			maxCPU = int32(jobConfig.Resources.MaxCPU)
-		}
-		if jobConfig.Resources.MaxMemory > 0 && maxMemory == 0 {
-			maxMemory = int32(jobConfig.Resources.MaxMemory)
-		}
-		if jobConfig.Resources.MaxIOBPS > 0 && maxIOBPS == 0 {
-			maxIOBPS = int32(jobConfig.Resources.MaxIOBPS)
-		}
-		if jobConfig.Resources.CPUCores != "" && cpuCores == "" {
-			cpuCores = jobConfig.Resources.CPUCores
-		}
-		if jobConfig.Network != "" && network == "" {
-			network = jobConfig.Network
-		}
-		if jobConfig.Runtime != "" && runtime == "" {
-			runtime = jobConfig.Runtime
-		}
-		if jobConfig.Schedule != "" && schedule == "" {
-			schedule = jobConfig.Schedule
-		}
-
-		// Append volumes from workflow
-		volumes = append(volumes, jobConfig.Volumes...)
-
-		// Append uploads from workflow
-		uploads = append(uploads, jobConfig.Uploads.Files...)
-		uploadDirs = append(uploadDirs, jobConfig.Uploads.Directories...)
-
-		// If no command provided in args, use workflow command
-		if commandStartIndex < 0 && jobConfig.Command != "" {
-			commandArgs := []string{jobConfig.Command}
-			commandArgs = append(commandArgs, jobConfig.Args...)
-			args = append(args, commandArgs...)
-			commandStartIndex = len(args) - len(commandArgs)
-		}
-	}
-
 	if commandStartIndex < 0 || commandStartIndex >= len(args) {
-		return fmt.Errorf("must specify a command or use --workflow with a job definition")
+		return fmt.Errorf("must specify a command to run")
 	}
 
 	commandArgs := args[commandStartIndex:]
@@ -683,81 +586,6 @@ func parseRelativeTime(spec string) (time.Time, error) {
 	return time.Now().Add(totalDuration), nil
 }
 
-// loadWorkflowConfig loads a job configuration from a YAML workflow file
-func loadWorkflowConfig(workflowSpec string) (*workflows.JobConfig, error) {
-	// Parse workflow spec (format: file.yaml or file.yaml:jobname)
-	parts := strings.SplitN(workflowSpec, ":", 2)
-	workflowFile := parts[0]
-	jobName := ""
-	if len(parts) > 1 {
-		jobName = parts[1]
-	}
-
-	// Load the YAML configuration
-	jobSet, err := workflows.LoadConfig(workflowFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load workflow file %s: %w", workflowFile, err)
-	}
-
-	// If no job name specified and there's only one job, use it
-	if jobName == "" {
-		if len(jobSet.Jobs) == 1 {
-			for _, job := range jobSet.Jobs {
-				return &job, nil
-			}
-		} else if len(jobSet.Jobs) > 1 {
-			var jobNames []string
-			for name := range jobSet.Jobs {
-				jobNames = append(jobNames, name)
-			}
-			return nil, fmt.Errorf("multiple jobs found in workflow, please specify one: %s", strings.Join(jobNames, ", "))
-		} else {
-			// Return empty config with defaults applied
-			return &jobSet.Defaults, nil
-		}
-	}
-
-	// Look for the specified job
-	if job, exists := jobSet.Jobs[jobName]; exists {
-		return &job, nil
-	}
-
-	return nil, fmt.Errorf("job '%s' not found in workflow %s", jobName, workflowFile)
-}
-
-// tryWorkflowDetection attempts to detect if a workflow file contains workflows
-func tryWorkflowDetection(workflowFile string) (workflows.WorkflowExecutionMode, string, error) {
-
-	// Try to load as workflow file
-	config, err := workflows.LoadWorkflowConfig(workflowFile)
-	if err != nil {
-		// If it fails to load as workflow, might be regular workflow
-		return workflows.ModeSingleJob, "", err
-	}
-
-	// If we have multiple workflows, return appropriate mode
-	if len(config.Workflows) > 0 {
-		return workflows.ModeNamedWorkflow, "", nil
-	}
-
-	// Check for dependencies in jobs
-	hasDependencies := false
-	for _, job := range config.Jobs {
-		if len(job.Requires) > 0 {
-			hasDependencies = true
-			break
-		}
-	}
-
-	// If dependencies exist, it's a workflow
-	if hasDependencies {
-		return workflows.ModeWorkflow, "", nil
-	}
-
-	// Otherwise, parallel execution
-	return workflows.ModeParallelJobs, "", nil
-}
-
 // handleWorkflowExecution handles workflow-based execution
 func handleWorkflowExecution(workflowFile string, mode workflows.WorkflowExecutionMode, selector string, commandArgs []string) error {
 	// Load client configuration for workflow execution
@@ -909,7 +737,7 @@ func executeWorkflowViaService(workflowPath string, workflowName string) error {
 	}
 
 	fmt.Printf("Workflow created with UUID: %s\n", createRes.WorkflowUuid)
-	fmt.Printf("Use 'rnx job status --workflow %s' to monitor progress\n", createRes.WorkflowUuid)
+	fmt.Printf("Use 'rnx workflow status %s' to monitor progress\n", createRes.WorkflowUuid)
 
 	return nil
 }

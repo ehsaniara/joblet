@@ -29,7 +29,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// PersistService is an INTERNAL service for joblet-core ←→ joblet-persist IPC communication.
+// PersistService is an INTERNAL service for joblet-core ←→ persist IPC communication.
 //
 // ⚠️  DO NOT USE DIRECTLY - This service is for internal communication only via Unix socket.
 //
@@ -37,7 +37,7 @@ const (
 //
 //	These methods proxy to this internal service automatically.
 //
-// This service is provided by joblet-persist subprocess and communicates via Unix socket IPC.
+// This service is provided by persist subprocess and communicates via Unix socket IPC.
 type PersistServiceClient interface {
 	// Health check - verify persist is running and responsive
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
@@ -119,7 +119,7 @@ func (c *persistServiceClient) DeleteJob(ctx context.Context, in *DeleteJobReque
 // All implementations must embed UnimplementedPersistServiceServer
 // for forward compatibility.
 //
-// PersistService is an INTERNAL service for joblet-core ←→ joblet-persist IPC communication.
+// PersistService is an INTERNAL service for joblet-core ←→ persist IPC communication.
 //
 // ⚠️  DO NOT USE DIRECTLY - This service is for internal communication only via Unix socket.
 //
@@ -127,7 +127,7 @@ func (c *persistServiceClient) DeleteJob(ctx context.Context, in *DeleteJobReque
 //
 //	These methods proxy to this internal service automatically.
 //
-// This service is provided by joblet-persist subprocess and communicates via Unix socket IPC.
+// This service is provided by persist subprocess and communicates via Unix socket IPC.
 type PersistServiceServer interface {
 	// Health check - verify persist is running and responsive
 	Ping(context.Context, *PingRequest) (*PingResponse, error)

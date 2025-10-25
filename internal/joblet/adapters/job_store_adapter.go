@@ -10,6 +10,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/internal/joblet/state"
 	pb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
@@ -45,6 +46,9 @@ type jobStoreAdapter struct {
 
 	// Persist client for deleting historical logs and metrics
 	persistClient pb.PersistServiceClient
+
+	// State client for persistent job state across restarts
+	stateClient *state.Client
 
 	// Task management (maintains compatibility with current Task-based approach)
 	tasks      map[string]*taskWrapper
@@ -95,6 +99,7 @@ func NewJobStorer(
 	logMgr *SimpleLogManager,
 	pubsub pubsub.PubSub[JobEvent],
 	persistClient pb.PersistServiceClient,
+	stateClient *state.Client,
 	persistEnabled bool,
 	logger *logger.Logger,
 ) JobStorer {
@@ -107,6 +112,7 @@ func NewJobStorer(
 		logMgr:         logMgr,
 		pubsub:         pubsub,
 		persistClient:  persistClient,
+		stateClient:    stateClient,
 		persistEnabled: persistEnabled,
 		tasks:          make(map[string]*taskWrapper),
 		logger:         logger,
@@ -163,6 +169,21 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 		a.logger.Warn("failed to publish job creation event", "jobId", job.Uuid, "error", err)
 	}
 
+	// Persist to state backend (async fire-and-forget)
+	if a.stateClient != nil {
+		// Create a copy to avoid data races if caller modifies the job
+		jobCopy := *job
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := a.stateClient.Create(ctx, &jobCopy); err != nil {
+				a.logger.Error("failed to persist job state", "jobId", jobCopy.Uuid, "error", err)
+			} else {
+				a.logger.Debug("job state persisted successfully", "jobId", jobCopy.Uuid)
+			}
+		}()
+	}
+
 	a.logger.Debug("job created successfully", "jobId", job.Uuid, "status", string(job.Status))
 }
 
@@ -209,6 +230,21 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
 		a.logger.Warn("failed to publish job update event", "jobId", job.Uuid, "error", err)
+	}
+
+	// Persist state update (async fire-and-forget)
+	if a.stateClient != nil {
+		// Create a copy to avoid data races if caller modifies the job
+		jobCopy := *job
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := a.stateClient.Update(ctx, &jobCopy); err != nil {
+				a.logger.Error("failed to update job state", "jobId", jobCopy.Uuid, "error", err)
+			} else {
+				a.logger.Debug("job state updated successfully", "jobId", jobCopy.Uuid)
+			}
+		}()
 	}
 
 	// Don't cleanup subscribers immediately - let them drain final log chunks
@@ -490,6 +526,66 @@ func (a *jobStoreAdapter) PubSub() pubsub.PubSub[JobEvent] {
 	return a.pubsub
 }
 
+// SyncFromPersistentState loads jobs from persistent state storage into memory.
+// Called during server startup to restore jobs across restarts.
+// This is the backbone of joblet's reliability - jobs survive restarts.
+func (a *jobStoreAdapter) SyncFromPersistentState(ctx context.Context) error {
+	if a.stateClient == nil {
+		a.logger.Warn("state client not available, cannot sync jobs from persistent storage")
+		return fmt.Errorf("state client not available")
+	}
+
+	a.logger.Info("syncing jobs from persistent state storage")
+
+	// List all jobs from persistent storage
+	jobs, err := a.stateClient.List(ctx, nil)
+	if err != nil {
+		a.logger.Error("failed to list jobs from persistent state", "error", err)
+		return fmt.Errorf("failed to sync from persistent state: %w", err)
+	}
+
+	if len(jobs) == 0 {
+		a.logger.Info("no jobs found in persistent state storage")
+		return nil
+	}
+
+	a.logger.Info("loading jobs from persistent state", "count", len(jobs))
+
+	// Load each job into memory
+	successCount := 0
+	for _, job := range jobs {
+		// Store in in-memory job store
+		if err := a.jobStore.Create(ctx, job.Uuid, job); err != nil {
+			a.logger.Warn("failed to restore job from persistent state", "jobId", job.Uuid, "error", err)
+			continue
+		}
+
+		// Create task wrapper for job management
+		logBuffer := a.logMgr.GetBuffer(job.Uuid)
+		task := &taskWrapper{
+			job:         job.DeepCopy(),
+			logBuffer:   logBuffer,
+			subscribers: make(map[string]*subscriptionContext),
+			logger:      a.logger.WithField("jobId", job.Uuid),
+			pubsub:      a.pubsub,
+		}
+
+		a.tasksMutex.Lock()
+		a.tasks[job.Uuid] = task
+		a.tasksMutex.Unlock()
+
+		successCount++
+		a.logger.Debug("restored job from persistent state", "jobId", job.Uuid, "status", string(job.Status))
+	}
+
+	a.logger.Info("successfully synced jobs from persistent state",
+		"total", len(jobs),
+		"success", successCount,
+		"failed", len(jobs)-successCount)
+
+	return nil
+}
+
 // Close gracefully shuts down the adapter and releases resources.
 // Stops cleanup routines, closes all subscriptions, and closes all backend
 // resources (buffer manager, pubsub, job store).
@@ -707,6 +803,19 @@ func (a *jobStoreAdapter) DeleteJob(jobID string) error {
 		return fmt.Errorf("failed to delete job from store: %w", err)
 	}
 
+	// Delete from state backend (async fire-and-forget)
+	if a.stateClient != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := a.stateClient.Delete(ctx, resolvedUuid); err != nil {
+				a.logger.Error("failed to delete job state", "jobId", resolvedUuid, "error", err)
+			} else {
+				a.logger.Debug("job state deleted successfully", "jobId", resolvedUuid)
+			}
+		}()
+	}
+
 	// Publish event
 	_ = a.publishJobEvent("DELETED", resolvedUuid, map[string]string{"reason": "user_requested"})
 
@@ -918,4 +1027,39 @@ func (t *taskWrapper) cleanupSubscribers() {
 	// The buffer should remain readable to allow viewing historical logs
 	// after job completion. The buffer will be closed when the entire
 	// adapter is shut down.
+}
+
+// HealthCheckServices verifies that state and persist services are healthy using Ping
+// This should be called after subprocesses have started
+func (a *jobStoreAdapter) HealthCheckServices(ctx context.Context) error {
+	// Check state service (mandatory)
+	if a.stateClient == nil {
+		return fmt.Errorf("state client is nil")
+	}
+
+	if err := a.stateClient.Ping(ctx); err != nil {
+		return fmt.Errorf("state service health check failed: %w", err)
+	}
+
+	a.logger.Info("state service health check passed (Ping)")
+
+	// Check persist service (if enabled)
+	if a.persistEnabled {
+		// If client is nil, connect to it now (deferred from initialization)
+		if a.persistClient == nil {
+			persistClient, err := WaitForPersistService("/opt/joblet/run/persist-grpc.sock", a.logger)
+			if err != nil {
+				return fmt.Errorf("persist service connection failed: %w", err)
+			}
+			a.persistClient = persistClient
+		}
+
+		// Now do the Ping health check
+		if _, err := a.persistClient.Ping(ctx, &pb.PingRequest{}); err != nil {
+			return fmt.Errorf("persist service health check failed: %w", err)
+		}
+		a.logger.Info("persist service health check passed (Ping)")
+	}
+
+	return nil
 }

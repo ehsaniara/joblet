@@ -15,7 +15,7 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-// Writer sends messages to joblet-persist via IPC
+// Writer sends messages to persist via IPC
 type Writer struct {
 	socket    string
 	conn      net.Conn
@@ -266,7 +266,7 @@ func (w *Writer) connect() error {
 	w.conn = conn
 	w.connected.Store(true)
 
-	w.logger.Info("Connected to joblet-persist", "socket", w.socket)
+	w.logger.Info("Connected to persist", "socket", w.socket)
 
 	return nil
 }

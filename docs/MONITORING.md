@@ -593,10 +593,10 @@ The persist service handles historical log and metric storage. Monitor its healt
 
 ```bash
 # Check persist service status (on server)
-ssh server "systemctl status joblet-persist"
+ssh server "systemctl status persist"
 
 # View persist service logs
-ssh server "journalctl -u joblet-persist -n 100 -f"
+ssh server "journalctl -u persist -n 100 -f"
 
 # Check IPC socket connectivity
 ssh server "ls -la /opt/joblet/run/persist.sock"
@@ -605,7 +605,7 @@ ssh server "ls -la /opt/joblet/run/persist.sock"
 ssh server "du -sh /opt/joblet/logs /opt/joblet/metrics"
 
 # Check for persist service errors
-ssh server "journalctl -u joblet-persist --since '1 hour ago' | grep -i error"
+ssh server "journalctl -u persist --since '1 hour ago' | grep -i error"
 ```
 
 **Persist Service Metrics:**
@@ -684,7 +684,7 @@ persist:
 
 ```bash
 # Service not running
-ssh server "sudo systemctl restart joblet-persist"
+ssh server "sudo systemctl restart persist"
 
 # Check if socket exists
 ssh server "sudo ls -la /opt/joblet/run/persist.sock"

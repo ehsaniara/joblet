@@ -26,9 +26,9 @@ LDFLAGS := -s -w \
 	-X github.com/ehsaniara/joblet/pkg/version.GitTag=$(GIT_TAG) \
 	-X github.com/ehsaniara/joblet/pkg/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all clean deploy test proto help joblet rnx persist version
+.PHONY: all clean deploy test proto help joblet rnx persist state version
 
-all: proto joblet rnx persist
+all: proto joblet rnx persist state
 	@echo "✅ Build complete - all binaries ready"
 
 joblet:
@@ -42,9 +42,14 @@ rnx:
 	@echo "✅ rnx built (version: $(VERSION))"
 
 persist:
-	@echo "Building joblet-persist..."
-	@cd persist && GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=joblet-persist" -o ../bin/joblet-persist ./cmd/joblet-persist
-	@echo "✅ joblet-persist built (version: $(VERSION))"
+	@echo "Building persist..."
+	@cd persist && GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=persist" -o ../bin/persist ./cmd/persist
+	@echo "✅ persist built (version: $(VERSION))"
+
+state:
+	@echo "Building state..."
+	@cd state && GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=state" -o ../bin/state ./cmd/state
+	@echo "✅ state built (version: $(VERSION))"
 
 proto:
 	@echo "Generating proto files..."
@@ -65,35 +70,38 @@ deploy: all
 	@echo "Deploying to $(REMOTE_USER)@$(REMOTE_HOST)..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
 	@echo "Copying binaries..."
-	@scp bin/joblet bin/rnx bin/joblet-persist $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
+	@scp bin/joblet bin/rnx bin/persist bin/state $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "Stopping services..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service || true'
 	@echo "Installing binaries..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp /tmp/joblet/build/* /opt/joblet/bin/ && sudo chmod +x /opt/joblet/bin/*'
 	@echo "Starting services..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl start joblet.service'
-	@echo "✅ Deployment complete (joblet-persist runs as subprocess)"
+	@echo "✅ Deployment complete (persist and state run as subprocesses)"
 
 test:
 	@echo "Running tests..."
 	@echo "Testing main module..."
-	@go test ./...
+	@JOBLET_TEST_MODE=true go test ./...
 	@echo "Testing persist module..."
-	@cd persist && go test ./...
+	@cd persist && JOBLET_TEST_MODE=true go test ./...
+	@echo "Testing state module..."
+	@cd state && JOBLET_TEST_MODE=true go test ./...
 	@echo "✅ All tests complete"
 
 help:
 	@echo "Joblet Monorepo Build System"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make all       - Build all binaries (joblet, rnx, joblet-persist)"
+	@echo "  make all       - Build all binaries (joblet, rnx, persist, state)"
 	@echo "  make joblet    - Build joblet daemon only"
 	@echo "  make rnx       - Build rnx CLI only"
-	@echo "  make persist   - Build joblet-persist only"
+	@echo "  make persist   - Build persist only"
+	@echo "  make state     - Build state only"
 	@echo "  make proto     - Generate proto files"
 	@echo "  make version   - Show version information"
 	@echo "  make clean     - Remove build artifacts"
-	@echo "  make test      - Run all tests (both modules)"
+	@echo "  make test      - Run all tests (all modules)"
 	@echo "  make deploy    - Deploy to remote server"
 	@echo ""
 	@echo "Version Information:"

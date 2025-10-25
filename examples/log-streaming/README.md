@@ -45,29 +45,29 @@ Choose from:
 
 ```bash
 # Quick 10-second demo (100 counts at 10 logs/second)
-rnx job run --workflow=jobs.yaml:quick-demo
+rnx workflow run jobs.yaml
 
 # Standard demo (1000 counts at 10 logs/second) 
-rnx job run --workflow=jobs.yaml:standard-demo
+rnx workflow run jobs.yaml
 
 # High-frequency test (20 logs/second)
-rnx job run --workflow=jobs.yaml:high-frequency
+rnx workflow run jobs.yaml
 
 # Burst test (50 logs/second - tests async overflow)
-rnx job run --workflow=jobs.yaml:burst-test
+rnx workflow run jobs.yaml
 
 # HPC simulation (10,000 counts over ~16 minutes)
-rnx job run --workflow=jobs.yaml:hpc-simulation
+rnx workflow run jobs.yaml
 
 # Stress test (100 logs/second)
-rnx job run --workflow=jobs.yaml:stress-test
+rnx workflow run jobs.yaml
 ```
 
 ### **Option 3: Real-Time Streaming**
 
 ```bash
 # Start a logging job
-JOB_ID=$(rnx job run --workflow=jobs.yaml:standard-demo | grep -o '[0-9a-f\-]*')
+JOB_ID=$(rnx workflow run jobs.yaml | grep -o '[0-9a-f\-]*')
 
 # Stream logs in real-time (watch async system in action)
 rnx job log -f $JOB_ID
@@ -93,7 +93,7 @@ rnx job log --follow=false $JOB_ID
 
 ```bash
 # Configure your own logging pattern
-START_NUM=0 END_NUM=5000 INTERVAL=0.05 rnx job run --workflow=jobs.yaml:custom-range
+START_NUM=0 END_NUM=5000 INTERVAL=0.05 rnx workflow run jobs.yaml
 ```
 
 Environment variables:
@@ -108,12 +108,12 @@ Test multiple high-frequency loggers simultaneously:
 
 ```bash
 # Run multiple concurrent loggers
-rnx job run --workflow=concurrent-logging.yaml
+rnx workflow run concurrent-logging.yaml
 
 # Or start them individually
-rnx job run --workflow=jobs.yaml:quick-demo &
-rnx job run --workflow=jobs.yaml:quick-demo &
-rnx job run --workflow=jobs.yaml:quick-demo &
+rnx workflow run jobs.yaml &
+rnx workflow run jobs.yaml &
+rnx workflow run jobs.yaml &
 
 # Monitor all jobs
 rnx job list
@@ -295,7 +295,7 @@ rnx monitor status
 rnx job status <job-uuid>
 
 # Use longer-running jobs
-rnx job run --workflow=jobs.yaml:hpc-simulation
+rnx workflow run jobs.yaml
 ```
 
 ### **Performance Validation**

@@ -20,15 +20,15 @@ Basic examples of Joblet features.
 
 ```bash
 # Run specific example using the workflow
-rnx job run --workflow=jobs.yaml:hello-world      # Basic hello world
-rnx job run --workflow=jobs.yaml:file-ops         # File operations demo
-rnx job run --workflow=jobs.yaml:resource-test    # Resource limits testing
-rnx job run --workflow=jobs.yaml:volume-demo      # Volume storage demo
-rnx job run --workflow=jobs.yaml:network-test     # Network isolation test
-rnx job run --workflow=jobs.yaml:workflow         # Multi-step workflow
+rnx workflow run jobs.yaml      # Basic hello world
+rnx workflow run jobs.yaml         # File operations demo
+rnx workflow run jobs.yaml    # Resource limits testing
+rnx workflow run jobs.yaml      # Volume storage demo
+rnx workflow run jobs.yaml     # Network isolation test
+rnx workflow run jobs.yaml         # Multi-step workflow
 
 # Run all demos using template
-rnx job run --workflow=jobs.yaml:run-all-demos
+rnx workflow run jobs.yaml
 ```
 
 ### Run All Basic Examples (Traditional Method)

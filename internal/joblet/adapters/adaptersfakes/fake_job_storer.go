@@ -49,6 +49,17 @@ type FakeJobStorer struct {
 	deleteJobLogsReturnsOnCall map[int]struct {
 		result1 error
 	}
+	HealthCheckServicesStub        func(context.Context) error
+	healthCheckServicesMutex       sync.RWMutex
+	healthCheckServicesArgsForCall []struct {
+		arg1 context.Context
+	}
+	healthCheckServicesReturns struct {
+		result1 error
+	}
+	healthCheckServicesReturnsOnCall map[int]struct {
+		result1 error
+	}
 	JobStub        func(string) (*domain.Job, bool)
 	jobMutex       sync.RWMutex
 	jobArgsForCall []struct {
@@ -148,6 +159,17 @@ type FakeJobStorer struct {
 		result1 error
 	}
 	sendUpdatesToClientWithSkipReturnsOnCall map[int]struct {
+		result1 error
+	}
+	SyncFromPersistentStateStub        func(context.Context) error
+	syncFromPersistentStateMutex       sync.RWMutex
+	syncFromPersistentStateArgsForCall []struct {
+		arg1 context.Context
+	}
+	syncFromPersistentStateReturns struct {
+		result1 error
+	}
+	syncFromPersistentStateReturnsOnCall map[int]struct {
 		result1 error
 	}
 	UpdateJobStub        func(*domain.Job)
@@ -368,6 +390,67 @@ func (fake *FakeJobStorer) DeleteJobLogsReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.deleteJobLogsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStorer) HealthCheckServices(arg1 context.Context) error {
+	fake.healthCheckServicesMutex.Lock()
+	ret, specificReturn := fake.healthCheckServicesReturnsOnCall[len(fake.healthCheckServicesArgsForCall)]
+	fake.healthCheckServicesArgsForCall = append(fake.healthCheckServicesArgsForCall, struct {
+		arg1 context.Context
+	}{arg1})
+	stub := fake.HealthCheckServicesStub
+	fakeReturns := fake.healthCheckServicesReturns
+	fake.recordInvocation("HealthCheckServices", []interface{}{arg1})
+	fake.healthCheckServicesMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJobStorer) HealthCheckServicesCallCount() int {
+	fake.healthCheckServicesMutex.RLock()
+	defer fake.healthCheckServicesMutex.RUnlock()
+	return len(fake.healthCheckServicesArgsForCall)
+}
+
+func (fake *FakeJobStorer) HealthCheckServicesCalls(stub func(context.Context) error) {
+	fake.healthCheckServicesMutex.Lock()
+	defer fake.healthCheckServicesMutex.Unlock()
+	fake.HealthCheckServicesStub = stub
+}
+
+func (fake *FakeJobStorer) HealthCheckServicesArgsForCall(i int) context.Context {
+	fake.healthCheckServicesMutex.RLock()
+	defer fake.healthCheckServicesMutex.RUnlock()
+	argsForCall := fake.healthCheckServicesArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeJobStorer) HealthCheckServicesReturns(result1 error) {
+	fake.healthCheckServicesMutex.Lock()
+	defer fake.healthCheckServicesMutex.Unlock()
+	fake.HealthCheckServicesStub = nil
+	fake.healthCheckServicesReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStorer) HealthCheckServicesReturnsOnCall(i int, result1 error) {
+	fake.healthCheckServicesMutex.Lock()
+	defer fake.healthCheckServicesMutex.Unlock()
+	fake.HealthCheckServicesStub = nil
+	if fake.healthCheckServicesReturnsOnCall == nil {
+		fake.healthCheckServicesReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.healthCheckServicesReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -860,6 +943,67 @@ func (fake *FakeJobStorer) SendUpdatesToClientWithSkipReturnsOnCall(i int, resul
 		})
 	}
 	fake.sendUpdatesToClientWithSkipReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStorer) SyncFromPersistentState(arg1 context.Context) error {
+	fake.syncFromPersistentStateMutex.Lock()
+	ret, specificReturn := fake.syncFromPersistentStateReturnsOnCall[len(fake.syncFromPersistentStateArgsForCall)]
+	fake.syncFromPersistentStateArgsForCall = append(fake.syncFromPersistentStateArgsForCall, struct {
+		arg1 context.Context
+	}{arg1})
+	stub := fake.SyncFromPersistentStateStub
+	fakeReturns := fake.syncFromPersistentStateReturns
+	fake.recordInvocation("SyncFromPersistentState", []interface{}{arg1})
+	fake.syncFromPersistentStateMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeJobStorer) SyncFromPersistentStateCallCount() int {
+	fake.syncFromPersistentStateMutex.RLock()
+	defer fake.syncFromPersistentStateMutex.RUnlock()
+	return len(fake.syncFromPersistentStateArgsForCall)
+}
+
+func (fake *FakeJobStorer) SyncFromPersistentStateCalls(stub func(context.Context) error) {
+	fake.syncFromPersistentStateMutex.Lock()
+	defer fake.syncFromPersistentStateMutex.Unlock()
+	fake.SyncFromPersistentStateStub = stub
+}
+
+func (fake *FakeJobStorer) SyncFromPersistentStateArgsForCall(i int) context.Context {
+	fake.syncFromPersistentStateMutex.RLock()
+	defer fake.syncFromPersistentStateMutex.RUnlock()
+	argsForCall := fake.syncFromPersistentStateArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeJobStorer) SyncFromPersistentStateReturns(result1 error) {
+	fake.syncFromPersistentStateMutex.Lock()
+	defer fake.syncFromPersistentStateMutex.Unlock()
+	fake.SyncFromPersistentStateStub = nil
+	fake.syncFromPersistentStateReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeJobStorer) SyncFromPersistentStateReturnsOnCall(i int, result1 error) {
+	fake.syncFromPersistentStateMutex.Lock()
+	defer fake.syncFromPersistentStateMutex.Unlock()
+	fake.SyncFromPersistentStateStub = nil
+	if fake.syncFromPersistentStateReturnsOnCall == nil {
+		fake.syncFromPersistentStateReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.syncFromPersistentStateReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }

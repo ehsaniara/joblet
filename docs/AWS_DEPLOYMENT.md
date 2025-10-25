@@ -61,7 +61,7 @@ Throughout this guide, `<EC2_USER>` refers to the default SSH user for your AMI:
     - 30 GB gp3 (minimum: 20 GB)
 
 5. **Advanced Details:**
-    - **IAM instance profile**: Select `JobletCloudWatchRole` (create first - see IAM Setup below)
+    - **IAM instance profile**: Select `JobletEC2Role` (create first - see IAM Setup below)
     - **User data** - Paste this script:
 
    ```bash
@@ -106,7 +106,7 @@ grep "Installation Complete" /var/log/joblet-install.log
 sudo systemctl status joblet
 
 # Check persist subprocess is running
-ps aux | grep joblet-persist | grep -v grep
+ps aux | grep persist | grep -v grep
 
 # Check sockets exist
 ls -la /opt/joblet/run/
@@ -117,17 +117,26 @@ sudo rnx job run echo "Hello from Joblet"
 
 ## IAM Role Setup
 
-CloudWatch Logs requires an IAM role. Create this **before launching** your instance.
+Joblet on EC2 automatically configures CloudWatch Logs and DynamoDB for state persistence. Create the IAM role **before launching** your instance.
+
+### What Gets Auto-Configured
+
+On EC2, the installer automatically:
+- ✅ **CloudWatch Logs**: Job logs and metrics sent to CloudWatch
+- ✅ **DynamoDB**: Job state persisted in DynamoDB table `joblet-jobs`
+- ✅ **Auto-Cleanup**: TTL enabled for automatic deletion of old jobs (30 days)
+- ✅ **Region Detection**: Automatically detects EC2 region
 
 ### Create IAM Policy
 
 ```bash
 # Create policy document
-cat > joblet-cloudwatch-policy.json << 'EOF'
+cat > joblet-aws-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "CloudWatchLogsAccess",
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
@@ -146,6 +155,7 @@ cat > joblet-cloudwatch-policy.json << 'EOF'
       ]
     },
     {
+      "Sid": "CloudWatchMetricsAccess",
       "Effect": "Allow",
       "Action": [
         "cloudwatch:PutMetricData",
@@ -155,6 +165,25 @@ cat > joblet-cloudwatch-policy.json << 'EOF'
       "Resource": "*"
     },
     {
+      "Sid": "DynamoDBStateAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:UpdateTimeToLive",
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:*:*:table/joblet-jobs"
+    },
+    {
+      "Sid": "EC2MetadataAccess",
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeRegions"
@@ -167,8 +196,8 @@ EOF
 
 # Create policy and capture ARN
 POLICY_ARN=$(aws iam create-policy \
-  --policy-name JobletCloudWatchLogsPolicy \
-  --policy-document file://joblet-cloudwatch-policy.json \
+  --policy-name JobletAWSPolicy \
+  --policy-document file://joblet-aws-policy.json \
   --query 'Policy.Arn' \
   --output text)
 
@@ -180,7 +209,7 @@ echo "Created policy: $POLICY_ARN"
 ```bash
 # Create role with EC2 trust policy
 aws iam create-role \
-  --role-name JobletCloudWatchRole \
+  --role-name JobletEC2Role \
   --assume-role-policy-document '{
     "Version": "2012-10-17",
     "Statement": [{
@@ -192,22 +221,28 @@ aws iam create-role \
 
 # Attach policy to role
 aws iam attach-role-policy \
-  --role-name JobletCloudWatchRole \
+  --role-name JobletEC2Role \
   --policy-arn $POLICY_ARN
 
 # Create instance profile
 aws iam create-instance-profile \
-  --instance-profile-name JobletCloudWatchRole
+  --instance-profile-name JobletEC2Role
 
 # Add role to instance profile
 aws iam add-role-to-instance-profile \
-  --instance-profile-name JobletCloudWatchRole \
-  --role-name JobletCloudWatchRole
+  --instance-profile-name JobletEC2Role \
+  --role-name JobletEC2Role
 
-echo "IAM role ready: JobletCloudWatchRole"
+echo "IAM role ready: JobletEC2Role"
 ```
 
-**Don't want CloudWatch?** Set `ENABLE_CLOUDWATCH="false"` in user data and skip IAM setup.
+**What This Enables:**
+- ✅ CloudWatch Logs for job logs and metrics
+- ✅ DynamoDB for persistent job state (survives restarts)
+- ✅ Automatic table creation and TTL setup
+- ✅ Cost: < $0.10/month for 100 jobs/day
+
+**Don't want CloudWatch?** Set `ENABLE_CLOUDWATCH="false"` in user data. DynamoDB state persistence will still be enabled on EC2.
 
 ## Security Group Configuration
 
@@ -423,6 +458,150 @@ aws cloudwatch get-metric-statistics \
 
 For advanced CloudWatch queries and monitoring, see [MONITORING.md](MONITORING.md).
 
+## State Persistence (Optional - DynamoDB)
+
+By default, job states are stored in memory and lost on restart. For production AWS deployments, you can enable persistent state storage using DynamoDB.
+
+### What is State Persistence?
+
+- **persist** (covered above): Stores historical logs/metrics in CloudWatch
+- **state service**: Stores job metadata (status, exit codes, timestamps) in DynamoDB
+
+### When to Use DynamoDB State Persistence
+
+✅ **Use DynamoDB when:**
+- Running production workloads where jobs must survive restarts
+- Need job history after EC2 instance replacement
+- Running auto-scaling EC2 fleets
+- Require durability and disaster recovery
+
+### Setup DynamoDB State Persistence
+
+**1. Create DynamoDB table:**
+
+```bash
+aws dynamodb create-table \
+  --table-name joblet-jobs \
+  --attribute-definitions AttributeName=jobId,AttributeType=S \
+  --key-schema AttributeName=jobId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region us-east-1
+```
+
+**Enable TTL for automatic cleanup:**
+
+```bash
+aws dynamodb update-time-to-live \
+  --table-name joblet-jobs \
+  --time-to-live-specification "Enabled=true, AttributeName=expiresAt"
+```
+
+**2. Create IAM policy for DynamoDB access:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:*:*:table/joblet-jobs"
+    }
+  ]
+}
+```
+
+**3. Attach policy to existing JobletCloudWatchRole:**
+
+```bash
+# Create the policy
+POLICY_ARN=$(aws iam create-policy \
+  --policy-name JobletDynamoDBPolicy \
+  --policy-document file://dynamodb-policy.json \
+  --query 'Policy.Arn' \
+  --output text)
+
+# Attach to existing role
+aws iam attach-role-policy \
+  --role-name JobletCloudWatchRole \
+  --policy-arn $POLICY_ARN
+```
+
+**4. Configure state persistence on EC2 instance:**
+
+```bash
+# SSH into instance
+ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
+
+# Edit configuration
+sudo nano /opt/joblet/config/joblet-config.yml
+
+# Add state configuration:
+state:
+  backend: "dynamodb"
+  socket: "/opt/joblet/run/state-ipc.sock"
+
+  storage:
+    dynamodb:
+      region: ""  # Auto-detect from EC2 metadata
+      table_name: "joblet-jobs"
+      ttl_enabled: true
+      ttl_days: 30  # Auto-delete completed jobs after 30 days
+
+# Restart joblet
+sudo systemctl restart joblet
+```
+
+**5. Verify state persistence:**
+
+```bash
+# Create a test job
+sudo rnx job run echo "Testing state persistence"
+
+# Get job ID
+JOB_ID=$(sudo rnx job list --json | jq -r '.[0].uuid')
+
+# Restart joblet service
+sudo systemctl restart joblet
+
+# Job should still exist after restart!
+sudo rnx job status $JOB_ID
+```
+
+### State Persistence Performance
+
+All state operations use async fire-and-forget pattern:
+- Create/Update/Delete operations run in goroutines with 5s timeout
+- Non-blocking - joblet continues immediately
+- High-throughput regardless of number of jobs
+- Automatic reconnection if state service restarts
+
+### Cost Considerations
+
+DynamoDB state persistence adds minimal cost:
+
+**DynamoDB Pricing (on-demand mode):**
+- Write: ~1 write per job create/update/complete
+- Read: ~1 read per job status query
+- Storage: Minimal (few KB per job, auto-deleted after TTL)
+
+**Typical costs (100 jobs/day):**
+- Writes: ~300 writes/day = $0.04/month
+- Storage: ~10 MB = $0.003/month
+- **Total: < $0.05/month**
+
+For comparison: CloudWatch Logs typically costs $5-50/month for the same workload.
+
+For complete state persistence documentation, see [state/README.md](../state/README.md).
+
 ## Troubleshooting
 
 ### Installation Failed
@@ -470,12 +649,12 @@ sudo journalctl -u joblet -n 100 --no-pager
    sudo systemctl restart joblet
    ```
 
-### joblet-persist Not Running
+### persist Not Running
 
 **Check if persist subprocess exists:**
 
 ```bash
-ps aux | grep joblet-persist | grep -v grep
+ps aux | grep persist | grep -v grep
 ls -la /opt/joblet/run/
 ```
 
@@ -566,6 +745,60 @@ aws ec2 associate-iam-instance-profile \
 # Restart joblet
 ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> "sudo systemctl restart joblet"
 ```
+
+### State Persistence Not Working
+
+**Check if state subprocess is running:**
+
+```bash
+ps aux | grep "bin/state" | grep -v grep
+ls -la /opt/joblet/run/state-ipc.sock
+```
+
+**Check state service logs:**
+
+```bash
+sudo journalctl -u joblet | grep -i "\[STATE\]"
+```
+
+**Verify DynamoDB table exists:**
+
+```bash
+aws dynamodb describe-table --table-name joblet-jobs
+```
+
+**Check IAM permissions:**
+
+```bash
+# Test DynamoDB access from EC2 instance
+aws dynamodb scan --table-name joblet-jobs --limit 1
+```
+
+**Common fixes:**
+
+1. **Missing DynamoDB permissions:**
+   ```bash
+   # Attach DynamoDB policy to role (see State Persistence section)
+   aws iam attach-role-policy \
+     --role-name JobletCloudWatchRole \
+     --policy-arn arn:aws:iam::YOUR_ACCOUNT:policy/JobletDynamoDBPolicy
+   ```
+
+2. **Wrong region in config:**
+   ```bash
+   # Edit config to use auto-detect
+   sudo nano /opt/joblet/config/joblet-config.yml
+   # Set: region: ""  # Empty for auto-detect
+   sudo systemctl restart joblet
+   ```
+
+3. **State service crashed:**
+   ```bash
+   # Check logs for crash reason
+   sudo journalctl -u joblet | grep -A 20 "state subprocess"
+   # Restart joblet
+   sudo systemctl restart joblet
+   ```
 
 ## Configuration Options
 
@@ -712,7 +945,8 @@ Key cost factors to consider (prices vary by region):
 ## Next Steps
 
 - **Monitoring**: See [MONITORING.md](MONITORING.md) for CloudWatch dashboards, alerts, and queries
-- **Persistence**: See [PERSISTENCE.md](PERSISTENCE.md) for CloudWatch backend configuration
+- **Persistence (Logs/Metrics)**: See [PERSISTENCE.md](PERSISTENCE.md) for CloudWatch backend configuration
+- **Persistence (Job State)**: See [state/README.md](../state/README.md) for DynamoDB state persistence
 - **Security**: See installation notes for security best practices
 - **SDK Integration**: See [API.md](API.md) for Python/Go SDK examples
 

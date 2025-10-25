@@ -32,8 +32,8 @@ Model deployment pipeline:
 cd examples/workflows/multi-workflow
 
 # Run specific workflow (pending integration)
-rnx job run --workflow=multi-workflow.yaml:ml-training
-rnx job run --workflow=multi-workflow.yaml:deployment
+rnx workflow run multi-workflow.yaml
+rnx workflow run multi-workflow.yaml
 
 # Note: Individual job selection doesn't work with multi-workflow format
 # Jobs are nested under workflows, not at the top level

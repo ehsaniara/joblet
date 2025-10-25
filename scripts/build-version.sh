@@ -80,9 +80,9 @@ build_component() {
     local ldflags
 
     # Check if it's in the persist module
-    if [ "$component" = "joblet-persist" ]; then
-        cmd_path="./persist/cmd/joblet-persist"
-        output_name="joblet-persist"
+    if [ "$component" = "persist" ]; then
+        cmd_path="./persist/cmd/persist"
+        output_name="persist"
     fi
 
     if [ ! -d "$cmd_path" ]; then
@@ -97,9 +97,9 @@ build_component() {
     mkdir -p "$OUTPUT_DIR"
 
     # Build with version injection
-    if [ "$component" = "joblet-persist" ]; then
+    if [ "$component" = "persist" ]; then
         # Build from persist module
-        (cd persist && go build -a -ldflags="$ldflags" -o "../$OUTPUT_DIR/$output_name" "./cmd/joblet-persist")
+        (cd persist && go build -a -ldflags="$ldflags" -o "../$OUTPUT_DIR/$output_name" "./cmd/persist")
     else
         go build -a -ldflags="$ldflags" -o "$OUTPUT_DIR/$output_name" "$cmd_path"
     fi
@@ -125,8 +125,8 @@ main() {
         "joblet")
             build_component "joblet"
             ;;
-        "joblet-persist")
-            build_component "joblet-persist"
+        "persist")
+            build_component "persist"
             ;;
         "api")
             if [ -d "./cmd/api" ]; then
@@ -139,14 +139,14 @@ main() {
             echo "Building all components..."
             build_component "rnx"
             build_component "joblet"
-            build_component "joblet-persist"
+            build_component "persist"
             if [ -d "./cmd/api" ]; then
                 build_component "api"
             fi
             ;;
         *)
             echo "Error: Unknown component '$COMPONENT'"
-            echo "Available components: rnx, joblet, joblet-persist, api, all"
+            echo "Available components: rnx, joblet, persist, api, all"
             exit 1
             ;;
     esac

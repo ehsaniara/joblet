@@ -16,12 +16,12 @@ Demonstrates parallel batch processing without dependencies between jobs.
 cd examples/workflows/parallel-jobs
 
 # Run individual batches
-rnx job run --workflow=parallel-jobs.yaml:batch1
-rnx job run --workflow=parallel-jobs.yaml:batch2
-rnx job run --workflow=parallel-jobs.yaml:batch3
+rnx workflow run parallel-jobs.yaml
+rnx workflow run parallel-jobs.yaml
+rnx workflow run parallel-jobs.yaml
 
 # Run all batches in parallel (pending integration)
-rnx job run --workflow=parallel-jobs.yaml
+rnx workflow run parallel-jobs.yaml
 ```
 
 ## Output

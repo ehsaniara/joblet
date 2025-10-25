@@ -863,7 +863,7 @@ func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflow
 		// Validate that ALL required files are available BEFORE proceeding
 		for _, file := range jobSpec.Uploads.Files {
 			if uploadedFiles == nil {
-				return fmt.Errorf("server-side workflow file reading not supported. Use 'rnx job run --workflow' with client-side file upload")
+				return fmt.Errorf("server-side workflow file reading not supported. Use 'rnx workflow run' with client-side file upload")
 			}
 
 			// Check file availability first (fail fast if missing)

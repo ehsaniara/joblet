@@ -60,7 +60,7 @@ jobs:
   #   1. Build binaries: make all
   #   2. Generate certificates: ./scripts/certs_gen_embedded.sh
   #   3. Start joblet server: JOBLET_CONFIG_PATH=./config/joblet-config.yml ./bin/joblet &
-  #   4. Start joblet-persist (optional): ./bin/joblet-persist &
+  #   4. Start persist (optional): ./bin/persist &
   #   5. Run E2E test suite: ./tests/ci/run_ci_tests.sh
   #
   # For production testing, use the deployment verification script:

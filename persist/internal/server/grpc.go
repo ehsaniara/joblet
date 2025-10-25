@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -129,6 +130,11 @@ func (s *GRPCServer) Start(ctx context.Context) error {
 	var isUnixSocket bool
 
 	if s.config.GRPCSocket != "" {
+		// Remove existing socket to prevent "address already in use" errors
+		if err := os.Remove(s.config.GRPCSocket); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove existing socket: %w", err)
+		}
+
 		// Prefer Unix socket for internal IPC
 		listener, err = net.Listen("unix", s.config.GRPCSocket)
 		if err != nil {

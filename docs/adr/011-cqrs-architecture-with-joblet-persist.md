@@ -1,4 +1,4 @@
-# ADR 0001: CQRS Architecture with joblet-persist Service
+# ADR 0001: CQRS Architecture with persist Service
 
 ## Status
 
@@ -25,16 +25,16 @@ We implement a CQRS (Command Query Responsibility Segregation) architecture by:
 
 1. **Splitting into two services:**
     - **joblet-core** (Port 50051): Handles commands (job execution, management) and live data streaming
-    - **joblet-persist** (Port 50052): Handles queries for historical logs and metrics
+    - **persist** (Port 50052): Handles queries for historical logs and metrics
 
 2. **Using Unix socket IPC for data replication:**
-    - Non-blocking async writes from joblet-core to joblet-persist
+    - Non-blocking async writes from joblet-core to persist
     - Protocol buffers for efficient serialization
     - Automatic reconnection with backoff on failures
     - Queue-based buffering to prevent job execution blocking
 
 3. **Maintaining backward compatibility:**
-    - joblet-persist is optional
+    - persist is optional
     - joblet-core functions independently if persist is not available
     - Existing deployments continue working without changes
 
@@ -83,7 +83,7 @@ We implement a CQRS (Command Query Responsibility Segregation) architecture by:
                  │                           │
                  │                           │
          ┌───────▼────────┐         ┌───────▼────────┐
-         │ joblet-persist │         │  joblet-core   │
+         │ persist │         │  joblet-core   │
          │  (Port 50052)  │         │  (Port 50051)  │
          │                │         │                │
          │ - Query logs   │◄────────│ - Job execute  │
@@ -96,8 +96,8 @@ We implement a CQRS (Command Query Responsibility Segregation) architecture by:
 ### Data Flow
 
 1. Job executes and generates logs/metrics in joblet-core
-2. joblet-core writes to local files AND sends via IPC to joblet-persist
-3. joblet-persist stores data in indexed local storage
+2. joblet-core writes to local files AND sends via IPC to persist
+3. persist stores data in indexed local storage
 4. Client queries historical data from persist service
 5. Client streams live data from core service
 
@@ -132,7 +132,7 @@ service PersistService {
 ```yaml
 persist:
   enabled: true
-  socket: "/tmp/joblet-persist.sock"
+  socket: "/tmp/persist.sock"
   buffer_size: 10000
   reconnect_delay: "5s"
 ```
@@ -143,7 +143,7 @@ persist:
 nodes:
   default:
     address: "server:50051"        # joblet-core
-    persistAddress: "server:50052"  # joblet-persist (optional)
+    persistAddress: "server:50052"  # persist (optional)
 ```
 
 ## Alternatives Considered
@@ -175,7 +175,7 @@ serialization.
 
 ### Phase 1: Deploy (Current)
 
-- Deploy joblet-persist alongside joblet-core
+- Deploy persist alongside joblet-core
 - Configure Unix socket IPC
 - Historical data starts accumulating
 

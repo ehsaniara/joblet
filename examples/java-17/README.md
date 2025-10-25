@@ -16,12 +16,12 @@ Enterprise Java development with the `java:17` runtime environment - instant com
 
 ```bash
 # Run specific Java 17 example using the workflow
-rnx job run --workflow=jobs.yaml:hello-joblet      # Compile and run HelloJoblet
-rnx job run --workflow=jobs.yaml:optimized-jvm     # Run with JVM optimization
-rnx job run --workflow=jobs.yaml:java17-features   # Demonstrate Java 17 features
-rnx job run --workflow=jobs.yaml:jar-package       # Package as JAR and run
-rnx job run --workflow=jobs.yaml:performance-test  # Performance testing
-rnx job run --workflow=jobs.yaml:data-persistence  # Persistent storage example
+rnx workflow run jobs.yaml      # Compile and run HelloJoblet
+rnx workflow run jobs.yaml     # Run with JVM optimization
+rnx workflow run jobs.yaml   # Demonstrate Java 17 features
+rnx workflow run jobs.yaml       # Package as JAR and run
+rnx workflow run jobs.yaml  # Performance testing
+rnx workflow run jobs.yaml  # Persistent storage example
 ```
 
 ### Prerequisites

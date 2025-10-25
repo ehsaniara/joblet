@@ -76,10 +76,10 @@ jobs:
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o joblet-linux-amd64 ./cmd/joblet
           GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o joblet-linux-arm64 ./cmd/joblet
 
-          echo "🚀 Building joblet-persist binaries..."
+          echo "🚀 Building persist binaries..."
           cd persist
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o ../joblet-persist-linux-amd64 ./cmd/joblet-persist
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o ../joblet-persist-linux-arm64 ./cmd/joblet-persist
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o ../persist-linux-amd64 ./cmd/persist
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o ../persist-linux-arm64 ./cmd/persist
           cd ..
 
           echo "🚀 Building RNX CLI for all platforms..."
@@ -113,11 +113,11 @@ jobs:
             echo "📦 Building packages for $arch..."
 
             # Copy binaries for this architecture
-            rm -rf joblet rnx joblet-persist  # Remove existing directories/files to avoid conflicts
+            rm -rf joblet rnx persist  # Remove existing directories/files to avoid conflicts
             cp joblet-linux-$arch joblet
             cp rnx-server-linux-$arch rnx
-            cp joblet-persist-linux-$arch joblet-persist
-            chmod +x joblet rnx joblet-persist
+            cp persist-linux-$arch persist
+            chmod +x joblet rnx persist
 
             # Build Debian package
             ./scripts/build-deb.sh $arch ${{ steps.version.outputs.version }}

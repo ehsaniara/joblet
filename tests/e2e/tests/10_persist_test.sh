@@ -2,7 +2,7 @@
 
 # Test 10: Persist Subprocess Integration Tests
 # Verifies: Log persistence, metric persistence, historical queries, IPC communication
-# Note: joblet-persist now runs as a subprocess of joblet-core (not a separate systemd service)
+# Note: persist now runs as a subprocess of joblet-core (not a separate systemd service)
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
@@ -19,10 +19,10 @@ test_suite_init "Persist Subprocess Integration Tests"
 # ============================================
 
 test_persist_service_running() {
-    echo "Checking if joblet-persist subprocess is running..."
+    echo "Checking if persist subprocess is running..."
 
     # Check if persist is running as subprocess of joblet
-    local persist_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep '/joblet-persist' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
+    local persist_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep '/persist' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
     local joblet_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep '/opt/joblet/bin/joblet\$' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
 
     if [[ -n "$persist_pid" ]] && [[ -n "$joblet_pid" ]]; then
@@ -30,15 +30,15 @@ test_persist_service_running() {
         local parent_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps -o ppid= -p $persist_pid" 2>/dev/null | tr -d ' ')
 
         if [[ "$parent_pid" == "$joblet_pid" ]]; then
-            echo "  ✓ joblet-persist subprocess is running (PID: $persist_pid, Parent: $joblet_pid)"
+            echo "  ✓ persist subprocess is running (PID: $persist_pid, Parent: $joblet_pid)"
             return 0
         else
-            echo "  ✗ joblet-persist is running but not as child of joblet"
+            echo "  ✗ persist is running but not as child of joblet"
             echo "    Persist PID: $persist_pid, Parent: $parent_pid, Expected Parent: $joblet_pid"
             return 1
         fi
     else
-        echo "  ✗ joblet-persist subprocess is not running"
+        echo "  ✗ persist subprocess is not running"
         echo "    Joblet PID: ${joblet_pid:-not found}"
         echo "    Persist PID: ${persist_pid:-not found}"
         ssh ${REMOTE_USER}@${REMOTE_HOST} "ps auxf | grep joblet | grep -v grep" || true
@@ -50,7 +50,7 @@ test_persist_socket_exists() {
     echo "Checking if persist Unix socket exists..."
 
     # Socket path is /opt/joblet/run/persist-ipc.sock
-    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist-ipc.sock" 2>/dev/null | grep -q "joblet-persist"; then
+    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist-ipc.sock" 2>/dev/null | grep -q "persist"; then
         echo "  ✓ Persist IPC socket exists at /opt/joblet/run/persist-ipc.sock"
         return 0
     elif ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/run/persist-ipc.sock" 2>/dev/null | grep -q "persist-ipc.sock"; then
@@ -246,7 +246,7 @@ test_ipc_socket_permissions() {
 test_persist_binary_version() {
     echo "Checking persist binary version..."
 
-    local version=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "/opt/joblet/bin/joblet-persist version 2>&1" || echo "version command not available")
+    local version=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "/opt/joblet/bin/persist version 2>&1" || echo "version command not available")
 
     echo "  Persist version: $version"
 

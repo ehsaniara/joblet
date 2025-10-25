@@ -197,32 +197,18 @@ func TestStatusCommandValidUUIDs(t *testing.T) {
 func TestStatusCommandFlagCombinations(t *testing.T) {
 	cmd := NewStatusCmd()
 
-	// Test that workflow and detail flags exist and can be set
+	// Verify that workflow and detail flags are removed (now use: rnx workflow status)
 	workflowFlag := cmd.Flags().Lookup("workflow")
 	detailFlag := cmd.Flags().Lookup("detail")
 
-	if workflowFlag == nil {
-		t.Fatal("workflow flag not found")
+	if workflowFlag != nil {
+		t.Fatal("workflow flag should not exist (removed - use rnx workflow status)")
 	}
-	if detailFlag == nil {
-		t.Fatal("detail flag not found")
-	}
-
-	// Test flag types
-	if workflowFlag.Value.Type() != "bool" {
-		t.Errorf("Expected workflow flag to be bool, got %s", workflowFlag.Value.Type())
-	}
-	if detailFlag.Value.Type() != "bool" {
-		t.Errorf("Expected detail flag to be bool, got %s", detailFlag.Value.Type())
+	if detailFlag != nil {
+		t.Fatal("detail flag should not exist (removed - use rnx workflow status --detail)")
 	}
 
-	// Test flag shortcuts
-	if workflowFlag.Shorthand != "w" {
-		t.Errorf("Expected workflow flag shorthand 'w', got '%s'", workflowFlag.Shorthand)
-	}
-	if detailFlag.Shorthand != "d" {
-		t.Errorf("Expected detail flag shorthand 'd', got '%s'", detailFlag.Shorthand)
-	}
+	// No flag shortcuts to test anymore - flags were removed in favor of dedicated workflow commands
 }
 
 func TestStatusDisplaySections(t *testing.T) {
