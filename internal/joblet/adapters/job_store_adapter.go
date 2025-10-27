@@ -48,7 +48,7 @@ type jobStoreAdapter struct {
 	persistClient pb.PersistServiceClient
 
 	// State client for persistent job state across restarts
-	stateClient *state.Client
+	stateClient state.StateClient
 
 	// Task management (maintains compatibility with current Task-based approach)
 	tasks      map[string]*taskWrapper
@@ -99,7 +99,7 @@ func NewJobStorer(
 	logMgr *SimpleLogManager,
 	pubsub pubsub.PubSub[JobEvent],
 	persistClient pb.PersistServiceClient,
-	stateClient *state.Client,
+	stateClient state.StateClient,
 	persistEnabled bool,
 	logger *logger.Logger,
 ) JobStorer {

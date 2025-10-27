@@ -322,23 +322,94 @@ make proto
 
 ## Testing
 
-### Test Main Module
+### Unit Tests
+
+Run all unit tests across the codebase:
 
 ```bash
+# Test main module
 go test ./...
-```
 
-### Test Persist Module
-
-```bash
+# Test persist module
 cd persist && go test ./...
-```
 
-### Test All
-
-```bash
+# Test all modules
 go test ./... && cd persist && go test ./...
 ```
+
+### E2E Tests
+
+End-to-end tests validate complete workflows against a running joblet instance.
+
+**Location:** `tests/e2e/`
+
+**Requirements:**
+- Remote joblet instance running
+- SSH access configured
+- RNX CLI configured for remote host
+
+**Running E2E Tests:**
+
+```bash
+# Run all e2e tests
+cd tests/e2e
+./run_tests.sh
+
+# Run specific test
+./tests/01_isolation_test.sh
+
+# Run with custom host
+JOBLET_TEST_HOST=192.168.1.161 JOBLET_TEST_USER=jay ./run_tests.sh
+```
+
+**Available E2E Tests:**
+1. `01_isolation_test.sh` - Process isolation validation
+2. `02_runtime_test.sh` - Runtime management
+3. `03_network_test.sh` - Network isolation
+4. `04_schedule_test.sh` - Job scheduling
+5. `05_volume_test.sh` - Volume management
+6. `06_workflow_test.sh` - Workflow execution
+7. `07_github_runtime_test.sh` - GitHub runtime registry
+8. `08_rnx_json_test.sh` - JSON output format
+9. `09_gpu_test.sh` - GPU allocation
+10. `10_persist_test.sh` - Log/metric persistence
+11. `11_metrics_gap_test.sh` - Metrics continuity
+12. `12_log_gap_simple_test.sh` - Log continuity (simple)
+13. `13_log_gap_live_test.sh` - Log continuity (live)
+14. `14_registry_runtime_test.sh` - Runtime registry
+15. `15_state_load_test.sh` - State client load test (1000+ jobs)
+
+**State Load Tests:**
+
+The state load test validates connection pool performance with high concurrency:
+
+```bash
+# Run with default 100 jobs
+./tests/15_state_load_test.sh
+
+# Full load test with 1000 jobs
+./tests/15_state_load_test.sh 1000
+
+# Custom pool size
+./tests/15_state_load_test.sh 1000 50
+```
+
+**Go-Based Load Tests:**
+
+For programmatic load testing:
+
+```bash
+# Run Go load tests (requires running state service)
+go test -v ./tests/e2e -run TestStateClient_Load
+
+# Specific test
+go test -v ./tests/e2e -run TestStateClient_Load1000
+
+# Skip if state service unavailable (auto-skips by default)
+go test -short ./tests/e2e
+```
+
+**Documentation:** See `tests/e2e/README_STATE_TESTS.md` for detailed load testing documentation.
 
 ---
 

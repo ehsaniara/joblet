@@ -96,7 +96,7 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 
-	jobStoreAdapter := adapters.NewJobStore(&cfg.Buffers, cfg.IPC.Enabled, log)
+	jobStoreAdapter := adapters.NewJobStore(cfg, cfg.IPC.Enabled, log)
 	defer func() {
 		if closeErr := jobStoreAdapter.Close(); closeErr != nil {
 			log.Error("error closing job store adapter", "error", closeErr)

@@ -183,6 +183,7 @@ type StateConfig struct {
 	Socket         string             `yaml:"socket" json:"socket"`                   // Unix socket path
 	BufferSize     int                `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
 	ReconnectDelay time.Duration      `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
+	PoolSize       int                `yaml:"pool_size" json:"pool_size"`             // Connection pool size (0 = use default 20)
 	Storage        StateStorageConfig `yaml:"storage" json:"storage"`                 // Backend-specific configuration
 }
 

@@ -206,7 +206,8 @@ state:
   socket: "/opt/joblet/run/state-ipc.sock"
   buffer_size: 10000
   reconnect_delay: "5s"
-  
+  pool_size: 20      # Connection pool size for high concurrency (default: 20, recommended for 1000+ jobs)
+
   storage:
     backend: "dynamodb"
     

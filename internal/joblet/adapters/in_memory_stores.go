@@ -19,13 +19,13 @@ import (
 
 // WaitForStateService waits for state service to be ready with retries (public for server.go)
 // Uses the Ping IPC message for efficient health checking
-func WaitForStateService(client *state.Client, logger *logger.Logger) error {
+func WaitForStateService(client state.StateClient, logger *logger.Logger) error {
 	return waitForStateService(client, logger)
 }
 
 // waitForStateService waits for state service to be ready with retries
 // Uses the Ping IPC message for efficient health checking
-func waitForStateService(client *state.Client, logger *logger.Logger) error {
+func waitForStateService(client state.StateClient, logger *logger.Logger) error {
 	const (
 		maxRetries    = 30 // 30 attempts
 		retryDelay    = 1 * time.Second
@@ -135,7 +135,7 @@ func waitForPersistService(socketPath string, logger *logger.Logger) error {
 }
 
 // NewJobStore creates a job store with buffer configuration and log persistence
-func NewJobStore(cfg *config.BuffersConfig, persistEnabled bool, logger *logger.Logger) JobStorer {
+func NewJobStore(cfg *config.Config, persistEnabled bool, logger *logger.Logger) JobStorer {
 	store := &SimpleJobStore{
 		jobs:   make(map[string]*domain.Job),
 		logger: logger.WithField("component", "job-store"),
@@ -143,8 +143,8 @@ func NewJobStore(cfg *config.BuffersConfig, persistEnabled bool, logger *logger.
 
 	// Use configured pubsub buffer size
 	bufferSize := 10000 // Default
-	if cfg != nil && cfg.PubsubBufferSize > 0 {
-		bufferSize = cfg.PubsubBufferSize
+	if cfg != nil && cfg.Buffers.PubsubBufferSize > 0 {
+		bufferSize = cfg.Buffers.PubsubBufferSize
 	}
 
 	pubsubSystem := pubsub.NewPubSub[JobEvent](
@@ -171,8 +171,17 @@ func NewJobStore(cfg *config.BuffersConfig, persistEnabled bool, logger *logger.
 	// Create state client for persistent job state across restarts
 	// Health check is deferred - happens after subprocess startup in server.go
 	stateSocketPath := "/opt/joblet/run/state-ipc.sock"
-	stateClient := state.NewClient(stateSocketPath, logger)
-	logger.Info("state client created - will connect after subprocess starts", "socket", stateSocketPath)
+
+	// Use pooled client for high-performance concurrent access (1000+ jobs)
+	// Pool size defaults to 20 connections, tuned for high concurrency
+	poolSize := 20
+	if cfg != nil && cfg.State.PoolSize > 0 {
+		poolSize = cfg.State.PoolSize
+	}
+
+	stateClient := state.NewPooledClient(stateSocketPath, poolSize, logger)
+	logger.Info("pooled state client created - will connect after subprocess starts",
+		"socket", stateSocketPath, "pool_size", poolSize)
 
 	// Logs are buffered in-memory for real-time streaming and forwarded to persist via IPC
 	return NewJobStorer(store, logMgr, pubsubSystem, persistClient, stateClient, persistEnabled, logger)
