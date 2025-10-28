@@ -15,9 +15,9 @@ letting you focus on your applications rather than infrastructure complexity.
 > Provides sandboxed code execution with GPU support, resource controls, and complete process
 > isolation for AI workloads.
 
-## 🎯 Key Capabilities
+## Key Capabilities
 
-- **🔒 Process Isolation**: Jobs run in secure sandboxes with separate namespaces, preventing interference between
+- **🔒 Isolation**: Run in secure sandboxes, separate namespaces, preventing interference between
   workloads
 - **⚡ GPU Acceleration**: Native NVIDIA GPU support with automatic CUDA env. setup for AI/ML workloads
 - **🎛️ Resource Management**: CPU, memory, I/O, and GPU resource limits with fine-grained control
@@ -27,12 +27,12 @@ letting you focus on your applications rather than infrastructure complexity.
 - **⏰ Job Scheduling**: Execute jobs immediately, schedule for specific times, or set delayed execution
 - **🛡️ Enterprise Security**: mTLS encryption with certificate-based authentication and role-based
   access control
-- **🐍 Runtime Environments**: Pre-configured Python ML, Java, and GraalVM environments eliminate container image
+- **🐍 Runtime**: Configured Python ML, Java, and GraalVM runtime environments
   management
 
-## 📦 Getting Started
+## Getting Started
 
-> **☁️ Cloud Deployment**: Joblet can be deployed directly on AWS EC2 with automated installation and CloudWatch
+> **☁️ Cloud Deployment**: Joblet can be deployed directly on AWS EC2 with automated installation DynamoDB and CloudWatch
 > integration. See the [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md) for one-click deployment with user data scripts.
 
 ### A. Joblet Server Installation (Linux)
@@ -172,11 +172,11 @@ rnx job run --schedule="2025-12-25T00:00:00" maintenance.py
 The Joblet Admin UI is available as a standalone package
 at [joblet-admin repository](https://github.com/ehsaniara/joblet-admin):
 
-- **📊 System Monitoring**: Real-time CPU, memory, disk, and network metrics with visual dashboards
-- **🎮 Job Management**: Comprehensive job listing, filtering, control, and log streaming capabilities
-- **🔗 Workflow Visualization**: Interactive dependency graphs and execution timelines
-- **⚙️ System Administration**: Intuitive volume, network, and runtime environment management
-- **⚡ Direct gRPC**: Connects directly to Joblet server via gRPC
+- **System Monitoring**: Real-time CPU, memory, disk, and network metrics with visual dashboards
+- **Job Management**: Comprehensive job listing, filtering, control, and log streaming capabilities
+- **Workflow Visualization**: Interactive dependency graphs and execution timelines
+- **System Administration**: Intuitive volume, network, and runtime environment management
+- **Direct gRPC**: Connects directly to Joblet server via gRPC
 
 To use the admin interface:
 
@@ -194,7 +194,7 @@ npm run dev
 
 **Learn more**: See the [Admin UI Documentation](docs/ADMIN_UI.md)
 
-## 📊 System Requirements
+## System Requirements
 
 ### Joblet Server (Linux)
 
@@ -211,7 +211,7 @@ npm run dev
 - **Resources**: Minimal - 50MB+ RAM, network connectivity to server port 50051
 - **Distribution**: Single binary executable with no additional dependencies
 
-## 📚 Documentation
+## Documentation
 
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Get up and running quickly with step-by-step instructions
 - **[Installation Guide](docs/INSTALLATION.md)** - Comprehensive installation procedures for all platforms
@@ -222,7 +222,7 @@ npm run dev
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
 - **[Working Examples](examples/)** - Production-ready workflow templates and configurations
 
-## 🔗 Related Projects
+## Related Projects
 
 - **[Joblet Admin UI](https://github.com/ehsaniara/joblet-admin)**
 - **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)**
@@ -233,7 +233,7 @@ npm run dev
 **Developing a custom client?** Start with the [protocol definitions](https://github.com/ehsaniara/joblet-proto) to
 generate language-specific bindings.
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
