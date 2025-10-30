@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/s
 **User data script**:
 ```bash
 #!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/ec2-user-data.sh -o /tmp/joblet-install.sh
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
 chmod +x /tmp/joblet-install.sh
 ENABLE_CLOUDWATCH=true /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```

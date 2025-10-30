@@ -34,7 +34,7 @@ This creates the `JobletEC2Role` IAM role with permissions for CloudWatch Logs a
 
 ```bash
 #!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/ec2-user-data.sh -o /tmp/joblet-install.sh
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
 chmod +x /tmp/joblet-install.sh
 ENABLE_CLOUDWATCH=true /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
@@ -162,7 +162,7 @@ If you don't want AWS CloudWatch or DynamoDB integration:
 
 ```bash
 #!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/ec2-user-data.sh -o /tmp/joblet-install.sh
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
 chmod +x /tmp/joblet-install.sh
 ENABLE_CLOUDWATCH=false /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
