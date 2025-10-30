@@ -2,6 +2,10 @@
 
 *From zero to running distributed jobs in 30 minutes*
 
+> **⚡ Quick Start**: For a faster, automated installation approach, see [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) which uses EC2 user data scripts for one-command deployment with automatic certificate management, CloudWatch integration, and support for multi-instance deployments via AWS Secrets Manager.
+>
+> This guide provides a detailed manual walkthrough for educational purposes and custom setups.
+
 ---
 
 ## Overview
@@ -217,6 +221,18 @@ If you want to manage Joblet via AWS CLI:
 
 ## Part 3: Install Joblet on EC2
 
+> **📖 Modern Approach Available**: This guide shows manual installation steps for educational purposes. For production deployments, we recommend using the automated EC2 user data script approach documented in [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md). The automated approach includes:
+> - One-command installation via user data script
+> - Automatic certificate generation with embedded certs (single instance) or AWS Secrets Manager (multi-instance)
+> - CloudWatch Logs integration
+> - DynamoDB state persistence
+> - Proper systemd service setup
+>
+> For multi-instance or auto-scaling deployments on AWS, see:
+> - [AWS Secrets Manager Integration](../SECRETS_MANAGER_INTEGRATION.md) - Shared certificates across instances
+> - [Scaling on AWS](../SCALING_ON_AWS.md) - Auto-scaling group setup
+> - [Certificate Management Comparison](../CERTIFICATE_MANAGEMENT_COMPARISON.md) - Choosing the right approach
+
 ### 3.1 Connect to EC2 Instance
 
 From your MacBook:
@@ -289,7 +305,9 @@ chmod +x joblet
 
 ### 3.4 Generate TLS Certificates
 
-Joblet requires TLS for secure communication:
+> **💡 Note**: The automated installation script (`scripts/ec2-user-data.sh`) handles certificate generation automatically. For AWS deployments with multiple instances, it can use AWS Secrets Manager to share CA and client certificates across instances while generating unique server certificates per instance. See [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) for details.
+
+Joblet requires TLS for secure communication. Here's the manual approach:
 
 ```bash
 # Create certs directory

@@ -37,7 +37,8 @@ Each ADR follows this structure:
 | [008](008-gpu-support-architecture.md)              | GPU Support Architecture                      | Accepted | 2024-09-*  |
 | [009](009-seccomp-syscall-filtering.md)             | Seccomp Syscall Filtering                     | Accepted | 2024-09-*  |
 | [010](010-collect-jobs-metrics.md)                  | Collect Jobs Metrics                          | Accepted | 2024-10-*  |
-| [011](011-cqrs-architecture-with-persist.md) | CQRS Architecture with persist Service | Accepted | 2025-10-*  |
+| [011](011-cqrs-architecture-with-persist.md)        | CQRS Architecture with persist Service        | Accepted | 2025-10-*  |
+| [012](012-aws-secrets-manager-cert-storage.md)      | AWS Secrets Manager for Certificate Storage   | Accepted | 2025-10-*  |
 
 ## Creating a New ADR
 
