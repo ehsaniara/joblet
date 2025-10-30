@@ -1,660 +1,273 @@
 # Joblet AWS EC2 Deployment Guide
 
-> **🚀 Want the fastest setup?** Jump to [Fast Track Setup](#fast-track-setup-complete-aws-stack) for a complete copy-paste deployment with IAM, CloudWatch, DynamoDB, Secrets Manager, and EC2 bootstrap in ~10 minutes.
+Deploy Joblet on AWS EC2 in **2 simple steps** (~10 minutes total).
 
-## Overview
+## Quick Start
 
-This guide shows you how to deploy Joblet on AWS EC2 using the automated user data script. The script automatically
-installs Joblet, configures TLS certificates, sets up networking, and optionally enables CloudWatch Logs.
+### Step 1: Setup IAM Role (CloudShell - 30 seconds)
 
-**Time to deploy: ~5 minutes** (or ~10 minutes with full AWS stack)
-
-**Recommended Setup:**
-
-- Port 443 (HTTPS) instead of default 50051 - better firewall compatibility
-- Dedicated EC2 instance (don't run alongside web servers)
-- CloudWatch Logs enabled for production workloads
-- IAM role attached for CloudWatch permissions
-
-> **Note on CloudWatch Logs**: CloudWatch is **optional**. For simple deployments or development, set
-`ENABLE_CLOUDWATCH="false"` in the user data script and skip the IAM setup section entirely. Logs will be stored locally
-> on the EC2 instance instead.
-
-## Fast Track Setup (3 Commands)
-
-> **⚡ Deploy in ~10 minutes**: Run 3 automated scripts from AWS CloudShell or your terminal to deploy Joblet with CloudWatch Logs and DynamoDB state persistence.
-
-### Using AWS CloudShell (Recommended)
-
-1. Open AWS Console → CloudShell (top-right toolbar icon)
-2. Run these 3 commands:
+Open **AWS Console → CloudShell** (top-right toolbar icon) and run:
 
 ```bash
-# Step 1: Setup IAM (one-time, ~30 seconds)
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
-
-# Step 2: Create Security Group (one-time, ~15 seconds)
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-security-group.sh | bash
-
-# Step 3: Launch Instance (~5 minutes)
-export KEY_NAME="your-ssh-key-name"  # Replace with your SSH key name
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/launch-instance.sh | bash
 ```
 
-3. Wait ~5 minutes for installation to complete
-4. Download client config and start using Joblet!
+This creates the `JobletEC2Role` IAM role with permissions for CloudWatch Logs and DynamoDB.
 
-**That's it!** Scripts automatically create IAM roles, security groups, and launch your instance with CloudWatch + DynamoDB enabled.
+### Step 2: Launch EC2 Instance (Console - 5 minutes)
 
-### Using Local Terminal
+1. Go to **EC2 Console → Launch Instance**
 
-If you prefer to run from your local machine:
+2. **Configure the instance**:
+   - **Name**: `joblet-server`
+   - **AMI**: Ubuntu Server 22.04 LTS (latest)
+   - **Instance type**: `t3.medium` (or larger)
+   - **Key pair**: Select or create your SSH key pair
+   - **Network**: Default VPC
+   - **Security Group**: Create new or select existing with:
+     - **SSH (22)** from your IP
+     - **HTTPS (443)** from your IP (for gRPC)
+   - **IAM Instance Profile**: Select `JobletEC2Role` ⬅️ Created in Step 1
+   - **Storage**: 30 GB gp3 (default)
+
+3. **Expand "Advanced Details" → Scroll to "User data"** and paste:
 
 ```bash
-# Prerequisites: AWS CLI configured
-aws configure  # If not already configured
-
-# Download scripts
-wget https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh
-wget https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-security-group.sh
-wget https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/launch-instance.sh
-
-chmod +x setup-iam.sh setup-security-group.sh launch-instance.sh
-
-# Review scripts (optional)
-cat setup-iam.sh
-
-# Run setup
-./setup-iam.sh
-./setup-security-group.sh
-export KEY_NAME="your-ssh-key-name"
-./launch-instance.sh
+#!/bin/bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/ec2-user-data.sh -o /tmp/joblet-install.sh
+chmod +x /tmp/joblet-install.sh
+ENABLE_CLOUDWATCH=true /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
 
-### What Gets Deployed
+4. Click **Launch instance**
 
-✅ **IAM Role**: `JobletEC2Role`
-- CloudWatch Logs permissions (automatic log aggregation)
-- DynamoDB permissions (persistent job state)
-- EC2 metadata access (region detection)
+### What Gets Deployed Automatically
 
-✅ **Security Group**: `joblet-server-sg`
-- SSH (22) from your IP
-- gRPC (443) from your IP
+When the instance boots, the user data script automatically:
 
-✅ **EC2 Instance**: Ubuntu 22.04, t3.medium
-- Joblet server on port 443
-- Automatic certificate generation (embedded)
-- systemd service (auto-starts on boot)
-- 30GB gp3 EBS volume
+✅ **Detects EC2 environment** (region, instance ID, metadata)
+✅ **Installs Joblet** via Debian/RPM package
+✅ **Creates DynamoDB table** `joblet-jobs` (for persistent job state)
+✅ **Configures CloudWatch Logs** `/joblet` log group (for log aggregation)
+✅ **Generates TLS certificates** (embedded in config)
+✅ **Starts Joblet server** on port 443 (systemd service)
 
-✅ **CloudWatch Logs**: `/joblet` log group
-- Real-time job logs and metrics
-- Searchable and filterable
-- 7-day retention (default)
+**Total time: ~5 minutes** after launch
 
-✅ **DynamoDB**: `joblet-jobs` table
-- Persistent job state (survives restarts)
-- TTL enabled (auto-cleanup after 30 days)
-- Pay-per-request billing
+---
 
-### Download Client Config
+## Post-Deployment
 
-After installation completes (~5 minutes):
+### 1. Download Client Configuration
+
+After the instance is running (wait ~5 minutes for installation):
 
 ```bash
-# Get instance IP from script output above
+# Get the public IP from EC2 Console
 PUBLIC_IP="x.x.x.x"  # Replace with actual IP
 
-# Download client configuration
+# Download client config
 mkdir -p ~/.rnx
 scp -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}:/opt/joblet/config/rnx-config.yml ~/.rnx/
+```
 
-# Test connection
+### 2. Test Connection
+
+```bash
+# List jobs (should return empty list)
 rnx job list
 
 # Run first job
 rnx job run echo "Hello from Joblet on AWS!"
 
-# View logs (stored in CloudWatch)
+# View job logs (stored in CloudWatch)
 rnx job log <job-id>
+
+# Check job status
+rnx job status <job-id>
 ```
 
-### Verification
+### 3. Verify AWS Integration
 
 ```bash
-# Check CloudWatch Logs
+# View CloudWatch Logs
 aws logs describe-log-streams --log-group-name /joblet
 
-# Check DynamoDB table
+# View DynamoDB table
 aws dynamodb describe-table --table-name joblet-jobs
 
 # SSH to instance
 ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
+
+# Check Joblet service status
 sudo systemctl status joblet
 ```
 
-### Script Details
+---
 
-For more information about the automation scripts, see [scripts/aws/README.md](../../scripts/aws/README.md)
+## What You Get
+
+### IAM Role (`JobletEC2Role`)
+- **CloudWatch Logs** permissions (CreateLogGroup, CreateLogStream, PutLogEvents)
+- **DynamoDB** permissions (CreateTable, PutItem, GetItem, UpdateItem, DeleteItem, Scan, Query)
+- **EC2 Metadata** access (region detection)
+
+### EC2 Instance
+- **Ubuntu 22.04** LTS
+- **Joblet server** running on port 443 (gRPC)
+- **Auto-starts on boot** (systemd service)
+- **30GB gp3 EBS** volume
+
+### CloudWatch Logs (`/joblet` log group)
+- **Real-time job logs** aggregated from all jobs
+- **Searchable and filterable** via AWS Console or CLI
+- **7-day retention** (default, configurable)
+- **Log format**: `/joblet/{nodeId}/jobs/{jobId}`
+
+### DynamoDB (`joblet-jobs` table)
+- **Persistent job state** (survives restarts)
+- **Auto-cleanup** with TTL (30 days for completed jobs)
+- **Pay-per-request** billing (no upfront costs)
+- **Automatic creation** during installation
 
 ---
 
-## Prerequisites
+## Advanced
 
-- AWS account with EC2 launch permissions
-- SSH key pair in your target region
-- Basic knowledge of EC2 console or AWS CLI
+### Alternative: Fully Automated CLI Deployment
 
-**Supported Operating Systems:**
-
-- Ubuntu 22.04 LTS (recommended)
-- Ubuntu 20.04 LTS
-- Debian 11/10
-- Amazon Linux 2023 (recommended for AL)
-- Amazon Linux 2
-- RHEL 8+ / CentOS Stream 8+ / Fedora 30+
-
-**Note on SSH Usernames:**
-Throughout this guide, `<EC2_USER>` refers to the default SSH user for your AMI:
-
-- Ubuntu/Debian: Use `ubuntu`
-- Amazon Linux: Use `ec2-user`
-- RHEL: Use `ec2-user`
-
-## Setup (Before Launching Instance)
-
-Before launching your EC2 instance, you need to set up IAM permissions and security groups.
-
-### Step 1: Create IAM Role
-
-Joblet on EC2 automatically configures CloudWatch Logs and DynamoDB for state persistence. Create the IAM role **first**.
-
-#### What Gets Auto-Configured
-
-On EC2, the installer automatically:
-- ✅ **CloudWatch Logs**: Job logs and metrics sent to CloudWatch
-- ✅ **DynamoDB**: Job state persisted in DynamoDB table `joblet-jobs`
-- ✅ **Auto-Cleanup**: TTL enabled for automatic deletion of old jobs (30 days)
-- ✅ **Region Detection**: Automatically detects EC2 region
-
-#### Create IAM Policy
+If you prefer command-line automation instead of the Console:
 
 ```bash
-# Create policy document
-cat > joblet-aws-policy.json << 'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "CloudWatchLogsAccess",
-      "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:PutRetentionPolicy",
-        "logs:DescribeLogStreams",
-        "logs:GetLogEvents",
-        "logs:FilterLogEvents",
-        "logs:DeleteLogGroup",
-        "logs:DeleteLogStream"
-      ],
-      "Resource": [
-        "arn:aws:logs:*:*:log-group:/joblet/*",
-        "arn:aws:logs:*:*:log-group:/joblet/*:*"
-      ]
-    },
-    {
-      "Sid": "CloudWatchMetricsAccess",
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:PutMetricData",
-        "cloudwatch:GetMetricStatistics",
-        "cloudwatch:ListMetrics"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "DynamoDBStateAccess",
-      "Effect": "Allow",
-      "Action": [
-        "dynamodb:CreateTable",
-        "dynamodb:DescribeTable",
-        "dynamodb:DescribeTimeToLive",
-        "dynamodb:UpdateTimeToLive",
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem",
-        "dynamodb:Scan",
-        "dynamodb:Query",
-        "dynamodb:BatchWriteItem"
-      ],
-      "Resource": "arn:aws:dynamodb:*:*:table/joblet-jobs"
-    },
-    {
-      "Sid": "EC2MetadataAccess",
-      "Effect": "Allow",
-      "Action": [
-        "ec2:DescribeRegions"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-EOF
+# Step 1: Setup IAM
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
 
-# Create policy and capture ARN
-POLICY_ARN=$(aws iam create-policy \
-  --policy-name JobletAWSPolicy \
-  --policy-document file://joblet-aws-policy.json \
-  --query 'Policy.Arn' \
-  --output text)
-
-echo "Created policy: $POLICY_ARN"
+# Step 2: Launch instance (will prompt for security group)
+export KEY_NAME="your-ssh-key-name"
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/launch-instance.sh | bash
 ```
 
-#### Create IAM Role
+The `launch-instance.sh` script will:
+- Find the latest Ubuntu 22.04 AMI
+- Prompt for security group selection (or create one)
+- Launch EC2 instance with user data
+- Output instance details (IP, DNS, etc.)
+
+### Disable CloudWatch/DynamoDB (Local-Only Mode)
+
+If you don't want AWS CloudWatch or DynamoDB integration:
+
+1. **Skip Step 1** (don't create IAM role)
+2. In Step 2, use this user data instead:
 
 ```bash
-# Create role with EC2 trust policy
-aws iam create-role \
-  --role-name JobletEC2Role \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ec2.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-# Attach policy to role
-aws iam attach-role-policy \
-  --role-name JobletEC2Role \
-  --policy-arn $POLICY_ARN
-
-# Create instance profile
-aws iam create-instance-profile \
-  --instance-profile-name JobletEC2Role
-
-# Add role to instance profile
-aws iam add-role-to-instance-profile \
-  --instance-profile-name JobletEC2Role \
-  --role-name JobletEC2Role
-
-echo "IAM role ready: JobletEC2Role"
+#!/bin/bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/ec2-user-data.sh -o /tmp/joblet-install.sh
+chmod +x /tmp/joblet-install.sh
+ENABLE_CLOUDWATCH=false /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
 
-**What This Enables:**
-- ✅ CloudWatch Logs for job logs and metrics
-- ✅ DynamoDB for persistent job state (survives restarts)
-- ✅ Automatic table creation and TTL setup
+This deploys Joblet with:
+- ❌ No CloudWatch Logs (logs stored in `/opt/joblet/logs/` on instance)
+- ❌ No DynamoDB (job state stored in memory, lost on restart)
+- ✅ Still fully functional for job execution
 
-**Don't want CloudWatch?** Set `ENABLE_CLOUDWATCH="false"` in user data. DynamoDB state persistence will still be enabled on EC2.
+### Monitor Installation Progress
 
-#### Optional: Add Secrets Manager Permissions
-
-If you plan to run multiple instances and want to share certificates via Secrets Manager:
+SSH to the instance and watch the installation:
 
 ```bash
-# Create Secrets Manager policy
-cat > joblet-secretsmanager-policy.json << 'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-        "secretsmanager:CreateSecret",
-        "secretsmanager:UpdateSecret"
-      ],
-      "Resource": "arn:aws:secretsmanager:*:*:secret:joblet/*"
-    }
-  ]
-}
-EOF
-
-# Create and attach policy
-SM_POLICY_ARN=$(aws iam create-policy \
-  --policy-name JobletSecretsManagerPolicy \
-  --policy-document file://joblet-secretsmanager-policy.json \
-  --query 'Policy.Arn' \
-  --output text)
-
-aws iam attach-role-policy \
-  --role-name JobletEC2Role \
-  --policy-arn $SM_POLICY_ARN
-
-echo "Secrets Manager permissions added"
-```
-
-### Step 2: Create Security Group
-
-Create a security group with these rules:
-
-```bash
-# Get your VPC ID
-VPC_ID=$(aws ec2 describe-vpcs \
-  --filters "Name=isDefault,Values=true" \
-  --query 'Vpcs[0].VpcId' \
-  --output text)
-
-# Create security group
-SG_ID=$(aws ec2 create-security-group \
-  --group-name joblet-server-sg \
-  --description "Security group for Joblet server" \
-  --vpc-id $VPC_ID \
-  --output text)
-
-# Get your public IP
-MY_IP=$(curl -s https://checkip.amazonaws.com)
-
-# Allow SSH from your IP
-aws ec2 authorize-security-group-ingress \
-  --group-id $SG_ID \
-  --protocol tcp \
-  --port 22 \
-  --cidr $MY_IP/32
-
-# Allow Joblet gRPC on port 443
-aws ec2 authorize-security-group-ingress \
-  --group-id $SG_ID \
-  --protocol tcp \
-  --port 443 \
-  --cidr $MY_IP/32
-
-echo "Security group created: $SG_ID"
-```
-
-**Or via Console:**
-
-- Inbound rules:
-    - SSH (22): Your IP only
-    - Custom TCP (443): Your IP or VPC CIDR
-- Outbound rules: Allow all (default)
-
-**Note:** Port 443 is for gRPC over TLS, not HTTP/HTTPS. This is purely for firewall compatibility.
-
-## Quick Start (AWS Console)
-
-### Step 1: Launch EC2 Instance
-
-1. Go to **EC2 Console** → **Launch Instance**
-
-2. **Configure Instance:**
-    - Name: `joblet-server`
-    - AMI: Ubuntu 22.04 LTS (or Amazon Linux 2023)
-    - Instance type: `t3.medium` (minimum: t3.small)
-    - Key pair: Select your SSH key
-
-3. **Network Settings:**
-    - VPC: Default or your VPC
-    - Auto-assign public IP: Enable
-    - Security group: Create new (see Security Group section below)
-
-4. **Storage:**
-    - 30 GB gp3 (minimum: 20 GB)
-
-5. **Advanced Details:**
-    - **IAM instance profile**: Select `JobletEC2Role` (create first - see IAM Setup below)
-    - **User data** - Paste this script:
-
-   ```bash
-   #!/bin/bash
-   set -e
-
-   # Configuration
-   export JOBLET_VERSION="latest"
-   export JOBLET_SERVER_PORT="443"
-   export ENABLE_CLOUDWATCH="true"
-   export JOBLET_CERT_DOMAIN=""  # Optional: your custom domain
-
-   # Optional: Enable Secrets Manager for shared certificates across instances
-   # export USE_SECRETS_MANAGER="true"
-
-   # Download and run installation script
-   curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-   chmod +x /tmp/joblet-install.sh
-   /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
-   ```
-
-6. **Launch** the instance
-
-### Step 2: Wait for Installation
-
-Installation takes 3-5 minutes. You can monitor progress:
-
-```bash
-# SSH into instance (use 'ubuntu' for Ubuntu AMI, 'ec2-user' for Amazon Linux)
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
+ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
 
 # Watch installation log
 tail -f /var/log/joblet-install.log
 
-# Check for completion
-grep "Installation Complete" /var/log/joblet-install.log
-```
-
-### Step 3: Verify Installation
-
-```bash
-# On EC2 instance:
-
-# Check service is running
+# Check if Joblet is running
 sudo systemctl status joblet
 
-# Check persist subprocess is running
-ps aux | grep persist | grep -v grep
-
-# Check sockets exist
-ls -la /opt/joblet/run/
-
-# Run test job
-sudo rnx job run echo "Hello from Joblet"
+# View Joblet logs
+sudo journalctl -u joblet -f
 ```
 
-## Post-Deployment
+### Security Group Configuration
 
-### Download Client Configuration
+**Required Rules:**
+- **SSH (22)**: Your IP address (for management)
+- **HTTPS (443)**: Your IP address or CIDR range (for gRPC client connections)
 
-From your **local machine**:
+**Optional Rules:**
+- **HTTPS (443)**: `0.0.0.0/0` (if you want to allow connections from anywhere - not recommended for production)
 
-```bash
-# Create config directory
-mkdir -p ~/.rnx
-
-# Download config from EC2 instance
-scp -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>:/opt/joblet/config/rnx-config.yml ~/.rnx/
-
-# Test connection
-rnx job list
-```
-
-### Connection Options
-
-The EC2 installation creates certificates with multiple addresses:
-
-- Internal IP: `10.0.1.100` (for VPC access)
-- Public IP: `3.15.123.45` (for external access)
-- EC2 Public DNS: `ec2-3-15-123-45.us-east-1.compute.amazonaws.com`
-- Custom domain: If you set `JOBLET_CERT_DOMAIN`
-
-You can configure multiple nodes in `~/.rnx/rnx-config.yml`:
-
-```yaml
-nodes:
-  default:
-    address: "10.0.1.100:443"  # Internal IP
-    cert: |
-      -----BEGIN CERTIFICATE-----
-      ...
-
-  production:
-    address: "ec2-3-15-123-45.us-east-1.compute.amazonaws.com:443"  # Public DNS
-    cert: |
-      -----BEGIN CERTIFICATE-----
-      ...
-```
-
-**Usage:**
-
-```bash
-rnx job list                      # Uses default node
-rnx --node=production job list    # Uses production node
-```
+**Important**: Always restrict SSH and gRPC access to your IP or VPC CIDR range for security.
 
 ### SSH Tunneling (For Private Instances)
 
-If your EC2 instance is in a private subnet or you want to connect through SSH tunneling:
-
-**1. Create SSH tunnel:**
+If your EC2 instance is in a private subnet without public IP:
 
 ```bash
-# Forward local port 50051 to the EC2 instance's internal IP on port 443
-ssh -N -v -L 50051:PRIVATE_IP:443 <EC2_USER>@EC2_PUBLIC_IP -i your-key.pem
+# Create SSH tunnel (from your workstation)
+ssh -i ~/.ssh/your-key.pem -L 50051:localhost:443 ubuntu@<BASTION_IP>
 
-# Example with actual values (using Ubuntu):
-ssh -N -v -L 50051:10.0.1.100:443 ubuntu@3.15.123.45 -i ~/.ssh/joblet-key.pem
+# Configure client to use localhost
+# Edit ~/.rnx/rnx-config.yml:
+#   server_address: localhost:50051
 ```
 
-**Flags explained:**
+### Cost Estimate
 
-- `-N`: Don't execute remote commands (tunnel only)
-- `-v`: Verbose mode (helps debug connection issues)
-- `-L 50051:PRIVATE_IP:443`: Forward local port 50051 to PRIVATE_IP:443 on the remote side
-- `-i your-key.pem`: SSH private key
+Approximate monthly costs (us-east-1, 24/7 operation):
 
-**2. Configure rnx to use localhost:**
+| Service | Cost |
+|---------|------|
+| EC2 t3.medium (on-demand) | ~$30/month |
+| EBS 30GB gp3 | ~$2.40/month |
+| CloudWatch Logs (10GB ingestion) | ~$5/month |
+| DynamoDB (pay-per-request, light usage) | ~$0.50/month |
+| **Total** | **~$38/month** |
 
-Edit `~/.rnx/rnx-config.yml`:
+**Cost savings tips:**
+- Use Reserved Instances or Savings Plans (~40% discount)
+- Stop instance when not in use (pay only for EBS storage)
+- Disable CloudWatch for dev/test environments
 
-```yaml
-nodes:
-  tunnel:
-    address: "localhost:50051"  # Connect through SSH tunnel
-    cert: |
-      -----BEGIN CERTIFICATE-----
-      ...  # Use the same certificate from the EC2 instance
+---
+
+## Troubleshooting
+
+### Installation Failed
+
+**Check installation log:**
+```bash
+ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
+cat /var/log/joblet-install.log
 ```
 
-**3. Test connection:**
+**Common issues:**
+- IAM role not attached → Go to EC2 Console → Instance → Actions → Security → Modify IAM role
+- AWS CLI not installed → User data script installs it automatically (wait longer)
+- Region mismatch → DynamoDB table created in wrong region (check IAM permissions)
+
+### Joblet Not Starting
 
 ```bash
-# Keep the SSH tunnel running in one terminal
-ssh -N -v -L 50051:10.0.1.100:443 ubuntu@3.15.123.45 -i ~/.ssh/joblet-key.pem
+# Check service status
+sudo systemctl status joblet
 
-# In another terminal, use the tunnel
-rnx --node=tunnel job list
+# View logs
+sudo journalctl -u joblet -n 50
+
+# Verify configuration
+cat /opt/joblet/config/joblet-config.yml
 ```
 
-**Persistent tunnel (optional):**
-
-For a persistent tunnel that reconnects automatically, use `autossh`:
+### DynamoDB Table Not Created
 
 ```bash
-# Install autossh
-sudo apt-get install autossh  # Ubuntu/Debian
-sudo yum install autossh      # Amazon Linux/RHEL
+# Check if IAM role has permissions
+aws iam get-role --role-name JobletEC2Role
+aws iam list-attached-role-policies --role-name JobletEC2Role
 
-# Create persistent tunnel
-autossh -M 0 -N -v -L 50051:10.0.1.100:443 ubuntu@3.15.123.45 -i ~/.ssh/joblet-key.pem
-```
-
-**Common use cases:**
-
-- EC2 instance in private subnet (no public IP)
-- Bastion host/jump server setup
-- Additional security layer (no direct gRPC port exposure)
-- Testing from environments where only SSH (port 22) is allowed
-
-### Run Test Jobs
-
-```bash
-# Submit a job
-rnx job run echo "Hello from Joblet on EC2"
-
-# View job list
-rnx job list
-
-# View job logs
-rnx job log <JOB_ID>
-
-# Check job status
-rnx job status <JOB_ID>
-```
-
-### Access CloudWatch Logs
-
-If you enabled CloudWatch, view logs in AWS Console:
-
-1. **CloudWatch Logs** → **Log groups**:
-    - `/joblet/<NODE_ID>/jobs` - All job logs for this node (grouped by node)
-        - Log streams: `<JOB_ID>-stdout`, `<JOB_ID>-stderr`
-    - **Default retention**: 7 days (configurable)
-
-2. **CloudWatch Metrics** → **Custom namespaces** → **Joblet/Jobs**:
-    - `CPUUsage`, `MemoryUsage`, `GPUUsage`
-    - `DiskReadBytes`, `DiskWriteBytes`
-    - `NetworkRxBytes`, `NetworkTxBytes`
-    - **Retention**: 15 months (automatic)
-
-**Via CLI:**
-
-```bash
-# List log groups
-aws logs describe-log-groups --log-group-name-prefix /joblet
-
-# Get instance metadata to find NODE_ID
-aws ec2 describe-instances --instance-ids i-xxxxxxxxx \
-  --query 'Reservations[0].Instances[0].Tags[?Key==`NodeId`].Value' --output text
-
-# Tail job logs (replace NODE_ID and JOB_ID)
-aws logs tail /joblet/<NODE_ID>/jobs --follow --filter-pattern <JOB_ID>
-
-# View specific job log stream
-aws logs get-log-events \
-  --log-group-name /joblet/<NODE_ID>/jobs \
-  --log-stream-name <JOB_ID>-stdout
-
-# Query metrics
-aws cloudwatch get-metric-statistics \
-  --namespace Joblet/Jobs \
-  --metric-name CPUUsage \
-  --dimensions Name=JobID,Value=<JOB_ID> Name=NodeID,Value=<NODE_ID> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 60 \
-  --statistics Average
-```
-
-For advanced CloudWatch queries and monitoring, see [MONITORING.md](MONITORING.md).
-
-## State Persistence (Optional - DynamoDB)
-
-By default, job states are stored in memory and lost on restart. For production AWS deployments, you can enable persistent state storage using DynamoDB.
-
-### What is State Persistence?
-
-- **persist** (covered above): Stores historical logs/metrics in CloudWatch
-- **state service**: Stores job metadata (status, exit codes, timestamps) in DynamoDB
-
-### When to Use DynamoDB State Persistence
-
-✅ **Use DynamoDB when:**
-- Running production workloads where jobs must survive restarts
-- Need job history after EC2 instance replacement
-- Running auto-scaling EC2 fleets
-- Require durability and disaster recovery
-
-### Setup DynamoDB State Persistence
-
-**1. Create DynamoDB table:**
-
-```bash
+# Manually create table (if needed)
 aws dynamodb create-table \
   --table-name joblet-jobs \
   --attribute-definitions AttributeName=jobId,AttributeType=S \
@@ -663,475 +276,102 @@ aws dynamodb create-table \
   --region us-east-1
 ```
 
-**Enable TTL for automatic cleanup:**
+### CloudWatch Logs Not Appearing
 
 ```bash
-aws dynamodb update-time-to-live \
-  --table-name joblet-jobs \
-  --time-to-live-specification "Enabled=true, AttributeName=expiresAt"
+# Check IAM permissions
+aws iam get-role-policy --role-name JobletEC2Role --policy-name JobletAWSPolicy
+
+# Verify CloudWatch agent/config
+cat /opt/joblet/config/joblet-config.yml | grep -A 5 "persist:"
+
+# Check log group exists
+aws logs describe-log-groups --log-group-name-prefix /joblet
 ```
 
-**2. Create IAM policy for DynamoDB access:**
+### Client Cannot Connect
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem",
-        "dynamodb:Scan",
-        "dynamodb:Query",
-        "dynamodb:BatchWriteItem"
-      ],
-      "Resource": "arn:aws:dynamodb:*:*:table/joblet-jobs"
-    }
-  ]
-}
-```
-
-**3. Attach policy to existing JobletCloudWatchRole:**
-
+**Check security group:**
 ```bash
-# Create the policy
-POLICY_ARN=$(aws iam create-policy \
-  --policy-name JobletDynamoDBPolicy \
-  --policy-document file://dynamodb-policy.json \
-  --query 'Policy.Arn' \
-  --output text)
-
-# Attach to existing role
-aws iam attach-role-policy \
-  --role-name JobletCloudWatchRole \
-  --policy-arn $POLICY_ARN
+# From EC2 Console or CLI
+aws ec2 describe-security-groups --group-ids sg-xxxxx
 ```
 
-**4. Configure state persistence on EC2 instance:**
+**Verify port 443 is open from your IP**
 
+**Test connectivity:**
 ```bash
-# SSH into instance
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
+# From your workstation
+telnet ${PUBLIC_IP} 443
 
-# Edit configuration
-sudo nano /opt/joblet/config/joblet-config.yml
-
-# Add state configuration:
-state:
-  backend: "dynamodb"
-  socket: "/opt/joblet/run/state-ipc.sock"
-
-  storage:
-    dynamodb:
-      region: ""  # Auto-detect from EC2 metadata
-      table_name: "joblet-jobs"
-      ttl_enabled: true
-      ttl_days: 30  # Auto-delete completed jobs after 30 days
-
-# Restart joblet
-sudo systemctl restart joblet
+# Or with openssl
+openssl s_client -connect ${PUBLIC_IP}:443
 ```
 
-**5. Verify state persistence:**
+### Connection Refused
 
+**Verify Joblet is listening:**
 ```bash
-# Create a test job
-sudo rnx job run echo "Testing state persistence"
-
-# Get job ID
-JOB_ID=$(sudo rnx job list --json | jq -r '.[0].uuid')
-
-# Restart joblet service
-sudo systemctl restart joblet
-
-# Job should still exist after restart!
-sudo rnx job status $JOB_ID
+ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
+sudo netstat -tulpn | grep 443
 ```
 
-### State Persistence Performance
-
-All state operations use async fire-and-forget pattern:
-- Create/Update/Delete operations run in goroutines with 5s timeout
-- Non-blocking - joblet continues immediately
-- High-throughput regardless of number of jobs
-- Automatic reconnection if state service restarts
-
-### Cost Considerations
-
-DynamoDB state persistence adds minimal cost:
-
-**DynamoDB Pricing (on-demand mode):**
-- Write: ~1 write per job create/update/complete
-- Read: ~1 read per job status query
-- Storage: Minimal (few KB per job, auto-deleted after TTL)
-
-**Typical costs (100 jobs/day):**
-- Writes: ~300 writes/day = $0.04/month
-- Storage: ~10 MB = $0.003/month
-- **Total: < $0.05/month**
-
-For comparison: CloudWatch Logs typically costs $5-50/month for the same workload.
-
-For complete state persistence documentation, see [state/README.md](../state/README.md).
-
-## Troubleshooting
-
-### Installation Failed
-
-**Check installation log:**
-
+**Check if certificates were generated:**
 ```bash
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
-cat /var/log/joblet-install.log
-grep -i error /var/log/joblet-install.log
+cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 ```
 
-**Common causes:**
+---
 
-- No internet access: Check VPC has internet gateway or NAT gateway
-- Package download failed: Check GitHub is accessible
-- Disk full: Use 30GB or larger volume
+## Architecture
 
-### Service Won't Start
+### Components
 
-**Check service status:**
-
-```bash
-sudo systemctl status joblet -l
-sudo journalctl -u joblet -n 100 --no-pager
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        AWS Account                          │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ EC2 Instance (Ubuntu 22.04)                          │  │
+│  │                                                      │  │
+│  │  ┌────────────────────────────────────────────┐     │  │
+│  │  │ Joblet Server (port 443)                   │     │  │
+│  │  │  - Job execution                           │     │  │
+│  │  │  - gRPC API                                │     │  │
+│  │  │  - TLS certificates (embedded)             │     │  │
+│  │  └────────────────────────────────────────────┘     │  │
+│  │                    ↓         ↓                       │  │
+│  └────────────────────┼─────────┼───────────────────────┘  │
+│                       ↓         ↓                          │
+│         ┌─────────────────┐  ┌──────────────────────┐     │
+│         │ CloudWatch Logs │  │ DynamoDB             │     │
+│         │                 │  │                      │     │
+│         │ /joblet/...     │  │ Table: joblet-jobs   │     │
+│         │ (job logs)      │  │ (job state)          │     │
+│         └─────────────────┘  └──────────────────────┘     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                           ↑
+                           │ gRPC (port 443)
+                           │
+                    ┌──────────────┐
+                    │ rnx Client   │
+                    │ (your laptop)│
+                    └──────────────┘
 ```
 
-**Common issues:**
+### Data Flow
 
-1. **Port 443 already in use:**
-   ```bash
-   sudo ss -tlnp | grep 443
-   # If occupied, use different port: JOBLET_SERVER_PORT="8443"
-   ```
+1. **Client → Joblet Server**: gRPC requests over TLS (port 443)
+2. **Joblet → DynamoDB**: Job state persistence (Create, Update, Get, List)
+3. **Joblet → CloudWatch**: Real-time log streaming (PutLogEvents)
+4. **Client ← CloudWatch**: Historical log queries via `rnx job log` (GetLogEvents)
 
-2. **Missing /opt/joblet/run directory:**
-   ```bash
-   sudo mkdir -p /opt/joblet/run
-   sudo systemctl restart joblet
-   ```
+---
 
-3. **Certificate issues:**
-   ```bash
-   sudo /usr/local/bin/certs_gen_embedded.sh
-   sudo systemctl restart joblet
-   ```
+## See Also
 
-### persist Not Running
-
-**Check if persist subprocess exists:**
-
-```bash
-ps aux | grep persist | grep -v grep
-ls -la /opt/joblet/run/
-```
-
-**Most common cause: Missing IAM role or wrong CloudWatch config**
-
-**Fix Option 1 - Attach IAM role:**
-
-```bash
-# From local machine
-aws ec2 associate-iam-instance-profile \
-  --instance-id i-xxxxxxxxx \
-  --iam-instance-profile Name=JobletCloudWatchRole
-
-# Then restart on EC2 instance
-sudo systemctl restart joblet
-```
-
-**Fix Option 2 - Disable CloudWatch:**
-
-```bash
-# Edit config
-sudo nano /opt/joblet/config/joblet-config.yml
-
-# Change:
-persist:
-  storage:
-    type: "local"  # Changed from "cloudwatch"
-
-    local:
-      logs:
-        directory: "/opt/joblet/logs"
-      metrics:
-        directory: "/opt/joblet/metrics"
-
-# Save and restart
-sudo systemctl restart joblet
-```
-
-### Can't Connect from Client
-
-**Check server is listening:**
-
-```bash
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> "sudo ss -tlnp | grep 443"
-```
-
-**Common issues:**
-
-1. **Security group doesn't allow traffic:**
-   ```bash
-   aws ec2 authorize-security-group-ingress \
-     --group-id sg-xxxxxxxxx \
-     --protocol tcp \
-     --port 443 \
-     --cidr YOUR_IP/32
-   ```
-
-2. **Wrong IP in client config:**
-   ```bash
-   # Download fresh config
-   scp -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>:/opt/joblet/config/rnx-config.yml ~/.rnx/
-   ```
-
-### CloudWatch Logs Not Working
-
-**Check IAM role is attached:**
-
-```bash
-# From local machine
-aws ec2 describe-instances \
-  --instance-ids i-xxxxxxxxx \
-  --query 'Reservations[0].Instances[0].IamInstanceProfile'
-```
-
-**Check joblet logs for CloudWatch errors:**
-
-```bash
-sudo journalctl -u joblet | grep -i cloudwatch
-```
-
-**If no role attached, attach it:**
-
-```bash
-aws ec2 associate-iam-instance-profile \
-  --instance-id i-xxxxxxxxx \
-  --iam-instance-profile Name=JobletCloudWatchRole
-
-# Restart joblet
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> "sudo systemctl restart joblet"
-```
-
-### State Persistence Not Working
-
-**Check if state subprocess is running:**
-
-```bash
-ps aux | grep "bin/state" | grep -v grep
-ls -la /opt/joblet/run/state-ipc.sock
-```
-
-**Check state service logs:**
-
-```bash
-sudo journalctl -u joblet | grep -i "\[STATE\]"
-```
-
-**Verify DynamoDB table exists:**
-
-```bash
-aws dynamodb describe-table --table-name joblet-jobs
-```
-
-**Check IAM permissions:**
-
-```bash
-# Test DynamoDB access from EC2 instance
-aws dynamodb scan --table-name joblet-jobs --limit 1
-```
-
-**Common fixes:**
-
-1. **Missing DynamoDB permissions:**
-   ```bash
-   # Attach DynamoDB policy to role (see State Persistence section)
-   aws iam attach-role-policy \
-     --role-name JobletCloudWatchRole \
-     --policy-arn arn:aws:iam::YOUR_ACCOUNT:policy/JobletDynamoDBPolicy
-   ```
-
-2. **Wrong region in config:**
-   ```bash
-   # Edit config to use auto-detect
-   sudo nano /opt/joblet/config/joblet-config.yml
-   # Set: region: ""  # Empty for auto-detect
-   sudo systemctl restart joblet
-   ```
-
-3. **State service crashed:**
-   ```bash
-   # Check logs for crash reason
-   sudo journalctl -u joblet | grep -A 20 "state subprocess"
-   # Restart joblet
-   sudo systemctl restart joblet
-   ```
-
-## Configuration Options
-
-The user data script accepts these environment variables:
-
-| Variable               | Description                          | Default  | Recommended |
-|------------------------|--------------------------------------|----------|-------------|
-| `JOBLET_VERSION`       | Version to install                   | `latest` | `latest`    |
-| `JOBLET_SERVER_PORT`   | gRPC server port                     | `50051`  | `443`       |
-| `ENABLE_CLOUDWATCH`    | Enable CloudWatch Logs               | `true`   | `true`      |
-| `USE_SECRETS_MANAGER`  | Share certs via Secrets Manager      | `auto`   | `true` (multi-instance) |
-| `JOBLET_CERT_DOMAIN`   | Custom domain for certificate        | (empty)  | (optional)  |
-
-**Example with custom configuration:**
-
-```bash
-#!/bin/bash
-export JOBLET_VERSION="v1.2.0"
-export JOBLET_SERVER_PORT="8443"
-export ENABLE_CLOUDWATCH="false"
-export USE_SECRETS_MANAGER="true"  # Enable for multi-instance deployments
-export JOBLET_CERT_DOMAIN="joblet.example.com"
-
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-chmod +x /tmp/joblet-install.sh
-/tmp/joblet-install.sh
-```
-
-### CloudWatch Log Retention
-
-After installation, you can configure log retention to control storage costs:
-
-```bash
-# SSH into instance
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
-
-# Edit config
-sudo nano /opt/joblet/config/joblet-config.yml
-
-# Under persist.storage.cloudwatch, add:
-persist:
-  storage:
-    type: cloudwatch
-    cloudwatch:
-      log_retention_days: 7    # Default (if not set)
-
-      # Other options:
-      # log_retention_days: 1    # Development (minimal cost)
-      # log_retention_days: 30   # Production (balance)
-      # log_retention_days: 365  # Compliance (1 year)
-      # log_retention_days: -1   # Never expire (expensive!)
-
-# Restart to apply
-sudo systemctl restart joblet
-```
-
-**Valid retention values:** 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653, -1 (never expire)
-
-**Note:** CloudWatch Metrics retention is fixed at 15 months and cannot be configured.
-
-## Quick Start (AWS CLI)
-
-If you prefer AWS CLI:
-
-```bash
-# Find latest Ubuntu AMI
-AMI_ID=$(aws ec2 describe-images \
-  --owners 099720109477 \
-  --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
-  --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
-  --output text)
-
-# Create user-data.sh (paste user data script from Quick Start section above)
-
-# Launch instance
-aws ec2 run-instances \
-  --image-id $AMI_ID \
-  --instance-type t3.medium \
-  --key-name my-key-pair \
-  --security-group-ids sg-xxxxxxxxx \
-  --subnet-id subnet-xxxxxxxxx \
-  --iam-instance-profile Name=JobletCloudWatchRole \
-  --user-data file://user-data.sh \
-  --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=joblet-server}]'
-```
-
-## Maintenance
-
-### Update Joblet
-
-```bash
-# SSH into instance
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>
-
-# For Ubuntu/Debian
-wget https://github.com/ehsaniara/joblet/releases/download/v1.2.0/joblet_1.2.0_amd64.deb
-sudo dpkg -i joblet_1.2.0_amd64.deb
-sudo systemctl restart joblet
-
-# For Amazon Linux/RHEL
-wget https://github.com/ehsaniara/joblet/releases/download/v1.2.0/joblet-1.2.0-1.x86_64.rpm
-sudo yum localinstall -y joblet-1.2.0-1.x86_64.rpm
-sudo systemctl restart joblet
-```
-
-### Backup Configuration
-
-```bash
-# Backup config and data
-ssh -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP> \
-  "sudo tar czf /tmp/joblet-backup.tar.gz /opt/joblet/config /opt/joblet/volumes"
-
-# Download backup
-scp -i ~/.ssh/your-key.pem <EC2_USER>@<PUBLIC_IP>:/tmp/joblet-backup.tar.gz ./
-```
-
-**For production:** Use EBS snapshots for complete backups.
-
-## Cost Considerations
-
-Key cost factors to consider (prices vary by region):
-
-| Component          | Configuration               | Notes                     |
-|--------------------|-----------------------------|---------------------------|
-| EC2 Instance       | t3.medium (2 vCPU, 4GB RAM) | Main compute cost         |
-| EBS Storage        | 30 GB gp3                   | Storage for jobs and data |
-| CloudWatch Logs    | Per GB ingested + stored    | 7-day retention (default) |
-| CloudWatch Metrics | Per unique metric           | 9 metrics per job         |
-
-**CloudWatch Logs breakdown (100 jobs/day, 1MB each):**
-
-- Ingestion: 3 GB/day ingested
-- Storage (7-day retention): ~21 GB stored
-- Note: Ingestion costs typically dominate over storage
-
-**Cost optimization strategies:**
-
-- Use t3.small for development environments
-- Stop instance during off-hours (saves ~50%)
-- Disable CloudWatch for dev/test environments
-- Reduce log retention to 1 day for development
-- Use Reserved Instances for production (significant savings)
-- Consider Spot Instances for batch/non-critical workloads
-
-## Next Steps
-
-- **Monitoring**: See [MONITORING.md](MONITORING.md) for CloudWatch dashboards, alerts, and queries
-- **Persistence (Logs/Metrics)**: See [PERSISTENCE.md](PERSISTENCE.md) for CloudWatch backend configuration
-- **Persistence (Job State)**: See [state/README.md](../state/README.md) for DynamoDB state persistence
-- **Security**: See installation notes for security best practices
-- **SDK Integration**: See [API.md](API.md) for Python/Go SDK examples
-- **Automation Scripts**: See [scripts/aws/README.md](../../scripts/aws/README.md) for script documentation
-
-## Support
-
-- **GitHub**: https://github.com/ehsaniara/joblet
-- **Issues**: https://github.com/ehsaniara/joblet/issues
-- **Installation Notes**:
-    - Debian/Ubuntu: [INSTALL_NOTES.md](INSTALL_NOTES.md)
-    - RHEL/Amazon Linux: [INSTALL_NOTES_RPM.md](INSTALL_NOTES_RPM.md)
+- [EC2 Installation Guide](installation/EC2_INSTALLATION.md) - Manual installation steps
+- [Certificate Management](CERTIFICATE_MANAGEMENT_COMPARISON.md) - Certificate options
+- [Main Documentation](README.md) - Complete Joblet documentation
+- [AWS Scripts](../scripts/aws/README.md) - Deployment script details

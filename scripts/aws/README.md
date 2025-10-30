@@ -1,58 +1,99 @@
 # Joblet AWS Deployment Scripts
 
-Quick deployment scripts for setting up Joblet on AWS EC2 with CloudWatch Logs and DynamoDB state persistence.
+Automated scripts for deploying Joblet on AWS EC2 with CloudWatch Logs and DynamoDB state persistence.
 
-## Quick Start (3 Commands)
+## Quick Start
 
-Run these commands in AWS CloudShell or your terminal with AWS CLI configured:
+### Recommended: Console + Script (Simplest)
+
+**Step 1**: Setup IAM role (CloudShell, ~30 seconds):
+```bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
+```
+
+**Step 2**: Launch EC2 from AWS Console:
+- Go to **EC2 Console → Launch Instance**
+- Select **Ubuntu 22.04 LTS**, **t3.medium** (or larger)
+- **Create security group** with: SSH (22) and HTTPS (443) from your IP
+- Select **IAM instance profile**: `JobletEC2Role`
+- Add **user data** (see below)
+- **Launch instance**
+
+**User data script**:
+```bash
+#!/bin/bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/ec2-user-data.sh -o /tmp/joblet-install.sh
+chmod +x /tmp/joblet-install.sh
+ENABLE_CLOUDWATCH=true /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+```
+
+### Alternative: Fully Automated CLI
+
+If you prefer full automation from the terminal:
 
 ```bash
-# 1. Setup IAM (one-time)
+# Step 1: Setup IAM
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
 
-# 2. Create Security Group (one-time)
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-security-group.sh | bash
-
-# 3. Launch Instance
+# Step 2: Launch instance (prompts for security group)
 export KEY_NAME="your-ssh-key-name"
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/launch-instance.sh | bash
 ```
 
 **Total time: ~10 minutes**
 
+---
+
 ## What Gets Deployed
 
-✅ **IAM Role** (`JobletEC2Role`)
+### Automatic Setup
+
+When the EC2 instance boots, it automatically:
+
+✅ **Detects EC2 environment** (region, instance ID, metadata)
+✅ **Installs Joblet** via Debian/RPM package
+✅ **Creates DynamoDB table** `joblet-jobs` (persistent job state)
+✅ **Configures CloudWatch Logs** `/joblet` log group (log aggregation)
+✅ **Generates TLS certificates** (embedded in config)
+✅ **Starts Joblet server** on port 443 (systemd service)
+
+### Resources Created
+
+**IAM Role** (`JobletEC2Role`)
 - CloudWatch Logs permissions
 - DynamoDB permissions
 - EC2 metadata access
 
-✅ **Security Group** (`joblet-server-sg`)
-- SSH (22) from your IP
-- gRPC (443) from your IP
+**Security Group**
+- Create manually in EC2 Console (recommended) or use `setup-security-group.sh`
+- Required: SSH (22) and HTTPS (443) from your IP
 
-✅ **EC2 Instance** (Ubuntu 22.04)
+**EC2 Instance** (Ubuntu 22.04)
 - Joblet server on port 443
 - Automatic certificate generation
 - systemd service (auto-starts)
+- 30 GB gp3 EBS volume
 
-✅ **CloudWatch Logs** (`/joblet` log group)
+**CloudWatch Logs** (`/joblet` log group)
 - Real-time job logs
-- Automatic retention
+- 7-day retention (default)
 
-✅ **DynamoDB** (`joblet-jobs` table)
+**DynamoDB** (`joblet-jobs` table)
 - Persistent job state
-- Auto-created with TTL
+- Auto-created with TTL (30-day cleanup)
+- Pay-per-request billing
+
+---
 
 ## Script Details
 
-### 1. setup-iam.sh
+### setup-iam.sh
 
 Creates IAM role with permissions for CloudWatch Logs and DynamoDB.
 
 **Usage:**
 ```bash
-./setup-iam.sh
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
 ```
 
 **What it creates:**
@@ -60,11 +101,39 @@ Creates IAM role with permissions for CloudWatch Logs and DynamoDB.
 - IAM Role: `JobletEC2Role`
 - Instance Profile: `JobletEC2Role`
 
-**Idempotent:** Safe to run multiple times.
+**Features:**
+- Idempotent (safe to run multiple times)
+- Auto-detects AWS credentials
+- CloudWatch Logs, DynamoDB, EC2 metadata permissions
 
-### 2. setup-security-group.sh
+### launch-instance.sh
 
-Creates security group with SSH and gRPC access.
+Launches EC2 instance with Joblet bootstrap.
+
+**Usage:**
+```bash
+export KEY_NAME="your-ssh-key"
+export SG_ID="sg-xxxxx"  # Optional, will prompt if not set
+./launch-instance.sh
+```
+
+**Environment variables:**
+- `KEY_NAME` - SSH key pair name (required)
+- `SG_ID` - Security group ID (optional, will prompt)
+- `REGION` - AWS region (default: us-east-1)
+- `INSTANCE_TYPE` - Instance type (default: t3.medium)
+- `ENABLE_CLOUDWATCH` - Enable CloudWatch (default: true)
+
+**What it does:**
+- Finds latest Ubuntu 22.04 AMI
+- Prompts for security group selection
+- Launches EC2 instance with user data
+- Attaches `JobletEC2Role` IAM profile
+- Outputs instance details (IP, DNS, etc.)
+
+### setup-security-group.sh (Optional)
+
+Creates security group with SSH and gRPC access. You can skip this and create the security group manually in the EC2 Console during instance launch.
 
 **Usage:**
 ```bash
@@ -78,63 +147,50 @@ Creates security group with SSH and gRPC access.
 **What it creates:**
 - Security Group: `joblet-server-sg`
 - SSH (22): Your IP
-- gRPC (443): Your IP
+- HTTPS (443): Your IP
 
-**Idempotent:** Safe to run multiple times.
+**Features:**
+- Idempotent (safe to run multiple times)
+- Auto-detects your public IP
+- Uses default VPC
 
-### 3. launch-instance.sh
-
-Launches EC2 instance with Joblet bootstrap.
-
-**Usage:**
-```bash
-export KEY_NAME="your-ssh-key"
-./launch-instance.sh
-```
-
-**Environment variables:**
-- `KEY_NAME` - SSH key pair name (required)
-- `SG_ID` - Security group ID (optional, will prompt)
-- `REGION` - AWS region (default: us-east-1)
-- `INSTANCE_TYPE` - Instance type (default: t3.medium)
-- `ENABLE_CLOUDWATCH` - Enable CloudWatch (default: true)
-
-**What it creates:**
-- EC2 instance with user data bootstrap
-- 30 GB gp3 EBS volume
-- Tags: Name=joblet-server, Application=Joblet
+---
 
 ## Using AWS CloudShell
 
-AWS CloudShell is perfect for running these scripts:
+AWS CloudShell is perfect for running the IAM setup script (no local AWS CLI needed):
 
-1. Open AWS Console → CloudShell (top right toolbar)
+1. Open **AWS Console → CloudShell** (top-right toolbar)
 
-2. Run the setup:
+2. Setup IAM:
 ```bash
-# Setup IAM
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
-
-# Setup Security Group (auto-detects your IP)
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-security-group.sh | bash
-
-# Launch instance (will prompt for SSH key)
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/launch-instance.sh | bash
 ```
 
-3. Wait 5 minutes for installation
+3. Then **launch EC2 from the Console** (easier than CLI):
+   - Go to **EC2 → Launch Instance**
+   - Create **security group** with SSH (22) and HTTPS (443)
+   - Select **IAM instance profile**: `JobletEC2Role`
+   - Add **user data** script (see Quick Start above)
 
-4. Download client config:
+4. Wait ~5 minutes for installation
+
+5. Download client config:
 ```bash
-# Get the instance IP from the output above
+# Get the instance IP from EC2 Console
 scp -i ~/.ssh/your-key.pem ubuntu@<PUBLIC_IP>:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
+
+---
 
 ## Verification
 
 Check that everything is working:
 
 ```bash
+# Test Joblet client
+rnx job list
+
 # View CloudWatch Logs
 aws logs describe-log-streams --log-group-name /joblet
 
@@ -148,59 +204,60 @@ ssh -i ~/.ssh/your-key.pem ubuntu@<PUBLIC_IP>
 sudo systemctl status joblet
 ```
 
-## Manual Download (Alternative)
-
-If you prefer to review scripts before running:
-
-```bash
-# Download scripts
-wget https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh
-wget https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-security-group.sh
-wget https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/launch-instance.sh
-
-# Make executable
-chmod +x setup-iam.sh setup-security-group.sh launch-instance.sh
-
-# Review
-cat setup-iam.sh
-
-# Run
-./setup-iam.sh
-./setup-security-group.sh
-./launch-instance.sh
-```
+---
 
 ## Troubleshooting
 
-**"AWS CLI not found"**
+**AWS CLI not found**
 - CloudShell: Already installed
 - Local: Install from https://aws.amazon.com/cli/
 
-**"AWS credentials not configured"**
+**AWS credentials not configured**
 ```bash
 aws configure
 ```
 
-**"SSH key not found"**
+**SSH key not found**
 - Create key pair in EC2 Console → Key Pairs
 - Or: `aws ec2 create-key-pair --key-name joblet-key --query 'KeyMaterial' --output text > ~/.ssh/joblet-key.pem`
 
-**"Security group already exists"**
+**Security group already exists**
 - Scripts are idempotent, safe to re-run
 - Or use existing: `export SG_ID=sg-xxxxxxxxx`
 
-## Cost
+**DynamoDB table not created**
+- Check IAM role is attached to instance
+- Check IAM permissions: `aws iam list-attached-role-policies --role-name JobletEC2Role`
+- Table is created automatically during package installation
 
-Approximate monthly costs:
-- EC2 t3.medium: ~$30/month (24/7)
+**CloudWatch logs not appearing**
+- Check IAM role has CloudWatch permissions
+- Verify `ENABLE_CLOUDWATCH=true` in user data
+- Check log group: `aws logs describe-log-groups --log-group-name-prefix /joblet`
+
+---
+
+## Cost Estimate
+
+Approximate monthly costs (us-east-1, 24/7 operation):
+
+- EC2 t3.medium: ~$30/month
 - EBS 30GB gp3: ~$2.40/month
-- CloudWatch Logs: ~$0.50/GB ingested
-- DynamoDB: Pay-per-request (negligible for typical usage)
+- CloudWatch Logs (10GB): ~$5/month
+- DynamoDB (pay-per-request): ~$0.50/month
 
-**Total: ~$35/month for single instance**
+**Total: ~$38/month**
+
+**Cost savings:**
+- Use Reserved Instances (~40% discount)
+- Stop instance when not in use
+- Disable CloudWatch for dev/test
+
+---
 
 ## See Also
 
-- [Complete AWS Deployment Guide](../../docs/AWS_DEPLOYMENT.md)
-- [Certificate Management](../../docs/CERTIFICATE_MANAGEMENT_COMPARISON.md)
-- [Main Documentation](../../docs/README.md)
+- [AWS Deployment Guide](../../docs/AWS_DEPLOYMENT.md) - Complete documentation
+- [EC2 Installation Guide](../../docs/installation/EC2_INSTALLATION.md) - Manual steps
+- [Certificate Management](../../docs/CERTIFICATE_MANAGEMENT_COMPARISON.md) - Certificate options
+- [Main Documentation](../../docs/README.md) - All Joblet docs

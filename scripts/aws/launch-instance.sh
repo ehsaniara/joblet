@@ -55,29 +55,37 @@ fi
 # Get SG_ID if not set
 if [ -z "$SG_ID" ]; then
     echo ""
-    echo "Available security groups:"
+    echo "=========================================================================="
+    echo "Security Group Selection"
+    echo "=========================================================================="
+    echo ""
+    echo "You can either:"
+    echo "  1. Create security group manually in EC2 Console (recommended)"
+    echo "  2. Run the automated script: ./setup-security-group.sh"
+    echo "  3. Use an existing security group"
+    echo ""
+    echo "Required rules for Joblet:"
+    echo "  - SSH (22) from your IP"
+    echo "  - HTTPS (443) from your IP (for gRPC)"
+    echo ""
+    echo "Looking for existing security groups..."
     aws ec2 describe-security-groups \
       --filters "Name=group-name,Values=joblet-server-sg" \
       --query 'SecurityGroups[*].[GroupId,GroupName,VpcId]' \
       --output table \
-      --region "$REGION"
+      --region "$REGION" 2>/dev/null || echo "(No joblet-server-sg found)"
     echo ""
-    read -p "Enter security group ID (or press Enter to search): " SG_ID
+    read -p "Enter security group ID (e.g., sg-xxxxxxxxx): " SG_ID
 
     if [ -z "$SG_ID" ]; then
-        # Try to find joblet-server-sg
-        SG_ID=$(aws ec2 describe-security-groups \
-          --filters "Name=group-name,Values=joblet-server-sg" \
-          --query 'SecurityGroups[0].GroupId' \
-          --output text \
-          --region "$REGION" 2>/dev/null || echo "")
-
-        if [ -z "$SG_ID" ] || [ "$SG_ID" = "None" ]; then
-            echo "❌ Error: Security group not found"
-            echo "Please run: ./setup-security-group.sh"
-            exit 1
-        fi
-        echo "Found security group: $SG_ID"
+        echo ""
+        echo "❌ Error: Security group ID is required"
+        echo ""
+        echo "Options:"
+        echo "  1. Create in EC2 Console: https://console.aws.amazon.com/ec2/v2/home#SecurityGroups"
+        echo "  2. Run automated script: curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-security-group.sh | bash"
+        echo "  3. Set environment variable: export SG_ID=sg-xxxxxxxxx"
+        exit 1
     fi
 fi
 
