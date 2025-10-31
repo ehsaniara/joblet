@@ -20,14 +20,15 @@ fi
 echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 
 # Check if binaries already exist (CI mode)
-if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ]; then
+if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ] && [ -f "./state" ]; then
     echo "📦 Using pre-built binaries from root directory (CI mode)..."
     mkdir -p ./bin
     cp ./joblet ./bin/joblet
     cp ./rnx ./bin/rnx
     cp ./persist ./bin/persist
-    chmod +x ./bin/joblet ./bin/rnx ./bin/persist
-elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ]; then
+    cp ./state ./bin/state
+    chmod +x ./bin/joblet ./bin/rnx ./bin/persist ./bin/state
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
     # Build all binaries if they don't exist
     echo "📦 Building all binaries..."
     make all || {
@@ -68,6 +69,12 @@ if [ ! -f "./bin/persist" ]; then
     exit 1
 fi
 cp ./bin/persist "$BUILD_DIR/opt/joblet/bin/"
+
+if [ ! -f "./bin/state" ]; then
+    echo "❌ state binary not found!"
+    exit 1
+fi
+cp ./bin/state "$BUILD_DIR/opt/joblet/bin/"
 
 # Copy template files (NOT actual configs with certificates)
 if [ -f "./scripts/joblet-config-template.yml" ]; then

@@ -44,8 +44,8 @@ if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ]; then
     cp ./joblet ./bin/joblet
     cp ./rnx ./bin/rnx
     cp ./persist ./bin/persist
-    chmod +x ./bin/joblet ./bin/rnx ./bin/persist
-elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ]; then
+    chmod +x ./bin/joblet ./bin/rnx ./bin/persist ./bin/state
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
     # Build all binaries if they don't exist
     echo "📦 Building all binaries..."
     make all || {
@@ -84,6 +84,12 @@ if [ ! -f "./bin/persist" ]; then
     exit 1
 fi
 cp ./bin/persist "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
+
+if [ ! -f "./bin/state" ]; then
+    echo "❌ state binary not found!"
+    exit 1
+fi
+cp ./bin/state "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
 
 # Copy scripts and configs
 cp -r ./scripts "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/" || {
@@ -171,6 +177,7 @@ mkdir -p \$RPM_BUILD_ROOT/etc/modules-load.d
 cp joblet \$RPM_BUILD_ROOT/opt/joblet/bin/
 cp rnx \$RPM_BUILD_ROOT/opt/joblet/bin/
 cp persist \$RPM_BUILD_ROOT/opt/joblet/bin/
+cp state \$RPM_BUILD_ROOT/opt/joblet/bin/
 
 # Install config templates and scripts
 cp scripts/joblet-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
@@ -376,6 +383,7 @@ fi
 /opt/joblet/bin/joblet
 /opt/joblet/bin/rnx
 /opt/joblet/bin/persist
+/opt/joblet/bin/state
 /opt/joblet/scripts/joblet-config-template.yml
 /opt/joblet/scripts/rnx-config-template.yml
 /opt/joblet/scripts/common-install-functions.sh

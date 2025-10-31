@@ -305,7 +305,7 @@ get_configuration() {
     print_success "Configuration loaded successfully"
 }
 
-# DEPRECATED: DynamoDB table is now created by setup-iam.sh script
+# DEPRECATED: DynamoDB table is now created by pre-setup.sh script
 # This function is kept for reference but should not be called during installation
 setup_dynamodb_table_deprecated() {
     # Create DynamoDB table for job state persistence
@@ -426,7 +426,7 @@ detect_aws_environment() {
             echo ""
 
             print_info "💾  DynamoDB State Persistence:"
-            echo "  Table 'joblet-jobs' should be created via setup-iam.sh script"
+            echo "  Table 'joblet-jobs' should be created via pre-setup.sh script"
             echo "  If not created, Joblet will use in-memory state (not persistent)"
             echo ""
 

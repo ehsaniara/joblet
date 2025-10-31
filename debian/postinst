@@ -104,6 +104,8 @@ case "$1" in
         chmod 755 /opt/joblet/bin
         chmod 755 /opt/joblet/bin/joblet
         chmod 755 /opt/joblet/bin/rnx
+        chmod 755 /opt/joblet/bin/persist
+        chmod 755 /opt/joblet/bin/state
         chmod 755 /opt/joblet/scripts
         chmod 644 /opt/joblet/scripts/joblet-config-template.yml
         chmod 644 /opt/joblet/scripts/rnx-config-template.yml

@@ -59,3 +59,9 @@ rpmbuild/
 
 # VERSION file (optional override for version info - git tags preferred)
 VERSION
+
+# Temporary files
+*.backup
+error.log
+*SUMMARY.md
+*CHECKLIST.md
