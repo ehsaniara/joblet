@@ -1,26 +1,29 @@
 #!/bin/bash
 #
-# Joblet AWS IAM Setup Script
-# Creates IAM role with permissions for CloudWatch Logs and DynamoDB state persistence
+# Joblet AWS Pre-Setup Script
+# Prepares AWS resources before EC2 instance launch:
+#   - Creates IAM role with CloudWatch Logs and DynamoDB permissions
+#   - Creates DynamoDB table for job state persistence
 #
-# Usage: ./setup-iam.sh
-# Or: curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
+# Usage: ./pre-setup.sh
+# Or: curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 #
 
 set -e
 
 echo "=========================================================================="
-echo "Joblet AWS IAM Setup"
+echo "Joblet AWS Pre-Setup"
 echo "=========================================================================="
 echo ""
 echo "This script will create:"
 echo "  • IAM Policy: JobletAWSPolicy"
 echo "  • IAM Role: JobletEC2Role"
 echo "  • Instance Profile: JobletEC2Role"
+echo "  • DynamoDB Table: joblet-jobs"
 echo ""
 echo "Permissions granted:"
 echo "  ✅ CloudWatch Logs - Automatic log aggregation"
-echo "  ✅ DynamoDB - Persistent job state (auto-created table)"
+echo "  ✅ DynamoDB - Persistent job state"
 echo "  ✅ EC2 Metadata - Region detection"
 echo ""
 
@@ -175,6 +178,74 @@ fi
 
 echo ""
 echo "=========================================================================="
+echo "Creating DynamoDB Table"
+echo "=========================================================================="
+echo ""
+
+# Get region (default to us-east-1)
+REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+
+# Check if table already exists
+if aws dynamodb describe-table --table-name joblet-jobs --region "$REGION" >/dev/null 2>&1; then
+    echo "⚠️  DynamoDB table 'joblet-jobs' already exists in region: $REGION"
+
+    # Check if TTL is enabled
+    TTL_STATUS=$(aws dynamodb describe-time-to-live --table-name joblet-jobs --region "$REGION" --query 'TimeToLiveDescription.TimeToLiveStatus' --output text 2>/dev/null || echo "")
+
+    if [ "$TTL_STATUS" = "ENABLED" ]; then
+        echo "✅ TTL already enabled on table"
+    else
+        echo "Enabling TTL for automatic cleanup..."
+        if aws dynamodb update-time-to-live \
+            --table-name joblet-jobs \
+            --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
+            --region "$REGION" >/dev/null 2>&1; then
+            echo "✅ TTL enabled - completed jobs will be auto-deleted after 30 days"
+        else
+            echo "⚠️  Could not enable TTL (may require additional permissions)"
+        fi
+    fi
+else
+    # Create DynamoDB table
+    echo "Creating DynamoDB table: joblet-jobs in region: $REGION"
+    if aws dynamodb create-table \
+        --table-name joblet-jobs \
+        --attribute-definitions AttributeName=jobId,AttributeType=S \
+        --key-schema AttributeName=jobId,KeyType=HASH \
+        --billing-mode PAY_PER_REQUEST \
+        --region "$REGION" \
+        --tags Key=ManagedBy,Value=Joblet Key=Purpose,Value=JobStatePersistence \
+        >/dev/null 2>&1; then
+        echo "✅ DynamoDB table created successfully"
+
+        # Wait for table to be active
+        echo "Waiting for table to become active..."
+        if aws dynamodb wait table-exists --table-name joblet-jobs --region "$REGION" 2>/dev/null; then
+            echo "✅ Table is now active"
+
+            # Enable TTL
+            echo "Enabling TTL for automatic cleanup of old jobs..."
+            if aws dynamodb update-time-to-live \
+                --table-name joblet-jobs \
+                --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
+                --region "$REGION" >/dev/null 2>&1; then
+                echo "✅ TTL enabled - completed jobs will be auto-deleted after 30 days"
+            else
+                echo "⚠️  Could not enable TTL (table created but TTL requires additional permissions)"
+            fi
+        else
+            echo "⚠️  Table created but may still be initializing"
+        fi
+    else
+        echo "❌ Failed to create DynamoDB table"
+        echo "You may need to create it manually using the AWS Console"
+        echo "Table name: joblet-jobs"
+        echo "Region: $REGION"
+    fi
+fi
+
+echo ""
+echo "=========================================================================="
 echo "✅ IAM Setup Complete"
 echo "=========================================================================="
 echo ""
@@ -182,12 +253,14 @@ echo "Resources created:"
 echo "  • Policy ARN: $POLICY_ARN"
 echo "  • IAM Role: JobletEC2Role"
 echo "  • Instance Profile: JobletEC2Role"
+echo "  • DynamoDB Table: joblet-jobs (region: $REGION)"
 echo ""
 echo "This enables:"
 echo "  ✅ CloudWatch Logs (/joblet log group)"
-echo "  ✅ DynamoDB state (joblet-jobs table, auto-created)"
+echo "  ✅ DynamoDB state (joblet-jobs table)"
 echo "  ✅ EC2 metadata access"
 echo ""
-echo "Next step: Create security group"
-echo "  Run: ./setup-security-group.sh"
+echo "Next step: Launch EC2 instance"
+echo "  - From Console: EC2 → Launch Instance"
+echo "  - Or run: ./launch-instance.sh"
 echo ""

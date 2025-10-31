@@ -119,6 +119,8 @@ sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
 
 ## AWS EC2 Deployment with Terraform
 
+> **💡 Quick Start**: For simpler EC2 deployment without Terraform, see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md) for ready-to-use bash scripts.
+
 ### Infrastructure as Code Deployment
 
 The following Terraform configuration deploys Joblet on AWS EC2 instances with production-ready security groups,

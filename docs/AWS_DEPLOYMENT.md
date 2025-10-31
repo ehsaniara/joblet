@@ -4,15 +4,17 @@ Deploy Joblet on AWS EC2 in **2 simple steps** (~10 minutes total).
 
 ## Quick Start
 
-### Step 1: Setup IAM Role (CloudShell - 30 seconds)
+### Step 1: AWS Pre-Setup (CloudShell - 30 seconds)
 
 Open **AWS Console → CloudShell** (top-right toolbar icon) and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 ```
 
-This creates the `JobletEC2Role` IAM role with permissions for CloudWatch Logs and DynamoDB.
+This creates:
+- `JobletEC2Role` IAM role with permissions for CloudWatch Logs and DynamoDB
+- `joblet-jobs` DynamoDB table for job state persistence
 
 ### Step 2: Launch EC2 Instance (Console - 5 minutes)
 
@@ -47,10 +49,11 @@ When the instance boots, the user data script automatically:
 
 ✅ **Detects EC2 environment** (region, instance ID, metadata)
 ✅ **Installs Joblet** via Debian/RPM package
-✅ **Creates DynamoDB table** `joblet-jobs` (for persistent job state)
 ✅ **Configures CloudWatch Logs** `/joblet` log group (for log aggregation)
 ✅ **Generates TLS certificates** (embedded in config)
 ✅ **Starts Joblet server** on port 443 (systemd service)
+
+**Note**: DynamoDB table is created in Step 1 (pre-setup), not on EC2 instance.
 
 **Total time: ~5 minutes** after launch
 
@@ -139,8 +142,8 @@ sudo systemctl status joblet
 If you prefer command-line automation instead of the Console:
 
 ```bash
-# Step 1: Setup IAM
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/setup-iam.sh | bash
+# Step 1: AWS Pre-Setup (IAM + DynamoDB)
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 
 # Step 2: Launch instance (will prompt for security group)
 export KEY_NAME="your-ssh-key-name"
