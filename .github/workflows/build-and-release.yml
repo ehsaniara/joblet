@@ -108,6 +108,14 @@ jobs:
             -o ../persist-${{ matrix.arch }} \
             ./cmd/persist
 
+      - name: Build state binary
+        run: |
+          cd state
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
+            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
+            -o ../state-${{ matrix.arch }} \
+            ./cmd/state
+
       - name: Upload joblet binary
         uses: actions/upload-artifact@v4
         with:
@@ -125,6 +133,12 @@ jobs:
         with:
           name: persist-binary-${{ matrix.arch }}
           path: persist-${{ matrix.arch }}
+
+      - name: Upload state binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-binary-${{ matrix.arch }}
+          path: state-${{ matrix.arch }}
 
   build-cross-platform-cli:
     needs: test
@@ -264,6 +278,12 @@ jobs:
           name: persist-binary-amd64
           path: ./
 
+      - name: Download state binary
+        uses: actions/download-artifact@v4
+        with:
+          name: state-binary-amd64
+          path: ./
+
       - name: Debug - List downloaded files
         run: |
           echo "Current working directory:"
@@ -318,13 +338,37 @@ jobs:
               exit 1
             fi
           fi
-          
+
+          # Find and handle persist binary
+          if [ -f "./persist-amd64" ]; then
+            echo "Found persist-amd64, making it executable and renaming..."
+            chmod +x persist-amd64
+            mv persist-amd64 persist
+          else
+            echo "ERROR: No persist binary found!"
+            exit 1
+          fi
+
+          # Find and handle state binary
+          if [ -f "./state-amd64" ]; then
+            echo "Found state-amd64, making it executable and renaming..."
+            chmod +x state-amd64
+            mv state-amd64 state
+          else
+            echo "ERROR: No state binary found!"
+            exit 1
+          fi
+
           echo "Final verification:"
-          ls -la joblet rnx
+          ls -la joblet rnx persist state
           echo "Joblet binary info:"
           file joblet
           echo "RNX binary info:"
           file rnx
+          echo "Persist binary info:"
+          file persist
+          echo "State binary info:"
+          file state
 
       - name: Install packaging dependencies
         run: |
@@ -383,6 +427,12 @@ jobs:
           name: persist-binary-arm64
           path: ./
 
+      - name: Download state binary
+        uses: actions/download-artifact@v4
+        with:
+          name: state-binary-arm64
+          path: ./
+
       - name: Debug - List downloaded files
         run: |
           echo "Current working directory:"
@@ -437,13 +487,37 @@ jobs:
               exit 1
             fi
           fi
-          
+
+          # Find and handle persist binary
+          if [ -f "./persist-arm64" ]; then
+            echo "Found persist-arm64, making it executable and renaming..."
+            chmod +x persist-arm64
+            mv persist-arm64 persist
+          else
+            echo "ERROR: No persist binary found!"
+            exit 1
+          fi
+
+          # Find and handle state binary
+          if [ -f "./state-arm64" ]; then
+            echo "Found state-arm64, making it executable and renaming..."
+            chmod +x state-arm64
+            mv state-arm64 state
+          else
+            echo "ERROR: No state binary found!"
+            exit 1
+          fi
+
           echo "Final verification:"
-          ls -la joblet rnx
+          ls -la joblet rnx persist state
           echo "Joblet binary info:"
           file joblet
           echo "RNX binary info:"
           file rnx
+          echo "Persist binary info:"
+          file persist
+          echo "State binary info:"
+          file state
 
       - name: Install packaging dependencies
         run: |
@@ -502,6 +576,12 @@ jobs:
           name: persist-binary-amd64
           path: ./
 
+      - name: Download state binary
+        uses: actions/download-artifact@v4
+        with:
+          name: state-binary-amd64
+          path: ./
+
       - name: Debug - List downloaded files
         run: |
           echo "Current working directory:"
@@ -514,7 +594,7 @@ jobs:
       - name: Make binaries executable
         run: |
           echo "Making binaries executable..."
-          
+
           # Find and handle joblet binary
           if [ -f "./joblet-amd64" ]; then
             echo "Found joblet-amd64, making it executable and renaming..."
@@ -534,7 +614,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           # Find and handle rnx binary
           if [ -f "./rnx-amd64" ]; then
             echo "Found rnx-amd64, making it executable and renaming..."
@@ -554,9 +634,29 @@ jobs:
               exit 1
             fi
           fi
-          
+
+          # Find and handle persist binary
+          if [ -f "./persist-amd64" ]; then
+            echo "Found persist-amd64, making it executable and renaming..."
+            chmod +x persist-amd64
+            mv persist-amd64 persist
+          else
+            echo "ERROR: No persist binary found!"
+            exit 1
+          fi
+
+          # Find and handle state binary
+          if [ -f "./state-amd64" ]; then
+            echo "Found state-amd64, making it executable and renaming..."
+            chmod +x state-amd64
+            mv state-amd64 state
+          else
+            echo "ERROR: No state binary found!"
+            exit 1
+          fi
+
           echo "Final verification:"
-          ls -la joblet rnx
+          ls -la joblet rnx persist state
 
       - name: Install RPM build tools
         run: |
@@ -615,6 +715,12 @@ jobs:
           name: persist-binary-arm64
           path: ./
 
+      - name: Download state binary
+        uses: actions/download-artifact@v4
+        with:
+          name: state-binary-arm64
+          path: ./
+
       - name: Debug - List downloaded files
         run: |
           echo "Current working directory:"
@@ -667,9 +773,29 @@ jobs:
               exit 1
             fi
           fi
-          
+
+          # Find and handle persist binary
+          if [ -f "./persist-arm64" ]; then
+            echo "Found persist-arm64, making it executable and renaming..."
+            chmod +x persist-arm64
+            mv persist-arm64 persist
+          else
+            echo "ERROR: No persist binary found!"
+            exit 1
+          fi
+
+          # Find and handle state binary
+          if [ -f "./state-arm64" ]; then
+            echo "Found state-arm64, making it executable and renaming..."
+            chmod +x state-arm64
+            mv state-arm64 state
+          else
+            echo "ERROR: No state binary found!"
+            exit 1
+          fi
+
           echo "Final verification:"
-          ls -la joblet rnx
+          ls -la joblet rnx persist state
 
       - name: Install RPM build tools with enhanced cross-compilation support
         run: |
