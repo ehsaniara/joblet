@@ -119,7 +119,8 @@ sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
 
 ## AWS EC2 Deployment with Terraform
 
-> **💡 Quick Start**: For simpler EC2 deployment without Terraform, see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md) for ready-to-use bash scripts.
+> **💡 Quick Start**: For simpler EC2 deployment without Terraform, see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md) for
+> ready-to-use bash scripts.
 
 ### Infrastructure as Code Deployment
 

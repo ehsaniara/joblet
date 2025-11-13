@@ -311,8 +311,8 @@ Single systemd service:
     - Binary: `/opt/joblet/bin/joblet`
     - Config: `/opt/joblet/config/joblet-config.yml`
     - Automatically spawns two subprocesses:
-      - **persist**: Log/metric persistence (persist: section)
-      - **state**: Job state persistence (state: section)
+        - **persist**: Log/metric persistence (persist: section)
+        - **state**: Job state persistence (state: section)
 
 ### Deployment Command
 

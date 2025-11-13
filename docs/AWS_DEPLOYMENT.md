@@ -13,6 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/p
 ```
 
 This creates:
+
 - `JobletEC2Role` IAM role with permissions for CloudWatch Logs and DynamoDB
 - `joblet-jobs` DynamoDB table for job state persistence
 
@@ -21,16 +22,16 @@ This creates:
 1. Go to **EC2 Console → Launch Instance**
 
 2. **Configure the instance**:
-   - **Name**: `joblet-server`
-   - **AMI**: Ubuntu Server 22.04 LTS (latest)
-   - **Instance type**: `t3.medium` (or larger)
-   - **Key pair**: Select or create your SSH key pair
-   - **Network**: Default VPC
-   - **Security Group**: Create new or select existing with:
-     - **SSH (22)** from your IP
-     - **HTTPS (443)** from your IP (for gRPC)
-   - **IAM Instance Profile**: Select `JobletEC2Role` ⬅️ Created in Step 1
-   - **Storage**: 30 GB gp3 (default)
+    - **Name**: `joblet-server`
+    - **AMI**: Ubuntu Server 22.04 LTS (latest)
+    - **Instance type**: `t3.medium` (or larger)
+    - **Key pair**: Select or create your SSH key pair
+    - **Network**: Default VPC
+    - **Security Group**: Create new or select existing with:
+        - **SSH (22)** from your IP
+        - **HTTPS (443)** from your IP (for gRPC)
+    - **IAM Instance Profile**: Select `JobletEC2Role` ⬅️ Created in Step 1
+    - **Storage**: 30 GB gp3 (default)
 
 3. **Expand "Advanced Details" → Scroll to "User data"** and paste:
 
@@ -111,23 +112,27 @@ sudo systemctl status joblet
 ## What You Get
 
 ### IAM Role (`JobletEC2Role`)
+
 - **CloudWatch Logs** permissions (CreateLogGroup, CreateLogStream, PutLogEvents)
 - **DynamoDB** permissions (CreateTable, PutItem, GetItem, UpdateItem, DeleteItem, Scan, Query)
 - **EC2 Metadata** access (region detection)
 
 ### EC2 Instance
+
 - **Ubuntu 22.04** LTS
 - **Joblet server** running on port 443 (gRPC)
 - **Auto-starts on boot** (systemd service)
 - **30GB gp3 EBS** volume
 
 ### CloudWatch Logs (`/joblet` log group)
+
 - **Real-time job logs** aggregated from all jobs
 - **Searchable and filterable** via AWS Console or CLI
 - **7-day retention** (default, configurable)
 - **Log format**: `/joblet/{nodeId}/jobs/{jobId}`
 
 ### DynamoDB (`joblet-jobs` table)
+
 - **Persistent job state** (survives restarts)
 - **Auto-cleanup** with TTL (30 days for completed jobs)
 - **Pay-per-request** billing (no upfront costs)
@@ -151,6 +156,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/l
 ```
 
 The `launch-instance.sh` script will:
+
 - Find the latest Ubuntu 22.04 AMI
 - Prompt for security group selection (or create one)
 - Launch EC2 instance with user data
@@ -171,6 +177,7 @@ ENABLE_CLOUDWATCH=false /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-instal
 ```
 
 This deploys Joblet with:
+
 - ❌ No CloudWatch Logs (logs stored in `/opt/joblet/logs/` on instance)
 - ❌ No DynamoDB (job state stored in memory, lost on restart)
 - ✅ Still fully functional for job execution
@@ -195,10 +202,12 @@ sudo journalctl -u joblet -f
 ### Security Group Configuration
 
 **Required Rules:**
+
 - **SSH (22)**: Your IP address (for management)
 - **HTTPS (443)**: Your IP address or CIDR range (for gRPC client connections)
 
 **Optional Rules:**
+
 - **HTTPS (443)**: `0.0.0.0/0` (if you want to allow connections from anywhere - not recommended for production)
 
 **Important**: Always restrict SSH and gRPC access to your IP or VPC CIDR range for security.
@@ -220,15 +229,16 @@ ssh -i ~/.ssh/your-key.pem -L 50051:localhost:443 ubuntu@<BASTION_IP>
 
 Approximate monthly costs (us-east-1, 24/7 operation):
 
-| Service | Cost |
-|---------|------|
-| EC2 t3.medium (on-demand) | ~$30/month |
-| EBS 30GB gp3 | ~$2.40/month |
-| CloudWatch Logs (10GB ingestion) | ~$5/month |
-| DynamoDB (pay-per-request, light usage) | ~$0.50/month |
-| **Total** | **~$38/month** |
+| Service                                 | Cost           |
+|-----------------------------------------|----------------|
+| EC2 t3.medium (on-demand)               | ~$30/month     |
+| EBS 30GB gp3                            | ~$2.40/month   |
+| CloudWatch Logs (10GB ingestion)        | ~$5/month      |
+| DynamoDB (pay-per-request, light usage) | ~$0.50/month   |
+| **Total**                               | **~$38/month** |
 
 **Cost savings tips:**
+
 - Use Reserved Instances or Savings Plans (~40% discount)
 - Stop instance when not in use (pay only for EBS storage)
 - Disable CloudWatch for dev/test environments
@@ -240,12 +250,14 @@ Approximate monthly costs (us-east-1, 24/7 operation):
 ### Installation Failed
 
 **Check installation log:**
+
 ```bash
 ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
 cat /var/log/joblet-install.log
 ```
 
 **Common issues:**
+
 - IAM role not attached → Go to EC2 Console → Instance → Actions → Security → Modify IAM role
 - AWS CLI not installed → User data script installs it automatically (wait longer)
 - Region mismatch → DynamoDB table created in wrong region (check IAM permissions)
@@ -295,6 +307,7 @@ aws logs describe-log-groups --log-group-name-prefix /joblet
 ### Client Cannot Connect
 
 **Check security group:**
+
 ```bash
 # From EC2 Console or CLI
 aws ec2 describe-security-groups --group-ids sg-xxxxx
@@ -303,6 +316,7 @@ aws ec2 describe-security-groups --group-ids sg-xxxxx
 **Verify port 443 is open from your IP**
 
 **Test connectivity:**
+
 ```bash
 # From your workstation
 telnet ${PUBLIC_IP} 443
@@ -314,12 +328,14 @@ openssl s_client -connect ${PUBLIC_IP}:443
 ### Connection Refused
 
 **Verify Joblet is listening:**
+
 ```bash
 ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
 sudo netstat -tulpn | grep 443
 ```
 
 **Check if certificates were generated:**
+
 ```bash
 cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 ```

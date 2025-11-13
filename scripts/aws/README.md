@@ -7,6 +7,7 @@ Automated scripts for deploying Joblet on AWS EC2 with CloudWatch Logs and Dynam
 ### Recommended: Console + Script (Simplest)
 
 **Step 1**: AWS Pre-Setup (CloudShell, ~30 seconds):
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 ```
@@ -14,6 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/p
 This creates IAM role and DynamoDB table.
 
 **Step 2**: Launch EC2 from AWS Console:
+
 - Go to **EC2 Console → Launch Instance**
 - Select **Ubuntu 22.04 LTS**, **t3.medium** (or larger)
 - **Create security group** with: SSH (22) and HTTPS (443) from your IP
@@ -22,6 +24,7 @@ This creates IAM role and DynamoDB table.
 - **Launch instance**
 
 **User data script**:
+
 ```bash
 #!/bin/bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
@@ -63,25 +66,30 @@ When the EC2 instance boots, it automatically:
 ### Resources Created
 
 **IAM Role** (`JobletEC2Role`)
+
 - CloudWatch Logs permissions
 - DynamoDB permissions
 - EC2 metadata access
 
 **Security Group**
+
 - Create manually in EC2 Console (recommended) or use `setup-security-group.sh`
 - Required: SSH (22) and HTTPS (443) from your IP
 
 **EC2 Instance** (Ubuntu 22.04)
+
 - Joblet server on port 443
 - Automatic certificate generation
 - systemd service (auto-starts)
 - 30 GB gp3 EBS volume
 
 **CloudWatch Logs** (`/joblet` log group)
+
 - Real-time job logs
 - 7-day retention (default)
 
 **DynamoDB** (`joblet-jobs` table)
+
 - Persistent job state
 - Auto-created with TTL (30-day cleanup)
 - Pay-per-request billing
@@ -95,17 +103,20 @@ When the EC2 instance boots, it automatically:
 Prepares AWS resources before EC2 launch.
 
 **Usage:**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 ```
 
 **What it creates:**
+
 - IAM Policy: `JobletAWSPolicy`
 - IAM Role: `JobletEC2Role`
 - Instance Profile: `JobletEC2Role`
 - DynamoDB Table: `joblet-jobs` (with TTL enabled)
 
 **Features:**
+
 - Idempotent (safe to run multiple times)
 - Auto-detects AWS credentials
 - Creates all prerequisites for Joblet deployment
@@ -115,6 +126,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/p
 Launches EC2 instance with Joblet bootstrap.
 
 **Usage:**
+
 ```bash
 export KEY_NAME="your-ssh-key"
 export SG_ID="sg-xxxxx"  # Optional, will prompt if not set
@@ -122,6 +134,7 @@ export SG_ID="sg-xxxxx"  # Optional, will prompt if not set
 ```
 
 **Environment variables:**
+
 - `KEY_NAME` - SSH key pair name (required)
 - `SG_ID` - Security group ID (optional, will prompt)
 - `REGION` - AWS region (default: us-east-1)
@@ -129,6 +142,7 @@ export SG_ID="sg-xxxxx"  # Optional, will prompt if not set
 - `ENABLE_CLOUDWATCH` - Enable CloudWatch (default: true)
 
 **What it does:**
+
 - Finds latest Ubuntu 22.04 AMI
 - Prompts for security group selection
 - Launches EC2 instance with user data
@@ -137,9 +151,11 @@ export SG_ID="sg-xxxxx"  # Optional, will prompt if not set
 
 ### setup-security-group.sh (Optional)
 
-Creates security group with SSH and gRPC access. You can skip this and create the security group manually in the EC2 Console during instance launch.
+Creates security group with SSH and gRPC access. You can skip this and create the security group manually in the EC2
+Console during instance launch.
 
 **Usage:**
+
 ```bash
 # Auto-detect your IP
 ./setup-security-group.sh
@@ -149,11 +165,13 @@ Creates security group with SSH and gRPC access. You can skip this and create th
 ```
 
 **What it creates:**
+
 - Security Group: `joblet-server-sg`
 - SSH (22): Your IP
 - HTTPS (443): Your IP
 
 **Features:**
+
 - Idempotent (safe to run multiple times)
 - Auto-detects your public IP
 - Uses default VPC
@@ -167,19 +185,21 @@ AWS CloudShell is perfect for running the IAM setup script (no local AWS CLI nee
 1. Open **AWS Console → CloudShell** (top-right toolbar)
 
 2. AWS Pre-Setup:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 ```
 
 3. Then **launch EC2 from the Console** (easier than CLI):
-   - Go to **EC2 → Launch Instance**
-   - Create **security group** with SSH (22) and HTTPS (443)
-   - Select **IAM instance profile**: `JobletEC2Role`
-   - Add **user data** script (see Quick Start above)
+    - Go to **EC2 → Launch Instance**
+    - Create **security group** with SSH (22) and HTTPS (443)
+    - Select **IAM instance profile**: `JobletEC2Role`
+    - Add **user data** script (see Quick Start above)
 
 4. Wait ~5 minutes for installation
 
 5. Download client config:
+
 ```bash
 # Get the instance IP from EC2 Console
 scp -i ~/.ssh/your-key.pem ubuntu@<PUBLIC_IP>:/opt/joblet/config/rnx-config.yml ~/.rnx/
@@ -213,28 +233,34 @@ sudo systemctl status joblet
 ## Troubleshooting
 
 **AWS CLI not found**
+
 - CloudShell: Already installed
 - Local: Install from https://aws.amazon.com/cli/
 
 **AWS credentials not configured**
+
 ```bash
 aws configure
 ```
 
 **SSH key not found**
+
 - Create key pair in EC2 Console → Key Pairs
 - Or: `aws ec2 create-key-pair --key-name joblet-key --query 'KeyMaterial' --output text > ~/.ssh/joblet-key.pem`
 
 **Security group already exists**
+
 - Scripts are idempotent, safe to re-run
 - Or use existing: `export SG_ID=sg-xxxxxxxxx`
 
 **DynamoDB table not created**
+
 - Check IAM role is attached to instance
 - Check IAM permissions: `aws iam list-attached-role-policies --role-name JobletEC2Role`
 - Table is created automatically during package installation
 
 **CloudWatch logs not appearing**
+
 - Check IAM role has CloudWatch permissions
 - Verify `ENABLE_CLOUDWATCH=true` in user data
 - Check log group: `aws logs describe-log-groups --log-group-name-prefix /joblet`
@@ -253,6 +279,7 @@ Approximate monthly costs (us-east-1, 24/7 operation):
 **Total: ~$38/month**
 
 **Cost savings:**
+
 - Use Reserved Instances (~40% discount)
 - Stop instance when not in use
 - Disable CloudWatch for dev/test

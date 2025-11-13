@@ -16,7 +16,7 @@ environments without the overhead of containerization.
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture overview
 - **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Developer workflows and build instructions
-- **[CONFIG_GUIDE.md](CONFIG_GUIDE.md)** - Configuration reference
+- **[CONFIGURATION.md](CONFIGURATION.md)** - Configuration reference
 - **[DESIGN.md](DESIGN.md)** - Design principles
 - **[API.md](API.md)** - gRPC API documentation
 

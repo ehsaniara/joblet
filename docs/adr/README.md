@@ -25,20 +25,20 @@ Each ADR follows this structure:
 
 ## ADR Index
 
-| Number                                              | Title                                         | Status   | Date       |
-|-----------------------------------------------------|-----------------------------------------------|----------|------------|
-| [001](001-two-stage-execution-pattern.md)           | Two-Stage Execution Pattern                   | Accepted | 2024-09-22 |
-| [002](002-workflow-vs-job-separation.md)            | Workflow vs Job Separation                    | Accepted | 2024-09-22 |
-| [003](003-namespace-isolation-strategy.md)          | Namespace Isolation Strategy                  | Accepted | 2024-09-22 |
-| [004](004-self-contained-runtime-architecture.md)   | Self-Contained Runtime Architecture           | Accepted | 2025-09-*  |
-| [005](005-async-log-persistence.md)                 | Async Log Persistence                         | Accepted | 2024-09-22 |
-| [006](006-embedded-certificates.md)                 | Embedded Certificates                         | Accepted | 2024-09-22 |
-| [007](007-cgroups-v2-resource-management.md)        | cgroups v2 Resource Management                | Accepted | 2024-09-22 |
-| [008](008-gpu-support-architecture.md)              | GPU Support Architecture                      | Accepted | 2024-09-*  |
-| [009](009-seccomp-syscall-filtering.md)             | Seccomp Syscall Filtering                     | Accepted | 2024-09-*  |
-| [010](010-collect-jobs-metrics.md)                  | Collect Jobs Metrics                          | Accepted | 2024-10-*  |
-| [011](011-cqrs-architecture-with-persist.md)        | CQRS Architecture with persist Service        | Accepted | 2025-10-*  |
-| [012](012-aws-secrets-manager-cert-storage.md)      | AWS Secrets Manager for Certificate Storage   | Accepted | 2025-10-*  |
+| Number                                            | Title                                       | Status   | Date       |
+|---------------------------------------------------|---------------------------------------------|----------|------------|
+| [001](001-two-stage-execution-pattern.md)         | Two-Stage Execution Pattern                 | Accepted | 2024-09-22 |
+| [002](002-workflow-vs-job-separation.md)          | Workflow vs Job Separation                  | Accepted | 2024-09-22 |
+| [003](003-namespace-isolation-strategy.md)        | Namespace Isolation Strategy                | Accepted | 2024-09-22 |
+| [004](004-self-contained-runtime-architecture.md) | Self-Contained Runtime Architecture         | Accepted | 2025-09-*  |
+| [005](005-async-log-persistence.md)               | Async Log Persistence                       | Accepted | 2024-09-22 |
+| [006](006-embedded-certificates.md)               | Embedded Certificates                       | Accepted | 2024-09-22 |
+| [007](007-cgroups-v2-resource-management.md)      | cgroups v2 Resource Management              | Accepted | 2024-09-22 |
+| [008](008-gpu-support-architecture.md)            | GPU Support Architecture                    | Accepted | 2024-09-*  |
+| [009](009-seccomp-syscall-filtering.md)           | Seccomp Syscall Filtering                   | Accepted | 2024-09-*  |
+| [010](010-collect-jobs-metrics.md)                | Collect Jobs Metrics                        | Accepted | 2024-10-*  |
+| [011](011-cqrs-architecture-with-persist.md)      | CQRS Architecture with persist Service      | Accepted | 2025-10-*  |
+| [012](012-aws-secrets-manager-cert-storage.md)    | AWS Secrets Manager for Certificate Storage | Accepted | 2025-10-*  |
 
 ## Creating a New ADR
 

@@ -2,13 +2,16 @@
 
 ## Overview
 
-Joblet State Persistence provides durable storage of job state information across system restarts. It runs as a dedicated subprocess (`joblet-state`) that communicates with the main joblet service via Unix socket IPC, offering multiple storage backends including in-memory and AWS DynamoDB.
+Joblet State Persistence provides durable storage of job state information across system restarts. It runs as a
+dedicated subprocess (`joblet-state`) that communicates with the main joblet service via Unix socket IPC, offering two
+storage backends: in-memory (default) and AWS DynamoDB (for EC2 deployments only).
 
 ## Architecture
 
 ### Process Model
 
-> **⚠️ CRITICAL REQUIREMENT:** Joblet main process **cannot start without** a healthy state service. The startup sequence includes a 30-second health check with retries to ensure state service is ready before accepting job requests.
+> **⚠️ CRITICAL REQUIREMENT:** Joblet main process **cannot start without** a healthy state service. The startup
+> sequence includes a 30-second health check with retries to ensure state service is ready before accepting job requests.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -73,6 +76,7 @@ Joblet State Persistence provides durable storage of job state information acros
 ### State Flow
 
 #### 1. Job Creation
+
 ```
 1. Joblet creates new job
 2. jobStoreAdapter.CreateNewJob(job)
@@ -83,6 +87,7 @@ Joblet State Persistence provides durable storage of job state information acros
 ```
 
 #### 2. Job Update
+
 ```
 1. Job status changes (e.g., RUNNING → COMPLETED)
 2. jobStoreAdapter.UpdateJob(job)
@@ -93,6 +98,7 @@ Joblet State Persistence provides durable storage of job state information acros
 ```
 
 #### 3. Job Deletion
+
 ```
 1. Job cleanup triggered
 2. stateClient.Delete(ctx, jobID)
@@ -108,6 +114,7 @@ Joblet State Persistence provides durable storage of job state information acros
 Simple in-memory storage using Go maps.
 
 **Features:**
+
 - ✅ No external dependencies
 - ✅ Ultra-fast operations (<1ms)
 - ✅ Simple deployment
@@ -115,12 +122,14 @@ Simple in-memory storage using Go maps.
 - ⚠️ Single-node only
 
 **Use Cases:**
+
 - Development environments
 - Testing
 - VM/local deployments
 - Non-critical workloads
 
 **Configuration:**
+
 ```yaml
 state:
   backend: "memory"
@@ -130,46 +139,50 @@ state:
 ```
 
 **Implementation:**
+
 ```go
 type memoryBackend struct {
-    jobs   map[string]*domain.Job
-    mu     sync.RWMutex
+jobs   map[string]*domain.Job
+mu     sync.RWMutex
 }
 
 func (m *memoryBackend) Update(ctx context.Context, job *domain.Job) error {
-    m.mu.Lock()
-    defer m.mu.Unlock()
+m.mu.Lock()
+defer m.mu.Unlock()
 
-    if _, exists := m.jobs[job.Uuid]; !exists {
-        return ErrJobNotFound
-    }
+if _, exists := m.jobs[job.Uuid]; !exists {
+return ErrJobNotFound
+}
 
-    m.jobs[job.Uuid] = job
-    return nil
+m.jobs[job.Uuid] = job
+return nil
 }
 ```
 
-### DynamoDB Backend (AWS)
+### DynamoDB Backend (EC2 Only)
 
-Cloud-native state persistence using AWS DynamoDB.
+Cloud-native state persistence using AWS DynamoDB. **Only available when Joblet is running on AWS EC2 instances.**
 
 **Features:**
+
 - ✅ State survives restarts
 - ✅ Multi-node support
 - ✅ Automatic scaling
 - ✅ Built-in TTL for cleanup
 - ✅ Strong consistency
 - ✅ IAM role authentication
-- ⚠️ AWS dependency
+- ⚠️ **EC2 only** - Requires EC2 instance with IAM role
 - ⚠️ Network latency (5-20ms)
 
 **Use Cases:**
-- Production AWS deployments
-- Multi-node clusters
-- High-availability requirements
-- Compliance/audit trails
+
+- Production AWS EC2 deployments
+- Multi-node EC2 clusters
+- High-availability EC2 requirements
+- Compliance/audit trails in AWS
 
 **Table Schema:**
+
 ```
 Table: joblet-jobs
 ├── Primary Key: jobId (String, HASH)
@@ -192,6 +205,7 @@ Table: joblet-jobs
 ```
 
 **Configuration:**
+
 ```yaml
 state:
   backend: "dynamodb"
@@ -208,11 +222,13 @@ state:
 ```
 
 **Auto-Detection:**
+
 1. **Region Detection:** Queries EC2 metadata service
 2. **Credential Detection:** Uses EC2 instance profile (IAM role)
 3. **Table Creation:** Automatic via installer on EC2
 
 **Required IAM Permissions:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -240,25 +256,27 @@ state:
 
 **DynamoDB Operations:**
 
-| Operation | DynamoDB API | Condition | TTL Behavior |
-|-----------|--------------|-----------|--------------|
-| Create | PutItem | `attribute_not_exists(jobId)` | No TTL (job running) |
-| Update | PutItem | `attribute_exists(jobId)` | TTL set if COMPLETED/FAILED |
-| Delete | DeleteItem | None | Immediate deletion |
-| Get | GetItem | None | N/A |
-| List | Scan | Optional FilterExpression | N/A |
-| Sync | BatchWriteItem | None | 25 items per batch |
+| Operation | DynamoDB API   | Condition                     | TTL Behavior                |
+|-----------|----------------|-------------------------------|-----------------------------|
+| Create    | PutItem        | `attribute_not_exists(jobId)` | No TTL (job running)        |
+| Update    | PutItem        | `attribute_exists(jobId)`     | TTL set if COMPLETED/FAILED |
+| Delete    | DeleteItem     | None                          | Immediate deletion          |
+| Get       | GetItem        | None                          | N/A                         |
+| List      | Scan           | Optional FilterExpression     | N/A                         |
+| Sync      | BatchWriteItem | None                          | 25 items per batch          |
 
 **TTL Logic:**
+
 ```go
 // Only set TTL for completed jobs
 if ttlDays > 0 && (job.Status == "COMPLETED" || job.Status == "FAILED") {
-    expiresAt := time.Now().Add(time.Duration(ttlDays) * 24 * time.Hour).Unix()
-    item["expiresAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", expiresAt)}
+expiresAt := time.Now().Add(time.Duration(ttlDays) * 24 * time.Hour).Unix()
+item["expiresAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", expiresAt)}
 }
 ```
 
 **Cost Considerations:**
+
 ```
 DynamoDB Pricing (PAY_PER_REQUEST mode):
 
@@ -290,6 +308,7 @@ TTL Savings:
 ### Message Format
 
 **Request:**
+
 ```json
 {
   "op": "create" | "update" | "delete" | "get" | "list" | "sync",
@@ -309,6 +328,7 @@ TTL Savings:
 ```
 
 **Response:**
+
 ```json
 {
   "requestId": "req-123456789",
@@ -322,89 +342,94 @@ TTL Savings:
 ### Operations
 
 #### Create
+
 ```go
 // Client
 msg := Message{
-    Operation: "create",
-    Job:       job,
-    RequestID: c.nextRequestID(),
-    Timestamp: time.Now().Unix(),
+Operation: "create",
+Job:       job,
+RequestID: c.nextRequestID(),
+Timestamp: time.Now().Unix(),
 }
 c.sendMessage(ctx, msg)
 
 // Server
 if err := backend.Create(ctx, msg.Job); err != nil {
-    return &Response{Success: false, Error: err.Error()}
+return &Response{Success: false, Error: err.Error()}
 }
 return &Response{Success: true, Job: msg.Job}
 ```
 
 #### Update
+
 ```go
 // Client
 msg := Message{
-    Operation: "update",
-    Job:       job,
-    RequestID: c.nextRequestID(),
-    Timestamp: time.Now().Unix(),
+Operation: "update",
+Job:       job,
+RequestID: c.nextRequestID(),
+Timestamp: time.Now().Unix(),
 }
 c.sendMessage(ctx, msg)
 
 // Server (DynamoDB example)
 item := jobToItem(msg.Job, ttlDays)
 input := &dynamodb.PutItemInput{
-    TableName:           aws.String(tableName),
-    Item:                item,
-    ConditionExpression: aws.String("attribute_exists(jobId)"),
+TableName:           aws.String(tableName),
+Item:                item,
+ConditionExpression: aws.String("attribute_exists(jobId)"),
 }
 _, err := client.PutItem(ctx, input)
 ```
 
 #### Get
+
 ```go
 // Client
 msg := Message{
-    Operation: "get",
-    JobID:     jobID,
-    RequestID: c.nextRequestID(),
-    Timestamp: time.Now().Unix(),
+Operation: "get",
+JobID:     jobID,
+RequestID: c.nextRequestID(),
+Timestamp: time.Now().Unix(),
 }
 response, err := c.sendMessageWithResponse(ctx, msg)
 return response.Job, err
 ```
 
 #### List
+
 ```go
 // Client
 msg := Message{
-    Operation: "list",
-    Filter: &Filter{
-        Status: "RUNNING",
-        Limit:  100,
-    },
-    RequestID: c.nextRequestID(),
-    Timestamp: time.Now().Unix(),
+Operation: "list",
+Filter: &Filter{
+Status: "RUNNING",
+Limit:  100,
+},
+RequestID: c.nextRequestID(),
+Timestamp: time.Now().Unix(),
 }
 response, err := c.sendMessageWithResponse(ctx, msg)
 return response.Jobs, err
 ```
 
 #### Sync (Bulk Update)
+
 ```go
 // Client - used for reconciliation after restart
 msg := Message{
-    Operation: "sync",
-    Jobs:      allJobs,  // Batch up to 25 jobs
-    RequestID: c.nextRequestID(),
-    Timestamp: time.Now().Unix(),
+Operation: "sync",
+Jobs:      allJobs, // Batch up to 25 jobs
+RequestID: c.nextRequestID(),
+Timestamp: time.Now().Unix(),
 }
 c.sendMessage(ctx, msg)
 
 // Server (DynamoDB example)
 // Batches 25 items per BatchWriteItem call
 for i := 0; i < len(jobs); i += 25 {
-    batch := jobs[i:min(i+25, len(jobs))]
-    backend.writeBatch(ctx, batch)
+batch := jobs[i:min(i+25, len(jobs))]
+backend.writeBatch(ctx, batch)
 }
 ```
 
@@ -452,6 +477,7 @@ state:
 ### Environment-Specific Configurations
 
 #### Development (Memory Backend)
+
 ```yaml
 state:
   backend: "memory"
@@ -459,6 +485,7 @@ state:
 ```
 
 #### AWS EC2 (DynamoDB Backend)
+
 ```yaml
 state:
   backend: "dynamodb"
@@ -613,13 +640,15 @@ aws dynamodb scan \
 ### Joblet Won't Start: "State service is not available"
 
 **Symptom:**
+
 ```
 FATAL: state service is not available - joblet cannot start
 ensure joblet-state subprocess is running and healthy
 panic: state service required but not available
 ```
 
-**Cause:** Joblet main process **requires** a healthy state service before it can start. It waits up to 30 seconds with retries.
+**Cause:** Joblet main process **requires** a healthy state service before it can start. It waits up to 30 seconds with
+retries.
 
 **Solution:**
 
@@ -777,12 +806,14 @@ sudo systemctl start joblet
 ## Performance
 
 ### Memory Backend
+
 - **Create**: < 1ms
 - **Update**: < 1ms
 - **Get**: < 1ms
 - **List**: < 10ms (1000 jobs)
 
 ### DynamoDB Backend
+
 - **Create**: 5-20ms (network latency)
 - **Update**: 5-20ms (network latency)
 - **Get**: 5-15ms (strongly consistent)
@@ -790,6 +821,7 @@ sudo systemctl start joblet
 - **Batch Sync**: 25 jobs/request
 
 **Optimization Tips:**
+
 - Use eventual consistency for reads (not implemented)
 - Batch operations where possible
 - Consider GSI for status-based queries (future)
@@ -799,6 +831,7 @@ sudo systemctl start joblet
 The state client uses connection pooling for high-concurrency workloads (1000+ concurrent jobs):
 
 **Architecture:**
+
 - Connection pool with configurable size (default: 20 connections)
 - Each connection reused for multiple operations
 - Thread-safe acquisition and release
@@ -806,12 +839,14 @@ The state client uses connection pooling for high-concurrency workloads (1000+ c
 - 10-second read timeout per operation
 
 **Performance Improvements:**
+
 - **200x faster** operations at 1000 concurrent jobs (2000ms → 10ms avg latency)
 - **800x better** timeout rate (80% → <0.1%)
 - **62% reduction** in CPU usage during high load
 - **75% reduction** in memory overhead
 
 **Configuration:**
+
 ```yaml
 state:
   pool_size: 20  # Default: 20 connections
@@ -819,26 +854,28 @@ state:
 
 **Pool Size Recommendations:**
 
-| Concurrent Jobs | Recommended Pool Size | Notes |
-|----------------|----------------------|-------|
-| < 100 | 10-20 | Default is sufficient |
-| 100-1000 | 20 | Default handles well |
-| 1000-2500 | 30-50 | Increase for headroom |
-| 2500-5000 | 50-100 | High concurrency |
-| > 5000 | 100+ | Monitor and adjust |
+| Concurrent Jobs | Recommended Pool Size | Notes                 |
+|-----------------|-----------------------|-----------------------|
+| < 100           | 10-20                 | Default is sufficient |
+| 100-1000        | 20                    | Default handles well  |
+| 1000-2500       | 30-50                 | Increase for headroom |
+| 2500-5000       | 50-100                | High concurrency      |
+| > 5000          | 100+                  | Monitor and adjust    |
 
 **Monitoring Pool Health:**
+
 ```go
 stats := stateClient.Stats()
 // Returns: pool_size, active_conns, available_conns,
 //          acquisitions, errors, timeouts
 ```
 
-For detailed performance analysis and benchmarks, see [STATE_PERFORMANCE.md](STATE_PERFORMANCE.md).
+Performance characteristics show significant improvements with connection pooling at high concurrency levels.
 
 ## Security
 
 ### Unix Socket Permissions
+
 ```bash
 # State IPC socket should be world-writable (joblet main process needs access)
 ls -la /opt/joblet/run/state-ipc.sock
@@ -850,12 +887,14 @@ ls -la /opt/joblet/run/
 ```
 
 ### DynamoDB Security
+
 - ✅ IAM role-based authentication (no credentials in config)
 - ✅ Encryption at rest (enabled by default)
 - ✅ Encryption in transit (TLS)
 - ✅ VPC endpoints (optional, for private subnets)
 
 **Recommended IAM Policy:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -889,17 +928,17 @@ ls -la /opt/joblet/run/
 
 ## Future Enhancements
 
-### Planned (v2.1+)
-- **PostgreSQL Backend**: SQL-based state storage
-- **Redis Backend**: High-performance caching layer
+### Planned
+
 - **State Reconciliation**: Automatic sync after network partitions
-- **Query Optimization**: GSI for status-based queries
+- **Query Optimization**: GSI for status-based queries in DynamoDB
 - **Backup & Restore**: Point-in-time state snapshots
 
 ### Under Consideration
-- **Multi-Region**: Cross-region state replication
-- **Compression**: Gzip job metadata to reduce storage
-- **Encryption**: Client-side encryption for sensitive data
+
+- **Multi-Region**: Cross-region DynamoDB replication
+- **Compression**: Gzip job metadata to reduce storage costs
+- **Encryption**: Client-side encryption for sensitive job data
 - **Audit Trail**: Immutable state change history
 
 ## References

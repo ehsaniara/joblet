@@ -344,6 +344,7 @@ End-to-end tests validate complete workflows against a running joblet instance.
 **Location:** `tests/e2e/`
 
 **Requirements:**
+
 - Remote joblet instance running
 - SSH access configured
 - RNX CLI configured for remote host
@@ -363,6 +364,7 @@ JOBLET_TEST_HOST=192.168.1.161 JOBLET_TEST_USER=jay ./run_tests.sh
 ```
 
 **Available E2E Tests:**
+
 1. `01_isolation_test.sh` - Process isolation validation
 2. `02_runtime_test.sh` - Runtime management
 3. `03_network_test.sh` - Network isolation

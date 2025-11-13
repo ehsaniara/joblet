@@ -32,7 +32,8 @@ letting you focus on your applications rather than infrastructure complexity.
 
 ## Getting Started
 
-> **☁️ Cloud Deployment**: Joblet can be deployed directly on AWS EC2 with automated installation DynamoDB and CloudWatch
+> **☁️ Cloud Deployment**: Joblet can be deployed directly on AWS EC2 with automated installation DynamoDB and
+> CloudWatch
 > integration. See the [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md) for one-click deployment with user data scripts.
 
 ### A. Joblet Server Installation (Linux)

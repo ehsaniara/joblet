@@ -5,9 +5,11 @@ Two guides for installing Joblet on AWS EC2 - choose the one that fits your need
 ## 📄 Available Guides
 
 ### 1. Technical Reference Guide
+
 **File:** `EC2_INSTALLATION.md`
 
 **Best for:**
+
 - System administrators
 - DevOps engineers
 - Production deployments
@@ -16,6 +18,7 @@ Two guides for installing Joblet on AWS EC2 - choose the one that fits your need
 **Style:** Step-by-step technical documentation with commands, configurations, and troubleshooting.
 
 **What's Covered:**
+
 - Complete EC2 setup with specifications
 - Security group configuration
 - IAM roles and permissions
@@ -30,9 +33,11 @@ Two guides for installing Joblet on AWS EC2 - choose the one that fits your need
 ---
 
 ### 2. Medium Article (Conversational)
+
 **File:** `EC2_INSTALLATION_MEDIUM.md`
 
 **Best for:**
+
 - Blog posts / Medium articles
 - Tutorial writers
 - Beginners learning the process
@@ -41,6 +46,7 @@ Two guides for installing Joblet on AWS EC2 - choose the one that fits your need
 **Style:** Personal, conversational tone with explanations of "why" behind each step.
 
 **What's Covered:**
+
 - Same technical content as reference guide
 - Written as a personal journey
 - More context and explanations
@@ -52,13 +58,13 @@ Two guides for installing Joblet on AWS EC2 - choose the one that fits your need
 
 ## Quick Comparison
 
-| Aspect | Technical Guide | Medium Article |
-|--------|----------------|----------------|
-| **Tone** | Formal, precise | Conversational, personal |
-| **Audience** | Engineers, admins | General developers, learners |
-| **Format** | Reference manual | Tutorial narrative |
-| **Use Case** | Production setup, documentation | Learning, blog content |
-| **Example** | "Configure the security group" | "Here's what I did with security groups" |
+| Aspect       | Technical Guide                 | Medium Article                           |
+|--------------|---------------------------------|------------------------------------------|
+| **Tone**     | Formal, precise                 | Conversational, personal                 |
+| **Audience** | Engineers, admins               | General developers, learners             |
+| **Format**   | Reference manual                | Tutorial narrative                       |
+| **Use Case** | Production setup, documentation | Learning, blog content                   |
+| **Example**  | "Configure the security group"  | "Here's what I did with security groups" |
 
 ---
 
@@ -82,6 +88,7 @@ Both guides result in the same setup:
 ```
 
 **Components:**
+
 - ✅ EC2 instance (Ubuntu 22.04)
 - ✅ Joblet server with TLS
 - ✅ Docker for job isolation
@@ -122,8 +129,8 @@ Once you complete either guide, you'll have:
    ```
 
 3. **CloudWatch monitoring**
-   - Logs in `/aws/joblet/server`
-   - Metrics in `Joblet/Server` namespace
+    - Logs in `/aws/joblet/server`
+    - Metrics in `Joblet/Server` namespace
 
 4. **Ready for workloads**
    ```bash
@@ -139,6 +146,7 @@ Once you complete either guide, you'll have:
 After installation, continue to:
 
 ### ML Demo Tutorial
+
 Run your first machine learning pipeline with Joblet.
 
 - [ML Demo README](../../examples/ml-demo/README.md)
@@ -146,6 +154,7 @@ Run your first machine learning pipeline with Joblet.
 - [ML Demo Medium Article](../../examples/ml-demo/MEDIUM_ARTICLE.md)
 
 ### Install Runtimes
+
 Get Python, Java, and other execution environments.
 
 ```bash
@@ -160,6 +169,7 @@ rnx runtime list
 ```
 
 ### Create Workflows
+
 Build your own job pipelines.
 
 ```yaml
@@ -167,7 +177,7 @@ version: "3.0"
 jobs:
   my-job:
     command: "python3"
-    args: ["script.py"]
+    args: [ "script.py" ]
     runtime: "python-3.11-ml"
 ```
 
@@ -176,18 +186,21 @@ jobs:
 ## Which Guide Should I Use?
 
 ### Use the Technical Guide if you:
+
 - Are setting up production infrastructure
 - Need a reference to come back to
 - Want all commands in one place
 - Prefer formal documentation
 
 ### Use the Medium Article if you:
+
 - Are learning how Joblet works
 - Want to understand the "why" behind each step
 - Are writing your own tutorial
 - Prefer a narrative style
 
 ### Use Both if you:
+
 - Want to understand context (Medium) while having commands reference (Technical)
 - Are writing documentation for your team
 - Need different versions for different audiences

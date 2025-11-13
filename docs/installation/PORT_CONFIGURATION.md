@@ -2,13 +2,15 @@
 
 ## Summary
 
-All installation documentation has been updated to use **port 443** for Joblet on AWS EC2, following the official Joblet AWS deployment recommendations.
+All installation documentation has been updated to use **port 443** for Joblet on AWS EC2, following the official Joblet
+AWS deployment recommendations.
 
 ---
 
 ## Port Configuration
 
 ### On EC2 (Server Side)
+
 **Joblet listens on port 443**
 
 ```yaml
@@ -19,6 +21,7 @@ server:
 ```
 
 ### On MacBook (Client Side)
+
 **SSH tunnel maps to port 8443 locally**
 
 ```bash
@@ -30,6 +33,7 @@ ssh -L 8443:localhost:443 ubuntu@ec2-host
 ```
 
 ### Client Configuration
+
 **Connect to localhost:8443 via tunnel**
 
 ```yaml
@@ -62,6 +66,7 @@ From the official Joblet AWS documentation:
 ✅ **Standard Alternative** - 8443 is a common alternative HTTPS port
 
 If you want to use 443 locally:
+
 ```bash
 sudo ~/bin/joblet-tunnel.sh  # Requires sudo
 ```
@@ -87,11 +92,13 @@ Description: Joblet gRPC API (HTTPS port for firewall compatibility)
 All tutorial documentation has been updated:
 
 ### Installation Guides
+
 - ✅ `docs/installation/EC2_INSTALLATION.md`
 - ✅ `docs/installation/EC2_INSTALLATION_MEDIUM.md`
 - ✅ `docs/installation/README.md`
 
 ### ML Demo Tutorials
+
 - ✅ `examples/ml-demo/README.md`
 - ✅ `examples/ml-demo/QUICKSTART.md`
 - ✅ `examples/ml-demo/MEDIUM_ARTICLE.md`
@@ -104,6 +111,7 @@ All tutorial documentation has been updated:
 If you have existing documentation or scripts using port 50051:
 
 ### Update Server Config
+
 ```yaml
 # OLD
 server:
@@ -115,12 +123,14 @@ server:
 ```
 
 ### Update Security Group
+
 ```
 # OLD: Port 50051
 # NEW: Port 443
 ```
 
 ### Update SSH Tunnel
+
 ```bash
 # OLD
 ssh -L 50051:localhost:50051 ubuntu@ec2-host
@@ -130,6 +140,7 @@ ssh -L 8443:localhost:443 ubuntu@ec2-host
 ```
 
 ### Update Client Config
+
 ```yaml
 # OLD
 server: "localhost:50051"
@@ -147,11 +158,13 @@ server: "ec2-host:443"    # Direct
 ### 1. Verify Server Port
 
 SSH to EC2:
+
 ```bash
 sudo netstat -tlnp | grep 443
 ```
 
 Should show:
+
 ```
 tcp  0  0  0.0.0.0:443  0.0.0.0:*  LISTEN  12345/joblet
 ```
@@ -159,6 +172,7 @@ tcp  0  0  0.0.0.0:443  0.0.0.0:*  LISTEN  12345/joblet
 ### 2. Test SSH Tunnel
 
 On MacBook:
+
 ```bash
 # Start tunnel
 ~/bin/joblet-tunnel.sh
@@ -168,6 +182,7 @@ nc -zv localhost 8443
 ```
 
 Should output:
+
 ```
 Connection to localhost port 8443 [tcp/*] succeeded!
 ```
@@ -179,6 +194,7 @@ rnx version
 ```
 
 Should show:
+
 ```
 rnx version: v1.0.0
 Server version: v1.0.0
@@ -193,6 +209,7 @@ Server version: v1.0.0
 **Problem:** Trying to use port 443 locally without sudo
 
 **Solution:** Use port 8443 locally instead:
+
 ```bash
 LOCAL_PORT="8443"  # In your tunnel script
 ```
@@ -202,6 +219,7 @@ LOCAL_PORT="8443"  # In your tunnel script
 **Problem:** Tunnel not running or wrong port
 
 **Solution:**
+
 1. Verify tunnel is running: `ps aux | grep ssh`
 2. Check tunnel is using correct ports
 3. Verify Joblet is listening on EC2: `sudo netstat -tlnp | grep 443`
@@ -211,6 +229,7 @@ LOCAL_PORT="8443"  # In your tunnel script
 **Problem:** TLS certificate mismatch
 
 **Solution:**
+
 - Ensure you copied `ca-cert.pem` from EC2
 - Check it's in `~/.rnx/certs/ca-cert.pem`
 - Verify path in `~/.rnx/rnx-config.yml`
@@ -219,21 +238,23 @@ LOCAL_PORT="8443"  # In your tunnel script
 
 ## Quick Reference
 
-| Location | Port | Why |
-|----------|------|-----|
-| **EC2 Server** | 443 | Standard HTTPS, firewall-friendly |
-| **SSH Tunnel (Local)** | 8443 | No sudo needed on MacBook |
-| **SSH Tunnel (Remote)** | 443 | Connects to Joblet on EC2 |
-| **Client Config** | 8443 or 443 | Depends on connection method |
+| Location                | Port        | Why                               |
+|-------------------------|-------------|-----------------------------------|
+| **EC2 Server**          | 443         | Standard HTTPS, firewall-friendly |
+| **SSH Tunnel (Local)**  | 8443        | No sudo needed on MacBook         |
+| **SSH Tunnel (Remote)** | 443         | Connects to Joblet on EC2         |
+| **Client Config**       | 8443 or 443 | Depends on connection method      |
 
 ### Connection Methods
 
 **Via SSH Tunnel (Recommended for security):**
+
 ```
 MacBook:8443 → SSH Tunnel → EC2:443
 ```
 
 **Direct Connection (Same VPC/VPN):**
+
 ```
 MacBook → EC2:443
 ```

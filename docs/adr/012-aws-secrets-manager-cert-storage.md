@@ -6,21 +6,25 @@ Proposed
 
 ## Context
 
-Joblet currently generates a new Certificate Authority (CA) for every installation. While this is secure, it creates operational challenges:
+Joblet currently generates a new Certificate Authority (CA) for every installation. While this is secure, it creates
+operational challenges:
 
 **Current behavior (embedded certs only):**
+
 - Every EC2 instance generates a new CA
 - Every EC2 instance generates new client certificates
 - Each instance requires a different client config file
 - Cannot easily add more instances
 
 **Problems:**
+
 1. **Multiple client configs:** Users need different `rnx-config.yml` files for each server
 2. **Certificate sprawl:** No centralized CA management
 3. **No compliance:** No audit trail of certificate generation/access
 4. **Manual rotation:** Each instance must be updated independently
 
 **What we need:**
+
 - Shared Root CA across all EC2 instances
 - Shared Admin Client certificate across all EC2 instances
 - Unique Server certificate per EC2 instance
@@ -29,7 +33,8 @@ Joblet currently generates a new Certificate Authority (CA) for every installati
 
 ## Decision
 
-Use AWS Secrets Manager to store and share Root CA and Admin Client certificates across EC2 instances, while generating unique Server certificates per instance.
+Use AWS Secrets Manager to store and share Root CA and Admin Client certificates across EC2 instances, while generating
+unique Server certificates per instance.
 
 ### Architecture
 
@@ -61,6 +66,7 @@ Use AWS Secrets Manager to store and share Root CA and Admin Client certificates
 ### Certificate Flow
 
 **First EC2 Instance:**
+
 ```bash
 1. Check Secrets Manager for joblet/ca-cert
    → Not found
@@ -73,6 +79,7 @@ Use AWS Secrets Manager to store and share Root CA and Admin Client certificates
 ```
 
 **Subsequent EC2 Instances:**
+
 ```bash
 1. Check Secrets Manager for joblet/ca-cert
    → Found!
@@ -87,6 +94,7 @@ Use AWS Secrets Manager to store and share Root CA and Admin Client certificates
 ### Secret Naming
 
 **Shared secrets (generated once):**
+
 ```
 joblet/ca-cert          # Root CA certificate
 joblet/ca-key           # Root CA private key
@@ -99,6 +107,7 @@ No per-instance paths. All instances share the same CA and client certificates.
 ### Behavior
 
 **On EC2 with IAM permissions:**
+
 ```bash
 # Auto-detect EC2, check Secrets Manager
 ./certs_gen_with_secretsmanager.sh
@@ -115,6 +124,7 @@ No per-instance paths. All instances share the same CA and client certificates.
 ```
 
 **Result:**
+
 - All instances can use the same Root CA
 - All instances accept the same client certificate
 - Each instance has a unique server certificate (security best practice)
@@ -125,6 +135,7 @@ No per-instance paths. All instances share the same CA and client certificates.
 ### The Good
 
 **Operational Benefits:**
+
 - ✅ One client config for all EC2 instances
 - ✅ Can add new instances easily (reuse existing CA)
 - ✅ Simplified certificate management
@@ -132,6 +143,7 @@ No per-instance paths. All instances share the same CA and client certificates.
 - ✅ Foundation for load balancers (future)
 
 **Security Benefits:**
+
 - ✅ Secrets encrypted with AWS KMS
 - ✅ CloudTrail logs all access
 - ✅ IAM policies control access
@@ -139,11 +151,13 @@ No per-instance paths. All instances share the same CA and client certificates.
 - ✅ Each server gets unique certificate
 
 **Compliance:**
+
 - ✅ SOC 2: Centralized secret management, audit logs
 - ✅ HIPAA: Encrypted storage, access controls
 - ✅ PCI DSS: Key management requirements
 
 **Certificate Lifecycle:**
+
 ```bash
 # View all shared certificates
 aws secretsmanager list-secrets --filters Key=name,Values=joblet/
@@ -160,15 +174,18 @@ aws cloudtrail lookup-events \
 ### The Trade-offs
 
 **Cost:**
+
 - Not per-instance (all instances share the same 4 secrets)
 - Compared to EC2 costs (~$30/month), this is negligible
 
 **Dependencies:**
+
 - Requires AWS Secrets Manager availability
 - Requires IAM permissions
 - First instance must succeed in storing secrets
 
 **Still Using Embedded Certs:**
+
 - Service reads certificates from config files (not directly from Secrets Manager)
 - Secrets Manager is a storage/sharing layer
 - If Secrets Manager is down, existing instances continue working
@@ -176,6 +193,7 @@ aws cloudtrail lookup-events \
 ### When to Use
 
 **✅ Use this approach:**
+
 - AWS EC2 deployments
 - Need multiple instances with same CA
 - Want one client config for all servers
@@ -183,6 +201,7 @@ aws cloudtrail lookup-events \
 - Planning future scaling/load balancing
 
 **❌ Don't use:**
+
 - Single instance deployment (no benefit)
 - On-premises deployment (no AWS Secrets Manager)
 - Development/testing (unnecessary cost)
@@ -216,21 +235,25 @@ aws cloudtrail lookup-events \
 ### Usage
 
 **Auto-detect (default on EC2):**
+
 ```bash
 ./certs_gen_with_secretsmanager.sh
 ```
 
 **Explicit enable:**
+
 ```bash
 USE_SECRETS_MANAGER=true ./certs_gen_with_secretsmanager.sh
 ```
 
 **Disable (embedded only):**
+
 ```bash
 USE_SECRETS_MANAGER=false ./certs_gen_embedded.sh
 ```
 
 **Force regenerate CA (rotation):**
+
 ```bash
 USE_SECRETS_MANAGER=true FORCE_REGENERATE=true ./certs_gen_with_secretsmanager.sh
 ```
@@ -238,6 +261,7 @@ USE_SECRETS_MANAGER=true FORCE_REGENERATE=true ./certs_gen_with_secretsmanager.s
 ### Certificate Rotation
 
 **Rotate Server Certificates (per instance, easy):**
+
 ```bash
 # On each instance, regenerate server cert (CA/client stay the same)
 sudo /usr/local/bin/certs_gen_with_secretsmanager.sh
@@ -245,6 +269,7 @@ sudo systemctl restart joblet
 ```
 
 **Rotate CA and Client Certificates (all instances, coordinated):**
+
 ```bash
 # Step 1: Force regenerate on one instance
 USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
@@ -266,6 +291,7 @@ USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
 ### Alternative 2: Per-Instance Secret Storage
 
 Store each instance's certificates separately:
+
 ```
 joblet/instances/i-xxx/ca-cert
 joblet/instances/i-xxx/client-cert
@@ -339,16 +365,19 @@ USE_SECRETS_MANAGER=true FORCE_REGENERATE=true ./certs_gen_with_secretsmanager.s
 ## Future Enhancements
 
 ### Phase 2: Auto-Scaling Groups
+
 - Create launch template with Secrets Manager enabled
 - ASG automatically reuses shared CA/client
 - Scale up/down seamlessly
 
 ### Phase 3: Load Balancer Support
+
 - NLB with TLS passthrough
 - All servers accept same client cert
 - Distribute traffic across instances
 
 ### Phase 4: Automatic Rotation
+
 - Lambda function triggered by Secrets Manager
 - Generates new certificates
 - Updates secrets

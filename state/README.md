@@ -2,15 +2,19 @@
 
 **Persistent Job State Management for Joblet**
 
-`state` is a subprocess service that provides persistent storage for job metadata across system restarts. It separates job state persistence from observability data (logs/metrics) handled by `persist`.
+`state` is a subprocess service that provides persistent storage for job metadata across system restarts. It separates
+job state persistence from observability data (logs/metrics) handled by `persist`.
 
 ## 📋 Overview
 
 ### Problem
+
 By default, Joblet stores job states in memory. When the service or host restarts, all job history is lost.
 
 ### Solution
+
 `state` provides pluggable persistent storage backends:
+
 - **Memory** (default, no persistence)
 - **DynamoDB** (AWS cloud persistence)
 - **Redis** (future: distributed caching)
@@ -79,6 +83,7 @@ aws dynamodb create-table \
 ```
 
 **Enable TTL (optional):**
+
 ```bash
 aws dynamodb update-time-to-live \
   --table-name joblet-jobs \
@@ -130,10 +135,12 @@ rnx job status <job-id>
 ## 📊 DynamoDB Schema
 
 ### Primary Key
+
 - **Partition Key**: `jobId` (String) - Unique job identifier
 - **Sort Key**: None (single-item per job)
 
 ### Attributes
+
 ```
 jobId: String         # UUID (e.g., "abc123...")
 jobStatus: String     # PENDING, RUNNING, COMPLETED, FAILED
@@ -147,6 +154,7 @@ expiresAt: Number     # Unix timestamp for TTL (auto-cleanup)
 ```
 
 ### Global Secondary Index (Future)
+
 ```
 status-createdAt-index
   - Partition: status
@@ -159,6 +167,7 @@ status-createdAt-index
 ### Performance
 
 All state operations use async fire-and-forget pattern for maximum performance:
+
 - Create/Update/Delete operations run in goroutines with 5s timeout
 - Non-blocking - joblet continues immediately
 - High-throughput regardless of number of jobs
@@ -167,14 +176,17 @@ All state operations use async fire-and-forget pattern for maximum performance:
 ### Backend Options
 
 #### Memory (Development/Testing)
+
 ```yaml
 state:
   backend: "memory"
 ```
+
 - RAM-only persistence (lost on restart)
 - Fast, suitable for testing
 
 #### DynamoDB (Production)
+
 ```yaml
 state:
   backend: "dynamodb"
@@ -187,6 +199,7 @@ state:
 ```
 
 #### Redis (Future)
+
 ```yaml
 state:
   backend: "redis"
@@ -203,6 +216,7 @@ state:
 ### Message Format
 
 **Request:**
+
 ```json
 {
   "op": "create",
@@ -219,6 +233,7 @@ state:
 ```
 
 **Response:**
+
 ```json
 {
   "requestId": "req-001",
@@ -229,6 +244,7 @@ state:
 ```
 
 ### Operations
+
 - `create` - Create new job state
 - `update` - Update existing job state
 - `delete` - Delete job state
@@ -239,6 +255,7 @@ state:
 ## 🔍 Monitoring
 
 ### Health Check
+
 ```bash
 # Check if state is running
 systemctl status joblet | grep state
@@ -248,13 +265,16 @@ ls -la /opt/joblet/run/state-ipc.sock
 ```
 
 ### Logs
+
 ```bash
 # View state logs (prefixed with [STATE])
 journalctl -u joblet -f | grep STATE
 ```
 
 ### DynamoDB Metrics
+
 Monitor in AWS CloudWatch:
+
 - `ConsumedReadCapacityUnits`
 - `ConsumedWriteCapacityUnits`
 - `ThrottledRequests`
@@ -263,6 +283,7 @@ Monitor in AWS CloudWatch:
 ## 🚨 Troubleshooting
 
 ### State subprocess not starting
+
 ```bash
 # Check if binary exists
 ls -la /opt/joblet/bin/state
@@ -275,6 +296,7 @@ journalctl -u joblet | grep -i "state"
 ```
 
 ### DynamoDB connection issues
+
 ```bash
 # Verify IAM permissions
 aws dynamodb describe-table --table-name joblet-jobs
@@ -287,6 +309,7 @@ aws ec2 describe-availability-zones --query 'AvailabilityZones[0].RegionName'
 ```
 
 ### IPC socket errors
+
 ```bash
 # Check socket permissions
 ls -la /opt/joblet/run/state-ipc.sock
@@ -299,6 +322,7 @@ sudo systemctl restart joblet
 ## 📖 Development
 
 ### Build
+
 ```bash
 cd state
 go mod download
@@ -306,6 +330,7 @@ go build -o ../bin/state cmd/state/main.go
 ```
 
 ### Test Locally
+
 ```bash
 # Use memory backend for testing
 echo "state:
@@ -316,6 +341,7 @@ JOBLET_CONFIG_PATH=test-config.yml ./bin/state
 ```
 
 ### Run Unit Tests
+
 ```bash
 go test ./internal/storage/...
 go test ./internal/ipc/...
@@ -324,6 +350,7 @@ go test ./internal/ipc/...
 ## 🔐 Security
 
 ### IAM Policy (DynamoDB)
+
 ```json
 {
   "Version": "2012-10-17",
@@ -346,6 +373,7 @@ go test ./internal/ipc/...
 ```
 
 ### EC2 Instance Profile
+
 Attach the IAM role with the above policy to your EC2 instance.
 
 ## 🎯 Future Enhancements

@@ -338,11 +338,12 @@ See [PERSISTENCE.md](PERSISTENCE.md) for detailed persistence configuration.
 
 ### State Persistence Configuration
 
-Job state persistence ensures job metadata survives system restarts. Unlike persist (which stores logs/metrics), the state service stores job status, exit codes, and metadata.
+Job state persistence ensures job metadata survives system restarts. Unlike persist (which stores logs/metrics), the
+state service stores job status, exit codes, and metadata.
 
 ```yaml
 state:
-  backend: "memory"  # Options: "memory", "dynamodb", "redis" (future)
+  backend: "memory"  # Options: "memory", "dynamodb" (EC2 only)
   socket: "/opt/joblet/run/state-ipc.sock"      # Unix socket for state operations
   buffer_size: 10000                             # Message buffer size
   reconnect_delay: "5s"                          # Reconnection retry delay
@@ -365,8 +366,7 @@ state:
 **Backend Options:**
 
 - **memory**: Jobs persist in RAM only (default, lost on restart)
-- **dynamodb**: Jobs persist in AWS DynamoDB (production, survives restarts)
-- **redis**: Planned for future releases
+- **dynamodb**: Jobs persist in AWS DynamoDB (EC2 only, production, survives restarts)
 
 **When to use DynamoDB state persistence:**
 
@@ -382,6 +382,7 @@ state:
 **Performance characteristics:**
 
 All state operations use async fire-and-forget pattern with connection pooling:
+
 - Non-blocking create/update/delete operations
 - 10-second timeout per operation (configurable)
 - Connection pool handles 1000+ concurrent jobs efficiently
@@ -390,14 +391,14 @@ All state operations use async fire-and-forget pattern with connection pooling:
 - Pool size configurable via `pool_size` (default: 20 connections)
 
 **Pool Size Recommendations:**
+
 - < 100 jobs: Default (20) is sufficient
 - 100-1000 jobs: Default (20) handles well
 - 1000-2500 jobs: Consider 30-50 for headroom
 - > 2500 jobs: 50-100+ depending on workload
 
-For detailed performance information, see [STATE_PERFORMANCE.md](STATE_PERFORMANCE.md).
-
-See [STATE_PERSISTENCE.md](./STATE_PERSISTENCE.md) for detailed state persistence documentation including DynamoDB setup, monitoring, and troubleshooting.
+See [STATE_PERSISTENCE.md](./STATE_PERSISTENCE.md) for detailed state persistence documentation including performance
+characteristics, DynamoDB setup, monitoring, and troubleshooting.
 
 ### Logging Configuration
 

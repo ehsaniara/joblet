@@ -95,7 +95,8 @@ Joblet supports multiple deployment architectures depending on your infrastructu
 
 ### AWS EC2 Deployment with CloudWatch
 
-> **💡 Quick Start**: For automated EC2 deployment with CloudWatch and DynamoDB, see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md) which provides ready-to-use scripts.
+> **💡 Quick Start**: For automated EC2 deployment with CloudWatch and DynamoDB,
+> see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md) which provides ready-to-use scripts.
 
 For cloud-native deployments on AWS, Joblet can use CloudWatch Logs for centralized log and metric storage across
 multiple nodes.

@@ -2,7 +2,9 @@
 
 *From zero to running distributed jobs in 30 minutes*
 
-> **⚡ Quick Start**: For a faster, automated installation approach, see [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) which uses EC2 user data scripts for one-command deployment with automatic certificate management, CloudWatch integration, and support for multi-instance deployments via AWS Secrets Manager.
+> **⚡ Quick Start**: For a faster, automated installation approach, see [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) which
+> uses EC2 user data scripts for one-command deployment with automatic certificate management, CloudWatch integration, and
+> support for multi-instance deployments via AWS Secrets Manager.
 >
 > This guide provides a detailed manual walkthrough for educational purposes and custom setups.
 
@@ -23,6 +25,7 @@ This guide walks you through setting up Joblet on AWS EC2, including:
 **Time to complete:** ~30 minutes
 
 **Prerequisites:**
+
 - AWS Account with EC2 access
 - MacBook with terminal access
 - SSH key pair for EC2
@@ -54,12 +57,12 @@ This guide walks you through setting up Joblet on AWS EC2, including:
 
 **Instance Specifications:**
 
-| Setting | Recommendation | Minimum |
-|---------|---------------|---------|
-| Instance Type | `t3.large` (2 vCPU, 8GB RAM) | `t3.medium` |
-| OS | Ubuntu 22.04 LTS | Ubuntu 20.04+ |
-| Storage | 50GB gp3 SSD | 30GB |
-| Architecture | x86_64 | x86_64 |
+| Setting       | Recommendation               | Minimum       |
+|---------------|------------------------------|---------------|
+| Instance Type | `t3.large` (2 vCPU, 8GB RAM) | `t3.medium`   |
+| OS            | Ubuntu 22.04 LTS             | Ubuntu 20.04+ |
+| Storage       | 50GB gp3 SSD                 | 30GB          |
+| Architecture  | x86_64                       | x86_64        |
 
 **Launch Steps:**
 
@@ -73,30 +76,30 @@ This guide walks you through setting up Joblet on AWS EC2, including:
    ```
 
 3. **Application and OS Images:**
-   - Choose: Ubuntu Server 22.04 LTS (HVM), SSD Volume Type
-   - Architecture: 64-bit (x86)
+    - Choose: Ubuntu Server 22.04 LTS (HVM), SSD Volume Type
+    - Architecture: 64-bit (x86)
 
 4. **Instance Type:**
-   - Select: `t3.large` (for production)
-   - Or: `t3.medium` (for testing)
+    - Select: `t3.large` (for production)
+    - Or: `t3.medium` (for testing)
 
 5. **Key Pair:**
-   - Create new or select existing key pair
-   - Download and save as `~/.ssh/joblet-key.pem`
-   - Set permissions:
-     ```bash
-     chmod 400 ~/.ssh/joblet-key.pem
-     ```
+    - Create new or select existing key pair
+    - Download and save as `~/.ssh/joblet-key.pem`
+    - Set permissions:
+      ```bash
+      chmod 400 ~/.ssh/joblet-key.pem
+      ```
 
 6. **Network Settings:**
-   - VPC: Default or your custom VPC
-   - Auto-assign public IP: Enable
-   - We'll configure security group in next step
+    - VPC: Default or your custom VPC
+    - Auto-assign public IP: Enable
+    - We'll configure security group in next step
 
 7. **Storage:**
-   - Size: 50 GB
-   - Volume Type: gp3
-   - Delete on termination: Uncheck (for data safety)
+    - Size: 50 GB
+    - Volume Type: gp3
+    - Delete on termination: Uncheck (for data safety)
 
 8. **Launch Instance**
 
@@ -108,11 +111,12 @@ Create a security group named `joblet-server-sg`:
 
 **Inbound Rules:**
 
-| Type | Protocol | Port | Source | Purpose |
-|------|----------|------|--------|---------|
-| SSH | TCP | 22 | Your IP/32 | SSH access from your MacBook |
+| Type | Protocol | Port | Source     | Purpose                      |
+|------|----------|------|------------|------------------------------|
+| SSH  | TCP      | 22   | Your IP/32 | SSH access from your MacBook |
 
 **Important Security Notes:**
+
 - ⚠️ **Never use `0.0.0.0/0`** for Joblet ports
 - ✅ Use your MacBook's public IP or VPN IP
 - ✅ For production, use VPN or AWS PrivateLink
@@ -141,7 +145,7 @@ Create a security group named `joblet-server-sg`:
    ```
 
 4. **Outbound Rules:**
-   - Keep default (all traffic allowed)
+    - Keep default (all traffic allowed)
 
 5. Attach security group to your EC2 instance
 
@@ -158,12 +162,12 @@ This allows the EC2 instance to send logs to CloudWatch.
 1. IAM → Roles → Create Role
 
 2. **Trusted Entity:**
-   - Select: AWS service
-   - Use case: EC2
+    - Select: AWS service
+    - Use case: EC2
 
 3. **Permissions:**
-   - Search and add: `CloudWatchAgentServerPolicy`
-   - Search and add: `AmazonSSMManagedInstanceCore` (optional, for Systems Manager)
+    - Search and add: `CloudWatchAgentServerPolicy`
+    - Search and add: `AmazonSSMManagedInstanceCore` (optional, for Systems Manager)
 
 4. **Role Details:**
    ```
@@ -191,8 +195,8 @@ If you want to manage Joblet via AWS CLI:
    ```
 
 2. **Attach Policies:**
-   - `AmazonEC2ReadOnlyAccess`
-   - Custom policy for Joblet (see below)
+    - `AmazonEC2ReadOnlyAccess`
+    - Custom policy for Joblet (see below)
 
 3. **Custom Policy (Optional):**
    ```json
@@ -221,7 +225,9 @@ If you want to manage Joblet via AWS CLI:
 
 ## Part 3: Install Joblet on EC2
 
-> **📖 Modern Approach Available**: This guide shows manual installation steps for educational purposes. For production deployments, we recommend using the automated EC2 user data script approach documented in [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md). The automated approach includes:
+> **📖 Modern Approach Available**: This guide shows manual installation steps for educational purposes. For production
+> deployments, we recommend using the automated EC2 user data script approach documented
+> in [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md). The automated approach includes:
 > - One-command installation via user data script
 > - Automatic certificate generation with embedded certs (single instance) or AWS Secrets Manager (multi-instance)
 > - CloudWatch Logs integration
@@ -278,6 +284,7 @@ docker --version
 ```
 
 **Log out and log back in for docker group changes to take effect:**
+
 ```bash
 exit
 ssh -i ~/.ssh/joblet-key.pem ubuntu@ec2-18-123-45-67.compute-1.amazonaws.com
@@ -305,7 +312,10 @@ chmod +x joblet
 
 ### 3.4 Generate TLS Certificates
 
-> **💡 Note**: The automated installation script (`scripts/ec2-user-data.sh`) handles certificate generation automatically. For AWS deployments with multiple instances, it can use AWS Secrets Manager to share CA and client certificates across instances while generating unique server certificates per instance. See [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) for details.
+> **💡 Note**: The automated installation script (`scripts/ec2-user-data.sh`) handles certificate generation
+> automatically. For AWS deployments with multiple instances, it can use AWS Secrets Manager to share CA and client
+> certificates across instances while generating unique server certificates per instance.
+> See [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) for details.
 
 Joblet requires TLS for secure communication. Here's the manual approach:
 
@@ -338,6 +348,7 @@ ls -la
 ```
 
 You should see:
+
 - `ca-cert.pem` (CA certificate)
 - `server-cert.pem` (Server certificate)
 - `server-key.pem` (Server private key)
@@ -588,6 +599,7 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
 ### 5.1 Why SSH Tunnel?
 
 SSH tunnel provides:
+
 - ✅ Secure encrypted connection
 - ✅ No need to expose ports publicly
 - ✅ Works from anywhere (coffee shop, home, etc.)
@@ -632,6 +644,7 @@ chmod +x ~/bin/joblet-tunnel.sh
 ```
 
 **Edit the script** and change:
+
 - `EC2_HOST` to your instance's public DNS
 - `SSH_KEY` path if different
 
@@ -643,6 +656,7 @@ chmod +x ~/bin/joblet-tunnel.sh
 ```
 
 You should see:
+
 ```
 🚇 Starting SSH tunnel to Joblet server...
    Local:  localhost:443
@@ -775,11 +789,13 @@ EOF
 Open **two terminal windows** on your MacBook:
 
 **Terminal 1** (SSH Tunnel):
+
 ```bash
 ~/bin/joblet-tunnel.sh
 ```
 
 **Terminal 2** (Joblet CLI):
+
 ```bash
 # Test connection
 rnx version
@@ -792,6 +808,7 @@ rnx job list
 ```
 
 **Expected Output:**
+
 ```bash
 $ rnx version
 rnx version: v1.0.0
@@ -856,10 +873,10 @@ Then open in your browser: http://localhost:8080
 - [ ] Logs are flowing to CloudWatch
 - [ ] Metrics are being collected
 - [ ] Set up CloudWatch alarms for:
-  - High CPU usage
-  - High memory usage
-  - Disk space usage
-  - Joblet service down
+    - High CPU usage
+    - High memory usage
+    - Disk space usage
+    - Joblet service down
 
 ### Backup
 
@@ -958,6 +975,7 @@ sudo systemctl restart amazon-cloudwatch-agent
 - **t3.large**: ~$60/month (24/7)
 
 **Savings:**
+
 - Use Reserved Instances (1-3 year): Save up to 60%
 - Use Spot Instances (non-prod): Save up to 90%
 - Stop instance when not in use
@@ -991,7 +1009,7 @@ Now that Joblet is running on EC2:
    ```
 
 3. ✅ **Run the ML Demo** - See Joblet in action
-   - [Continue to ML Demo Tutorial →](../../examples/ml-demo/README.md)
+    - [Continue to ML Demo Tutorial →](../../examples/ml-demo/README.md)
 
 4. ✅ **Build Your Workflows** - Start with simple jobs
    ```bash
