@@ -162,19 +162,3 @@ func (s *MetricsSubscriber) Stop() {
 		"metricsSent", s.metricsSent.Load(),
 		"errors", s.errors.Load())
 }
-
-// Stats returns metrics subscriber statistics
-func (s *MetricsSubscriber) Stats() MetricsSubscriberStats {
-	return MetricsSubscriberStats{
-		EventsProcessed: s.eventsProcessed.Load(),
-		MetricsSent:     s.metricsSent.Load(),
-		Errors:          s.errors.Load(),
-	}
-}
-
-// MetricsSubscriberStats represents metrics subscriber statistics
-type MetricsSubscriberStats struct {
-	EventsProcessed uint64
-	MetricsSent     uint64
-	Errors          uint64
-}

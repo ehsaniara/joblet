@@ -130,19 +130,3 @@ func (s *Subscriber) Stop() {
 		"logsSent", s.logsSent.Load(),
 		"errors", s.errors.Load())
 }
-
-// Stats returns subscriber statistics
-func (s *Subscriber) Stats() SubscriberStats {
-	return SubscriberStats{
-		EventsProcessed: s.eventsProcessed.Load(),
-		LogsSent:        s.logsSent.Load(),
-		Errors:          s.errors.Load(),
-	}
-}
-
-// SubscriberStats represents subscriber statistics
-type SubscriberStats struct {
-	EventsProcessed uint64
-	LogsSent        uint64
-	Errors          uint64
-}

@@ -238,9 +238,13 @@ main() {
         echo -e "${RED}No tests found matching pattern: $test_pattern${NC}"
         exit 1
     fi
-    
-    # Always build and deploy for 100% confidence
-    build_and_deploy
+
+    # Build and deploy unless SKIP_DEPLOY is set
+    if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
+        build_and_deploy
+    else
+        echo -e "${YELLOW}⊘ Skipping build and deploy (SKIP_DEPLOY=1)${NC}\n"
+    fi
     
     # Run tests
     run_all_tests

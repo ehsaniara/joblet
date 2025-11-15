@@ -41,6 +41,5 @@ type StateClient interface {
 	Ping(ctx context.Context) error
 }
 
-// Ensure both implementations satisfy the interface
-var _ StateClient = (*Client)(nil)
+// Ensure PooledClient satisfies the interface
 var _ StateClient = (*PooledClient)(nil)

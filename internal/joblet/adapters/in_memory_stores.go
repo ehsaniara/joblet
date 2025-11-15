@@ -17,63 +17,6 @@ import (
 
 // Direct constructors to replace the over-engineered factory pattern
 
-// WaitForStateService waits for state service to be ready with retries (public for server.go)
-// Uses the Ping IPC message for efficient health checking
-func WaitForStateService(client state.StateClient, logger *logger.Logger) error {
-	return waitForStateService(client, logger)
-}
-
-// waitForStateService waits for state service to be ready with retries
-// Uses the Ping IPC message for efficient health checking
-func waitForStateService(client state.StateClient, logger *logger.Logger) error {
-	const (
-		maxRetries    = 30 // 30 attempts
-		retryDelay    = 1 * time.Second
-		healthTimeout = 2 * time.Second
-	)
-
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		// Try to connect
-		if err := client.Connect(); err != nil {
-			logger.Debug("state service connection attempt failed",
-				"attempt", attempt, "maxRetries", maxRetries, "error", err)
-
-			if attempt < maxRetries {
-				time.Sleep(retryDelay)
-				continue
-			}
-			return fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, err)
-		}
-
-		// Connection succeeded, now verify it's healthy with Ping
-		ctx, cancel := context.WithTimeout(context.Background(), healthTimeout)
-		defer cancel()
-
-		// Use Ping IPC message for efficient health check (no backend query overhead)
-		err := client.Ping(ctx)
-		if err != nil {
-			logger.Debug("state service health check (Ping) failed",
-				"attempt", attempt, "error", err)
-
-			// Close the connection and retry
-			client.Close()
-
-			if attempt < maxRetries {
-				time.Sleep(retryDelay)
-				continue
-			}
-			return fmt.Errorf("state service not healthy after %d attempts: %w", maxRetries, err)
-		}
-
-		// Success - connection established and Ping responded
-		logger.Info("state service health check passed (Ping)",
-			"attempts", attempt, "totalTime", time.Duration(attempt-1)*retryDelay)
-		return nil
-	}
-
-	return fmt.Errorf("state service did not become ready within %v", time.Duration(maxRetries)*retryDelay)
-}
-
 // WaitForPersistService waits for persist service to be ready with retries (public for server.go)
 // Uses the Ping RPC for efficient health checking
 func WaitForPersistService(socketPath string, logger *logger.Logger) (persistpb.PersistServiceClient, error) {
