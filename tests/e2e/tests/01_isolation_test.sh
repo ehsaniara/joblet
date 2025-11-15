@@ -363,14 +363,18 @@ echo -e "${BLUE}─────────────────────�
 
 test_ipc_namespace() {
     # Test IPC isolation by checking that container has its own empty IPC namespace
-    local output=$(run_remote_job "echo 'MSG_QUEUES:' && ipcs -q | grep -c '^0x' || echo 0; echo 'SHM_SEGS:' && ipcs -m | grep -c '^0x' || echo 0; echo 'SEMAPHORES:' && ipcs -s | grep -c '^0x' || echo 0")
-    
-    # Check that all IPC object counts are 0 (isolated namespace)
-    if echo "$output" | grep -q "MSG_QUEUES:" && echo "$output" | grep -q "SHM_SEGS:" && echo "$output" | grep -q "SEMAPHORES:"; then
-        local msg_count=$(echo "$output" | grep "MSG_QUEUES:" -A1 | tail -1)
-        local shm_count=$(echo "$output" | grep "SHM_SEGS:" -A1 | tail -1)  
-        local sem_count=$(echo "$output" | grep "SEMAPHORES:" -A1 | tail -1)
-        
+    # Count IPC objects directly - in an isolated namespace, all should be empty
+    local output=$(run_remote_job "ipcs -q 2>/dev/null | tail -n +4 | grep -c '^0x'; ipcs -m 2>/dev/null | tail -n +4 | grep -c '^0x'; ipcs -s 2>/dev/null | tail -n +4 | grep -c '^0x'")
+
+    # Parse the three counts (one per line)
+    local counts=($(echo "$output" | grep -E '^[0-9]+$'))
+
+    # Check that we got exactly 3 counts and all are 0
+    if [[ ${#counts[@]} -eq 3 ]]; then
+        local msg_count=${counts[0]:-1}
+        local shm_count=${counts[1]:-1}
+        local sem_count=${counts[2]:-1}
+
         if [[ "$msg_count" == "0" ]] && [[ "$shm_count" == "0" ]] && [[ "$sem_count" == "0" ]]; then
             echo "    IPC namespace properly isolated (0 msg queues, 0 shm segments, 0 semaphores)"
             return 0

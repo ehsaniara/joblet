@@ -109,37 +109,3 @@ func (m *Manager) Stop() error {
 	m.logger.Info("IPC manager stopped (logs and metrics)")
 	return nil
 }
-
-// Stats returns combined statistics for logs and metrics
-func (m *Manager) Stats() *Stats {
-	if m.writer == nil {
-		return &Stats{}
-	}
-
-	writerStats := m.writer.Stats()
-	logStats := m.logSubscriber.Stats()
-	metricsStats := m.metricsSubscriber.Stats()
-
-	return &Stats{
-		Connected:             writerStats.Connected,
-		MsgsSent:              writerStats.MsgsSent,
-		MsgsDropped:           writerStats.MsgsDropped,
-		WriteErrors:           writerStats.WriteErrors,
-		LogEventsProcessed:    logStats.EventsProcessed,
-		LogsSent:              logStats.LogsSent,
-		MetricEventsProcessed: metricsStats.EventsProcessed,
-		MetricsSent:           metricsStats.MetricsSent,
-	}
-}
-
-// Stats represents combined IPC statistics for logs and metrics
-type Stats struct {
-	Connected             bool
-	MsgsSent              uint64
-	MsgsDropped           uint64
-	WriteErrors           uint64
-	LogEventsProcessed    uint64
-	LogsSent              uint64
-	MetricEventsProcessed uint64
-	MetricsSent           uint64
-}

@@ -298,24 +298,6 @@ func (w *Writer) Close() error {
 	return nil
 }
 
-// Stats returns writer statistics
-func (w *Writer) Stats() WriterStats {
-	return WriterStats{
-		Connected:   w.connected.Load(),
-		MsgsSent:    w.msgsSent.Load(),
-		MsgsDropped: w.msgsDropped.Load(),
-		WriteErrors: w.writeErrors.Load(),
-	}
-}
-
-// WriterStats represents writer statistics
-type WriterStats struct {
-	Connected   bool
-	MsgsSent    uint64
-	MsgsDropped uint64
-	WriteErrors uint64
-}
-
 // reconnectManager handles reconnection logic
 type reconnectManager struct {
 	delay       time.Duration
