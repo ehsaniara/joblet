@@ -458,6 +458,190 @@ description: "Python 3.11 with ML"
 	assert.Contains(t, err.Error(), "runtime not found")
 }
 
+func TestResolver_FindRuntimeDirectory_DefaultToLatest(t *testing.T) {
+	tempDir := t.TempDir()
+	runtimesPath := filepath.Join(tempDir, "runtimes")
+
+	// Create nested version structure with multiple versions
+	// /runtimes/python-3.11-ml/1.0.0/
+	// /runtimes/python-3.11-ml/1.2.0/
+	// /runtimes/python-3.11-ml/1.1.0/
+	runtimeName := "python-3.11-ml"
+	runtimeBaseDir := filepath.Join(runtimesPath, runtimeName)
+
+	versions := []string{"1.0.0", "1.2.0", "1.1.0"}
+	for _, version := range versions {
+		versionDir := filepath.Join(runtimeBaseDir, version)
+		err := os.MkdirAll(versionDir, 0755)
+		require.NoError(t, err)
+
+		config := `name: python-3.11-ml
+language: python
+version: "` + version + `"
+description: "Python 3.11 with ML"
+`
+		err = os.WriteFile(filepath.Join(versionDir, "runtime.yml"), []byte(config), 0644)
+		require.NoError(t, err)
+	}
+
+	testPlatform := platform.NewPlatform()
+	resolver := NewResolver(runtimesPath, testPlatform)
+
+	// Test: When no version specified, should return latest (1.2.0)
+	foundPath, err := resolver.FindRuntimeDirectory("python-3.11-ml")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(runtimeBaseDir, "1.2.0"), foundPath)
+
+	// Test: When @latest specified, should return latest (1.2.0)
+	foundPath, err = resolver.FindRuntimeDirectory("python-3.11-ml@latest")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(runtimeBaseDir, "1.2.0"), foundPath)
+
+	// Test: When specific version specified, should return that version
+	foundPath, err = resolver.FindRuntimeDirectory("python-3.11-ml@1.0.0")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(runtimeBaseDir, "1.0.0"), foundPath)
+
+	// Test: When non-existent version specified, should error
+	_, err = resolver.FindRuntimeDirectory("python-3.11-ml@9.9.9")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "runtime not found")
+}
+
+func TestResolver_FindRuntimeDirectory_SingleVersion(t *testing.T) {
+	tempDir := t.TempDir()
+	runtimesPath := filepath.Join(tempDir, "runtimes")
+
+	// Create nested version structure with single version
+	runtimeName := "openjdk-21"
+	versionDir := filepath.Join(runtimesPath, runtimeName, "1.0.0")
+	err := os.MkdirAll(versionDir, 0755)
+	require.NoError(t, err)
+
+	config := `name: openjdk-21
+language: java
+version: "1.0.0"
+description: "OpenJDK 21"
+`
+	err = os.WriteFile(filepath.Join(versionDir, "runtime.yml"), []byte(config), 0644)
+	require.NoError(t, err)
+
+	testPlatform := platform.NewPlatform()
+	resolver := NewResolver(runtimesPath, testPlatform)
+
+	// Test: Should find the single version without @
+	foundPath, err := resolver.FindRuntimeDirectory("openjdk-21")
+	require.NoError(t, err)
+	assert.Equal(t, versionDir, foundPath)
+
+	// Test: Should find with @latest
+	foundPath, err = resolver.FindRuntimeDirectory("openjdk-21@latest")
+	require.NoError(t, err)
+	assert.Equal(t, versionDir, foundPath)
+
+	// Test: Should find with explicit version
+	foundPath, err = resolver.FindRuntimeDirectory("openjdk-21@1.0.0")
+	require.NoError(t, err)
+	assert.Equal(t, versionDir, foundPath)
+}
+
+func TestResolver_findLatestVersion(t *testing.T) {
+	testPlatform := platform.NewPlatform()
+	resolver := NewResolver("/test", testPlatform)
+
+	tests := []struct {
+		name     string
+		versions []struct {
+			path    string
+			version string
+		}
+		expected string
+	}{
+		{
+			name:     "empty list",
+			versions: nil,
+			expected: "",
+		},
+		{
+			name: "single version",
+			versions: []struct {
+				path    string
+				version string
+			}{
+				{path: "/runtimes/test/1.0.0", version: "1.0.0"},
+			},
+			expected: "/runtimes/test/1.0.0",
+		},
+		{
+			name: "multiple versions ascending",
+			versions: []struct {
+				path    string
+				version string
+			}{
+				{path: "/runtimes/test/1.0.0", version: "1.0.0"},
+				{path: "/runtimes/test/1.1.0", version: "1.1.0"},
+				{path: "/runtimes/test/1.2.0", version: "1.2.0"},
+			},
+			expected: "/runtimes/test/1.2.0",
+		},
+		{
+			name: "multiple versions descending",
+			versions: []struct {
+				path    string
+				version string
+			}{
+				{path: "/runtimes/test/2.0.0", version: "2.0.0"},
+				{path: "/runtimes/test/1.5.0", version: "1.5.0"},
+				{path: "/runtimes/test/1.0.0", version: "1.0.0"},
+			},
+			expected: "/runtimes/test/2.0.0",
+		},
+		{
+			name: "multiple versions mixed order",
+			versions: []struct {
+				path    string
+				version string
+			}{
+				{path: "/runtimes/test/1.2.0", version: "1.2.0"},
+				{path: "/runtimes/test/1.0.0", version: "1.0.0"},
+				{path: "/runtimes/test/1.3.0", version: "1.3.0"},
+				{path: "/runtimes/test/1.1.0", version: "1.1.0"},
+			},
+			expected: "/runtimes/test/1.3.0",
+		},
+		{
+			name: "major version difference",
+			versions: []struct {
+				path    string
+				version string
+			}{
+				{path: "/runtimes/test/1.9.9", version: "1.9.9"},
+				{path: "/runtimes/test/2.0.0", version: "2.0.0"},
+			},
+			expected: "/runtimes/test/2.0.0",
+		},
+		{
+			name: "patch version difference",
+			versions: []struct {
+				path    string
+				version string
+			}{
+				{path: "/runtimes/test/1.0.1", version: "1.0.1"},
+				{path: "/runtimes/test/1.0.10", version: "1.0.10"},
+				{path: "/runtimes/test/1.0.2", version: "1.0.2"},
+			},
+			expected: "/runtimes/test/1.0.10",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolver.findLatestVersion(tt.versions)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Benchmark tests for performance-critical methods
 func BenchmarkListRuntimes(b *testing.B) {
 	tempDir := b.TempDir()

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
+	"github.com/ehsaniara/joblet/pkg/semver"
 
 	"gopkg.in/yaml.v3"
 )
@@ -210,8 +211,23 @@ func (r *Resolver) ResolveRuntime(runtimeSpec string) (*RuntimeConfig, error) {
 
 // FindRuntimeDirectory finds the directory for a runtime specification (fully generic)
 // Supports nested version structure: /opt/joblet/runtimes/<name>/<version>/
+// When no version is specified (no @), returns the latest version available
 // This is exported for use by the filesystem isolator
 func (r *Resolver) FindRuntimeDirectory(spec string) (string, error) {
+	// Check if spec contains @ (explicit version)
+	hasExplicitVersion := strings.Contains(spec, "@")
+
+	// Parse spec to extract name and version
+	var runtimeName, requestedVersion string
+	if hasExplicitVersion {
+		parts := strings.SplitN(spec, "@", 2)
+		runtimeName = parts[0]
+		requestedVersion = parts[1]
+	} else {
+		runtimeName = spec
+		requestedVersion = "" // Will resolve to latest
+	}
+
 	// Scan all runtime directories and check their runtime.yml files
 	entries, err := r.platform.ReadDir(r.runtimesPath)
 	if err != nil {
@@ -232,6 +248,12 @@ func (r *Resolver) FindRuntimeDirectory(spec string) (string, error) {
 			continue
 		}
 
+		// Collect all matching versions for this runtime
+		var matchingVersions []struct {
+			path    string
+			version string
+		}
+
 		for _, versionEntry := range versionEntries {
 			if !versionEntry.IsDir() {
 				continue
@@ -246,17 +268,43 @@ func (r *Resolver) FindRuntimeDirectory(spec string) (string, error) {
 				continue // Skip directories without valid runtime.yml
 			}
 
-			// Check if the runtime name matches exactly
-			if config.Name == spec {
-				return versionPath, nil
+			// Check if the runtime name matches
+			if config.Name == runtimeName {
+				// If explicit version requested, return exact match
+				if requestedVersion != "" && requestedVersion != "latest" {
+					if config.Version == requestedVersion {
+						return versionPath, nil
+					}
+				} else {
+					// Collect for latest version selection
+					matchingVersions = append(matchingVersions, struct {
+						path    string
+						version string
+					}{
+						path:    versionPath,
+						version: config.Version,
+					})
+				}
+			}
+		}
+
+		// If we found matching versions and need latest, find the highest version
+		if len(matchingVersions) > 0 && (requestedVersion == "" || requestedVersion == "latest") {
+			latestPath := r.findLatestVersion(matchingVersions)
+			if latestPath != "" {
+				r.logger.Debug("resolved to latest version", "spec", spec, "path", latestPath)
+				return latestPath, nil
 			}
 		}
 
 		// Also check flat structure (backward compatibility)
 		flatConfigPath := filepath.Join(runtimeNameDir, "runtime.yml")
 		config, err := r.loadRuntimeConfig(flatConfigPath)
-		if err == nil && config.Name == spec {
-			return runtimeNameDir, nil
+		if err == nil && config.Name == runtimeName {
+			// For flat structure, if version matches or no version requested
+			if requestedVersion == "" || requestedVersion == "latest" || config.Version == requestedVersion {
+				return runtimeNameDir, nil
+			}
 		}
 	}
 
@@ -617,4 +665,44 @@ func (r *Resolver) ListGPUEnabledRuntimes() ([]*RuntimeInfo, error) {
 	}
 
 	return gpuRuntimes, nil
+}
+
+// findLatestVersion finds the highest semantic version from a list of versions
+// Returns the path of the latest version, or empty string if no valid versions found
+func (r *Resolver) findLatestVersion(versions []struct {
+	path    string
+	version string
+}) string {
+	if len(versions) == 0 {
+		return ""
+	}
+
+	// If only one version, return it
+	if len(versions) == 1 {
+		return versions[0].path
+	}
+
+	// Find the highest semantic version
+	var latestSemver *semver.Version
+	latestPath := ""
+
+	for _, v := range versions {
+		// Try to parse as semantic version
+		sv, err := semver.NewVersion(v.version)
+		if err != nil {
+			// If not a valid semver, use it as fallback if we have no other
+			if latestPath == "" {
+				latestPath = v.path
+			}
+			continue
+		}
+
+		// Update if this is the first valid version or if it's greater than the current latest
+		if latestSemver == nil || sv.GreaterThan(latestSemver) {
+			latestSemver = sv
+			latestPath = v.path
+		}
+	}
+
+	return latestPath
 }
