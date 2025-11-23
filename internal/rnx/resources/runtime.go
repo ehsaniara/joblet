@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -39,9 +38,6 @@ Examples:
   # Install from local codebase
   rnx runtime install openjdk-21
   
-  # Install from GitHub repository
-  rnx runtime install openjdk-21 --github-repo=owner/repo/tree/main/runtimes
-  
   # Get information about a specific runtime (language, database, etc.)
   rnx runtime info openjdk-21
   
@@ -63,7 +59,6 @@ Examples:
 }
 
 func NewRuntimeListCmd() *cobra.Command {
-	var githubRepo string
 	var registryURL string
 
 	cmd := &cobra.Command{
@@ -79,16 +74,12 @@ Examples:
   rnx runtime list --registry
 
   # List available runtimes from a custom registry
-  rnx runtime list --registry=myorg/custom-runtimes
-
-  # List available runtimes from a GitHub repository
-  rnx runtime list --github-repo=owner/repo/tree/main/runtimes`,
+  rnx runtime list --registry=myorg/custom-runtimes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRuntimeList(cmd, args, githubRepo, registryURL)
+			return runRuntimeList(cmd, args, registryURL)
 		},
 	}
 
-	cmd.Flags().StringVar(&githubRepo, "github-repo", "", "List runtimes from GitHub repository instead of local files. Supports formats: owner/repo, owner/repo/tree/branch/path")
 	cmd.Flags().StringVar(&registryURL, "registry", "", "List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo")
 
 	// Set NoOptDefVal so --registry works without a value
@@ -97,12 +88,7 @@ Examples:
 	return cmd
 }
 
-func runRuntimeList(cmd *cobra.Command, args []string, githubRepo string, registryURL string) error {
-	// Check for conflicting flags
-	if githubRepo != "" && registryURL != "" {
-		return fmt.Errorf("cannot use both --github-repo and --registry flags together")
-	}
-
+func runRuntimeList(cmd *cobra.Command, args []string, registryURL string) error {
 	// If registry flag is provided, list runtimes from registry
 	if cmd.Flags().Changed("registry") {
 		// Normalize and validate registry URL (only GitHub registries allowed)
@@ -111,11 +97,6 @@ func runRuntimeList(cmd *cobra.Command, args []string, githubRepo string, regist
 			return fmt.Errorf("invalid registry: %w", err)
 		}
 		return runRegistryRuntimeList(normalizedURL)
-	}
-
-	// If github-repo flag is provided, list runtimes from GitHub manifest
-	if githubRepo != "" {
-		return runGitHubRuntimeList(githubRepo)
 	}
 
 	// Create client and connect to server for local runtimes
@@ -631,86 +612,6 @@ func runRuntimeRemove(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// runGitHubRuntimeInstall installs runtime from GitHub repository
-func runGitHubRuntimeList(githubRepo string) error {
-	// Parse GitHub repository URL
-	repository, branch, path, err := parseGitHubRepo(githubRepo)
-	if err != nil {
-		return fmt.Errorf("failed to parse GitHub repository: %w", err)
-	}
-
-	fmt.Printf("Fetching runtime manifest from GitHub repository: %s\n", githubRepo)
-	fmt.Printf("📋 Repository: %s\n", repository)
-	fmt.Printf("📋 Branch: %s\n", branch)
-	fmt.Printf("📋 Path: %s\n", path)
-	fmt.Println()
-
-	// Construct manifest URL
-	manifestURL := fmt.Sprintf("https://github.com/%s/raw/%s/%s/runtime-manifest.json", repository, branch, path)
-	fmt.Printf("🔍 Downloading manifest from: %s\n", manifestURL)
-
-	// Download and parse manifest
-	manifest, err := fetchGitHubManifest(manifestURL)
-	if err != nil {
-		fmt.Printf("Failed to fetch runtime manifest: %v\n", err)
-		fmt.Println()
-		fmt.Println("This repository may not support the new manifest-based runtime system.")
-		fmt.Printf("Repository maintainers: Please create a runtime-manifest.json file at: %s\n", manifestURL)
-		return fmt.Errorf("failed to fetch runtime manifest")
-	}
-
-	fmt.Printf("Successfully fetched manifest (version %s)\n", manifest.Version)
-	fmt.Printf("📅 Generated: %s\n", manifest.Generated)
-	fmt.Println()
-
-	// Display available runtimes
-	runtimes := manifest.Runtimes
-	if len(runtimes) == 0 {
-		if common.JSONOutput {
-			fmt.Println("[]")
-		} else {
-			fmt.Println("No runtimes available in this repository.")
-		}
-		return nil
-	}
-
-	if common.JSONOutput {
-		return outputManifestRuntimesJSON(runtimes)
-	}
-
-	// Display runtimes in a table
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "RUNTIME\tVERSION\tLANGUAGE\tPLATFORMS\tDESCRIPTION")
-	fmt.Fprintln(w, "-------\t-------\t--------\t---------\t-----------")
-
-	for name, rt := range runtimes {
-		// Count supported platforms (now platforms is a string array)
-		platformCount := len(rt.Platforms)
-		platformStr := fmt.Sprintf("%d platforms", platformCount)
-
-		// Truncate description if too long
-		desc := rt.Description
-		if len(desc) > 40 {
-			desc = desc[:37] + "..."
-		}
-
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			name,
-			rt.Version,
-			rt.Language,
-			platformStr,
-			desc,
-		)
-	}
-
-	w.Flush()
-	fmt.Printf("\nFound %d runtime(s) in repository %s\n", len(runtimes), repository)
-	fmt.Printf("\nInstall with: rnx runtime install <runtime-name> --github-repo=%s\n", githubRepo)
-	fmt.Printf("Get details with: rnx runtime info <runtime-name> --github-repo=%s\n", githubRepo)
-
-	return nil
-}
-
 // runRegistryRuntimeList lists available runtimes from the runtime registry
 func runRegistryRuntimeList(registryURL string) error {
 	fmt.Printf("📦 Fetching available runtimes from registry: %s\n", registryURL)
@@ -859,96 +760,6 @@ func outputRegistryRuntimesJSON(reg *registry.Registry) error {
 	return encoder.Encode(runtimes)
 }
 
-// GitHubManifest represents the runtime manifest structure
-type GitHubManifest struct {
-	Version    string                     `json:"version"`
-	Generated  string                     `json:"generated"`
-	Repository string                     `json:"repository"`
-	BaseURL    string                     `json:"base_url"`
-	Runtimes   map[string]ManifestRuntime `json:"runtimes"`
-}
-
-type ManifestRuntime struct {
-	Name          string                `json:"name"`
-	DisplayName   string                `json:"display_name"`
-	Version       string                `json:"version"`
-	Description   string                `json:"description"`
-	Category      string                `json:"category"`
-	Language      string                `json:"language"`
-	ArchiveURL    string                `json:"archive_url"`
-	ArchiveSize   int64                 `json:"archive_size"`
-	Checksum      string                `json:"checksum"`
-	Platforms     []string              `json:"platforms"`
-	Requirements  ManifestRequirements  `json:"requirements"`
-	Provides      ManifestProvides      `json:"provides"`
-	Documentation ManifestDocumentation `json:"documentation"`
-	Tags          []string              `json:"tags"`
-}
-
-type ManifestRequirements struct {
-	MinRAM      int  `json:"min_ram_mb"`
-	MinDisk     int  `json:"min_disk_mb"`
-	GPURequired bool `json:"gpu_required"`
-}
-
-type ManifestProvides struct {
-	Executables     []string          `json:"executables"`
-	Libraries       []string          `json:"libraries"`
-	EnvironmentVars map[string]string `json:"environment_vars"`
-}
-
-type ManifestDocumentation struct {
-	Usage    string   `json:"usage"`
-	Examples []string `json:"examples"`
-}
-
-// fetchGitHubManifest downloads and parses the runtime manifest from GitHub
-func fetchGitHubManifest(manifestURL string) (*GitHubManifest, error) {
-	resp, err := http.Get(manifestURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download manifest: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to download manifest: HTTP %d", resp.StatusCode)
-	}
-
-	var manifest GitHubManifest
-	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest JSON: %w", err)
-	}
-
-	return &manifest, nil
-}
-
-// outputManifestRuntimesJSON outputs manifest runtimes in JSON format
-func outputManifestRuntimesJSON(runtimes map[string]ManifestRuntime) error {
-	// Convert to slice format for consistent JSON output
-	var runtimeList []map[string]interface{}
-
-	for name, rt := range runtimes {
-		runtimeInfo := map[string]interface{}{
-			"name":          name,
-			"display_name":  rt.DisplayName,
-			"version":       rt.Version,
-			"description":   rt.Description,
-			"category":      rt.Category,
-			"language":      rt.Language,
-			"platforms":     rt.Platforms,
-			"requirements":  rt.Requirements,
-			"provides":      rt.Provides,
-			"documentation": rt.Documentation,
-			"tags":          rt.Tags,
-		}
-		runtimeList = append(runtimeList, runtimeInfo)
-	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(runtimeList)
-}
-
 // runStreamingRegistryRuntimeInstall installs runtime from external registry with streaming logs
 func runStreamingRegistryRuntimeInstall(ctx context.Context, client *client.JobClient, runtimeSpec string, force bool, registryURL string) error {
 	fmt.Printf("Starting registry runtime installation...\n\n")
@@ -1003,45 +814,6 @@ func runStreamingRegistryRuntimeInstall(ctx context.Context, client *client.JobC
 
 	fmt.Printf("\nRegistry runtime installation completed successfully!\n")
 	return nil
-}
-
-// parseGitHubRepo parses GitHub repository URL in various formats
-// Examples:
-//   - "owner/repo/tree/branch/path" -> ("owner/repo", "branch", "path")
-//   - "owner/repo/tree/main/runtimes" -> ("owner/repo", "main", "runtimes")
-//   - "owner/repo" -> ("owner/repo", "main", "")
-func parseGitHubRepo(githubRepo string) (repository, branch, path string, err error) {
-	if githubRepo == "" {
-		return "", "", "", fmt.Errorf("GitHub repository URL cannot be empty")
-	}
-
-	// Handle different GitHub URL formats
-	parts := strings.Split(githubRepo, "/")
-
-	// Minimum format: owner/repo
-	if len(parts) < 2 {
-		return "", "", "", fmt.Errorf("invalid GitHub repository format. Expected: owner/repo or owner/repo/tree/branch/path")
-	}
-
-	repository = fmt.Sprintf("%s/%s", parts[0], parts[1])
-	branch = "main" // default branch
-	path = ""
-
-	// If more parts exist, parse tree/branch/path structure
-	if len(parts) > 2 {
-		if len(parts) >= 4 && parts[2] == "tree" {
-			// Format: owner/repo/tree/branch[/path...]
-			branch = parts[3]
-			if len(parts) > 4 {
-				path = strings.Join(parts[4:], "/")
-			}
-		} else {
-			// Format: owner/repo/path... (assume main branch)
-			path = strings.Join(parts[2:], "/")
-		}
-	}
-
-	return repository, branch, path, nil
 }
 
 // normalizeRegistryURL converts shorthand GitHub repo format to full URL

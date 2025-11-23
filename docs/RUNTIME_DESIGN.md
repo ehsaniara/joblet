@@ -10,6 +10,7 @@ using it effectively.
     - [Key Design Principles](#key-design-principles)
     - [Architecture](#architecture)
     - [Implementation Details](#implementation-details)
+    - [Execution Internals](#execution-internals)
     - [Security Considerations](#security-considerations)
     - [Performance Optimization](#performance-optimization)
 - [Part 2: Practical Examples](#part-2-practical-examples)
@@ -138,6 +139,223 @@ Runtimes that provide complete language environments with interpreters/compilers
 3. **Environment Setup**: Runtime environment variables applied
 4. **Execution**: Job runs with access to runtime tools
 5. **Cleanup**: Runtime mounts cleaned up
+
+## Execution Internals
+
+This section documents the internal implementation details of how runtimes are resolved, mounted, and executed.
+
+### Execution Flow Overview
+
+When a user runs `rnx job run --runtime=python-3.11 "python script.py"`, the following flow occurs:
+
+```
+┌─────────────────────┐
+│ 1. CLI Parsing      │  internal/rnx/jobs/run.go
+│    Parse --runtime  │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 2. gRPC Request     │  RunJobRequest protobuf
+│    Send to server   │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 3. Job Building     │  internal/joblet/core/joblet.go
+│    Create domain.Job│
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 4. Execution Coord  │  internal/joblet/core/execution/coordinator.go
+│    Set JOB_RUNTIME  │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 5. Process Fork     │  Namespace isolation
+│    PID/NET/MNT/IPC  │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 6. Filesystem Setup │  internal/joblet/core/filesystem/isolator.go
+│    Mount runtime    │
+│    Perform chroot   │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 7. Job Execution    │  internal/modes/jobexec/jobexec.go
+│    Execute command  │
+└─────────────────────┘
+```
+
+### Key Components
+
+| Component | File | Key Functions |
+|-----------|------|---------------|
+| CLI Run Command | `internal/rnx/jobs/run.go` | `runRun()` (lines 137-376) |
+| Job Handler | `internal/joblet/core/joblet.go` | `StartJob()` (lines 99-160) |
+| Execution Coordinator | `internal/joblet/core/execution/coordinator.go` | `StartJob()` (lines 52-184) |
+| Environment Builder | `internal/joblet/core/execution/environment_service.go` | `BuildEnvironment()` (lines 44-107) |
+| Filesystem Isolator | `internal/joblet/core/filesystem/isolator.go` | `Setup()` (lines 336-436) |
+| Runtime Mounting | `internal/joblet/core/filesystem/isolator.go` | `mountRuntime()` (lines 1204-1227) |
+| Mount Manager | `internal/joblet/core/filesystem/isolator.go` | `mountRuntimeWithManager()` (lines 1230-1402) |
+| Runtime Resolver | `internal/joblet/runtime/resolver.go` | `FindRuntimeDirectory()` (lines 214-307) |
+| Job Execution | `internal/modes/jobexec/jobexec.go` | `ExecuteJob()` (lines 83-107) |
+
+### Environment Variable Flow
+
+The runtime specification flows through the system via environment variables:
+
+```
+CLI Input: --runtime=python-3.11
+    │
+    ▼
+gRPC RunJobRequest.Runtime = "python-3.11"
+    │
+    ▼
+domain.Job.Runtime = "python-3.11"
+    │
+    ▼
+ExecutionCoordinator.BuildEnvironment()
+    │ Creates: JOB_RUNTIME=python-3.11
+    │ Also adds runtime-specific env vars from runtime.yml
+    ▼
+JobFilesystem.loadRuntimeFromEnvironment()
+    │ Reads: f.Runtime = os.Getenv("JOB_RUNTIME")
+    ▼
+JobFilesystem.mountRuntime()
+    │ Resolves path, loads config, bind mounts
+    ▼
+Job Process
+    │ Executes with runtime binaries in PATH
+    └─ Environment includes PYTHONPATH, PATH_PREPEND, etc.
+```
+
+### Runtime Resolution Algorithm
+
+The resolver (`internal/joblet/runtime/resolver.go`) finds the runtime directory:
+
+```go
+// Input: spec = "python-3.11"
+//
+// Step 1: Scan /opt/joblet/runtimes/
+//   - Check for versioned structure: <name>/<version>/runtime.yml
+//   - Check for flat structure: <name>/runtime.yml
+//
+// Step 2: Load runtime.yml from each candidate
+//   - Parse YAML to get runtime name, version, language
+//
+// Step 3: Match against spec
+//   - Exact name match: "python-3.11" == config.Name
+//   - Semantic matching for version specs
+//
+// Output: /opt/joblet/runtimes/python-3.11/1.3.1/
+```
+
+**Supported Specification Formats:**
+- `python-3.11` - Direct name match
+- `python-3.11@1.3.1` - Name with version (npm-style)
+- `python-3.11@latest` - Latest version
+
+### Two-Phase Mount Process
+
+Runtime mounting in `mountRuntimeWithManager()` uses a two-phase approach to avoid read-only parent directory issues:
+
+**Phase 1: Create Mount Points** (before any mounts)
+```go
+for _, mount := range config.Mounts {
+    // 1. Check if source exists in runtime directory
+    // 2. Create target directory in chroot
+    // 3. Handle file vs directory sources
+}
+```
+
+**Phase 2: Bind Mount** (after all directories created)
+```go
+for _, mount := range config.Mounts {
+    // 1. Bind mount: mount(source, target, "", MS_BIND, "")
+    // 2. If readonly: remount with MS_BIND | MS_REMOUNT | MS_RDONLY
+}
+```
+
+**Example Mount from Python 3.11:**
+```
+Source: /opt/joblet/runtimes/python-3.11/1.3.1/bin
+Target: /usr/local/bin (in chroot)
+Flags:  MS_BIND (read-write for runtime)
+Result: Chrooted /usr/local/bin contains python, pip, etc.
+```
+
+### Filesystem Isolation Sequence
+
+The `JobFilesystem.Setup()` function (lines 336-436) performs isolation in this order:
+
+1. **Validate job context** - Check JOB_ID, verify PID 1
+2. **Create essential directories** - /etc, /tmp, /proc, /dev, /work, /volumes
+3. **Mount allowed read-only host directories** - /bin, /usr/bin, /lib, etc.
+4. **Load runtime from environment** - Read JOB_RUNTIME env var
+5. **Mount runtime** ← Critical step, allows runtime to override defaults
+6. **Mount volumes** - User-specified persistent volumes
+7. **Setup /tmp** - Isolated writable temp space
+8. **Perform chroot** - Change root to isolated filesystem
+9. **Mount essential filesystems** - /proc, /dev after chroot
+
+### Runtime Environment Loading
+
+The environment service (`internal/joblet/core/execution/environment_service.go`) loads runtime-specific environment variables:
+
+```go
+// getRuntimeEnvironment(runtimeSpec string) []string
+//
+// 1. Load /opt/joblet/runtimes/<spec>/runtime.yml
+// 2. Parse YAML environment section
+// 3. Handle PATH_PREPEND special case
+// 4. Return array of "KEY=VALUE" strings
+```
+
+**Example runtime.yml environment:**
+```yaml
+environment:
+  PATH_PREPEND: "/usr/local/bin"
+  PYTHONPATH: "/usr/local/lib/python3.11/site-packages"
+  PYTHON_VERSION: "3.11"
+```
+
+**Result in job process:**
+```
+PATH=/usr/local/bin:$ORIGINAL_PATH
+PYTHONPATH=/usr/local/lib/python3.11/site-packages
+PYTHON_VERSION=3.11
+```
+
+### Critical Design Points
+
+1. **Mount Order Matters**: Runtime mounting happens AFTER allowed directories but BEFORE chroot, allowing runtime files to override host defaults
+
+2. **Environment Variable Bridge**: `JOB_RUNTIME` env var bridges CLI input through server to filesystem isolation layer
+
+3. **Two-Phase Mounting**: Prevents "read-only filesystem" errors when parent directories are already mounted read-only
+
+4. **Chroot Boundary**: All mounting completes before `chroot()` call; after chroot, mounts are in place
+
+5. **PID 1 Validation**: Filesystem setup validates it's running as PID 1 in new namespace for security
+
+### Data Flow Summary
+
+| Stage | Component | Data | Key Variable |
+|-------|-----------|------|--------------|
+| CLI | run.go | "python-3.11" | Command line arg |
+| gRPC | RunJobRequest | runtime field | Protobuf field |
+| Server | domain.Job | Job.Runtime | Struct field |
+| Execution | Coordinator | Build environment | JOB_RUNTIME env |
+| Isolation | JobFilesystem | loadRuntime() | Reads env var |
+| Mount | Resolver | FindRuntimeDirectory() | Returns path |
+| Config | runtime.yml | mounts & environment | YAML config |
+| Process | Job | Runtime in PATH | Modified PATH |
 
 ### Network Integration
 

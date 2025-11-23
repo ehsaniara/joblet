@@ -924,7 +924,6 @@ rnx runtime list [flags]
 |-----------------|-------------------------------------------------------------------------------------------------------|---------|
 | `--json`        | Output in JSON format                                                                                 | false   |
 | `--registry`    | List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo | ""      |
-| `--github-repo` | List runtimes from GitHub repository. Supports formats: owner/repo, owner/repo/tree/branch/path       | ""      |
 
 #### Description
 
@@ -933,8 +932,6 @@ The list command can show:
 1. **Locally installed runtimes** (default) - Shows runtimes already installed on the server
 2. **Available runtimes from registry** (with `--registry` flag) - Shows runtimes available for installation from GitHub
    registries
-3. **Available runtimes from repository** (with `--github-repo` flag) - Shows runtimes from a custom GitHub repository
-   path
 
 #### Examples
 
@@ -950,9 +947,6 @@ rnx runtime list --registry
 
 # List available runtimes from custom registry
 rnx runtime list --registry=myorg/custom-runtimes
-
-# List available runtimes from GitHub repository
-rnx runtime list --github-repo=owner/repo/tree/main/runtimes
 ```
 
 ### `rnx runtime info`

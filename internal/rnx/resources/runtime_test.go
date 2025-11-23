@@ -77,6 +77,52 @@ func TestNewRuntimeListCmd(t *testing.T) {
 	if cmd.RunE == nil {
 		t.Error("RunE function is nil")
 	}
+
+	// Verify --registry flag exists
+	registryFlag := cmd.Flags().Lookup("registry")
+	if registryFlag == nil {
+		t.Error("Expected --registry flag not found")
+	} else {
+		if registryFlag.Value.Type() != "string" {
+			t.Errorf("Expected --registry flag to be string, got %s", registryFlag.Value.Type())
+		}
+		// Verify NoOptDefVal is set for --registry (allows using flag without value)
+		if registryFlag.NoOptDefVal != "ehsaniara/joblet-runtimes" {
+			t.Errorf("Expected --registry NoOptDefVal to be 'ehsaniara/joblet-runtimes', got '%s'", registryFlag.NoOptDefVal)
+		}
+	}
+}
+
+func TestRuntimeListFlags(t *testing.T) {
+	cmd := NewRuntimeListCmd()
+
+	// Test that --registry flag exists with correct configuration
+	tests := []struct {
+		flagName     string
+		expectedType string
+		shouldExist  bool
+	}{
+		{"registry", "string", true},
+	}
+
+	for _, tt := range tests {
+		t.Run("flag_"+tt.flagName, func(t *testing.T) {
+			flag := cmd.Flags().Lookup(tt.flagName)
+			if tt.shouldExist {
+				if flag == nil {
+					t.Errorf("Flag '%s' not found but should exist", tt.flagName)
+					return
+				}
+				if flag.Value.Type() != tt.expectedType {
+					t.Errorf("Expected flag '%s' to be %s, got %s", tt.flagName, tt.expectedType, flag.Value.Type())
+				}
+			} else {
+				if flag != nil {
+					t.Errorf("Flag '%s' found but should not exist", tt.flagName)
+				}
+			}
+		})
+	}
 }
 
 func TestNewRuntimeInfoCmd(t *testing.T) {
@@ -148,9 +194,10 @@ func TestNewRuntimeInstallCmd(t *testing.T) {
 		t.Error("RunE function is nil")
 	}
 
-	// Check for expected flags (install command only has force flag)
+	// Check for expected flags
 	expectedFlags := map[string]bool{
-		"force": false, // bool flag
+		"force":    false, // bool flag
+		"registry": false, // string flag
 	}
 
 	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
@@ -162,6 +209,14 @@ func TestNewRuntimeInstallCmd(t *testing.T) {
 	for flagName, found := range expectedFlags {
 		if !found {
 			t.Errorf("Expected flag '%s' not found", flagName)
+		}
+	}
+
+	// Verify --registry flag configuration
+	registryFlag := cmd.Flags().Lookup("registry")
+	if registryFlag != nil {
+		if registryFlag.NoOptDefVal != "ehsaniara/joblet-runtimes" {
+			t.Errorf("Expected --registry NoOptDefVal to be 'ehsaniara/joblet-runtimes', got '%s'", registryFlag.NoOptDefVal)
 		}
 	}
 }
