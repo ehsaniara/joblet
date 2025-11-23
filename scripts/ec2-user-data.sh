@@ -271,11 +271,9 @@ install_redhat_amazon() {
 
 configure_cloudwatch() {
     if [ "$ENABLE_CLOUDWATCH" != "true" ]; then
-        log "CloudWatch Logs backend not enabled (set ENABLE_CLOUDWATCH=true to enable)"
+        log "CloudWatch backend not enabled (set ENABLE_CLOUDWATCH=true to enable)"
         return 0
     fi
-
-    log "Configuring CloudWatch Logs backend..."
 
     CONFIG_FILE="/opt/joblet/config/joblet-config.yml"
 
@@ -284,39 +282,15 @@ configure_cloudwatch() {
         return 1
     fi
 
-    # Check if persist.storage section exists
-    if ! grep -q "persist:" "$CONFIG_FILE"; then
-        log "Adding persist configuration section..."
-        cat >> "$CONFIG_FILE" << 'EOF'
+    log "Configuring AWS storage backends..."
 
-# Persistence service configuration
-persist:
-  server:
-    grpc_socket: "/opt/joblet/run/persist-grpc.sock"
+    # Update persist storage to CloudWatch
+    sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
 
-  ipc:
-    socket: "/opt/joblet/run/persist-ipc.sock"
+    # Update state backend to DynamoDB
+    sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
 
-  storage:
-    type: "cloudwatch"
-
-    cloudwatch:
-      region: ""  # Auto-detect from EC2 metadata
-      log_group_prefix: "/joblet"
-      log_stream_prefix: "job-"
-      metric_namespace: "Joblet/Production"
-
-      # Batch settings
-      log_batch_size: 100
-      metric_batch_size: 20
-EOF
-    else
-        log "Updating persist.storage configuration..."
-        # Use sed to update the storage type
-        sed -i 's/type: ".*"/type: "cloudwatch"/' "$CONFIG_FILE" || true
-    fi
-
-    log_success "CloudWatch Logs backend configured"
+    log_success "Set persist=cloudwatch, state=dynamodb"
 }
 
 start_joblet_service() {

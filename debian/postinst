@@ -141,6 +141,9 @@ case "$1" in
 
         # Generate certificates and embed them in config files
         if generate_and_embed_certificates; then
+            # Configure storage backends based on environment
+            configure_storage_backends
+
             # Set secure permissions on config files (they now contain private keys)
             chmod 600 /opt/joblet/config/joblet-config.yml
             chmod 600 /opt/joblet/config/rnx-config.yml

@@ -453,67 +453,17 @@ if [ -f "$SERVER_TEMPLATE" ]; then
         print_info "EC2 auto-detected via metadata service"
     fi
 
-    # Configure CloudWatch if running on EC2
+    # Configure AWS backends if running on EC2
     if [ "$IS_EC2" = "true" ]; then
-        print_info "🌩️  AWS EC2 detected - configuring CloudWatch backend"
-        if [ -n "$EC2_INSTANCE_ID" ]; then
-            echo "  Instance ID: $EC2_INSTANCE_ID"
-        fi
-        if [ -n "$EC2_REGION" ]; then
-            echo "  Region: $EC2_REGION"
-        fi
+        print_info "AWS EC2 detected - configuring CloudWatch and DynamoDB backends"
 
-        # Update persist storage type to cloudwatch
-        sed -i '/persist:/,/^  storage:/ {
-            /type: "local"/ s/type: "local"/type: "cloudwatch"/
-        }' "$SERVER_CONFIG"
-
-        # Comment out local storage configuration (lines between "local:" and next top-level key)
-        awk '
-        /^    local:/ { in_local=1; print "    # local:"; next }
-        in_local && /^    [a-z]/ && !/^      / { in_local=0 }
-        in_local { print "    #" $0; next }
-        { print }
-        ' "$SERVER_CONFIG" > "${SERVER_CONFIG}.tmp" && mv "${SERVER_CONFIG}.tmp" "$SERVER_CONFIG"
-
-        # Set region if detected
-        if [ -n "$EC2_REGION" ]; then
-            sed -i "/region: \"\"/s/region: \"\"/region: \"$EC2_REGION\"/" "$SERVER_CONFIG"
-        fi
-
-        print_success "CloudWatch backend configured (region: ${EC2_REGION:-auto-detect})"
-        print_info "Logs will be stored in CloudWatch Logs under /joblet/$NODE_ID/jobs/"
+        # Update persist storage to CloudWatch
+        sed -i 's/type: "local"/type: "cloudwatch"/' "$SERVER_CONFIG"
 
         # Update state backend to DynamoDB
-        print_info "💾  Configuring DynamoDB backend for state persistence"
-        sed -i '/^state:/,/^[^ ]/ {
-            /backend: "memory"/ s/backend: "memory"/backend: "dynamodb"/
-        }' "$SERVER_CONFIG"
+        sed -i 's/backend: "memory"/backend: "dynamodb"/' "$SERVER_CONFIG"
 
-        # Add DynamoDB storage configuration if not present
-        if ! grep -q "storage:" "$SERVER_CONFIG" | grep -A 20 "^state:" | grep -q "dynamodb:"; then
-            # Add storage section under state
-            sed -i '/^state:/a\
-  storage:\
-    dynamodb:\
-      region: ""  # Auto-detect from EC2 metadata\
-      table_name: "joblet-jobs"\
-      ttl_enabled: true\
-      ttl_days: 30' "$SERVER_CONFIG"
-        fi
-
-        # Set region in DynamoDB config if detected
-        if [ -n "$EC2_REGION" ]; then
-            sed -i "/^state:/,/^[^ ]/ {
-                /region: \"\"/ s/region: \"\"/region: \"$EC2_REGION\"/
-            }" "$SERVER_CONFIG"
-        fi
-
-        print_success "DynamoDB backend configured (region: ${EC2_REGION:-auto-detect}, table: joblet-jobs)"
-        print_info "Job state will persist in DynamoDB and survive restarts"
-        print_warning "Ensure IAM role with CloudWatch Logs + DynamoDB permissions is attached to this EC2 instance"
-    else
-        print_info "Not running on AWS EC2 - using local filesystem storage"
+        print_success "Set persist=cloudwatch, state=dynamodb"
     fi
 
     # Append security section with embedded certificates

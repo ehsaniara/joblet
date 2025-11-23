@@ -64,12 +64,10 @@ type MetricReader struct {
 // NewBackend creates a new storage backend based on configuration
 func NewBackend(cfg *config.StorageConfig, nodeID string, log *logger.Logger) (Backend, error) {
 	switch cfg.Type {
-	case "local":
+	case "local", "":
 		return NewLocalBackend(cfg, log)
 	case "cloudwatch":
 		return NewCloudWatchBackend(cfg, nodeID, log)
-	case "s3":
-		return nil, fmt.Errorf("S3 backend not implemented yet (v2.0)")
 	default:
 		return nil, fmt.Errorf("unknown storage backend type: %s", cfg.Type)
 	}

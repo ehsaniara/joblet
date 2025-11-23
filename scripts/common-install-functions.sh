@@ -467,6 +467,29 @@ display_aws_quickstart() {
     fi
 }
 
+configure_storage_backends() {
+    # Configure storage backends based on detected environment
+    # Must be called after detect_aws_environment() and after config file exists
+
+    CONFIG_FILE="/opt/joblet/config/joblet-config.yml"
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        return 1
+    fi
+
+    if [ "$EC2_CLOUDWATCH_CONFIGURED" = "true" ]; then
+        print_info "Configuring AWS storage backends..."
+
+        # Update persist storage to CloudWatch
+        sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
+
+        # Update state backend to DynamoDB
+        sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
+
+        print_success "Set persist=cloudwatch, state=dynamodb"
+    fi
+}
+
 generate_and_embed_certificates() {
     print_info "Generating certificates with configured IPs and domains..."
 
