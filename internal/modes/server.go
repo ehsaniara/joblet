@@ -923,9 +923,10 @@ func (s *persistSubprocessSupervisor) startProcess() error {
 	cmd.Stdout = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stdout}
 	cmd.Stderr = &prefixWriter{prefix: "[PERSIST] ", writer: os.Stderr}
 
-	// Keep subprocess in same process group
+	// Keep subprocess in same process group and kill when parent dies
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: false, // Keep in same process group
+		Setpgid:   false,           // Keep in same process group
+		Pdeathsig: syscall.SIGTERM, // Kill child when parent dies
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -1119,9 +1120,10 @@ func (s *stateSubprocessSupervisor) startProcess() error {
 	cmd.Stdout = &prefixWriter{prefix: "[STATE] ", writer: os.Stdout}
 	cmd.Stderr = &prefixWriter{prefix: "[STATE] ", writer: os.Stderr}
 
-	// Keep subprocess in same process group
+	// Keep subprocess in same process group and kill when parent dies
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: false, // Keep in same process group
+		Setpgid:   false,           // Keep in same process group
+		Pdeathsig: syscall.SIGTERM, // Kill child when parent dies
 	}
 
 	if err := cmd.Start(); err != nil {
