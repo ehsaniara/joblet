@@ -126,8 +126,10 @@ func TestScheduler_RemoveJob(t *testing.T) {
 	job1 := createTestJob("job-1", scheduledTime)
 	job2 := createTestJob("job-2", scheduledTime.Add(1*time.Hour))
 
-	s.AddJob(job1)
-	s.AddJob(job2)
+	err := s.AddJob(job1)
+	require.NoError(t, err)
+	err = s.AddJob(job2)
+	require.NoError(t, err)
 	assert.Equal(t, 2, s.GetQueueSize())
 
 	// Remove first job
@@ -155,9 +157,12 @@ func TestScheduler_GetScheduledJobs(t *testing.T) {
 	job2 := createTestJob("job-2", now.Add(2*time.Hour))
 	job3 := createTestJob("job-3", now.Add(30*time.Minute))
 
-	s.AddJob(job1)
-	s.AddJob(job2)
-	s.AddJob(job3)
+	err := s.AddJob(job1)
+	require.NoError(t, err)
+	err = s.AddJob(job2)
+	require.NoError(t, err)
+	err = s.AddJob(job3)
+	require.NoError(t, err)
 
 	jobs := s.GetScheduledJobs()
 	assert.Len(t, jobs, 3)
@@ -179,7 +184,7 @@ func TestScheduler_ExecutesJobAtScheduledTime(t *testing.T) {
 	// Start scheduler
 	err := s.Start()
 	require.NoError(t, err)
-	defer s.Stop()
+	defer func() { _ = s.Stop() }()
 
 	// Schedule a job for immediate execution (in the past)
 	pastTime := time.Now().Add(-1 * time.Second)
@@ -204,7 +209,7 @@ func TestScheduler_ExecutesJobsInOrder(t *testing.T) {
 	// Start scheduler
 	err := s.Start()
 	require.NoError(t, err)
-	defer s.Stop()
+	defer func() { _ = s.Stop() }()
 
 	now := time.Now()
 
@@ -213,9 +218,12 @@ func TestScheduler_ExecutesJobsInOrder(t *testing.T) {
 	job2 := createTestJob("job-2", now.Add(100*time.Millisecond))
 	job3 := createTestJob("job-3", now.Add(50*time.Millisecond))
 
-	s.AddJob(job1)
-	s.AddJob(job2)
-	s.AddJob(job3)
+	err = s.AddJob(job1)
+	require.NoError(t, err)
+	err = s.AddJob(job2)
+	require.NoError(t, err)
+	err = s.AddJob(job3)
+	require.NoError(t, err)
 
 	// Wait for all executions
 	time.Sleep(300 * time.Millisecond)
@@ -237,7 +245,7 @@ func TestScheduler_HandleExecutionError(t *testing.T) {
 	// Start scheduler
 	err := s.Start()
 	require.NoError(t, err)
-	defer s.Stop()
+	defer func() { _ = s.Stop() }()
 
 	// Schedule job for immediate execution
 	pastTime := time.Now().Add(-1 * time.Second)
@@ -261,7 +269,7 @@ func TestScheduler_NewJobWakesUpScheduler(t *testing.T) {
 	// Start scheduler
 	err := s.Start()
 	require.NoError(t, err)
-	defer s.Stop()
+	defer func() { _ = s.Stop() }()
 
 	// Give scheduler time to enter wait state
 	time.Sleep(50 * time.Millisecond)
@@ -292,7 +300,8 @@ func TestScheduler_StopDuringExecution(t *testing.T) {
 	// Add a future job
 	futureTime := time.Now().Add(10 * time.Second)
 	job := createTestJob("future-job", futureTime)
-	s.AddJob(job)
+	err = s.AddJob(job)
+	require.NoError(t, err)
 
 	// Stop immediately
 	err = s.Stop()
@@ -312,10 +321,12 @@ func TestScheduler_IsRunning(t *testing.T) {
 
 	assert.False(t, s.IsRunning())
 
-	s.Start()
+	err := s.Start()
+	require.NoError(t, err)
 	assert.True(t, s.IsRunning())
 
-	s.Stop()
+	err = s.Stop()
+	require.NoError(t, err)
 	assert.False(t, s.IsRunning())
 }
 

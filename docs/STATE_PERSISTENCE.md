@@ -3,7 +3,7 @@
 ## Overview
 
 Joblet State Persistence provides durable storage of job state information across system restarts. It runs as a
-dedicated subprocess (`joblet-state`) that communicates with the main joblet service via Unix socket IPC, offering two
+dedicated subprocess (`state`) that communicates with the main joblet service via Unix socket IPC, offering two
 storage backends: in-memory (default) and AWS DynamoDB (for EC2 deployments only).
 
 ## Architecture
@@ -517,8 +517,8 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 5 "^state:"
 sudo systemctl start joblet
 
 # Verify state subprocess
-ps aux | grep joblet-state
-# Expected: /opt/joblet/joblet-state (running as subprocess)
+ps aux | grep "bin/state"
+# Expected: /opt/joblet/bin/state (running as subprocess)
 ```
 
 ### AWS EC2 Deployment (DynamoDB Backend)

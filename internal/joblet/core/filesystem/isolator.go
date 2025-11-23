@@ -310,7 +310,9 @@ func (f *JobFilesystem) Setup() error {
 		if err := f.setupLimitedWorkDir(); err != nil {
 			log.Warn("failed to setup limited work directory", "error", err)
 			if _, statErr := f.platform.Stat(workPath); statErr != nil {
-				f.platform.MkdirAll(workPath, 0755)
+				if mkdirErr := f.platform.MkdirAll(workPath, 0755); mkdirErr != nil {
+					log.Warn("failed to create work directory fallback", "error", mkdirErr)
+				}
 			}
 		}
 	}
