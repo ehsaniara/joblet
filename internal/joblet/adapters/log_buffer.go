@@ -4,8 +4,7 @@ import (
 	"sync"
 )
 
-// SimpleLogBuffer replaces the over-engineered buffer system
-// Just stores log chunks for jobs without unnecessary abstractions
+// SimpleLogBuffer stores log chunks for jobs in memory
 type SimpleLogBuffer struct {
 	jobID string
 	data  [][]byte
@@ -83,7 +82,6 @@ func (b *SimpleLogBuffer) Clear() {
 }
 
 // SimpleLogManager manages log buffers for all jobs
-// Replaces complex buffer factory and manager abstractions
 type SimpleLogManager struct {
 	buffers map[string]*SimpleLogBuffer
 	mutex   sync.RWMutex

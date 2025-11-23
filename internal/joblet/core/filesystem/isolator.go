@@ -54,69 +54,41 @@ type JobFilesystem struct {
 	logger        *logger.Logger
 }
 
-// PrepareInitBinary copies the joblet init binary into the isolated filesystem.
-// Creates /sbin directory in the chroot environment and copies the host binary
-// to /sbin/init with executable permissions. This binary will be executed as
-// PID 1 inside the isolated environment to manage the job process.
-// Returns error if directory creation or binary copying fails.
+// PrepareInitBinary copies the joblet init binary to /sbin/init in the chroot.
+// This binary runs as PID 1 to manage the job process.
 func (f *JobFilesystem) PrepareInitBinary(hostBinaryPath string) error {
-	log := f.logger.WithField("operation", "prepare-init-binary")
-
-	// Create /sbin directory in the isolated root
 	sbinDir := filepath.Join(f.RootDir, "sbin")
 	if err := f.platform.MkdirAll(sbinDir, 0755); err != nil {
 		return fmt.Errorf("failed to create sbin directory: %w", err)
 	}
 
-	// Set the init path that will be used inside the chroot
 	f.InitPath = "/sbin/init"
-
-	// Copy the binary to the isolated filesystem
 	destPath := filepath.Join(f.RootDir, "sbin", "init")
 
-	// Read the host binary
 	data, err := f.platform.ReadFile(hostBinaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to read host binary: %w", err)
 	}
 
-	// Write to the isolated location
 	if err := f.platform.WriteFile(destPath, data, 0755); err != nil {
 		return fmt.Errorf("failed to write init binary: %w", err)
 	}
 
-	log.Debug("init binary prepared in isolated filesystem",
-		"hostPath", hostBinaryPath,
-		"isolatedPath", destPath,
-		"chrootPath", f.InitPath)
-
 	return nil
 }
 
-// CreateJobFilesystem creates a new isolated filesystem environment for a job.
-// Sets up the directory structure needed for job execution:
-//   - Job root directory under configured base path
-//   - Temporary directory with job ID substitution
-//   - Work directory for job files and execution
-//
-// Performs safety validation to ensure running in proper job conte
-// Performs safety validation to ensure running in proper job context.
-// Returns JobFilesystem instance ready for setup and chroot operations.
+// CreateJobFilesystem creates directory structure for a job's isolated environment.
 func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 	log := i.logger.WithField("jobID", jobID)
-	log.Debug("creating isolated filesystem for job")
 
-	// Create job-specific directories
 	jobRootDir := filepath.Join(i.config.Filesystem.BaseDir, jobID)
 	jobTmpDir := strings.Replace(i.config.Filesystem.TmpDir, "{JOB_ID}", jobID, -1)
 	jobWorkDir := filepath.Join(jobRootDir, "work")
 
-	// Ensure we're in a job context (safety check)
 	if err := i.validateJobContext(); err != nil {
 		return nil, fmt.Errorf("filesystem isolation safety check failed: %w", err)
 	}
 
-	// Create directory structure
 	dirs := []string{jobRootDir, jobTmpDir, jobWorkDir}
 	for _, dir := range dirs {
 		if err := i.platform.MkdirAll(dir, 0755); err != nil {
@@ -124,7 +96,7 @@ func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 		}
 	}
 
-	filesystem := &JobFilesystem{
+	return &JobFilesystem{
 		JobID:    jobID,
 		RootDir:  jobRootDir,
 		TmpDir:   jobTmpDir,
@@ -132,29 +104,11 @@ func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 		platform: i.platform,
 		config:   i.config,
 		logger:   log,
-	}
-
-	log.Debug("job filesystem structure created",
-		"rootDir", jobRootDir,
-		"tmpDir", jobTmpDir,
-		"workDir", jobWorkDir)
-
-	return filesystem, nil
+	}, nil
 }
 
-// CreateBuilderFilesystem creates filesystem structure for runtime build jobs.
-// Builder jobs require access to the full host OS environment (minus /opt/joblet)
-// to provide compilation tools and package managers for building runtime environments.
-//
-// Sets up the directory structure needed for runtime builds:
-//   - Job root directory under configured base path (same as regular jobs)
-//   - Temporary directory with job ID substitution
-//   - Work directory for build files and execution
-//
-// The key difference from regular jobs is that builder jobs will mount the entire
-// host filesystem (excluding /opt/joblet to prevent recursion) instead of minimal binaries.
-//
-// Returns JobFilesystem instance configured for builder chroot operations.
+// CreateBuilderFilesystem creates directory structure for runtime build jobs.
+// Same structure as regular jobs, but marked as builder for full host access.
 func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error) {
 	log := i.logger.WithField("jobID", jobID)
 	log.Debug("creating builder filesystem for runtime build job")
@@ -308,151 +262,84 @@ options ndots:0
 	return nil
 }
 
-// Setup performs complete filesystem isolation for the job environment.
-//
-//  1. Validates running in job context (safety check)
-//
-//  2. Creates essential directory structure
-//
-//  3. Creates basic system files (/etc/resolv.conf, /etc/hosts)
-//
-//  4. Mounts allowed read-only directories from host
-//
-//  5. Loads and mounts job volumes
-//
-//  6. Sets up limited work directory (1MB) if no volumes
-//
-//  7. Mounts upload pipes directory
-//
-//  8. Sets up isolated /tmp directory
-//
-//  9. Performs chroot to isolated environment
-//
-//  10. Mounts essential filesystems (/proc, /dev)
-//
-//  10. Mounts essential filesystems (/proc, /dev)
-//
-// Returns error if any step fails - job cannot proceed without proper isolation.
+// Setup creates an isolated filesystem environment for job execution.
+// Mounts system directories read-only, sets up volumes and runtime,
+// then chroots into the isolated environment.
 func (f *JobFilesystem) Setup() error {
 	log := f.logger.WithField("operation", "filesystem-setup")
-	log.Debug("setting up filesystem isolation")
-	log.Debug("JobFilesystem.Setup() called", "jobID", f.JobID, "currentVolumes", f.Volumes)
 
-	// Double-check we're in a job context
 	if err := f.validateInJobContext(); err != nil {
 		return fmt.Errorf("refusing to setup filesystem isolation: %w", err)
 	}
 
-	// Create essential directory structure in the isolated root
 	if err := f.createEssentialDirs(); err != nil {
 		return fmt.Errorf("failed to create essential directories: %w", err)
 	}
 
-	// Create essential files
 	if err := f.createEssentialFiles(); err != nil {
 		return fmt.Errorf("failed to create essential files: %w", err)
 	}
 
-	// Mount allowed read-only directories from host FIRST (default minimal chroot)
+	// Mount system directories first, then runtime overlays them
 	if err := f.mountAllowedDirs(); err != nil {
 		return fmt.Errorf("failed to mount allowed directories: %w", err)
 	}
 
-	// Load runtime information from environment
 	f.loadRuntimeFromEnvironment()
 
-	// Mount runtime AFTER allowed directories to overlay runtime-specific files
-	// This allows runtime files to override/extend the default minimal chroot
-	f.logger.Debug("about to mount runtime", "runtime", f.Runtime)
 	if err := f.mountRuntime(); err != nil {
 		return fmt.Errorf("failed to mount runtime: %w", err)
 	}
-	f.logger.Debug("finished mounting runtime", "runtime", f.Runtime)
 
-	// Load volumes from environment if not already set
-	f.logger.Debug("checking volume setup", "jobID", f.JobID, "currentVolumes", f.Volumes, "volumeCount", len(f.Volumes))
 	if len(f.Volumes) == 0 {
-		f.logger.Debug("loading volumes from environment", "jobID", f.JobID)
 		f.loadVolumesFromEnvironment()
-	} else {
-		f.logger.Debug("volumes already set, skipping environment load", "jobID", f.JobID, "volumes", f.Volumes)
 	}
 
-	// Mount volumes BEFORE chroot
-	f.logger.Debug("about to mount volumes", "jobID", f.JobID, "volumes", f.Volumes, "volumeCount", len(f.Volumes))
 	if err := f.mountVolumes(); err != nil {
 		return fmt.Errorf("failed to mount volumes: %w", err)
 	}
-	f.logger.Debug("volume mounting completed", "jobID", f.JobID)
 
-	// If no volumes are mounted, try to set up limited work directory (1MB)
-	// BUT skip if work directory already contains uploaded files
+	// Set up limited work directory unless volumes or uploads are present
 	workPath := filepath.Join(f.RootDir, "work")
 	workDirHasFiles := false
 	if files, err := f.platform.ReadDir(workPath); err == nil && len(files) > 0 {
 		workDirHasFiles = true
-		log.Debug("work directory contains uploaded files, skipping tmpfs mount", "fileCount", len(files))
 	}
 
 	if len(f.Volumes) == 0 && !workDirHasFiles {
 		if err := f.setupLimitedWorkDir(); err != nil {
-			log.Warn("failed to setup limited work directory, using unlimited work dir", "error", err)
-			// Ensure work directory is still accessible
+			log.Warn("failed to setup limited work directory", "error", err)
 			if _, statErr := f.platform.Stat(workPath); statErr != nil {
-				// Work directory might have been corrupted, recreate it
-				if mkdirErr := f.platform.MkdirAll(workPath, 0755); mkdirErr != nil {
-					log.Error("failed to recreate work directory", "error", mkdirErr)
-				} else {
-					log.Debug("recreated work directory after mount failure")
-				}
+				f.platform.MkdirAll(workPath, 0755)
 			}
 		}
 	}
 
-	// Mount pipes directory for uploads
 	if err := f.mountPipesDirectory(); err != nil {
-		// Log warning but don't fail - jobs without uploads should still work
 		log.Warn("failed to mount pipes directory", "error", err)
-		// Don't return error - continue without upload support
 	}
 
-	// Setup /tmp as isolated writable space
 	if err := f.setupTmpDir(); err != nil {
 		return fmt.Errorf("failed to setup tmp directory: %w", err)
 	}
 
-	// Finally, chroot to the isolated environment
 	if err := f.performChroot(); err != nil {
 		return fmt.Errorf("chroot failed: %w", err)
 	}
 
-	// Mount essential read-only filesystems AFTER chroot
 	if err := f.mountEssentialFS(); err != nil {
 		return fmt.Errorf("failed to mount essential filesystems: %w", err)
 	}
 
-	log.Debug("filesystem isolation setup completed successfully")
 	return nil
 }
 
-// SetupBuilder sets up filesystem isolation for runtime build jobs.
-// Builder jobs require access to the full host OS environment to provide
-// compilation tools and package managers. This method:
-//
-//  1. Validates running in job context (safety check)
-//  2. Creates basic directory structure
-//  3. Mounts entire host filesystem excluding /opt/joblet to prevent recursion
-//  4. Bind mounts /opt/joblet/runtimes as read-write for runtime installation
-//  5. Sets up isolated /tmp directory
-//  6. Performs chroot to builder environment
-//  7. Mounts essential filesystems (/proc, /dev)
-//
-// Returns error if any step fails - build job cannot proceed without proper isolation.
+// SetupBuilder creates filesystem isolation for runtime build jobs.
+// Unlike regular jobs, builders get access to the full host OS (excluding /opt/joblet)
+// for compilation tools, with /opt/joblet/runtimes mounted read-write.
 func (f *JobFilesystem) SetupBuilder() error {
 	log := f.logger.WithField("operation", "builder-setup")
-	log.Debug("setting up builder filesystem isolation")
 
-	// Double-check we're in a job context
 	if err := f.validateInJobContext(); err != nil {
 		return fmt.Errorf("refusing to setup builder isolation: %w", err)
 	}

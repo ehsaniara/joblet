@@ -11,12 +11,11 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-// JobStorer handles all the job storage stuff - keeping track of jobs, their logs,
-// and making sure everyone who cares about job updates gets notified.
+// JobStorer manages job storage, logs, and client notifications.
 //
 //counterfeiter:generate . JobStorer
 type JobStorer interface {
-	// Basic job stuff - create, update, find, list
+	// Job CRUD operations
 	CreateNewJob(job *domain.Job)
 	UpdateJob(job *domain.Job)
 	Job(id string) (*domain.Job, bool)
@@ -28,37 +27,32 @@ type JobStorer interface {
 	SendUpdatesToClient(ctx context.Context, id string, stream interfaces.DomainStreamer) error
 	SendUpdatesToClientWithSkip(ctx context.Context, id string, stream interfaces.DomainStreamer, skipCount int) error
 
-	// Taking care of job logs
+	// Log management
 	DeleteJobLogs(jobID string) error
 
-	// Cleanup - get rid of jobs and all their stuff when we're done
+	// Job deletion
 	DeleteJob(jobID string) error
 
 	// PubSub access for IPC integration
 	PubSub() pubsub.PubSub[JobEvent]
 
-	// State synchronization - restore jobs from persistent storage
+	// State synchronization
 	SyncFromPersistentState(ctx context.Context) error
 
-	// Health checks for state and persist services using Ping
+	// Health checks
 	HealthCheckServices(ctx context.Context) error
 
-	// Shutting down gracefully
+	// Lifecycle
 	Close() error
 }
 
-// VolumeStorer handles all our volume storage needs - creating them, tracking them,
-// and cleaning them up when we're done.
+// VolumeStorer manages volume creation, tracking, and cleanup.
 type VolumeStorer interface {
-	// All the basic volume operations
 	interfaces.VolumeStore
-
-	// Cleanup when done
 	Close() error
 }
 
 // NetworkStorer manages network configurations and job network allocations.
-// Keeps track of which jobs are using which networks and how they're connected.
 type NetworkStorer interface {
 	// Setting up and managing network configs
 	CreateNetwork(config *NetworkConfig) error

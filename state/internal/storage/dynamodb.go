@@ -153,7 +153,9 @@ func (d *dynamoDBBackend) Delete(ctx context.Context, jobID string) error {
 func (d *dynamoDBBackend) List(ctx context.Context, filter *Filter) ([]*domain.Job, error) {
 	var jobs []*domain.Job
 
-	// Use Scan for simple cases (TODO: optimize with GSI for status filtering)
+	// Uses Scan with FilterExpression for simplicity.
+	// For high-volume production use, consider adding a GSI on jobStatus
+	// to enable Query operations instead of Scan for better performance.
 	input := &dynamodb.ScanInput{
 		TableName: aws.String(d.tableName),
 	}

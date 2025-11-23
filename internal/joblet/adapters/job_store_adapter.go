@@ -466,11 +466,8 @@ func (a *jobStoreAdapter) SendUpdatesToClient(ctx context.Context, id string, st
 	return a.SendUpdatesToClientWithSkip(ctx, id, stream, 0)
 }
 
-// SendUpdatesToClientWithSkip sends updates to client, skipping the first skipCount items
-// This is used to avoid duplicates when persist has already sent some items
-// When persist is disabled, skips all buffer reads and only does live streaming
+// SendUpdatesToClientWithSkip streams logs to client, skipping already-sent items from persist.
 func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id string, stream interfaces.DomainStreamer, skipCount int) error {
-	// Resolve UUID by prefix first
 	resolvedUuid, err := a.resolveUuidByPrefix(id)
 	if err != nil {
 		a.logger.Warn("failed to resolve job UUID", "input", id, "error", err)
@@ -516,8 +513,6 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 		return nil
 	}
 
-	// Subscribe to job events for real-time updates
-	// This will block until the subscription ends
 	return a.subscribeToJobUpdates(ctx, resolvedUuid, task, stream)
 }
 
@@ -526,9 +521,7 @@ func (a *jobStoreAdapter) PubSub() pubsub.PubSub[JobEvent] {
 	return a.pubsub
 }
 
-// SyncFromPersistentState loads jobs from persistent state storage into memory.
-// Called during server startup to restore jobs across restarts.
-// This is the backbone of joblet's reliability - jobs survive restarts.
+// SyncFromPersistentState restores jobs from state storage on startup.
 func (a *jobStoreAdapter) SyncFromPersistentState(ctx context.Context) error {
 	if a.stateClient == nil {
 		a.logger.Warn("state client not available, cannot sync jobs from persistent storage")
@@ -1029,10 +1022,8 @@ func (t *taskWrapper) cleanupSubscribers() {
 	// adapter is shut down.
 }
 
-// HealthCheckServices verifies that state and persist services are healthy using Ping
-// This should be called after subprocesses have started
+// HealthCheckServices verifies state and persist services are healthy.
 func (a *jobStoreAdapter) HealthCheckServices(ctx context.Context) error {
-	// Check state service (mandatory)
 	if a.stateClient == nil {
 		return fmt.Errorf("state client is nil")
 	}

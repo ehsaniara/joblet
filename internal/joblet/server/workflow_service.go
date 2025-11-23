@@ -612,42 +612,8 @@ func (s *WorkflowServiceServer) convertWorkflowStateToInfo(ws *workflow.Workflow
 	return info
 }
 
-// convertJobDependenciesToWorkflowJobs converts internal JobDependency structures to protobuf WorkflowJob messages.
-//
-// RESPONSIBILITY:
-// - Transforms internal workflow job data into API-compatible protobuf messages
-// - Properly separates job IDs from job names for CLI display
-// - Constructs dependency lists from job requirement specifications
-// - Enables proper job status reporting with both IDs and readable names
-//
-// JOB NAMES INTEGRATION:
-// - JobId field contains actual job IDs (e.g., "42", "43") for jobs that have been started
-// - JobId field contains job names (e.g., "setup-data") for jobs that haven't been started yet
-// - JobName field always contains readable job names from workflow YAML
-// - This separation allows CLI to display both columns correctly
-//
-// WORKFLOW:
-// 1. Iterates through internal JobDependency map
-// 2. Creates WorkflowJob protobuf message for each job
-// 3. Sets JobId from JobDependency.JobID (actual ID if started, job name if not)
-// 4. Sets JobName from JobDependency.InternalName (always the workflow YAML name)
-// 5. Maps job status to string representation
-// 6. Builds dependency list from job requirements
-//
-// PARAMETERS:
-// - jobs: Map of job identifiers to JobDependency structures from workflow manager
-//
-// RETURNS:
-// - []*pb.WorkflowJob: Array of protobuf messages ready for gRPC response
-//
-// CLI DISPLAY IMPACT:
-// This method directly affects how workflow status is displayed:
-// - JOB ID column shows actual job IDs for started jobs
-// - JOB NAME column shows readable names from YAML
-// - DEPENDENCIES column shows job name dependencies for clarity
-//
-// USAGE:
-// Called by GetWorkflowStatus to convert internal data for API responses.
+// convertJobDependenciesToWorkflowJobs converts internal JobDependency structures to protobuf messages.
+// Sets JobUuid to actual job ID for started jobs (or "0" for pending), and JobName to workflow YAML name.
 func (s *WorkflowServiceServer) convertJobDependenciesToWorkflowJobs(jobs map[string]*workflow.JobDependency) []*pb.WorkflowJob {
 	var workflowJobs []*pb.WorkflowJob
 
@@ -806,48 +772,7 @@ func (s *WorkflowServiceServer) orchestrateWorkflow(ctx context.Context, workflo
 }
 
 // executeWorkflowJob executes a single job within a workflow context.
-//
-// RESPONSIBILITY:
-// - Creates and starts a job based on workflow job specification
-// - Handles file uploads and environment variable merging for the job
-// - Updates workflow manager with actual job ID after successful job creation
-// - Initiates job monitoring to track status changes throughout execution
-// - Integrates job names feature by mapping workflow job names to actual job IDs
-//
-// WORKFLOW:
-// 1. Processes file uploads from workflow job specification
-// 2. Validates and normalizes network configuration for job isolation
-// 3. Merges global workflow and job-specific environment variables
-// 4. Creates StartJobRequest with job name from workflow YAML
-// 5. Starts job via joblet service and receives actual job ID
-// 6. Updates workflow manager to map job name to actual job ID
-// 7. Notifies workflow manager of initial job status
-// 8. Launches background job monitoring goroutine
-//
-// PARAMETERS:
-// - ctx: Context for request cancellation and timeout handling
-// - workflowID: Unique identifier of the parent workflow
-// - jobName: readable job name from workflow YAML (e.g., "setup-data")
-// - jobSpec: Complete job specification including command, resources, dependencies
-// - workflowYAML: Full workflow configuration for environment variable merging
-// - uploadedFiles: Pre-uploaded files available to all jobs in the workflow
-//
-// RETURNS:
-// - error: If job creation fails, network validation fails, or job startup errors
-//
-// JOB NAMES INTEGRATION:
-// - Sets StartJobRequest.Name to jobName for proper job identification
-// - Calls UpdateJobID to map job name to actual job ID after creation
-// - Enables CLI to display both job IDs and readable names
-//
-// ERROR HANDLING:
-// - Returns error immediately if job creation fails
-// - Logs warnings for non-critical issues (e.g., job ID mapping failures)
-// - Ensures job monitoring starts even if secondary operations fail
-//
-// CONCURRENCY:
-// - Safe for concurrent execution across multiple workflow jobs
-// - Job monitoring runs in separate goroutine to prevent blocking
+// Processes uploads, merges environment variables, starts the job, and begins monitoring.
 func (s *WorkflowServiceServer) executeWorkflowJob(ctx context.Context, workflowID int, jobName string, jobSpec JobSpec, workflowYAML *WorkflowYAML, uploadedFiles map[string][]byte) error {
 	log := s.logger.WithFields("workflowId", workflowID, "jobName", jobName)
 	log.Info("executing workflow job")
