@@ -21,6 +21,7 @@ import (
 
 	"github.com/ehsaniara/joblet/internal/joblet"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
 	"github.com/ehsaniara/joblet/internal/joblet/ipc"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
@@ -501,7 +502,11 @@ func processUploadFile(upload interface{}, workspaceDir string, cfg *config.Conf
 	// Type assertion to access fields
 	u := upload.(*FileUpload)
 
-	fullPath := filepath.Join(workspaceDir, u.Path)
+	// Validate path to prevent path traversal attacks
+	fullPath, err := validation.ValidatePathWithinBase(workspaceDir, u.Path)
+	if err != nil {
+		return fmt.Errorf("invalid upload path: %w", err)
+	}
 
 	if u.IsDirectory {
 		// Create directory
