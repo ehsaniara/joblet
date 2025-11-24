@@ -385,17 +385,20 @@ func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 
 	a.tasksMutex.RLock()
 	task, exists := a.tasks[resolvedUuid]
-	a.tasksMutex.RUnlock()
-
 	if !exists {
+		a.tasksMutex.RUnlock()
 		a.logger.Warn("attempted to write to buffer for non-existent job", "jobId", resolvedUuid, "chunkSize", len(chunk))
 		return
 	}
 
+	// Capture logBuffer pointer while holding lock to avoid race conditions
+	logBuffer := task.logBuffer
+	a.tasksMutex.RUnlock()
+
 	// Only write to buffer if persist is enabled (gap prevention)
 	// When persist is disabled, skip buffering to avoid unbounded growth
-	if a.persistEnabled && task.logBuffer != nil {
-		if err := task.logBuffer.Write(chunk); err != nil {
+	if a.persistEnabled && logBuffer != nil {
+		if err := logBuffer.Write(chunk); err != nil {
 			a.logger.Error("failed to write to job log buffer", "jobId", resolvedUuid, "error", err)
 			return
 		}
@@ -907,9 +910,19 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 		cancel:      cancel,
 	}
 
+	// Register subscriber with proper locking to avoid race with task deletion
+	a.tasksMutex.RLock()
+	task, exists := a.tasks[jobID]
+	if !exists {
+		a.tasksMutex.RUnlock()
+		unsubscribe()
+		cancel()
+		return fmt.Errorf("job no longer exists")
+	}
 	task.subMutex.Lock()
 	task.subscribers[subID] = subContext
 	task.subMutex.Unlock()
+	a.tasksMutex.RUnlock()
 
 	// Create a channel to signal when subscription ends
 	done := make(chan error, 1)
@@ -922,9 +935,14 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 			unsubscribe()
 			cancel()
 
-			task.subMutex.Lock()
-			delete(task.subscribers, subID)
-			task.subMutex.Unlock()
+			// Clean up subscriber with proper locking to avoid race with task deletion
+			a.tasksMutex.RLock()
+			if task, exists := a.tasks[jobID]; exists {
+				task.subMutex.Lock()
+				delete(task.subscribers, subID)
+				task.subMutex.Unlock()
+			}
+			a.tasksMutex.RUnlock()
 
 			a.logger.Debug("subscription cleaned up", "jobId", jobID, "subId", subID)
 

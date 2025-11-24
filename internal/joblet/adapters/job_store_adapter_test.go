@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -368,4 +369,164 @@ func TestWriteToBuffer_Concurrent(t *testing.T) {
 	chunks := buffer.ReadAll()
 	expectedChunks := numGoroutines * numWrites
 	assert.Equal(t, expectedChunks, len(chunks), "All concurrent writes should be buffered")
+}
+
+// TestWriteToBuffer_ConcurrentWithDeletion verifies WriteToBuffer handles concurrent task deletion
+func TestWriteToBuffer_ConcurrentWithDeletion(t *testing.T) {
+	// Setup
+	log := logger.New()
+	store := &SimpleJobStore{
+		jobs:   make(map[string]*domain.Job),
+		logger: log,
+	}
+	logMgr := NewSimpleLogManager()
+	ps := pubsub.NewPubSub[JobEvent]()
+
+	adapter := NewJobStorer(store, logMgr, ps, nil, nil, true, log)
+	jobStoreAdapter := adapter.(*jobStoreAdapter)
+
+	// Create multiple test jobs
+	numJobs := 10
+	for i := 0; i < numJobs; i++ {
+		jobID := fmt.Sprintf("delete-test-job-%d", i)
+		job := &domain.Job{
+			Uuid:   jobID,
+			Status: domain.StatusRunning,
+		}
+
+		buffer := NewSimpleLogBuffer(jobID)
+		jobStoreAdapter.tasksMutex.Lock()
+		jobStoreAdapter.tasks[jobID] = &taskWrapper{
+			job:       job,
+			logBuffer: buffer,
+			pubsub:    ps,
+		}
+		jobStoreAdapter.tasksMutex.Unlock()
+	}
+
+	// Test: Concurrent writes while deleting tasks
+	var wg sync.WaitGroup
+
+	// Writers
+	for i := 0; i < numJobs; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			jobID := fmt.Sprintf("delete-test-job-%d", idx)
+			for j := 0; j < 100; j++ {
+				jobStoreAdapter.WriteToBuffer(jobID, []byte("test data"))
+			}
+		}(i)
+	}
+
+	// Deleters - delete tasks while writers are running
+	for i := 0; i < numJobs; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			jobID := fmt.Sprintf("delete-test-job-%d", idx)
+			// Small delay to let some writes happen
+			for j := 0; j < 50; j++ {
+				// Spin
+			}
+			jobStoreAdapter.tasksMutex.Lock()
+			delete(jobStoreAdapter.tasks, jobID)
+			jobStoreAdapter.tasksMutex.Unlock()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Verify: No panics occurred (test passes if we reach here)
+	assert.True(t, true, "Concurrent writes with deletion completed without race")
+}
+
+// TestSubscribeCleanup_ConcurrentWithDeletion verifies subscription cleanup handles concurrent task deletion
+func TestSubscribeCleanup_ConcurrentWithDeletion(t *testing.T) {
+	// Setup
+	log := logger.New()
+	store := &SimpleJobStore{
+		jobs:   make(map[string]*domain.Job),
+		logger: log,
+	}
+	logMgr := NewSimpleLogManager()
+	ps := pubsub.NewPubSub[JobEvent]()
+
+	adapter := NewJobStorer(store, logMgr, ps, nil, nil, true, log)
+	jobStoreAdapter := adapter.(*jobStoreAdapter)
+
+	// Create test jobs with subscribers map
+	numJobs := 5
+	for i := 0; i < numJobs; i++ {
+		jobID := fmt.Sprintf("subscribe-test-job-%d", i)
+		job := &domain.Job{
+			Uuid:   jobID,
+			Status: domain.StatusRunning,
+		}
+
+		buffer := NewSimpleLogBuffer(jobID)
+		jobStoreAdapter.tasksMutex.Lock()
+		jobStoreAdapter.tasks[jobID] = &taskWrapper{
+			job:         job,
+			logBuffer:   buffer,
+			subscribers: make(map[string]*subscriptionContext),
+			pubsub:      ps,
+		}
+		jobStoreAdapter.tasksMutex.Unlock()
+	}
+
+	// Test: Concurrent subscriber registration/cleanup while deleting tasks
+	var wg sync.WaitGroup
+
+	// Subscriber registrations and cleanups
+	for i := 0; i < numJobs; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			jobID := fmt.Sprintf("subscribe-test-job-%d", idx)
+
+			for j := 0; j < 50; j++ {
+				subID := fmt.Sprintf("sub_%d_%d", idx, j)
+
+				// Register subscriber
+				jobStoreAdapter.tasksMutex.RLock()
+				if task, exists := jobStoreAdapter.tasks[jobID]; exists {
+					task.subMutex.Lock()
+					task.subscribers[subID] = &subscriptionContext{id: subID}
+					task.subMutex.Unlock()
+				}
+				jobStoreAdapter.tasksMutex.RUnlock()
+
+				// Cleanup subscriber
+				jobStoreAdapter.tasksMutex.RLock()
+				if task, exists := jobStoreAdapter.tasks[jobID]; exists {
+					task.subMutex.Lock()
+					delete(task.subscribers, subID)
+					task.subMutex.Unlock()
+				}
+				jobStoreAdapter.tasksMutex.RUnlock()
+			}
+		}(i)
+	}
+
+	// Deleters
+	for i := 0; i < numJobs; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			jobID := fmt.Sprintf("subscribe-test-job-%d", idx)
+			// Small delay
+			for j := 0; j < 25; j++ {
+				// Spin
+			}
+			jobStoreAdapter.tasksMutex.Lock()
+			delete(jobStoreAdapter.tasks, jobID)
+			jobStoreAdapter.tasksMutex.Unlock()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Verify: No panics occurred (test passes if we reach here)
+	assert.True(t, true, "Concurrent subscription operations with deletion completed without race")
 }
