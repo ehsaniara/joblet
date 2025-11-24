@@ -23,6 +23,12 @@ var (
 )
 
 func main() {
+	// Handle version subcommand before flag parsing
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		println("persist version", version, "(commit:", commit+", built:", buildTime+")")
+		os.Exit(0)
+	}
+
 	flag.Parse()
 
 	// Initialize logger with defaults first
