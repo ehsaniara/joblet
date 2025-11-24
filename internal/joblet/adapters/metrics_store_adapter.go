@@ -186,11 +186,8 @@ func (a *MetricsStoreAdapter) PublishMetrics(ctx context.Context, sample *domain
 	return nil
 }
 
-// StreamMetrics streams real-time metrics for a job
-// This method:
-// 1. First sends buffered samples (prevents gaps during persist→live transition)
-// 2. Then streams live samples from pub-sub
-// Historical metrics are retrieved via persist gRPC service (not implemented here)
+// StreamMetrics streams real-time metrics for a job.
+// Sends buffered samples first, then subscribes to live samples from pub-sub.
 func (a *MetricsStoreAdapter) StreamMetrics(
 	ctx context.Context,
 	jobID string,

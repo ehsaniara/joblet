@@ -101,11 +101,11 @@ func (s *Server) Stop() error {
 		s.listener.Close()
 	}
 
+	// Close write pipeline first so workers can exit
+	close(s.writePipe)
+
 	// Wait for all goroutines
 	s.wg.Wait()
-
-	// Close write pipeline
-	close(s.writePipe)
 
 	s.logger.Info("IPC server stopped",
 		"msgsReceived", s.msgsReceived.Load(),
@@ -155,14 +155,23 @@ func (s *Server) handleConnection(conn net.Conn) {
 	lengthBuf := make([]byte, 4)
 
 	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		default:
-		}
+		// Set read deadline to allow graceful shutdown
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 		// Read length prefix
 		if _, err := io.ReadFull(conn, lengthBuf); err != nil {
+			// Check if context was cancelled during read
+			select {
+			case <-s.ctx.Done():
+				return
+			default:
+			}
+
+			// Check for timeout (expected during shutdown check)
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue // Retry read with new deadline
+			}
+
 			if err != io.EOF {
 				s.logger.Debug("Connection closed", "connID", connID, "error", err)
 			}
@@ -219,6 +228,14 @@ func (s *Server) writeWorker(id int) {
 
 	for {
 		select {
+		case <-s.ctx.Done():
+			// Context cancelled, flush remaining batch and exit
+			if len(batch) > 0 {
+				s.processBatch(batch, workerLog)
+			}
+			workerLog.Debug("Write worker stopped (context cancelled)")
+			return
+
 		case msg, ok := <-s.writePipe:
 			if !ok {
 				// Channel closed, flush remaining batch and exit

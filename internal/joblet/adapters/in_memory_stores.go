@@ -15,10 +15,8 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-// Direct constructors to replace the over-engineered factory pattern
-
-// WaitForPersistService waits for persist service to be ready with retries (public for server.go)
-// Uses the Ping RPC for efficient health checking
+// WaitForPersistService waits for persist service to be ready with retries.
+// Uses Ping RPC for health checking.
 func WaitForPersistService(socketPath string, logger *logger.Logger) (persistpb.PersistServiceClient, error) {
 	if err := waitForPersistService(socketPath, logger); err != nil {
 		return nil, err

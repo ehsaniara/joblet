@@ -89,8 +89,13 @@ func (s *Subscriber) processEvents(updates <-chan pubsub.Message[adapters.JobEve
 			seq := sequence[jobID]
 			sequence[jobID] = seq + 1
 
-			// Determine stream type (we don't have this info in JobEvent currently, default to stdout)
-			// TODO: JobEvent should include stream type (stdout/stderr)
+			// Stream type defaults to stdout because the current architecture combines
+			// stdout and stderr into a single OutputWriter for simplicity.
+			// Supporting separate streams would require:
+			// 1. Two separate OutputWriters in job_executor.go
+			// 2. Adding StreamType field to JobEvent
+			// 3. Updating WriteToBuffer to accept stream type
+			// For now, all logs appear as stdout in the persist layer.
 			streamType := ipcpb.StreamType_STREAM_TYPE_STDOUT
 
 			// Send to IPC writer

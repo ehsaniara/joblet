@@ -104,7 +104,7 @@ func (s *grpcAuthorization) extractClientRole(ctx context.Context) (ClientRole, 
 		}
 	}
 
-	// default to viewer role for backward compatibility
+	// Clients must have explicit "admin" or "viewer" in certificate OU
 	return UnknownRole, nil
 }
 

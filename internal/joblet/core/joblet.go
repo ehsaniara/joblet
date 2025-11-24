@@ -30,6 +30,18 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
+// Constants for job execution timing
+const (
+	// LogFlushDelay is the time to wait for async log publishing after process completion
+	LogFlushDelay = 300 * time.Millisecond
+
+	// PeriodicCleanupInterval is the interval between orphaned resource cleanup runs
+	PeriodicCleanupInterval = 5 * time.Minute
+
+	// DefaultMetricsSampleInterval is the default interval for metrics collection
+	DefaultMetricsSampleInterval = 5 * time.Second
+)
+
 // Joblet orchestrates job execution using specialized components.
 // Main entry point for job management - coordinates validation, building,
 // resource allocation, execution, and cleanup for all job types.
@@ -89,7 +101,7 @@ func NewPlatformJoblet(store adapters.JobStorer, metricsStore *adapters.MetricsS
 	// Start periodic cleanup
 	go j.cleanup.SchedulePeriodicCleanup(
 		context.Background(),
-		5*time.Minute,
+		PeriodicCleanupInterval,
 		j.getActiveJobIDs,
 	)
 
@@ -100,14 +112,11 @@ func NewPlatformJoblet(store adapters.JobStorer, metricsStore *adapters.MetricsS
 // Main job entry point - validates request, builds job domain object,
 // then routes to either immediate execution or scheduler based on schedule field.
 func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (*domain.Job, error) {
-	j.logger.Debug("CORE JOBLET StartJob called",
-		"command", req.Command,
-		"network", req.Network,
-		"volumes", req.Volumes,
-		"runtime", req.Runtime)
 	j.logger.Debug("StartJob called",
 		"command", req.Command,
 		"network", req.Network,
+		"volumes", req.Volumes,
+		"runtime", req.Runtime,
 		"args", req.Args)
 
 	// Convert interface request to internal request using simplified approach
@@ -256,7 +265,7 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 	// Start metrics collection (always enabled for pubsub live streaming)
 	// Metrics are sent to pubsub for real-time clients AND to persist via IPC
 	if j.metricsStore != nil {
-		sampleInterval := 5 * time.Second // Default sample interval
+		sampleInterval := DefaultMetricsSampleInterval
 
 		// Get GPU indices from job if allocated
 		var gpuIndices []int
@@ -541,10 +550,11 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 
 	// Give a brief moment for final log chunks to be written and published
 	// cmd.Wait() ensures pipes are closed, but async pubsub publishes might still be in flight
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(LogFlushDelay)
 
 	// Determine final status
 	var exitCode int32
+	now := time.Now()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -554,12 +564,12 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		}
 		job.Status = domain.StatusFailed
 		job.ExitCode = exitCode
-		job.EndTime = &[]time.Time{time.Now()}[0]
+		job.EndTime = &now
 	} else {
 		exitCode = 0
 		job.Status = domain.StatusCompleted
 		job.ExitCode = exitCode
-		job.EndTime = &[]time.Time{time.Now()}[0]
+		job.EndTime = &now
 	}
 
 	// Update state
@@ -608,9 +618,10 @@ func (j *Joblet) updateJobRunning(job *domain.Job, cmd platform.Command) {
 // handleExecutionFailure handles job execution failures by updating status,
 // setting failure exit code, and triggering appropriate cleanup based on job type.
 func (j *Joblet) handleExecutionFailure(job *domain.Job) {
+	now := time.Now()
 	job.Status = domain.StatusFailed
 	job.ExitCode = -1
-	job.EndTime = &[]time.Time{time.Now()}[0]
+	job.EndTime = &now
 	j.store.UpdateJob(job)
 
 	// Handle cleanup for failed jobs - runtime builds get partial cleanup

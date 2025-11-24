@@ -560,8 +560,9 @@ func (ns *NetworkSetup) setupHostsFile(pid int, alloc *JobAllocation) error {
 // This ensures that jobs in different networks cannot communicate with each other,
 // providing network-level security isolation between different job groups.
 func (ns *NetworkSetup) setupNetworkIsolation(networkName string, bridgeName string) {
-	// Don't isolate the default bridge network (for backward compatibility)
-	// You might want to change this policy
+	// Don't isolate the default "bridge" network - it's the system default
+	// network used when no explicit network is specified. Isolating it would
+	// break jobs that don't specify a network.
 	if networkName == "bridge" {
 		ns.logger.Debug("skipping isolation for default bridge network")
 		return

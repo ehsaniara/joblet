@@ -40,7 +40,7 @@ joblet/
 ### 1. Joblet (Main Service)
 
 - **Binary**: `bin/joblet`
-- **Port**: `:50051` (gRPC)
+- **Port**: `:50051` (gRPC) or `:443` on AWS/EC2
 - **Purpose**: Job execution engine
 - **Responsibilities**:
     - Job scheduling and execution
@@ -50,10 +50,10 @@ joblet/
     - Runtime management
     - Live metrics streaming
 
-### 2. Joblet-Persist (Persistence Service)
+### 2. Persist (Persistence Service)
 
 - **Binary**: `bin/persist`
-- **Port**: `:50052` (gRPC)
+- **Communication**: Unix socket IPC + gRPC socket for queries
 - **Purpose**: Historical data persistence and queries
 - **Responsibilities**:
     - Receive logs/metrics via IPC
@@ -96,23 +96,35 @@ joblet/
 │  RNX Client │◄──── gRPC ────────►│  Joblet Service  │
 └─────────────┘     :50051         │     (main)       │
                                    └──────────────────┘
-                                           │
-                                           │ Unix Socket
-                                           │ IPC
-                                           │
-                                           ▼
-                                   ┌──────────────────┐
-                                   │ Joblet-Persist   │
-                                   │   (storage)      │
-                                   └──────────────────┘
-                                           │
-                                           │ gRPC
-                                           ▼
-                                   ┌──────────────────┐
-                                   │   RNX Queries    │
-                                   │ (historical data)│
-                                   └──────────────────┘
+                                      │           │
+                          ┌───────────┘           └───────────┐
+                          │ Unix Socket                       │ Unix Socket
+                          │ IPC (logs/metrics)                │ IPC (job state)
+                          ▼                                   ▼
+                   ┌──────────────────┐             ┌──────────────────┐
+                   │     Persist      │             │      State       │
+                   │  (logs/metrics)  │             │   (job state)    │
+                   └──────────────────┘             └──────────────────┘
+                          │                                   │
+                          │ gRPC                              │
+                          ▼                                   ▼
+                   ┌──────────────────┐             ┌──────────────────┐
+                   │   RNX Queries    │             │  Storage Backend │
+                   │ (historical data)│             │ (Memory/DynamoDB)│
+                   └──────────────────┘             └──────────────────┘
 ```
+
+### Subprocess Management
+
+Joblet automatically spawns and supervises two subprocesses:
+
+- **Persist**: Handles log and metrics persistence
+- **State**: Handles job state persistence
+
+Both subprocesses are managed with:
+- **Auto-restart**: Exponential backoff (1s → 30s max) on crash
+- **Graceful shutdown**: SIGTERM with 10s timeout before SIGKILL
+- **Parent death signal**: `Pdeathsig: SIGTERM` ensures children terminate when parent dies
 
 ### Communication Protocols
 

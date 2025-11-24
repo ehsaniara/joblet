@@ -10,9 +10,8 @@ import (
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
-// ExecutionCoordinator coordinates different execution services.
-// Replaces monolithic ExecutionEngine with focused coordinator that orchestrates
-// environment setup, networking, process management, isolation, and GPU management for job execution.
+// ExecutionCoordinator coordinates execution services for job lifecycle management.
+// Orchestrates environment setup, networking, process management, isolation, and GPU management.
 type ExecutionCoordinator struct {
 	environmentManager EnvironmentManager
 	networkManager     NetworkManager
