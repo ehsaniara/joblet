@@ -93,16 +93,19 @@ buffers:
   pubsub_buffer_size: 10000   # Pub-sub channel buffer for high-throughput production traffic
   chunk_size: 1048576         # 1MB chunks for optimal streaming performance
 
-# IPC configuration for persist integration
+# IPC configuration for persist integration (joblet -> persist communication)
 # IMPORTANT: This setting controls BOTH persistence AND buffering behavior:
 #   enabled: true  - Logs/metrics buffered in memory + forwarded to persist (gap prevention enabled)
 #   enabled: false - NO buffering (live streaming only, no persistence, no historical data)
 # Disabling persist eliminates unbounded memory growth but loses historical log/metric access
+#
+# NOTE: The socket path defined here is the SINGLE SOURCE OF TRUTH.
+#       persist.ipc inherits this socket path automatically (Go best practice: avoid duplication)
 ipc:
-  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket for log/metric writes
-  buffer_size: 10000                              # Message buffer size
-  reconnect_delay: "5s"                           # Reconnection retry delay
-  max_reconnects: 0                               # Max reconnection attempts (0 = infinite)
+  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket path (shared with persist.ipc)
+  buffer_size: 10000                              # Client: message buffer size
+  reconnect_delay: "5s"                           # Client: reconnection retry delay
+  max_reconnects: 0                               # Client: max reconnection attempts (0 = infinite)
 
 # Volume management configuration
 volumes:
@@ -143,7 +146,8 @@ persist:
     # TLS: Disabled for Unix socket (pure Linux IPC)
 
   ipc:
-    socket: "/opt/joblet/run/persist-ipc.sock"  # Unix socket for log/metric writes
+    # socket: inherited from top-level ipc.socket (single source of truth)
+    # Server-specific settings only:
     max_connections: 10
     max_message_size: 134217728  # 128MB - handle large batches
     read_buffer: 8388608         # 8MB

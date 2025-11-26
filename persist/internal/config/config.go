@@ -145,13 +145,20 @@ type ServerInfo struct {
 	NodeID string `yaml:"nodeId"` // Node identifier for distributed deployments
 }
 
+// ParentIPCConfig holds the top-level IPC configuration from joblet
+// Used to inherit socket path (single source of truth)
+type ParentIPCConfig struct {
+	Socket string `yaml:"socket"` // Unix socket path (inherited by persist)
+}
+
 // RootConfig wraps the persist config to support nested structure
 // and includes shared configurations from parent (joblet)
 type RootConfig struct {
-	Server   ServerInfo     `yaml:"server"` // Server info (nodeId)
-	Persist  *Config        `yaml:"persist"`
-	Logging  LoggingConfig  `yaml:"logging"`  // Inherited logging config
-	Security SecurityConfig `yaml:"security"` // Inherited TLS certificates
+	Server   ServerInfo      `yaml:"server"` // Server info (nodeId)
+	IPC      ParentIPCConfig `yaml:"ipc"`    // Top-level IPC config (socket path)
+	Persist  *Config         `yaml:"persist"`
+	Logging  LoggingConfig   `yaml:"logging"`  // Inherited logging config
+	Security SecurityConfig  `yaml:"security"` // Inherited TLS certificates
 }
 
 // LoadResult contains persist config and inherited parent configurations
@@ -175,6 +182,14 @@ func Load(path string) (*LoadResult, error) {
 	rootCfg := &RootConfig{}
 	if err := yaml.Unmarshal(data, rootCfg); err == nil && rootCfg.Persist != nil {
 		// Found persist section in joblet-config.yml - inherit parent configs
+
+		// Inherit IPC socket from top-level ipc.socket if not specified in persist.ipc
+		// This ensures single source of truth for socket path (Go best practice: avoid duplication)
+		if rootCfg.Persist.IPC.Socket == "" && rootCfg.IPC.Socket != "" {
+			rootCfg.Persist.IPC.Socket = rootCfg.IPC.Socket
+		}
+
+		// Validate after inheritance so inherited values are checked
 		if err := rootCfg.Persist.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid persist configuration: %w", err)
 		}

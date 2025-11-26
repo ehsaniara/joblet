@@ -281,16 +281,18 @@ buffers:
 **⚠️ IMPORTANT: `ipc.enabled` controls BOTH persistence AND in-memory buffering behavior.**
 
 ```yaml
-# IPC configuration for persist integration
+# IPC configuration for persist integration (joblet -> persist communication)
 # This setting controls BOTH persistence AND buffering:
 #   enabled: true  - Logs/metrics buffered in memory + forwarded to persist (gap prevention enabled)
 #   enabled: false - NO buffering (live streaming only, no persistence, no historical data)
+#
+# NOTE: The socket path here is the SINGLE SOURCE OF TRUTH - persist.ipc inherits it automatically
 ipc:
   enabled: true                                   # Enable IPC to persist service + in-memory buffering
-  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket for log/metric writes
-  buffer_size: 10000                              # Message buffer size
-  reconnect_delay: "5s"                           # Reconnection retry delay
-  max_reconnects: 0                               # Max reconnection attempts (0 = infinite)
+  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket path (shared with persist.ipc)
+  buffer_size: 10000                              # Client: message buffer size
+  reconnect_delay: "5s"                           # Client: reconnection retry delay
+  max_reconnects: 0                               # Client: max reconnection attempts (0 = infinite)
 
 # Persistence service configuration (only used when ipc.enabled: true)
 persist:
@@ -299,7 +301,8 @@ persist:
     max_connections: 500
 
   ipc:
-    socket: "/opt/joblet/run/persist-ipc.sock"  # Must match main ipc.socket
+    # socket: inherited from top-level ipc.socket (single source of truth)
+    # Server-specific settings only:
     max_connections: 10
     max_message_size: 134217728  # 128MB
 
