@@ -225,26 +225,6 @@ ssh -i ~/.ssh/your-key.pem -L 50051:localhost:443 ubuntu@<BASTION_IP>
 #   server_address: localhost:50051
 ```
 
-### Cost Estimate
-
-Approximate monthly costs (us-east-1, 24/7 operation):
-
-| Service                                 | Cost           |
-|-----------------------------------------|----------------|
-| EC2 t3.medium (on-demand)               | ~$30/month     |
-| EBS 30GB gp3                            | ~$2.40/month   |
-| CloudWatch Logs (10GB ingestion)        | ~$5/month      |
-| DynamoDB (pay-per-request, light usage) | ~$0.50/month   |
-| **Total**                               | **~$38/month** |
-
-**Cost savings tips:**
-
-- Use Reserved Instances or Savings Plans (~40% discount)
-- Stop instance when not in use (pay only for EBS storage)
-- Disable CloudWatch for dev/test environments
-
----
-
 ## Troubleshooting
 
 ### Installation Failed

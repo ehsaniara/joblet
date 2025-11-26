@@ -41,6 +41,21 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
     exit 1
 fi
 
+# Get region early - this is critical for DynamoDB table location
+REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
+
+echo "=========================================================================="
+echo "⚠️  IMPORTANT: Using AWS Region: $REGION"
+echo "=========================================================================="
+echo ""
+echo "The DynamoDB table will be created in this region."
+echo "Your EC2 instance MUST be launched in the SAME region ($REGION)."
+echo ""
+echo "To use a different region, set AWS_DEFAULT_REGION before running:"
+echo "  export AWS_DEFAULT_REGION=us-west-2"
+echo "  ./pre-setup.sh"
+echo ""
+
 echo "Checking for existing IAM resources..."
 
 # Check if policy already exists
@@ -182,9 +197,6 @@ echo "Creating DynamoDB Table"
 echo "=========================================================================="
 echo ""
 
-# Get region (default to us-east-1)
-REGION="${AWS_DEFAULT_REGION:-us-east-1}"
-
 # Check if table already exists
 if aws dynamodb describe-table --table-name joblet-jobs --region "$REGION" >/dev/null 2>&1; then
     echo "⚠️  DynamoDB table 'joblet-jobs' already exists in region: $REGION"
@@ -246,21 +258,28 @@ fi
 
 echo ""
 echo "=========================================================================="
-echo "✅ IAM Setup Complete"
+echo "✅ Pre-Setup Complete"
 echo "=========================================================================="
 echo ""
 echo "Resources created:"
 echo "  • Policy ARN: $POLICY_ARN"
 echo "  • IAM Role: JobletEC2Role"
 echo "  • Instance Profile: JobletEC2Role"
-echo "  • DynamoDB Table: joblet-jobs (region: $REGION)"
+echo "  • DynamoDB Table: joblet-jobs"
 echo ""
 echo "This enables:"
 echo "  ✅ CloudWatch Logs (/joblet log group)"
 echo "  ✅ DynamoDB state (joblet-jobs table)"
 echo "  ✅ EC2 metadata access"
 echo ""
-echo "Next step: Launch EC2 instance"
-echo "  - From Console: EC2 → Launch Instance"
-echo "  - Or run: ./launch-instance.sh"
+echo "=========================================================================="
+echo "⚠️  CRITICAL: Launch EC2 in region: $REGION"
+echo "=========================================================================="
+echo ""
+echo "The DynamoDB table was created in $REGION."
+echo "Joblet auto-detects the EC2 region and will fail if the regions don't match."
+echo ""
+echo "Next step: Launch EC2 instance in $REGION"
+echo "  - From Console: EC2 → Launch Instance (ensure region is $REGION)"
+echo "  - Or run: REGION=$REGION ./launch-instance.sh"
 echo ""

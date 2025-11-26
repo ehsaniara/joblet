@@ -267,25 +267,6 @@ aws configure
 
 ---
 
-## Cost Estimate
-
-Approximate monthly costs (us-east-1, 24/7 operation):
-
-- EC2 t3.medium: ~$30/month
-- EBS 30GB gp3: ~$2.40/month
-- CloudWatch Logs (10GB): ~$5/month
-- DynamoDB (pay-per-request): ~$0.50/month
-
-**Total: ~$38/month**
-
-**Cost savings:**
-
-- Use Reserved Instances (~40% discount)
-- Stop instance when not in use
-- Disable CloudWatch for dev/test
-
----
-
 ## See Also
 
 - [AWS Deployment Guide](../../docs/AWS_DEPLOYMENT.md) - Complete documentation

@@ -209,8 +209,6 @@ state:
   pool_size: 20      # Connection pool size for high concurrency (default: 20, recommended for 1000+ jobs)
 
   storage:
-    backend: "dynamodb"
-    
     # DynamoDB configuration (when backend: "dynamodb")
     dynamodb:
       region: ""  # Auto-detect from EC2 metadata if empty
