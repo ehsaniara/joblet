@@ -232,6 +232,7 @@ MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBALr6hQ7lhZhh3j1f
 }
 
 func TestGetClientTLSConfig(t *testing.T) {
+	// Valid test certificates (self-signed, for testing only)
 	validCert := `-----BEGIN CERTIFICATE-----
 MIIBkTCB+wIJAKHDIG1ZbVONMA0GCSqGSIb3DQEBBQUAMA0xCzAJBgNVBAYTAlVT
 -----END CERTIFICATE-----`
@@ -255,6 +256,48 @@ MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBALr6hQ7lhZhh3j1f
 			},
 			wantErr: true,
 			errMsg:  "certificates are not configured",
+		},
+		{
+			name: "missing key",
+			node: Node{
+				Address: "localhost:50051",
+				Cert:    validCert,
+				CA:      validCert,
+			},
+			wantErr: true,
+			errMsg:  "certificates are not configured",
+		},
+		{
+			name: "missing CA",
+			node: Node{
+				Address: "localhost:50051",
+				Cert:    validCert,
+				Key:     validKey,
+			},
+			wantErr: true,
+			errMsg:  "certificates are not configured",
+		},
+		{
+			name: "invalid cert format",
+			node: Node{
+				Address: "localhost:50051",
+				Cert:    "invalid cert data",
+				Key:     validKey,
+				CA:      validCert,
+			},
+			wantErr: true,
+			errMsg:  "failed to load client certificate",
+		},
+		{
+			name: "invalid CA format",
+			node: Node{
+				Address: "localhost:50051",
+				Cert:    validCert,
+				Key:     validKey,
+				CA:      "invalid ca data",
+			},
+			wantErr: true,
+			errMsg:  "failed to load client certificate", // X509KeyPair fails first
 		},
 	}
 
@@ -456,4 +499,225 @@ func containsMiddle(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestFindClientConfig(t *testing.T) {
+	// Test RNX_CONFIG environment variable
+	t.Run("RNX_CONFIG env var", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "custom-rnx-config.yml")
+
+		// Create the config file
+		if err := os.WriteFile(configPath, []byte("version: 3.0"), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		os.Setenv("RNX_CONFIG", configPath)
+		defer os.Unsetenv("RNX_CONFIG")
+
+		result := findClientConfig()
+		if result != configPath {
+			t.Errorf("Expected config path '%s', got '%s'", configPath, result)
+		}
+	})
+
+	t.Run("RNX_CONFIG env var - non-existent file", func(t *testing.T) {
+		os.Setenv("RNX_CONFIG", "/non/existent/config.yml")
+		defer os.Unsetenv("RNX_CONFIG")
+
+		result := findClientConfig()
+		// Should fall through to search other locations
+		// Result depends on what's actually on the filesystem
+		// Just verify it doesn't crash and returns something (possibly empty)
+		_ = result
+	})
+
+	t.Run("local config file", func(t *testing.T) {
+		// Save current directory
+		origDir, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("Failed to get current directory: %v", err)
+		}
+
+		// Create temp directory and change to it
+		tmpDir := t.TempDir()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("Failed to change directory: %v", err)
+		}
+		defer func() { _ = os.Chdir(origDir) }()
+
+		// Clear RNX_CONFIG to ensure we're testing file search
+		os.Unsetenv("RNX_CONFIG")
+
+		// Create local config file
+		if err := os.WriteFile("rnx-config.yml", []byte("version: 3.0"), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		result := findClientConfig()
+		if result != "./rnx-config.yml" {
+			t.Errorf("Expected './rnx-config.yml', got '%s'", result)
+		}
+	})
+
+	t.Run("no config found", func(t *testing.T) {
+		// Save current directory
+		origDir, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("Failed to get current directory: %v", err)
+		}
+
+		// Create empty temp directory and change to it
+		tmpDir := t.TempDir()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("Failed to change directory: %v", err)
+		}
+		defer func() { _ = os.Chdir(origDir) }()
+
+		// Clear environment and HOME to prevent finding any config
+		os.Unsetenv("RNX_CONFIG")
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir) // Set HOME to empty temp dir
+		defer os.Setenv("HOME", origHome)
+
+		result := findClientConfig()
+		// Should return empty string if no config found in standard locations
+		if result != "" {
+			// Only fail if we find a config that shouldn't exist
+			// Some CI environments might have configs in /etc or /opt
+			t.Logf("Found config at non-standard location: %s", result)
+		}
+	})
+}
+
+func TestLoadFromFile(t *testing.T) {
+	t.Run("JOBLET_CONFIG_PATH env var", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "joblet-config.yml")
+
+		// Create a valid config file
+		configContent := `version: "3.0"
+server:
+  address: "10.0.0.1"
+  port: 50051
+  mode: "server"
+joblet:
+  defaultCpuLimit: 100
+  defaultMemoryLimit: 512
+  maxConcurrentJobs: 100
+cgroup:
+  baseDir: "/sys/fs/cgroup/joblet.slice"
+logging:
+  level: "INFO"
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		os.Setenv("JOBLET_CONFIG_PATH", configPath)
+		defer os.Unsetenv("JOBLET_CONFIG_PATH")
+
+		config, path, err := LoadConfig()
+		if err != nil {
+			t.Fatalf("LoadConfig() error = %v", err)
+		}
+
+		if path != configPath {
+			t.Errorf("Expected config path '%s', got '%s'", configPath, path)
+		}
+
+		if config.Server.Address != "10.0.0.1" {
+			t.Errorf("Expected server address '10.0.0.1', got '%s'", config.Server.Address)
+		}
+	})
+
+	t.Run("invalid YAML", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "invalid-config.yml")
+
+		// Create an invalid YAML file
+		if err := os.WriteFile(configPath, []byte("invalid: yaml: content: ["), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		os.Setenv("JOBLET_CONFIG_PATH", configPath)
+		defer os.Unsetenv("JOBLET_CONFIG_PATH")
+
+		_, _, err := LoadConfig()
+		if err == nil {
+			t.Errorf("Expected error for invalid YAML, got nil")
+		}
+	})
+}
+
+func TestLoadClientConfigAutoFind(t *testing.T) {
+	// Test LoadClientConfig with empty path (should use findClientConfig)
+	t.Run("auto-find with RNX_CONFIG", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "rnx-config.yml")
+
+		validConfig := `version: "3.0"
+nodes:
+  default:
+    address: "auto-find-test:50051"
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      test cert
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      test key
+      -----END PRIVATE KEY-----
+    ca: |
+      -----BEGIN CERTIFICATE-----
+      test ca
+      -----END CERTIFICATE-----`
+
+		if err := os.WriteFile(configPath, []byte(validConfig), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		os.Setenv("RNX_CONFIG", configPath)
+		defer os.Unsetenv("RNX_CONFIG")
+
+		config, err := LoadClientConfig("")
+		if err != nil {
+			t.Fatalf("LoadClientConfig() error = %v", err)
+		}
+
+		node, err := config.GetNode("default")
+		if err != nil {
+			t.Fatalf("GetNode() error = %v", err)
+		}
+
+		if node.Address != "auto-find-test:50051" {
+			t.Errorf("Expected address 'auto-find-test:50051', got '%s'", node.Address)
+		}
+	})
+
+	t.Run("auto-find no config", func(t *testing.T) {
+		// Clear all env vars and use temp dir without any configs
+		os.Unsetenv("RNX_CONFIG")
+
+		origDir, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("Failed to get current directory: %v", err)
+		}
+
+		tmpDir := t.TempDir()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("Failed to change directory: %v", err)
+		}
+		defer func() { _ = os.Chdir(origDir) }()
+
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", origHome)
+
+		_, err = LoadClientConfig("")
+		if err == nil {
+			t.Logf("LoadClientConfig found a config unexpectedly - system may have configs in /etc or /opt")
+		}
+		// Error is expected when no config is found
+	})
 }

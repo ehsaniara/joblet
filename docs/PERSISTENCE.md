@@ -394,6 +394,13 @@ server:
   address: "0.0.0.0"
   port: 50051
 
+# IPC configuration - SINGLE SOURCE OF TRUTH for socket path
+# persist.ipc inherits the socket path automatically
+ipc:
+  socket: "/opt/joblet/run/persist-ipc.sock"  # Unix socket path (shared with persist.ipc)
+  buffer_size: 10000                          # Client: message buffer size
+  reconnect_delay: "5s"                       # Client: reconnection retry delay
+
 # Main joblet configuration
 joblet:
 # ... main service config ...
@@ -405,7 +412,8 @@ persist:
     max_connections: 500
 
   ipc:
-    socket: "/opt/joblet/run/persist-ipc.sock"  # Unix socket for writes
+    # socket: inherited from top-level ipc.socket (single source of truth)
+    # Server-specific settings only:
     max_connections: 10
     max_message_size: 134217728  # 128MB
 
@@ -437,20 +445,23 @@ security:
 
 The persistence service **inherits** several settings from the parent configuration:
 
-1. **Logging Configuration**
+1. **IPC Socket Path**
+    - `ipc.socket` → used by `persist.ipc` (single source of truth, avoids duplication)
+
+2. **Logging Configuration**
     - `logging.level`
     - `logging.format`
     - `logging.output`
 
-2. **Security Settings**
+3. **Security Settings**
     - `security.serverCert` (for TLS)
     - `security.serverKey`
     - `security.caCert`
 
-3. **Node Identity**
+4. **Node Identity**
     - `server.nodeId` (for CloudWatch multi-node support)
 
-4. **Base Paths**
+5. **Base Paths**
     - `persist.storage.base_dir` defaults to parent's base directory
 
 ### Enabling and Disabling Persistence

@@ -207,10 +207,10 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 		a.logger.Warn("attempted to update non-existent job", "jobId", job.Uuid)
 		return
 	}
-
 	oldStatus := string(task.job.Status)
-	newStatus := string(job.Status)
 	a.tasksMutex.RUnlock()
+
+	newStatus := string(job.Status)
 
 	// Update in store
 	ctx := context.Background()
@@ -219,8 +219,13 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 		return
 	}
 
-	// Update task wrapper
-	task.job = job.DeepCopy()
+	// Update task wrapper with write lock
+	a.tasksMutex.Lock()
+	task, exists = a.tasks[job.Uuid]
+	if exists {
+		task.job = job.DeepCopy()
+	}
+	a.tasksMutex.Unlock()
 
 	// Publish update event
 	if err := a.publishEvent(JobEvent{
@@ -380,17 +385,20 @@ func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 
 	a.tasksMutex.RLock()
 	task, exists := a.tasks[resolvedUuid]
-	a.tasksMutex.RUnlock()
-
 	if !exists {
+		a.tasksMutex.RUnlock()
 		a.logger.Warn("attempted to write to buffer for non-existent job", "jobId", resolvedUuid, "chunkSize", len(chunk))
 		return
 	}
 
+	// Capture logBuffer pointer while holding lock to avoid race conditions
+	logBuffer := task.logBuffer
+	a.tasksMutex.RUnlock()
+
 	// Only write to buffer if persist is enabled (gap prevention)
 	// When persist is disabled, skip buffering to avoid unbounded growth
-	if a.persistEnabled && task.logBuffer != nil {
-		if err := task.logBuffer.Write(chunk); err != nil {
+	if a.persistEnabled && logBuffer != nil {
+		if err := logBuffer.Write(chunk); err != nil {
 			a.logger.Error("failed to write to job log buffer", "jobId", resolvedUuid, "error", err)
 			return
 		}
@@ -425,21 +433,25 @@ func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 
 	a.tasksMutex.RLock()
 	task, exists := a.tasks[resolvedUuid]
-	a.tasksMutex.RUnlock()
-
 	if !exists {
+		a.tasksMutex.RUnlock()
 		a.logger.Debug("output requested for non-existent job", "jobId", resolvedUuid)
 		return nil, false, fmt.Errorf("job not found")
 	}
 
-	if task.logBuffer == nil {
-		return []byte{}, task.job.IsRunning(), nil
+	// Capture values while holding lock to avoid race conditions
+	logBuffer := task.logBuffer
+	isRunning := task.job.IsRunning()
+	a.tasksMutex.RUnlock()
+
+	if logBuffer == nil {
+		return []byte{}, isRunning, nil
 	}
 
-	chunks := task.logBuffer.ReadAll()
+	chunks := logBuffer.ReadAll()
 	if len(chunks) == 0 {
 		a.logger.Debug("no data available in job log buffer", "jobId", id)
-		return []byte{}, task.job.IsRunning(), nil
+		return []byte{}, isRunning, nil
 	}
 
 	// Combine all chunks into a single byte slice
@@ -453,7 +465,6 @@ func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 		data = append(data, chunk...)
 	}
 
-	isRunning := task.job.IsRunning()
 	a.logger.Debug("job output retrieved", "jobId", id, "outputSize", len(data), "isRunning", isRunning)
 
 	return data, isRunning, nil
@@ -476,22 +487,26 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 
 	a.tasksMutex.RLock()
 	task, exists := a.tasks[resolvedUuid]
-	a.tasksMutex.RUnlock()
-
 	if !exists {
+		a.tasksMutex.RUnlock()
 		a.logger.Warn("stream requested for non-existent job", "jobId", resolvedUuid)
 		return fmt.Errorf("job not found")
 	}
 
+	// Capture values while holding lock to avoid race conditions
+	logBuffer := task.logBuffer
+	isCompleted := task.job.IsCompleted()
+	a.tasksMutex.RUnlock()
+
 	// Send existing buffer content, skipping items already sent by persist
 	// ONLY when persist is enabled - otherwise skip buffer entirely to avoid stale data
-	if a.persistEnabled && task.logBuffer != nil {
+	if a.persistEnabled && logBuffer != nil {
 		var chunks [][]byte
 		if skipCount > 0 {
-			chunks = task.logBuffer.ReadAfterSkip(skipCount)
+			chunks = logBuffer.ReadAfterSkip(skipCount)
 			a.logger.Debug("reading buffer with skip", "jobId", id, "skipCount", skipCount, "remainingChunks", len(chunks))
 		} else {
-			chunks = task.logBuffer.ReadAll()
+			chunks = logBuffer.ReadAll()
 		}
 
 		if len(chunks) > 0 {
@@ -508,12 +523,12 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 	}
 
 	// If job is completed, we're done
-	if task.job.IsCompleted() {
+	if isCompleted {
 		a.logger.Debug("job is completed, finishing stream", "jobId", id)
 		return nil
 	}
 
-	return a.subscribeToJobUpdates(ctx, resolvedUuid, task, stream)
+	return a.subscribeToJobUpdates(ctx, resolvedUuid, stream)
 }
 
 // PubSub returns the pub-sub instance for external integration (e.g., IPC)
@@ -870,7 +885,7 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 // subscribeToJobUpdates creates a real-time subscription for job events.
 // Handles LOG_CHUNK events by streaming data to client, and UPDATED events by checking
 // for job completion. Manages subscription lifecycle and cleanup automatically.
-func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, task *taskWrapper, stream interfaces.DomainStreamer) error {
+func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, stream interfaces.DomainStreamer) error {
 	// Subscribe to single "jobs" topic (filter by JobID in loop)
 	topic := "jobs"
 	a.logger.Debug("subscribing to job events for streaming", "jobId", jobID, "topic", topic)
@@ -895,9 +910,19 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 		cancel:      cancel,
 	}
 
+	// Register subscriber with proper locking to avoid race with task deletion
+	a.tasksMutex.RLock()
+	task, exists := a.tasks[jobID]
+	if !exists {
+		a.tasksMutex.RUnlock()
+		unsubscribe()
+		cancel()
+		return fmt.Errorf("job no longer exists")
+	}
 	task.subMutex.Lock()
 	task.subscribers[subID] = subContext
 	task.subMutex.Unlock()
+	a.tasksMutex.RUnlock()
 
 	// Create a channel to signal when subscription ends
 	done := make(chan error, 1)
@@ -910,9 +935,14 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 			unsubscribe()
 			cancel()
 
-			task.subMutex.Lock()
-			delete(task.subscribers, subID)
-			task.subMutex.Unlock()
+			// Clean up subscriber with proper locking to avoid race with task deletion
+			a.tasksMutex.RLock()
+			if task, exists := a.tasks[jobID]; exists {
+				task.subMutex.Lock()
+				delete(task.subscribers, subID)
+				task.subMutex.Unlock()
+			}
+			a.tasksMutex.RUnlock()
 
 			a.logger.Debug("subscription cleaned up", "jobId", jobID, "subId", subID)
 

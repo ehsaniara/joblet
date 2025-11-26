@@ -51,23 +51,6 @@ filesystem:
   baseDir: "/opt/joblet/jobs"
   tmpDir: "/tmp/job-{JOB_ID}"
   workspaceDir: "/work"         # Directory for job uploads and execution
-  allowedMounts:
-    - "/usr/bin"
-    - "/bin"
-    - "/usr/sbin"               # Network tools (ip, route, etc.)
-    - "/lib"
-    - "/lib64"
-    - "/usr/lib"
-    - "/usr/lib64"
-    # Network configuration files
-    - "/etc/resolv.conf"        # DNS resolver configuration
-    - "/etc/hosts"              # Local hostname resolution
-    - "/etc/nsswitch.conf"      # Name service switch configuration
-    # SSL certificate directories
-    - "/etc/ssl"
-    - "/etc/pki"
-    - "/etc/ca-certificates"
-    - "/usr/share/ca-certificates"
   blockDevices: false
 
 grpc:
@@ -93,16 +76,19 @@ buffers:
   pubsub_buffer_size: 10000   # Pub-sub channel buffer for high-throughput production traffic
   chunk_size: 1048576         # 1MB chunks for optimal streaming performance
 
-# IPC configuration for persist integration
+# IPC configuration for persist integration (joblet -> persist communication)
 # IMPORTANT: This setting controls BOTH persistence AND buffering behavior:
 #   enabled: true  - Logs/metrics buffered in memory + forwarded to persist (gap prevention enabled)
 #   enabled: false - NO buffering (live streaming only, no persistence, no historical data)
 # Disabling persist eliminates unbounded memory growth but loses historical log/metric access
+#
+# NOTE: The socket path defined here is the SINGLE SOURCE OF TRUTH.
+#       persist.ipc inherits this socket path automatically (Go best practice: avoid duplication)
 ipc:
-  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket for log/metric writes
-  buffer_size: 10000                              # Message buffer size
-  reconnect_delay: "5s"                           # Reconnection retry delay
-  max_reconnects: 0                               # Max reconnection attempts (0 = infinite)
+  socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket path (shared with persist.ipc)
+  buffer_size: 10000                              # Client: message buffer size
+  reconnect_delay: "5s"                           # Client: reconnection retry delay
+  max_reconnects: 0                               # Client: max reconnection attempts (0 = infinite)
 
 # Volume management configuration
 volumes:
@@ -122,6 +108,24 @@ runtime:
     - "/usr/lib/jvm"
     - "/usr/local/node"
     - "/usr/local/go"
+  # Paths mounted read-only into job sandbox
+  allowed_mounts:
+    - "/usr/bin"
+    - "/bin"
+    - "/usr/sbin"               # Network tools (ip, route, etc.)
+    - "/lib"
+    - "/lib64"
+    - "/usr/lib"
+    - "/usr/lib64"
+    # Network configuration files
+    - "/etc/resolv.conf"        # DNS resolver configuration
+    - "/etc/hosts"              # Local hostname resolution
+    - "/etc/nsswitch.conf"      # Name service switch configuration
+    # SSL certificate directories
+    - "/etc/ssl"
+    - "/etc/pki"
+    - "/etc/ca-certificates"
+    - "/usr/share/ca-certificates"
 
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
@@ -143,7 +147,8 @@ persist:
     # TLS: Disabled for Unix socket (pure Linux IPC)
 
   ipc:
-    socket: "/opt/joblet/run/persist-ipc.sock"  # Unix socket for log/metric writes
+    # socket: inherited from top-level ipc.socket (single source of truth)
+    # Server-specific settings only:
     max_connections: 10
     max_message_size: 134217728  # 128MB - handle large batches
     read_buffer: 8388608         # 8MB
@@ -209,8 +214,6 @@ state:
   pool_size: 20      # Connection pool size for high concurrency (default: 20, recommended for 1000+ jobs)
 
   storage:
-    backend: "dynamodb"
-    
     # DynamoDB configuration (when backend: "dynamodb")
     dynamodb:
       region: ""  # Auto-detect from EC2 metadata if empty

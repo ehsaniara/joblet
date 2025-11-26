@@ -482,3 +482,126 @@ security:
 	// Note: Defaults for log_group_prefix, etc. are applied in NewCloudWatchBackend
 	// Config struct just holds what's in the YAML file
 }
+
+func TestLoad_IPCSocketInheritance(t *testing.T) {
+	// Test that persist.ipc.socket is inherited from top-level ipc.socket
+	// when persist.ipc.socket is not specified (single source of truth)
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "ipc-inherit-config.yml")
+
+	configContent := `
+version: "3.0"
+
+server:
+  nodeId: "test-node"
+
+# Top-level IPC config - single source of truth for socket path
+ipc:
+  socket: "/opt/joblet/run/inherited-socket.sock"
+  buffer_size: 5000
+
+persist:
+  server:
+    grpc_socket: "/tmp/test-grpc.sock"
+  ipc:
+    # socket NOT specified - should be inherited from top-level ipc.socket
+    max_connections: 10
+    max_message_size: 1048576
+  storage:
+    type: "local"
+    local:
+      logs:
+        directory: "/tmp/test/logs"
+      metrics:
+        directory: "/tmp/test/metrics"
+
+logging:
+  level: "info"
+
+security:
+  serverCert: ""
+  serverKey: ""
+  caCert: ""
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify IPC socket was inherited from top-level ipc.socket
+	expectedSocket := "/opt/joblet/run/inherited-socket.sock"
+	if result.Config.IPC.Socket != expectedSocket {
+		t.Errorf("Expected IPC socket '%s' (inherited), got '%s'", expectedSocket, result.Config.IPC.Socket)
+	}
+
+	// Verify server-specific settings are still loaded
+	if result.Config.IPC.MaxConnections != 10 {
+		t.Errorf("Expected max_connections 10, got %d", result.Config.IPC.MaxConnections)
+	}
+
+	if result.Config.IPC.MaxMessageSize != 1048576 {
+		t.Errorf("Expected max_message_size 1048576, got %d", result.Config.IPC.MaxMessageSize)
+	}
+}
+
+func TestLoad_IPCSocketExplicitOverride(t *testing.T) {
+	// Test that explicit persist.ipc.socket takes precedence over top-level ipc.socket
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "ipc-override-config.yml")
+
+	configContent := `
+version: "3.0"
+
+server:
+  nodeId: "test-node"
+
+# Top-level IPC config
+ipc:
+  socket: "/opt/joblet/run/parent-socket.sock"
+
+persist:
+  server:
+    grpc_socket: "/tmp/test-grpc.sock"
+  ipc:
+    # Explicit socket - should NOT be overridden by parent
+    socket: "/opt/joblet/run/explicit-socket.sock"
+    max_connections: 10
+  storage:
+    type: "local"
+    local:
+      logs:
+        directory: "/tmp/test/logs"
+      metrics:
+        directory: "/tmp/test/metrics"
+
+logging:
+  level: "info"
+
+security:
+  serverCert: ""
+  serverKey: ""
+  caCert: ""
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify explicit socket is used (not inherited)
+	expectedSocket := "/opt/joblet/run/explicit-socket.sock"
+	if result.Config.IPC.Socket != expectedSocket {
+		t.Errorf("Expected explicit IPC socket '%s', got '%s'", expectedSocket, result.Config.IPC.Socket)
+	}
+}

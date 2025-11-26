@@ -1088,9 +1088,13 @@ Joblet Service → Unix Socket → Persist Service
 **Configuration**:
 
 ```yaml
+# Socket path defined at top-level (single source of truth)
+ipc:
+  socket: "/opt/joblet/run/persist-ipc.sock"
+
 persist:
   ipc:
-    socket: "/opt/joblet/run/persist-ipc.sock"
+    # socket: inherited from top-level ipc.socket
     max_message_size: 10485760  # 10MB
 ```
 

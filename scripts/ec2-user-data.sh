@@ -28,7 +28,7 @@ JOBLET_VERSION="${JOBLET_VERSION:-latest}"
 ENABLE_CLOUDWATCH="${ENABLE_CLOUDWATCH:-true}"
 
 # Joblet server configuration
-JOBLET_SERVER_PORT="${JOBLET_SERVER_PORT:-50051}"
+JOBLET_SERVER_PORT="${JOBLET_SERVER_PORT:-443}"
 
 # Certificate configuration (optional - will use EC2 IPs if not set)
 JOBLET_CERT_DOMAIN="${JOBLET_CERT_DOMAIN:-}"

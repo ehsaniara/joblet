@@ -28,3 +28,7 @@ require (
 )
 
 tool github.com/maxbrunsfeld/counterfeiter/v6
+
+// Workaround for counterfeiter issue #344: VendorlessPath removed in x/tools v0.38.0
+// Remove this when counterfeiter releases a fix
+replace golang.org/x/tools => golang.org/x/tools v0.37.0
