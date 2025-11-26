@@ -544,7 +544,7 @@ func TestFindClientConfig(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatalf("Failed to change directory: %v", err)
 		}
-		defer os.Chdir(origDir)
+		defer func() { _ = os.Chdir(origDir) }()
 
 		// Clear RNX_CONFIG to ensure we're testing file search
 		os.Unsetenv("RNX_CONFIG")
@@ -572,7 +572,7 @@ func TestFindClientConfig(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatalf("Failed to change directory: %v", err)
 		}
-		defer os.Chdir(origDir)
+		defer func() { _ = os.Chdir(origDir) }()
 
 		// Clear environment and HOME to prevent finding any config
 		os.Unsetenv("RNX_CONFIG")
@@ -708,7 +708,7 @@ nodes:
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatalf("Failed to change directory: %v", err)
 		}
-		defer os.Chdir(origDir)
+		defer func() { _ = os.Chdir(origDir) }()
 
 		origHome := os.Getenv("HOME")
 		os.Setenv("HOME", tmpDir)

@@ -528,7 +528,7 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 		return nil
 	}
 
-	return a.subscribeToJobUpdates(ctx, resolvedUuid, task, stream)
+	return a.subscribeToJobUpdates(ctx, resolvedUuid, stream)
 }
 
 // PubSub returns the pub-sub instance for external integration (e.g., IPC)
@@ -885,7 +885,7 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 // subscribeToJobUpdates creates a real-time subscription for job events.
 // Handles LOG_CHUNK events by streaming data to client, and UPDATED events by checking
 // for job completion. Manages subscription lifecycle and cleanup automatically.
-func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, task *taskWrapper, stream interfaces.DomainStreamer) error {
+func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, stream interfaces.DomainStreamer) error {
 	// Subscribe to single "jobs" topic (filter by JobID in loop)
 	topic := "jobs"
 	a.logger.Debug("subscribing to job events for streaming", "jobId", jobID, "topic", topic)

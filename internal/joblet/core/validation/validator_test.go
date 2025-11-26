@@ -260,3 +260,185 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestValidateEnvironmentVariable(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string
+		value   string
+		wantErr bool
+	}{
+		{
+			name:    "valid env var",
+			key:     "MY_VAR",
+			value:   "hello",
+			wantErr: false,
+		},
+		{
+			name:    "valid env var with underscore prefix",
+			key:     "_PRIVATE_VAR",
+			value:   "secret",
+			wantErr: false,
+		},
+		{
+			name:    "valid env var with numbers",
+			key:     "VAR123",
+			value:   "value",
+			wantErr: false,
+		},
+		{
+			name:    "invalid env var - starts with number",
+			key:     "123VAR",
+			value:   "value",
+			wantErr: true,
+		},
+		{
+			name:    "invalid env var - contains dash",
+			key:     "MY-VAR",
+			value:   "value",
+			wantErr: true,
+		},
+		{
+			name:    "invalid env var - contains space",
+			key:     "MY VAR",
+			value:   "value",
+			wantErr: true,
+		},
+		{
+			name:    "invalid env var - contains special char",
+			key:     "MY@VAR",
+			value:   "value",
+			wantErr: true,
+		},
+		{
+			name:    "empty value is valid",
+			key:     "EMPTY_VAR",
+			value:   "",
+			wantErr: false,
+		},
+		{
+			name:    "value at limit (32768 bytes)",
+			key:     "LARGE_VAR",
+			value:   string(make([]byte, 32768)),
+			wantErr: false,
+		},
+		{
+			name:    "value over limit (32769 bytes)",
+			key:     "TOO_LARGE_VAR",
+			value:   string(make([]byte, 32769)),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateEnvironmentVariable(tt.key, tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateEnvironmentVariable() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestIsReservedName(t *testing.T) {
+	reservedNames := map[string]bool{
+		"system":   true,
+		"root":     true,
+		"admin":    true,
+		"reserved": true,
+	}
+
+	tests := []struct {
+		name         string
+		resourceName string
+		want         bool
+	}{
+		{
+			name:         "reserved name - system",
+			resourceName: "system",
+			want:         true,
+		},
+		{
+			name:         "reserved name - root",
+			resourceName: "root",
+			want:         true,
+		},
+		{
+			name:         "not reserved",
+			resourceName: "myresource",
+			want:         false,
+		},
+		{
+			name:         "empty name",
+			resourceName: "",
+			want:         false,
+		},
+		{
+			name:         "case sensitive - System not reserved",
+			resourceName: "System",
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsReservedName(tt.resourceName, reservedNames); got != tt.want {
+				t.Errorf("IsReservedName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewValidator(t *testing.T) {
+	v := NewValidator()
+	if v == nil {
+		t.Error("NewValidator() returned nil")
+	}
+}
+
+func TestNormalizeRuntimeName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "colon to hyphen",
+			input: "python:3.11",
+			want:  "python-3.11",
+		},
+		{
+			name:  "hyphen to colon",
+			input: "python-3.11",
+			want:  "python:3.11",
+		},
+		{
+			name:  "no separator",
+			input: "python",
+			want:  "python",
+		},
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "multiple hyphens - only first converted",
+			input: "python-3.11-ml",
+			want:  "python:3.11-ml",
+		},
+		{
+			name:  "multiple colons - only first converted",
+			input: "python:3.11:ml",
+			want:  "python-3.11:ml",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeRuntimeName(tt.input); got != tt.want {
+				t.Errorf("normalizeRuntimeName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

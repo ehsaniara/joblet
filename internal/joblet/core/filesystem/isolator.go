@@ -433,7 +433,7 @@ func (f *JobFilesystem) createEssentialDirs() error {
 // Continues with remaining mounts if individual mounts fail.
 func (f *JobFilesystem) mountAllowedDirs() error {
 	// Enhanced to create parent directories automatically
-	for _, allowedDir := range f.config.Filesystem.AllowedMounts {
+	for _, allowedDir := range f.config.Runtime.AllowedMounts {
 		// Skip if the host directory doesn't exist
 		if _, err := f.platform.Stat(allowedDir); f.platform.IsNotExist(err) {
 			f.logger.Debug("skipping non-existent allowed directory", "dir", allowedDir)

@@ -91,11 +91,10 @@ type CgroupConfig struct {
 
 // FilesystemConfig holds filesystem configuration
 type FilesystemConfig struct {
-	BaseDir       string   `yaml:"baseDir" json:"baseDir"`
-	TmpDir        string   `yaml:"tmpDir" json:"tmpDir"`
-	WorkspaceDir  string   `yaml:"workspaceDir" json:"workspaceDir"`
-	AllowedMounts []string `yaml:"allowedMounts" json:"allowedMounts"`
-	BlockDevices  bool     `yaml:"blockDevices" json:"blockDevices"`
+	BaseDir      string `yaml:"baseDir" json:"baseDir"`
+	TmpDir       string `yaml:"tmpDir" json:"tmpDir"`
+	WorkspaceDir string `yaml:"workspaceDir" json:"workspaceDir"`
+	BlockDevices bool   `yaml:"blockDevices" json:"blockDevices"`
 }
 
 // GRPCConfig holds gRPC-specific configuration
@@ -155,8 +154,9 @@ type VolumesConfig struct {
 
 // RuntimeConfig holds runtime system configuration
 type RuntimeConfig struct {
-	BasePath    string   `yaml:"base_path" json:"base_path"`
-	CommonPaths []string `yaml:"common_paths" json:"common_paths"`
+	BasePath      string   `yaml:"base_path" json:"base_path"`
+	CommonPaths   []string `yaml:"common_paths" json:"common_paths"`
+	AllowedMounts []string `yaml:"allowed_mounts" json:"allowed_mounts"` // Paths mounted read-only into job sandbox
 }
 
 // GPUConfig holds GPU support configuration
@@ -244,11 +244,10 @@ var DefaultConfig = Config{
 		CleanupTimeout:    5 * time.Second,
 	},
 	Filesystem: FilesystemConfig{
-		BaseDir:       "/opt/joblet/jobs",
-		TmpDir:        "/tmp/job-{JOB_ID}",
-		WorkspaceDir:  "/work",
-		AllowedMounts: []string{"/usr/bin", "/bin", "/lib", "/lib64"},
-		BlockDevices:  false,
+		BaseDir:      "/opt/joblet/jobs",
+		TmpDir:       "/tmp/job-{JOB_ID}",
+		WorkspaceDir: "/work",
+		BlockDevices: false,
 	},
 	GRPC: GRPCConfig{
 		MaxRecvMsgSize:        134217728,          // 128MB for production traffic
@@ -304,6 +303,12 @@ var DefaultConfig = Config{
 			"/usr/lib/jvm",
 			"/usr/local/node",
 			"/usr/local/go",
+		},
+		AllowedMounts: []string{
+			"/usr/bin",
+			"/bin",
+			"/lib",
+			"/lib64",
 		},
 	},
 	GPU: GPUConfig{

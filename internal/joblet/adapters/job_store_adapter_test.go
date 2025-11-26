@@ -200,7 +200,7 @@ func TestUpdateJob_Concurrent(t *testing.T) {
 	}
 
 	// Add job to store first
-	store.Create(context.Background(), jobID, job)
+	_ = store.Create(context.Background(), jobID, job)
 
 	// Create task with buffer
 	buffer := NewSimpleLogBuffer(jobID)
@@ -265,7 +265,7 @@ func TestOutput_Concurrent(t *testing.T) {
 
 	// Create task with buffer and some data
 	buffer := NewSimpleLogBuffer(jobID)
-	buffer.Write([]byte("test data"))
+	_ = buffer.Write([]byte("test data"))
 	jobStoreAdapter.tasks = map[string]*taskWrapper{
 		jobID: {
 			job:       job,

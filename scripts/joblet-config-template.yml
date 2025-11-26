@@ -51,23 +51,6 @@ filesystem:
   baseDir: "/opt/joblet/jobs"
   tmpDir: "/tmp/job-{JOB_ID}"
   workspaceDir: "/work"         # Directory for job uploads and execution
-  allowedMounts:
-    - "/usr/bin"
-    - "/bin"
-    - "/usr/sbin"               # Network tools (ip, route, etc.)
-    - "/lib"
-    - "/lib64"
-    - "/usr/lib"
-    - "/usr/lib64"
-    # Network configuration files
-    - "/etc/resolv.conf"        # DNS resolver configuration
-    - "/etc/hosts"              # Local hostname resolution
-    - "/etc/nsswitch.conf"      # Name service switch configuration
-    # SSL certificate directories
-    - "/etc/ssl"
-    - "/etc/pki"
-    - "/etc/ca-certificates"
-    - "/usr/share/ca-certificates"
   blockDevices: false
 
 grpc:
@@ -125,6 +108,24 @@ runtime:
     - "/usr/lib/jvm"
     - "/usr/local/node"
     - "/usr/local/go"
+  # Paths mounted read-only into job sandbox
+  allowed_mounts:
+    - "/usr/bin"
+    - "/bin"
+    - "/usr/sbin"               # Network tools (ip, route, etc.)
+    - "/lib"
+    - "/lib64"
+    - "/usr/lib"
+    - "/usr/lib64"
+    # Network configuration files
+    - "/etc/resolv.conf"        # DNS resolver configuration
+    - "/etc/hosts"              # Local hostname resolution
+    - "/etc/nsswitch.conf"      # Name service switch configuration
+    # SSL certificate directories
+    - "/etc/ssl"
+    - "/etc/pki"
+    - "/etc/ca-certificates"
+    - "/usr/share/ca-certificates"
 
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
