@@ -4,7 +4,7 @@ Deploy Joblet on AWS EC2 in **2 simple steps** (~10 minutes total).
 
 ## Quick Start
 
-### Step 1: AWS Pre-Setup (CloudShell - 30 seconds)
+### Step 1: AWS Pre-Setup (CloudShell - 1 minute)
 
 Open **AWS Console → CloudShell** (top-right toolbar icon) and run:
 
@@ -12,10 +12,18 @@ Open **AWS Console → CloudShell** (top-right toolbar icon) and run:
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
 ```
 
-This creates:
+This interactive script creates:
 
 - `JobletEC2Role` IAM role with permissions for CloudWatch Logs and DynamoDB
 - `joblet-jobs` DynamoDB table for job state persistence
+- **DynamoDB VPC Endpoint** (required) for secure access to DynamoDB
+
+The script will:
+1. Ask you to select a VPC for the EC2 instance
+2. Check if a DynamoDB VPC Endpoint exists in that VPC
+3. Let you select an existing endpoint or create a new one
+
+**Note the VPC ID** shown at the end - you'll need it in Step 2.
 
 ### Step 2: Launch EC2 Instance (Console - 5 minutes)
 
@@ -26,7 +34,7 @@ This creates:
     - **AMI**: Ubuntu Server 22.04 LTS (latest)
     - **Instance type**: `t3.medium` (or larger)
     - **Key pair**: Select or create your SSH key pair
-    - **Network**: Default VPC
+    - **Network**: Select the VPC from Step 1 ⬅️ Important!
     - **Security Group**: Create new or select existing with:
         - **SSH (22)** from your IP
         - **HTTPS (443)** from your IP (for gRPC)
@@ -138,6 +146,25 @@ sudo systemctl status joblet
 - **Pay-per-request** billing (no upfront costs)
 - **Automatic creation** during installation
 
+### VPC Endpoint (DynamoDB Gateway) - Required
+
+- **Required for Joblet** to access DynamoDB from EC2
+- **Secure DynamoDB access** without internet exposure
+- **Traffic stays within AWS** network (never goes to public internet)
+- **No NAT Gateway required** for DynamoDB access
+- **Created automatically** by the pre-setup script if not exists
+
+### Graceful Fallback (Resilience)
+
+Joblet is designed to **always start**, even if AWS services are unavailable:
+
+| Service | Primary | Fallback | Behavior |
+|---------|---------|----------|----------|
+| **State** | DynamoDB | In-memory | Jobs work, but state lost on restart |
+| **Persist** | CloudWatch | Local disk | Logs stored at `/opt/joblet/logs` |
+
+When running in fallback mode, Joblet logs **prominent warnings** so you know AWS integration is not working. This ensures Joblet remains functional for development/testing even without proper AWS setup.
+
 ---
 
 ## Advanced
@@ -227,6 +254,66 @@ ssh -i ~/.ssh/your-key.pem -L 50051:localhost:443 ubuntu@<BASTION_IP>
 
 ## Troubleshooting
 
+### Joblet Running in Fallback Mode
+
+If you see warnings like these in the logs (`sudo journalctl -u joblet`):
+
+```
+========================================================================
+[STATE] WARNING: Running with IN-MEMORY backend (fallback mode)
+[STATE] Job state will NOT persist across restarts!
+[STATE] Reason: failed to connect to dynamodb
+[STATE] To fix: Check VPC Endpoint, IAM role, and DynamoDB table
+========================================================================
+```
+
+Or:
+
+```
+========================================================================
+[PERSIST] WARNING: Running with LOCAL storage backend (fallback mode)
+[PERSIST] Logs will be stored on disk at /opt/joblet/logs
+[PERSIST] CloudWatch Logs integration is DISABLED
+[PERSIST] Reason: failed to connect to cloudwatch
+[PERSIST] To fix: Check IAM role and CloudWatch permissions
+========================================================================
+```
+
+**This means Joblet is running but with reduced functionality:**
+
+| Service | Normal Mode | Fallback Mode | Impact |
+|---------|-------------|---------------|--------|
+| **State** | DynamoDB | In-memory | Job state lost on restart |
+| **Persist** | CloudWatch | Local disk | Logs only on EC2, not in CloudWatch |
+
+**Common causes and fixes:**
+
+1. **DynamoDB fallback** (State service):
+   - VPC Endpoint not configured → Run pre-setup script or create manually
+   - VPC Endpoint in wrong VPC → Ensure EC2 is in the same VPC
+   - IAM role not attached → Attach `JobletEC2Role` to EC2 instance
+   - DynamoDB table doesn't exist → Table should be created by pre-setup script
+
+2. **CloudWatch fallback** (Persist service):
+   - IAM role missing CloudWatch permissions → Check `JobletEC2Role` policy
+   - IAM role not attached → Attach `JobletEC2Role` to EC2 instance
+
+**To verify and fix:**
+
+```bash
+# Check if IAM role is attached
+curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/
+
+# Check VPC Endpoint exists (from CloudShell or local AWS CLI)
+aws ec2 describe-vpc-endpoints --filters "Name=service-name,Values=com.amazonaws.REGION.dynamodb"
+
+# Check DynamoDB table exists
+aws dynamodb describe-table --table-name joblet-jobs --region REGION
+
+# Restart Joblet after fixing
+sudo systemctl restart joblet
+```
+
 ### Installation Failed
 
 **Check installation log:**
@@ -270,6 +357,47 @@ aws dynamodb create-table \
   --billing-mode PAY_PER_REQUEST \
   --region us-east-1
 ```
+
+### DynamoDB VPC Endpoint Policy Error
+
+If you see an error like:
+
+```
+AccessDeniedException: User is not authorized to perform: dynamodb:DescribeTable
+because no VPC endpoint policy allows the dynamodb:DescribeTable action
+```
+
+This means the VPC Endpoint has a restrictive policy that doesn't allow DynamoDB access.
+
+**Solution: Update VPC Endpoint Policy**
+
+1. Go to **VPC Console → Endpoints**
+2. Find the DynamoDB endpoint (type: Gateway)
+3. Edit the **Policy** and select "Full Access" or add specific permissions:
+
+```json
+{
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:*:*:table/joblet-jobs"
+    }
+  ]
+}
+```
+
+**Note:** VPC Endpoints created by the pre-setup script use "Full Access" policy by default, which allows all DynamoDB operations.
 
 ### CloudWatch Logs Not Appearing
 
@@ -327,42 +455,55 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 ### Components
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        AWS Account                          │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ EC2 Instance (Ubuntu 22.04)                          │  │
-│  │                                                      │  │
-│  │  ┌────────────────────────────────────────────┐     │  │
-│  │  │ Joblet Server (port 443)                   │     │  │
-│  │  │  - Job execution                           │     │  │
-│  │  │  - gRPC API                                │     │  │
-│  │  │  - TLS certificates (embedded)             │     │  │
-│  │  └────────────────────────────────────────────┘     │  │
-│  │                    ↓         ↓                       │  │
-│  └────────────────────┼─────────┼───────────────────────┘  │
-│                       ↓         ↓                          │
-│         ┌─────────────────┐  ┌──────────────────────┐     │
-│         │ CloudWatch Logs │  │ DynamoDB             │     │
-│         │                 │  │                      │     │
-│         │ /joblet/...     │  │ Table: joblet-jobs   │     │
-│         │ (job logs)      │  │ (job state)          │     │
-│         └─────────────────┘  └──────────────────────┘     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-                           ↑
-                           │ gRPC (port 443)
-                           │
-                    ┌──────────────┐
-                    │ rnx Client   │
-                    │ (your laptop)│
-                    └──────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                          AWS Account                               │
+│                                                                    │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │                           VPC                                │  │
+│  │                                                              │  │
+│  │  ┌────────────────────────────────────────────────────┐     │  │
+│  │  │ EC2 Instance (Ubuntu 22.04)                        │     │  │
+│  │  │                                                    │     │  │
+│  │  │  ┌──────────────────────────────────────────┐     │     │  │
+│  │  │  │ Joblet Server (port 443)                 │     │     │  │
+│  │  │  │  - Job execution                         │     │     │  │
+│  │  │  │  - gRPC API                              │     │     │  │
+│  │  │  │  - TLS certificates (embedded)           │     │     │  │
+│  │  │  └──────────────────────────────────────────┘     │     │  │
+│  │  │                    │                               │     │  │
+│  │  └────────────────────┼───────────────────────────────┘     │  │
+│  │                       │                                      │  │
+│  │                       ▼                                      │  │
+│  │           ┌───────────────────────┐                         │  │
+│  │           │ VPC Endpoint          │                         │  │
+│  │           │ (DynamoDB Gateway)    │                         │  │
+│  │           └───────────┬───────────┘                         │  │
+│  │                       │                                      │  │
+│  └───────────────────────┼──────────────────────────────────────┘  │
+│                          │                                         │
+│            ┌─────────────┴─────────────┐                          │
+│            ▼                           ▼                          │
+│  ┌─────────────────┐         ┌──────────────────────┐            │
+│  │ CloudWatch Logs │         │ DynamoDB             │            │
+│  │                 │         │                      │            │
+│  │ /joblet/...     │         │ Table: joblet-jobs   │            │
+│  │ (job logs)      │         │ (job state)          │            │
+│  └─────────────────┘         └──────────────────────┘            │
+│                                                                    │
+└───────────────────────────────────────────────────────────────────┘
+                              ↑
+                              │ gRPC (port 443)
+                              │
+                       ┌──────────────┐
+                       │ rnx Client   │
+                       │ (your laptop)│
+                       └──────────────┘
 ```
 
 ### Data Flow
 
 1. **Client → Joblet Server**: gRPC requests over TLS (port 443)
-2. **Joblet → DynamoDB**: Job state persistence (Create, Update, Get, List)
+2. **Joblet → VPC Endpoint → DynamoDB**: Job state persistence (private, no internet)
 3. **Joblet → CloudWatch**: Real-time log streaming (PutLogEvents)
 4. **Client ← CloudWatch**: Historical log queries via `rnx job log` (GetLogEvents)
 

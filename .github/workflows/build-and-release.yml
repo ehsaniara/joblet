@@ -1,53 +1,30 @@
-name: Build and Release Joblet
+name: Release
 
 on:
   push:
-    branches: [ main, develop ]
     tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
   security-events: write
-  actions: read
 
 env:
   GO_VERSION: '1.24'
-  PACKAGE_NAME: 'joblet'
 
 jobs:
+  # Quick sanity test before building
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+      - run: go test ./...
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Run tests
-        run: go test -v ./...
-
-      - name: Run linting
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
-          args: --print-issued-lines=true --out-format=colored-line-number
-
-  build-binary:
+  # Build all binaries
+  build-binaries:
     needs: test
     runs-on: ubuntu-latest
     strategy:
@@ -60,87 +37,110 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Determine version
+      - name: Get version
         id: version
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
-          fi
-          
-          # Clean version for package formats
-          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
-          
-          # Ensure version starts with digit
-          if [[ ! "$CLEAN_VERSION" =~ ^[0-9] ]]; then
-            CLEAN_VERSION="1.0.0"
-          fi
-          
-          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
-          echo "raw_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $CLEAN_VERSION (from $VERSION)"
+          VERSION=${GITHUB_REF#refs/tags/v}
+          # Clean for package format
+          CLEAN=$(echo "$VERSION" | sed 's/-[0-9]*-g[a-f0-9]*$//')
+          echo "version=$CLEAN" >> $GITHUB_OUTPUT
+          echo "Building version: $CLEAN"
 
-      - name: Build joblet binary
+      - name: Build all binaries
         run: |
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
-            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o joblet-${{ matrix.arch }} \
-            ./cmd/joblet
+          mkdir -p bin
+          LDFLAGS="-X main.version=${{ steps.version.outputs.version }} -w -s"
 
-      - name: Build RNX CLI binary
+          # Main binaries
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o bin/joblet ./cmd/joblet
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o bin/rnx ./cmd/rnx
+
+          # Submodule binaries
+          cd persist && GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o ../bin/persist ./cmd/persist && cd ..
+          cd state && GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o ../bin/state ./cmd/state && cd ..
+
+          ls -la bin/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.arch }}
+          path: bin/
+
+  # Build Debian packages
+  build-deb:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ amd64, arm64 ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-${{ matrix.arch }}
+          path: ./
+
+      - name: Prepare binaries
         run: |
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
-            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o rnx-${{ matrix.arch }} \
-            ./cmd/rnx
+          chmod +x joblet rnx persist state
+          ls -la
 
-      - name: Build persist binary
+      - name: Build Debian package
         run: |
-          cd persist
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
-            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o ../persist-${{ matrix.arch }} \
-            ./cmd/persist
+          chmod +x scripts/build-deb.sh
+          ./scripts/build-deb.sh ${{ matrix.arch }} ${{ needs.build-binaries.outputs.version }}
 
-      - name: Build state binary
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.arch }}
+          path: "*.deb"
+
+  # Build RPM packages
+  build-rpm:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            rpm_arch: x86_64
+          - arch: arm64
+            rpm_arch: aarch64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-${{ matrix.arch }}
+          path: ./
+
+      - name: Prepare binaries
         run: |
-          cd state
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
-            -ldflags "-X main.version=${{ steps.version.outputs.version }} -w -s" \
-            -o ../state-${{ matrix.arch }} \
-            ./cmd/state
+          chmod +x joblet rnx persist state
+          ls -la
 
-      - name: Upload joblet binary
-        uses: actions/upload-artifact@v4
+      - name: Install RPM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Build RPM package
+        run: |
+          chmod +x scripts/build-rpm.sh
+          ./scripts/build-rpm.sh ${{ matrix.rpm_arch }} ${{ needs.build-binaries.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: joblet-binary-${{ matrix.arch }}
-          path: joblet-${{ matrix.arch }}
+          name: rpm-${{ matrix.rpm_arch }}
+          path: "*.rpm"
 
-      - name: Upload RNX CLI binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: rnx-binary-${{ matrix.arch }}
-          path: rnx-${{ matrix.arch }}
-
-      - name: Upload persist binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: persist-binary-${{ matrix.arch }}
-          path: persist-${{ matrix.arch }}
-
-      - name: Upload state binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: state-binary-${{ matrix.arch }}
-          path: state-${{ matrix.arch }}
-
-  build-cross-platform-cli:
+  # Build cross-platform RNX CLI
+  build-cli:
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -148,1174 +148,202 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Get version
         id: version
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-            TAG_VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=$(git describe --tags --always --dirty)-$(git rev-parse --short HEAD)
-            TAG_VERSION="v${VERSION}"
-          fi
-          
-          # Clean version for package formats
-          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]\+-g[a-f0-9]\+.*//' | sed 's/-[a-f0-9]\+$//')
-          
-          # Ensure version starts with digit
-          if [[ ! "$CLEAN_VERSION" =~ ^[0-9] ]]; then
-            CLEAN_VERSION="1.0.0"
-          fi
-          
-          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
-          echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build cross-platform RNX CLI
+      - name: Build cross-platform CLI
         run: |
-          echo "🚀 Building RNX CLI for all platforms..."
-          mkdir -p cli-dist
-          
-          # Linux (Desktop/Client usage)
-          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-linux-amd64 ./cmd/rnx
-          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-linux-arm64 ./cmd/rnx
-          GOOS=linux GOARCH=386 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-linux-386 ./cmd/rnx
-          
-          # macOS (Intel and Apple Silicon)
-          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-darwin-amd64 ./cmd/rnx
-          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-darwin-arm64 ./cmd/rnx
-          
+          mkdir -p dist
+          LDFLAGS="-X main.version=${{ steps.version.outputs.version }} -w -s"
+
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/rnx-linux-amd64 ./cmd/rnx
+          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/rnx-linux-arm64 ./cmd/rnx
+
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/rnx-darwin-amd64 ./cmd/rnx
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/rnx-darwin-arm64 ./cmd/rnx
+
           # Windows
-          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-windows-amd64.exe ./cmd/rnx
-          GOOS=windows GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-windows-arm64.exe ./cmd/rnx
-          GOOS=windows GOARCH=386 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-windows-386.exe ./cmd/rnx
-          
-          # FreeBSD
-          GOOS=freebsd GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-freebsd-amd64 ./cmd/rnx
-          GOOS=freebsd GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.tag_version }} -w -s" -o cli-dist/rnx-freebsd-arm64 ./cmd/rnx
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/rnx-windows-amd64.exe ./cmd/rnx
 
-      - name: Create cross-platform archives
-        run: |
-          cd cli-dist
-          
           # Create archives
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-amd64.tar.gz rnx-linux-amd64
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-arm64.tar.gz rnx-linux-arm64
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-linux-386.tar.gz rnx-linux-386
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-amd64.tar.gz rnx-darwin-amd64
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-arm64.tar.gz rnx-darwin-arm64
-          
-          # Universal macOS archive
-          mkdir -p universal-macos
-          cp rnx-darwin-amd64 universal-macos/rnx-intel
-          cp rnx-darwin-arm64 universal-macos/rnx-apple-silicon
-          cat > universal-macos/install.sh << 'EOF'
-          #!/bin/bash
-          # Universal macOS installer for RNX CLI
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "arm64" ]; then
-              echo "Installing RNX for Apple Silicon (M1/M2/M3)..."
-              cp rnx-apple-silicon /usr/local/bin/rnx
-          else
-              echo "Installing RNX for Intel..."
-              cp rnx-intel /usr/local/bin/rnx
-          fi
-          chmod +x /usr/local/bin/rnx
-          echo "✅ RNX CLI installed successfully!"
-          echo "Usage: rnx --help"
-          EOF
-          chmod +x universal-macos/install.sh
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-darwin-universal.tar.gz -C universal-macos .
-          
-          # Windows archives
-          zip rnx-${{ steps.version.outputs.tag_version }}-windows-amd64.zip rnx-windows-amd64.exe
-          zip rnx-${{ steps.version.outputs.tag_version }}-windows-arm64.zip rnx-windows-arm64.exe
-          zip rnx-${{ steps.version.outputs.tag_version }}-windows-386.zip rnx-windows-386.exe
-          
-          # FreeBSD archives
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-freebsd-amd64.tar.gz rnx-freebsd-amd64
-          tar -czf rnx-${{ steps.version.outputs.tag_version }}-freebsd-arm64.tar.gz rnx-freebsd-arm64
-          
-          # Generate checksums for CLI
-          sha256sum *.tar.gz *.zip > rnx-cli-checksums.txt
+          cd dist
+          tar -czf rnx-${{ steps.version.outputs.version }}-linux-amd64.tar.gz rnx-linux-amd64
+          tar -czf rnx-${{ steps.version.outputs.version }}-linux-arm64.tar.gz rnx-linux-arm64
+          tar -czf rnx-${{ steps.version.outputs.version }}-darwin-amd64.tar.gz rnx-darwin-amd64
+          tar -czf rnx-${{ steps.version.outputs.version }}-darwin-arm64.tar.gz rnx-darwin-arm64
+          zip rnx-${{ steps.version.outputs.version }}-windows-amd64.zip rnx-windows-amd64.exe
 
-      - name: Upload cross-platform CLI artifacts
-        uses: actions/upload-artifact@v4
+          sha256sum *.tar.gz *.zip > checksums.txt
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: cross-platform-cli
-          path: cli-dist/*
+          name: cli-archives
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
 
-  build-deb-package-amd64:
-    needs: [ test, build-binary ]
+  # Test packages
+  test-packages:
+    needs: [ build-deb, build-rpm ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Download joblet binary
-        uses: actions/download-artifact@v4
-        with:
-          name: joblet-binary-amd64
-          path: ./
-
-      - name: Download RNX CLI binary
-        uses: actions/download-artifact@v4
-        with:
-          name: rnx-binary-amd64
-          path: ./
-
-      - name: Download persist binary
-        uses: actions/download-artifact@v4
-        with:
-          name: persist-binary-amd64
-          path: ./
-
-      - name: Download state binary
-        uses: actions/download-artifact@v4
-        with:
-          name: state-binary-amd64
-          path: ./
-
-      - name: Debug - List downloaded files
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la ./
-          echo "Looking for binaries:"
-          find . -name "*joblet*" -o -name "*rnx*" | head -10
-          echo "All files in current directory tree:"
-          find . -type f | head -20
-
-      - name: Make binaries executable
-        run: |
-          echo "Making binaries executable..."
-          
-          # Find and handle joblet binary
-          if [ -f "./joblet-amd64" ]; then
-            echo "Found joblet-amd64, making it executable and renaming..."
-            chmod +x joblet-amd64
-            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-            mv joblet-amd64 joblet
-          else
-            echo "joblet-amd64 not found, searching for alternatives..."
-            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
-            if [ -n "$JOBLET_FILE" ]; then
-              echo "Found joblet binary at: $JOBLET_FILE"
-              chmod +x "$JOBLET_FILE"
-              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-              mv "$JOBLET_FILE" joblet
-            else
-              echo "ERROR: No joblet binary found!"
-              exit 1
-            fi
-          fi
-          
-          # Find and handle rnx binary
-          if [ -f "./rnx-amd64" ]; then
-            echo "Found rnx-amd64, making it executable and renaming..."
-            chmod +x rnx-amd64
-            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-            mv rnx-amd64 rnx
-          else
-            echo "rnx-amd64 not found, searching for alternatives..."
-            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
-            if [ -n "$RNX_FILE" ]; then
-              echo "Found rnx binary at: $RNX_FILE"
-              chmod +x "$RNX_FILE"
-              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-              mv "$RNX_FILE" rnx
-            else
-              echo "ERROR: No rnx binary found!"
-              exit 1
-            fi
-          fi
-
-          # Find and handle persist binary
-          if [ -f "./persist-amd64" ]; then
-            echo "Found persist-amd64, making it executable and renaming..."
-            chmod +x persist-amd64
-            mv persist-amd64 persist
-          else
-            echo "ERROR: No persist binary found!"
-            exit 1
-          fi
-
-          # Find and handle state binary
-          if [ -f "./state-amd64" ]; then
-            echo "Found state-amd64, making it executable and renaming..."
-            chmod +x state-amd64
-            mv state-amd64 state
-          else
-            echo "ERROR: No state binary found!"
-            exit 1
-          fi
-
-          echo "Final verification:"
-          ls -la joblet rnx persist state
-          echo "Joblet binary info:"
-          file joblet
-          echo "RNX binary info:"
-          file rnx
-          echo "Persist binary info:"
-          file persist
-          echo "State binary info:"
-          file state
-
-      - name: Install packaging dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev build-essential devscripts protobuf-compiler
-
-      - name: Install Go protoc plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-      - name: Set version from previous job
-        run: |
-          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
-
-      - name: Make scripts executable
-        run: |
-          chmod +x scripts/build-deb.sh
-
-      - name: Create Debian package (amd64)
-        run: |
-          ./scripts/build-deb.sh amd64 ${{ env.VERSION }}
-
-      - name: Upload Debian package (amd64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: debian-package-amd64
-          path: "*.deb"
-
-  build-deb-package-arm64:
-    needs: [ test, build-binary ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Download joblet binary
-        uses: actions/download-artifact@v4
-        with:
-          name: joblet-binary-arm64
-          path: ./
-
-      - name: Download RNX CLI binary
-        uses: actions/download-artifact@v4
-        with:
-          name: rnx-binary-arm64
-          path: ./
-
-      - name: Download persist binary
-        uses: actions/download-artifact@v4
-        with:
-          name: persist-binary-arm64
-          path: ./
-
-      - name: Download state binary
-        uses: actions/download-artifact@v4
-        with:
-          name: state-binary-arm64
-          path: ./
-
-      - name: Debug - List downloaded files
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la ./
-          echo "Looking for binaries:"
-          find . -name "*joblet*" -o -name "*rnx*" | head -10
-          echo "All files in current directory tree:"
-          find . -type f | head -20
-
-      - name: Make binaries executable
-        run: |
-          echo "Making binaries executable..."
-          
-          # Find and handle joblet binary
-          if [ -f "./joblet-arm64" ]; then
-            echo "Found joblet-arm64, making it executable and renaming..."
-            chmod +x joblet-arm64
-            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-            mv joblet-arm64 joblet
-          else
-            echo "joblet-arm64 not found, searching for alternatives..."
-            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
-            if [ -n "$JOBLET_FILE" ]; then
-              echo "Found joblet binary at: $JOBLET_FILE"
-              chmod +x "$JOBLET_FILE"
-              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-              mv "$JOBLET_FILE" joblet
-            else
-              echo "ERROR: No joblet binary found!"
-              exit 1
-            fi
-          fi
-          
-          # Find and handle rnx binary
-          if [ -f "./rnx-arm64" ]; then
-            echo "Found rnx-arm64, making it executable and renaming..."
-            chmod +x rnx-arm64
-            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-            mv rnx-arm64 rnx
-          else
-            echo "rnx-arm64 not found, searching for alternatives..."
-            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
-            if [ -n "$RNX_FILE" ]; then
-              echo "Found rnx binary at: $RNX_FILE"
-              chmod +x "$RNX_FILE"
-              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-              mv "$RNX_FILE" rnx
-            else
-              echo "ERROR: No rnx binary found!"
-              exit 1
-            fi
-          fi
-
-          # Find and handle persist binary
-          if [ -f "./persist-arm64" ]; then
-            echo "Found persist-arm64, making it executable and renaming..."
-            chmod +x persist-arm64
-            mv persist-arm64 persist
-          else
-            echo "ERROR: No persist binary found!"
-            exit 1
-          fi
-
-          # Find and handle state binary
-          if [ -f "./state-arm64" ]; then
-            echo "Found state-arm64, making it executable and renaming..."
-            chmod +x state-arm64
-            mv state-arm64 state
-          else
-            echo "ERROR: No state binary found!"
-            exit 1
-          fi
-
-          echo "Final verification:"
-          ls -la joblet rnx persist state
-          echo "Joblet binary info:"
-          file joblet
-          echo "RNX binary info:"
-          file rnx
-          echo "Persist binary info:"
-          file persist
-          echo "State binary info:"
-          file state
-
-      - name: Install packaging dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev build-essential devscripts protobuf-compiler
-
-      - name: Install Go protoc plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-      - name: Set version from previous job
-        run: |
-          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
-
-      - name: Make scripts executable
-        run: |
-          chmod +x scripts/build-deb.sh
-
-      - name: Create Debian package (arm64)
-        run: |
-          ./scripts/build-deb.sh arm64 ${{ env.VERSION }}
-
-      - name: Upload Debian package (arm64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: debian-package-arm64
-          path: "*.deb"
-
-  build-rpm-package-x86_64:
-    needs: [ test, build-binary ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Download joblet binary
-        uses: actions/download-artifact@v4
-        with:
-          name: joblet-binary-amd64
-          path: ./
-
-      - name: Download RNX CLI binary
-        uses: actions/download-artifact@v4
-        with:
-          name: rnx-binary-amd64
-          path: ./
-
-      - name: Download persist binary
-        uses: actions/download-artifact@v4
-        with:
-          name: persist-binary-amd64
-          path: ./
-
-      - name: Download state binary
-        uses: actions/download-artifact@v4
-        with:
-          name: state-binary-amd64
-          path: ./
-
-      - name: Debug - List downloaded files
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la ./
-          echo "Looking for binaries:"
-          find . -name "*joblet*" -o -name "*rnx*" | head -10
-
-      - name: Make binaries executable
-        run: |
-          echo "Making binaries executable..."
-
-          # Find and handle joblet binary
-          if [ -f "./joblet-amd64" ]; then
-            echo "Found joblet-amd64, making it executable and renaming..."
-            chmod +x joblet-amd64
-            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-            mv joblet-amd64 joblet
-          else
-            echo "joblet-amd64 not found, searching for alternatives..."
-            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
-            if [ -n "$JOBLET_FILE" ]; then
-              echo "Found joblet binary at: $JOBLET_FILE"
-              chmod +x "$JOBLET_FILE"
-              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-              mv "$JOBLET_FILE" joblet
-            else
-              echo "ERROR: No joblet binary found!"
-              exit 1
-            fi
-          fi
-
-          # Find and handle rnx binary
-          if [ -f "./rnx-amd64" ]; then
-            echo "Found rnx-amd64, making it executable and renaming..."
-            chmod +x rnx-amd64
-            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-            mv rnx-amd64 rnx
-          else
-            echo "rnx-amd64 not found, searching for alternatives..."
-            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
-            if [ -n "$RNX_FILE" ]; then
-              echo "Found rnx binary at: $RNX_FILE"
-              chmod +x "$RNX_FILE"
-              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-              mv "$RNX_FILE" rnx
-            else
-              echo "ERROR: No rnx binary found!"
-              exit 1
-            fi
-          fi
-
-          # Find and handle persist binary
-          if [ -f "./persist-amd64" ]; then
-            echo "Found persist-amd64, making it executable and renaming..."
-            chmod +x persist-amd64
-            mv persist-amd64 persist
-          else
-            echo "ERROR: No persist binary found!"
-            exit 1
-          fi
-
-          # Find and handle state binary
-          if [ -f "./state-amd64" ]; then
-            echo "Found state-amd64, making it executable and renaming..."
-            chmod +x state-amd64
-            mv state-amd64 state
-          else
-            echo "ERROR: No state binary found!"
-            exit 1
-          fi
-
-          echo "Final verification:"
-          ls -la joblet rnx persist state
-
-      - name: Install RPM build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm build-essential protobuf-compiler
-
-      - name: Install Go protoc plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-      - name: Set version from previous job
-        run: |
-          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
-
-      - name: Make scripts executable
-        run: |
-          chmod +x scripts/build-rpm.sh
-
-      - name: Build RPM package (x86_64)
-        run: |
-          ./scripts/build-rpm.sh x86_64 ${{ env.VERSION }}
-
-      - name: Upload RPM package (x86_64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: rpm-package-x86_64
-          path: "*.rpm"
-
-  build-rpm-package-aarch64:
-    needs: [ test, build-binary ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Download joblet binary
-        uses: actions/download-artifact@v4
-        with:
-          name: joblet-binary-arm64
-          path: ./
-
-      - name: Download RNX CLI binary
-        uses: actions/download-artifact@v4
-        with:
-          name: rnx-binary-arm64
-          path: ./
-
-      - name: Download persist binary
-        uses: actions/download-artifact@v4
-        with:
-          name: persist-binary-arm64
-          path: ./
-
-      - name: Download state binary
-        uses: actions/download-artifact@v4
-        with:
-          name: state-binary-arm64
-          path: ./
-
-      - name: Debug - List downloaded files
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la ./
-          echo "Looking for binaries:"
-          find . -name "*joblet*" -o -name "*rnx*" | head -10
-
-      - name: Make binaries executable
-        run: |
-          echo "Making binaries executable..."
-          
-          # Find and handle joblet binary
-          if [ -f "./joblet-arm64" ]; then
-            echo "Found joblet-arm64, making it executable and renaming..."
-            chmod +x joblet-arm64
-            rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-            mv joblet-arm64 joblet
-          else
-            echo "joblet-arm64 not found, searching for alternatives..."
-            JOBLET_FILE=$(find . -name "*joblet*" -type f | head -1)
-            if [ -n "$JOBLET_FILE" ]; then
-              echo "Found joblet binary at: $JOBLET_FILE"
-              chmod +x "$JOBLET_FILE"
-              rm -rf joblet  # Remove existing joblet directory/file to avoid conflicts
-              mv "$JOBLET_FILE" joblet
-            else
-              echo "ERROR: No joblet binary found!"
-              exit 1
-            fi
-          fi
-          
-          # Find and handle rnx binary
-          if [ -f "./rnx-arm64" ]; then
-            echo "Found rnx-arm64, making it executable and renaming..."
-            chmod +x rnx-arm64
-            rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-            mv rnx-arm64 rnx
-          else
-            echo "rnx-arm64 not found, searching for alternatives..."
-            RNX_FILE=$(find . -name "*rnx*" -type f | head -1)
-            if [ -n "$RNX_FILE" ]; then
-              echo "Found rnx binary at: $RNX_FILE"
-              chmod +x "$RNX_FILE"
-              rm -rf rnx  # Remove existing rnx directory/file to avoid conflicts
-              mv "$RNX_FILE" rnx
-            else
-              echo "ERROR: No rnx binary found!"
-              exit 1
-            fi
-          fi
-
-          # Find and handle persist binary
-          if [ -f "./persist-arm64" ]; then
-            echo "Found persist-arm64, making it executable and renaming..."
-            chmod +x persist-arm64
-            mv persist-arm64 persist
-          else
-            echo "ERROR: No persist binary found!"
-            exit 1
-          fi
-
-          # Find and handle state binary
-          if [ -f "./state-arm64" ]; then
-            echo "Found state-arm64, making it executable and renaming..."
-            chmod +x state-arm64
-            mv state-arm64 state
-          else
-            echo "ERROR: No state binary found!"
-            exit 1
-          fi
-
-          echo "Final verification:"
-          ls -la joblet rnx persist state
-
-      - name: Install RPM build tools with enhanced cross-compilation support
-        run: |
-          sudo apt-get update
-
-          # Install core RPM build tools
-          sudo apt-get install -y rpm build-essential protobuf-compiler
-
-          # Install QEMU for emulation support (helps with architecture detection)
-          sudo apt-get install -y qemu-user-static
-
-          # Add architecture support for cross-compilation
-          sudo dpkg --add-architecture arm64
-
-          # Install cross-compilation tools if available
-          sudo apt-get install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available, proceeding with binary packaging"
-
-      - name: Install Go protoc plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-          # Configure binfmt to handle aarch64 binaries (helps RPM understand the architecture)
-          sudo update-binfmts --display || echo "binfmt configuration not available"
-
-      - name: Set version from previous job
-        run: |
-          echo "VERSION=${{ needs.build-binary.outputs.version }}" >> $GITHUB_ENV
-
-      - name: Make scripts executable
-        run: |
-          chmod +x scripts/build-rpm.sh
-
-      - name: Build RPM package (aarch64) with enhanced cross-compilation
-        run: |
-          # Use aarch64 explicitly (not arm64) for RPM builds
-          ./scripts/build-rpm.sh aarch64 ${{ env.VERSION }}
-
-      - name: Upload RPM package (aarch64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: rpm-package-aarch64
-          path: "*.rpm"
-
-  test-debian-package-amd64:
-    needs: build-deb-package-amd64
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Download Debian package (amd64)
-        uses: actions/download-artifact@v4
-        with:
-          name: debian-package-amd64
-          path: ./
-
-      - name: Test Debian package metadata (amd64)
-        run: |
-          # Check package info
-          dpkg-deb -I *.deb
-          
-          # List package contents
-          dpkg-deb -c *.deb
-          
-          # Test dependencies
-          dpkg-deb --field *.deb Depends
-          
-          # Verify architecture
-          dpkg-deb --field *.deb Architecture
-          
-          # Check if this is the native architecture (can test installation)
-          PACKAGE_ARCH=$(dpkg-deb --field *.deb Architecture)
-          SYSTEM_ARCH=$(dpkg --print-architecture)
-          echo "Package architecture: $PACKAGE_ARCH"
-          echo "System architecture: $SYSTEM_ARCH"
-          
-          if [ "$PACKAGE_ARCH" = "$SYSTEM_ARCH" ]; then
-            echo "Testing installation (native architecture)..."
-            sudo dpkg --dry-run -i *.deb
-          else
-            echo "Skipping installation test (cross-architecture)"
-          fi
-
-  test-debian-package-arm64:
-    needs: build-deb-package-arm64
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Download Debian package (arm64)
-        uses: actions/download-artifact@v4
-        with:
-          name: debian-package-arm64
-          path: ./
-
-      - name: Test Debian package metadata (arm64)
-        run: |
-          # Check package info
-          dpkg-deb -I *.deb
-          
-          # List package contents
-          dpkg-deb -c *.deb
-          
-          # Test dependencies
-          dpkg-deb --field *.deb Depends
-          
-          # Verify architecture
-          PACKAGE_ARCH=$(dpkg-deb --field *.deb Architecture)
-          echo "Package architecture: $PACKAGE_ARCH"
-          
-          # Verify it's arm64
-          if [ "$PACKAGE_ARCH" = "arm64" ]; then
-            echo "✓ Package correctly built for arm64"
-          else
-            echo "✗ Expected arm64, got $PACKAGE_ARCH"
-            exit 1
-          fi
-          
-          echo "Skipping installation test (cross-architecture)"
-
-  test-rpm-package-x86_64:
-    needs: build-rpm-package-x86_64
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Install RPM tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm
-
-      - name: Download RPM package (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: rpm-package-x86_64
-          path: ./
-
-      - name: Test RPM package (x86_64)
-        run: |
-          # Test RPM package validity
-          rpm -qip *.rpm
-          
-          # List package contents
-          rpm -qlp *.rpm
-          
-          # Test package dependencies
-          rpm -qpR *.rpm
-          
-          # Test installation (dry run equivalent)
-          rpm --test -i *.rpm || echo "RPM validation completed"
-          
-          # Verify architecture
-          rpm -qp --queryformat '%{ARCH}\n' *.rpm
-
-  test-rpm-package-aarch64:
-    needs: build-rpm-package-aarch64
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Install RPM tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm
-
-      - name: Download RPM package (aarch64)
-        uses: actions/download-artifact@v4
-        with:
-          name: rpm-package-aarch64
-          path: ./
-
-      - name: Test RPM package (aarch64)
-        run: |
-          # Test RPM package validity
-          rpm -qip *.rpm
-          
-          # List package contents
-          rpm -qlp *.rpm
-          
-          # Test package dependencies
-          rpm -qpR *.rpm
-          
-          # Test installation (dry run equivalent)
-          rpm --test -i *.rpm || echo "RPM validation completed"
-          
-          # Verify architecture
-          rpm -qp --queryformat '%{ARCH}\n' *.rpm
-
-  security-scan-debian-amd64:
-    needs: build-deb-package-amd64
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Debian package (amd64)
-        uses: actions/download-artifact@v4
-        with:
-          name: debian-package-amd64
-          path: ./packages/
-
-      - name: Security scan Debian amd64 with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './packages'
-          format: 'sarif'
-          output: 'trivy-results-debian-amd64.sarif'
-
-      - name: Upload Trivy scan results (Debian amd64)
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results-debian-amd64.sarif'
-          category: 'debian-amd64'
-
-  security-scan-debian-arm64:
-    needs: build-deb-package-arm64
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Debian package (arm64)
-        uses: actions/download-artifact@v4
-        with:
-          name: debian-package-arm64
-          path: ./packages/
-
-      - name: Security scan Debian arm64 with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './packages'
-          format: 'sarif'
-          output: 'trivy-results-debian-arm64.sarif'
-
-      - name: Upload Trivy scan results (Debian arm64)
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results-debian-arm64.sarif'
-          category: 'debian-arm64'
-
-  security-scan-rpm-x86_64:
-    needs: build-rpm-package-x86_64
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download RPM package (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: rpm-package-x86_64
-          path: ./packages/
-
-      - name: Security scan RPM x86_64 with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './packages'
-          format: 'sarif'
-          output: 'trivy-results-rpm-x86_64.sarif'
-
-      - name: Upload Trivy scan results (RPM x86_64)
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results-rpm-x86_64.sarif'
-          category: 'rpm-x86_64'
-
-  security-scan-rpm-aarch64:
-    needs: build-rpm-package-aarch64
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download RPM package (aarch64)
-        uses: actions/download-artifact@v4
-        with:
-          name: rpm-package-aarch64
-          path: ./packages/
-
-      - name: Security scan RPM aarch64 with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './packages'
-          format: 'sarif'
-          output: 'trivy-results-rpm-aarch64.sarif'
-
-      - name: Upload Trivy scan results (RPM aarch64)
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results-rpm-aarch64.sarif'
-          category: 'rpm-aarch64'
-
-  release:
-    needs: [
-      build-deb-package-amd64,
-      build-deb-package-arm64,
-      build-rpm-package-x86_64,
-      build-rpm-package-aarch64,
-      test-debian-package-amd64,
-      test-debian-package-arm64,
-      test-rpm-package-x86_64,
-      test-rpm-package-aarch64,
-      security-scan-debian-amd64,
-      security-scan-debian-arm64,
-      security-scan-rpm-x86_64,
-      security-scan-rpm-aarch64,
-      build-cross-platform-cli,
-      build-binary
-    ]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all packages
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: packages/
 
-      - name: Organize release artifacts
+      - name: Test Debian packages
         run: |
-          mkdir -p release/
-          
-          # Server packages (.deb and .rpm)
-          find packages/ -name "*.deb" -exec cp {} release/ \;
-          find packages/ -name "*.rpm" -exec cp {} release/ \;
-          
-          # Cross-platform CLI archives
-          find packages/cross-platform-cli -name "*.tar.gz" -exec cp {} release/ \;
-          find packages/cross-platform-cli -name "*.zip" -exec cp {} release/ \;
-          find packages/cross-platform-cli -name "*-checksums.txt" -exec cp {} release/ \;
-          
-          # Generate comprehensive checksums
-          cd release/
-          sha256sum *.deb *.rpm *.tar.gz *.zip > joblet-complete-checksums.txt
-          
-          echo "📦 Release contents:"
+          for deb in packages/deb-*/*.deb; do
+            echo "Testing $deb..."
+            dpkg-deb -I "$deb"
+            dpkg-deb -c "$deb"
+          done
+
+      - name: Test RPM packages
+        run: |
+          sudo apt-get update && sudo apt-get install -y rpm
+          for rpm in packages/rpm-*/*.rpm; do
+            echo "Testing $rpm..."
+            rpm -qip "$rpm"
+            rpm -qlp "$rpm"
+          done
+
+  # Security scan
+  security-scan:
+    needs: [ build-deb, build-rpm ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages/
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './packages'
+          format: 'table'
+          exit-code: '0'  # Don't fail on vulnerabilities, just report
+
+  # Create GitHub Release
+  release:
+    needs: [ build-deb, build-rpm, build-cli, build-binaries, test-packages, security-scan ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Organize release files
+        run: |
+          mkdir -p release
+          find artifacts/ -name "*.deb" -exec cp {} release/ \;
+          find artifacts/ -name "*.rpm" -exec cp {} release/ \;
+          find artifacts/ -name "*.tar.gz" -exec cp {} release/ \;
+          find artifacts/ -name "*.zip" -exec cp {} release/ \;
+
+          cd release
+          sha256sum * > SHA256SUMS.txt
           ls -la
 
-      - name: Create comprehensive release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            ## Server Installation (Linux)
+
+            ### Debian/Ubuntu
+            ```bash
+            # AMD64 (Intel/AMD)
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binaries.outputs.version }}_amd64.deb
+            sudo dpkg -i joblet_${{ needs.build-binaries.outputs.version }}_amd64.deb
+
+            # ARM64 (AWS Graviton, ARM servers)
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binaries.outputs.version }}_arm64.deb
+            sudo dpkg -i joblet_${{ needs.build-binaries.outputs.version }}_arm64.deb
+
+            # Start service
+            sudo systemctl start joblet && sudo systemctl enable joblet
+            ```
+
+            ### RHEL/CentOS/Amazon Linux
+            ```bash
+            # x86_64
+            sudo yum install -y https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binaries.outputs.version }}-1.x86_64.rpm
+
+            # aarch64 (AWS Graviton)
+            sudo yum install -y https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binaries.outputs.version }}-1.aarch64.rpm
+
+            # Start service
+            sudo systemctl start joblet && sudo systemctl enable joblet
+            ```
+
+            ---
+
+            ## RNX CLI (Client)
+
+            ### macOS
+            ```bash
+            # Apple Silicon (M1/M2/M3/M4)
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-arm64.tar.gz | tar xz
+            sudo mv rnx-darwin-arm64 /usr/local/bin/rnx
+
+            # Intel
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-amd64.tar.gz | tar xz
+            sudo mv rnx-darwin-amd64 /usr/local/bin/rnx
+            ```
+
+            ### Windows
+            ```powershell
+            Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-amd64.zip" -OutFile rnx.zip
+            Expand-Archive rnx.zip -DestinationPath .
+            Move-Item rnx-windows-amd64.exe C:\Windows\rnx.exe
+            ```
+
+            ### Linux
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-amd64.tar.gz | tar xz
+            sudo mv rnx-linux-amd64 /usr/local/bin/rnx
+            ```
+
+            ---
+
+            ## Quick Start
+
+            ```bash
+            # 1. Copy client config from server
+            scp your-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+
+            # 2. Test connection
+            rnx job list
+
+            # 3. Run a job
+            rnx job run echo "Hello from Joblet!"
+            ```
+
+            ---
+
+            ## Verify Checksums
+            ```bash
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          name: "Joblet ${{ github.ref_name }}"
-          files: |
-            release/*.deb
-            release/*.rpm
-            release/*.tar.gz
-            release/*.zip
-            release/*-checksums.txt
-          body: |
-            ** 🚀 Complete Joblet release** ${{ github.ref_name }} with both Linux server packages and cross-platform RNX CLI.
-            
-            ---
-            
-            ## 🖥️ Linux Server Installation (Full Joblet + RNX)
-            
-            Choose your Linux distribution and architecture:
-            
-            ### 📋 Debian/Ubuntu (.deb packages)
-            ```bash
-            # AMD64 servers (Intel/AMD)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_amd64.deb
-            
-            # ARM64 servers (AWS Graviton, ARM servers)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
-            sudo dpkg -i joblet_${{ needs.build-binary.outputs.version }}_arm64.deb
-            
-            # Start the service
-            sudo systemctl start joblet && sudo systemctl enable joblet
-            ```
-            
-            ### 🔴 RHEL/CentOS/Fedora/Amazon Linux (.rpm packages)
-            ```bash
-            # x86_64 servers (Intel/AMD)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.x86_64.rpm
-            
-            # aarch64 servers (AWS Graviton, ARM servers)
-            wget https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-${{ needs.build-binary.outputs.version }}-1.aarch64.rpm
-            
-            # Install based on your distribution:
-            sudo yum localinstall -y joblet-*.rpm     # Amazon Linux 2
-            sudo dnf localinstall -y joblet-*.rpm     # Amazon Linux 2023/Fedora
-            sudo rpm -ivh joblet-*.rpm                # RHEL/CentOS
-            
-            # Start the service
-            sudo systemctl start joblet && sudo systemctl enable joblet
-            ```
-            
-            ---
-            
-            ## 📱 RNX CLI Installation (Desktop/Laptop Client)
-            
-            Install the RNX CLI on your desktop/laptop to connect to Joblet servers:
-            
-            ### 🍎 macOS
-            ```bash
-            # Intel Macs
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-amd64.tar.gz | tar xz
-            sudo mv rnx-darwin-amd64 /usr/local/bin/rnx
-            
-            # Apple Silicon (M1/M2/M3/M4)
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-arm64.tar.gz | tar xz
-            sudo mv rnx-darwin-arm64 /usr/local/bin/rnx
-            
-            # Universal installer (auto-detects architecture)
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-darwin-universal.tar.gz | tar xz
-            sudo bash install.sh
-            ```
-            
-            ### 🪟 Windows
-            ```powershell
-            # AMD64 (Intel/AMD)
-            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-amd64.zip" -OutFile "rnx.zip"
-            Expand-Archive rnx.zip
-            Move-Item rnx\rnx-windows-amd64.exe "C:\Program Files\rnx.exe"
-            
-            # ARM64 (Surface Pro X, other ARM Windows)
-            Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-windows-arm64.zip" -OutFile "rnx.zip"
-            ```
-            
-            ### 🐧 Linux Desktop
-            ```bash
-            # AMD64 (Intel/AMD)
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-amd64.tar.gz | tar xz
-            sudo mv rnx-linux-amd64 /usr/local/bin/rnx
-            
-            # ARM64 (Raspberry Pi 4, Pine64, etc.)
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-arm64.tar.gz | tar xz
-            sudo mv rnx-linux-arm64 /usr/local/bin/rnx
-            
-            # i386 (older 32-bit systems)
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-linux-386.tar.gz | tar xz
-            sudo mv rnx-linux-386 /usr/local/bin/rnx
-            ```
-            
-            ### 😈 FreeBSD
-            ```bash
-            # AMD64
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/rnx-${{ github.ref_name }}-freebsd-amd64.tar.gz | tar xz
-            sudo mv rnx-freebsd-amd64 /usr/local/bin/rnx
-            ```
-            
-            ---
-            
-            ## 🎯 What You Get
-            
-            | Component | Purpose | Platforms |
-            |-----------|---------|-----------|
-            | **Server Packages** | Deploy Joblet daemon | Linux servers (.deb/.rpm) |
-            | **RNX CLI** | Connect to servers | macOS, Windows, Linux, FreeBSD |
-            
-            ### 🖥️ Server Packages Include:
-            - ✅ **Joblet daemon** - Main server process
-            - ✅ **RNX CLI** - Command-line client  
-            - ✅ **Embedded certificates** - Automatic mTLS setup
-            - ✅ **Systemd service** - Auto-start configuration
-            - ✅ **Certificate generator** - Easy certificate management
-            
-            ### 📱 Cross-Platform RNX CLI:
-            - ✅ **macOS** (Intel + Apple Silicon + Universal)
-            - ✅ **Windows** (AMD64 + ARM64 + i386)
-            - ✅ **Linux Desktop** (AMD64 + ARM64 + i386)
-            - ✅ **FreeBSD** (AMD64 + ARM64)
-            
-            ---
-            
-            ## 🚀 Quick Start
-            
-            ```bash
-            # 1. Install server package on your Linux server (see above)
-            # 2. Install RNX CLI on your desktop/laptop (see above)
-            # 3. Copy client configuration from server
-            scp your-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
-            
-            # 4. Test connection and run jobs
-            rnx list
-            rnx run echo "Hello from Joblet!"
-            rnx run --max-cpu=50 --max-memory=512 python3 script.py
-            rnx log <job-id>
-            ```
-            
-            ## 🔐 Package Verification
-            
-            ```bash
-            # Verify all checksums
-            curl -L https://github.com/ehsaniara/joblet/releases/download/${{ github.ref_name }}/joblet-complete-checksums.txt
-            sha256sum -c joblet-complete-checksums.txt
-            ```
-            
-            ---
-            
-            ## 📊 Architecture Support Matrix
-            
-            | Package Type | AMD64/x86_64 | ARM64/aarch64 | i386 |
-            |-------------|--------------|---------------|------|
-            | **Debian (.deb)** | ✅ | ✅ | ❌ |
-            | **RPM (.rpm)** | ✅ | ✅ | ❌ |
-            | **RNX CLI** | ✅ | ✅ | ✅ |
-            
-            Perfect for modern cloud environments including **AWS Graviton**, **Azure ARM**, and traditional **Intel/AMD** servers.
-          generate_release_notes: false
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-          make_latest: true
