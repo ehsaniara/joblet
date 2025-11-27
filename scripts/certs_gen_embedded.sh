@@ -273,17 +273,8 @@ if [ -f "$SERVER_TEMPLATE" ]; then
             /backend: "memory"/ s/backend: "memory"/backend: "dynamodb"/
         }' "$SERVER_CONFIG"
 
-        # Add DynamoDB storage configuration if not present
-        if ! grep -q "storage:" "$SERVER_CONFIG" | grep -A 20 "^state:" | grep -q "dynamodb:"; then
-            # Add storage section under state
-            sed -i '/^state:/a\
-  storage:\
-    dynamodb:\
-      region: ""  # Auto-detect from EC2 metadata\
-      table_name: "joblet-jobs"\
-      ttl_enabled: true\
-      ttl_days: 30' "$SERVER_CONFIG"
-        fi
+        # Note: DynamoDB storage configuration is already in the template
+        # (state.storage.dynamodb section) - no need to add it here
 
         # Set region in DynamoDB config if detected
         if [ -n "$EC2_REGION" ]; then
