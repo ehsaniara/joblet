@@ -14,14 +14,16 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/p
 
 This interactive script creates:
 
-- `JobletEC2Role` IAM role with permissions for CloudWatch Logs and DynamoDB
+- `JobletEC2Role` IAM role with permissions for CloudWatch Logs, DynamoDB, and Secrets Manager
 - `joblet-jobs` DynamoDB table for job state persistence
 - **DynamoDB VPC Endpoint** (required) for secure access to DynamoDB
+- **CA and client certificates** in AWS Secrets Manager (for horizontal scaling)
 
 The script will:
 1. Ask you to select a VPC for the EC2 instance
 2. Check if a DynamoDB VPC Endpoint exists in that VPC
 3. Let you select an existing endpoint or create a new one
+4. Generate and store shared CA/client certificates in Secrets Manager
 
 **Note the VPC ID** shown at the end - you'll need it in Step 2.
 
@@ -59,7 +61,8 @@ When the instance boots, the user data script automatically:
 ✅ **Detects EC2 environment** (region, instance ID, metadata)
 ✅ **Installs Joblet** via Debian/RPM package
 ✅ **Configures CloudWatch Logs** `/joblet` log group (for log aggregation)
-✅ **Generates TLS certificates** (embedded in config)
+✅ **Fetches CA/client certificates** from Secrets Manager (shared across instances)
+✅ **Generates server TLS certificate** (instance-specific, embedded in config)
 ✅ **Starts Joblet server** on port 443 (systemd service)
 
 **Note**: DynamoDB table is created in Step 1 (pre-setup), not on EC2 instance.
@@ -123,6 +126,7 @@ sudo systemctl status joblet
 
 - **CloudWatch Logs** permissions (CreateLogGroup, CreateLogStream, PutLogEvents)
 - **DynamoDB** permissions (CreateTable, PutItem, GetItem, UpdateItem, DeleteItem, Scan, Query)
+- **Secrets Manager** permissions (GetSecretValue, DescribeSecret, CreateSecret, UpdateSecret)
 - **EC2 Metadata** access (region detection)
 
 ### EC2 Instance
@@ -153,6 +157,14 @@ sudo systemctl status joblet
 - **Traffic stays within AWS** network (never goes to public internet)
 - **No NAT Gateway required** for DynamoDB access
 - **Created automatically** by the pre-setup script if not exists
+
+### Secrets Manager (TLS Certificates)
+
+- **Shared CA certificate** (`joblet/ca-cert`, `joblet/ca-key`) - Same across all instances
+- **Shared client certificate** (`joblet/client-cert`, `joblet/client-key`) - Same for all clients
+- **Instance-specific server certificate** - Generated fresh on each EC2 instance
+- **Enables horizontal scaling** - Multiple Joblet instances share the same CA/client trust
+- **Created automatically** by the pre-setup script
 
 ### Graceful Fallback (Resilience)
 

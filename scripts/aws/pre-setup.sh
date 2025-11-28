@@ -21,11 +21,13 @@ echo "  • IAM Policy: JobletAWSPolicy"
 echo "  • IAM Role: JobletEC2Role"
 echo "  • Instance Profile: JobletEC2Role"
 echo "  • DynamoDB Table: joblet-jobs"
-echo "  • VPC Endpoint for DynamoDB (optional, recommended for security)"
+echo "  • VPC Endpoint for DynamoDB (required)"
+echo "  • Secrets Manager: CA and client certificates (for horizontal scaling)"
 echo ""
 echo "Permissions granted:"
 echo "  ✅ CloudWatch Logs - Automatic log aggregation"
 echo "  ✅ DynamoDB - Persistent job state (via private VPC endpoint)"
+echo "  ✅ Secrets Manager - Shared CA/client certificates"
 echo "  ✅ EC2 Metadata - Region detection"
 echo ""
 
@@ -124,6 +126,19 @@ else
         "ec2:DescribeRegions"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "SecretsManagerCertAccess",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:CreateSecret",
+        "secretsmanager:UpdateSecret",
+        "secretsmanager:PutSecretValue",
+        "secretsmanager:TagResource"
+      ],
+      "Resource": "arn:aws:secretsmanager:*:*:secret:joblet/*"
     }
   ]
 }
@@ -256,6 +271,150 @@ else
         echo "Table name: joblet-jobs"
         echo "Region: $REGION"
     fi
+fi
+
+echo ""
+echo "=========================================================================="
+echo "Secrets Manager Certificates"
+echo "=========================================================================="
+echo ""
+echo "Checking for shared CA and client certificates..."
+echo "These certificates enable horizontal scaling (multiple EC2 instances)."
+echo ""
+
+SECRETS_PREFIX="joblet"
+
+# Check if CA cert exists
+CA_CERT_EXISTS=false
+if aws secretsmanager describe-secret --secret-id "$SECRETS_PREFIX/ca-cert" --region "$REGION" >/dev/null 2>&1; then
+    echo "✅ CA certificate already exists in Secrets Manager"
+    CA_CERT_EXISTS=true
+fi
+
+CLIENT_CERT_EXISTS=false
+if aws secretsmanager describe-secret --secret-id "$SECRETS_PREFIX/client-cert" --region "$REGION" >/dev/null 2>&1; then
+    echo "✅ Client certificate already exists in Secrets Manager"
+    CLIENT_CERT_EXISTS=true
+fi
+
+# Generate and store certs if they don't exist
+if [ "$CA_CERT_EXISTS" = false ] || [ "$CLIENT_CERT_EXISTS" = false ]; then
+    echo ""
+    echo "Generating certificates..."
+
+    # Create temp directory for certificate generation
+    CERT_TEMP_DIR=$(mktemp -d)
+    trap "rm -rf $CERT_TEMP_DIR" EXIT
+
+    if [ "$CA_CERT_EXISTS" = false ]; then
+        echo "   Generating CA certificate (4096-bit RSA, 3 years validity)..."
+
+        # Generate CA private key
+        openssl genrsa -out "$CERT_TEMP_DIR/ca.key" 4096 2>/dev/null
+
+        # Generate CA certificate
+        openssl req -new -x509 -days 1095 -sha256 \
+            -key "$CERT_TEMP_DIR/ca.key" \
+            -out "$CERT_TEMP_DIR/ca.crt" \
+            -subj "/C=US/ST=Cloud/L=AWS/O=Joblet/OU=CA/CN=Joblet Root CA" 2>/dev/null
+
+        # Store CA cert in Secrets Manager
+        if aws secretsmanager create-secret \
+            --name "$SECRETS_PREFIX/ca-cert" \
+            --description "Joblet Root CA Certificate" \
+            --secret-string "$(cat "$CERT_TEMP_DIR/ca.crt")" \
+            --region "$REGION" \
+            --tags Key=Application,Value=Joblet Key=Type,Value=Certificate >/dev/null 2>&1; then
+            echo "   ✅ CA certificate stored in Secrets Manager"
+        else
+            echo "   ❌ Failed to store CA certificate"
+        fi
+
+        # Store CA key in Secrets Manager
+        if aws secretsmanager create-secret \
+            --name "$SECRETS_PREFIX/ca-key" \
+            --description "Joblet Root CA Private Key" \
+            --secret-string "$(cat "$CERT_TEMP_DIR/ca.key")" \
+            --region "$REGION" \
+            --tags Key=Application,Value=Joblet Key=Type,Value=PrivateKey >/dev/null 2>&1; then
+            echo "   ✅ CA private key stored in Secrets Manager"
+        else
+            echo "   ❌ Failed to store CA private key"
+        fi
+
+        CA_CERT_EXISTS=true
+    else
+        # Retrieve CA cert and key for client cert generation
+        aws secretsmanager get-secret-value --secret-id "$SECRETS_PREFIX/ca-cert" --region "$REGION" \
+            --query 'SecretString' --output text > "$CERT_TEMP_DIR/ca.crt" 2>/dev/null
+        aws secretsmanager get-secret-value --secret-id "$SECRETS_PREFIX/ca-key" --region "$REGION" \
+            --query 'SecretString' --output text > "$CERT_TEMP_DIR/ca.key" 2>/dev/null
+    fi
+
+    if [ "$CLIENT_CERT_EXISTS" = false ]; then
+        echo "   Generating client certificate (2048-bit RSA, 1 year validity)..."
+
+        # Generate client private key
+        openssl genrsa -out "$CERT_TEMP_DIR/client.key" 2048 2>/dev/null
+
+        # Generate client CSR
+        openssl req -new -sha256 \
+            -key "$CERT_TEMP_DIR/client.key" \
+            -out "$CERT_TEMP_DIR/client.csr" \
+            -subj "/C=US/ST=Cloud/L=AWS/O=Joblet/OU=Client/CN=admin" 2>/dev/null
+
+        # Create client extensions file
+        cat > "$CERT_TEMP_DIR/client_ext.cnf" << 'EXTEOF'
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+EXTEOF
+
+        # Sign client certificate with CA
+        openssl x509 -req -days 365 -sha256 \
+            -in "$CERT_TEMP_DIR/client.csr" \
+            -CA "$CERT_TEMP_DIR/ca.crt" \
+            -CAkey "$CERT_TEMP_DIR/ca.key" \
+            -CAcreateserial \
+            -out "$CERT_TEMP_DIR/client.crt" \
+            -extfile "$CERT_TEMP_DIR/client_ext.cnf" 2>/dev/null
+
+        # Store client cert in Secrets Manager
+        if aws secretsmanager create-secret \
+            --name "$SECRETS_PREFIX/client-cert" \
+            --description "Joblet Admin Client Certificate" \
+            --secret-string "$(cat "$CERT_TEMP_DIR/client.crt")" \
+            --region "$REGION" \
+            --tags Key=Application,Value=Joblet Key=Type,Value=Certificate >/dev/null 2>&1; then
+            echo "   ✅ Client certificate stored in Secrets Manager"
+        else
+            echo "   ❌ Failed to store client certificate"
+        fi
+
+        # Store client key in Secrets Manager
+        if aws secretsmanager create-secret \
+            --name "$SECRETS_PREFIX/client-key" \
+            --description "Joblet Admin Client Private Key" \
+            --secret-string "$(cat "$CERT_TEMP_DIR/client.key")" \
+            --region "$REGION" \
+            --tags Key=Application,Value=Joblet Key=Type,Value=PrivateKey >/dev/null 2>&1; then
+            echo "   ✅ Client private key stored in Secrets Manager"
+        else
+            echo "   ❌ Failed to store client private key"
+        fi
+    fi
+
+    echo ""
+    echo "✅ Certificates created and stored in Secrets Manager"
+    echo "   Secret prefix: $SECRETS_PREFIX"
+    echo "   Secrets created:"
+    echo "     - $SECRETS_PREFIX/ca-cert"
+    echo "     - $SECRETS_PREFIX/ca-key"
+    echo "     - $SECRETS_PREFIX/client-cert"
+    echo "     - $SECRETS_PREFIX/client-key"
+else
+    echo ""
+    echo "✅ All certificates already exist in Secrets Manager"
 fi
 
 echo ""
@@ -430,6 +589,7 @@ echo "  • IAM Policy: $POLICY_ARN"
 echo "  • IAM Role: JobletEC2Role"
 echo "  • Instance Profile: JobletEC2Role"
 echo "  • DynamoDB Table: joblet-jobs (region: $REGION)"
+echo "  • Secrets Manager: CA and client certificates"
 if [ -n "$VPC_ID" ]; then
     echo "  • VPC: $VPC_ID"
     if [ "$ENDPOINT_STATUS" = "created" ]; then
