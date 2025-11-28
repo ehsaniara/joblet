@@ -107,13 +107,17 @@ jobs:
         run: |
           echo "Files after download:"
           ls -la
+          # persist and state are directories in the repo, so artifacts are inside them
+          mv persist/persist-${{ matrix.arch }} ./persist-bin
+          mv state/state-${{ matrix.arch }} ./state-bin
           mv joblet-${{ matrix.arch }} joblet
           mv rnx-${{ matrix.arch }} rnx
-          mv persist-${{ matrix.arch }} persist
-          mv state-${{ matrix.arch }} state
+          mv persist-bin persist
+          mv state-bin state
           chmod +x joblet rnx persist state
           echo "Files after rename:"
           ls -la joblet rnx persist state
+          file joblet rnx persist state
 
       - name: Build Debian package
         run: |
@@ -166,13 +170,17 @@ jobs:
         run: |
           echo "Files after download:"
           ls -la
+          # persist and state are directories in the repo, so artifacts are inside them
+          mv persist/persist-${{ matrix.arch }} ./persist-bin
+          mv state/state-${{ matrix.arch }} ./state-bin
           mv joblet-${{ matrix.arch }} joblet
           mv rnx-${{ matrix.arch }} rnx
-          mv persist-${{ matrix.arch }} persist
-          mv state-${{ matrix.arch }} state
+          mv persist-bin persist
+          mv state-bin state
           chmod +x joblet rnx persist state
           echo "Files after rename:"
           ls -la joblet rnx persist state
+          file joblet rnx persist state
 
       - name: Install RPM tools
         run: |
