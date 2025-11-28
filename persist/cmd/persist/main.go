@@ -62,15 +62,57 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize storage backend (pass nodeID for multi-node CloudWatch deployments)
+	// Initialize storage backend with graceful fallback
 	backend, err := storage.NewBackend(&cfg.Storage, result.NodeID, log)
+	actualStorageType := cfg.Storage.Type
+
 	if err != nil {
-		log.Error("Failed to initialize storage backend", "error", err)
-		os.Exit(1)
+		log.Error("Failed to initialize storage backend, falling back to local",
+			"error", err,
+			"requested_backend", cfg.Storage.Type)
+
+		// Fall back to local backend with default directories
+		fallbackConfig := &config.StorageConfig{
+			Type: "local",
+			Local: config.LocalConfig{
+				Logs: config.LogStorageConfig{
+					Directory: "/opt/joblet/logs",
+					Format:    "jsonl",
+					Rotation: config.RotationConfig{
+						MaxSizeMB:       100,
+						MaxFiles:        10,
+						CompressRotated: true,
+					},
+				},
+				Metrics: config.MetricStorageConfig{
+					Directory: "/opt/joblet/metrics",
+					Format:    "jsonl.gz",
+					Rotation: config.RotationConfig{
+						MaxSizeMB:       50,
+						MaxFiles:        5,
+						CompressRotated: true,
+					},
+				},
+			},
+		}
+
+		backend, err = storage.NewBackend(fallbackConfig, result.NodeID, log)
+		if err != nil {
+			log.Error("Failed to create fallback local backend", "error", err)
+			os.Exit(1)
+		}
+		actualStorageType = "local"
+		log.Warn("========================================================================")
+		log.Warn("[PERSIST] WARNING: Running with LOCAL storage backend (fallback mode)")
+		log.Warn("[PERSIST] Logs will be stored on disk at /opt/joblet/logs")
+		log.Warn("[PERSIST] CloudWatch Logs integration is DISABLED")
+		log.Warn("[PERSIST] Reason: failed to connect to " + cfg.Storage.Type)
+		log.Warn("[PERSIST] To fix: Check IAM role and CloudWatch permissions")
+		log.Warn("========================================================================")
 	}
 	defer backend.Close()
 
-	log.Info("Storage backend initialized", "type", cfg.Storage.Type)
+	log.Info("Storage backend initialized", "type", actualStorageType)
 
 	// Initialize IPC server
 	ipcServer := ipc.NewServer(&cfg.IPC, backend, log)

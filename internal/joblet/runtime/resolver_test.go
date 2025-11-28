@@ -3,6 +3,7 @@ package runtime
 import (
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/ehsaniara/joblet/pkg/platform"
@@ -182,6 +183,8 @@ func TestResolver_ResolveRuntime(t *testing.T) {
 	err := os.MkdirAll(runtimeDir, 0755)
 	require.NoError(t, err)
 
+	// Use the current system architecture to ensure the test passes
+	currentArch := goruntime.GOARCH
 	config := `name: python-3.11
 language: python
 version: "3.11.9"
@@ -190,7 +193,7 @@ mounts:
   - source: "isolated/bin"
     target: "/bin"
 requirements:
-  architectures: ["x86_64", "amd64"]
+  architectures: ["` + currentArch + `"]
 packages:
   - numpy
   - pandas
@@ -208,7 +211,7 @@ packages:
 	assert.Equal(t, "python-3.11", resolvedConfig.Name)
 	assert.Equal(t, "python", resolvedConfig.Language)
 	assert.Equal(t, "3.11.9", resolvedConfig.Version)
-	assert.Equal(t, []string{"x86_64", "amd64"}, resolvedConfig.Requirements.Architectures)
+	assert.Equal(t, []string{currentArch}, resolvedConfig.Requirements.Architectures)
 	assert.Equal(t, []string{"numpy", "pandas"}, resolvedConfig.Packages)
 
 	// Test resolving non-existent runtime
@@ -369,6 +372,15 @@ func TestResolver_validateRuntime(t *testing.T) {
 	testPlatform := platform.NewPlatform()
 	resolver := NewResolver("/test", testPlatform)
 
+	// Get current architecture to build dynamic test cases
+	currentArch := goruntime.GOARCH
+
+	// Create an incompatible architecture that differs from current
+	incompatibleArch := "mips"
+	if currentArch == "mips" {
+		incompatibleArch = "sparc"
+	}
+
 	tests := []struct {
 		name        string
 		config      *RuntimeConfig
@@ -392,7 +404,7 @@ func TestResolver_validateRuntime(t *testing.T) {
 				Language: "python",
 				Version:  "3.11",
 				Requirements: RuntimeRequirements{
-					Architectures: []string{"x86_64", "amd64"},
+					Architectures: []string{currentArch},
 				},
 			},
 			expectError: false,
@@ -404,7 +416,7 @@ func TestResolver_validateRuntime(t *testing.T) {
 				Language: "python",
 				Version:  "3.11",
 				Requirements: RuntimeRequirements{
-					Architectures: []string{"arm64", "mips"},
+					Architectures: []string{incompatibleArch},
 				},
 			},
 			expectError: true,
@@ -416,7 +428,7 @@ func TestResolver_validateRuntime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := resolver.validateRuntime(tt.config)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errorText != "" {
 					assert.Contains(t, err.Error(), tt.errorText)
 				}

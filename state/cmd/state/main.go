@@ -40,23 +40,52 @@ func main() {
 		"backend", cfg.State.Backend,
 		"socket", cfg.State.Socket)
 
-	// Create storage backend
+	// Create storage backend with graceful fallback
 	storageConfig := convertToStorageConfig(&cfg.State)
 	backend, err := storage.NewBackend(storageConfig)
+	actualBackend := cfg.State.Backend
+
 	if err != nil {
-		log.Fatal("failed to create storage backend", "error", err)
+		log.Error("failed to create storage backend, falling back to memory", "error", err, "requested_backend", cfg.State.Backend)
+		// Fall back to memory backend
+		storageConfig.Backend = "memory"
+		backend, err = storage.NewBackend(storageConfig)
+		if err != nil {
+			log.Fatal("failed to create fallback memory backend", "error", err)
+		}
+		actualBackend = "memory"
+		log.Warn("========================================================================")
+		log.Warn("[STATE] WARNING: Running with IN-MEMORY backend (fallback mode)")
+		log.Warn("[STATE] Job state will NOT persist across restarts!")
+		log.Warn("[STATE] Reason: failed to connect to " + cfg.State.Backend)
+		log.Warn("[STATE] To fix: Check VPC Endpoint, IAM role, and DynamoDB table")
+		log.Warn("========================================================================")
+	} else {
+		// Health check only if primary backend succeeded
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := backend.HealthCheck(ctx); err != nil {
+			cancel()
+			log.Error("backend health check failed, falling back to memory", "error", err, "requested_backend", cfg.State.Backend)
+			backend.Close()
+			// Fall back to memory backend
+			storageConfig.Backend = "memory"
+			backend, err = storage.NewBackend(storageConfig)
+			if err != nil {
+				log.Fatal("failed to create fallback memory backend", "error", err)
+			}
+			actualBackend = "memory"
+			log.Warn("========================================================================")
+			log.Warn("[STATE] WARNING: Running with IN-MEMORY backend (fallback mode)")
+			log.Warn("[STATE] Job state will NOT persist across restarts!")
+			log.Warn("[STATE] Reason: health check failed for " + cfg.State.Backend)
+			log.Warn("[STATE] To fix: Check VPC Endpoint, IAM role, and DynamoDB table")
+			log.Warn("========================================================================")
+		}
+		cancel()
 	}
 	defer backend.Close()
 
-	// Health check
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	if err := backend.HealthCheck(ctx); err != nil {
-		cancel()
-		log.Fatal("backend health check failed", "error", err)
-	}
-	cancel()
-
-	log.Info("[STATE] Storage backend initialized successfully", "backend", cfg.State.Backend)
+	log.Info("[STATE] Storage backend initialized successfully", "backend", actualBackend)
 
 	// Create IPC server
 	socketPath := cfg.State.Socket
