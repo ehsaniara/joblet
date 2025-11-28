@@ -79,10 +79,13 @@ build_component() {
     local output_name="$component"
     local ldflags
 
-    # Check if it's in the persist module
+    # Check if it's in a submodule
     if [ "$component" = "persist" ]; then
         cmd_path="./persist/cmd/persist"
         output_name="persist"
+    elif [ "$component" = "state" ]; then
+        cmd_path="./state/cmd/state"
+        output_name="state"
     fi
 
     if [ ! -d "$cmd_path" ]; then
@@ -100,6 +103,9 @@ build_component() {
     if [ "$component" = "persist" ]; then
         # Build from persist module
         (cd persist && go build -a -ldflags="$ldflags" -o "../$OUTPUT_DIR/$output_name" "./cmd/persist")
+    elif [ "$component" = "state" ]; then
+        # Build from state module
+        (cd state && go build -a -ldflags="$ldflags" -o "../$OUTPUT_DIR/$output_name" "./cmd/state")
     else
         go build -a -ldflags="$ldflags" -o "$OUTPUT_DIR/$output_name" "$cmd_path"
     fi
@@ -128,6 +134,9 @@ main() {
         "persist")
             build_component "persist"
             ;;
+        "state")
+            build_component "state"
+            ;;
         "api")
             if [ -d "./cmd/api" ]; then
                 build_component "api"
@@ -140,13 +149,14 @@ main() {
             build_component "rnx"
             build_component "joblet"
             build_component "persist"
+            build_component "state"
             if [ -d "./cmd/api" ]; then
                 build_component "api"
             fi
             ;;
         *)
             echo "Error: Unknown component '$COMPONENT'"
-            echo "Available components: rnx, joblet, persist, api, all"
+            echo "Available components: rnx, joblet, persist, state, api, all"
             exit 1
             ;;
     esac
