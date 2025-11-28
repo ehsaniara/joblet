@@ -38,12 +38,13 @@ fi
 echo "🔨 Building RPM package for $PACKAGE_NAME v$CLEAN_VERSION ($RPM_ARCH)..."
 
 # Check if binaries already exist (CI mode)
-if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ]; then
+if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ] && [ -f "./state" ]; then
     echo "📦 Using pre-built binaries from root directory (CI mode)..."
     mkdir -p ./bin
     cp ./joblet ./bin/joblet
     cp ./rnx ./bin/rnx
     cp ./persist ./bin/persist
+    cp ./state ./bin/state
     chmod +x ./bin/joblet ./bin/rnx ./bin/persist ./bin/state
 elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
     # Build all binaries if they don't exist
