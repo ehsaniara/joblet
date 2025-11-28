@@ -105,15 +105,21 @@ jobs:
 
       - name: Prepare binaries
         run: |
+          echo "Files after download:"
+          ls -la
           mv joblet-${{ matrix.arch }} joblet
           mv rnx-${{ matrix.arch }} rnx
           mv persist-${{ matrix.arch }} persist
           mv state-${{ matrix.arch }} state
           chmod +x joblet rnx persist state
-          ls -la
+          echo "Files after rename:"
+          ls -la joblet rnx persist state
 
       - name: Build Debian package
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Checking binaries exist:"
+          ls -la joblet rnx persist state
           chmod +x scripts/build-deb.sh
           ./scripts/build-deb.sh ${{ matrix.arch }} ${{ needs.build-binaries.outputs.version }}
 
@@ -158,12 +164,15 @@ jobs:
 
       - name: Prepare binaries
         run: |
+          echo "Files after download:"
+          ls -la
           mv joblet-${{ matrix.arch }} joblet
           mv rnx-${{ matrix.arch }} rnx
           mv persist-${{ matrix.arch }} persist
           mv state-${{ matrix.arch }} state
           chmod +x joblet rnx persist state
-          ls -la
+          echo "Files after rename:"
+          ls -la joblet rnx persist state
 
       - name: Install RPM tools
         run: |
@@ -172,6 +181,9 @@ jobs:
 
       - name: Build RPM package
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Checking binaries exist:"
+          ls -la joblet rnx persist state
           chmod +x scripts/build-rpm.sh
           ./scripts/build-rpm.sh ${{ matrix.rpm_arch }} ${{ needs.build-binaries.outputs.version }}
 
