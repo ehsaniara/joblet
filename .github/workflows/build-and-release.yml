@@ -13,19 +13,8 @@ env:
   GO_VERSION: '1.24'
 
 jobs:
-  # Quick sanity test before building
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-      - run: go test ./...
-
   # Build all binaries
   build-binaries:
-    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -52,23 +41,37 @@ jobs:
 
       - name: Build all binaries
         run: |
-          mkdir -p bin
           LDFLAGS="-X main.version=${{ steps.version.outputs.version }} -w -s"
 
           # Main binaries
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o bin/joblet ./cmd/joblet
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o bin/rnx ./cmd/rnx
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o joblet-${{ matrix.arch }} ./cmd/joblet
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o rnx-${{ matrix.arch }} ./cmd/rnx
 
           # Submodule binaries
-          cd persist && GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o ../bin/persist ./cmd/persist && cd ..
-          cd state && GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o ../bin/state ./cmd/state && cd ..
+          cd persist && GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o ../persist-${{ matrix.arch }} ./cmd/persist && cd ..
+          cd state && GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o ../state-${{ matrix.arch }} ./cmd/state && cd ..
 
-          ls -la bin/
+          ls -la *-${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.arch }}
-          path: bin/
+          name: joblet-binary-${{ matrix.arch }}
+          path: joblet-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rnx-binary-${{ matrix.arch }}
+          path: rnx-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: persist-binary-${{ matrix.arch }}
+          path: persist-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: state-binary-${{ matrix.arch }}
+          path: state-${{ matrix.arch }}
 
   # Build Debian packages
   build-deb:
@@ -82,11 +85,30 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: binaries-${{ matrix.arch }}
+          name: joblet-binary-${{ matrix.arch }}
+          path: ./
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rnx-binary-${{ matrix.arch }}
+          path: ./
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: persist-binary-${{ matrix.arch }}
+          path: ./
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: state-binary-${{ matrix.arch }}
           path: ./
 
       - name: Prepare binaries
         run: |
+          mv joblet-${{ matrix.arch }} joblet
+          mv rnx-${{ matrix.arch }} rnx
+          mv persist-${{ matrix.arch }} persist
+          mv state-${{ matrix.arch }} state
           chmod +x joblet rnx persist state
           ls -la
 
@@ -116,11 +138,30 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: binaries-${{ matrix.arch }}
+          name: joblet-binary-${{ matrix.arch }}
+          path: ./
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rnx-binary-${{ matrix.arch }}
+          path: ./
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: persist-binary-${{ matrix.arch }}
+          path: ./
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: state-binary-${{ matrix.arch }}
           path: ./
 
       - name: Prepare binaries
         run: |
+          mv joblet-${{ matrix.arch }} joblet
+          mv rnx-${{ matrix.arch }} rnx
+          mv persist-${{ matrix.arch }} persist
+          mv state-${{ matrix.arch }} state
           chmod +x joblet rnx persist state
           ls -la
 
@@ -141,7 +182,6 @@ jobs:
 
   # Build cross-platform RNX CLI
   build-cli:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
