@@ -148,13 +148,6 @@ case "$1" in
             chmod 600 /opt/joblet/config/joblet-config.yml
             chmod 600 /opt/joblet/config/rnx-config.yml
 
-            # Create convenience copy for local CLI usage
-            if [ -f /opt/joblet/config/rnx-config.yml ]; then
-                mkdir -p /etc/joblet
-                cp /opt/joblet/config/rnx-config.yml /etc/joblet/rnx-config.yml
-                chmod 644 /etc/joblet/rnx-config.yml
-                print_success "Client config available at /etc/joblet/rnx-config.yml"
-            fi
         else
             print_error "Failed to generate certificates"
             exit 1
@@ -196,46 +189,6 @@ case "$1" in
 
         # Display quickstart information
         display_quickstart_info "debian"
-
-        # Setup user-local rnx installation
-        if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
-            USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-            if [ -n "$USER_HOME" ] && [ -d "$USER_HOME" ]; then
-                print_info "Setting up rnx in user directory for $SUDO_USER..."
-
-                # Create ~/.rnx directory
-                mkdir -p "$USER_HOME/.rnx"
-
-                # Copy rnx binary
-                cp /opt/joblet/bin/rnx "$USER_HOME/.rnx/"
-                chmod 755 "$USER_HOME/.rnx/rnx"
-
-                # Copy config if it exists
-                if [ -f /opt/joblet/config/rnx-config.yml ]; then
-                    cp /opt/joblet/config/rnx-config.yml "$USER_HOME/.rnx/"
-                    chmod 644 "$USER_HOME/.rnx/rnx-config.yml"
-                fi
-
-                # Set ownership
-                chown -R "$SUDO_USER:$(id -gn "$SUDO_USER")" "$USER_HOME/.rnx"
-
-                # Add to PATH in shell profiles if not already present
-                for profile in "$USER_HOME/.bashrc" "$USER_HOME/.profile" "$USER_HOME/.zshrc"; do
-                    if [ -f "$profile" ]; then
-                        if ! grep -q 'export PATH="$HOME/.rnx:$PATH"' "$profile"; then
-                            echo '' >> "$profile"
-                            echo '# Add ~/.rnx to PATH for joblet rnx CLI' >> "$profile"
-                            echo 'export PATH="$HOME/.rnx:$PATH"' >> "$profile"
-                            chown "$SUDO_USER:$(id -gn "$SUDO_USER")" "$profile"
-                            print_success "Added ~/.rnx to PATH in $profile"
-                        fi
-                    fi
-                done
-
-                print_success "rnx installed in $USER_HOME/.rnx"
-                print_info "Reload your shell or run: source ~/.bashrc"
-            fi
-        fi
 
         ;;
 esac
