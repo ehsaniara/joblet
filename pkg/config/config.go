@@ -423,7 +423,6 @@ func (n *Node) GetClientTLSConfig() (*tls.Config, error) {
 //  3. ./config/joblet-config.yml
 //  4. ./joblet-config.yml
 //  5. /etc/joblet/joblet-config.yml
-//  5. /etc/joblet/joblet-config.yml
 //
 // Applies environment variable overrides for server address, mode, and logging.
 // Validates the final configuration before returning.
