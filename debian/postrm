@@ -15,9 +15,6 @@ case "$1" in
         rm -f /usr/bin/joblet
         rm -f /usr/bin/rnx
 
-        # Remove user-accessible certificate symlinks
-        rm -rf /etc/joblet
-
         # Note: Job logs in /opt/joblet/logs are preserved
         # Use 'apt purge joblet' to remove all data including job logs
         if [ -d "/opt/joblet/logs" ] && [ "$(ls -A /opt/joblet/logs 2>/dev/null)" ]; then
@@ -43,7 +40,6 @@ case "$1" in
         # Remove all joblet files including job logs, volumes, and configuration
         rm -rf /opt/joblet
         rm -rf /var/log/joblet
-        rm -rf /etc/joblet
 
         # Remove symlinks
         rm -f /usr/bin/joblet

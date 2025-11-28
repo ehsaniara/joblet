@@ -197,6 +197,10 @@ chmod +x \$RPM_BUILD_ROOT/usr/local/bin/certs_gen_embedded.sh
 # Create symlinks for system-wide commands
 ln -sf /opt/joblet/bin/rnx \$RPM_BUILD_ROOT/usr/local/bin/rnx
 
+# Create /usr/bin symlink as well (ensures rnx works everywhere in PATH)
+mkdir -p \$RPM_BUILD_ROOT/usr/bin
+ln -sf /opt/joblet/bin/rnx \$RPM_BUILD_ROOT/usr/bin/rnx
+
 # Create br_netfilter module loading config
 cat > \$RPM_BUILD_ROOT/etc/modules-load.d/joblet.conf << 'MODULESEOF'
 # Load modules required for Joblet network isolation
@@ -253,13 +257,6 @@ if generate_and_embed_certificates; then
     # Set secure permissions on config files
     chmod 600 /opt/joblet/config/joblet-config.yml 2>/dev/null || true
     chmod 600 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
-
-    # Create convenience copy for local CLI usage
-    if [ -f /opt/joblet/config/rnx-config.yml ]; then
-        mkdir -p /etc/joblet
-        cp /opt/joblet/config/rnx-config.yml /etc/joblet/rnx-config.yml
-        chmod 644 /etc/joblet/rnx-config.yml
-    fi
 fi
 
 # Setup network requirements
@@ -364,9 +361,6 @@ if [ \$1 -eq 0 ]; then
     # Remove systemd log directory
     rm -rf /var/log/joblet
 
-    # Remove convenience config copy
-    rm -rf /etc/joblet
-
     # Note: Job logs in /opt/joblet/logs are preserved
     if [ -d "/opt/joblet/logs" ] && [ "\$(ls -A /opt/joblet/logs 2>/dev/null)" ]; then
         echo "ℹ️  Job logs preserved in /opt/joblet/logs"
@@ -391,6 +385,7 @@ fi
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
 /usr/local/bin/rnx
+/usr/bin/rnx
 /etc/modules-load.d/joblet.conf
 
 %dir /opt/joblet
