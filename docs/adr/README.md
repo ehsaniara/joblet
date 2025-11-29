@@ -39,6 +39,7 @@ Each ADR follows this structure:
 | [010](010-collect-jobs-metrics.md)                | Collect Jobs Metrics                        | Accepted | 2024-10-*  |
 | [011](011-cqrs-architecture-with-persist.md)      | CQRS Architecture with persist Service      | Accepted | 2025-10-*  |
 | [012](012-aws-secrets-manager-cert-storage.md)    | AWS Secrets Manager for Certificate Storage | Accepted | 2025-10-*  |
+| [013](013-extract-workflow-to-separate-project.md) | Extract Workflow to Separate Project        | Proposed | 2025-11-29 |
 
 ## Creating a New ADR
 
