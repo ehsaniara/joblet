@@ -188,6 +188,7 @@ fi
 
 # Determine if we should use Secrets Manager
 SHOULD_USE_SM="false"
+print_info "USE_SECRETS_MANAGER=$USE_SECRETS_MANAGER, IS_EC2=$IS_EC2, EC2_REGION=$EC2_REGION"
 if [ "$USE_SECRETS_MANAGER" = "true" ]; then
     SHOULD_USE_SM="true"
     print_info "Secrets Manager explicitly enabled"
@@ -197,6 +198,8 @@ elif [ "$USE_SECRETS_MANAGER" = "auto" ] && [ "$IS_EC2" = "true" ]; then
 elif [ "$USE_SECRETS_MANAGER" = "false" ]; then
     SHOULD_USE_SM="false"
     print_info "Secrets Manager explicitly disabled"
+else
+    print_warning "Secrets Manager NOT enabled (USE_SECRETS_MANAGER=$USE_SECRETS_MANAGER, IS_EC2=$IS_EC2)"
 fi
 
 # Check AWS CLI availability if using Secrets Manager
@@ -244,6 +247,7 @@ CLIENT_FROM_SM="false"
 
 if [ "$SHOULD_USE_SM" = "true" ] && [ "$FORCE_REGENERATE" != "true" ]; then
     print_info "Checking AWS Secrets Manager for existing CA and client certificates..."
+    print_info "Looking for secrets with prefix: ${SECRETS_PREFIX} in region: ${EC2_REGION}"
 
     # Try to retrieve CA from Secrets Manager
     if secret_exists "${SECRETS_PREFIX}/ca-cert" "$EC2_REGION" && \
@@ -265,7 +269,11 @@ if [ "$SHOULD_USE_SM" = "true" ] && [ "$FORCE_REGENERATE" != "true" ]; then
                 print_warning "CA certificate from Secrets Manager is expired or invalid"
                 rm -f ca-cert.pem ca-key.pem
             fi
+        else
+            print_warning "CA certificate content is empty from Secrets Manager"
         fi
+    else
+        print_warning "CA certificates not found in Secrets Manager (looked for ${SECRETS_PREFIX}/ca-cert and ${SECRETS_PREFIX}/ca-key)"
     fi
 
     # Try to retrieve client certificate from Secrets Manager
@@ -288,7 +296,11 @@ if [ "$SHOULD_USE_SM" = "true" ] && [ "$FORCE_REGENERATE" != "true" ]; then
                 print_warning "Client certificate from Secrets Manager is expired or invalid"
                 rm -f admin-client-cert.pem admin-client-key.pem
             fi
+        else
+            print_warning "Client certificate content is empty from Secrets Manager"
         fi
+    else
+        print_warning "Client certificates not found in Secrets Manager (looked for ${SECRETS_PREFIX}/client-cert and ${SECRETS_PREFIX}/client-key)"
     fi
 fi
 
