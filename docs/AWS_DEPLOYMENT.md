@@ -58,12 +58,12 @@ ENABLE_CLOUDWATCH=true /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install
 
 When the instance boots, the user data script automatically:
 
-✅ **Detects EC2 environment** (region, instance ID, metadata)
-✅ **Installs Joblet** via Debian/RPM package
-✅ **Configures CloudWatch Logs** `/joblet` log group (for log aggregation)
-✅ **Fetches CA/client certificates** from Secrets Manager (shared across instances)
-✅ **Generates server TLS certificate** (instance-specific, embedded in config)
-✅ **Starts Joblet server** on port 443 (systemd service)
+- **Detects EC2 environment** (region, instance ID, metadata)
+- **Installs Joblet** via Debian/RPM package
+- **Configures CloudWatch Logs** `/joblet` log group (for log aggregation)
+- **Fetches CA/client certificates** from Secrets Manager (shared across instances)
+- **Generates server TLS certificate** (instance-specific, embedded in config)
+- **Starts Joblet server** on port 443 (systemd service)
 
 **Note**: DynamoDB table is created in Step 1 (pre-setup), not on EC2 instance.
 
@@ -314,8 +314,9 @@ Or:
 **To verify and fix:**
 
 ```bash
-# Check if IAM role is attached
-curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/
+# Check if IAM role is attached (using IMDSv2)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/
 
 # Check VPC Endpoint exists (from CloudShell or local AWS CLI)
 aws ec2 describe-vpc-endpoints --filters "Name=service-name,Values=com.amazonaws.REGION.dynamodb"

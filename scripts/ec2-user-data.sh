@@ -60,18 +60,17 @@ get_ec2_metadata() {
     local path="$1"
     local default="${2:-}"
 
-    # Use IMDSv2 (more secure)
-    local token=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+    # Use IMDSv2 only (required on modern EC2 instances, IMDSv1 is disabled)
+    local token=$(curl -s -m 5 -X PUT "http://169.254.169.254/latest/api/token" \
         -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
 
-    if [ -n "$token" ]; then
-        # IMDSv2
-        curl -s -H "X-aws-ec2-metadata-token: $token" \
-            "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo "$default"
-    else
-        # Fallback to IMDSv1
-        curl -s "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo "$default"
+    if [ -z "$token" ]; then
+        echo "$default"
+        return
     fi
+
+    curl -s -m 5 -H "X-aws-ec2-metadata-token: $token" \
+        "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo "$default"
 }
 
 gather_ec2_info() {

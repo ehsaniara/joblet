@@ -305,86 +305,6 @@ get_configuration() {
     print_success "Configuration loaded successfully"
 }
 
-# DEPRECATED: DynamoDB table is now created by pre-setup.sh script
-# This function is kept for reference but should not be called during installation
-setup_dynamodb_table_deprecated() {
-    # Create DynamoDB table for job state persistence
-    # Uses AWS CLI to create table if it doesn't exist
-
-    local TABLE_NAME="${DYNAMODB_TABLE_NAME:-joblet-jobs}"
-    local AWS_REGION="${EC2_REGION:-us-east-1}"
-
-    print_info "Setting up DynamoDB table for state persistence..."
-
-    # Check if AWS CLI is available
-    if ! command -v aws >/dev/null 2>&1; then
-        print_warning "AWS CLI not found - skipping table creation"
-        print_warning "Install AWS CLI: https://aws.amazon.com/cli/"
-        print_warning "Or create table manually using the AWS Console"
-        return 1
-    fi
-
-    # Check if table already exists
-    if aws dynamodb describe-table --table-name "$TABLE_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
-        print_success "DynamoDB table '$TABLE_NAME' already exists"
-
-        # Check if TTL is enabled
-        local ttl_status=$(aws dynamodb describe-time-to-live --table-name "$TABLE_NAME" --region "$AWS_REGION" --query 'TimeToLiveDescription.TimeToLiveStatus' --output text 2>/dev/null || echo "")
-        if [ "$ttl_status" != "ENABLED" ]; then
-            print_info "Enabling TTL on existing table..."
-            if aws dynamodb update-time-to-live \
-                --table-name "$TABLE_NAME" \
-                --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
-                --region "$AWS_REGION" >/dev/null 2>&1; then
-                print_success "TTL enabled on table '$TABLE_NAME'"
-            else
-                print_warning "Could not enable TTL (may require additional permissions)"
-            fi
-        else
-            print_success "TTL already enabled on table '$TABLE_NAME'"
-        fi
-        return 0
-    fi
-
-    # Create the table
-    print_info "Creating DynamoDB table: $TABLE_NAME"
-    if aws dynamodb create-table \
-        --table-name "$TABLE_NAME" \
-        --attribute-definitions AttributeName=jobId,AttributeType=S \
-        --key-schema AttributeName=jobId,KeyType=HASH \
-        --billing-mode PAY_PER_REQUEST \
-        --region "$AWS_REGION" \
-        --tags Key=ManagedBy,Value=Joblet Key=Purpose,Value=JobStatePersistence \
-        >/dev/null 2>&1; then
-        print_success "DynamoDB table created successfully"
-
-        # Wait for table to be active
-        print_info "Waiting for table to become active..."
-        if aws dynamodb wait table-exists --table-name "$TABLE_NAME" --region "$AWS_REGION" 2>/dev/null; then
-            print_success "Table is now active"
-
-            # Enable TTL
-            print_info "Enabling TTL for automatic cleanup of old jobs..."
-            if aws dynamodb update-time-to-live \
-                --table-name "$TABLE_NAME" \
-                --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
-                --region "$AWS_REGION" >/dev/null 2>&1; then
-                print_success "TTL enabled - completed jobs will be auto-deleted after 30 days"
-            else
-                print_warning "Could not enable TTL (table created but TTL requires additional permissions)"
-            fi
-        else
-            print_warning "Table created but may still be initializing"
-        fi
-        return 0
-    else
-        print_error "Failed to create DynamoDB table"
-        print_warning "You may need to create it manually or check IAM permissions"
-        print_warning "See: https://docs.aws.amazon.com/cli/latest/reference/dynamodb/create-table.html"
-        return 1
-    fi
-}
-
 detect_aws_environment() {
     # Detect if running on AWS EC2 and load configuration
     # Sets: EC2_INFO, EC2_CLOUDWATCH_CONFIGURED, EC2_DYNAMODB_CONFIGURED, EC2_INSTANCE_ID, EC2_REGION
@@ -508,6 +428,18 @@ generate_and_embed_certificates() {
     # Determine which certificate generation script to use
     # On EC2 with Secrets Manager available, use secretsmanager version to fetch shared CA/client certs
     CERT_SCRIPT="/usr/local/bin/certs_gen_embedded.sh"
+
+    # Detect EC2 via metadata service if not already set (supports IMDSv2)
+    if [ "$IS_EC2" != "true" ]; then
+        # Try IMDSv2 first (more secure, required on newer instances)
+        IMDS_TOKEN=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" 2>/dev/null)
+        if [ -n "$IMDS_TOKEN" ]; then
+            if curl -s -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id >/dev/null 2>&1; then
+                IS_EC2="true"
+            fi
+        fi
+    fi
+
     if [ "$IS_EC2" = "true" ] && [ -x /usr/local/bin/certs_gen_with_secretsmanager.sh ]; then
         print_info "EC2 detected - using Secrets Manager for shared CA/client certificates"
         CERT_SCRIPT="/usr/local/bin/certs_gen_with_secretsmanager.sh"

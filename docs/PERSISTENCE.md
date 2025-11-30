@@ -307,7 +307,7 @@ log_retention_days: -1
 **Auto-Detection Features:**
 
 1. **Region Detection:**
-    - Queries EC2 metadata service: `http://169.254.169.254/latest/meta-data/placement/region`
+    - Queries EC2 metadata service using IMDSv2 (token-based authentication)
     - Falls back to `us-east-1` if not on EC2
     - 5-second timeout
 

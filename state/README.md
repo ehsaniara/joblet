@@ -301,8 +301,9 @@ journalctl -u joblet | grep -i "state"
 # Verify IAM permissions
 aws dynamodb describe-table --table-name joblet-jobs
 
-# Check EC2 instance profile
-curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
+# Check EC2 instance profile (using IMDSv2)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/
 
 # Test region detection
 aws ec2 describe-availability-zones --query 'AvailabilityZones[0].RegionName'

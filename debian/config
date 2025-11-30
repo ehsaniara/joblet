@@ -24,34 +24,37 @@ detect_internal_ip() {
     echo "${ip:-127.0.0.1}"
 }
 
+# Get IMDSv2 token (required, IMDSv1 is disabled on modern EC2 instances)
+get_imds_token() {
+    curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 300" 2>/dev/null || echo ""
+}
+
 is_ec2_instance() {
-    if curl -s --max-time 1 --connect-timeout 1 http://169.254.169.254/latest/dynamic/instance-identity/document >/dev/null 2>&1; then
-        return 0
+    # Use IMDSv2 to detect EC2 instance (IMDSv1 is disabled on modern instances)
+    local token=$(get_imds_token)
+    if [ -z "$token" ]; then
+        return 1  # Not EC2 or IMDS not available
     fi
 
-    # Check hypervisor UUID if exists
-    if [ -r /sys/hypervisor/uuid ]; then
-        if grep -qi "^ec2" /sys/hypervisor/uuid 2>/dev/null; then
-            return 0
-        fi
+    local instance_id=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+        http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
+    if [ -n "$instance_id" ] && [[ "$instance_id" == i-* ]]; then
+        return 0  # Is EC2
     fi
 
-    # Check DMI for Amazon
-    for dmi_file in /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/bios_vendor /sys/class/dmi/id/board_vendor; do
-        if [ -r "$dmi_file" ]; then
-            if grep -qi "amazon\|ec2" "$dmi_file" 2>/dev/null; then
-                return 0
-            fi
-        fi
-    done
-
-    return 1
+    return 1  # Not EC2
 }
 
 get_ec2_metadata() {
     local metadata_item="$1"
-    local result=$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/$metadata_item 2>/dev/null)
-    echo "$result"
+    local token=$(get_imds_token)
+    if [ -z "$token" ]; then
+        echo ""
+        return
+    fi
+    curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+        "http://169.254.169.254/latest/meta-data/$metadata_item" 2>/dev/null || echo ""
 }
 
 detect_public_ip() {

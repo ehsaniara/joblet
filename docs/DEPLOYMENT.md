@@ -305,8 +305,9 @@ aws logs describe-log-groups --log-group-name-prefix "/joblet/"
 **Issue: Region auto-detection failed**
 
 ```bash
-# Check EC2 metadata service
-curl http://169.254.169.254/latest/meta-data/placement/region
+# Check EC2 metadata service (using IMDSv2)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region
 
 # If fails, set region explicitly in config
 persist:
