@@ -97,9 +97,11 @@ fi
 # Note: persist now runs as subprocess, no separate service needed
 cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"
 
-# Copy certificate generation script (embedded version)
+# Copy certificate generation scripts
 cp ./scripts/certs_gen_embedded.sh "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
 chmod +x "$BUILD_DIR/usr/local/bin/certs_gen_embedded.sh"
+cp ./scripts/certs_gen_with_secretsmanager.sh "$BUILD_DIR/usr/local/bin/certs_gen_with_secretsmanager.sh"
+chmod +x "$BUILD_DIR/usr/local/bin/certs_gen_with_secretsmanager.sh"
 
 # Copy common installation functions
 cp ./scripts/common-install-functions.sh "$BUILD_DIR/opt/joblet/scripts/"

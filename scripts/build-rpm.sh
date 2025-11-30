@@ -99,7 +99,7 @@ cp -r ./scripts "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/" || {
 }
 
 # Ensure required files exist
-for file in joblet-config-template.yml rnx-config-template.yml joblet.service certs_gen_embedded.sh common-install-functions.sh; do
+for file in joblet-config-template.yml rnx-config-template.yml joblet.service certs_gen_embedded.sh certs_gen_with_secretsmanager.sh common-install-functions.sh; do
     if [ ! -f "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/$file" ]; then
         if [ -f "./scripts/$file" ]; then
             cp "./scripts/$file" "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
@@ -190,9 +190,11 @@ cp scripts/common-install-functions.sh \$RPM_BUILD_ROOT/opt/joblet/scripts/
 # Install systemd service
 cp scripts/joblet.service \$RPM_BUILD_ROOT/etc/systemd/system/
 
-# Install certificate generation script
+# Install certificate generation scripts
 cp scripts/certs_gen_embedded.sh \$RPM_BUILD_ROOT/usr/local/bin/
 chmod +x \$RPM_BUILD_ROOT/usr/local/bin/certs_gen_embedded.sh
+cp scripts/certs_gen_with_secretsmanager.sh \$RPM_BUILD_ROOT/usr/local/bin/
+chmod +x \$RPM_BUILD_ROOT/usr/local/bin/certs_gen_with_secretsmanager.sh
 
 # Create symlinks for system-wide commands
 ln -sf /opt/joblet/bin/rnx \$RPM_BUILD_ROOT/usr/local/bin/rnx
@@ -385,6 +387,7 @@ fi
 /opt/joblet/scripts/common-install-functions.sh
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
+/usr/local/bin/certs_gen_with_secretsmanager.sh
 /usr/local/bin/rnx
 /usr/bin/rnx
 /etc/modules-load.d/joblet.conf

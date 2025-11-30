@@ -505,9 +505,17 @@ generate_and_embed_certificates() {
         echo "  Additional: $JOBLET_ADDITIONAL_NAMES"
     fi
 
-    # Run the embedded certificate generation script
-    if [ -x /usr/local/bin/certs_gen_embedded.sh ]; then
-        if /usr/local/bin/certs_gen_embedded.sh; then
+    # Determine which certificate generation script to use
+    # On EC2 with Secrets Manager available, use secretsmanager version to fetch shared CA/client certs
+    CERT_SCRIPT="/usr/local/bin/certs_gen_embedded.sh"
+    if [ "$IS_EC2" = "true" ] && [ -x /usr/local/bin/certs_gen_with_secretsmanager.sh ]; then
+        print_info "EC2 detected - using Secrets Manager for shared CA/client certificates"
+        CERT_SCRIPT="/usr/local/bin/certs_gen_with_secretsmanager.sh"
+    fi
+
+    # Run the certificate generation script
+    if [ -x "$CERT_SCRIPT" ]; then
+        if "$CERT_SCRIPT"; then
             print_success "Certificates generated successfully"
 
             # Update the server configuration with the actual bind address and port
