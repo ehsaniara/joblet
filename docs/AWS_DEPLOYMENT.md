@@ -371,47 +371,6 @@ aws dynamodb create-table \
   --region us-east-1
 ```
 
-### DynamoDB VPC Endpoint Policy Error
-
-If you see an error like:
-
-```
-AccessDeniedException: User is not authorized to perform: dynamodb:DescribeTable
-because no VPC endpoint policy allows the dynamodb:DescribeTable action
-```
-
-This means the VPC Endpoint has a restrictive policy that doesn't allow DynamoDB access.
-
-**Solution: Update VPC Endpoint Policy**
-
-1. Go to **VPC Console → Endpoints**
-2. Find the DynamoDB endpoint (type: Gateway)
-3. Edit the **Policy** and select "Full Access" or add specific permissions:
-
-```json
-{
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": [
-        "dynamodb:DescribeTable",
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem",
-        "dynamodb:Scan",
-        "dynamodb:Query",
-        "dynamodb:BatchWriteItem"
-      ],
-      "Resource": "arn:aws:dynamodb:*:*:table/joblet-jobs"
-    }
-  ]
-}
-```
-
-**Note:** VPC Endpoints created by the pre-setup script use "Full Access" policy by default, which allows all DynamoDB operations.
-
 ### CloudWatch Logs Not Appearing
 
 ```bash

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/domain/values"
 	"github.com/ehsaniara/joblet/state/internal/storage"
 	"github.com/ehsaniara/joblet/state/internal/storage/storagefakes"
 )
@@ -414,5 +415,282 @@ func TestDynamoDB_Close(t *testing.T) {
 	err := backend.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestDynamoDB_AllFieldsStored verifies that all job fields are stored in DynamoDB
+func TestDynamoDB_AllFieldsStored(t *testing.T) {
+	mockClient := &storagefakes.FakeDynamoDBAPI{}
+	backend := storage.NewDynamoDBBackendWithClient(mockClient, "test-table", 30)
+
+	// Create a job with all fields populated
+	cpuLimit, _ := values.NewCPUPercentage(50)
+	memLimit, _ := values.NewMemorySize(1024 * 1024 * 100) // 100MB
+	ioLimit, _ := values.NewBandwidth(1024 * 1024)         // 1MB/s
+	cpuCores, _ := values.ParseCPUCoreSet("0-3")
+
+	testJob := &domain.Job{
+		Uuid:    "full-job-123",
+		Name:    "test-job-name",
+		Command: "python",
+		Args:    []string{"script.py", "--verbose", "--output=/tmp/out"},
+		Type:    domain.JobType("standard"),
+		Status:  domain.JobStatus("RUNNING"),
+		NodeId:  "node-1",
+		Limits: domain.ResourceLimits{
+			CPU:         cpuLimit,
+			CPUCores:    cpuCores,
+			Memory:      memLimit,
+			IOBandwidth: ioLimit,
+		},
+		Network:          "custom-network",
+		Volumes:          []string{"vol1", "vol2"},
+		Runtime:          "python:3.9",
+		WorkflowUuid:     "workflow-abc",
+		WorkingDirectory: "/app/workdir",
+		Dependencies:     []string{"job-a", "job-b"},
+		Environment:      map[string]string{"ENV1": "value1", "ENV2": "value2"},
+		GPUIndices:       []int32{0, 1},
+		GPUCount:         2,
+		GPUMemoryMB:      4096,
+		Pid:              12345,
+		ExitCode:         0,
+	}
+
+	mockClient.PutItemReturns(&dynamodb.PutItemOutput{}, nil)
+
+	err := backend.Create(context.Background(), testJob)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Get the stored item
+	_, input, _ := mockClient.PutItemArgsForCall(0)
+	item := input.Item
+
+	// Verify all fields are present
+	tests := []struct {
+		field    string
+		expected interface{}
+	}{
+		{"jobId", "full-job-123"},
+		{"name", "test-job-name"},
+		{"command", "python"},
+		{"jobStatus", "RUNNING"},
+		{"nodeId", "node-1"},
+		{"network", "custom-network"},
+		{"runtime", "python:3.9"},
+		{"workflowUuid", "workflow-abc"},
+		{"workingDirectory", "/app/workdir"},
+	}
+
+	for _, tt := range tests {
+		attr, ok := item[tt.field].(*types.AttributeValueMemberS)
+		if !ok {
+			t.Errorf("field %s not found or wrong type", tt.field)
+			continue
+		}
+		if attr.Value != tt.expected {
+			t.Errorf("field %s: expected %v, got %v", tt.field, tt.expected, attr.Value)
+		}
+	}
+
+	// Verify args list
+	argsAttr, ok := item["args"].(*types.AttributeValueMemberL)
+	if !ok {
+		t.Fatal("args field not found or wrong type")
+	}
+	if len(argsAttr.Value) != 3 {
+		t.Errorf("expected 3 args, got %d", len(argsAttr.Value))
+	}
+
+	// Verify volumes list
+	volAttr, ok := item["volumes"].(*types.AttributeValueMemberL)
+	if !ok {
+		t.Fatal("volumes field not found or wrong type")
+	}
+	if len(volAttr.Value) != 2 {
+		t.Errorf("expected 2 volumes, got %d", len(volAttr.Value))
+	}
+
+	// Verify dependencies list
+	depsAttr, ok := item["dependencies"].(*types.AttributeValueMemberL)
+	if !ok {
+		t.Fatal("dependencies field not found or wrong type")
+	}
+	if len(depsAttr.Value) != 2 {
+		t.Errorf("expected 2 dependencies, got %d", len(depsAttr.Value))
+	}
+
+	// Verify environment map
+	envAttr, ok := item["environment"].(*types.AttributeValueMemberM)
+	if !ok {
+		t.Fatal("environment field not found or wrong type")
+	}
+	if len(envAttr.Value) != 2 {
+		t.Errorf("expected 2 env vars, got %d", len(envAttr.Value))
+	}
+
+	// Verify limits map
+	limitsAttr, ok := item["limits"].(*types.AttributeValueMemberM)
+	if !ok {
+		t.Fatal("limits field not found or wrong type")
+	}
+	if _, ok := limitsAttr.Value["cpu"]; !ok {
+		t.Error("limits.cpu not found")
+	}
+	if _, ok := limitsAttr.Value["memory"]; !ok {
+		t.Error("limits.memory not found")
+	}
+
+	// Verify GPU fields
+	gpuIndicesAttr, ok := item["gpuIndices"].(*types.AttributeValueMemberL)
+	if !ok {
+		t.Fatal("gpuIndices field not found or wrong type")
+	}
+	if len(gpuIndicesAttr.Value) != 2 {
+		t.Errorf("expected 2 GPU indices, got %d", len(gpuIndicesAttr.Value))
+	}
+
+	gpuCountAttr, ok := item["gpuCount"].(*types.AttributeValueMemberN)
+	if !ok {
+		t.Fatal("gpuCount field not found or wrong type")
+	}
+	if gpuCountAttr.Value != "2" {
+		t.Errorf("expected gpuCount '2', got %s", gpuCountAttr.Value)
+	}
+
+	gpuMemAttr, ok := item["gpuMemoryMB"].(*types.AttributeValueMemberN)
+	if !ok {
+		t.Fatal("gpuMemoryMB field not found or wrong type")
+	}
+	if gpuMemAttr.Value != "4096" {
+		t.Errorf("expected gpuMemoryMB '4096', got %s", gpuMemAttr.Value)
+	}
+}
+
+// TestDynamoDB_AllFieldsRetrieved verifies that all job fields are correctly retrieved from DynamoDB
+func TestDynamoDB_AllFieldsRetrieved(t *testing.T) {
+	mockClient := &storagefakes.FakeDynamoDBAPI{}
+	backend := storage.NewDynamoDBBackendWithClient(mockClient, "test-table", 30)
+
+	// Create a mock DynamoDB item with all fields
+	mockItem := map[string]types.AttributeValue{
+		"jobId":            &types.AttributeValueMemberS{Value: "full-job-456"},
+		"name":             &types.AttributeValueMemberS{Value: "retrieved-job"},
+		"command":          &types.AttributeValueMemberS{Value: "node"},
+		"jobStatus":        &types.AttributeValueMemberS{Value: "COMPLETED"},
+		"nodeId":           &types.AttributeValueMemberS{Value: "node-2"},
+		"jobType":          &types.AttributeValueMemberS{Value: "standard"},
+		"network":          &types.AttributeValueMemberS{Value: "bridge"},
+		"runtime":          &types.AttributeValueMemberS{Value: "node:18"},
+		"workflowUuid":     &types.AttributeValueMemberS{Value: "wf-123"},
+		"workingDirectory": &types.AttributeValueMemberS{Value: "/work"},
+		"startTime":        &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+		"exitCode":         &types.AttributeValueMemberN{Value: "0"},
+		"pid":              &types.AttributeValueMemberN{Value: "9999"},
+		"args": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberS{Value: "app.js"},
+			&types.AttributeValueMemberS{Value: "--port=3000"},
+		}},
+		"volumes": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberS{Value: "data-vol"},
+		}},
+		"dependencies": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberS{Value: "setup-job"},
+		}},
+		"environment": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"NODE_ENV": &types.AttributeValueMemberS{Value: "production"},
+		}},
+		"limits": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"cpu":         &types.AttributeValueMemberN{Value: "75"},
+			"memory":      &types.AttributeValueMemberN{Value: "536870912"}, // 512MB
+			"ioBandwidth": &types.AttributeValueMemberN{Value: "10485760"},  // 10MB/s
+			"cpuCores":    &types.AttributeValueMemberS{Value: "0-1"},
+		}},
+		"gpuIndices": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberN{Value: "0"},
+		}},
+		"gpuCount":    &types.AttributeValueMemberN{Value: "1"},
+		"gpuMemoryMB": &types.AttributeValueMemberN{Value: "8192"},
+	}
+
+	mockClient.GetItemReturns(&dynamodb.GetItemOutput{Item: mockItem}, nil)
+
+	job, err := backend.Get(context.Background(), "full-job-456")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify all fields are correctly parsed
+	if job.Uuid != "full-job-456" {
+		t.Errorf("expected UUID 'full-job-456', got %s", job.Uuid)
+	}
+	if job.Name != "retrieved-job" {
+		t.Errorf("expected Name 'retrieved-job', got %s", job.Name)
+	}
+	if job.Command != "node" {
+		t.Errorf("expected Command 'node', got %s", job.Command)
+	}
+	if len(job.Args) != 2 {
+		t.Errorf("expected 2 args, got %d", len(job.Args))
+	}
+	if job.Args[0] != "app.js" {
+		t.Errorf("expected first arg 'app.js', got %s", job.Args[0])
+	}
+	if job.Type != domain.JobType("standard") {
+		t.Errorf("expected Type 'standard', got %s", job.Type)
+	}
+	if job.Status != domain.JobStatus("COMPLETED") {
+		t.Errorf("expected Status 'COMPLETED', got %s", job.Status)
+	}
+	if job.Network != "bridge" {
+		t.Errorf("expected Network 'bridge', got %s", job.Network)
+	}
+	if job.Runtime != "node:18" {
+		t.Errorf("expected Runtime 'node:18', got %s", job.Runtime)
+	}
+	if len(job.Volumes) != 1 || job.Volumes[0] != "data-vol" {
+		t.Errorf("expected Volumes ['data-vol'], got %v", job.Volumes)
+	}
+	if job.WorkflowUuid != "wf-123" {
+		t.Errorf("expected WorkflowUuid 'wf-123', got %s", job.WorkflowUuid)
+	}
+	if job.WorkingDirectory != "/work" {
+		t.Errorf("expected WorkingDirectory '/work', got %s", job.WorkingDirectory)
+	}
+	if len(job.Dependencies) != 1 || job.Dependencies[0] != "setup-job" {
+		t.Errorf("expected Dependencies ['setup-job'], got %v", job.Dependencies)
+	}
+	if job.Environment["NODE_ENV"] != "production" {
+		t.Errorf("expected Environment['NODE_ENV']='production', got %s", job.Environment["NODE_ENV"])
+	}
+
+	// Verify limits
+	if job.Limits.CPU.Value() != 75 {
+		t.Errorf("expected CPU limit 75, got %d", job.Limits.CPU.Value())
+	}
+	if job.Limits.Memory.Bytes() != 536870912 {
+		t.Errorf("expected Memory limit 536870912, got %d", job.Limits.Memory.Bytes())
+	}
+	if job.Limits.IOBandwidth.BytesPerSecond() != 10485760 {
+		t.Errorf("expected IO limit 10485760, got %d", job.Limits.IOBandwidth.BytesPerSecond())
+	}
+
+	// Verify GPU fields
+	if len(job.GPUIndices) != 1 || job.GPUIndices[0] != 0 {
+		t.Errorf("expected GPUIndices [0], got %v", job.GPUIndices)
+	}
+	if job.GPUCount != 1 {
+		t.Errorf("expected GPUCount 1, got %d", job.GPUCount)
+	}
+	if job.GPUMemoryMB != 8192 {
+		t.Errorf("expected GPUMemoryMB 8192, got %d", job.GPUMemoryMB)
+	}
+	if job.Pid != 9999 {
+		t.Errorf("expected Pid 9999, got %d", job.Pid)
+	}
+	if job.ExitCode != 0 {
+		t.Errorf("expected ExitCode 0, got %d", job.ExitCode)
 	}
 }
