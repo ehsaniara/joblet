@@ -176,11 +176,12 @@ cd "$TEMP_DIR"
 
 # Detect AWS environment
 # Check if already set by parent process (exported from common-install-functions.sh)
+print_info "DEBUG: Initial values - IS_EC2='$IS_EC2', EC2_REGION='$EC2_REGION'"
 if [ "$IS_EC2" = "true" ] && [ -n "$EC2_REGION" ]; then
     print_info "Using EC2 environment from parent process (region: $EC2_REGION)"
 elif [ -f /tmp/joblet-ec2-info ]; then
     source /tmp/joblet-ec2-info
-    print_info "Using EC2 metadata from /tmp/joblet-ec2-info"
+    print_info "Using EC2 metadata from /tmp/joblet-ec2-info (IS_EC2=$IS_EC2, EC2_REGION=$EC2_REGION)"
 elif detect_ec2; then
     IS_EC2="true"
     EC2_REGION=$(get_ec2_metadata "placement/region")
@@ -188,7 +189,9 @@ elif detect_ec2; then
 else
     IS_EC2="false"
     EC2_REGION=""
+    print_info "Not running on EC2"
 fi
+print_info "DEBUG: Final values - IS_EC2='$IS_EC2', EC2_REGION='$EC2_REGION'"
 
 # Determine if we should use Secrets Manager
 SHOULD_USE_SM="false"
