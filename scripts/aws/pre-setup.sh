@@ -667,6 +667,55 @@ else
             fi
         fi
     fi
+
+    # Update VPC Endpoint policy to allow DynamoDB access
+    # This is needed because default policies may be restrictive
+    if [ -n "$ENDPOINT_ID" ] && [ "$ENDPOINT_ID" != "None" ]; then
+        echo ""
+        echo "Updating VPC Endpoint policy for DynamoDB access..."
+
+        # Create policy with only required DynamoDB actions (least privilege)
+        # Get AWS account ID for resource ARN
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/null || echo "*")
+
+        cat > /tmp/dynamodb-endpoint-policy.json << POLICY_EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "dynamodb:DescribeTable",
+                "dynamodb:CreateTable",
+                "dynamodb:PutItem",
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:UpdateTimeToLive",
+                "dynamodb:DescribeTimeToLive"
+            ],
+            "Resource": "arn:aws:dynamodb:${REGION}:${AWS_ACCOUNT_ID}:table/joblet-jobs"
+        }
+    ]
+}
+POLICY_EOF
+
+        if aws ec2 modify-vpc-endpoint --region "$REGION" \
+            --vpc-endpoint-id "$ENDPOINT_ID" \
+            --policy-document file:///tmp/dynamodb-endpoint-policy.json 2>/dev/null; then
+            echo "✅ VPC Endpoint policy updated (full DynamoDB access)"
+        else
+            echo "⚠️  Could not update VPC Endpoint policy"
+            echo "   You may need to manually update the policy to allow DynamoDB access."
+            echo "   See: AWS Console → VPC → Endpoints → $ENDPOINT_ID → Policy"
+        fi
+
+        rm -f /tmp/dynamodb-endpoint-policy.json
+    fi
 fi
 
 echo ""
