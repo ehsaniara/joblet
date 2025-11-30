@@ -170,6 +170,7 @@ fi
 
 # Create config directory if it doesn't exist
 mkdir -p "$CONFIG_DIR"
+chmod 755 "$CONFIG_DIR"  # Directory needs to be accessible for rnx client
 
 # Create temporary directory for certificate generation
 TEMP_DIR=$(mktemp -d)
