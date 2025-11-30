@@ -25,46 +25,42 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-# Detect if running on AWS EC2 by querying metadata service
+# Detect if running on AWS EC2 by querying metadata service (IMDSv2 only)
 detect_ec2() {
-    # Try to get EC2 instance ID with short timeout
-    # Use IMDSv2 (more secure) with fallback to IMDSv1
+    # Use IMDSv2 (required on modern EC2 instances)
     local token
     token=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
         -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
 
-    local instance_id
-    if [ -n "$token" ]; then
-        # IMDSv2
-        instance_id=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
-            "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || echo "")
-    else
-        # Fallback to IMDSv1
-        instance_id=$(curl -s -m 2 "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || echo "")
+    if [ -z "$token" ]; then
+        return 1  # Not EC2 or IMDS not available
     fi
 
-    if [ -n "$instance_id" ] && [ "$instance_id" != "" ]; then
+    local instance_id
+    instance_id=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+        "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || echo "")
+
+    if [ -n "$instance_id" ] && [[ "$instance_id" == i-* ]]; then
         return 0  # Is EC2
     else
         return 1  # Not EC2
     fi
 }
 
-# Get EC2 metadata value
+# Get EC2 metadata value (IMDSv2 only)
 get_ec2_metadata() {
     local path="$1"
     local token
     token=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
         -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
 
-    if [ -n "$token" ]; then
-        # IMDSv2
-        curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
-            "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo ""
-    else
-        # Fallback to IMDSv1
-        curl -s -m 2 "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo ""
+    if [ -z "$token" ]; then
+        echo ""
+        return
     fi
+
+    curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+        "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo ""
 }
 
 echo "🔐 Generating certificates and embedding them in config files..."
@@ -311,7 +307,6 @@ fi
 
 # Update client configuration with embedded certificates
 print_info "Updating client configuration with embedded certificates..."
-CLIENT_TEMPLATE="$TEMPLATE_DIR/rnx-config-template.yml"
 CLIENT_CONFIG="$CONFIG_DIR/rnx-config.yml"
 
 # Create client configuration with embedded certificates
