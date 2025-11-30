@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/domain/values"
 )
 
 // dynamoDBBackend implements Backend using AWS DynamoDB
@@ -286,6 +287,15 @@ func jobToItem(job *domain.Job, ttlDays int) map[string]types.AttributeValue {
 		"nodeId":    &types.AttributeValueMemberS{Value: job.NodeId},
 	}
 
+	// Store args as a list
+	if len(job.Args) > 0 {
+		argsValues := make([]types.AttributeValue, len(job.Args))
+		for i, arg := range job.Args {
+			argsValues[i] = &types.AttributeValueMemberS{Value: arg}
+		}
+		item["args"] = &types.AttributeValueMemberL{Value: argsValues}
+	}
+
 	// Timestamps
 	if !job.StartTime.IsZero() {
 		item["startTime"] = &types.AttributeValueMemberS{Value: job.StartTime.Format(time.RFC3339)}
@@ -311,6 +321,80 @@ func jobToItem(job *domain.Job, ttlDays int) map[string]types.AttributeValue {
 	}
 	if job.Runtime != "" {
 		item["runtime"] = &types.AttributeValueMemberS{Value: job.Runtime}
+	}
+
+	// Job name and type
+	if job.Name != "" {
+		item["name"] = &types.AttributeValueMemberS{Value: job.Name}
+	}
+	if job.Type != "" {
+		item["jobType"] = &types.AttributeValueMemberS{Value: string(job.Type)}
+	}
+
+	// Resource limits (store as nested map)
+	limitsMap := map[string]types.AttributeValue{}
+	if cpu := job.Limits.CPU.Value(); cpu > 0 {
+		limitsMap["cpu"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", cpu)}
+	}
+	if cpuCores := job.Limits.CPUCores.String(); cpuCores != "" {
+		limitsMap["cpuCores"] = &types.AttributeValueMemberS{Value: cpuCores}
+	}
+	if memory := job.Limits.Memory.Bytes(); memory > 0 {
+		limitsMap["memory"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", memory)}
+	}
+	if io := job.Limits.IOBandwidth.BytesPerSecond(); io > 0 {
+		limitsMap["ioBandwidth"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", io)}
+	}
+	if len(limitsMap) > 0 {
+		item["limits"] = &types.AttributeValueMemberM{Value: limitsMap}
+	}
+
+	// Volumes
+	if len(job.Volumes) > 0 {
+		volValues := make([]types.AttributeValue, len(job.Volumes))
+		for i, vol := range job.Volumes {
+			volValues[i] = &types.AttributeValueMemberS{Value: vol}
+		}
+		item["volumes"] = &types.AttributeValueMemberL{Value: volValues}
+	}
+
+	// Workflow fields
+	if job.WorkflowUuid != "" {
+		item["workflowUuid"] = &types.AttributeValueMemberS{Value: job.WorkflowUuid}
+	}
+	if job.WorkingDirectory != "" {
+		item["workingDirectory"] = &types.AttributeValueMemberS{Value: job.WorkingDirectory}
+	}
+	if len(job.Dependencies) > 0 {
+		depValues := make([]types.AttributeValue, len(job.Dependencies))
+		for i, dep := range job.Dependencies {
+			depValues[i] = &types.AttributeValueMemberS{Value: dep}
+		}
+		item["dependencies"] = &types.AttributeValueMemberL{Value: depValues}
+	}
+
+	// Environment variables (non-secret only)
+	if len(job.Environment) > 0 {
+		envMap := make(map[string]types.AttributeValue, len(job.Environment))
+		for k, v := range job.Environment {
+			envMap[k] = &types.AttributeValueMemberS{Value: v}
+		}
+		item["environment"] = &types.AttributeValueMemberM{Value: envMap}
+	}
+
+	// GPU fields
+	if len(job.GPUIndices) > 0 {
+		gpuValues := make([]types.AttributeValue, len(job.GPUIndices))
+		for i, idx := range job.GPUIndices {
+			gpuValues[i] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", idx)}
+		}
+		item["gpuIndices"] = &types.AttributeValueMemberL{Value: gpuValues}
+	}
+	if job.GPUCount > 0 {
+		item["gpuCount"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", job.GPUCount)}
+	}
+	if job.GPUMemoryMB > 0 {
+		item["gpuMemoryMB"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", job.GPUMemoryMB)}
 	}
 
 	// TTL attribute (Unix timestamp when item should expire)
@@ -376,6 +460,110 @@ func itemToJob(item map[string]types.AttributeValue) (*domain.Job, error) {
 	}
 	if v, ok := item["runtime"].(*types.AttributeValueMemberS); ok {
 		job.Runtime = v.Value
+	}
+
+	// Parse args list
+	if v, ok := item["args"].(*types.AttributeValueMemberL); ok {
+		job.Args = make([]string, len(v.Value))
+		for i, av := range v.Value {
+			if s, ok := av.(*types.AttributeValueMemberS); ok {
+				job.Args[i] = s.Value
+			}
+		}
+	}
+
+	// Parse job name and type
+	if v, ok := item["name"].(*types.AttributeValueMemberS); ok {
+		job.Name = v.Value
+	}
+	if v, ok := item["jobType"].(*types.AttributeValueMemberS); ok {
+		job.Type = domain.JobType(v.Value)
+	}
+
+	// Parse resource limits
+	if v, ok := item["limits"].(*types.AttributeValueMemberM); ok {
+		if cpu, ok := v.Value["cpu"].(*types.AttributeValueMemberN); ok {
+			var cpuVal int32
+			if _, err := fmt.Sscanf(cpu.Value, "%d", &cpuVal); err == nil {
+				job.Limits.CPU, _ = values.NewCPUPercentage(cpuVal)
+			}
+		}
+		if cpuCores, ok := v.Value["cpuCores"].(*types.AttributeValueMemberS); ok {
+			job.Limits.CPUCores, _ = values.ParseCPUCoreSet(cpuCores.Value)
+		}
+		if memory, ok := v.Value["memory"].(*types.AttributeValueMemberN); ok {
+			var memVal int64
+			if _, err := fmt.Sscanf(memory.Value, "%d", &memVal); err == nil {
+				job.Limits.Memory, _ = values.NewMemorySize(memVal)
+			}
+		}
+		if io, ok := v.Value["ioBandwidth"].(*types.AttributeValueMemberN); ok {
+			var ioVal int64
+			if _, err := fmt.Sscanf(io.Value, "%d", &ioVal); err == nil {
+				job.Limits.IOBandwidth, _ = values.NewBandwidth(ioVal)
+			}
+		}
+	}
+
+	// Parse volumes
+	if v, ok := item["volumes"].(*types.AttributeValueMemberL); ok {
+		job.Volumes = make([]string, len(v.Value))
+		for i, av := range v.Value {
+			if s, ok := av.(*types.AttributeValueMemberS); ok {
+				job.Volumes[i] = s.Value
+			}
+		}
+	}
+
+	// Parse workflow fields
+	if v, ok := item["workflowUuid"].(*types.AttributeValueMemberS); ok {
+		job.WorkflowUuid = v.Value
+	}
+	if v, ok := item["workingDirectory"].(*types.AttributeValueMemberS); ok {
+		job.WorkingDirectory = v.Value
+	}
+	if v, ok := item["dependencies"].(*types.AttributeValueMemberL); ok {
+		job.Dependencies = make([]string, len(v.Value))
+		for i, av := range v.Value {
+			if s, ok := av.(*types.AttributeValueMemberS); ok {
+				job.Dependencies[i] = s.Value
+			}
+		}
+	}
+
+	// Parse environment variables
+	if v, ok := item["environment"].(*types.AttributeValueMemberM); ok {
+		job.Environment = make(map[string]string, len(v.Value))
+		for k, av := range v.Value {
+			if s, ok := av.(*types.AttributeValueMemberS); ok {
+				job.Environment[k] = s.Value
+			}
+		}
+	}
+
+	// Parse GPU fields
+	if v, ok := item["gpuIndices"].(*types.AttributeValueMemberL); ok {
+		job.GPUIndices = make([]int32, len(v.Value))
+		for i, av := range v.Value {
+			if n, ok := av.(*types.AttributeValueMemberN); ok {
+				var idx int32
+				if _, err := fmt.Sscanf(n.Value, "%d", &idx); err == nil {
+					job.GPUIndices[i] = idx
+				}
+			}
+		}
+	}
+	if v, ok := item["gpuCount"].(*types.AttributeValueMemberN); ok {
+		var count int32
+		if _, err := fmt.Sscanf(v.Value, "%d", &count); err == nil {
+			job.GPUCount = count
+		}
+	}
+	if v, ok := item["gpuMemoryMB"].(*types.AttributeValueMemberN); ok {
+		var mem int64
+		if _, err := fmt.Sscanf(v.Value, "%d", &mem); err == nil {
+			job.GPUMemoryMB = mem
+		}
 	}
 
 	return job, nil
