@@ -62,15 +62,8 @@ echo ""
 
 echo "Checking for existing IAM resources..."
 
-# Check if policy already exists
-EXISTING_POLICY=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='JobletAWSPolicy'].Arn" --output text)
-if [ -n "$EXISTING_POLICY" ]; then
-    echo "⚠️  IAM Policy 'JobletAWSPolicy' already exists: $EXISTING_POLICY"
-    POLICY_ARN="$EXISTING_POLICY"
-else
-    # Create IAM policy
-    echo "Creating IAM policy..."
-    cat > /tmp/joblet-aws-policy.json << 'EOF'
+# Define the policy document (used for both create and update)
+cat > /tmp/joblet-aws-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -144,15 +137,42 @@ else
 }
 EOF
 
-    POLICY_ARN=$(aws iam create-policy \
-      --policy-name JobletAWSPolicy \
-      --policy-document file:///tmp/joblet-aws-policy.json \
-      --query 'Policy.Arn' \
-      --output text)
+# Check if policy already exists
+EXISTING_POLICY=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='JobletAWSPolicy'].Arn" --output text)
+if [ -n "$EXISTING_POLICY" ]; then
+    echo "⚠️  IAM Policy 'JobletAWSPolicy' already exists: $EXISTING_POLICY"
+    echo "Replacing with latest permissions..."
 
-    echo "✅ IAM Policy created: $POLICY_ARN"
-    rm /tmp/joblet-aws-policy.json
+    # Detach from JobletEC2Role
+    aws iam detach-role-policy --role-name JobletEC2Role --policy-arn "$EXISTING_POLICY" 2>/dev/null || true
+
+    # Delete all non-default policy versions
+    for VERSION_ID in $(aws iam list-policy-versions --policy-arn "$EXISTING_POLICY" \
+        --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text 2>/dev/null); do
+        aws iam delete-policy-version --policy-arn "$EXISTING_POLICY" --version-id "$VERSION_ID" 2>/dev/null || true
+    done
+
+    # Delete the policy
+    if ! aws iam delete-policy --policy-arn "$EXISTING_POLICY" 2>&1; then
+        echo "❌ Failed to delete policy. It may have other dependencies."
+        echo "   Please manually detach the policy from other roles/users/groups and re-run."
+        rm -f /tmp/joblet-aws-policy.json
+        exit 1
+    fi
+    echo "   Deleted old policy"
 fi
+
+# Create IAM policy
+echo "Creating IAM policy..."
+POLICY_ARN=$(aws iam create-policy \
+  --policy-name JobletAWSPolicy \
+  --policy-document file:///tmp/joblet-aws-policy.json \
+  --query 'Policy.Arn' \
+  --output text)
+
+echo "✅ IAM Policy created: $POLICY_ARN"
+
+rm -f /tmp/joblet-aws-policy.json
 
 # Check if role already exists
 if aws iam get-role --role-name JobletEC2Role >/dev/null 2>&1; then
