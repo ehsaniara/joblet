@@ -431,18 +431,26 @@ generate_and_embed_certificates() {
 
     # Detect EC2 via metadata service if not already set (supports IMDSv2)
     if [ "$IS_EC2" != "true" ]; then
-        # Try IMDSv2 first (more secure, required on newer instances)
+        # Try IMDSv2 (required on modern instances)
         IMDS_TOKEN=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" 2>/dev/null)
         if [ -n "$IMDS_TOKEN" ]; then
             if curl -s -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id >/dev/null 2>&1; then
                 IS_EC2="true"
+                # Also get the region if not set
+                if [ -z "$EC2_REGION" ]; then
+                    EC2_REGION=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
+                fi
             fi
         fi
     fi
 
     if [ "$IS_EC2" = "true" ] && [ -x /usr/local/bin/certs_gen_with_secretsmanager.sh ]; then
         print_info "EC2 detected - using Secrets Manager for shared CA/client certificates"
+        print_info "EC2 Region: $EC2_REGION"
         CERT_SCRIPT="/usr/local/bin/certs_gen_with_secretsmanager.sh"
+        # Export for the certificate generation script subprocess
+        export IS_EC2
+        export EC2_REGION
     fi
 
     # Run the certificate generation script
