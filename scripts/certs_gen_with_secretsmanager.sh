@@ -175,15 +175,19 @@ trap "rm -rf $TEMP_DIR" EXIT
 cd "$TEMP_DIR"
 
 # Detect AWS environment
-IS_EC2="false"
-EC2_REGION=""
-if [ -f /tmp/joblet-ec2-info ]; then
+# Check if already set by parent process (exported from common-install-functions.sh)
+if [ "$IS_EC2" = "true" ] && [ -n "$EC2_REGION" ]; then
+    print_info "Using EC2 environment from parent process (region: $EC2_REGION)"
+elif [ -f /tmp/joblet-ec2-info ]; then
     source /tmp/joblet-ec2-info
     print_info "Using EC2 metadata from /tmp/joblet-ec2-info"
 elif detect_ec2; then
     IS_EC2="true"
     EC2_REGION=$(get_ec2_metadata "placement/region")
     print_info "EC2 auto-detected via metadata service (region: $EC2_REGION)"
+else
+    IS_EC2="false"
+    EC2_REGION=""
 fi
 
 # Determine if we should use Secrets Manager
@@ -445,24 +449,8 @@ if [ -f "$SERVER_TEMPLATE" ]; then
     sed -i "s/address: \".*\"/address: \"$SERVER_ADDRESS\"/" "$SERVER_CONFIG"
     sed -i "s/nodeId: \"\"/nodeId: \"$NODE_ID\"/" "$SERVER_CONFIG"
 
-    # Check if running on AWS EC2 and configure CloudWatch backend automatically
-    IS_EC2="false"
-    EC2_REGION=""
-    EC2_INSTANCE_ID=""
-
-    # Method 1: Check for pre-created EC2 info file (from ec2-user-data.sh)
-    if [ -f /tmp/joblet-ec2-info ]; then
-        source /tmp/joblet-ec2-info
-        print_info "Using EC2 metadata from /tmp/joblet-ec2-info"
-    # Method 2: Direct EC2 detection (for manual package installations on EC2)
-    elif detect_ec2; then
-        IS_EC2="true"
-        EC2_REGION=$(get_ec2_metadata "placement/region")
-        EC2_INSTANCE_ID=$(get_ec2_metadata "instance-id")
-        print_info "EC2 auto-detected via metadata service"
-    fi
-
     # Configure AWS backends if running on EC2
+    # Note: IS_EC2 and EC2_REGION are already set at the beginning of the script
     if [ "$IS_EC2" = "true" ]; then
         print_info "AWS EC2 detected - configuring CloudWatch and DynamoDB backends"
 
