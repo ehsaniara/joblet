@@ -482,10 +482,10 @@ else
     echo ""
     echo "Checking for existing DynamoDB VPC Endpoints in $VPC_ID..."
 
-    # Check if DynamoDB endpoint already exists in this VPC
+    # Check if DynamoDB endpoint already exists in this VPC (any state, not just 'available')
     EXISTING_ENDPOINTS=$(aws ec2 describe-vpc-endpoints --region "$REGION" \
-        --filters "Name=vpc-id,Values=$VPC_ID" "Name=service-name,Values=com.amazonaws.$REGION.dynamodb" "Name=state,Values=available" \
-        --query 'VpcEndpoints[*].[VpcEndpointId,Tags[?Key==`Name`].Value|[0]]' \
+        --filters "Name=vpc-id,Values=$VPC_ID" "Name=service-name,Values=com.amazonaws.$REGION.dynamodb" \
+        --query 'VpcEndpoints[*].[VpcEndpointId,State,Tags[?Key==`Name`].Value|[0]]' \
         --output text 2>/dev/null || echo "")
 
     if [ -n "$EXISTING_ENDPOINTS" ] && [ "$EXISTING_ENDPOINTS" != "None" ]; then
@@ -495,9 +495,9 @@ else
 
         # Display endpoints with numbers
         ENDPOINT_NUM=0
-        echo "$EXISTING_ENDPOINTS" | while IFS=$'\t' read -r endpoint_id name; do
+        echo "$EXISTING_ENDPOINTS" | while IFS=$'\t' read -r endpoint_id state name; do
             ENDPOINT_NUM=$((ENDPOINT_NUM + 1))
-            printf "  %d) %s  %s\n" "$ENDPOINT_NUM" "$endpoint_id" "${name:+($name)}"
+            printf "  %d) %s [%s] %s\n" "$ENDPOINT_NUM" "$endpoint_id" "$state" "${name:+($name)}"
         done
         echo "  N) Create new endpoint"
         echo ""
@@ -548,33 +548,103 @@ else
         fi
     else
         echo ""
-        echo "No existing DynamoDB VPC Endpoint found. Creating one..."
+        echo "No existing DynamoDB VPC Endpoint found in query results."
         echo ""
 
+        # Get route tables for this VPC
         ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "$REGION" \
             --filters "Name=vpc-id,Values=$VPC_ID" \
             --query 'RouteTables[*].RouteTableId' --output text 2>/dev/null | tr '\t' ' ')
 
-        if [ -z "$ROUTE_TABLE_IDS" ] || [ "$ROUTE_TABLE_IDS" = "None" ]; then
-            echo "❌ No route tables found for VPC $VPC_ID"
-            echo "   Cannot create VPC Endpoint. Please create route tables first."
-            exit 1
+        # Check if DynamoDB routes already exist in any route table
+        # DynamoDB uses prefix list (pl-*) routes for Gateway endpoints
+        DYNAMODB_PREFIX_LIST=$(aws ec2 describe-prefix-lists --region "$REGION" \
+            --filters "Name=prefix-list-name,Values=com.amazonaws.$REGION.dynamodb" \
+            --query 'PrefixLists[0].PrefixListId' --output text 2>/dev/null || echo "")
+
+        if [ -n "$DYNAMODB_PREFIX_LIST" ] && [ "$DYNAMODB_PREFIX_LIST" != "None" ]; then
+            # Check if any route table has this prefix list
+            for RT_ID in $ROUTE_TABLE_IDS; do
+                EXISTING_ROUTE=$(aws ec2 describe-route-tables --region "$REGION" \
+                    --route-table-ids "$RT_ID" \
+                    --query "RouteTables[0].Routes[?DestinationPrefixListId=='$DYNAMODB_PREFIX_LIST'].DestinationPrefixListId" \
+                    --output text 2>/dev/null || echo "")
+
+                if [ -n "$EXISTING_ROUTE" ] && [ "$EXISTING_ROUTE" != "None" ]; then
+                    echo "✅ DynamoDB route already exists in route table $RT_ID"
+                    echo "   A DynamoDB VPC Endpoint is already configured for this VPC."
+                    echo ""
+
+                    # Try to find the endpoint ID
+                    ENDPOINT_ID=$(aws ec2 describe-vpc-endpoints --region "$REGION" \
+                        --filters "Name=vpc-id,Values=$VPC_ID" "Name=service-name,Values=com.amazonaws.$REGION.dynamodb" \
+                        --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>/dev/null || echo "")
+
+                    if [ -n "$ENDPOINT_ID" ] && [ "$ENDPOINT_ID" != "None" ]; then
+                        echo "   Endpoint ID: $ENDPOINT_ID"
+                    fi
+
+                    ENDPOINT_STATUS="existing"
+                    break
+                fi
+            done
         fi
 
-        echo "   Route tables: $ROUTE_TABLE_IDS"
-
-        if ENDPOINT_ID=$(aws ec2 create-vpc-endpoint --region "$REGION" \
-            --vpc-id "$VPC_ID" \
-            --service-name "com.amazonaws.$REGION.dynamodb" \
-            --route-table-ids $ROUTE_TABLE_IDS \
-            --vpc-endpoint-type Gateway \
-            --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=joblet-dynamodb-endpoint},{Key=ManagedBy,Value=Joblet}]" \
-            --query 'VpcEndpoint.VpcEndpointId' --output text 2>&1); then
-            echo "✅ VPC Endpoint created: $ENDPOINT_ID"
-            ENDPOINT_STATUS="created"
+        # If we found existing route, skip creation
+        if [ "$ENDPOINT_STATUS" = "existing" ]; then
+            echo ""
+            echo "Skipping VPC Endpoint creation - already configured."
         else
-            echo "❌ Failed to create VPC Endpoint: $ENDPOINT_ID"
-            exit 1
+            # No existing route found, proceed with creation
+            echo "Creating new DynamoDB VPC Endpoint..."
+            echo ""
+
+            if [ -z "$ROUTE_TABLE_IDS" ] || [ "$ROUTE_TABLE_IDS" = "None" ]; then
+                echo "❌ No route tables found for VPC $VPC_ID"
+                echo "   Cannot create VPC Endpoint. Please create route tables first."
+                exit 1
+            fi
+
+            echo "   Route tables: $ROUTE_TABLE_IDS"
+
+            # Try to create endpoint, handle RouteAlreadyExists error
+            CREATE_OUTPUT=$(aws ec2 create-vpc-endpoint --region "$REGION" \
+                --vpc-id "$VPC_ID" \
+                --service-name "com.amazonaws.$REGION.dynamodb" \
+                --route-table-ids $ROUTE_TABLE_IDS \
+                --vpc-endpoint-type Gateway \
+                --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=joblet-dynamodb-endpoint},{Key=ManagedBy,Value=Joblet}]" \
+                --query 'VpcEndpoint.VpcEndpointId' --output text 2>&1)
+            CREATE_STATUS=$?
+
+            if [ $CREATE_STATUS -eq 0 ]; then
+                ENDPOINT_ID="$CREATE_OUTPUT"
+                echo "✅ VPC Endpoint created: $ENDPOINT_ID"
+                ENDPOINT_STATUS="created"
+            elif echo "$CREATE_OUTPUT" | grep -q "RouteAlreadyExists"; then
+                # Route exists - there's already a DynamoDB endpoint for this VPC
+                echo ""
+                echo "⚠️  DynamoDB route already exists in route table."
+                echo "   This means a DynamoDB VPC Endpoint is already configured."
+                echo ""
+
+                # Try to find the existing endpoint (including all states)
+                ENDPOINT_ID=$(aws ec2 describe-vpc-endpoints --region "$REGION" \
+                    --filters "Name=vpc-id,Values=$VPC_ID" "Name=service-name,Values=com.amazonaws.$REGION.dynamodb" \
+                    --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>/dev/null || echo "")
+
+                if [ -n "$ENDPOINT_ID" ] && [ "$ENDPOINT_ID" != "None" ]; then
+                    echo "✅ Found existing VPC Endpoint: $ENDPOINT_ID"
+                    ENDPOINT_STATUS="existing"
+                else
+                    echo "✅ DynamoDB access is already configured via existing VPC Endpoint."
+                    ENDPOINT_STATUS="existing"
+                fi
+            else
+                echo "❌ Failed to create VPC Endpoint:"
+                echo "   $CREATE_OUTPUT"
+                exit 1
+            fi
         fi
     fi
 fi
