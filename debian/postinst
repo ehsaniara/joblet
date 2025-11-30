@@ -112,7 +112,7 @@ case "$1" in
         chmod +x /usr/local/bin/certs_gen_embedded.sh
 
         mkdir -p /opt/joblet/config
-        chmod 700 /opt/joblet/config  # Restricted since it will contain private keys
+        chmod 755 /opt/joblet/config  # Directory needs to be accessible for rnx client
 
         # Create symlinks
         if [ ! -L /usr/bin/rnx ]; then
@@ -146,7 +146,9 @@ case "$1" in
 
             # Set secure permissions on config files (they now contain private keys)
             chmod 600 /opt/joblet/config/joblet-config.yml
-            chmod 600 /opt/joblet/config/rnx-config.yml
+            # rnx-config.yml needs to be readable for client usage
+            # Users can copy to ~/.rnx/ for personal use or use directly
+            chmod 644 /opt/joblet/config/rnx-config.yml
 
         else
             print_error "Failed to generate certificates"

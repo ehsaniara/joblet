@@ -256,12 +256,13 @@ sudo journalctl -u joblet -f
 If your EC2 instance is in a private subnet without public IP:
 
 ```bash
-# Create SSH tunnel (from your workstation)
-ssh -i ~/.ssh/your-key.pem -L 50051:localhost:443 ubuntu@<BASTION_IP>
+# Create SSH tunnel through bastion (from your workstation)
+# Replace <PRIVATE_IP> with the Joblet EC2 instance's private IP (e.g., 172.31.16.50)
+ssh -i ~/.ssh/your-key.pem -L 50051:<PRIVATE_IP>:443 ubuntu@<BASTION_IP>
 
 # Configure client to use localhost
 # Edit ~/.rnx/rnx-config.yml:
-#   server_address: localhost:50051
+#   address: localhost:50051
 ```
 
 ## Troubleshooting

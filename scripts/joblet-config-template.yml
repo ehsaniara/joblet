@@ -85,6 +85,7 @@ buffers:
 # NOTE: The socket path defined here is the SINGLE SOURCE OF TRUTH.
 #       persist.ipc inherits this socket path automatically (Go best practice: avoid duplication)
 ipc:
+  enabled: true                                   # Enable IPC to persist service + in-memory buffering
   socket: "/opt/joblet/run/persist-ipc.sock"      # Unix socket path (shared with persist.ipc)
   buffer_size: 10000                              # Client: message buffer size
   reconnect_delay: "5s"                           # Client: reconnection retry delay

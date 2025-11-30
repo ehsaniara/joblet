@@ -256,7 +256,8 @@ echo ""
 if generate_and_embed_certificates; then
     # Set secure permissions on config files
     chmod 600 /opt/joblet/config/joblet-config.yml 2>/dev/null || true
-    chmod 600 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
+    # rnx-config.yml needs to be readable for client usage
+    chmod 644 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
 fi
 
 # Setup network requirements

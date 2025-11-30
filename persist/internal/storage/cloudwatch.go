@@ -424,30 +424,28 @@ func (b *CloudWatchBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) 
 
 		data := metric.Data
 
-		// CPU Usage
-		if data.CpuUsage > 0 {
-			metricData = append(metricData, cloudwatchtypes.MetricDatum{
-				MetricName: aws.String("CPUUsage"),
-				Unit:       cloudwatchtypes.StandardUnitNone,
-				Value:      aws.Float64(data.CpuUsage),
-				Timestamp:  &timestamp,
-				Dimensions: baseDimensions,
-			})
-		}
+		// CPU Usage (value is in cores, convert to percent for CloudWatch)
+		// e.g., 0.5 cores = 50%, 2.0 cores = 200%
+		metricData = append(metricData, cloudwatchtypes.MetricDatum{
+			MetricName: aws.String("CPUUsage"),
+			Unit:       cloudwatchtypes.StandardUnitPercent,
+			Value:      aws.Float64(data.CpuUsage * 100),
+			Timestamp:  &timestamp,
+			Dimensions: baseDimensions,
+		})
 
 		// Memory Usage (convert to MB for better CloudWatch visualization)
-		if data.MemoryUsage > 0 {
-			memoryMB := float64(data.MemoryUsage) / 1024 / 1024
-			metricData = append(metricData, cloudwatchtypes.MetricDatum{
-				MetricName: aws.String("MemoryUsage"),
-				Unit:       cloudwatchtypes.StandardUnitMegabytes,
-				Value:      aws.Float64(memoryMB),
-				Timestamp:  &timestamp,
-				Dimensions: baseDimensions,
-			})
-		}
+		memoryMB := float64(data.MemoryUsage) / 1024 / 1024
+		metricData = append(metricData, cloudwatchtypes.MetricDatum{
+			MetricName: aws.String("MemoryUsage"),
+			Unit:       cloudwatchtypes.StandardUnitMegabytes,
+			Value:      aws.Float64(memoryMB),
+			Timestamp:  &timestamp,
+			Dimensions: baseDimensions,
+		})
 
-		// GPU Usage
+		// GPU Usage (only sent when GPU is allocated to the job)
+		// GpuUsage > 0 indicates GPU is being used; 0 means no GPU allocated
 		if data.GpuUsage > 0 {
 			metricData = append(metricData, cloudwatchtypes.MetricDatum{
 				MetricName: aws.String("GPUUsage"),
@@ -458,68 +456,54 @@ func (b *CloudWatchBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) 
 			})
 		}
 
-		// Disk I/O metrics
+		// Disk I/O metrics (always send, including zero values for complete time series)
 		if data.DiskIo != nil {
-			if data.DiskIo.ReadBytes > 0 {
-				metricData = append(metricData, cloudwatchtypes.MetricDatum{
-					MetricName: aws.String("DiskReadBytes"),
-					Unit:       cloudwatchtypes.StandardUnitBytes,
-					Value:      aws.Float64(float64(data.DiskIo.ReadBytes)),
-					Timestamp:  &timestamp,
-					Dimensions: baseDimensions,
-				})
-			}
-			if data.DiskIo.WriteBytes > 0 {
-				metricData = append(metricData, cloudwatchtypes.MetricDatum{
-					MetricName: aws.String("DiskWriteBytes"),
-					Unit:       cloudwatchtypes.StandardUnitBytes,
-					Value:      aws.Float64(float64(data.DiskIo.WriteBytes)),
-					Timestamp:  &timestamp,
-					Dimensions: baseDimensions,
-				})
-			}
-			if data.DiskIo.ReadOps > 0 {
-				metricData = append(metricData, cloudwatchtypes.MetricDatum{
-					MetricName: aws.String("DiskReadOps"),
-					Unit:       cloudwatchtypes.StandardUnitCount,
-					Value:      aws.Float64(float64(data.DiskIo.ReadOps)),
-					Timestamp:  &timestamp,
-					Dimensions: baseDimensions,
-				})
-			}
-			if data.DiskIo.WriteOps > 0 {
-				metricData = append(metricData, cloudwatchtypes.MetricDatum{
-					MetricName: aws.String("DiskWriteOps"),
-					Unit:       cloudwatchtypes.StandardUnitCount,
-					Value:      aws.Float64(float64(data.DiskIo.WriteOps)),
-					Timestamp:  &timestamp,
-					Dimensions: baseDimensions,
-				})
-			}
+			metricData = append(metricData, cloudwatchtypes.MetricDatum{
+				MetricName: aws.String("DiskReadBytes"),
+				Unit:       cloudwatchtypes.StandardUnitBytes,
+				Value:      aws.Float64(float64(data.DiskIo.ReadBytes)),
+				Timestamp:  &timestamp,
+				Dimensions: baseDimensions,
+			})
+			metricData = append(metricData, cloudwatchtypes.MetricDatum{
+				MetricName: aws.String("DiskWriteBytes"),
+				Unit:       cloudwatchtypes.StandardUnitBytes,
+				Value:      aws.Float64(float64(data.DiskIo.WriteBytes)),
+				Timestamp:  &timestamp,
+				Dimensions: baseDimensions,
+			})
+			metricData = append(metricData, cloudwatchtypes.MetricDatum{
+				MetricName: aws.String("DiskReadOps"),
+				Unit:       cloudwatchtypes.StandardUnitCount,
+				Value:      aws.Float64(float64(data.DiskIo.ReadOps)),
+				Timestamp:  &timestamp,
+				Dimensions: baseDimensions,
+			})
+			metricData = append(metricData, cloudwatchtypes.MetricDatum{
+				MetricName: aws.String("DiskWriteOps"),
+				Unit:       cloudwatchtypes.StandardUnitCount,
+				Value:      aws.Float64(float64(data.DiskIo.WriteOps)),
+				Timestamp:  &timestamp,
+				Dimensions: baseDimensions,
+			})
 		}
 
-		// Network I/O metrics (convert to KB for better visualization)
+		// Network I/O metrics (always send, including zero values for complete time series)
 		if data.NetworkIo != nil {
-			if data.NetworkIo.RxBytes > 0 {
-				rxKB := float64(data.NetworkIo.RxBytes) / 1024
-				metricData = append(metricData, cloudwatchtypes.MetricDatum{
-					MetricName: aws.String("NetworkRxBytes"),
-					Unit:       cloudwatchtypes.StandardUnitKilobytes,
-					Value:      aws.Float64(rxKB),
-					Timestamp:  &timestamp,
-					Dimensions: baseDimensions,
-				})
-			}
-			if data.NetworkIo.TxBytes > 0 {
-				txKB := float64(data.NetworkIo.TxBytes) / 1024
-				metricData = append(metricData, cloudwatchtypes.MetricDatum{
-					MetricName: aws.String("NetworkTxBytes"),
-					Unit:       cloudwatchtypes.StandardUnitKilobytes,
-					Value:      aws.Float64(txKB),
-					Timestamp:  &timestamp,
-					Dimensions: baseDimensions,
-				})
-			}
+			metricData = append(metricData, cloudwatchtypes.MetricDatum{
+				MetricName: aws.String("NetworkRxBytes"),
+				Unit:       cloudwatchtypes.StandardUnitBytes,
+				Value:      aws.Float64(float64(data.NetworkIo.RxBytes)),
+				Timestamp:  &timestamp,
+				Dimensions: baseDimensions,
+			})
+			metricData = append(metricData, cloudwatchtypes.MetricDatum{
+				MetricName: aws.String("NetworkTxBytes"),
+				Unit:       cloudwatchtypes.StandardUnitBytes,
+				Value:      aws.Float64(float64(data.NetworkIo.TxBytes)),
+				Timestamp:  &timestamp,
+				Dimensions: baseDimensions,
+			})
 		}
 	}
 
