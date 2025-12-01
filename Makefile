@@ -28,7 +28,7 @@ LDFLAGS := -s -w \
 
 .PHONY: all clean deploy test proto help joblet rnx persist state version
 
-all: proto joblet rnx persist state
+all: joblet rnx persist state
 	@echo "✅ Build complete - all binaries ready"
 
 joblet:

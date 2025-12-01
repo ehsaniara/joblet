@@ -154,9 +154,12 @@ type VolumesConfig struct {
 
 // RuntimeConfig holds runtime system configuration
 type RuntimeConfig struct {
-	BasePath      string   `yaml:"base_path" json:"base_path"`
-	CommonPaths   []string `yaml:"common_paths" json:"common_paths"`
-	AllowedMounts []string `yaml:"allowed_mounts" json:"allowed_mounts"` // Paths mounted read-only into job sandbox
+	BasePath             string   `yaml:"base_path" json:"base_path"`
+	CommonPaths          []string `yaml:"common_paths" json:"common_paths"`
+	AllowedMounts        []string `yaml:"allowed_mounts" json:"allowed_mounts"`                 // Paths mounted read-only into job sandbox
+	InstallWritablePaths []string `yaml:"install_writable_paths" json:"install_writable_paths"` // Writable tmpfs mounts for runtime installation
+	InstallHostBinds     []string `yaml:"install_host_binds" json:"install_host_binds"`         // Host directories to bind-mount read-only during installation
+	InstallEnvPath       string   `yaml:"install_env_path" json:"install_env_path"`             // PATH environment for install chroot
 }
 
 // GPUConfig holds GPU support configuration
@@ -310,6 +313,21 @@ var DefaultConfig = Config{
 			"/lib",
 			"/lib64",
 		},
+		InstallWritablePaths: []string{
+			"/var/cache/apt",
+			"/var/lib/apt",
+			"/var/lib/dpkg",
+		},
+		InstallHostBinds: []string{
+			"/usr",
+			"/lib",
+			"/lib64",
+			"/bin",
+			"/sbin",
+			"/etc",
+			"/var",
+		},
+		InstallEnvPath: "/usr/bin:/bin:/sbin:/usr/sbin",
 	},
 	GPU: GPUConfig{
 		Enabled:            false,       // Off by default - opt-in only

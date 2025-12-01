@@ -170,3 +170,375 @@ func TestRuntimeInstaller_StreamingInterface(t *testing.T) {
 // - autoDetectRuntimePath: Auto-detection of runtime paths
 // - writeFilesToChroot: File writing to chroot (consolidated)
 // - findLocalRuntime: Local runtime discovery (simplified)
+
+// Tests for config-driven runtime installation settings
+
+func TestRuntimeConfig_InstallWritablePaths(t *testing.T) {
+	tests := []struct {
+		name          string
+		writablePaths []string
+		expectedCount int
+		shouldContain []string
+	}{
+		{
+			name: "debian/ubuntu paths",
+			writablePaths: []string{
+				"/var/cache/apt",
+				"/var/lib/apt",
+				"/var/lib/dpkg",
+			},
+			expectedCount: 3,
+			shouldContain: []string{"/var/cache/apt", "/var/lib/dpkg"},
+		},
+		{
+			name: "rhel/centos paths",
+			writablePaths: []string{
+				"/var/cache/yum",
+				"/var/lib/rpm",
+			},
+			expectedCount: 2,
+			shouldContain: []string{"/var/cache/yum", "/var/lib/rpm"},
+		},
+		{
+			name: "fedora/dnf paths",
+			writablePaths: []string{
+				"/var/cache/dnf",
+				"/var/lib/dnf",
+				"/var/lib/rpm",
+			},
+			expectedCount: 3,
+			shouldContain: []string{"/var/cache/dnf", "/var/lib/rpm"},
+		},
+		{
+			name:          "empty paths",
+			writablePaths: []string{},
+			expectedCount: 0,
+			shouldContain: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: config.RuntimeConfig{
+					BasePath:             "/opt/joblet/runtimes",
+					InstallWritablePaths: tt.writablePaths,
+				},
+			}
+
+			assert.Len(t, cfg.Runtime.InstallWritablePaths, tt.expectedCount)
+			for _, expected := range tt.shouldContain {
+				assert.Contains(t, cfg.Runtime.InstallWritablePaths, expected)
+			}
+		})
+	}
+}
+
+func TestRuntimeConfig_InstallHostBinds(t *testing.T) {
+	tests := []struct {
+		name          string
+		hostBinds     []string
+		expectedCount int
+		shouldContain []string
+	}{
+		{
+			name: "standard linux FHS paths",
+			hostBinds: []string{
+				"/usr",
+				"/lib",
+				"/lib64",
+				"/bin",
+				"/sbin",
+				"/etc",
+				"/var",
+			},
+			expectedCount: 7,
+			shouldContain: []string{"/usr", "/bin", "/lib", "/etc"},
+		},
+		{
+			name: "minimal paths",
+			hostBinds: []string{
+				"/usr",
+				"/lib",
+				"/bin",
+			},
+			expectedCount: 3,
+			shouldContain: []string{"/usr", "/bin"},
+		},
+		{
+			name: "with optional paths",
+			hostBinds: []string{
+				"/usr",
+				"/lib",
+				"/lib64",
+				"/bin",
+				"/sbin",
+				"/etc",
+				"/var",
+				"/opt",
+			},
+			expectedCount: 8,
+			shouldContain: []string{"/opt"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: config.RuntimeConfig{
+					BasePath:         "/opt/joblet/runtimes",
+					InstallHostBinds: tt.hostBinds,
+				},
+			}
+
+			assert.Len(t, cfg.Runtime.InstallHostBinds, tt.expectedCount)
+			for _, expected := range tt.shouldContain {
+				assert.Contains(t, cfg.Runtime.InstallHostBinds, expected)
+			}
+		})
+	}
+}
+
+func TestRuntimeConfig_InstallEnvPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		envPath     string
+		expected    string
+		shouldMatch bool
+	}{
+		{
+			name:        "standard linux PATH",
+			envPath:     "/usr/bin:/bin:/sbin:/usr/sbin",
+			expected:    "/usr/bin:/bin:/sbin:/usr/sbin",
+			shouldMatch: true,
+		},
+		{
+			name:        "extended PATH with local bins",
+			envPath:     "/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin",
+			expected:    "/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin",
+			shouldMatch: true,
+		},
+		{
+			name:        "alpine linux style",
+			envPath:     "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			expected:    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			shouldMatch: true,
+		},
+		{
+			name:        "empty PATH uses fallback",
+			envPath:     "",
+			expected:    "",
+			shouldMatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: config.RuntimeConfig{
+					BasePath:       "/opt/joblet/runtimes",
+					InstallEnvPath: tt.envPath,
+				},
+			}
+
+			assert.Equal(t, tt.expected, cfg.Runtime.InstallEnvPath)
+		})
+	}
+}
+
+func TestRuntimeConfig_DefaultValues(t *testing.T) {
+	// Test that default config has expected values
+	defaultCfg := config.DefaultConfig
+
+	// Check InstallWritablePaths defaults (Debian/Ubuntu)
+	assert.NotEmpty(t, defaultCfg.Runtime.InstallWritablePaths)
+	assert.Contains(t, defaultCfg.Runtime.InstallWritablePaths, "/var/cache/apt")
+	assert.Contains(t, defaultCfg.Runtime.InstallWritablePaths, "/var/lib/apt")
+	assert.Contains(t, defaultCfg.Runtime.InstallWritablePaths, "/var/lib/dpkg")
+
+	// Check InstallHostBinds defaults
+	assert.NotEmpty(t, defaultCfg.Runtime.InstallHostBinds)
+	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/usr")
+	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/lib")
+	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/bin")
+	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/etc")
+	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/var")
+
+	// Check InstallEnvPath default
+	assert.Equal(t, "/usr/bin:/bin:/sbin:/usr/sbin", defaultCfg.Runtime.InstallEnvPath)
+}
+
+func TestRuntimeInstaller_ConfigDrivenEnvPath(t *testing.T) {
+	tests := []struct {
+		name            string
+		configEnvPath   string
+		expectedContain string
+	}{
+		{
+			name:            "uses config PATH",
+			configEnvPath:   "/custom/bin:/usr/bin:/bin",
+			expectedContain: "/custom/bin",
+		},
+		{
+			name:            "standard PATH",
+			configEnvPath:   "/usr/bin:/bin:/sbin:/usr/sbin",
+			expectedContain: "/usr/bin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: config.RuntimeConfig{
+					BasePath:       "/opt/joblet/runtimes",
+					InstallEnvPath: tt.configEnvPath,
+				},
+			}
+			testLogger := logger.New()
+			testPlatform := platform.NewPlatform()
+
+			installer := NewRuntimeInstaller(cfg, testLogger, testPlatform)
+
+			// Verify config is stored correctly
+			assert.Equal(t, tt.configEnvPath, installer.config.Runtime.InstallEnvPath)
+			assert.Contains(t, installer.config.Runtime.InstallEnvPath, tt.expectedContain)
+		})
+	}
+}
+
+func TestRuntimeInstaller_ConfigDrivenHostBinds(t *testing.T) {
+	tests := []struct {
+		name          string
+		hostBinds     []string
+		expectedCount int
+	}{
+		{
+			name:          "full FHS paths",
+			hostBinds:     []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc", "/var"},
+			expectedCount: 7,
+		},
+		{
+			name:          "minimal paths",
+			hostBinds:     []string{"/usr", "/lib", "/bin"},
+			expectedCount: 3,
+		},
+		{
+			name:          "empty paths",
+			hostBinds:     []string{},
+			expectedCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: config.RuntimeConfig{
+					BasePath:         "/opt/joblet/runtimes",
+					InstallHostBinds: tt.hostBinds,
+				},
+			}
+			testLogger := logger.New()
+			testPlatform := platform.NewPlatform()
+
+			installer := NewRuntimeInstaller(cfg, testLogger, testPlatform)
+
+			assert.Len(t, installer.config.Runtime.InstallHostBinds, tt.expectedCount)
+		})
+	}
+}
+
+func TestRuntimeInstaller_ConfigDrivenWritablePaths(t *testing.T) {
+	tests := []struct {
+		name          string
+		writablePaths []string
+		distroType    string
+	}{
+		{
+			name:          "debian ubuntu",
+			writablePaths: []string{"/var/cache/apt", "/var/lib/apt", "/var/lib/dpkg"},
+			distroType:    "debian",
+		},
+		{
+			name:          "rhel centos",
+			writablePaths: []string{"/var/cache/yum", "/var/lib/rpm"},
+			distroType:    "rhel",
+		},
+		{
+			name:          "fedora",
+			writablePaths: []string{"/var/cache/dnf", "/var/lib/dnf", "/var/lib/rpm"},
+			distroType:    "fedora",
+		},
+		{
+			name:          "alpine",
+			writablePaths: []string{"/var/cache/apk", "/lib/apk"},
+			distroType:    "alpine",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: config.RuntimeConfig{
+					BasePath:             "/opt/joblet/runtimes",
+					InstallWritablePaths: tt.writablePaths,
+				},
+			}
+			testLogger := logger.New()
+			testPlatform := platform.NewPlatform()
+
+			installer := NewRuntimeInstaller(cfg, testLogger, testPlatform)
+
+			// Verify all paths are stored
+			assert.Equal(t, tt.writablePaths, installer.config.Runtime.InstallWritablePaths)
+		})
+	}
+}
+
+func TestRuntimeConfig_CrossDistroCompatibility(t *testing.T) {
+	// Test configurations for different Linux distributions
+	distroConfigs := map[string]config.RuntimeConfig{
+		"debian": {
+			BasePath:             "/opt/joblet/runtimes",
+			InstallWritablePaths: []string{"/var/cache/apt", "/var/lib/apt", "/var/lib/dpkg"},
+			InstallHostBinds:     []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc", "/var"},
+			InstallEnvPath:       "/usr/bin:/bin:/sbin:/usr/sbin",
+		},
+		"rhel": {
+			BasePath:             "/opt/joblet/runtimes",
+			InstallWritablePaths: []string{"/var/cache/yum", "/var/lib/rpm"},
+			InstallHostBinds:     []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc", "/var"},
+			InstallEnvPath:       "/usr/bin:/bin:/sbin:/usr/sbin",
+		},
+		"fedora": {
+			BasePath:             "/opt/joblet/runtimes",
+			InstallWritablePaths: []string{"/var/cache/dnf", "/var/lib/dnf", "/var/lib/rpm"},
+			InstallHostBinds:     []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc", "/var"},
+			InstallEnvPath:       "/usr/bin:/bin:/sbin:/usr/sbin",
+		},
+		"alpine": {
+			BasePath:             "/opt/joblet/runtimes",
+			InstallWritablePaths: []string{"/var/cache/apk", "/lib/apk"},
+			InstallHostBinds:     []string{"/usr", "/lib", "/bin", "/sbin", "/etc", "/var"},
+			InstallEnvPath:       "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		},
+	}
+
+	for distro, runtimeCfg := range distroConfigs {
+		t.Run(distro, func(t *testing.T) {
+			cfg := &config.Config{
+				Runtime: runtimeCfg,
+			}
+
+			// Verify essential fields are set
+			assert.NotEmpty(t, cfg.Runtime.BasePath, "BasePath should not be empty for %s", distro)
+			assert.NotEmpty(t, cfg.Runtime.InstallWritablePaths, "InstallWritablePaths should not be empty for %s", distro)
+			assert.NotEmpty(t, cfg.Runtime.InstallHostBinds, "InstallHostBinds should not be empty for %s", distro)
+			assert.NotEmpty(t, cfg.Runtime.InstallEnvPath, "InstallEnvPath should not be empty for %s", distro)
+
+			// Verify common host binds are present
+			assert.Contains(t, cfg.Runtime.InstallHostBinds, "/usr")
+			assert.Contains(t, cfg.Runtime.InstallHostBinds, "/bin")
+			assert.Contains(t, cfg.Runtime.InstallHostBinds, "/lib")
+		})
+	}
+}
