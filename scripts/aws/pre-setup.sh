@@ -381,7 +381,7 @@ if [ "$CA_CERT_EXISTS" = false ] || [ "$CLIENT_CERT_EXISTS" = false ]; then
         openssl req -new -sha256 \
             -key "$CERT_TEMP_DIR/client.key" \
             -out "$CERT_TEMP_DIR/client.csr" \
-            -subj "/C=US/ST=Cloud/L=AWS/O=Joblet/OU=Client/CN=admin" 2>/dev/null
+            -subj "/C=US/ST=Cloud/L=AWS/O=Joblet/OU=admin/CN=admin-client" 2>/dev/null
 
         # Create client extensions file
         cat > "$CERT_TEMP_DIR/client_ext.cnf" << 'EXTEOF'
