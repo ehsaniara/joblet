@@ -89,7 +89,7 @@ Both guides result in the same setup:
 
 **Components:**
 
-- ✅ EC2 instance (Ubuntu 22.04)
+- ✅ EC2 instance (Ubuntu Server 24.04 LTS)
 - ✅ Joblet server with TLS
 - ✅ Docker for job isolation
 - ✅ CloudWatch logging and metrics

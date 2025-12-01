@@ -63,10 +63,161 @@ get_ec2_metadata() {
         "http://169.254.169.254/latest/meta-data/$path" 2>/dev/null || echo ""
 }
 
-# Check if AWS CLI is available
-check_aws_cli() {
-    if ! command -v aws >/dev/null 2>&1; then
-        print_error "AWS CLI not found. Please install it: https://aws.amazon.com/cli/"
+# ============================================================================
+# AWS Secrets Manager API Functions (using curl, no AWS CLI required)
+# ============================================================================
+
+# Cache for IAM credentials
+AWS_ACCESS_KEY_ID=""
+AWS_SECRET_ACCESS_KEY=""
+AWS_SESSION_TOKEN=""
+AWS_CREDS_EXPIRY=""
+
+# Get IAM credentials from EC2 instance metadata (IMDSv2)
+get_iam_credentials() {
+    if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_CREDS_EXPIRY" ]; then
+        # Check if credentials are still valid (with 5 minute buffer)
+        local now=$(date +%s)
+        local expiry=$(date -d "$AWS_CREDS_EXPIRY" +%s 2>/dev/null || echo 0)
+        if [ $now -lt $((expiry - 300)) ]; then
+            return 0  # Credentials still valid
+        fi
+    fi
+
+    # Get IMDS token
+    local token=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
+
+    if [ -z "$token" ]; then
+        print_error "Failed to get IMDS token"
+        return 1
+    fi
+
+    # Get IAM role name
+    local role_name=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $token" \
+        "http://169.254.169.254/latest/meta-data/iam/security-credentials/" 2>/dev/null)
+
+    if [ -z "$role_name" ]; then
+        print_error "No IAM role attached to this EC2 instance"
+        return 1
+    fi
+
+    # Get credentials for the role
+    local creds_json=$(curl -s -m 5 -H "X-aws-ec2-metadata-token: $token" \
+        "http://169.254.169.254/latest/meta-data/iam/security-credentials/$role_name" 2>/dev/null)
+
+    if [ -z "$creds_json" ]; then
+        print_error "Failed to get IAM credentials"
+        return 1
+    fi
+
+    # Parse credentials
+    if command -v jq >/dev/null 2>&1; then
+        AWS_ACCESS_KEY_ID=$(echo "$creds_json" | jq -r '.AccessKeyId')
+        AWS_SECRET_ACCESS_KEY=$(echo "$creds_json" | jq -r '.SecretAccessKey')
+        AWS_SESSION_TOKEN=$(echo "$creds_json" | jq -r '.Token')
+        AWS_CREDS_EXPIRY=$(echo "$creds_json" | jq -r '.Expiration')
+    else
+        # Fallback to grep/sed
+        AWS_ACCESS_KEY_ID=$(echo "$creds_json" | grep -o '"AccessKeyId" *: *"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+        AWS_SECRET_ACCESS_KEY=$(echo "$creds_json" | grep -o '"SecretAccessKey" *: *"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+        AWS_SESSION_TOKEN=$(echo "$creds_json" | grep -o '"Token" *: *"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+        AWS_CREDS_EXPIRY=$(echo "$creds_json" | grep -o '"Expiration" *: *"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+    fi
+
+    if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+        print_error "Failed to parse IAM credentials"
+        return 1
+    fi
+
+    return 0
+}
+
+# Helper function for HMAC-SHA256 (returns hex)
+hmac_sha256() {
+    local key="$1"
+    local data="$2"
+    echo -n "$data" | openssl dgst -sha256 -mac HMAC -macopt "hexkey:$key" | sed 's/^.* //'
+}
+
+# Helper function for HMAC-SHA256 with string key (returns hex)
+hmac_sha256_string_key() {
+    local key="$1"
+    local data="$2"
+    echo -n "$data" | openssl dgst -sha256 -hmac "$key" | sed 's/^.* //'
+}
+
+# AWS Signature Version 4 signing
+aws_sign_request() {
+    local method="$1"
+    local service="$2"
+    local region="$3"
+    local endpoint="$4"
+    local payload="$5"
+    local amz_target="$6"
+
+    local host="${service}.${region}.amazonaws.com"
+    local date_stamp=$(date -u +%Y%m%d)
+    local amz_date=$(date -u +%Y%m%dT%H%M%SZ)
+    local content_type="application/x-amz-json-1.1"
+
+    # Create canonical request
+    local payload_hash=$(echo -n "$payload" | openssl dgst -sha256 | sed 's/^.* //')
+
+    # Build canonical headers (must be sorted alphabetically and lowercase)
+    local canonical_headers="content-type:${content_type}
+host:${host}
+x-amz-date:${amz_date}
+x-amz-security-token:${AWS_SESSION_TOKEN}
+x-amz-target:${amz_target}
+"
+    local signed_headers="content-type;host;x-amz-date;x-amz-security-token;x-amz-target"
+
+    # Build canonical request
+    local canonical_request="${method}
+/
+
+${canonical_headers}
+${signed_headers}
+${payload_hash}"
+
+    local canonical_request_hash=$(echo -n "$canonical_request" | openssl dgst -sha256 | sed 's/^.* //')
+
+    # Create string to sign
+    local credential_scope="${date_stamp}/${region}/${service}/aws4_request"
+    local string_to_sign="AWS4-HMAC-SHA256
+${amz_date}
+${credential_scope}
+${canonical_request_hash}"
+
+    # Calculate signature using proper HMAC chain
+    # Step 1: kDate = HMAC("AWS4" + secretKey, dateStamp)
+    local k_date=$(hmac_sha256_string_key "AWS4${AWS_SECRET_ACCESS_KEY}" "$date_stamp")
+    # Step 2: kRegion = HMAC(kDate, region)
+    local k_region=$(hmac_sha256 "$k_date" "$region")
+    # Step 3: kService = HMAC(kRegion, service)
+    local k_service=$(hmac_sha256 "$k_region" "$service")
+    # Step 4: kSigning = HMAC(kService, "aws4_request")
+    local k_signing=$(hmac_sha256 "$k_service" "aws4_request")
+    # Step 5: signature = HMAC(kSigning, stringToSign)
+    local signature=$(hmac_sha256 "$k_signing" "$string_to_sign")
+
+    local authorization="AWS4-HMAC-SHA256 Credential=${AWS_ACCESS_KEY_ID}/${credential_scope}, SignedHeaders=${signed_headers}, Signature=${signature}"
+
+    # Make the request
+    curl -s -X "$method" "https://${host}/" \
+        -H "Content-Type: ${content_type}" \
+        -H "X-Amz-Date: ${amz_date}" \
+        -H "X-Amz-Target: ${amz_target}" \
+        -H "X-Amz-Security-Token: ${AWS_SESSION_TOKEN}" \
+        -H "Authorization: ${authorization}" \
+        -d "$payload"
+}
+
+# Check if we can access Secrets Manager
+check_secrets_manager_access() {
+    if ! get_iam_credentials; then
+        print_error "Cannot get IAM credentials from instance metadata"
         return 1
     fi
     return 0
@@ -77,9 +228,14 @@ secret_exists() {
     local secret_name="$1"
     local region="$2"
 
-    if aws secretsmanager describe-secret \
-        --secret-id "$secret_name" \
-        --region "$region" >/dev/null 2>&1; then
+    if ! get_iam_credentials; then
+        return 1
+    fi
+
+    local payload="{\"SecretId\":\"${secret_name}\"}"
+    local response=$(aws_sign_request "POST" "secretsmanager" "$region" "/" "$payload" "secretsmanager.DescribeSecret")
+
+    if echo "$response" | grep -q '"ARN"'; then
         return 0  # Exists
     else
         return 1  # Does not exist
@@ -91,11 +247,51 @@ get_secret() {
     local secret_name="$1"
     local region="$2"
 
-    aws secretsmanager get-secret-value \
-        --secret-id "$secret_name" \
-        --region "$region" \
-        --query 'SecretString' \
-        --output text 2>/dev/null || echo ""
+    if ! get_iam_credentials; then
+        echo ""
+        return
+    fi
+
+    local payload="{\"SecretId\":\"${secret_name}\"}"
+    local response=$(aws_sign_request "POST" "secretsmanager" "$region" "/" "$payload" "secretsmanager.GetSecretValue")
+
+    # Check for errors
+    if echo "$response" | grep -q '"__type".*Exception'; then
+        local error_msg
+        if command -v jq >/dev/null 2>&1; then
+            error_msg=$(echo "$response" | jq -r '.Message // empty')
+        else
+            error_msg=$(echo "$response" | grep -o '"Message" *: *"[^"]*"' | head -1 | sed 's/.*: *"\(.*\)"/\1/')
+        fi
+        print_error "Failed to get secret: $error_msg"
+        echo ""
+        return
+    fi
+
+    # Extract SecretString from response
+    local secret_string
+    if command -v jq >/dev/null 2>&1; then
+        secret_string=$(echo "$response" | jq -r '.SecretString // empty')
+    else
+        # Fallback to sed - extract between "SecretString":" and next "
+        secret_string=$(echo "$response" | \
+            grep -o '"SecretString" *: *"[^"]*"' | \
+            sed 's/"SecretString" *: *"//' | \
+            sed 's/"$//' | \
+            sed 's/\\n/\n/g')
+    fi
+    echo "$secret_string"
+}
+
+# Escape string for JSON
+json_escape() {
+    local str="$1"
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$str" | jq -Rs '.[:-1]'  | sed 's/^"//; s/"$//'
+    else
+        # Fallback: escape backslashes, quotes, and newlines
+        printf '%s' "$str" | sed 's/\\/\\\\/g; s/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
+    fi
 }
 
 # Store secret in Secrets Manager
@@ -105,23 +301,39 @@ store_secret() {
     local region="$3"
     local description="$4"
 
+    if ! get_iam_credentials; then
+        print_error "Cannot store secret: failed to get IAM credentials"
+        return 1
+    fi
+
+    # Escape the secret value for JSON
+    local escaped_value=$(json_escape "$secret_value")
+
     if secret_exists "$secret_name" "$region"; then
         # Update existing secret
-        aws secretsmanager update-secret \
-            --secret-id "$secret_name" \
-            --secret-string "$secret_value" \
-            --region "$region" >/dev/null 2>&1
-        print_success "Updated existing secret: $secret_name"
+        local payload="{\"SecretId\":\"${secret_name}\",\"SecretString\":\"${escaped_value}\"}"
+        local response=$(aws_sign_request "POST" "secretsmanager" "$region" "/" "$payload" "secretsmanager.UpdateSecret")
+
+        if echo "$response" | grep -q '"ARN"'; then
+            print_success "Updated existing secret: $secret_name"
+        else
+            print_error "Failed to update secret: $secret_name"
+            print_error "Response: $response"
+            return 1
+        fi
     else
         # Create new secret
-        aws secretsmanager create-secret \
-            --name "$secret_name" \
-            --description "$description" \
-            --secret-string "$secret_value" \
-            --region "$region" \
-            --tags Key=Application,Value=Joblet Key=Type,Value=Certificate \
-            >/dev/null 2>&1
-        print_success "Created new secret: $secret_name"
+        local escaped_desc=$(json_escape "$description")
+        local payload="{\"Name\":\"${secret_name}\",\"Description\":\"${escaped_desc}\",\"SecretString\":\"${escaped_value}\"}"
+        local response=$(aws_sign_request "POST" "secretsmanager" "$region" "/" "$payload" "secretsmanager.CreateSecret")
+
+        if echo "$response" | grep -q '"ARN"'; then
+            print_success "Created new secret: $secret_name"
+        else
+            print_error "Failed to create secret: $secret_name"
+            print_error "Response: $response"
+            return 1
+        fi
     fi
 }
 
@@ -209,14 +421,14 @@ else
     print_warning "Secrets Manager NOT enabled (USE_SECRETS_MANAGER=$USE_SECRETS_MANAGER, IS_EC2=$IS_EC2)"
 fi
 
-# Check AWS CLI availability if using Secrets Manager
+# Check Secrets Manager access if using Secrets Manager
 if [ "$SHOULD_USE_SM" = "true" ]; then
-    if ! check_aws_cli; then
-        print_warning "AWS CLI not available, falling back to embedded certificates"
-        SHOULD_USE_SM="false"
-    elif [ -z "$EC2_REGION" ]; then
+    if [ -z "$EC2_REGION" ]; then
         print_error "Cannot determine AWS region"
         print_warning "Set EC2_REGION environment variable or disable Secrets Manager"
+        SHOULD_USE_SM="false"
+    elif ! check_secrets_manager_access; then
+        print_warning "Cannot access AWS Secrets Manager, falling back to embedded certificates"
         SHOULD_USE_SM="false"
     fi
 fi

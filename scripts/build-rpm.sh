@@ -131,6 +131,7 @@ Source0:        %{name}-%{version}.tar.gz
 Requires:       systemd
 Requires:       openssl >= 1.1.1
 Requires:       curl
+Requires:       jq
 
 # Network requirements
 Requires:       iptables

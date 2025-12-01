@@ -33,7 +33,7 @@ The script will:
 
 2. **Configure the instance**:
     - **Name**: `joblet-server`
-    - **AMI**: Ubuntu Server 22.04 LTS (latest)
+    - **AMI**: Ubuntu Server 24.04 LTS
     - **Instance type**: `t3.medium` (or larger)
     - **Key pair**: Select or create your SSH key pair
     - **Network**: Select the VPC from Step 1 ⬅️ Important!
@@ -131,7 +131,7 @@ sudo systemctl status joblet
 
 ### EC2 Instance
 
-- **Ubuntu 22.04** LTS
+- **Ubuntu Server 24.04 LTS** (recommended)
 - **Joblet server** running on port 443 (gRPC)
 - **Auto-starts on boot** (systemd service)
 - **30GB gp3 EBS** volume
@@ -196,7 +196,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/l
 
 The `launch-instance.sh` script will:
 
-- Find the latest Ubuntu 22.04 AMI
+- Find the latest Ubuntu 24.04 LTS AMI
 - Prompt for security group selection (or create one)
 - Launch EC2 instance with user data
 - Output instance details (IP, DNS, etc.)
@@ -435,7 +435,7 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 │  │                           VPC                                │  │
 │  │                                                              │  │
 │  │  ┌────────────────────────────────────────────────────┐     │  │
-│  │  │ EC2 Instance (Ubuntu 22.04)                        │     │  │
+│  │  │ EC2 Instance (Ubuntu 24.04 LTS)                     │     │  │
 │  │  │                                                    │     │  │
 │  │  │  ┌──────────────────────────────────────────┐     │     │  │
 │  │  │  │ Joblet Server (port 443)                 │     │     │  │

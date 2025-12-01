@@ -7,7 +7,7 @@
 # - Auto-detects the OS (Ubuntu/Debian vs Amazon Linux/RHEL)
 # - Gathers EC2 metadata (instance ID, region, IPs)
 # - Downloads and installs the appropriate Joblet package
-# - Configures Joblet with EC2-specific settings
+# - Configures Joblet with EC2-specific settings (uses curl for AWS API calls)
 # - Optionally enables CloudWatch Logs backend
 # - Starts the Joblet service
 #
