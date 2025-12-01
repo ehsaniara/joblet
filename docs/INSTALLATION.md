@@ -835,7 +835,7 @@ subjectAltName = DNS:localhost,DNS:joblet,IP:127.0.0.1,IP:${JOBLET_SERVER_ADDRES
 # Create client certificate
 openssl genrsa -out client-key.pem 4096
 openssl req -new -key client-key.pem -out client.csr \
-  -subj "/CN=rnx-client/OU=admin"
+  -subj "/CN=admin-client/OU=admin"
 openssl x509 -req -in client.csr -CA ca-cert.pem -CAkey ca-key.pem \
   -out client-cert.pem -days 365 -CAcreateserial
 ```
