@@ -618,8 +618,8 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 	}
 
 	// Bind mount host filesystem directories (READ-ONLY to prevent host contamination)
-	hostDirs := []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc", "/var"}
-	for _, dir := range hostDirs {
+	// Uses config-driven list to support different distros (Debian, RHEL, Alpine, etc.)
+	for _, dir := range ri.config.Runtime.InstallHostBinds {
 		if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
 			target := filepath.Join(chrootDir, dir)
 			// CRITICAL: Mount as READ-ONLY to prevent host contamination
@@ -629,37 +629,52 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 				continue
 			}
 			// Make the bind mount read-only (requires remount)
+			// CRITICAL: If this fails, we MUST unmount to prevent host contamination
 			if err := syscall.Mount("", target, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
-				ri.logger.Debug("failed to make bind mount read-only", "target", target, "error", err)
-				// Don't add to mountedPaths if remount failed
+				ri.logger.Warn("failed to make bind mount read-only, unmounting for safety", "target", target, "error", err)
+				// Unmount the writable bind mount to prevent host contamination
+				if unmountErr := syscall.Unmount(target, syscall.MNT_DETACH); unmountErr != nil {
+					ri.logger.Error("failed to unmount writable bind mount", "target", target, "error", unmountErr)
+				}
 				continue
 			}
 			mountedPaths = append(mountedPaths, target)
 		}
 	}
 
-	// Mount writable tmpfs for apt cache (required for runtime installation with apt)
-	// This overlays on top of the read-only /var mount
-	aptCacheDir := filepath.Join(chrootDir, "var/cache/apt")
-	if err := os.MkdirAll(aptCacheDir, 0755); err == nil {
-		if err := syscall.Mount("tmpfs", aptCacheDir, "tmpfs", 0, "size=2G"); err != nil {
-			ri.logger.Debug("failed to mount tmpfs for apt cache", "target", aptCacheDir, "error", err)
-		} else {
-			mountedPaths = append(mountedPaths, aptCacheDir)
-			// Create required subdirectories (ignore errors - non-critical)
-			_ = os.MkdirAll(filepath.Join(aptCacheDir, "archives", "partial"), 0755)
+	// Mount writable tmpfs for package manager directories (from config)
+	// This allows apt/dpkg/yum/dnf to work inside the chroot
+	for _, writablePath := range ri.config.Runtime.InstallWritablePaths {
+		targetDir := filepath.Join(chrootDir, writablePath)
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			ri.logger.Debug("failed to create writable dir", "path", targetDir, "error", err)
+			continue
 		}
-	}
+		if err := syscall.Mount("tmpfs", targetDir, "tmpfs", 0, "size=2G"); err != nil {
+			ri.logger.Debug("failed to mount tmpfs", "target", targetDir, "error", err)
+			continue
+		}
+		mountedPaths = append(mountedPaths, targetDir)
 
-	// Mount writable tmpfs for apt lib (dpkg status, etc.)
-	aptLibDir := filepath.Join(chrootDir, "var/lib/apt")
-	if err := os.MkdirAll(aptLibDir, 0755); err == nil {
-		if err := syscall.Mount("tmpfs", aptLibDir, "tmpfs", 0, "size=512M"); err != nil {
-			ri.logger.Debug("failed to mount tmpfs for apt lib", "target", aptLibDir, "error", err)
-		} else {
-			mountedPaths = append(mountedPaths, aptLibDir)
-			// Create required subdirectories (ignore errors - non-critical)
-			_ = os.MkdirAll(filepath.Join(aptLibDir, "lists", "partial"), 0755)
+		// Copy existing data from host if it exists (needed for dpkg database, etc.)
+		if stat, err := os.Stat(writablePath); err == nil && stat.IsDir() {
+			copyCmd := exec.Command("cp", "-a", writablePath+"/.", targetDir)
+			_ = copyCmd.Run()
+		}
+
+		// Recreate subdirectory structure from host (needed for package managers)
+		// This handles apt, yum, dnf, etc. without hardcoding distro-specific paths
+		if stat, err := os.Stat(writablePath); err == nil && stat.IsDir() {
+			_ = filepath.Walk(writablePath, func(path string, info os.FileInfo, err error) error {
+				if err != nil || !info.IsDir() {
+					return nil
+				}
+				relPath, _ := filepath.Rel(writablePath, path)
+				if relPath != "." {
+					_ = os.MkdirAll(filepath.Join(targetDir, relPath), 0755)
+				}
+				return nil
+			})
 		}
 	}
 
@@ -850,12 +865,17 @@ fi
 func (ri *RuntimeInstaller) runChrootCommand(ctx context.Context, chrootDir, command string, args []string, runtimeSpec string, runtimeVersion string, streamer RuntimeInstallationStreamer) (string, error) {
 	cmd := exec.CommandContext(ctx, "chroot", append([]string{chrootDir, command}, args...)...)
 
+	// Use config-driven PATH to support different distros
+	envPath := ri.config.Runtime.InstallEnvPath
+	if envPath == "" {
+		envPath = "/usr/bin:/bin:/sbin:/usr/sbin" // fallback default
+	}
 	env := []string{
-		"PATH=/usr/bin:/bin:/sbin:/usr/sbin",
+		fmt.Sprintf("PATH=%s", envPath),
 		"HOME=/root",
 		fmt.Sprintf("RUNTIME_SPEC=%s", runtimeSpec),
 		fmt.Sprintf("RUNTIME_VERSION=%s", runtimeVersion),
-		"RUNTIME_DIR=/opt/joblet/runtimes",
+		fmt.Sprintf("RUNTIME_DIR=%s", ri.config.Runtime.BasePath),
 		fmt.Sprintf("BUILD_ID=install-%d", time.Now().Unix()),
 		"JOBLET_CHROOT=true",
 	}

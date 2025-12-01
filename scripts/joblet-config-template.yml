@@ -109,6 +109,29 @@ runtime:
     - "/usr/lib/jvm"
     - "/usr/local/node"
     - "/usr/local/go"
+  # Writable tmpfs mounts for runtime installation (package manager support)
+  # These directories get tmpfs overlays during chroot-based runtime installation
+  # Debian/Ubuntu: apt/dpkg directories
+  # RHEL/Fedora: yum/dnf directories (add as needed)
+  install_writable_paths:
+    - "/var/cache/apt"           # apt package cache
+    - "/var/lib/apt"             # apt state
+    - "/var/lib/dpkg"            # dpkg database
+    # - "/var/cache/yum"         # yum cache (RHEL/CentOS)
+    # - "/var/cache/dnf"         # dnf cache (Fedora)
+    # - "/var/lib/rpm"           # rpm database
+  # Host directories to bind-mount read-only during runtime installation
+  # These provide access to host binaries/libraries for setup scripts
+  install_host_binds:
+    - "/usr"
+    - "/lib"
+    - "/lib64"
+    - "/bin"
+    - "/sbin"
+    - "/etc"
+    - "/var"
+  # PATH environment variable for runtime installation chroot
+  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
   # Paths mounted read-only into job sandbox
   allowed_mounts:
     - "/usr/bin"
