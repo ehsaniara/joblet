@@ -229,29 +229,17 @@ secret_exists() {
     local region="$2"
 
     if ! get_iam_credentials; then
-        print_error "secret_exists: Failed to get IAM credentials"
         return 1
     fi
 
     local payload="{\"SecretId\":\"${secret_name}\"}"
     local response=$(aws_sign_request "POST" "secretsmanager" "$region" "/" "$payload" "secretsmanager.DescribeSecret")
 
-    print_info "DEBUG: secret_exists check for '$secret_name' in region '$region'"
-
     if echo "$response" | grep -q '"ARN"'; then
-        print_info "DEBUG: Secret '$secret_name' exists"
         return 0  # Exists
     else
-        # Check for specific error types
-        if echo "$response" | grep -q "ResourceNotFoundException"; then
-            print_info "DEBUG: Secret '$secret_name' does not exist (ResourceNotFoundException)"
-        elif echo "$response" | grep -q "AccessDeniedException"; then
-            print_error "DEBUG: Access denied to secret '$secret_name' - check IAM permissions"
-            print_error "DEBUG: Response: $response"
-        elif echo "$response" | grep -q "Exception"; then
-            print_error "DEBUG: Error checking secret '$secret_name': $response"
-        else
-            print_info "DEBUG: Secret '$secret_name' not found (response: ${response:0:200}...)"
+        if echo "$response" | grep -q "AccessDeniedException"; then
+            print_error "Access denied to secret '$secret_name' - check IAM permissions"
         fi
         return 1  # Does not exist
     fi
@@ -262,10 +250,7 @@ get_secret() {
     local secret_name="$1"
     local region="$2"
 
-    print_info "DEBUG: get_secret called for '$secret_name' in region '$region'"
-
     if ! get_iam_credentials; then
-        print_error "get_secret: Failed to get IAM credentials"
         echo ""
         return
     fi
@@ -282,7 +267,6 @@ get_secret() {
             error_msg=$(echo "$response" | grep -o '"Message" *: *"[^"]*"' | head -1 | sed 's/.*: *"\(.*\)"/\1/')
         fi
         print_error "Failed to get secret '$secret_name': $error_msg"
-        print_error "DEBUG: Full response: ${response:0:500}"
         echo ""
         return
     fi
@@ -298,12 +282,6 @@ get_secret() {
             sed 's/"SecretString" *: *"//' | \
             sed 's/"$//' | \
             sed 's/\\n/\n/g')
-    fi
-
-    if [ -n "$secret_string" ]; then
-        print_info "DEBUG: Successfully retrieved secret '$secret_name' (${#secret_string} bytes)"
-    else
-        print_warning "DEBUG: Secret '$secret_name' retrieved but content is empty"
     fi
 
     echo "$secret_string"
@@ -416,37 +394,27 @@ cd "$TEMP_DIR"
 
 # Detect AWS environment
 # Check if already set by parent process (exported from common-install-functions.sh)
-print_info "DEBUG: Initial values - IS_EC2='$IS_EC2', EC2_REGION='$EC2_REGION'"
 if [ "$IS_EC2" = "true" ] && [ -n "$EC2_REGION" ]; then
-    print_info "Using EC2 environment from parent process (region: $EC2_REGION)"
+    print_info "Using EC2 environment (region: $EC2_REGION)"
 elif [ -f /tmp/joblet-ec2-info ]; then
     source /tmp/joblet-ec2-info
-    print_info "Using EC2 metadata from /tmp/joblet-ec2-info (IS_EC2=$IS_EC2, EC2_REGION=$EC2_REGION)"
+    print_info "Using EC2 metadata from cache (region: $EC2_REGION)"
 elif detect_ec2; then
     IS_EC2="true"
     EC2_REGION=$(get_ec2_metadata "placement/region")
-    print_info "EC2 auto-detected via metadata service (region: $EC2_REGION)"
+    print_info "EC2 detected (region: $EC2_REGION)"
 else
     IS_EC2="false"
     EC2_REGION=""
     print_info "Not running on EC2"
 fi
-print_info "DEBUG: Final values - IS_EC2='$IS_EC2', EC2_REGION='$EC2_REGION'"
 
 # Determine if we should use Secrets Manager
 SHOULD_USE_SM="false"
-print_info "USE_SECRETS_MANAGER=$USE_SECRETS_MANAGER, IS_EC2=$IS_EC2, EC2_REGION=$EC2_REGION"
 if [ "$USE_SECRETS_MANAGER" = "true" ]; then
     SHOULD_USE_SM="true"
-    print_info "Secrets Manager explicitly enabled"
 elif [ "$USE_SECRETS_MANAGER" = "auto" ] && [ "$IS_EC2" = "true" ]; then
     SHOULD_USE_SM="true"
-    print_info "Secrets Manager auto-enabled (detected EC2 environment)"
-elif [ "$USE_SECRETS_MANAGER" = "false" ]; then
-    SHOULD_USE_SM="false"
-    print_info "Secrets Manager explicitly disabled"
-else
-    print_warning "Secrets Manager NOT enabled (USE_SECRETS_MANAGER=$USE_SECRETS_MANAGER, IS_EC2=$IS_EC2)"
 fi
 
 # Check Secrets Manager access if using Secrets Manager
