@@ -229,15 +229,30 @@ secret_exists() {
     local region="$2"
 
     if ! get_iam_credentials; then
+        print_error "secret_exists: Failed to get IAM credentials"
         return 1
     fi
 
     local payload="{\"SecretId\":\"${secret_name}\"}"
     local response=$(aws_sign_request "POST" "secretsmanager" "$region" "/" "$payload" "secretsmanager.DescribeSecret")
 
+    print_info "DEBUG: secret_exists check for '$secret_name' in region '$region'"
+
     if echo "$response" | grep -q '"ARN"'; then
+        print_info "DEBUG: Secret '$secret_name' exists"
         return 0  # Exists
     else
+        # Check for specific error types
+        if echo "$response" | grep -q "ResourceNotFoundException"; then
+            print_info "DEBUG: Secret '$secret_name' does not exist (ResourceNotFoundException)"
+        elif echo "$response" | grep -q "AccessDeniedException"; then
+            print_error "DEBUG: Access denied to secret '$secret_name' - check IAM permissions"
+            print_error "DEBUG: Response: $response"
+        elif echo "$response" | grep -q "Exception"; then
+            print_error "DEBUG: Error checking secret '$secret_name': $response"
+        else
+            print_info "DEBUG: Secret '$secret_name' not found (response: ${response:0:200}...)"
+        fi
         return 1  # Does not exist
     fi
 }
@@ -247,7 +262,10 @@ get_secret() {
     local secret_name="$1"
     local region="$2"
 
+    print_info "DEBUG: get_secret called for '$secret_name' in region '$region'"
+
     if ! get_iam_credentials; then
+        print_error "get_secret: Failed to get IAM credentials"
         echo ""
         return
     fi
@@ -263,7 +281,8 @@ get_secret() {
         else
             error_msg=$(echo "$response" | grep -o '"Message" *: *"[^"]*"' | head -1 | sed 's/.*: *"\(.*\)"/\1/')
         fi
-        print_error "Failed to get secret: $error_msg"
+        print_error "Failed to get secret '$secret_name': $error_msg"
+        print_error "DEBUG: Full response: ${response:0:500}"
         echo ""
         return
     fi
@@ -280,6 +299,13 @@ get_secret() {
             sed 's/"$//' | \
             sed 's/\\n/\n/g')
     fi
+
+    if [ -n "$secret_string" ]; then
+        print_info "DEBUG: Successfully retrieved secret '$secret_name' (${#secret_string} bytes)"
+    else
+        print_warning "DEBUG: Secret '$secret_name' retrieved but content is empty"
+    fi
+
     echo "$secret_string"
 }
 
@@ -287,7 +313,9 @@ get_secret() {
 json_escape() {
     local str="$1"
     if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$str" | jq -Rs '.[:-1]'  | sed 's/^"//; s/"$//'
+        # jq -Rs reads input as raw string and outputs as JSON string
+        # We strip the surrounding quotes to get just the escaped content
+        printf '%s' "$str" | jq -Rs . | sed 's/^"//; s/"$//'
     else
         # Fallback: escape backslashes, quotes, and newlines
         printf '%s' "$str" | sed 's/\\/\\\\/g; s/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
