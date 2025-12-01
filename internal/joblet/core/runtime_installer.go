@@ -638,6 +638,31 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 		}
 	}
 
+	// Mount writable tmpfs for apt cache (required for runtime installation with apt)
+	// This overlays on top of the read-only /var mount
+	aptCacheDir := filepath.Join(chrootDir, "var/cache/apt")
+	if err := os.MkdirAll(aptCacheDir, 0755); err == nil {
+		if err := syscall.Mount("tmpfs", aptCacheDir, "tmpfs", 0, "size=2G"); err != nil {
+			ri.logger.Debug("failed to mount tmpfs for apt cache", "target", aptCacheDir, "error", err)
+		} else {
+			mountedPaths = append(mountedPaths, aptCacheDir)
+			// Create required subdirectories (ignore errors - non-critical)
+			_ = os.MkdirAll(filepath.Join(aptCacheDir, "archives", "partial"), 0755)
+		}
+	}
+
+	// Mount writable tmpfs for apt lib (dpkg status, etc.)
+	aptLibDir := filepath.Join(chrootDir, "var/lib/apt")
+	if err := os.MkdirAll(aptLibDir, 0755); err == nil {
+		if err := syscall.Mount("tmpfs", aptLibDir, "tmpfs", 0, "size=512M"); err != nil {
+			ri.logger.Debug("failed to mount tmpfs for apt lib", "target", aptLibDir, "error", err)
+		} else {
+			mountedPaths = append(mountedPaths, aptLibDir)
+			// Create required subdirectories (ignore errors - non-critical)
+			_ = os.MkdirAll(filepath.Join(aptLibDir, "lists", "partial"), 0755)
+		}
+	}
+
 	// The bind mounts above provide access to host binaries
 	// Setup scripts will find what they need and copy to their isolated/ directory
 
