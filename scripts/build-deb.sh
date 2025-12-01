@@ -114,7 +114,7 @@ Version: $CLEAN_VERSION
 Section: utils
 Priority: optional
 Architecture: $ARCH
-Depends: openssl (>= 1.1.1), systemd, debconf (>= 0.5) | debconf-2.0, curl
+Depends: openssl (>= 1.1.1), systemd, debconf (>= 0.5) | debconf-2.0, curl, jq
 Maintainer: Jay Ehsaniara <ehsaniara@gmail.com>
 Homepage: https://github.com/ehsaniara/joblet
 Description: Joblet Job Isolation Platform with Embedded Certificates

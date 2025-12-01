@@ -60,7 +60,7 @@ This guide walks you through setting up Joblet on AWS EC2, including:
 | Setting       | Recommendation               | Minimum       |
 |---------------|------------------------------|---------------|
 | Instance Type | `t3.large` (2 vCPU, 8GB RAM) | `t3.medium`   |
-| OS            | Ubuntu 22.04 LTS             | Ubuntu 20.04+ |
+| OS            | Ubuntu Server 24.04 LTS      | Ubuntu 22.04+ |
 | Storage       | 50GB gp3 SSD                 | 30GB          |
 | Architecture  | x86_64                       | x86_64        |
 
@@ -76,7 +76,7 @@ This guide walks you through setting up Joblet on AWS EC2, including:
    ```
 
 3. **Application and OS Images:**
-    - Choose: Ubuntu Server 22.04 LTS (HVM), SSD Volume Type
+    - Choose: Ubuntu Server 24.04 LTS (HVM), SSD Volume Type
     - Architecture: 64-bit (x86)
 
 4. **Instance Type:**

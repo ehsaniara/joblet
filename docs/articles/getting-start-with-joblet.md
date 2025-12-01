@@ -25,7 +25,7 @@ dependency on kernel features like cgroups and namespaces.
 
 ### Prerequisites
 
-- Ubuntu 20.04 or later (also supports RHEL/CentOS 8+, Amazon Linux)
+- Ubuntu 22.04 or later (Ubuntu 24.04 LTS recommended; also supports RHEL/CentOS 8+, Amazon Linux 2023)
 - Root or sudo access
 - At least 2GB RAM and 20GB disk space
 - Port 50051 available for gRPC communication

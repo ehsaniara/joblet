@@ -26,7 +26,7 @@ Joblet requires Linux for job execution due to its dependency on Linux-specific 
 
 | Component            | Requirement                               | Notes                                      |
 |----------------------|-------------------------------------------|--------------------------------------------|
-| **Operating System** | Linux (Ubuntu 20.04+, CentOS 8+, RHEL 8+) | Kernel 4.6+ required for cgroup namespaces |
+| **Operating System** | Linux (Ubuntu 22.04+, CentOS 8+, RHEL 8+) | Kernel 4.6+ required for cgroup namespaces |
 | **Kernel Features**  | cgroups v2, namespaces, systemd           | `CONFIG_CGROUPS=y`, `CONFIG_NAMESPACES=y`  |
 | **Architecture**     | x86_64 (amd64) or ARM64                   | Single binary supports both                |
 | **Memory**           | 2GB+ RAM (scales with concurrent jobs)    | ~2MB overhead per job                      |
@@ -104,7 +104,7 @@ multiple nodes.
 #### Prerequisites
 
 1. **EC2 Instance Requirements:**
-    - Amazon Linux 2, Ubuntu 20.04+, or Red Hat Enterprise Linux 8+
+    - Amazon Linux 2023, Ubuntu Server 24.04 LTS (recommended), or Red Hat Enterprise Linux 8+
     - Instance type: t3.medium or larger (2 vCPU, 4GB RAM minimum)
     - Storage: 20GB+ EBS volume
 
