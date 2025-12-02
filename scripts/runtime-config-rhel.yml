@@ -30,6 +30,7 @@ runtime:
     - "/var/lib/yum"             # yum state
     - "/etc/yum.repos.d"         # yum repos config
     - "/var/log/yum.log"         # yum logs
+    - "/usr/local"               # pip installs packages here
 
   # Host directories to bind-mount read-only during runtime installation
   # These provide access to host binaries/libraries for setup scripts
