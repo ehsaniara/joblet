@@ -26,6 +26,7 @@ runtime:
     - "/var/cache/apk"           # apk package cache
     - "/lib/apk"                 # apk database
     - "/etc/apk"                 # apk config
+    - "/usr/local"               # pip installs packages here
 
   # Host directories to bind-mount read-only during runtime installation
   # These provide access to host binaries/libraries for setup scripts

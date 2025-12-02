@@ -681,6 +681,17 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 	// The bind mounts above provide access to host binaries
 	// Setup scripts will find what they need and copy to their isolated/ directory
 
+	// Ensure DNS resolution works in chroot by copying resolved resolv.conf content
+	// On modern systems (especially EC2 with systemd-resolved), /etc/resolv.conf is often
+	// a symlink (e.g., -> ../run/systemd/resolve/stub-resolv.conf). The symlink chain
+	// may not resolve correctly through bind mounts, so we copy the actual content.
+	if resolvMount, err := ri.ensureDNSResolution(chrootDir); err != nil {
+		ri.logger.Warn("failed to ensure DNS resolution in chroot", "error", err)
+		// Non-fatal: continue anyway, some setups might work without this
+	} else if resolvMount != "" {
+		mountedPaths = append(mountedPaths, resolvMount)
+	}
+
 	cleanup := func() {
 		// Unmount all mounted paths in reverse order
 		for i := len(mountedPaths) - 1; i >= 0; i-- {
@@ -721,6 +732,65 @@ func (ri *RuntimeInstaller) createDeviceNodes(chrootDir string) error {
 // makedev creates a device number from major and minor numbers
 func (ri *RuntimeInstaller) makedev(major, minor uint32) uint64 {
 	return uint64(major)<<8 | uint64(minor)
+}
+
+// ensureDNSResolution ensures DNS works in the chroot by bind-mounting resolv.conf content
+// On modern systems with systemd-resolved (common on EC2), /etc/resolv.conf is a symlink
+// that may not resolve correctly through bind mounts. This function reads the actual
+// nameserver configuration and bind-mounts it into the chroot.
+// Returns the mount path for cleanup tracking, or empty string if no mount was created.
+// Note: /etc/resolv.conf is a universal POSIX/FHS standard path across all Linux distributions.
+func (ri *RuntimeInstaller) ensureDNSResolution(chrootDir string) (string, error) {
+	// /etc/resolv.conf is the standard DNS resolver config path on all Linux distros (POSIX/FHS)
+	const hostResolvConf = "/etc/resolv.conf"
+
+	// Read the resolved content of /etc/resolv.conf (follows symlinks)
+	resolvContent, err := os.ReadFile(hostResolvConf)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", hostResolvConf, err)
+	}
+
+	// Create a temp file with the resolv.conf content
+	tmpFile, err := os.CreateTemp("", "resolv.conf-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp resolv.conf: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	if _, err := tmpFile.Write(resolvContent); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to write temp resolv.conf: %w", err)
+	}
+	tmpFile.Close()
+
+	// Target path in chroot (same standard path)
+	chrootResolv := filepath.Join(chrootDir, hostResolvConf)
+
+	// Ensure target directory exists (needed for bind mount)
+	if err := os.MkdirAll(filepath.Dir(chrootResolv), 0755); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to create dir for %s in chroot: %w", hostResolvConf, err)
+	}
+
+	// Create empty target file if it doesn't exist (needed for file bind mount)
+	if _, err := os.Stat(chrootResolv); os.IsNotExist(err) {
+		if f, err := os.Create(chrootResolv); err == nil {
+			f.Close()
+		}
+	}
+
+	// Bind mount our temp file over the chroot's resolv.conf
+	if err := syscall.Mount(tmpPath, chrootResolv, "", syscall.MS_BIND, ""); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to bind mount %s: %w", hostResolvConf, err)
+	}
+
+	ri.logger.Debug("DNS resolution configured in chroot via bind mount", "path", chrootResolv, "content_size", len(resolvContent))
+
+	// Note: tmpFile will be cleaned up when the chroot is cleaned up
+	// The bind mount keeps the file accessible even after unlink
+	return chrootResolv, nil
 }
 
 // downloadAndExtractRepo downloads and extracts GitHub repository

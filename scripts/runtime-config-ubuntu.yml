@@ -29,6 +29,7 @@ runtime:
     - "/var/lib/dpkg"            # dpkg database
     - "/etc/apt"                 # apt config
     - "/var/log/apt"             # apt logs
+    - "/usr/local"               # pip installs packages here
 
   # Host directories to bind-mount read-only during runtime installation
   # These provide access to host binaries/libraries for setup scripts

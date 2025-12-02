@@ -348,15 +348,14 @@ func TestRuntimeConfig_InstallEnvPath(t *testing.T) {
 
 func TestRuntimeConfig_DefaultValues(t *testing.T) {
 	// Test that default config has expected values
+	// Note: InstallWritablePaths is empty in DefaultConfig (distro-specific, loaded from runtime-config.yml)
+	// InstallHostBinds has FHS-compliant defaults that work on all distros
 	defaultCfg := config.DefaultConfig
 
-	// InstallWritablePaths should be EMPTY by default
-	// Distro-specific paths must be configured via runtime-config.yml
-	// This ensures cross-distribution compatibility (apt vs yum vs dnf vs apk)
-	assert.Empty(t, defaultCfg.Runtime.InstallWritablePaths,
-		"InstallWritablePaths should be empty - distro-specific paths come from runtime-config.yml")
+	// Check InstallWritablePaths is empty (distro-specific, loaded from runtime-config.yml)
+	assert.Empty(t, defaultCfg.Runtime.InstallWritablePaths, "InstallWritablePaths should be empty in DefaultConfig - loaded from runtime-config.yml")
 
-	// Check InstallHostBinds defaults (FHS-compliant, works on all distros)
+	// Check InstallHostBinds has FHS-compliant defaults (work on all distros)
 	assert.NotEmpty(t, defaultCfg.Runtime.InstallHostBinds)
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/usr")
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/lib")
@@ -364,8 +363,11 @@ func TestRuntimeConfig_DefaultValues(t *testing.T) {
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/etc")
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/var")
 
-	// Check InstallEnvPath default (standard PATH, works on all distros)
+	// Check InstallEnvPath has fallback default
 	assert.Equal(t, "/usr/bin:/bin:/sbin:/usr/sbin", defaultCfg.Runtime.InstallEnvPath)
+
+	// Check base path default
+	assert.Equal(t, "/opt/joblet/runtimes", defaultCfg.Runtime.BasePath)
 }
 
 func TestRuntimeInstaller_ConfigDrivenEnvPath(t *testing.T) {
