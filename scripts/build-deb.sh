@@ -93,6 +93,17 @@ else
     exit 1
 fi
 
+# Copy runtime config files for all supported distros
+# The installer will select the appropriate one based on OS detection
+for distro in ubuntu rhel fedora alpine; do
+    if [ -f "./scripts/runtime-config-${distro}.yml" ]; then
+        cp "./scripts/runtime-config-${distro}.yml" "$BUILD_DIR/opt/joblet/scripts/"
+        echo "✅ Copied runtime-config-${distro}.yml"
+    else
+        echo "⚠️  Runtime config not found: ./scripts/runtime-config-${distro}.yml"
+    fi
+done
+
 # Copy service files
 # Note: persist now runs as subprocess, no separate service needed
 cp ./scripts/joblet.service "$BUILD_DIR/etc/systemd/system/"

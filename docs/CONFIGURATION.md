@@ -23,7 +23,38 @@ Comprehensive guide to configuring Joblet server and RNX client.
 
 ## Server Configuration
 
-The Joblet server configuration file is typically located at `/opt/joblet/config/joblet-config.yml`.
+Joblet uses a **split configuration architecture** for cross-distribution compatibility:
+
+| File                 | Purpose                                          | Location              |
+|----------------------|--------------------------------------------------|-----------------------|
+| `joblet-config.yml`  | Core joblet config (server, IPC, persist, state) | `/opt/joblet/config/` |
+| `runtime-config.yml` | Distro-specific runtime settings                 | `/opt/joblet/config/` |
+
+### Configuration Files
+
+**Main config:** `/opt/joblet/config/joblet-config.yml`
+
+- Server settings, IPC, persistence, state, security
+- Distro-agnostic settings
+
+**Runtime config:** `/opt/joblet/config/runtime-config.yml`
+
+- Package manager paths (apt/yum/dnf/apk)
+- Library paths for the specific Linux distribution
+- Automatically selected during installation based on OS detection
+
+### Automatic Distro Detection
+
+During installation, Joblet automatically detects your Linux distribution and installs the appropriate runtime config:
+
+| Distribution                   | Runtime Config Selected     |
+|--------------------------------|-----------------------------|
+| Ubuntu, Debian, Linux Mint     | `runtime-config-ubuntu.yml` |
+| RHEL, CentOS, Rocky, AlmaLinux | `runtime-config-rhel.yml`   |
+| Fedora, Amazon Linux 2023+     | `runtime-config-fedora.yml` |
+| Alpine Linux                   | `runtime-config-alpine.yml` |
+
+The detection uses `/etc/os-release` and falls back to package manager detection.
 
 ### Basic Configuration
 
@@ -197,33 +228,71 @@ volume:
 
 ### Runtime Configuration
 
+Runtime configuration is stored in a **separate file** (`runtime-config.yml`) for cross-distribution compatibility.
+The appropriate config is automatically selected during installation based on your Linux distribution.
+
+**File location:** `/opt/joblet/config/runtime-config.yml`
+
 ```yaml
+# Example: runtime-config-ubuntu.yml (auto-selected for Ubuntu/Debian)
 runtime:
-  base_path: "/opt/joblet/runtimes" # Runtime storage path
-  common_paths:                     # Common runtime search paths
+  base_path: "/opt/joblet/runtimes"
+
+  common_paths:
     - "/usr/local/bin"
     - "/usr/local/lib"
     - "/usr/lib/jvm"
     - "/usr/local/node"
     - "/usr/local/go"
 
+  # Distro-specific: Package manager writable paths for runtime installation
+  # These get tmpfs overlays during chroot-based runtime builds
+  install_writable_paths:
+    - "/var/cache/apt"      # Ubuntu/Debian: apt cache
+    - "/var/lib/apt"        # Ubuntu/Debian: apt state
+    - "/var/lib/dpkg"       # Ubuntu/Debian: dpkg database
+    - "/etc/apt"            # Ubuntu/Debian: apt config
+    - "/var/log/apt"        # Ubuntu/Debian: apt logs
+
+  # Host directories bind-mounted read-only during runtime installation
+  install_host_binds:
+    - "/usr"
+    - "/lib"
+    - "/lib64"
+    - "/bin"
+    - "/sbin"
+    - "/etc"
+    - "/var"
+
+  # PATH for runtime installation chroot
+  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
+
   # Paths mounted read-only into job sandbox
   allowed_mounts:
     - "/usr/bin"
     - "/bin"
-    - "/usr/sbin"                   # Network tools (ip, route, etc.)
+    - "/usr/sbin"
     - "/lib"
     - "/lib64"
     - "/usr/lib"
     - "/usr/lib64"
-    - "/etc/resolv.conf"            # DNS resolver configuration
-    - "/etc/hosts"                  # Local hostname resolution
-    - "/etc/nsswitch.conf"          # Name service switch configuration
-    - "/etc/ssl"                    # SSL certificates
+    - "/etc/resolv.conf"
+    - "/etc/hosts"
+    - "/etc/nsswitch.conf"
+    - "/etc/ssl"
     - "/etc/pki"
     - "/etc/ca-certificates"
     - "/usr/share/ca-certificates"
 ```
+
+**Distro-specific `install_writable_paths` examples:**
+
+| Distribution        | Package Manager | Writable Paths                                    |
+|---------------------|-----------------|---------------------------------------------------|
+| Ubuntu/Debian       | apt/dpkg        | `/var/cache/apt`, `/var/lib/apt`, `/var/lib/dpkg` |
+| RHEL/CentOS         | yum/rpm         | `/var/cache/yum`, `/var/lib/rpm`, `/var/lib/yum`  |
+| Fedora/Amazon Linux | dnf/rpm         | `/var/cache/dnf`, `/var/lib/dnf`, `/var/lib/rpm`  |
+| Alpine              | apk             | `/var/cache/apk`, `/lib/apk`, `/etc/apk`          |
 
 ### Security Settings
 
@@ -683,15 +752,16 @@ openssl req -new -key client-key.pem -out viewer.csr \
 
 ### Server Environment Variables
 
-| Variable                | Description                        | Default                                |
-|-------------------------|------------------------------------|----------------------------------------|
-| `JOBLET_CONFIG_PATH`    | Path to configuration file         | `/opt/joblet/config/joblet-config.yml` |
-| `JOBLET_LOG_LEVEL`      | Log level override                 | from config                            |
-| `JOBLET_SERVER_ADDRESS` | Server address override            | from config                            |
-| `JOBLET_SERVER_PORT`    | Server port override               | from config                            |
-| `JOBLET_NODE_ID`        | Node identifier override           | from config                            |
-| `JOBLET_MAX_JOBS`       | Maximum concurrent jobs            | from config                            |
-| `JOBLET_CI_MODE`        | Enable CI mode (relaxed isolation) | `false`                                |
+| Variable                     | Description                        | Default                                 |
+|------------------------------|------------------------------------|-----------------------------------------|
+| `JOBLET_CONFIG_PATH`         | Path to main configuration file    | `/opt/joblet/config/joblet-config.yml`  |
+| `JOBLET_RUNTIME_CONFIG_PATH` | Path to runtime configuration file | `/opt/joblet/config/runtime-config.yml` |
+| `JOBLET_LOG_LEVEL`           | Log level override                 | from config                             |
+| `JOBLET_SERVER_ADDRESS`      | Server address override            | from config                             |
+| `JOBLET_SERVER_PORT`         | Server port override               | from config                             |
+| `JOBLET_NODE_ID`             | Node identifier override           | from config                             |
+| `JOBLET_MAX_JOBS`            | Maximum concurrent jobs            | from config                             |
+| `JOBLET_CI_MODE`             | Enable CI mode (relaxed isolation) | `false`                                 |
 
 ### Client Environment Variables
 
