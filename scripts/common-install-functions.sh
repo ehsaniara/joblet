@@ -25,6 +25,88 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+# Detect Linux distribution and return the appropriate runtime config filename
+# Returns: ubuntu, rhel, fedora, or alpine
+detect_linux_distro() {
+    local distro="ubuntu"  # Default to Ubuntu
+
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+
+        case "$ID" in
+            ubuntu|debian|linuxmint|pop)
+                distro="ubuntu"
+                ;;
+            rhel|centos|rocky|almalinux|ol|scientific)
+                # Check if it's a newer version that uses dnf
+                if [ -f /etc/dnf/dnf.conf ] || command -v dnf >/dev/null 2>&1; then
+                    distro="fedora"  # dnf-based
+                else
+                    distro="rhel"    # yum-based
+                fi
+                ;;
+            fedora|amzn)
+                # Amazon Linux 2023+ uses dnf, Amazon Linux 2 uses yum
+                if [ "$ID" = "amzn" ] && [ "${VERSION_ID%%.*}" -lt 2023 ] 2>/dev/null; then
+                    distro="rhel"    # Amazon Linux 2 uses yum
+                else
+                    distro="fedora"  # Fedora and Amazon Linux 2023+ use dnf
+                fi
+                ;;
+            alpine)
+                distro="alpine"
+                ;;
+            *)
+                # Try to detect by package manager
+                if command -v apt-get >/dev/null 2>&1; then
+                    distro="ubuntu"
+                elif command -v dnf >/dev/null 2>&1; then
+                    distro="fedora"
+                elif command -v yum >/dev/null 2>&1; then
+                    distro="rhel"
+                elif command -v apk >/dev/null 2>&1; then
+                    distro="alpine"
+                fi
+                ;;
+        esac
+    else
+        # Fallback detection by package manager
+        if command -v apt-get >/dev/null 2>&1; then
+            distro="ubuntu"
+        elif command -v dnf >/dev/null 2>&1; then
+            distro="fedora"
+        elif command -v yum >/dev/null 2>&1; then
+            distro="rhel"
+        elif command -v apk >/dev/null 2>&1; then
+            distro="alpine"
+        fi
+    fi
+
+    echo "$distro"
+}
+
+# Select and copy the appropriate runtime config for this distro
+# This function should be called during package installation
+select_runtime_config() {
+    local scripts_dir="${1:-/opt/joblet/scripts}"
+    local config_dir="${2:-/opt/joblet/config}"
+
+    local distro=$(detect_linux_distro)
+    local runtime_config_src="${scripts_dir}/runtime-config-${distro}.yml"
+    local runtime_config_dst="${config_dir}/runtime-config.yml"
+
+    print_info "Detected Linux distribution: ${distro}"
+
+    if [ -f "$runtime_config_src" ]; then
+        cp "$runtime_config_src" "$runtime_config_dst"
+        chmod 644 "$runtime_config_dst"
+        print_success "Installed runtime config for ${distro}: ${runtime_config_dst}"
+    else
+        print_warning "Runtime config not found: ${runtime_config_src}"
+        print_warning "Using built-in defaults for runtime configuration"
+    fi
+}
+
 detect_internal_ip() {
     local ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
     if [ -z "$ip" ]; then

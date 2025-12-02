@@ -1,5 +1,8 @@
 # Unified Joblet Configuration
 # This file configures both joblet (main service) and persist (persistence service)
+#
+# Runtime configuration is in a SEPARATE file: runtime-config.yml
+# The installer automatically selects the correct runtime config for your distro.
 
 version: "3.0"
 
@@ -100,57 +103,6 @@ monitoring:
   system_interval: "10s"
   cloud_detection: true
 
-# Runtime System Configuration
-runtime:
-  base_path: "/opt/joblet/runtimes"
-  common_paths:
-    - "/usr/local/bin"
-    - "/usr/local/lib"
-    - "/usr/lib/jvm"
-    - "/usr/local/node"
-    - "/usr/local/go"
-  # Writable tmpfs mounts for runtime installation (package manager support)
-  # These directories get tmpfs overlays during chroot-based runtime installation
-  # Debian/Ubuntu: apt/dpkg directories
-  # RHEL/Fedora: yum/dnf directories (add as needed)
-  install_writable_paths:
-    - "/var/cache/apt"           # apt package cache
-    - "/var/lib/apt"             # apt state
-    - "/var/lib/dpkg"            # dpkg database
-    # - "/var/cache/yum"         # yum cache (RHEL/CentOS)
-    # - "/var/cache/dnf"         # dnf cache (Fedora)
-    # - "/var/lib/rpm"           # rpm database
-  # Host directories to bind-mount read-only during runtime installation
-  # These provide access to host binaries/libraries for setup scripts
-  install_host_binds:
-    - "/usr"
-    - "/lib"
-    - "/lib64"
-    - "/bin"
-    - "/sbin"
-    - "/etc"
-    - "/var"
-  # PATH environment variable for runtime installation chroot
-  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
-  # Paths mounted read-only into job sandbox
-  allowed_mounts:
-    - "/usr/bin"
-    - "/bin"
-    - "/usr/sbin"               # Network tools (ip, route, etc.)
-    - "/lib"
-    - "/lib64"
-    - "/usr/lib"
-    - "/usr/lib64"
-    # Network configuration files
-    - "/etc/resolv.conf"        # DNS resolver configuration
-    - "/etc/hosts"              # Local hostname resolution
-    - "/etc/nsswitch.conf"      # Name service switch configuration
-    # SSL certificate directories
-    - "/etc/ssl"
-    - "/etc/pki"
-    - "/etc/ca-certificates"
-    - "/usr/share/ca-certificates"
-
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
 
@@ -249,7 +201,7 @@ state:
       write_capacity: 5  # 0 for on-demand pricing
       batch_size: 25
       batch_interval: "100ms"
-    
+
     # Redis configuration (future - when backend: "redis")
     # redis:
     #   endpoint: "localhost:6379"

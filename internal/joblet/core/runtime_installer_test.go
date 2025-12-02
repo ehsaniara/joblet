@@ -350,13 +350,13 @@ func TestRuntimeConfig_DefaultValues(t *testing.T) {
 	// Test that default config has expected values
 	defaultCfg := config.DefaultConfig
 
-	// Check InstallWritablePaths defaults (Debian/Ubuntu)
-	assert.NotEmpty(t, defaultCfg.Runtime.InstallWritablePaths)
-	assert.Contains(t, defaultCfg.Runtime.InstallWritablePaths, "/var/cache/apt")
-	assert.Contains(t, defaultCfg.Runtime.InstallWritablePaths, "/var/lib/apt")
-	assert.Contains(t, defaultCfg.Runtime.InstallWritablePaths, "/var/lib/dpkg")
+	// InstallWritablePaths should be EMPTY by default
+	// Distro-specific paths must be configured via runtime-config.yml
+	// This ensures cross-distribution compatibility (apt vs yum vs dnf vs apk)
+	assert.Empty(t, defaultCfg.Runtime.InstallWritablePaths,
+		"InstallWritablePaths should be empty - distro-specific paths come from runtime-config.yml")
 
-	// Check InstallHostBinds defaults
+	// Check InstallHostBinds defaults (FHS-compliant, works on all distros)
 	assert.NotEmpty(t, defaultCfg.Runtime.InstallHostBinds)
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/usr")
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/lib")
@@ -364,7 +364,7 @@ func TestRuntimeConfig_DefaultValues(t *testing.T) {
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/etc")
 	assert.Contains(t, defaultCfg.Runtime.InstallHostBinds, "/var")
 
-	// Check InstallEnvPath default
+	// Check InstallEnvPath default (standard PATH, works on all distros)
 	assert.Equal(t, "/usr/bin:/bin:/sbin:/usr/sbin", defaultCfg.Runtime.InstallEnvPath)
 }
 

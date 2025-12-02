@@ -1,0 +1,66 @@
+# Runtime Configuration for Ubuntu / Debian
+# This file is automatically selected by the installer based on OS detection.
+#
+# Supported distributions:
+#   - Ubuntu (all versions)
+#   - Debian (all versions)
+#   - Linux Mint
+#   - Pop!_OS
+#   - Any dpkg/apt-based distribution
+
+# Runtime System Configuration
+runtime:
+  base_path: "/opt/joblet/runtimes"
+
+  # Common paths where runtimes may be installed
+  common_paths:
+    - "/usr/local/bin"
+    - "/usr/local/lib"
+    - "/usr/lib/jvm"
+    - "/usr/local/node"
+    - "/usr/local/go"
+
+  # Writable tmpfs mounts for runtime installation (package manager support)
+  # These directories get tmpfs overlays during chroot-based runtime installation
+  # Ubuntu/Debian use apt/dpkg package management
+  install_writable_paths:
+    - "/var/cache/apt"           # apt package cache
+    - "/var/lib/apt"             # apt state
+    - "/var/lib/dpkg"            # dpkg database
+    - "/etc/apt"                 # apt config
+    - "/var/log/apt"             # apt logs
+
+  # Host directories to bind-mount read-only during runtime installation
+  # These provide access to host binaries/libraries for setup scripts
+  # FHS-compliant paths that work across all Linux distributions
+  install_host_binds:
+    - "/usr"
+    - "/lib"
+    - "/lib64"
+    - "/bin"
+    - "/sbin"
+    - "/etc"
+    - "/var"
+
+  # PATH environment variable for runtime installation chroot
+  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
+
+  # Paths mounted read-only into job sandbox
+  # These provide essential binaries and libraries for job execution
+  allowed_mounts:
+    - "/usr/bin"
+    - "/bin"
+    - "/usr/sbin"               # Network tools (ip, route, etc.)
+    - "/lib"
+    - "/lib64"
+    - "/usr/lib"
+    - "/usr/lib64"
+    # Network configuration files
+    - "/etc/resolv.conf"        # DNS resolver configuration
+    - "/etc/hosts"              # Local hostname resolution
+    - "/etc/nsswitch.conf"      # Name service switch configuration
+    # SSL certificate directories
+    - "/etc/ssl"
+    - "/etc/pki"
+    - "/etc/ca-certificates"
+    - "/usr/share/ca-certificates"

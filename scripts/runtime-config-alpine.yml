@@ -1,0 +1,61 @@
+# Runtime Configuration for Alpine Linux
+# This file is automatically selected by the installer based on OS detection.
+#
+# Supported distributions:
+#   - Alpine Linux (all versions)
+#
+# Note: Alpine uses musl libc instead of glibc. Some binaries compiled
+# for glibc-based systems may not work. Use Alpine-specific packages.
+
+# Runtime System Configuration
+runtime:
+  base_path: "/opt/joblet/runtimes"
+
+  # Common paths where runtimes may be installed
+  common_paths:
+    - "/usr/local/bin"
+    - "/usr/local/lib"
+    - "/usr/lib/jvm"
+    - "/usr/local/node"
+    - "/usr/local/go"
+
+  # Writable tmpfs mounts for runtime installation (package manager support)
+  # These directories get tmpfs overlays during chroot-based runtime installation
+  # Alpine uses apk package management
+  install_writable_paths:
+    - "/var/cache/apk"           # apk package cache
+    - "/lib/apk"                 # apk database
+    - "/etc/apk"                 # apk config
+
+  # Host directories to bind-mount read-only during runtime installation
+  # These provide access to host binaries/libraries for setup scripts
+  # FHS-compliant paths that work across all Linux distributions
+  install_host_binds:
+    - "/usr"
+    - "/lib"
+    - "/bin"
+    - "/sbin"
+    - "/etc"
+    - "/var"
+  # Note: Alpine doesn't have /lib64 (uses /lib for both 32/64-bit)
+
+  # PATH environment variable for runtime installation chroot
+  # Alpine has a slightly different PATH layout
+  install_env_path: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+  # Paths mounted read-only into job sandbox
+  # These provide essential binaries and libraries for job execution
+  allowed_mounts:
+    - "/usr/bin"
+    - "/bin"
+    - "/usr/sbin"               # Network tools (ip, route, etc.)
+    - "/lib"
+    - "/usr/lib"
+    # Network configuration files
+    - "/etc/resolv.conf"        # DNS resolver configuration
+    - "/etc/hosts"              # Local hostname resolution
+    - "/etc/nsswitch.conf"      # Name service switch configuration
+    # SSL certificate directories (Alpine uses /etc/ssl)
+    - "/etc/ssl"
+    - "/usr/share/ca-certificates"
+  # Note: Alpine doesn't have /lib64 or /usr/lib64

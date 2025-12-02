@@ -1,0 +1,67 @@
+# Runtime Configuration for RHEL / CentOS / Rocky / AlmaLinux (yum-based)
+# This file is automatically selected by the installer based on OS detection.
+#
+# Supported distributions:
+#   - Red Hat Enterprise Linux (RHEL) 7, 8
+#   - CentOS 7, Stream 8
+#   - Rocky Linux 8, 9
+#   - AlmaLinux 8, 9
+#   - Oracle Linux
+#   - Any yum-based distribution
+
+# Runtime System Configuration
+runtime:
+  base_path: "/opt/joblet/runtimes"
+
+  # Common paths where runtimes may be installed
+  common_paths:
+    - "/usr/local/bin"
+    - "/usr/local/lib"
+    - "/usr/lib/jvm"
+    - "/usr/local/node"
+    - "/usr/local/go"
+
+  # Writable tmpfs mounts for runtime installation (package manager support)
+  # These directories get tmpfs overlays during chroot-based runtime installation
+  # RHEL/CentOS use yum/rpm package management
+  install_writable_paths:
+    - "/var/cache/yum"           # yum package cache
+    - "/var/lib/rpm"             # rpm database
+    - "/var/lib/yum"             # yum state
+    - "/etc/yum.repos.d"         # yum repos config
+    - "/var/log/yum.log"         # yum logs
+
+  # Host directories to bind-mount read-only during runtime installation
+  # These provide access to host binaries/libraries for setup scripts
+  # FHS-compliant paths that work across all Linux distributions
+  install_host_binds:
+    - "/usr"
+    - "/lib"
+    - "/lib64"
+    - "/bin"
+    - "/sbin"
+    - "/etc"
+    - "/var"
+
+  # PATH environment variable for runtime installation chroot
+  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
+
+  # Paths mounted read-only into job sandbox
+  # These provide essential binaries and libraries for job execution
+  allowed_mounts:
+    - "/usr/bin"
+    - "/bin"
+    - "/usr/sbin"               # Network tools (ip, route, etc.)
+    - "/lib"
+    - "/lib64"
+    - "/usr/lib"
+    - "/usr/lib64"
+    # Network configuration files
+    - "/etc/resolv.conf"        # DNS resolver configuration
+    - "/etc/hosts"              # Local hostname resolution
+    - "/etc/nsswitch.conf"      # Name service switch configuration
+    # SSL certificate directories (RHEL uses /etc/pki)
+    - "/etc/ssl"
+    - "/etc/pki"
+    - "/etc/ca-certificates"
+    - "/usr/share/ca-certificates"

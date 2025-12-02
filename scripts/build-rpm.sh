@@ -112,6 +112,17 @@ for file in joblet-config-template.yml rnx-config-template.yml joblet.service ce
     fi
 done
 
+# Copy runtime config files for all supported distros
+# The installer will select the appropriate one based on OS detection
+for distro in ubuntu rhel fedora alpine; do
+    if [ -f "./scripts/runtime-config-${distro}.yml" ]; then
+        cp "./scripts/runtime-config-${distro}.yml" "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/scripts/"
+        echo "✅ Copied runtime-config-${distro}.yml"
+    else
+        echo "⚠️  Runtime config not found: ./scripts/runtime-config-${distro}.yml"
+    fi
+done
+
 # Note: persist now runs as a subprocess of joblet, no separate service needed
 
 # Create the spec file with network support
@@ -187,6 +198,13 @@ cp scripts/joblet-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/rnx-config-template.yml \$RPM_BUILD_ROOT/opt/joblet/scripts/
 cp scripts/common-install-functions.sh \$RPM_BUILD_ROOT/opt/joblet/scripts/
 
+# Install runtime config files for all supported distros
+for distro in ubuntu rhel fedora alpine; do
+    if [ -f "scripts/runtime-config-\${distro}.yml" ]; then
+        cp "scripts/runtime-config-\${distro}.yml" \$RPM_BUILD_ROOT/opt/joblet/scripts/
+    fi
+done
+
 # persist runs as subprocess, no separate service needed
 
 # Install systemd service
@@ -236,6 +254,13 @@ display_system_changes_warning
 
 echo "🔧 Configuring Joblet Service..."
 echo ""
+
+# Create config directory
+mkdir -p /opt/joblet/config
+chmod 755 /opt/joblet/config
+
+# Select and install the appropriate runtime config for this distro
+select_runtime_config /opt/joblet/scripts /opt/joblet/config
 
 # Get configuration from environment variables
 get_configuration
@@ -387,6 +412,10 @@ fi
 /opt/joblet/scripts/joblet-config-template.yml
 /opt/joblet/scripts/rnx-config-template.yml
 /opt/joblet/scripts/common-install-functions.sh
+/opt/joblet/scripts/runtime-config-ubuntu.yml
+/opt/joblet/scripts/runtime-config-rhel.yml
+/opt/joblet/scripts/runtime-config-fedora.yml
+/opt/joblet/scripts/runtime-config-alpine.yml
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
 /usr/local/bin/certs_gen_with_secretsmanager.sh

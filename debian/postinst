@@ -114,6 +114,9 @@ case "$1" in
         mkdir -p /opt/joblet/config
         chmod 755 /opt/joblet/config  # Directory needs to be accessible for rnx client
 
+        # Select and install the appropriate runtime config for this distro
+        select_runtime_config /opt/joblet/scripts /opt/joblet/config
+
         # Create symlinks
         if [ ! -L /usr/bin/rnx ]; then
             ln -sf /opt/joblet/bin/rnx /usr/bin/rnx

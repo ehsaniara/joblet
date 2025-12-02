@@ -298,27 +298,28 @@ var DefaultConfig = Config{
 		BasePath:              "/opt/joblet/volumes",
 		DefaultDiskQuotaBytes: 1048576, // 1MB default
 	},
+	// Runtime configuration
+	// IMPORTANT: Distro-specific settings (InstallWritablePaths) must be configured
+	// in joblet-config.yml. See scripts/joblet-config-template.yml for examples.
 	Runtime: RuntimeConfig{
 		BasePath: "/opt/joblet/runtimes",
-		CommonPaths: []string{
+		CommonPaths: []string{ // Common runtime installation paths (FHS-compliant)
 			"/usr/local/bin",
 			"/usr/local/lib",
 			"/usr/lib/jvm",
 			"/usr/local/node",
 			"/usr/local/go",
 		},
-		AllowedMounts: []string{
+		AllowedMounts: []string{ // Paths mounted into job sandbox (FHS-compliant)
 			"/usr/bin",
 			"/bin",
 			"/lib",
 			"/lib64",
 		},
-		InstallWritablePaths: []string{
-			"/var/cache/apt",
-			"/var/lib/apt",
-			"/var/lib/dpkg",
-		},
-		InstallHostBinds: []string{
+		// Distro-specific: MUST be configured in joblet-config.yml
+		// See scripts/joblet-config-template.yml for Ubuntu, RHEL, Fedora, Alpine examples
+		InstallWritablePaths: []string{},
+		InstallHostBinds: []string{ // FHS-compliant - works on all distros
 			"/usr",
 			"/lib",
 			"/lib64",
@@ -327,7 +328,7 @@ var DefaultConfig = Config{
 			"/etc",
 			"/var",
 		},
-		InstallEnvPath: "/usr/bin:/bin:/sbin:/usr/sbin",
+		InstallEnvPath: "/usr/bin:/bin:/sbin:/usr/sbin", // Standard PATH - works on all distros
 	},
 	GPU: GPUConfig{
 		Enabled:            false,       // Off by default - opt-in only
@@ -448,10 +449,18 @@ func (n *Node) GetClientTLSConfig() (*tls.Config, error) {
 func LoadConfig() (*Config, string, error) {
 	config := DefaultConfig
 
-	// Load from config file if it exists
+	// Load from main config file if it exists
 	path, err := loadFromFile(&config)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load config file: %w", err)
+	}
+
+	// Load runtime config (separate file for distro-specific settings)
+	// Runtime config is merged into the main config, overriding runtime section only
+	if runtimePath, runtimeErr := loadRuntimeConfig(&config); runtimeErr != nil {
+		return nil, "", fmt.Errorf("failed to load runtime config: %w", runtimeErr)
+	} else if runtimePath != "" {
+		path = path + " + " + runtimePath
 	}
 
 	if val := os.Getenv("JOBLET_SERVER_ADDRESS"); val != "" {
@@ -512,6 +521,71 @@ func loadFromFile(config *Config) (string, error) {
 	}
 
 	return "built-in defaults (no config file found)", nil
+}
+
+// runtimeConfigWrapper is used to unmarshal runtime config which only has the runtime section.
+type runtimeConfigWrapper struct {
+	Runtime RuntimeConfig `yaml:"runtime"`
+}
+
+// loadRuntimeConfig loads runtime configuration from a separate distro-specific file.
+// This allows the installer to select the appropriate runtime config based on the OS.
+// Searches for runtime-config.yml in standard locations.
+// Returns empty string if no runtime config file is found (not an error - uses main config values).
+func loadRuntimeConfig(config *Config) (string, error) {
+	runtimePaths := []string{
+		os.Getenv("JOBLET_RUNTIME_CONFIG_PATH"),
+		"/opt/joblet/config/runtime-config.yml",
+		"./config/runtime-config.yml",
+		"./runtime-config.yml",
+		"/etc/joblet/runtime-config.yml",
+	}
+
+	for _, path := range runtimePaths {
+		if path == "" {
+			continue
+		}
+
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to read runtime config file %s: %w", path, err)
+		}
+
+		var runtimeWrapper runtimeConfigWrapper
+		if err := yaml.Unmarshal(data, &runtimeWrapper); err != nil {
+			return "", fmt.Errorf("failed to parse runtime config file %s: %w", path, err)
+		}
+
+		// Merge runtime config into main config
+		// Only override non-empty values from runtime config
+		if runtimeWrapper.Runtime.BasePath != "" {
+			config.Runtime.BasePath = runtimeWrapper.Runtime.BasePath
+		}
+		if len(runtimeWrapper.Runtime.CommonPaths) > 0 {
+			config.Runtime.CommonPaths = runtimeWrapper.Runtime.CommonPaths
+		}
+		if len(runtimeWrapper.Runtime.InstallWritablePaths) > 0 {
+			config.Runtime.InstallWritablePaths = runtimeWrapper.Runtime.InstallWritablePaths
+		}
+		if len(runtimeWrapper.Runtime.InstallHostBinds) > 0 {
+			config.Runtime.InstallHostBinds = runtimeWrapper.Runtime.InstallHostBinds
+		}
+		if runtimeWrapper.Runtime.InstallEnvPath != "" {
+			config.Runtime.InstallEnvPath = runtimeWrapper.Runtime.InstallEnvPath
+		}
+		if len(runtimeWrapper.Runtime.AllowedMounts) > 0 {
+			config.Runtime.AllowedMounts = runtimeWrapper.Runtime.AllowedMounts
+		}
+
+		return path, nil
+	}
+
+	// No runtime config file found - not an error, use values from main config or defaults
+	return "", nil
 }
 
 // Validate performs comprehensive validation of the configuration.
