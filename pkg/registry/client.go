@@ -183,6 +183,8 @@ func (c *Client) fetchFromURL(ctx context.Context, url string) (*Registry, error
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "joblet-runtime-client/1.0")
+	req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	req.Header.Set("Pragma", "no-cache")
 
 	// Execute request
 	resp, err := c.httpClient.Do(req)
