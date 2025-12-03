@@ -2,7 +2,10 @@
 
 ## Status
 
-Proposed
+**Implemented** (December 2025)
+
+The workflow code has been removed from joblet. Joblet now focuses exclusively on single-job execution. Workflow
+orchestration will be developed as a separate project that uses joblet's Job API for execution.
 
 ## Context
 
@@ -252,5 +255,5 @@ existing clients.
 
 ## References
 
-- [ADR-002: Workflow vs Job Separation](002-workflow-vs-job-separation.md) - Original separation decision
-- [WORKFLOWS.md](/docs/WORKFLOWS.md) - Current workflow documentation
+- This ADR supersedes ADR-002 (Workflow vs Job Separation), which has been removed as workflow functionality no longer
+  exists in joblet

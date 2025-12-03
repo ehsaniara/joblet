@@ -13,7 +13,7 @@ func NewJobCmd() *cobra.Command {
 
 Available subcommands:
   run        Run a new job immediately or schedule it for later
-  list       List all jobs or workflows
+  list       List all jobs
   status     Show status of a specific job
   log        Stream logs from a job
   metrics    View resource usage metrics for a job

@@ -197,18 +197,16 @@ func TestStatusCommandValidUUIDs(t *testing.T) {
 func TestStatusCommandFlagCombinations(t *testing.T) {
 	cmd := NewStatusCmd()
 
-	// Verify that workflow and detail flags are removed (now use: rnx workflow status)
+	// Verify that deprecated flags are removed
 	workflowFlag := cmd.Flags().Lookup("workflow")
 	detailFlag := cmd.Flags().Lookup("detail")
 
 	if workflowFlag != nil {
-		t.Fatal("workflow flag should not exist (removed - use rnx workflow status)")
+		t.Fatal("workflow flag should not exist")
 	}
 	if detailFlag != nil {
-		t.Fatal("detail flag should not exist (removed - use rnx workflow status --detail)")
+		t.Fatal("detail flag should not exist")
 	}
-
-	// No flag shortcuts to test anymore - flags were removed in favor of dedicated workflow commands
 }
 
 func TestStatusDisplaySections(t *testing.T) {
@@ -227,7 +225,6 @@ func TestStatusDisplaySections(t *testing.T) {
 		"Uploaded Files:",
 		"Environment:",
 		"Secrets:",
-		"Workflow Context:",
 		"Results:",
 		"Actions:",
 	}

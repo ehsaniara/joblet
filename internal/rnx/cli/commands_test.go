@@ -32,26 +32,23 @@ func TestRootCommand(t *testing.T) {
 				Short: "RNX - Remote eXecution client for Joblet",
 				Long: `RNX (Remote eXecution) - Command Line Interface to interact with Joblet gRPC services using embedded certificates
 
-RNX provides a complete interface for job execution, workflow management, and resource control
+RNX provides a complete interface for job execution and resource control
 on Joblet servers. It supports immediate execution, scheduling, and comprehensive monitoring.
 
 Key Features:
   - Execute jobs with resource limits and scheduling
-  - Manage multi-job workflows with dependencies  
   - Create and manage networks, volumes, and runtimes
   - Monitor remote server resources, job performance, and volume usage
   - Stream real-time logs from running jobs
 
 Quick Examples:
-  rnx job run python script.py                    # Run a simple job
-  rnx workflow run pipeline.yaml                  # Execute a workflow
-  rnx workflow list                               # List all workflows
-  rnx job status <job-uuid>                       # Check job status (supports short UUIDs)
-  rnx job log <job-uuid>                          # Stream job logs (supports short UUIDs)
-  rnx monitor status                          # View remote server metrics and volumes
-  rnx monitor top --json                      # JSON output for dashboards
+  rnx job run python script.py               # Run a simple job
+  rnx job status <job-uuid>                  # Check job status (supports short UUIDs)
+  rnx job log <job-uuid>                     # Stream job logs (supports short UUIDs)
+  rnx monitor status                         # View remote server metrics and volumes
+  rnx monitor top --json                     # JSON output for dashboards
 
-Note: Job and workflow UUIDs support short-form usage (first 8 characters)
+Note: Job UUIDs support short-form usage (first 8 characters)
 if they uniquely identify the resource.
 
 Use 'rnx <command> --help' for detailed information about any command.`,
@@ -256,12 +253,12 @@ func TestSubcommandFlags(t *testing.T) {
 	}{
 		{
 			command:     "status",
-			validFlags:  []string{}, // No job-specific flags (workflow flags removed)
+			validFlags:  []string{},
 			description: "Status command flags",
 		},
 		{
 			command:     "list",
-			validFlags:  []string{}, // No job-specific flags (workflow flags removed)
+			validFlags:  []string{},
 			description: "List command flags",
 		},
 		{
@@ -413,7 +410,6 @@ func TestRunCommandResourceFlags(t *testing.T) {
 			description: "Schedule specification",
 			validValues: []string{"1hour", "30min", "2025-12-31T23:59:59Z"},
 		},
-		// --workflow flag removed (now use: rnx workflow run <file>)
 	}
 
 	for _, rf := range resourceFlags {

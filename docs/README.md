@@ -23,7 +23,6 @@ environments without the overhead of containerization.
 ### Features
 
 - **[GPU_SUPPORT.md](GPU_SUPPORT.md)** - GPU acceleration
-- **[WORKFLOWS.md](WORKFLOWS.md)** - Workflow orchestration
 - **[NETWORK_MANAGEMENT.md](NETWORK_MANAGEMENT.md)** - Network isolation
 - **[VOLUME_MANAGEMENT.md](VOLUME_MANAGEMENT.md)** - Storage management
 - **[RUNTIME_SYSTEM.md](RUNTIME_SYSTEM.md)** - Runtime environments
@@ -51,8 +50,6 @@ seamless integration with existing infrastructure through a unified gRPC API and
 - **Resource Management**: Granular control over CPU, memory, I/O, and GPU resources through cgroups v2 integration
 - **GPU Acceleration**: Native NVIDIA GPU support with automatic device allocation, CUDA environment provisioning, and
   memory isolation
-- **Workflow Orchestration**: Sophisticated dependency management with directed acyclic graph (DAG) execution and
-  conditional logic
 - **Network Virtualization**: Software-defined networking with customizable CIDR blocks, traffic shaping, and inter-job
   communication policies
 - **Storage Abstraction**: Flexible volume management supporting persistent and ephemeral storage with quota enforcement
@@ -120,47 +117,6 @@ rnx job run --gpu=2 --gpu-memory=16GB \
 rnx network create test-env --cidr=10.10.0.0/24
 rnx job run --network=test-env --runtime=openjdk-21 ./service-a
 rnx job run --network=test-env --runtime=python-3.11-ml ./service-b
-```
-
-### Complex Workflow Orchestration
-
-```yaml
-# ml-pipeline.yaml
-jobs:
-  data-extraction:
-    command: "python3"
-    args: [ "extract.py" ]
-    runtime: "python-3.11-ml"
-    resources:
-      max_memory: 2048
-      max_cpu: 100
-
-  model-training:
-    command: "python3"
-    args: [ "train.py" ]
-    runtime: "python-3.11-ml"
-    requires:
-      - data-extraction: "COMPLETED"
-    resources:
-      max_memory: 8192
-      max_cpu: 400
-      gpu_count: 1
-      gpu_memory_mb: 8192
-```
-
-```bash
-# Execute and monitor workflow with job names
-rnx workflow run ml-pipeline.yaml
-rnx workflow status a1b2c3d4-e5f6-7890-1234-567890abcdef
-
-# View workflow status with original YAML content (available from any workstation)
-rnx workflow status --detail a1b2c3d4-e5f6-7890-1234-567890abcdef
-
-# Output shows job names, node identification, and dependencies:
-# JOB UUID        JOB NAME             NODE ID         STATUS       EXIT CODE  DEPENDENCIES
-# -----------------------------------------------------------------------------------------
-# f47ac10b-...    data-extraction      8f94c5b2-...    COMPLETED    0          -
-# a1b2c3d4-...    model-training       8f94c5b2-...    RUNNING      -          data-extraction     
 ```
 
 ### Site Reliability Engineering Operations
@@ -233,7 +189,6 @@ rnx job run --max-memory=1024 --runtime=python-3.11-ml \
 - [**RNX CLI Reference**](./RNX_CLI_REFERENCE.md) - Complete command reference with examples
 - [**Job Execution Guide**](./JOB_EXECUTION.md) - Running jobs with resource limits and isolation
 - [**GPU Support Guide**](./GPU_SUPPORT.md) - NVIDIA GPU acceleration, CUDA environments, and resource management
-- [**Workflows Guide**](./WORKFLOWS.md) - YAML workflows with dependencies and orchestration
 - [**Runtime System**](./RUNTIME_SYSTEM.md) - Pre-built environments for instant execution (start here)
 - [**Runtime Registry Guide**](./RUNTIME_REGISTRY_GUIDE.md) - Using and managing runtime registries
 - [**Runtime Design & Examples**](./RUNTIME_DESIGN.md) - Technical design with practical examples
@@ -266,18 +221,11 @@ rnx job run --max-memory=1024 --runtime=python-3.11-ml \
 # Run your first job
 rnx job run echo "Hello, Joblet!"
 
-# Create a workflow
-cat > ml-pipeline.yaml << EOF
-jobs:
-  analyze:
-    command: "python3"
-    args: ["analyze.py", "--data", "/data/input.csv"]
-    runtime: "python-3.11-ml"
-    volumes: ["data-volume"]
-EOF
+# Run a job with a runtime
+rnx job run --runtime=python-3.11-ml python3 script.py
 
-# Execute the workflow
-rnx workflow run ml-pipeline.yaml
+# Run a job with resource limits
+rnx job run --max-memory=2048 --max-cpu=200 python3 intensive_task.py
 ```
 
 ## Command Reference

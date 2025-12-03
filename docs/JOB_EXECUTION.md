@@ -307,14 +307,11 @@ Use job UUIDs to:
 ### Monitoring Job Progress
 
 ```bash
-# Real-time status (shows job name for workflow jobs)
+# Real-time status
 watch -n 1 rnx job status <job-uuid>
 
 # Example with actual UUID:
 watch -n 1 rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479
-
-# Workflow status with job names and dependencies
-rnx workflow status <workflow-id>
 
 # Stream logs (use Ctrl+C to stop)
 rnx job log <job-uuid>
@@ -322,11 +319,8 @@ rnx job log <job-uuid>
 # Example with actual UUID:
 rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479
 
-# List running jobs (shows names and status)
+# List running jobs
 rnx job list --json | jq '.[] | select(.status == "RUNNING")'
-
-# Filter by job name (for workflow jobs)
-rnx job list --json | jq '.[] | select(.name == "process-data")'
 ```
 
 ### Job Completion

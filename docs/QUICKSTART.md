@@ -361,13 +361,6 @@ rnx job cancel <job-uuid>       # Cancel scheduled job
 rnx job delete <job-uuid>       # Delete specific job
 rnx job delete-all              # Delete all non-running jobs
 
-# Workflow Management
-rnx workflow run file.yaml      # Run workflow
-rnx workflow list               # List workflows
-rnx workflow status <uuid>      # Check workflow status
-rnx workflow status --detail <uuid> # View workflow status + YAML
-rnx workflow status --json --detail <uuid> # JSON output with YAML content
-
 # Volume Management
 rnx volume create <name>    # Create volume
 rnx volume list             # List volumes

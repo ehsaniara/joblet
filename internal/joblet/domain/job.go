@@ -29,16 +29,10 @@ var (
 )
 
 // Job represents a job with value objects replacing primitive obsession.
-//
-// JOB NAMES FEATURE:
-// The Name field provides readable identification for jobs within workflows.
-// - For workflow jobs: Contains the job name from YAML (e.g., "setup-data", "process-data")
-// - For individual jobs: Empty string (only Id is used for identification)
-// This enables better workflow visibility and dependency tracking in CLI tools.
 type Job struct {
 	// Core identifiers
 	Uuid string // Unique identifier for job tracking
-	Name string // Readable job name (workflow jobs only, empty for individual jobs)
+	Name string // Optional readable job name
 
 	// Execution details
 	Command string   // Executable command path
@@ -66,11 +60,11 @@ type Job struct {
 	Volumes []string // Volume names to mount
 	Runtime string   // Runtime specification
 
-	// Workflow integration
-	WorkflowUuid     string       // UUID of parent workflow (empty for individual jobs)
+	// Job context (deprecated workflow fields kept for API compatibility)
+	WorkflowUuid     string       // Deprecated: unused, kept for API compatibility
 	WorkingDirectory string       // Execution directory path
 	Uploads          []FileUpload // Files uploaded with the job
-	Dependencies     []string     // Job names this job depends on (workflow jobs only)
+	Dependencies     []string     // Deprecated: unused, kept for API compatibility
 
 	// Environment
 	Environment       map[string]string // Environment variables
@@ -351,33 +345,10 @@ func (j *Job) SetSecretEnvironmentValue(env values.Environment) {
 	j.secretEnv = &env
 }
 
-// DeepCopy creates a deep copy of the job including the Name field.
+// DeepCopy creates a deep copy of the job.
 //
-// RESPONSIBILITY:
-// - Creates an independent copy of the Job struct with all fields properly duplicated
-// - Handles deep copying of slices, maps, and pointer fields to prevent shared references
-// - Ensures the Name field (job names feature) is properly preserved in the copy
-// - Provides thread-safe job duplication for concurrent operations
-//
-// JOB NAMES INTEGRATION:
-// - Preserves the Name field which contains readable job names for workflow jobs
-// - Maintains job identity information for proper workflow status display
-// - Ensures copied jobs retain their workflow context and naming information
-//
-// DEEP COPY BEHAVIOR:
-// - Primitive fields: Direct value copy (Id, Name, Command, Status, etc.)
-// - Slices: Creates new slices with copied elements (Args, Volumes)
-// - Maps: Creates new maps with all key-value pairs copied (Environment, SecretEnvironment)
-// - Pointers: Creates new pointer instances with copied values (EndTime, ScheduledTime)
-// - Value objects: Safe to copy directly (ResourceLimits uses value semantics)
-//
-// THREAD SAFETY:
-// - Safe for concurrent use as it creates completely independent copies
-// - No shared state between original and copied job instances
-// - Prevents race conditions when jobs are accessed from multiple goroutines
-//
-// USAGE:
-// Called by job store adapters and workflow managers when job isolation is required.
+// Creates an independent copy of the Job struct with all fields properly duplicated.
+// Safe for concurrent use as it creates completely independent copies with no shared state.
 func (j *Job) DeepCopy() *Job {
 	if j == nil {
 		return nil

@@ -370,16 +370,15 @@ JOBLET_TEST_HOST=192.168.1.161 JOBLET_TEST_USER=jay ./run_tests.sh
 3. `03_network_test.sh` - Network isolation
 4. `04_schedule_test.sh` - Job scheduling
 5. `05_volume_test.sh` - Volume management
-6. `06_workflow_test.sh` - Workflow execution
-7. `07_github_runtime_test.sh` - GitHub runtime registry
-8. `08_rnx_json_test.sh` - JSON output format
-9. `09_gpu_test.sh` - GPU allocation
-10. `10_persist_test.sh` - Log/metric persistence
-11. `11_metrics_gap_test.sh` - Metrics continuity
-12. `12_log_gap_simple_test.sh` - Log continuity (simple)
-13. `13_log_gap_live_test.sh` - Log continuity (live)
-14. `14_registry_runtime_test.sh` - Runtime registry
-15. `15_state_load_test.sh` - State client load test (1000+ jobs)
+6. `07_github_runtime_test.sh` - GitHub runtime registry
+7. `08_rnx_json_test.sh` - JSON output format
+8. `09_gpu_test.sh` - GPU allocation
+9. `10_persist_test.sh` - Log/metric persistence
+10. `11_metrics_gap_test.sh` - Metrics continuity
+11. `12_log_gap_simple_test.sh` - Log continuity (simple)
+12. `13_log_gap_live_test.sh` - Log continuity (live)
+13. `14_registry_runtime_test.sh` - Runtime registry
+14. `15_state_load_test.sh` - State client load test (1000+ jobs)
 
 **State Load Tests:**
 
