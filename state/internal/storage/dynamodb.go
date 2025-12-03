@@ -358,19 +358,9 @@ func jobToItem(job *domain.Job, ttlDays int) map[string]types.AttributeValue {
 		item["volumes"] = &types.AttributeValueMemberL{Value: volValues}
 	}
 
-	// Workflow fields
-	if job.WorkflowUuid != "" {
-		item["workflowUuid"] = &types.AttributeValueMemberS{Value: job.WorkflowUuid}
-	}
+	// Working directory
 	if job.WorkingDirectory != "" {
 		item["workingDirectory"] = &types.AttributeValueMemberS{Value: job.WorkingDirectory}
-	}
-	if len(job.Dependencies) > 0 {
-		depValues := make([]types.AttributeValue, len(job.Dependencies))
-		for i, dep := range job.Dependencies {
-			depValues[i] = &types.AttributeValueMemberS{Value: dep}
-		}
-		item["dependencies"] = &types.AttributeValueMemberL{Value: depValues}
 	}
 
 	// Environment variables (non-secret only)
@@ -515,20 +505,9 @@ func itemToJob(item map[string]types.AttributeValue) (*domain.Job, error) {
 		}
 	}
 
-	// Parse workflow fields
-	if v, ok := item["workflowUuid"].(*types.AttributeValueMemberS); ok {
-		job.WorkflowUuid = v.Value
-	}
+	// Parse working directory
 	if v, ok := item["workingDirectory"].(*types.AttributeValueMemberS); ok {
 		job.WorkingDirectory = v.Value
-	}
-	if v, ok := item["dependencies"].(*types.AttributeValueMemberL); ok {
-		job.Dependencies = make([]string, len(v.Value))
-		for i, av := range v.Value {
-			if s, ok := av.(*types.AttributeValueMemberS); ok {
-				job.Dependencies[i] = s.Value
-			}
-		}
 	}
 
 	// Parse environment variables

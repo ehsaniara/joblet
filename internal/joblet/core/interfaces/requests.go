@@ -42,10 +42,8 @@ type StartJobRequest struct {
 	GPUCount    int32 // Number of GPUs requested (0 = no GPU)
 	GPUMemoryMB int64 // Minimum GPU memory requirement in MB (0 = any)
 
-	// Deprecated fields (kept for API compatibility)
-	WorkflowUuid     string   // Deprecated: unused
-	WorkingDirectory string   // Execution directory path
-	Dependencies     []string // Deprecated: unused
+	// Working directory
+	WorkingDirectory string // Execution directory path
 }
 
 // ResourceLimits encapsulates resource constraints for a job

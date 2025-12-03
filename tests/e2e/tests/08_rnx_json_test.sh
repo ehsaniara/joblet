@@ -208,7 +208,7 @@ test_rnx_status_json() {
         done
         
         # Check for new fields added in the enhancement (even if empty)
-        local new_fields="network volumes runtime workDir uploads dependencies workflowUuid"
+        local new_fields="network volumes runtime workDir uploads"
         for field in $new_fields; do
             if ! echo "$json_output" | grep -q "\"$field\""; then
                 echo "    ${YELLOW}Note: Status JSON missing new field: $field (may be empty)${NC}"

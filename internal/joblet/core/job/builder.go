@@ -43,10 +43,8 @@ type BuildRequest struct {
 	Environment       map[string]string
 	SecretEnvironment map[string]string
 	JobType           domain.JobType
-	WorkflowUuid      string
 	WorkingDirectory  string
 	Uploads           []domain.FileUpload
-	Dependencies      []string
 	GPUCount          int32 // Number of GPUs requested
 	GPUMemoryMB       int64 // GPU memory requirement in MB
 }
@@ -87,10 +85,8 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		Runtime:           req.Runtime,
 		Environment:       b.copyEnvironment(req.Environment),
 		SecretEnvironment: b.copyEnvironment(req.SecretEnvironment),
-		WorkflowUuid:      req.WorkflowUuid,
 		WorkingDirectory:  req.WorkingDirectory,
 		Uploads:           req.Uploads,
-		Dependencies:      b.copyStrings(req.Dependencies),
 		GPUCount:          req.GPUCount,           // GPU requirements
 		GPUMemoryMB:       req.GPUMemoryMB,        // GPU memory requirement
 		GPUIndices:        []int32{},              // Will be populated during allocation

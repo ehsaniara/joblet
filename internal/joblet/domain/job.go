@@ -60,11 +60,9 @@ type Job struct {
 	Volumes []string // Volume names to mount
 	Runtime string   // Runtime specification
 
-	// Job context (deprecated workflow fields kept for API compatibility)
-	WorkflowUuid     string       // Deprecated: unused, kept for API compatibility
+	// Job context
 	WorkingDirectory string       // Execution directory path
 	Uploads          []FileUpload // Files uploaded with the job
-	Dependencies     []string     // Deprecated: unused, kept for API compatibility
 
 	// Environment
 	Environment       map[string]string // Environment variables

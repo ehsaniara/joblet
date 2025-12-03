@@ -11,11 +11,15 @@ orchestration will be developed as a separate project that uses joblet's Job API
 
 The following changes were made to implement this decision:
 
-**Code Changes:**
-- Removed workflow display section from `internal/rnx/jobs/status.go`
-- Removed `workflowUuid` and `dependencies` from JSON output in status command
-- Removed `JOBLET_WORKFLOW_ID` from reserved environment variables in `internal/rnx/jobs/run.go`
-- Marked `WorkflowUuid` and `Dependencies` fields as deprecated in domain model (kept for API compatibility)
+**Code Removal (Complete):**
+- Removed `WorkflowUuid` and `Dependencies` fields from `internal/joblet/domain/job.go`
+- Removed `WorkflowUuid` and `Dependencies` from `internal/joblet/core/interfaces/requests.go`
+- Removed workflow fields from `internal/joblet/core/job/builder.go`
+- Removed workflow fields from `internal/joblet/core/joblet.go`
+- Removed workflow fields from `internal/joblet/server/job_service.go` response
+- Removed workflow serialization from `state/internal/storage/dynamodb.go`
+- Removed workflow display from `internal/rnx/jobs/status.go`
+- Removed `JOBLET_WORKFLOW_ID` from reserved environment variables
 - Updated test files to remove workflow-specific references
 
 **Documentation Updates:**
@@ -25,16 +29,17 @@ The following changes were made to implement this decision:
 - Updated `docs/DEVELOPER_GUIDE.md`, `docs/JOB_EXECUTION.md`, `docs/DESIGN.md`
 - Updated `docs/INSTALLATION.md`, `docs/QUICKSTART.md`, `docs/NETWORK_MANAGEMENT.md`
 - Updated `docs/ADMIN_UI.md`, `docs/articles/getting-start-with-joblet.md`
+- Updated `docs/DEPRECATION.md`, `docs/ENVIRONMENT_VARIABLES.md`, `docs/GPU_TESTING.md`
 - Updated `docs/adr/README.md` to remove workflow ADR reference
 
 **Test Updates:**
 - Removed `tests/e2e/tests/06_workflow_test.sh` (obsolete E2E test)
-- All remaining E2E tests pass (13/13 test suites)
+- Updated `state/internal/storage/dynamodb_test.go` to remove workflow assertions
+- All remaining E2E tests pass
 
-**API Compatibility:**
-- `WorkflowUuid` and `Dependencies` fields retained in domain model with deprecation comments
+**Proto Compatibility:**
 - Proto definitions in external `joblet-proto` repository remain unchanged
-- Fields are unused but kept to avoid breaking API compatibility
+- Joblet ignores workflow fields from proto but does not send them in responses
 
 ## Context
 
