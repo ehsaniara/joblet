@@ -7,7 +7,7 @@ import (
 // StartJobRequest encapsulates all parameters needed to start a job
 type StartJobRequest struct {
 	// Job identification
-	Name string // readable job name (for workflows, empty for individual jobs)
+	Name string // optional readable job name
 
 	// Command and arguments
 	Command string
@@ -42,10 +42,8 @@ type StartJobRequest struct {
 	GPUCount    int32 // Number of GPUs requested (0 = no GPU)
 	GPUMemoryMB int64 // Minimum GPU memory requirement in MB (0 = any)
 
-	// Workflow integration
-	WorkflowUuid     string   // UUID of parent workflow (empty for individual jobs)
-	WorkingDirectory string   // Execution directory path
-	Dependencies     []string // Job names this job depends on (workflow jobs only)
+	// Working directory
+	WorkingDirectory string // Execution directory path
 }
 
 // ResourceLimits encapsulates resource constraints for a job

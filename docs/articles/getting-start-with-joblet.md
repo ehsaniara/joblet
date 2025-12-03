@@ -220,7 +220,6 @@ The Admin UI provides:
 - **Dashboard**: Real-time system metrics (CPU, memory, disk, network)
 - **Job Management**: List, filter, and manage all jobs
 - **Live Logs**: Stream job output in real-time
-- **Workflow Visualization**: View job dependencies and execution flow
 - **Volume Management**: Create and manage persistent volumes
 - **Network Configuration**: Manage network isolation settings
 
@@ -304,54 +303,7 @@ rnx job run --runtime=graalvmjdk-21 java -version
 The benefit of runtimes: After the initial installation, jobs start in 2-3 seconds with all dependencies ready, versus
 minutes for cold starts.
 
-### Example 4: YAML Workflow Definition
-
-Create a workflow file `jobs.yaml`:
-
-```yaml
-version: "3.0"
-
-jobs:
-  data-prep:
-    command: "python3"
-    args: [ "-c", "print('Preparing data...'); import time; time.sleep(2)" ]
-    runtime: "python-3.11"
-    resources:
-      max_cpu: 100
-      max_memory: 512
-
-  ml-training:
-    command: "python3"
-    args: [ "-c", "print('Training model...'); import time; time.sleep(3)" ]
-    runtime: "python-3.11-ml"
-    resources:
-      max_cpu: 400
-      max_memory: 2048
-    requires:
-      - data-prep: "COMPLETED"
-
-  evaluation:
-    command: "python3"
-    args: [ "-c", "print('Evaluating model...')" ]
-    runtime: "python-3.11-ml"
-    requires:
-      - ml-training: "COMPLETED"
-```
-
-Run the workflow:
-
-```bash
-# Run a specific job from the workflow
-rnx workflow run jobs.yaml
-
-# Run the entire workflow (all jobs with dependencies)
-rnx workflow run jobs.yaml
-
-# Check workflow status
-rnx workflow status <workflow-id>
-```
-
-### Example 5: Long-running Jobs with Monitoring
+### Example 4: Long-running Jobs with Monitoring
 
 ```bash
 # Start a web server
@@ -371,7 +323,7 @@ rnx job log $JOB_ID
 rnx job stop $JOB_ID
 ```
 
-### Example 6: Network Isolation
+### Example 5: Network Isolation
 
 ```bash
 # No network access
@@ -471,7 +423,6 @@ for monitoring and management.
 
 ### Next Steps
 
-- Explore [workflow templates](https://github.com/ehsaniara/joblet/tree/main/examples/workflows) for complex pipelines
 - Set up [scheduled jobs](https://github.com/ehsaniara/joblet/blob/main/docs/JOB_EXECUTION.md#scheduled-execution) for
   automation
 - Configure [RBAC](https://github.com/ehsaniara/joblet/blob/main/docs/SECURITY.md) for multi-user environments

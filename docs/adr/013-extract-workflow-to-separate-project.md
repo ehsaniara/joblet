@@ -2,7 +2,44 @@
 
 ## Status
 
-Proposed
+**Implemented** (December 2025)
+
+The workflow code has been removed from joblet. Joblet now focuses exclusively on single-job execution. Workflow
+orchestration will be developed as a separate project that uses joblet's Job API for execution.
+
+### Implementation Completed
+
+The following changes were made to implement this decision:
+
+**Code Removal (Complete):**
+- Removed `WorkflowUuid` and `Dependencies` fields from `internal/joblet/domain/job.go`
+- Removed `WorkflowUuid` and `Dependencies` from `internal/joblet/core/interfaces/requests.go`
+- Removed workflow fields from `internal/joblet/core/job/builder.go`
+- Removed workflow fields from `internal/joblet/core/joblet.go`
+- Removed workflow fields from `internal/joblet/server/job_service.go` response
+- Removed workflow serialization from `state/internal/storage/dynamodb.go`
+- Removed workflow display from `internal/rnx/jobs/status.go`
+- Removed `JOBLET_WORKFLOW_ID` from reserved environment variables
+- Updated test files to remove workflow-specific references
+
+**Documentation Updates:**
+- Removed `docs/WORKFLOWS.md`
+- Removed `docs/adr/002-workflow-vs-job-separation.md` (superseded by this ADR)
+- Updated `docs/README.md`, `docs/API.md`, `docs/ARCHITECTURE.md`
+- Updated `docs/DEVELOPER_GUIDE.md`, `docs/JOB_EXECUTION.md`, `docs/DESIGN.md`
+- Updated `docs/INSTALLATION.md`, `docs/QUICKSTART.md`, `docs/NETWORK_MANAGEMENT.md`
+- Updated `docs/ADMIN_UI.md`, `docs/articles/getting-start-with-joblet.md`
+- Updated `docs/DEPRECATION.md`, `docs/ENVIRONMENT_VARIABLES.md`, `docs/GPU_TESTING.md`
+- Updated `docs/adr/README.md` to remove workflow ADR reference
+
+**Test Updates:**
+- Removed `tests/e2e/tests/06_workflow_test.sh` (obsolete E2E test)
+- Updated `state/internal/storage/dynamodb_test.go` to remove workflow assertions
+- All remaining E2E tests pass
+
+**Proto Compatibility:**
+- Proto definitions in external `joblet-proto` repository remain unchanged
+- Joblet ignores workflow fields from proto but does not send them in responses
 
 ## Context
 
@@ -252,5 +289,5 @@ existing clients.
 
 ## References
 
-- [ADR-002: Workflow vs Job Separation](002-workflow-vs-job-separation.md) - Original separation decision
-- [WORKFLOWS.md](/docs/WORKFLOWS.md) - Current workflow documentation
+- This ADR supersedes ADR-002 (Workflow vs Job Separation), which has been removed as workflow functionality no longer
+  exists in joblet

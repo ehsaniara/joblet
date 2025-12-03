@@ -129,12 +129,6 @@ service JobService {
 
   // Job metrics operations
   rpc GetJobMetrics(JobMetricsRequest) returns (stream JobMetricsSample);
-
-  // Workflow operations
-  rpc RunWorkflow(RunWorkflowRequest) returns (RunWorkflowResponse);
-  rpc GetWorkflowStatus(GetWorkflowStatusRequest) returns (GetWorkflowStatusResponse);
-  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
-  rpc GetWorkflowJobs(GetWorkflowJobsRequest) returns (GetWorkflowJobsResponse);
 }
 ```
 
@@ -555,7 +549,7 @@ Core job representation used across all API responses.
 ```protobuf
 message Job {
   string id = 1;                    // Unique job UUID identifier
-  string name = 2;                  // Readable job name (from workflows, empty for individual jobs)
+  string name = 2;                  // Readable job name
   string command = 3;               // Command being executed
   repeated string args = 4;         // Command arguments
   int32 maxCPU = 5;                // CPU limit in percent
@@ -614,7 +608,7 @@ Response message for job status requests, including node identification.
 ```protobuf
 message GetJobStatusRes {
   string uuid = 1;                  // Job UUID
-  string name = 2;                  // Job name (from workflows, empty for individual jobs)
+  string name = 2;                  // Job name
   string command = 3;               // Command being executed
   repeated string args = 4;         // Command arguments
   int32 maxCPU = 5;                // CPU limit in percent
@@ -633,12 +627,10 @@ message GetJobStatusRes {
   repeated string volumes = 18;     // Volume names
   string workDir = 19;             // Working directory
   repeated FileUpload uploads = 20; // File uploads
-  repeated string dependencies = 21; // Job dependencies
-  string workflowUuid = 22;        // Workflow UUID if part of workflow
-  int32 gpuCount = 23;             // Number of GPUs allocated
-  repeated int32 gpuIndices = 24;   // GPU indices allocated
-  int64 gpuMemoryMB = 25;          // GPU memory in MB
-  string nodeId = 26;              // Unique identifier of the Joblet node that executed this job
+  int32 gpuCount = 21;             // Number of GPUs allocated
+  repeated int32 gpuIndices = 22;   // GPU indices allocated
+  int64 gpuMemoryMB = 23;          // GPU memory in MB
+  string nodeId = 24;              // Unique identifier of the Joblet node that executed this job
 }
 ```
 
@@ -893,150 +885,6 @@ sudo journalctl -u joblet -f
 - **Resource Usage**: Check cgroup statistics in `/sys/fs/cgroup/joblet.slice/`
 - **Network**: Monitor gRPC connection count and latency
 - **Memory**: Track job output buffer sizes and cleanup efficiency
-
-## Workflow API
-
-### Overview
-
-Joblet provides comprehensive workflow orchestration through YAML-defined job dependencies. Workflows enable complex
-multi-job execution with dependency management, resource isolation, and comprehensive monitoring.
-
-### Key Workflow Features
-
-- **Job Names**: Job names derived from YAML job keys
-- **Dependency Management**: Define job execution order with `requires` clauses
-- **Resource Isolation**: Per-job resource limits and network configuration
-- **Real-time Monitoring**: Track workflow progress with job-level status updates
-- **Validation**: Pre-execution validation prevents runtime failures
-
-### Service Architecture
-
-The API provides multiple services with distinct responsibilities:
-
-#### JobService (Production Operations)
-
-Handles regular user jobs with production isolation:
-
-```protobuf
-service JobService {
-  // Job execution with production isolation
-  rpc RunJob(RunJobReq) returns (RunJobRes);
-  rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
-  rpc StopJob(StopJobReq) returns (StopJobRes);
-  rpc ListJobs(EmptyRequest) returns (Jobs);
-  rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
-  
-  // Workflow execution
-  rpc RunWorkflow(RunWorkflowRequest) returns (RunWorkflowResponse);
-  rpc GetWorkflowStatus(GetWorkflowStatusRequest) returns (GetWorkflowStatusResponse);
-  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
-  rpc GetWorkflowJobs(GetWorkflowJobsRequest) returns (GetWorkflowJobsResponse);
-}
-```
-
-#### RuntimeService (Administrative Operations)
-
-Handles runtime building with builder chroot access:
-
-```protobuf
-service RuntimeService {
-  // Runtime installation and management
-  rpc InstallRuntime(InstallRuntimeRequest) returns (InstallRuntimeResponse);
-  rpc ListRuntimes(ListRuntimesRequest) returns (ListRuntimesResponse);
-  rpc GetRuntimeInfo(GetRuntimeInfoRequest) returns (GetRuntimeInfoResponse);
-  rpc TestRuntime(TestRuntimeRequest) returns (TestRuntimeResponse);
-}
-```
-
-**Key Differences:**
-
-- **JobService**: Sets `JobType: "standard"` → minimal chroot with production isolation
-- **RuntimeService**: Sets `JobType: "runtime-build"` → builder chroot with host OS access
-
-### Workflow Messages
-
-#### WorkflowJob
-
-Represents a job within a workflow with dependency information.
-
-```protobuf
-message WorkflowJob {
-  string jobId = 1;                      // Actual job UUID for started jobs, "0" for non-started jobs
-  string jobName = 2;                    // Job name from workflow YAML
-  string status = 3;                     // Current job status
-  repeated string dependencies = 4;       // List of job names this job depends on
-  Timestamp startTime = 5;               // Job start time
-  Timestamp endTime = 6;                 // Job completion time
-  int32 exitCode = 7;                    // Process exit code
-}
-```
-
-**Job ID Behavior:**
-
-- **Started jobs**: `jobId` contains actual job UUID assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "
-  6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-- **Non-started jobs**: `jobId` shows "0" to indicate the job hasn't been started yet
-
-#### GetWorkflowStatusResponse
-
-Provides comprehensive workflow status with job details.
-
-```protobuf
-message GetWorkflowStatusResponse {
-  WorkflowInfo workflow = 1;             // Overall workflow information
-  repeated WorkflowJob jobs = 2;         // Detailed job information with dependencies
-}
-```
-
-### Job Names in Workflows
-
-Workflow jobs have **Job names** derived from YAML job keys:
-
-```yaml
-# workflow.yaml
-jobs:
-  setup-data:        # Job name: "setup-data"
-    command: "python3"
-    args: ["setup.py"]
-    
-  process-data:      # Job name: "process-data" 
-    command: "python3"
-    args: ["process.py"]
-    requires:
-      - setup-data: "COMPLETED"
-```
-
-**Job ID vs Job Name:**
-
-- **Job ID**: Unique UUID identifier assigned by joblet (e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479", "
-  6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-- **Job Name**: Job name from workflow YAML (e.g., "setup-data", "process-data")
-
-**Status Display:**
-
-```
-JOB ID                                   JOB NAME             STATUS       EXIT CODE  DEPENDENCIES        
----------------------------------------------------------------------------------------------------------------------
-f47ac10b-58cc-4372-a567-0e02b2c3d479     setup-data           COMPLETED    0          -                   
-6ba7b810-9dad-11d1-80b4-00c04fd430c8     process-data         RUNNING      -          setup-data          
-```
-
-### CLI Integration
-
-Workflow status commands automatically display job names for better visibility:
-
-```bash
-# Get workflow status with job names and dependencies
-rnx workflow status a1b2c3d4-e5f6-7890-1234-567890abcdef
-
-# List workflows
-rnx workflow list
-
-# Execute workflow
-rnx workflow run pipeline.yaml
-```
-
----
 
 ## Persist Service API
 
@@ -1327,14 +1175,6 @@ persist:
 - **Documentation**: Complete method documentation across entire adapter layer
 
 ### Version 2.10.0 (August 2025)
-
-#### Workflow Enhancements
-
-- **Job Names Support**: Added job names for workflow jobs
-    - Job names derived from YAML job keys (e.g., "setup-data", "process-data")
-    - Enhanced CLI display with separate JOB ID and JOB NAME columns
-    - Updated protobuf messages to include name field
-    - Improved workflow monitoring and dependency visualization
 
 #### API Implementations
 

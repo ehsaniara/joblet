@@ -84,7 +84,6 @@ joblet/
 - **Purpose**: Command-line interface
 - **Features**:
     - Job management (run, status, stop, logs)
-    - Workflow orchestration
     - Network/volume management
     - Runtime installation
     - Multi-node support
@@ -456,7 +455,6 @@ make deploy
 - [ ] Cloud storage backends (S3, CloudWatch)
 - [ ] Distributed job scheduling (multi-node)
 - [ ] Job priority and preemption
-- [ ] Advanced workflow DAGs
 - [ ] Web UI dashboard
 
 ### Considered

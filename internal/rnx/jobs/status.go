@@ -29,7 +29,6 @@ The status command shows complete job information including:
 • Volume storage (mounted persistent and memory volumes)
 • Environment variables (regular and secret/masked)
 • File uploads and working directory
-• Workflow information (UUID, dependencies for workflow jobs)
 • Process results (exit code, completion status)
 • Contextual next actions (view logs, stop job, etc.)
 
@@ -47,9 +46,6 @@ Examples:
   # Get job status in JSON format (all fields)
   rnx job status --json f47ac10b
 
-  # For workflow status, use:
-  rnx workflow status <workflow-uuid>
-
 Job Status Information Displayed:
   • Basic Info: Job UUID, name, command with arguments, current status
   • Timing: Creation time, start time, end time, execution duration
@@ -61,7 +57,6 @@ Job Status Information Displayed:
   • Uploaded Files: List of files uploaded for job execution
   • Environment: Regular environment variables (visible in logs)
   • Secrets: Secret environment variables (masked as ***)
-  • Workflow Context: Workflow UUID and job dependencies (if applicable)
   • Results: Exit code and completion status
   • Actions: Contextual next steps (view logs, stop job, etc.)
 
@@ -240,20 +235,6 @@ func getJobStatus(jobID string) error {
 		}
 	}
 
-	// Display workflow information
-	if response.WorkflowUuid != "" {
-		fmt.Printf("\nWorkflow Information:\n")
-		fmt.Printf("  Workflow UUID: %s\n", response.WorkflowUuid)
-
-		// Display dependencies if available
-		if len(response.Dependencies) > 0 {
-			fmt.Printf("  Dependencies:\n")
-			for _, dep := range response.Dependencies {
-				fmt.Printf("    - %s\n", dep)
-			}
-		}
-	}
-
 	// Display environment variables (if any)
 	hasEnvVars := len(response.Environment) > 0 || len(response.SecretEnvironment) > 0
 	if hasEnvVars {
@@ -354,8 +335,6 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 		"runtime":           response.Runtime,
 		"workDir":           response.WorkDir,
 		"uploads":           response.Uploads,
-		"dependencies":      response.Dependencies,
-		"workflowUuid":      response.WorkflowUuid,
 	}
 
 	// Include resource limits if set
@@ -375,241 +354,4 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)
-}
-
-// GetWorkflowStatus retrieves and displays comprehensive workflow status with job names.
-//
-// RESPONSIBILITY:
-// - Fetches detailed workflow status from the joblet server
-// - Formats and displays workflow information with job names and dependencies
-// - Provides both tabular and JSON output formats for different use cases
-// - Integrates job names feature to show readable job identifiers
-//
-// JOB NAMES DISPLAY:
-// - JOB ID column: Shows actual job IDs (e.g., "42", "43") for started jobs
-// - JOB NAME column: Shows readable names from workflow YAML (e.g., "setup-data")
-// - DEPENDENCIES column: Lists job name dependencies for clarity
-// - Properly handles jobs that haven't been started (show job names in ID column)
-//
-// OUTPUT FORMATS:
-// 1. Tabular format (default):
-//   - Workflow summary (ID, status, progress, timing)
-//   - Job table with columns: JOB ID, JOB NAME, STATUS, EXIT CODE, DEPENDENCIES
-//   - Color-coded status indicators
-//   - Helpful action suggestions based on workflow state
-//
-// 2. JSON format (--json flag):
-//   - Complete workflow metadata
-//   - Detailed job information including dependencies and timing
-//   - Machine-readable format for scripting and automation
-//
-// WORKFLOW:
-// 1. Creates gRPC client connection to joblet server
-// 2. Sends GetWorkflowStatus request with workflow ID
-// 3. Processes response based on output format preference
-// 4. Formats and displays comprehensive workflow status
-// 5. Provides contextual next-step suggestions
-//
-// PARAMETERS:
-// - workflowID: Unique numeric identifier for the workflow
-//
-// RETURNS:
-// - error: If client creation fails, request fails, or formatting errors occur
-func GetWorkflowStatus(workflowID string, showDetail bool) error {
-	client, err := common.NewJobClient()
-	if err != nil {
-		return fmt.Errorf("couldn't connect to joblet server: %w", err)
-	}
-	defer client.Close()
-
-	// Create workflow service client
-	workflowClient := pb.NewJobServiceClient(client.GetConn())
-
-	req := &pb.GetWorkflowStatusRequest{
-		WorkflowUuid: workflowID,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	res, err := workflowClient.GetWorkflowStatus(ctx, req)
-	if err != nil {
-		return fmt.Errorf("couldn't get workflow status: %w", err)
-	}
-
-	if common.JSONOutput {
-		return outputWorkflowStatusJSON(res, showDetail)
-	}
-
-	workflow := res.Workflow
-
-	// Display workflow summary
-	fmt.Printf("Workflow UUID: %s\n", workflow.Uuid)
-	fmt.Printf("\n")
-
-	// Display YAML content if detail flag is set
-	if showDetail {
-		if workflow.YamlContent != "" {
-			displayWorkflowYAMLContent(workflow.YamlContent)
-		} else {
-			fmt.Printf("Warning: YAML content not available from server\n\n")
-		}
-	}
-
-	// Display status with color coding (if terminal supports it)
-	statusColor, resetColor := getStatusColor(workflow.Status)
-	fmt.Printf("Status: %s%s%s\n", statusColor, workflow.Status, resetColor)
-	fmt.Printf("Progress: %d/%d jobs completed", workflow.CompletedJobs, workflow.TotalJobs)
-	if workflow.FailedJobs > 0 {
-		fmt.Printf(" (%d failed)", workflow.FailedJobs)
-	}
-	fmt.Printf("\n\n")
-
-	// Display timing information
-	fmt.Printf("Timing:\n")
-	if workflow.CreatedAt != nil && workflow.CreatedAt.Seconds > 0 {
-		createdTime := time.Unix(workflow.CreatedAt.Seconds, 0)
-		fmt.Printf("  Created:   %s\n", createdTime.Format("2006-01-02 15:04:05 MST"))
-	}
-	if workflow.StartedAt != nil && workflow.StartedAt.Seconds > 0 {
-		startedTime := time.Unix(workflow.StartedAt.Seconds, 0)
-		fmt.Printf("  Started:   %s\n", startedTime.Format("2006-01-02 15:04:05 MST"))
-	}
-	if workflow.CompletedAt != nil && workflow.CompletedAt.Seconds > 0 {
-		completedTime := time.Unix(workflow.CompletedAt.Seconds, 0)
-		fmt.Printf("  Completed: %s\n", completedTime.Format("2006-01-02 15:04:05 MST"))
-		// Calculate duration
-		if workflow.StartedAt != nil && workflow.StartedAt.Seconds > 0 {
-			startTime := time.Unix(workflow.StartedAt.Seconds, 0)
-			duration := completedTime.Sub(startTime)
-			fmt.Printf("  Duration:  %s\n", formatDuration(duration))
-		}
-	}
-	fmt.Printf("\n")
-
-	// Display jobs with detailed information
-	if len(res.Jobs) > 0 {
-		fmt.Printf("Jobs in Workflow:\n")
-		fmt.Printf("-----------------------------------------------------------------------------------------------------------------------------\n")
-		fmt.Printf("%-38s %-20s %-12s %-10s %-20s\n", "JOB ID", "JOB NAME", "STATUS", "EXIT CODE", "DEPENDENCIES")
-		fmt.Printf("-----------------------------------------------------------------------------------------------------------------------------\n")
-
-		for _, job := range res.Jobs {
-			// Format status with color
-			jobStatusColor, _ := getStatusColor(job.Status)
-
-			exitCodeStr := "-"
-			if job.ExitCode > 0 || job.Status == "COMPLETED" {
-				exitCodeStr = fmt.Sprintf("%d", job.ExitCode)
-			}
-
-			deps := "-"
-			if len(job.Dependencies) > 0 {
-				deps = strings.Join(job.Dependencies, ", ")
-				if len(deps) > 20 {
-					deps = deps[:17] + "..."
-				}
-			}
-
-			// Truncate job name if too long for display
-			jobName := job.JobName
-			if jobName == "" {
-				jobName = "-"
-			} else if len(jobName) > 20 {
-				jobName = jobName[:17] + "..."
-			}
-
-			// Use full job UUID (no truncation needed with wider format)
-			jobID := job.JobUuid
-
-			fmt.Printf("%-38s %-20s %s%-12s%s %-10s %-20s\n",
-				jobID,
-				jobName,
-				jobStatusColor, job.Status, resetColor,
-				exitCodeStr,
-				deps)
-
-			// Show timing for completed/running jobs
-			if job.StartTime != nil && job.StartTime.Seconds > 0 {
-				startTime := time.Unix(job.StartTime.Seconds, 0)
-				fmt.Printf("                                        Started: %s", startTime.Format("15:04:05"))
-				if job.EndTime != nil && job.EndTime.Seconds > 0 {
-					endTime := time.Unix(job.EndTime.Seconds, 0)
-					duration := endTime.Sub(startTime)
-					fmt.Printf("  Duration: %s", formatDuration(duration))
-				}
-				fmt.Printf("\n")
-			}
-		}
-		fmt.Printf("\n")
-	}
-
-	// Show available actions
-	fmt.Printf("\nAvailable Actions:\n")
-	fmt.Printf("  • rnx workflow list          # List all workflows\n")
-	if workflow.Status == "RUNNING" {
-		fmt.Printf("  • rnx job status %s          # Refresh workflow status\n", workflow.Uuid)
-	}
-	for _, job := range res.Jobs {
-		if job.Status == "COMPLETED" || job.Status == "FAILED" {
-			fmt.Printf("  • rnx job log %s             # View logs for job %s\n", job.JobUuid, job.JobUuid)
-			break
-		}
-	}
-
-	return nil
-}
-
-// outputWorkflowStatusJSON outputs workflow status in JSON format
-func outputWorkflowStatusJSON(res *pb.GetWorkflowStatusResponse, showDetail bool) error {
-	// Convert protobuf workflow status to JSON structure
-	statusData := map[string]interface{}{
-		"uuid":           res.Workflow.Uuid,
-		"status":         res.Workflow.Status,
-		"total_jobs":     res.Workflow.TotalJobs,
-		"completed_jobs": res.Workflow.CompletedJobs,
-		"failed_jobs":    res.Workflow.FailedJobs,
-		"created_at":     res.Workflow.CreatedAt,
-		"started_at":     res.Workflow.StartedAt,
-		"completed_at":   res.Workflow.CompletedAt,
-		"jobs":           make([]map[string]interface{}, 0, len(res.Jobs)),
-	}
-
-	// Include YAML content if detail flag is set and content is available
-	if showDetail && res.Workflow.YamlContent != "" {
-		statusData["yaml_content"] = res.Workflow.YamlContent
-	}
-
-	// Add job details
-	for _, job := range res.Jobs {
-		jobData := map[string]interface{}{
-			"id":     job.JobUuid,
-			"name":   job.JobName,
-			"status": job.Status,
-		}
-		if job.ExitCode != 0 {
-			jobData["exit_code"] = job.ExitCode
-		}
-		if len(job.Dependencies) > 0 {
-			jobData["dependencies"] = job.Dependencies
-		}
-		if job.StartTime != nil && job.StartTime.Seconds > 0 {
-			jobData["start_time"] = job.StartTime
-		}
-		if job.EndTime != nil && job.EndTime.Seconds > 0 {
-			jobData["end_time"] = job.EndTime
-		}
-		statusData["jobs"] = append(statusData["jobs"].([]map[string]interface{}), jobData)
-	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(statusData)
-}
-
-// displayWorkflowYAMLContent displays YAML content directly from server
-func displayWorkflowYAMLContent(yamlContent string) {
-	fmt.Printf("YAML Content:\n")
-	fmt.Printf("=============\n")
-	fmt.Printf("%s\n", yamlContent)
 }

@@ -64,10 +64,10 @@ func TestNewStatusCmd(t *testing.T) {
 		t.Error("RunE function is nil")
 	}
 
-	// Check that no workflow-specific flags exist (removed in favor of rnx workflow command)
+	// Check that deprecated flags are removed
 	flags := cmd.Flags()
 
-	// These flags should NOT exist anymore
+	// These flags should NOT exist
 	unexpectedFlags := []string{"detail", "workflow"}
 	for _, flagName := range unexpectedFlags {
 		if flag := flags.Lookup(flagName); flag != nil {
@@ -91,11 +91,9 @@ func TestStatusCommandEnhancedHelp(t *testing.T) {
 		"Volume storage (mounted persistent and memory volumes)",
 		"Environment variables (regular and secret/masked)",
 		"File uploads and working directory",
-		"Workflow information (UUID, dependencies for workflow jobs)",
 		"Examples:",
 		"Job Status Information Displayed:",
 		"Output Formats:",
-		"For workflow status, use:",
 	}
 
 	for _, section := range expectedSections {
@@ -118,12 +116,11 @@ func TestStatusCommandHelpExamples(t *testing.T) {
 	cmd := NewStatusCmd()
 	helpContent := cmd.Long
 
-	// Test that specific job examples are included (workflow examples removed)
+	// Test that specific job examples are included
 	expectedExamples := []string{
 		"rnx job status f47ac10b-58cc-4372-a567-0e02b2c3d479",
 		"rnx job status f47ac10b",
 		"rnx job status --json f47ac10b",
-		"rnx workflow status <workflow-uuid>",
 	}
 
 	for _, example := range expectedExamples {
@@ -149,7 +146,6 @@ func TestStatusCommandInformationCategories(t *testing.T) {
 		"Uploaded Files: List of files uploaded for job execution",
 		"Environment: Regular environment variables (visible in logs)",
 		"Secrets: Secret environment variables (masked as ***)",
-		"Workflow Context: Workflow UUID and job dependencies (if applicable)",
 		"Results: Exit code and completion status",
 		"Actions: Contextual next steps (view logs, stop job, etc.)",
 	}
@@ -197,7 +193,7 @@ func TestNewListCmd(t *testing.T) {
 		t.Error("RunE function is nil")
 	}
 
-	// Verify workflow flag is removed (now use: rnx workflow list)
+	// Verify deprecated flags are removed
 	if flag := cmd.Flags().Lookup("workflow"); flag != nil {
 		t.Error("Unexpected 'workflow' flag found (should be removed)")
 	}
@@ -462,12 +458,12 @@ func TestJobCommandFlags(t *testing.T) {
 		{
 			name:          "status command flags",
 			cmdFunc:       NewStatusCmd,
-			expectedFlags: []string{}, // Workflow flags removed - use rnx workflow status
+			expectedFlags: []string{},
 		},
 		{
 			name:          "list command flags",
 			cmdFunc:       NewListCmd,
-			expectedFlags: []string{}, // Workflow flags removed - use rnx workflow list
+			expectedFlags: []string{},
 		},
 		{
 			name:          "log command flags",

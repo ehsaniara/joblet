@@ -22,54 +22,20 @@ All features listed below have been **REMOVED** in v5.0.0. See migration guide a
 
 ### 1. JobServiceServer
 
-**Status**: ✅ **REMOVED** in v5.0.0
+**Status**: ✅ **ACTIVE** in v5.0.0
 
 **Current Location**: `internal/joblet/server/job_service.go`
 
-**Reason for Deprecation**:
-The original `JobServiceServer` has been superseded by `WorkflowServiceServer`, which implements a unified architecture
-where all jobs (individual and workflow) are handled through a single service.
-
-**Migration Path**:
-
-#### Before (Deprecated):
-
-```go
-// OLD: Using JobServiceServer
-jobService := server.NewJobServiceServer(auth, jobStore, metricsStore, joblet)
-pb.RegisterJobServiceServer(grpcServer, jobService)
-```
-
-#### After (Current):
-
-```go
-// NEW: Using WorkflowServiceServer
-workflowManager := workflow.NewWorkflowManager()
-jobService := server.NewWorkflowServiceServer(
-    auth,
-    jobStore,
-    metricsStore,
-    joblet,
-    workflowManager,
-    volumeManager,
-    runtimeResolver,
-)
-pb.RegisterJobServiceServer(grpcServer, jobService)
-```
+**Description**:
+The `JobServiceServer` handles all job-related gRPC operations including job submission, status queries, and lifecycle management.
 
 **Current Status**:
 
-- ✅ WorkflowServiceServer fully implements JobServiceServer interface
-- ✅ Already used in production (see `internal/joblet/server/grpc_server.go:81`)
-- ⚠️ Still marked as `JobServiceServer` type but uses workflow implementation
-- ❌ Old implementation file still exists for reference
+- ✅ Implements `JobServiceServer` interface from joblet-proto
+- ✅ Used in production (see `internal/joblet/server/grpc_server.go`)
+- ✅ Handles individual job execution
 
-**Removal Plan**:
-
-1. **v4.7.3** (Current): File marked as deprecated, workflow implementation active
-2. **v5.0.0**: Remove `internal/joblet/server/job_service.go` entirely
-
-**Impact**: Low - Already migrated to WorkflowServiceServer internally
+**Impact**: None - This is the active implementation
 
 ---
 
@@ -208,41 +174,27 @@ initPath, err := envService.GetRuntimeInitPath(ctx, "python-3.11")
 
 ---
 
-### 5. Workflow-Level Environment Variables
+### 5. Separate Secret Environment Flag
 
 **Status**: ✅ **REMOVED** in v5.0.0
 
-**Removed Fields**:
+**Removed CLI Flag**:
 
-```yaml
-# workflow.yaml (OLD - No longer supported)
-version: "1.0"
-environment:              # ❌ REMOVED
-  GLOBAL_VAR: "value"
-secret_environment:       # ❌ REMOVED
-  API_KEY: "secret"
-jobs:
-  my-job:
-    command: python3
-    args: [script.py]
+```bash
+# OLD - No longer supported
+rnx job run --env="PUBLIC_VAR=value" --secret-env="API_KEY=secret" app
 ```
 
 **Migration** (Required for v5.0.0):
 
-Define environment variables directly in each job specification.
+Use single `--env` flag with naming conventions for automatic secret detection.
 
 #### After (v5.0.0 - Required):
 
-```yaml
-# workflow.yaml (NEW - Required)
-version: "1.0"
-jobs:
-  my-job:
-    command: python3
-    args: [script.py]
-    environment:          # ✅ Job-level environment (REQUIRED)
-      GLOBAL_VAR: "value"
-      SECRET_API_KEY: "secret"  # Auto-detected as secret by naming
+```bash
+# NEW - Use single --env flag
+rnx job run --env="PUBLIC_VAR=value" --env="API_KEY=secret" app
+# API_KEY auto-detected as secret by _KEY suffix
 ```
 
 **Secret Detection** (New in v5.0.0):
@@ -254,54 +206,7 @@ Secrets are automatically detected by naming convention:
 - `*_PASSWORD` suffix (e.g., `DATABASE_PASSWORD`)
 - `*_SECRET` suffix (e.g., `OAUTH_SECRET`)
 
-**Impact**: High - Breaking change, workflow YAML files must be updated
-
----
-
-### 6. Job-Level SecretEnvironment Field
-
-**Status**: ✅ **REMOVED** in v5.0.0
-
-**Removed Field**:
-
-```yaml
-# Job specification (OLD - No longer supported)
-jobs:
-  my-job:
-    command: python3
-    environment:
-      NORMAL_VAR: "value"
-    secret_environment:    # ❌ REMOVED
-      API_KEY: "secret"
-```
-
-**Migration** (Required for v5.0.0):
-
-Merge all variables into a single `environment` field with naming conventions.
-
-#### After (v5.0.0 - Required):
-
-```yaml
-# Job specification (NEW - Required)
-jobs:
-  my-job:
-    command: python3
-    environment:
-      NORMAL_VAR: "value"
-      SECRET_API_KEY: "secret"  # Auto-detected by naming
-      DATABASE_PASSWORD: "pass"  # Auto-detected by naming
-```
-
-**Automatic Secret Detection** (v5.0.0):
-Variables matching these patterns are automatically treated as secrets:
-
-- Prefix: `SECRET_*` (e.g., `SECRET_DATABASE_PASSWORD`)
-- Suffix: `*_TOKEN` (e.g., `GITHUB_TOKEN`)
-- Suffix: `*_KEY` (e.g., `API_KEY`)
-- Suffix: `*_PASSWORD` (e.g., `DATABASE_PASSWORD`)
-- Suffix: `*_SECRET` (e.g., `OAUTH_SECRET`)
-
-**Impact**: Medium - Breaking change, requires YAML update
+**Impact**: Medium - Breaking change, CLI usage must be updated
 
 ---
 
@@ -313,20 +218,18 @@ Variables matching these patterns are automatically treated as secrets:
 
 Breaking Changes Applied:
 
-- ✅ Removed `internal/joblet/server/job_service.go`
 - ✅ Removed legacy `JobStatus*` constants
 - ✅ Removed sequential ID generator methods
 - ✅ Removed `GetRuntimeInitPath` method
-- ✅ Removed workflow-level environment fields from YAML schema
-- ✅ Removed `secret_environment` field from JobSpec
+- ✅ Removed `--secret-env` CLI flag
 - ✅ Removed network ready FD fallback (`NETWORK_READY_FD`)
 - ✅ Removed legacy Job struct fields (`StartedAt`, `CompletedAt` aliases)
+- ✅ Removed workflow orchestration (moved to separate project per ADR-013)
 - ✅ Added automatic secret detection by naming convention
 
 Migration Support:
 
 - ✅ Complete migration guide in V5_CLEANUP_SUMMARY.md
-- ✅ Migration script available (see below)
 - ✅ All replacements documented with examples
 
 ---
@@ -346,38 +249,16 @@ grep -r "NewSequentialIDGenerator\|NextWithTimestamp" .
 grep -r "GetRuntimeInitPath" .
 ```
 
-### 2. Audit Your Workflows
+### 2. Update Code
 
-```bash
-# Search for removed YAML fields (will cause parsing errors)
-grep -r "secret_environment" workflows/
-
-# Check workflow-level environment (will be ignored)
-grep -A5 "^environment:" workflows/*.yaml
-```
-
-### 3. Update Code
-
-Automated migration (Python script):
-
-```bash
-# Download migration script
-curl -O https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/migrate-to-v5.py
-
-# Run migration script
-python3 migrate-to-v5.py --dry-run workflows/
-python3 migrate-to-v5.py --apply workflows/
-```
-
-Or manual updates:
+Manual updates:
 
 - Replace `JobStatus*` → `Status*` in Go code
 - Replace `NewSequentialIDGenerator` → `NewUUIDGenerator`
-- Move workflow-level `environment` → job-level `environment`
-- Merge `secret_environment` → `environment` with naming conventions
+- Replace `--secret-env` → `--env` with naming conventions for secrets
 - Update `NETWORK_READY_FD` → `NETWORK_READY_FILE` in deployment scripts
 
-### 4. Test Changes
+### 3. Test Changes
 
 ```bash
 # Run full test suite
@@ -385,12 +266,9 @@ go test ./...
 
 # Run E2E tests
 ./tests/e2e/run_tests.sh
-
-# Verify workflows parse correctly
-rnx workflow validate workflows/*.yaml
 ```
 
-### 5. Update Deployment
+### 4. Update Deployment
 
 ```bash
 # If using NETWORK_READY_FD, switch to NETWORK_READY_FILE

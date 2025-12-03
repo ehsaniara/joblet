@@ -140,9 +140,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           req.JobType,
-		WorkflowUuid:      req.WorkflowUuid,
 		WorkingDirectory:  req.WorkingDirectory,
-		Dependencies:      req.Dependencies,
 		GPUCount:          req.GPUCount,    // GPU requirements
 		GPUMemoryMB:       req.GPUMemoryMB, // GPU memory requirement
 	}

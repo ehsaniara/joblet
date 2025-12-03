@@ -28,10 +28,7 @@ Examples:
   rnx job list
 
   # List jobs in JSON format
-  rnx job list --json
-
-  # For workflows, use:
-  rnx workflow list`,
+  rnx job list --json`,
 		RunE: runList,
 	}
 

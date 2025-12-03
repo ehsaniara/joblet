@@ -38,10 +38,10 @@ go test ./tests/gpu -v
 
 #### What Integration Tests Cover
 
-- End-to-end GPU job workflow
+- End-to-end GPU job execution
 - CLI flag parsing (`--gpu`, `--gpu-memory`)
 - JSON API responses
-- Workflow GPU allocation
+- GPU allocation and deallocation
 - Error handling and resource cleanup
 
 ### 3. System Tests (Real GPUs)
@@ -121,10 +121,7 @@ rnx job run --gpu=1 echo "Production GPU test"
 # 2. Resource monitoring
 rnx monitor status  # Check GPU status
 
-# 3. Workflow validation
-rnx workflow run examples/workflows/gpu-ml-pipeline.yaml
-
-# 4. Load testing (carefully)
+# 3. Load testing (carefully)
 # Run multiple GPU jobs to test resource management
 ```
 
@@ -166,35 +163,19 @@ rnx job run --gpu=2 --gpu-memory=4GB python distributed_training.py
 # - Both GPUs released after completion
 ```
 
-### Test Case 4: GPU Workflow
+### Test Case 4: Sequential GPU Jobs
 
 ```bash
-# Create test workflow
-cat > gpu_workflow.yaml << EOF
-jobs:
-  data-prep:
-    command: "echo"
-    args: ["Preprocessing data"]
-    resources:
-      max_memory: 1024
+# Run data preprocessing job (no GPU)
+rnx job run --memory=1GB echo "Preprocessing data"
 
-  training:
-    command: "echo"
-    args: ["Training model"]
-    requires:
-      - data-prep: "COMPLETED"
-    resources:
-      gpu_count: 1
-      gpu_memory_mb: 4096
-      max_memory: 2048
-EOF
-
-rnx workflow run gpu_workflow.yaml
+# Run training job with GPU
+rnx job run --gpu=1 --gpu-memory=4GB --memory=2GB echo "Training model"
 
 # Verify:
-# - data-prep runs without GPU
-# - training job gets GPU allocation
-# - Jobs execute in correct order
+# - Jobs complete successfully
+# - GPU is allocated for training job
+# - GPU is released after completion
 ```
 
 ### Test Case 5: GPU Isolation

@@ -1,13 +1,12 @@
 # Environment Variables
 
-Joblet provides comprehensive support for environment variables in both CLI jobs and workflow-based jobs. Environment
+Joblet provides comprehensive support for environment variables in jobs. Environment
 variables allow you to pass configuration, secrets, and runtime parameters to your jobs in a secure and flexible manner.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [CLI Usage](#cli-usage)
-- [Workflow Usage](#workflow-usage)
 - [Secret Detection](#secret-detection)
 - [Security Features](#security-features)
 - [Validation](#validation)
@@ -22,7 +21,7 @@ variables allow you to pass configuration, secrets, and runtime parameters to yo
 ### Key Features
 
 - **Automatic secret detection** (based on variable naming conventions)
-- **Multiple input methods** (command line flags, workflow YAML)
+- **Multiple input methods** (command line flags)
 - **Variable templating** (`${VAR_NAME}` syntax for referencing other variables)
 - **Status display masking** (secret variables shown as `***` in status output)
 - **Variable validation** (name format, value size, conflict detection)
@@ -79,40 +78,6 @@ rnx job run \
   --env="BATCH_SIZE=1000" \
   --env="SECRET_API_KEY=api_key_here" \
   python process_data.py
-```
-
-## Workflow Usage
-
-### Basic Example
-
-```yaml
-jobs:
-  my-job:
-    command: "python3"
-    args: ["app.py"]
-    environment:
-      # Regular variables (visible)
-      NODE_ENV: "production"
-      DEBUG_MODE: "false"
-      BATCH_SIZE: "100"
-
-      # Secrets (auto-detected, masked in logs)
-      DATABASE_PASSWORD: "super_secret_password"
-      API_KEY: "dummy_api_key_example"
-      JWT_SECRET: "your_jwt_signing_secret"
-      SECRET_ENCRYPTION_KEY: "encryption_key_here"
-```
-
-### Variable Templating
-
-```yaml
-jobs:
-  build-job:
-    command: "bash"
-    args: ["-c", "echo \"Debug mode: ${DEBUG_MODE:+enabled}\"; echo \"Secret configured: ${SECRET_KEY:+yes}\""]
-    environment:
-      DEBUG_MODE: "true"
-      SECRET_KEY: "secret_value"  # Auto-detected as secret
 ```
 
 ## Secret Detection
@@ -280,237 +245,148 @@ environment:
 
 ### Example 1: Machine Learning Training
 
-```yaml
-jobs:
-  ml-training:
-    command: "python"
-    args: ["train.py"]
-    environment:
-      # Training config
-      MODEL_NAME: "gpt-2"
-      EPOCHS: "10"
-      BATCH_SIZE: "32"
-      LEARNING_RATE: "0.001"
-
-      # Paths
-      DATA_DIR: "/volumes/datasets"
-      OUTPUT_DIR: "/volumes/models"
-
-      # Secrets (auto-detected)
-      WANDB_API_KEY: "your_wandb_api_key_here"
-      HF_TOKEN: "huggingface_token_here"
-      AWS_ACCESS_KEY: "aws_key_for_s3_data"
-      AWS_SECRET_KEY: "aws_secret_for_s3_data"
-    resources:
-      max_memory: 16384
-      gpu_count: 1
-    volumes: ["ml-data", "models"]
+```bash
+rnx job run \
+  --env="MODEL_NAME=gpt-2" \
+  --env="EPOCHS=10" \
+  --env="BATCH_SIZE=32" \
+  --env="LEARNING_RATE=0.001" \
+  --env="DATA_DIR=/volumes/datasets" \
+  --env="OUTPUT_DIR=/volumes/models" \
+  --env="WANDB_API_KEY=your_wandb_api_key_here" \
+  --env="HF_TOKEN=huggingface_token_here" \
+  --env="AWS_ACCESS_KEY=aws_key_for_s3_data" \
+  --env="AWS_SECRET_KEY=aws_secret_for_s3_data" \
+  --gpu=1 \
+  --memory=16GB \
+  python train.py
 ```
 
-### Example 2: Data Pipeline
+Variables `WANDB_API_KEY`, `HF_TOKEN`, `AWS_ACCESS_KEY`, and `AWS_SECRET_KEY` are automatically detected as secrets by their naming patterns.
 
-```yaml
-jobs:
-  extract-data:
-    command: "python"
-    args: ["extract.py"]
-    environment:
-      # Pipeline config
-      SOURCE_TYPE: "postgresql"
-      OUTPUT_FORMAT: "parquet"
-      BATCH_SIZE: "1000"
-      LOG_LEVEL: "INFO"
+### Example 2: Data Processing
 
-      # Secrets (auto-detected)
-      API_KEY: "your_api_key_here"
-      DATABASE_PASSWORD: "extraction_db_password"
-      DATABASE_URL: "postgresql://user:${DATABASE_PASSWORD}@host/db"
-    volumes: ["data-pipeline"]
+```bash
+# Extract job with secrets
+rnx job run \
+  --env="SOURCE_TYPE=postgresql" \
+  --env="OUTPUT_FORMAT=parquet" \
+  --env="BATCH_SIZE=1000" \
+  --env="LOG_LEVEL=INFO" \
+  --env="API_KEY=your_api_key_here" \
+  --env="DATABASE_PASSWORD=extraction_db_password" \
+  python extract.py
 
-  transform-data:
-    command: "python"
-    args: ["transform.py"]
-    environment:
-      # Transform config
-      INPUT_FORMAT: "parquet"
-      OUTPUT_FORMAT: "parquet"
-      VALIDATION_MODE: "strict"
-    volumes: ["data-pipeline"]
-    requires:
-      - extract-data: "COMPLETED"
+# Transform job
+rnx job run \
+  --env="INPUT_FORMAT=parquet" \
+  --env="OUTPUT_FORMAT=parquet" \
+  --env="VALIDATION_MODE=strict" \
+  python transform.py
 
-  load-data:
-    command: "python"
-    args: ["load.py"]
-    environment:
-      # Load config
-      TARGET_DATABASE: "warehouse"
-      BATCH_SIZE: "500"
-      RETRY_COUNT: "3"
-
-      # Secrets (auto-detected)
-      WAREHOUSE_PASSWORD: "warehouse_secret"
-      WAREHOUSE_CONNECTION_STRING: "postgresql://..."
-    volumes: ["data-pipeline"]
-    requires:
-      - transform-data: "COMPLETED"
+# Load job with secrets
+rnx job run \
+  --env="TARGET_DATABASE=warehouse" \
+  --env="BATCH_SIZE=500" \
+  --env="RETRY_COUNT=3" \
+  --env="WAREHOUSE_PASSWORD=warehouse_secret" \
+  python load.py
 ```
 
-### Example 3: Microservices Deployment
+### Example 3: API Service
 
-```yaml
-jobs:
-  api-gateway:
-    command: "node"
-    args: ["gateway.js"]
-    environment:
-      # Service config
-      PORT: "8080"
-      NODE_ENV: "production"
-      LOG_LEVEL: "info"
-      RATE_LIMIT: "100"
-
-      # Secrets (auto-detected)
-      API_SECRET: "gateway_api_secret"
-      AUTH_TOKEN: "gateway_auth_token"
-      JWT_SECRET: "jwt_signing_key"
-    network: "microservices"
-    resources:
-      max_memory: 512
-
-  backend-service:
-    command: "java"
-    args: ["-jar", "service.jar"]
-    environment:
-      # Service config
-      SERVER_PORT: "9090"
-      SPRING_PROFILES_ACTIVE: "production"
-
-      # Secrets (auto-detected)
-      DATABASE_PASSWORD: "backend_db_password"
-      REDIS_PASSWORD: "redis_secret"
-      SECRET_KEY: "backend_secret_key"
-    network: "microservices"
-    requires:
-      - api-gateway: "RUNNING"
+```bash
+rnx job run \
+  --env="PORT=8080" \
+  --env="NODE_ENV=production" \
+  --env="LOG_LEVEL=info" \
+  --env="RATE_LIMIT=100" \
+  --env="API_SECRET=gateway_api_secret" \
+  --env="AUTH_TOKEN=gateway_auth_token" \
+  --env="JWT_SECRET=jwt_signing_key" \
+  --memory=512MB \
+  node gateway.js
 ```
 
 ### Example 4: GPU-Accelerated Workload
 
-```yaml
-jobs:
-  distributed-training:
-    command: "python"
-    args: ["-m", "torch.distributed.launch", "train.py"]
-    environment:
-      # Distributed training
-      MASTER_ADDR: "localhost"
-      MASTER_PORT: "29500"
-      WORLD_SIZE: "2"
-      RANK: "0"
-
-      # Model config
-      MODEL_SIZE: "large"
-      PRECISION: "fp16"
-      GRADIENT_CHECKPOINTING: "true"
-
-      # Secrets (auto-detected)
-      CLUSTER_TOKEN: "secure_cluster_token"
-      MONITORING_API_KEY: "monitoring_key"
-      SECRET_MODEL_KEY: "model_encryption_key"
-    resources:
-      gpu_count: 2
-      max_memory: 32768
-    network: "distributed-training"
+```bash
+rnx job run \
+  --env="MASTER_ADDR=localhost" \
+  --env="MASTER_PORT=29500" \
+  --env="WORLD_SIZE=2" \
+  --env="RANK=0" \
+  --env="MODEL_SIZE=large" \
+  --env="PRECISION=fp16" \
+  --env="GRADIENT_CHECKPOINTING=true" \
+  --env="CLUSTER_TOKEN=secure_cluster_token" \
+  --env="MONITORING_API_KEY=monitoring_key" \
+  --env="SECRET_MODEL_KEY=model_encryption_key" \
+  --gpu=2 \
+  --memory=32GB \
+  python -m torch.distributed.launch train.py
 ```
 
 ## Advanced Use Cases
 
 ### Variable Templating with Secrets
 
-```yaml
-jobs:
-  deploy:
-    command: "deploy.sh"
-    environment:
-      ENVIRONMENT: "production"
-      SERVICE_NAME: "api"
+```bash
+# Using shell variable expansion for templating
+SERVICE_NAME="api"
+ENVIRONMENT="production"
 
-      # Templating with secrets
-      SECRET_KEY_PATH: "/secrets/${SERVICE_NAME}/${ENVIRONMENT}/key.pem"
-      DATABASE_URL: "postgresql://user:${DATABASE_PASSWORD}@${DB_HOST}/db"
-
-      # Secrets (auto-detected)
-      DATABASE_PASSWORD: "prod_db_secret"
-      DB_HOST: "db.production.internal"
-      SECRET_DEPLOYMENT_KEY: "deploy_key_prod"
+rnx job run \
+  --env="ENVIRONMENT=${ENVIRONMENT}" \
+  --env="SERVICE_NAME=${SERVICE_NAME}" \
+  --env="SECRET_KEY_PATH=/secrets/${SERVICE_NAME}/${ENVIRONMENT}/key.pem" \
+  --env="DATABASE_PASSWORD=prod_db_secret" \
+  --env="DB_HOST=db.production.internal" \
+  --env="SECRET_DEPLOYMENT_KEY=deploy_key_prod" \
+  ./deploy.sh
 ```
 
-### Multi-Stage Pipeline
+### Build and Test Jobs
 
-```yaml
-jobs:
-  build:
-    command: "make"
-    args: ["build"]
-    environment:
-      BUILD_ENV: "production"
-      OPTIMIZE: "true"
+```bash
+# Build job with secrets
+rnx job run \
+  --env="BUILD_ENV=production" \
+  --env="OPTIMIZE=true" \
+  --env="NPM_TOKEN=npm_registry_token" \
+  --env="PRIVATE_KEY=code_signing_key" \
+  make build
 
-      # Build secrets (auto-detected)
-      NPM_TOKEN: "npm_registry_token"
-      PRIVATE_KEY: "code_signing_key"
+# Test job with secrets
+rnx job run \
+  --env="TEST_ENV=ci" \
+  --env="COVERAGE=true" \
+  --env="TEST_DATABASE_PASSWORD=test_db_secret" \
+  make test
 
-  test:
-    command: "make"
-    args: ["test"]
-    environment:
-      TEST_ENV: "ci"
-      COVERAGE: "true"
-
-      # Test secrets (auto-detected)
-      TEST_DATABASE_PASSWORD: "test_db_secret"
-    requires:
-      - build: "COMPLETED"
-
-  deploy:
-    command: "make"
-    args: ["deploy"]
-    environment:
-      DEPLOY_TARGET: "production"
-
-      # Deployment secrets (auto-detected)
-      DEPLOYMENT_KEY: "production_deploy_key"
-      SSH_PRIVATE_KEY: "ssh_deploy_key"
-    requires:
-      - test: "COMPLETED"
+# Deploy job with secrets
+rnx job run \
+  --env="DEPLOY_TARGET=production" \
+  --env="DEPLOYMENT_KEY=production_deploy_key" \
+  --env="SSH_PRIVATE_KEY=ssh_deploy_key" \
+  make deploy
 ```
 
 ## Migration from v4.x to v5.0.0
 
 ### Before (v4.x) - DEPRECATED
 
-```yaml
-# v4.x - No longer supported
-jobs:
-  my-job:
-    command: "app"
-    environment:
-      PUBLIC_VAR: "value"
-    secret_environment:        # ❌ REMOVED
-      API_KEY: "secret"
+```bash
+# v4.x - Separate secret flag (No longer supported)
+rnx job run --env="PUBLIC_VAR=value" --secret-env="API_KEY=secret" app
 ```
 
 ### After (v5.0.0) - REQUIRED
 
-```yaml
-# v5.0.0 - Current
-jobs:
-  my-job:
-    command: "app"
-    environment:
-      PUBLIC_VAR: "value"
-      API_KEY: "secret"        # ✅ Auto-detected as secret
+```bash
+# v5.0.0 - Single --env flag with auto-detection
+rnx job run --env="PUBLIC_VAR=value" --env="API_KEY=secret" app
+# API_KEY auto-detected as secret by _KEY suffix
 ```
 
 ## Additional Resources

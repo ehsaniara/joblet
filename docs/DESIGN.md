@@ -520,7 +520,6 @@ CPUUsage        float64
 - **Job scheduling**: Queue management and priority scheduling
 - **Multi-node support**: Distributed job execution across nodes
 - **GPU support**: NVIDIA GPU isolation and resource management
-- **Workflow management**: Job dependencies and conditional execution
 - **Audit logging**: Comprehensive security and compliance logging
 - **Metrics export**: Prometheus/InfluxDB integration
 - **Web UI**: Browser-based job management interface

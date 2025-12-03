@@ -7,7 +7,6 @@ import (
 	"github.com/ehsaniara/joblet/internal/rnx/common"
 	"github.com/ehsaniara/joblet/internal/rnx/jobs"
 	"github.com/ehsaniara/joblet/internal/rnx/resources"
-	"github.com/ehsaniara/joblet/internal/rnx/workflow"
 	"github.com/ehsaniara/joblet/pkg/config"
 
 	"github.com/spf13/cobra"
@@ -18,13 +17,12 @@ var rootCmd = &cobra.Command{
 	Short: "RNX - Remote eXecution client for Joblet",
 	Long: `RNX (Remote eXecution) - Command Line Interface to interact with Joblet gRPC services using embedded certificates
 
-RNX provides a complete interface for job execution, workflow management, and resource control
+RNX provides a complete interface for job execution and resource control
 on Joblet servers. It supports immediate execution, scheduling, and comprehensive monitoring.
 
 Key Features:
   - Execute jobs with resource limits and scheduling
   - GPU acceleration support for ML/AI workloads
-  - Manage multi-job workflows with dependencies
   - Create and manage networks, volumes, and runtimes
   - Monitor remote server resources, job performance, and volume usage
   - Stream real-time logs from running jobs
@@ -32,9 +30,6 @@ Key Features:
 Quick Examples:
   rnx job run python script.py               # Run a simple job
   rnx job run --gpu=1 python train.py        # Run GPU-accelerated job
-  rnx workflow run pipeline.yaml             # Execute a workflow
-  rnx workflow list                          # List all workflows
-  rnx workflow status <uuid>                 # Check workflow status
   rnx job status <job-uuid>                  # Check job status (supports short UUIDs)
   rnx job log <job-uuid>                     # Stream job logs (supports short UUIDs)
   rnx job cancel <job-uuid>                  # Cancel a scheduled job (status: CANCELED)
@@ -43,7 +38,7 @@ Quick Examples:
   rnx monitor status                         # View remote server metrics and volumes
   rnx monitor top --json                     # JSON output for dashboards
 
-Note: Job and workflow UUIDs support short-form usage (first 8 characters)
+Note: Job UUIDs support short-form usage (first 8 characters)
 if they uniquely identify the resource.
 
 Use 'rnx <command> --help' for detailed information about any command.`,
@@ -91,7 +86,6 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(jobs.NewJobCmd())
-	rootCmd.AddCommand(workflow.NewWorkflowCmd())
 	rootCmd.AddCommand(jobs.NewMonitorCmd())
 	rootCmd.AddCommand(NewNodesCmd())
 	rootCmd.AddCommand(NewHelpConfigCmd())

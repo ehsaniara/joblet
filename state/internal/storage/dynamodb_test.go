@@ -446,9 +446,7 @@ func TestDynamoDB_AllFieldsStored(t *testing.T) {
 		Network:          "custom-network",
 		Volumes:          []string{"vol1", "vol2"},
 		Runtime:          "python:3.9",
-		WorkflowUuid:     "workflow-abc",
 		WorkingDirectory: "/app/workdir",
-		Dependencies:     []string{"job-a", "job-b"},
 		Environment:      map[string]string{"ENV1": "value1", "ENV2": "value2"},
 		GPUIndices:       []int32{0, 1},
 		GPUCount:         2,
@@ -480,7 +478,6 @@ func TestDynamoDB_AllFieldsStored(t *testing.T) {
 		{"nodeId", "node-1"},
 		{"network", "custom-network"},
 		{"runtime", "python:3.9"},
-		{"workflowUuid", "workflow-abc"},
 		{"workingDirectory", "/app/workdir"},
 	}
 
@@ -511,15 +508,6 @@ func TestDynamoDB_AllFieldsStored(t *testing.T) {
 	}
 	if len(volAttr.Value) != 2 {
 		t.Errorf("expected 2 volumes, got %d", len(volAttr.Value))
-	}
-
-	// Verify dependencies list
-	depsAttr, ok := item["dependencies"].(*types.AttributeValueMemberL)
-	if !ok {
-		t.Fatal("dependencies field not found or wrong type")
-	}
-	if len(depsAttr.Value) != 2 {
-		t.Errorf("expected 2 dependencies, got %d", len(depsAttr.Value))
 	}
 
 	// Verify environment map
@@ -584,7 +572,6 @@ func TestDynamoDB_AllFieldsRetrieved(t *testing.T) {
 		"jobType":          &types.AttributeValueMemberS{Value: "standard"},
 		"network":          &types.AttributeValueMemberS{Value: "bridge"},
 		"runtime":          &types.AttributeValueMemberS{Value: "node:18"},
-		"workflowUuid":     &types.AttributeValueMemberS{Value: "wf-123"},
 		"workingDirectory": &types.AttributeValueMemberS{Value: "/work"},
 		"startTime":        &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
 		"exitCode":         &types.AttributeValueMemberN{Value: "0"},
@@ -595,9 +582,6 @@ func TestDynamoDB_AllFieldsRetrieved(t *testing.T) {
 		}},
 		"volumes": &types.AttributeValueMemberL{Value: []types.AttributeValue{
 			&types.AttributeValueMemberS{Value: "data-vol"},
-		}},
-		"dependencies": &types.AttributeValueMemberL{Value: []types.AttributeValue{
-			&types.AttributeValueMemberS{Value: "setup-job"},
 		}},
 		"environment": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
 			"NODE_ENV": &types.AttributeValueMemberS{Value: "production"},
@@ -653,14 +637,8 @@ func TestDynamoDB_AllFieldsRetrieved(t *testing.T) {
 	if len(job.Volumes) != 1 || job.Volumes[0] != "data-vol" {
 		t.Errorf("expected Volumes ['data-vol'], got %v", job.Volumes)
 	}
-	if job.WorkflowUuid != "wf-123" {
-		t.Errorf("expected WorkflowUuid 'wf-123', got %s", job.WorkflowUuid)
-	}
 	if job.WorkingDirectory != "/work" {
 		t.Errorf("expected WorkingDirectory '/work', got %s", job.WorkingDirectory)
-	}
-	if len(job.Dependencies) != 1 || job.Dependencies[0] != "setup-job" {
-		t.Errorf("expected Dependencies ['setup-job'], got %v", job.Dependencies)
 	}
 	if job.Environment["NODE_ENV"] != "production" {
 		t.Errorf("expected Environment['NODE_ENV']='production', got %s", job.Environment["NODE_ENV"])

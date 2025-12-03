@@ -1,7 +1,7 @@
 # Joblet Web Admin UI
 
-The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs, monitoring system performance,
-and visualizing workflows. The admin UI is now available as a standalone package in
+The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs and monitoring system performance.
+The admin UI is now available as a standalone package in
 the [joblet-admin repository](https://github.com/ehsaniara/joblet-admin),
 connecting directly to the Joblet server via gRPC.
 
@@ -12,7 +12,6 @@ connecting directly to the Joblet server via gRPC.
 - [Dashboard Overview](#dashboard-overview)
 - [System Monitoring](#system-monitoring)
 - [Job Management](#job-management)
-- [Workflow Management](#workflow-management)
 - [Administration Features](#administration-features)
 - [Troubleshooting](#troubleshooting)
 
@@ -105,12 +104,6 @@ The admin UI consists of several main sections accessible via the navigation sid
 - **Job List**: All jobs with pagination and filtering
 - **Job Details**: Individual job information and logs
 - **Job Actions**: Start, stop, delete operations
-
-### 🔄 Workflows
-
-- **Workflow List**: Overview of all workflow definitions
-- **Workflow Visualization**: Graph, tree, and timeline views
-- **Workflow Execution**: Status and progress tracking
 
 ### ⚙️ Administration
 
@@ -268,77 +261,6 @@ Filter jobs by various criteria:
 - **Runtime**: Filter by runtime environment
 - **Network**: Filter by network configuration
 - **Command Pattern**: Search by command text
-
-## Workflow Management
-
-The Workflows section provides powerful tools for managing complex job orchestrations.
-
-![Workflow Management Interface](./AdminUI-Workflow1.png)
-*Workflow visualization and management interface with dependency graph*
-
-### Workflow List View
-
-#### Overview Display
-
-- **Workflow Summary**: Name, description, and job count
-- **Status Indicators**: Overall workflow status
-- **Execution History**: Recent workflow runs
-- **Quick Actions**: Execute, edit, or delete workflows
-
-#### Workflow Information
-
-- **Job Count**: Total number of jobs in the workflow
-- **Dependencies**: Number of job dependencies
-- **Estimated Duration**: Expected execution time
-- **Last Execution**: Last run timestamp and status
-
-### Workflow Detail Views
-
-Click on any workflow to access detailed visualization options:
-
-#### Graph View
-
-- **Dependency Graph**: Visual representation of job dependencies
-- **Interactive Nodes**: Click nodes to view job details
-- **Status Overlay**: Real-time execution status on graph
-- **Zoom and Pan**: Navigate large workflows easily
-
-#### Tree View
-
-- **Hierarchical Display**: Tree structure showing job relationships
-- **Expandable Nodes**: Drill down into job groups
-- **Status Indicators**: Visual status for each job
-- **Dependency Lines**: Clear dependency relationships
-
-#### Timeline View
-
-- **Execution Timeline**: Chronological view of job execution
-- **Duration Bars**: Visual representation of job duration
-- **Parallel Execution**: Show concurrent job execution
-- **Critical Path**: Highlight longest execution path
-
-### Workflow Execution
-
-#### Starting Workflows
-
-- **Execute Button**: Start workflow from the workflow list
-- **Parameter Input**: Provide runtime parameters (if required)
-- **Validation**: Pre-execution validation of dependencies
-- **Confirmation**: Review execution plan before starting
-
-#### Monitoring Execution
-
-- **Real-time Updates**: Live status updates as jobs execute
-- **Progress Tracking**: Overall workflow progress percentage
-- **Job Status**: Individual job status within the workflow
-- **Error Handling**: Failed job indicators and error messages
-
-#### Workflow Actions
-
-- **Stop Workflow**: Halt all running jobs in the workflow
-- **Retry Failed**: Re-execute only failed jobs
-- **View Logs**: Access logs for all jobs in the workflow
-- **Export Results**: Download workflow execution report
 
 ## Administration Features
 
