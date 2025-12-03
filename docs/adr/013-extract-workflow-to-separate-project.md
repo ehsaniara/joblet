@@ -7,6 +7,35 @@
 The workflow code has been removed from joblet. Joblet now focuses exclusively on single-job execution. Workflow
 orchestration will be developed as a separate project that uses joblet's Job API for execution.
 
+### Implementation Completed
+
+The following changes were made to implement this decision:
+
+**Code Changes:**
+- Removed workflow display section from `internal/rnx/jobs/status.go`
+- Removed `workflowUuid` and `dependencies` from JSON output in status command
+- Removed `JOBLET_WORKFLOW_ID` from reserved environment variables in `internal/rnx/jobs/run.go`
+- Marked `WorkflowUuid` and `Dependencies` fields as deprecated in domain model (kept for API compatibility)
+- Updated test files to remove workflow-specific references
+
+**Documentation Updates:**
+- Removed `docs/WORKFLOWS.md`
+- Removed `docs/adr/002-workflow-vs-job-separation.md` (superseded by this ADR)
+- Updated `docs/README.md`, `docs/API.md`, `docs/ARCHITECTURE.md`
+- Updated `docs/DEVELOPER_GUIDE.md`, `docs/JOB_EXECUTION.md`, `docs/DESIGN.md`
+- Updated `docs/INSTALLATION.md`, `docs/QUICKSTART.md`, `docs/NETWORK_MANAGEMENT.md`
+- Updated `docs/ADMIN_UI.md`, `docs/articles/getting-start-with-joblet.md`
+- Updated `docs/adr/README.md` to remove workflow ADR reference
+
+**Test Updates:**
+- Removed `tests/e2e/tests/06_workflow_test.sh` (obsolete E2E test)
+- All remaining E2E tests pass (13/13 test suites)
+
+**API Compatibility:**
+- `WorkflowUuid` and `Dependencies` fields retained in domain model with deprecation comments
+- Proto definitions in external `joblet-proto` repository remain unchanged
+- Fields are unused but kept to avoid breaking API compatibility
+
 ## Context
 
 Joblet currently bundles workflow orchestration directly into the main codebase. While ADR-002 established separation
