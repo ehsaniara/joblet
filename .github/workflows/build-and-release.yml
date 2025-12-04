@@ -53,6 +53,27 @@ jobs:
 
           ls -la *-${{ matrix.arch }}
 
+      - name: Verify built binary architecture
+        run: |
+          EXPECTED_ARCH="${{ matrix.arch }}"
+          if [ "$EXPECTED_ARCH" = "arm64" ]; then
+            EXPECTED_PATTERN="aarch64|ARM aarch64"
+          else
+            EXPECTED_PATTERN="x86-64|x86_64"
+          fi
+
+          echo "Verifying built binaries are $EXPECTED_ARCH..."
+          for bin in joblet rnx persist state; do
+            ACTUAL=$(file "${bin}-${{ matrix.arch }}")
+            if ! echo "$ACTUAL" | grep -qE "$EXPECTED_PATTERN"; then
+              echo "ERROR: ${bin}-${{ matrix.arch }} has wrong architecture!"
+              echo "  Expected: $EXPECTED_ARCH"
+              echo "  Actual: $ACTUAL"
+              exit 1
+            fi
+            echo "OK: ${bin}-${{ matrix.arch }} is $EXPECTED_ARCH"
+          done
+
       - uses: actions/upload-artifact@v4
         with:
           name: joblet-binary-${{ matrix.arch }}
@@ -118,6 +139,35 @@ jobs:
           ls -la joblet rnx persist state
           file joblet rnx persist state
 
+      - name: Verify binary architecture
+        run: |
+          EXPECTED_ARCH="${{ matrix.arch }}"
+          if [ "$EXPECTED_ARCH" = "arm64" ]; then
+            EXPECTED_PATTERN="aarch64|ARM aarch64"
+          else
+            EXPECTED_PATTERN="x86-64|x86_64"
+          fi
+
+          echo "Verifying binaries are $EXPECTED_ARCH..."
+          FAILED=0
+          for bin in joblet rnx persist state; do
+            ACTUAL=$(file "$bin")
+            if ! echo "$ACTUAL" | grep -qE "$EXPECTED_PATTERN"; then
+              echo "ERROR: $bin has wrong architecture!"
+              echo "  Expected: $EXPECTED_ARCH ($EXPECTED_PATTERN)"
+              echo "  Actual: $ACTUAL"
+              FAILED=1
+            else
+              echo "OK: $bin is $EXPECTED_ARCH"
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "Architecture verification failed!"
+            exit 1
+          fi
+          echo "All binaries verified as $EXPECTED_ARCH"
+
       - name: Build Debian package
         run: |
           echo "Current directory: $(pwd)"
@@ -179,6 +229,35 @@ jobs:
           echo "Files after rename:"
           ls -la joblet rnx persist state
           file joblet rnx persist state
+
+      - name: Verify binary architecture
+        run: |
+          EXPECTED_ARCH="${{ matrix.arch }}"
+          if [ "$EXPECTED_ARCH" = "arm64" ]; then
+            EXPECTED_PATTERN="aarch64|ARM aarch64"
+          else
+            EXPECTED_PATTERN="x86-64|x86_64"
+          fi
+
+          echo "Verifying binaries are $EXPECTED_ARCH..."
+          FAILED=0
+          for bin in joblet rnx persist state; do
+            ACTUAL=$(file "$bin")
+            if ! echo "$ACTUAL" | grep -qE "$EXPECTED_PATTERN"; then
+              echo "ERROR: $bin has wrong architecture!"
+              echo "  Expected: $EXPECTED_ARCH ($EXPECTED_PATTERN)"
+              echo "  Actual: $ACTUAL"
+              FAILED=1
+            else
+              echo "OK: $bin is $EXPECTED_ARCH"
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "Architecture verification failed!"
+            exit 1
+          fi
+          echo "All binaries verified as $EXPECTED_ARCH"
 
       - name: Install RPM tools
         run: |
