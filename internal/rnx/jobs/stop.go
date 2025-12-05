@@ -20,17 +20,25 @@ func NewStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop <job-uuid>",
 		Short: "Stop a running job",
-		Long: `Stop a job that's currently running or scheduled to run.
+		Long: `Stop a job that's currently running.
 
-This will gracefully stop running jobs, or cancel jobs that haven't started yet.
-The job will be marked as stopped and you can safely delete it afterward.
+This will gracefully stop running jobs by sending SIGTERM, then SIGKILL if needed.
+The job will be marked as STOPPED and you can safely delete it afterward.
+
+For scheduled jobs that haven't started, use 'rnx job cancel' instead.
+
+Short-form UUIDs are supported - you can use just the first 8 characters
+if they uniquely identify a job.
 
 Examples:
-  # Stop a running job
+  # Stop a running job (full UUID)
   rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
 
-  # Cancel a job that's waiting to run
-  rnx job stop a1b2c3d4-5678-90ab-cdef-1234567890ab`,
+  # Stop using short UUID
+  rnx job stop f47ac10b
+
+  # For scheduled jobs, use cancel instead
+  rnx job cancel f47ac10b`,
 		Args: cobra.ExactArgs(1),
 		RunE: runStop,
 	}

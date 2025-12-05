@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/unprivileged"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/ebpf/visibility"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/scheduler"
@@ -59,6 +61,9 @@ type Joblet struct {
 	executionEngine *ExecutionEngineV2
 	scheduler       *scheduler.Scheduler
 	cleanup         *cleanup.Coordinator
+
+	// Optional eBPF visibility monitor for tracking job activity
+	visibilityMonitor interfaces.VisibilityMonitor
 }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components.
@@ -260,10 +265,24 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 	// Update job state
 	j.updateJobRunning(job, cmd)
 
+	// Add the process to its cgroup for resource limits and eBPF visibility
+	if job.CgroupPath != "" && job.Pid > 0 {
+		if err := j.resourceManager.AddProcessToCgroup(job.CgroupPath, int(job.Pid)); err != nil {
+			log.Warn("failed to add process to cgroup", "error", err, "pid", job.Pid, "cgroupPath", job.CgroupPath)
+			// Don't fail the job - it will still run, just without cgroup limits/visibility
+		} else {
+			log.Info("added job process to cgroup", "pid", job.Pid, "cgroupPath", job.CgroupPath)
+		}
+	}
+
 	// Start metrics collection (always enabled for pubsub live streaming)
 	// Metrics are sent to pubsub for real-time clients AND to persist via IPC
 	if j.metricsStore != nil {
-		sampleInterval := DefaultMetricsSampleInterval
+		// Use configured metrics interval, fall back to default if not set
+		sampleInterval := j.config.Telemetry.MetricsInterval
+		if sampleInterval == 0 {
+			sampleInterval = DefaultMetricsSampleInterval
+		}
 
 		// Get GPU indices from job if allocated
 		var gpuIndices []int
@@ -294,6 +313,25 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 		} else {
 			log.Debug("metrics collector started", "sampleInterval", sampleInterval)
 		}
+	}
+
+	// Start eBPF visibility monitoring if enabled
+	// Note: Processes run in the "proc" subdirectory of the job cgroup, so we need
+	// to use that path for cgroup ID lookup to match what eBPF's bpf_get_current_cgroup_id() returns
+	if j.visibilityMonitor != nil && job.CgroupPath != "" {
+		procCgroupPath := filepath.Join(job.CgroupPath, "proc")
+		cgroupID, err := visibility.CgroupIDFromPath(procCgroupPath)
+		if err != nil {
+			log.Warn("failed to get cgroup ID for visibility monitoring", "error", err, "path", procCgroupPath)
+		} else {
+			if err := j.visibilityMonitor.AddJob(job.Uuid, cgroupID); err != nil {
+				log.Warn("failed to add job to visibility monitor", "error", err)
+			} else {
+				log.Info("eBPF visibility monitoring started for job", "cgroupId", cgroupID, "cgroupPath", procCgroupPath)
+			}
+		}
+	} else {
+		log.Debug("eBPF visibility monitoring skipped", "hasMonitor", j.visibilityMonitor != nil, "hasCgroupPath", job.CgroupPath != "")
 	}
 
 	// Monitor asynchronously
@@ -582,6 +620,15 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		}
 	}
 
+	// Stop eBPF visibility monitoring if enabled
+	if j.visibilityMonitor != nil {
+		if err := j.visibilityMonitor.RemoveJob(job.Uuid); err != nil {
+			log.Warn("failed to remove job from visibility monitor", "error", err)
+		} else {
+			log.Debug("eBPF visibility monitoring stopped")
+		}
+	}
+
 	// Cleanup resources - but handle runtime build jobs specially
 	if job.Type.IsRuntimeBuild() {
 		// For runtime builds: clean system resources but preserve filesystem artifacts
@@ -757,4 +804,14 @@ func createGPUManager(gpuConfig config.GPUConfig, platform platform.Platform, lo
 	}
 
 	return gpuManager
+}
+
+// SetVisibilityMonitor sets the eBPF visibility monitor for job activity tracking.
+// This is called after joblet creation to inject the optional eBPF monitor.
+// If the monitor is nil, visibility tracking is disabled.
+func (j *Joblet) SetVisibilityMonitor(monitor interfaces.VisibilityMonitor) {
+	j.visibilityMonitor = monitor
+	if monitor != nil {
+		j.logger.Info("eBPF visibility monitor enabled for job activity tracking")
+	}
 }

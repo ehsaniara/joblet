@@ -103,6 +103,16 @@ monitoring:
   system_interval: "10s"
   cloud_detection: true
 
+# Telemetry configuration for metrics collection and eBPF visibility
+telemetry:
+  # Resource metrics collection interval (CPU, memory, disk I/O, network)
+  # Lower intervals provide more granular data but increase overhead
+  metrics_interval: "5s"     # Default: 5 seconds (valid range: 1s-60s)
+
+  # eBPF activity tracking (Linux 5.8+ required)
+  # Captures process executions, network connections, memory mappings
+  ebpf_enabled: true         # Default: true (disable to reduce overhead)
+
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
 

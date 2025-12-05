@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** (December 2025)
+**Implemented** (December 2025)
 
 ## Context
 
@@ -75,7 +75,19 @@ CONNECTIONS:
 | Type | Source | Frequency | Data |
 |------|--------|-----------|------|
 | **Metrics** | cgroups v2 | Periodic (1-5s) | CPU, memory, disk I/O, network bytes, GPU |
-| **Activity** | eBPF | Event-driven | Process exec, network connect, file access |
+| **Activity** | eBPF | Event-driven | Process exec, network connect/accept, socket data, memory mappings, file access |
+
+**eBPF Event Types:**
+
+| Event | CLI Display | Description |
+|-------|------------|-------------|
+| exec | EXEC | Process executions (fork/exec syscalls) |
+| connect | NET | Outgoing network connections (connect syscall) |
+| accept | ACCEPT | Incoming network connections (accept syscall) |
+| socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
+| mmap | MMAP | Memory mappings with executable permissions |
+| mprotect | MPROTECT | Memory protection changes adding exec permission |
+| file | FILE | File access (open/read/write) - optional, high volume |
 
 ### Unified Event Model
 
@@ -204,9 +216,13 @@ Format:
 
 ```
 CloudWatch Logs:
-  Log Group: /joblet/telemetry
-  Log Stream: {node_id}/{job_id}
-  Format: JSON (same as local)
+  Log Group: /joblet/{node_id}
+  Log Streams:
+    - {job_id}-logs         # stdout/stderr logs
+    - {job_id}-metrics      # Resource metrics
+    - {job_id}-exec-events  # Process execution events (eBPF)
+    - {job_id}-connect-events # Network connection events (eBPF)
+  Format: JSON
 
 CloudWatch Metrics (for dashboards):
   Namespace: Joblet/Jobs
@@ -214,13 +230,24 @@ CloudWatch Metrics (for dashboards):
   Metrics: CPUPercent, MemoryBytes, GPUPercent
 ```
 
-CloudWatch Insights query example:
+CloudWatch Insights query examples:
 ```sql
-fields @timestamp, type, data.binary, data.address, data.port
-| filter job_id = "abc123"
-| filter type in ["exec", "connect"]
+-- Query exec events for a job
+fields @timestamp, pid, filename, args
+| filter @logStream like "abc123-exec-events"
 | sort @timestamp desc
 | limit 100
+
+-- Query network connections for a job
+fields @timestamp, pid, dst_addr, dst_port, protocol
+| filter @logStream like "abc123-connect-events"
+| sort @timestamp desc
+| limit 100
+
+-- Find all processes that connected to a specific host
+fields @timestamp, job_id, pid, comm, dst_addr, dst_port
+| filter dst_addr = "10.0.1.50"
+| sort @timestamp desc
 ```
 
 ### gRPC API
@@ -297,20 +324,28 @@ message FileData {
 
 ### CLI Integration
 
-Single command that handles both live and historical (like `rnx job log`):
+The `rnx job metrics` command provides unified telemetry viewing (like `rnx job log`):
 
 ```bash
-# Watch telemetry - smart behavior based on job status
-$ rnx job watch <job-id>
-# - If job is RUNNING  → streams live telemetry
-# - If job is COMPLETED → shows historical telemetry
+# View metrics - smart behavior based on job status
+$ rnx job metrics <job-id>
+# - If job is RUNNING  → streams live metrics
+# - If job is COMPLETED → shows historical metrics, then exits
 
-# Filter options
-$ rnx job watch <job-id> --metrics      # Only resource metrics
-$ rnx job watch <job-id> --activity     # Only activity events
-$ rnx job watch <job-id> --type=exec    # Only exec events
-$ rnx job watch <job-id> --type=connect # Only network events
-$ rnx job watch <job-id> --since=1h     # Historical from last hour
+# Include eBPF telemetry events
+$ rnx job metrics <job-id> --tel
+
+# Short UUIDs are supported (first 8 characters)
+$ rnx job metrics f47ac10b --tel
+
+# Filter eBPF events with grep
+$ rnx job metrics f47ac10b --tel | grep EXEC     # Process executions
+$ rnx job metrics f47ac10b --tel | grep NET      # Outgoing connections
+$ rnx job metrics f47ac10b --tel | grep ACCEPT   # Incoming connections
+$ rnx job metrics f47ac10b --tel | grep MMAP     # Memory mappings with exec
+
+# JSON output
+$ rnx --json job metrics f47ac10b
 ```
 
 ### Configuration
@@ -421,32 +456,33 @@ persist/internal/
 
 ## Implementation Plan
 
-### Phase 1: Unified Telemetry Framework
-- Define TelemetryEvent types in joblet
-- Implement TelemetryCollector
+### Phase 1: Unified Telemetry Framework ✅ COMPLETED
+- Define TelemetryEvent types in joblet (`internal/joblet/telemetry/event.go`)
+- Implement TelemetryCollector (`internal/joblet/telemetry/collector.go`)
 - Refactor existing metrics to emit TelemetryEvents
-- IPC sender to persist service
+- IPC sender to persist service (`internal/joblet/ipc/persister.go`)
 
-### Phase 2: Persist Service Updates
-- Update persist to receive telemetry events
-- Local storage backend for telemetry
-- CloudWatch storage backend (optional)
+### Phase 2: Persist Service Updates ✅ COMPLETED
+- Update persist to receive telemetry events (exec, connect events via IPC)
+- Local storage backend for telemetry (`exec_events.jsonl.gz`, `connect_events.jsonl.gz`)
+- CloudWatch storage backend (`{jobID}-exec-events`, `{jobID}-connect-events` streams)
 
-### Phase 3: eBPF Activity Tracking
-- eBPF program for execve, connect (visibility.c)
-- Go monitor using cilium/ebpf
-- Integration with TelemetryCollector
+### Phase 3: eBPF Activity Tracking ✅ COMPLETED
+- eBPF program for execve, connect (`internal/joblet/ebpf/visibility/bpf/visibility.c`)
+- Go monitor using cilium/ebpf (`internal/joblet/ebpf/visibility/monitor.go`)
+- Integration with TelemetryCollector via EventPersister interface
 - Job lifecycle hooks (start/stop monitoring by cgroup ID)
 
-### Phase 4: gRPC API
+### Phase 4: gRPC API ✅ COMPLETED
 - StreamJobTelemetry RPC (live)
 - GetJobTelemetry RPC (historical)
 - Single unified response format
 
-### Phase 5: CLI
-- `rnx job watch` command
-- Smart live/historical behavior
-- TUI display with metrics + activity
+### Phase 5: CLI ✅ COMPLETED
+- `rnx job metrics --tel` command for unified metrics + eBPF telemetry
+- Smart live/historical behavior (like `rnx job log`)
+- Short UUID support (first 8 characters)
+- Grep-friendly output format (EXEC, NET, ACCEPT, MMAP, etc.)
 
 ## Requirements
 

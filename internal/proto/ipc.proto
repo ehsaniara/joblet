@@ -22,6 +22,12 @@ enum MessageType {
   MESSAGE_TYPE_UNSPECIFIED = 0;
   MESSAGE_TYPE_LOG = 1;
   MESSAGE_TYPE_METRIC = 2;
+  MESSAGE_TYPE_EXEC_EVENT = 3;      // eBPF process execution event
+  MESSAGE_TYPE_CONNECT_EVENT = 4;   // eBPF network connection event
+  MESSAGE_TYPE_ACCEPT_EVENT = 5;    // eBPF accept (incoming connection) event
+  MESSAGE_TYPE_SOCKET_DATA_EVENT = 6; // eBPF sendto/recvfrom event
+  MESSAGE_TYPE_MMAP_EVENT = 7;      // eBPF mmap event
+  MESSAGE_TYPE_MPROTECT_EVENT = 8;  // eBPF mprotect event
 }
 
 // LogLine represents a single log line from a job
@@ -71,4 +77,86 @@ message NetworkIO {
   int64 tx_bytes = 2;
   int64 rx_packets = 3;
   int64 tx_packets = 4;
+}
+
+// ExecEvent represents a process execution event from eBPF visibility
+message ExecEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  uint32 ppid = 5;           // Parent process ID
+  uint32 uid = 6;            // User ID
+  uint32 gid = 7;            // Group ID
+  string comm = 8;           // Process command name (max 16 chars)
+  string filename = 9;       // Full path to executable
+  repeated string args = 10; // Command arguments
+}
+
+// ConnectEvent represents a network connection event from eBPF visibility
+message ConnectEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string src_addr = 6;       // Source IP address
+  uint32 src_port = 7;       // Source port
+  string dst_addr = 8;       // Destination IP address
+  uint32 dst_port = 9;       // Destination port
+  string protocol = 10;      // Protocol (TCP, UDP)
+}
+
+// AcceptEvent represents an incoming connection accept from eBPF visibility
+message AcceptEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string src_addr = 6;       // Remote (client) IP address
+  uint32 src_port = 7;       // Remote (client) port
+  string dst_addr = 8;       // Local IP address
+  uint32 dst_port = 9;       // Local port (listening port)
+  string protocol = 10;      // Protocol (TCP)
+}
+
+// SocketDataEvent represents sendto/recvfrom events from eBPF visibility
+message SocketDataEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string direction = 6;      // "send" or "recv"
+  string addr = 7;           // Remote IP address
+  uint32 port = 8;           // Remote port
+  string protocol = 9;       // Protocol (TCP, UDP)
+  int64 bytes = 10;          // Bytes transferred
+}
+
+// MmapEvent represents memory mapping events from eBPF visibility
+message MmapEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  uint64 addr = 6;           // Memory address
+  uint64 length = 7;         // Mapping length
+  uint32 prot = 8;           // Protection flags (PROT_READ, PROT_WRITE, PROT_EXEC)
+  uint32 flags = 9;          // Mapping flags (MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS)
+  string filename = 10;      // File being mapped (if file-backed)
+}
+
+// MprotectEvent represents memory protection change events from eBPF visibility
+message MprotectEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  uint64 addr = 6;           // Memory address
+  uint64 length = 7;         // Region length
+  uint32 prot = 8;           // New protection flags (PROT_READ, PROT_WRITE, PROT_EXEC)
 }

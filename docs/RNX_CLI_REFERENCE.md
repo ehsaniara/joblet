@@ -329,10 +329,10 @@ rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
 
 ### `rnx job metrics`
 
-View resource usage metrics for a job as time-series data.
+View resource usage metrics and eBPF telemetry for a job as time-series data.
 
 ```bash
-rnx job metrics <job-uuid>
+rnx job metrics <job-uuid> [--tel]
 ```
 
 Shows CPU, memory, I/O, network, and process metrics collected during job execution.
@@ -340,9 +340,10 @@ Metrics are stored as time-series data, allowing complete historical replay of r
 
 #### Parameters
 
-| Parameter | Description                                       |
-|-----------|---------------------------------------------------|
-| `--json`  | Output in JSON format (global flag: `rnx --json`) |
+| Parameter | Description                                                    |
+|-----------|----------------------------------------------------------------|
+| `--tel`   | Include eBPF telemetry events (process executions + network)   |
+| `--json`  | Output in JSON format (global flag: `rnx --json`)              |
 
 #### Behavior
 
@@ -365,14 +366,38 @@ Works with both running and completed jobs. Supports short UUIDs (first 8 charac
 | Process  | Count, threads, open file descriptors                       |
 | GPU      | Utilization, memory, temperature, power (if GPUs allocated) |
 
+#### eBPF Telemetry Events (--tel flag)
+
+When `--tel` is specified, the following eBPF visibility events are included:
+
+| Event Type | Description                                              |
+|------------|----------------------------------------------------------|
+| EXEC       | Process executions (fork/exec syscalls)                  |
+| NET        | Outgoing network connections (connect syscall)           |
+| ACCEPT     | Incoming network connections (accept syscall)            |
+| SEND/RECV  | Socket data transfers (sendto/recvfrom syscalls)         |
+| MMAP       | Memory mappings with executable permissions              |
+| MPROTECT   | Memory protection changes adding exec permission         |
+
+These events are useful for security monitoring, debugging, and understanding job behavior.
+
 #### Examples
 
 ```bash
 # View metrics for a completed job (shows complete history then exits)
 rnx job metrics f47ac10b-58cc-4372-a567-0e02b2c3d479
 
-# Monitor a running job (shows history + live stream until completion)
-rnx job metrics a1b2c3d4
+# Monitor a running job using short UUID
+rnx job metrics f47ac10b
+
+# View metrics + all eBPF telemetry events
+rnx job metrics f47ac10b --tel
+
+# Filter specific eBPF event types with grep
+rnx job metrics f47ac10b --tel | grep EXEC
+rnx job metrics f47ac10b --tel | grep NET
+rnx job metrics f47ac10b --tel | grep ACCEPT
+rnx job metrics f47ac10b --tel | grep MMAP
 
 # Output as JSON (one sample per line)
 rnx --json job metrics f47ac10b
@@ -412,12 +437,20 @@ rnx job stop <job-uuid>
 ```
 
 Terminates a running job using graceful shutdown (SIGTERM) followed by force termination (SIGKILL) if necessary.
+The job will be marked as STOPPED and you can safely delete it afterward.
+
+For scheduled jobs that haven't started, use `rnx job cancel` instead.
+
+Supports short UUIDs (first 8 characters) if they uniquely identify the job.
 
 #### Examples
 
 ```bash
-# Stop a running job
+# Stop a running job (full UUID)
 rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+# Stop using short UUID
+rnx job stop f47ac10b
 
 # Stop multiple jobs
 rnx job list --json | jq -r '.[] | select(.status == "RUNNING") | .id' | xargs -I {} rnx job stop {}

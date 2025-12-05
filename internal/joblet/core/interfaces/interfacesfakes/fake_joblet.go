@@ -48,6 +48,11 @@ type FakeJoblet struct {
 	executeScheduledJobReturnsOnCall map[int]struct {
 		result1 error
 	}
+	SetVisibilityMonitorStub        func(interfaces.VisibilityMonitor)
+	setVisibilityMonitorMutex       sync.RWMutex
+	setVisibilityMonitorArgsForCall []struct {
+		arg1 interfaces.VisibilityMonitor
+	}
 	StartJobStub        func(context.Context, interfaces.StartJobRequest) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
 	startJobArgsForCall []struct {
@@ -265,6 +270,38 @@ func (fake *FakeJoblet) ExecuteScheduledJobReturnsOnCall(i int, result1 error) {
 	fake.executeScheduledJobReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakeJoblet) SetVisibilityMonitor(arg1 interfaces.VisibilityMonitor) {
+	fake.setVisibilityMonitorMutex.Lock()
+	fake.setVisibilityMonitorArgsForCall = append(fake.setVisibilityMonitorArgsForCall, struct {
+		arg1 interfaces.VisibilityMonitor
+	}{arg1})
+	stub := fake.SetVisibilityMonitorStub
+	fake.recordInvocation("SetVisibilityMonitor", []interface{}{arg1})
+	fake.setVisibilityMonitorMutex.Unlock()
+	if stub != nil {
+		fake.SetVisibilityMonitorStub(arg1)
+	}
+}
+
+func (fake *FakeJoblet) SetVisibilityMonitorCallCount() int {
+	fake.setVisibilityMonitorMutex.RLock()
+	defer fake.setVisibilityMonitorMutex.RUnlock()
+	return len(fake.setVisibilityMonitorArgsForCall)
+}
+
+func (fake *FakeJoblet) SetVisibilityMonitorCalls(stub func(interfaces.VisibilityMonitor)) {
+	fake.setVisibilityMonitorMutex.Lock()
+	defer fake.setVisibilityMonitorMutex.Unlock()
+	fake.SetVisibilityMonitorStub = stub
+}
+
+func (fake *FakeJoblet) SetVisibilityMonitorArgsForCall(i int) interfaces.VisibilityMonitor {
+	fake.setVisibilityMonitorMutex.RLock()
+	defer fake.setVisibilityMonitorMutex.RUnlock()
+	argsForCall := fake.setVisibilityMonitorArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *FakeJoblet) StartJob(arg1 context.Context, arg2 interfaces.StartJobRequest) (*domain.Job, error) {

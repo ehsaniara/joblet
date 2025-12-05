@@ -12,6 +12,7 @@ Comprehensive guide to configuring Joblet server and RNX client.
     - [Security Settings](#security-settings)
     - [Buffer Configuration](#buffer-configuration)
     - [Persistence Configuration](#persistence-configuration)
+    - [Telemetry Configuration](#telemetry-configuration)
     - [State Persistence Configuration](#state-persistence-configuration)
     - [Logging Configuration](#logging-configuration)
 - [Client Configuration](#client-configuration)
@@ -383,6 +384,75 @@ persist:
       metrics:
         directory: "/opt/joblet/metrics"
         format: "jsonl.gz"
+      events:
+        directory: "/opt/joblet/events"  # eBPF events storage
+        format: "jsonl.gz"
+
+    # CloudWatch configuration (when type: "cloudwatch")
+    cloudwatch:
+      region: "us-west-2"           # AWS region
+      log_group_prefix: "/joblet"   # CloudWatch log group prefix
+      # Log streams created per job:
+      # - {job_id}-logs           (stdout/stderr)
+      # - {job_id}-metrics        (resource metrics)
+      # - {job_id}-exec-events    (eBPF process execution)
+      # - {job_id}-connect-events (eBPF network connections)
+```
+
+### Telemetry Configuration
+
+Configure resource metrics collection and eBPF-based activity tracking:
+
+```yaml
+telemetry:
+  # Resource metrics collection interval (cgroups v2)
+  # How often to sample CPU, memory, disk I/O, and network metrics
+  metrics_interval: "5s"     # Default: 5 seconds (minimum: 1s)
+
+  # eBPF activity tracking (Linux 5.8+ required)
+  ebpf_enabled: true         # Enable eBPF visibility (default: true)
+```
+
+**Metrics Interval Tuning:**
+
+| Interval | Use Case | Trade-off |
+|----------|----------|-----------|
+| `1s` | High-resolution debugging | Higher CPU overhead, more data |
+| `5s` | Default, balanced | Good for most workloads |
+| `10s` | Long-running jobs | Lower overhead, less granular |
+| `30s` | Cost-sensitive/high-volume | Minimal overhead, coarse data |
+
+**eBPF Event Types:**
+
+| Event | Description | Use Case |
+|-------|-------------|----------|
+| `exec` | Process execution (fork/exec syscalls) | Debug what binaries jobs run |
+| `connect` | Outgoing network connections (connect syscall) | Track external service dependencies |
+| `accept` | Incoming network connections (accept syscall) | Monitor server connections |
+| `socket_data` | Socket data transfers (sendto/recvfrom) | Monitor data flow |
+| `mmap` | Memory mappings with exec permissions | Detect code loading |
+| `mprotect` | Memory protection changes adding exec | Detect JIT compilation |
+| `file` | File access (open/read/write) | Audit data access (high volume) |
+
+**Requirements:**
+- Linux kernel 5.8+ (for eBPF ring buffer)
+- `CAP_BPF` and `CAP_PERFMON` capabilities (joblet runs as root)
+
+**CloudWatch Integration:**
+
+When using CloudWatch storage backend, eBPF events are shipped to dedicated log streams:
+```
+Log Group: /joblet/{node_id}
+  {job_id}-exec-events     # Process execution events (JSON)
+  {job_id}-connect-events  # Network connection events (JSON)
+```
+
+Query eBPF events with CloudWatch Insights:
+```sql
+-- Find all network connections to a specific host
+fields @timestamp, job_id, pid, dst_addr, dst_port
+| filter dst_addr = "10.0.1.50"
+| sort @timestamp desc
 ```
 
 **When to enable persistence (`ipc.enabled: true`):**

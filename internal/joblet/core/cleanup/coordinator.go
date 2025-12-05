@@ -116,12 +116,6 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 	// 3. Runtime cleanup is now handled by the filesystem isolator during unmounting
 	// No separate runtime cleanup needed since runtime mounts are cleaned up with job filesystem
 
-	// 4. Clean up any remaining resources
-	if err := c.cleanupAdditionalResources(jobID); err != nil {
-		log.Error("additional resource cleanup failed", "error", err)
-		status.Errors = append(status.Errors, fmt.Errorf("additional: %w", err))
-	}
-
 	// Clean up network resources if network store is available
 	if c.networkStore != nil {
 		if adapterAlloc, exists := c.networkStore.JobNetworkAllocation(jobID); exists {
@@ -195,12 +189,6 @@ func (c *Coordinator) CleanupJobSystemResourcesOnly(jobID string) error {
 
 	// 3. Skip runtime cleanup to preserve runtime installations
 	log.Debug("skipping runtime resource cleanup for runtime build job")
-
-	// 4. Clean up any remaining system resources (networking, etc.)
-	if err := c.cleanupAdditionalResources(jobID); err != nil {
-		log.Error("additional system resource cleanup failed", "error", err)
-		status.Errors = append(status.Errors, fmt.Errorf("additional: %w", err))
-	}
 
 	status.Completed = true
 
@@ -316,19 +304,6 @@ func (c *Coordinator) cleanupFilesystem(jobID string) error {
 		return fmt.Errorf("filesystem cleanup had %d errors: %v", len(errors), errors)
 	}
 
-	return nil
-}
-
-// cleanupAdditionalResources cleans up any additional resources
-func (c *Coordinator) cleanupAdditionalResources(jobID string) error {
-	log := c.logger.WithField("operation", "additional-cleanup")
-	log.Debug("cleaning up additional resources", "jobID", jobID)
-
-	// Clean up any network namespaces (if applicable)
-	// Clean up any IPC resources
-	// Clean up any other job-specific resources
-
-	// For now, this is a placeholder for future resource types
 	return nil
 }
 

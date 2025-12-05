@@ -489,3 +489,246 @@ func TestLocalBackend_EmptyJobID(t *testing.T) {
 		t.Logf("WriteLogs with empty job ID returned error (may be expected): %v", err)
 	}
 }
+
+func TestLocalBackend_WriteExecEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-exec-events"
+	events := []*ipcpb.ExecEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       1234,
+			Ppid:      1,
+			Filename:  "/bin/bash",
+			Args:      []string{"-c", "echo hello"},
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       1235,
+			Ppid:      1234,
+			Filename:  "/usr/bin/echo",
+			Args:      []string{"hello"},
+		},
+	}
+
+	err = backend.WriteExecEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write exec events: %v", err)
+	}
+
+	// Verify exec events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	execEventsPath := filepath.Join(jobEventsDir, "exec_events.jsonl.gz")
+
+	if _, err := os.Stat(execEventsPath); os.IsNotExist(err) {
+		t.Error("Expected exec_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteExecEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	// Writing empty events should not error
+	err = backend.WriteExecEvents("test-job", []*ipcpb.ExecEvent{})
+	if err != nil {
+		t.Errorf("WriteExecEvents with empty slice should not error: %v", err)
+	}
+}
+
+func TestLocalBackend_WriteConnectEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-connect-events"
+	events := []*ipcpb.ConnectEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       5678,
+			DstAddr:   "8.8.8.8",
+			DstPort:   443,
+			Protocol:  "tcp",
+			SrcAddr:   "10.0.0.1",
+			SrcPort:   54321,
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       5678,
+			DstAddr:   "1.1.1.1",
+			DstPort:   80,
+			Protocol:  "tcp",
+		},
+	}
+
+	err = backend.WriteConnectEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write connect events: %v", err)
+	}
+
+	// Verify connect events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	connectEventsPath := filepath.Join(jobEventsDir, "connect_events.jsonl.gz")
+
+	if _, err := os.Stat(connectEventsPath); os.IsNotExist(err) {
+		t.Error("Expected connect_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteConnectEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	// Writing empty events should not error
+	err = backend.WriteConnectEvents("test-job", []*ipcpb.ConnectEvent{})
+	if err != nil {
+		t.Errorf("WriteConnectEvents with empty slice should not error: %v", err)
+	}
+}
+
+func TestLocalBackend_WriteExecEvents_AppendMode(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-append"
+
+	// Write first batch
+	events1 := []*ipcpb.ExecEvent{
+		{
+			JobId:    jobID,
+			Sequence: 1,
+			Pid:      100,
+			Filename: "/bin/first",
+		},
+	}
+	err = backend.WriteExecEvents(jobID, events1)
+	if err != nil {
+		t.Fatalf("Failed to write first batch: %v", err)
+	}
+
+	// Write second batch
+	events2 := []*ipcpb.ExecEvent{
+		{
+			JobId:    jobID,
+			Sequence: 2,
+			Pid:      200,
+			Filename: "/bin/second",
+		},
+	}
+	err = backend.WriteExecEvents(jobID, events2)
+	if err != nil {
+		t.Fatalf("Failed to write second batch: %v", err)
+	}
+
+	// Verify file was created and has content from both writes
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	execEventsPath := filepath.Join(jobEventsDir, "exec_events.jsonl.gz")
+
+	info, err := os.Stat(execEventsPath)
+	if err != nil {
+		t.Fatalf("Failed to stat exec events file: %v", err)
+	}
+
+	// File should have content from both writes
+	if info.Size() == 0 {
+		t.Error("Expected exec events file to have content")
+	}
+}

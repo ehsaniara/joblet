@@ -707,6 +707,118 @@ ssh server "df -h /opt/joblet && df -i /opt/joblet"
 4. **Backup Strategy**: Include `/opt/joblet/logs` and `/opt/joblet/metrics` in backups
 5. **Log Rotation**: Ensure persist service logs don't fill up disk
 
+### 8. eBPF Telemetry and CloudWatch Integration
+
+When eBPF visibility is enabled, joblet captures process execution, network connection, and memory events from jobs. These events are shipped to CloudWatch alongside regular logs and metrics.
+
+**Viewing eBPF Telemetry via CLI:**
+```bash
+# View metrics + eBPF telemetry events for a job
+rnx job metrics <job-uuid> --tel
+
+# Using short UUID (first 8 characters)
+rnx job metrics f47ac10b --tel
+
+# Filter specific event types
+rnx job metrics f47ac10b --tel | grep EXEC    # Process executions
+rnx job metrics f47ac10b --tel | grep NET     # Outgoing connections
+rnx job metrics f47ac10b --tel | grep ACCEPT  # Incoming connections
+rnx job metrics f47ac10b --tel | grep MMAP    # Memory mappings with exec
+```
+
+**Available eBPF Event Types:**
+
+| Event | Display | Description |
+|-------|---------|-------------|
+| exec | EXEC | Process executions (fork/exec syscalls) |
+| connect | NET | Outgoing network connections (connect syscall) |
+| accept | ACCEPT | Incoming network connections (accept syscall) |
+| socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
+| mmap | MMAP | Memory mappings with executable permissions |
+| mprotect | MPROTECT | Memory protection changes adding exec permission |
+
+**Data Flow:**
+```
+eBPF Monitor → Telemetry Collector → IPC Writer → Persist Service → CloudWatch Logs
+```
+
+**CloudWatch Log Streams (per job):**
+```
+Log Group: /joblet/{node_id}
+  - {job_id}-logs           # stdout/stderr logs
+  - {job_id}-metrics        # Resource metrics
+  - {job_id}-exec-events    # Process execution events (eBPF)
+  - {job_id}-connect-events # Network connection events (eBPF)
+```
+
+**Querying eBPF Events in CloudWatch Insights:**
+
+```sql
+-- Find all processes executed by a job
+fields @timestamp, pid, filename, args
+| filter @logStream like "abc123-exec-events"
+| sort @timestamp desc
+| limit 100
+
+-- Find network connections made by a job
+fields @timestamp, pid, dst_addr, dst_port, protocol
+| filter @logStream like "abc123-connect-events"
+| sort @timestamp desc
+
+-- Find jobs connecting to a specific database
+fields @timestamp, job_id, pid, comm, dst_addr, dst_port
+| filter dst_addr = "10.0.1.50" and dst_port = 5432
+| sort @timestamp desc
+
+-- Correlate process executions with network activity
+fields @timestamp, @logStream
+| filter @logStream like "-exec-events" or @logStream like "-connect-events"
+| sort @timestamp desc
+| limit 200
+```
+
+**Local Storage (when CloudWatch is disabled):**
+
+eBPF events are stored locally in compressed JSONL format:
+```
+/opt/joblet/events/{job-uuid}/
+├── exec_events.jsonl.gz     # Process execution events
+└── connect_events.jsonl.gz  # Network connection events
+```
+
+**Monitoring eBPF Event Volume:**
+```bash
+# Check eBPF event storage usage
+ssh server "du -sh /opt/joblet/events/*"
+
+# Monitor event write rate (from persist logs)
+ssh server "journalctl -u persist | grep 'Wrote.*events' | tail -20"
+```
+
+**Configuration:**
+
+eBPF visibility is configured in joblet:
+```yaml
+# /opt/joblet/config/config.yml
+telemetry:
+  activity:
+    enabled: true  # Enable eBPF tracking
+    events:
+      exec: true     # Track process executions
+      connect: true  # Track network connections
+      file: false    # File access (high volume, disabled by default)
+```
+
+CloudWatch storage is configured in persist:
+```yaml
+# /opt/joblet/config/persist.yml
+storage:
+  type: cloudwatch  # or "local" for standalone VMs
+  cloudwatch:
+    region: us-west-2
+    log_group_prefix: /joblet
+```
+
 ---
 
 ## Related Documentation
