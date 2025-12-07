@@ -575,10 +575,13 @@ func (s *JobServiceServer) StreamJobTelemetry(req *pb.StreamTelemetryRequest, st
 
 	log.Debug("starting telemetry stream", "types", req.Types)
 
-	// Check if job is completed - if so, just send buffered events and exit
+	// Check if job is completed - if so, send buffered events and query persist
 	job, exists := s.jobStore.Job(resolvedUUID)
 	if exists && job.IsCompleted() {
-		log.Debug("job completed, sending buffered events only")
+		log.Debug("job completed, sending buffered and persisted events")
+		eventCount := 0
+
+		// First try in-memory buffer (for recently completed jobs on same node)
 		events := s.telemetryCollector.GetBufferedEvents(resolvedUUID, filter, time.Time{}, time.Time{}, 0)
 		for _, event := range events {
 			pbEvent := event.ToProto()
@@ -586,8 +589,145 @@ func (s *JobServiceServer) StreamJobTelemetry(req *pb.StreamTelemetryRequest, st
 				log.Warn("failed to send telemetry event", "error", err)
 				return status.Errorf(codes.Internal, "failed to send telemetry event: %v", err)
 			}
+			eventCount++
 		}
-		log.Debug("telemetry streaming completed for finished job", "eventCount", len(events))
+
+		// If buffer is empty, query historical telemetry from persist service
+		// This handles the case where job ran on a different node or after restart
+		if eventCount == 0 && s.persistClient != nil {
+			log.Debug("buffer empty, querying persist service for historical telemetry")
+
+			// Check which event types are requested
+			wantsMetrics := len(filter.Types) == 0
+			wantsExec := len(filter.Types) == 0
+			wantsConnect := len(filter.Types) == 0
+			for _, t := range filter.Types {
+				if t == telemetry.EventTypeMetrics {
+					wantsMetrics = true
+				}
+				if t == telemetry.EventTypeExec {
+					wantsExec = true
+				}
+				if t == telemetry.EventTypeConnect {
+					wantsConnect = true
+				}
+			}
+
+			// Query metrics if requested
+			if wantsMetrics {
+				metricsReq := &persistpb.QueryMetricsRequest{
+					JobId: resolvedUUID,
+				}
+				metricsStream, err := s.persistClient.QueryMetrics(stream.Context(), metricsReq)
+				if err != nil {
+					log.Debug("failed to query metrics from persist", "error", err)
+				} else {
+					for {
+						metric, err := metricsStream.Recv()
+						if err != nil {
+							break // EOF or error
+						}
+						pbEvent := &pb.TelemetryEvent{
+							Timestamp: metric.Timestamp,
+							JobId:     metric.JobId,
+							Type:      "metrics",
+							Data: &pb.TelemetryEvent_Metrics{
+								Metrics: &pb.TelemetryMetricsData{
+									CpuPercent:     metric.Data.CpuUsage * 100,
+									MemoryBytes:    metric.Data.MemoryUsage,
+									GpuPercent:     metric.Data.GpuUsage * 100,
+									DiskReadBytes:  metric.Data.DiskIo.GetReadBytes(),
+									DiskWriteBytes: metric.Data.DiskIo.GetWriteBytes(),
+									NetRecvBytes:   metric.Data.NetworkIo.GetRxBytes(),
+									NetSentBytes:   metric.Data.NetworkIo.GetTxBytes(),
+								},
+							},
+						}
+						if err := stream.Send(pbEvent); err != nil {
+							log.Warn("failed to send metric event", "error", err)
+							return status.Errorf(codes.Internal, "failed to send metric event: %v", err)
+						}
+						eventCount++
+					}
+				}
+			}
+
+			// Query exec events if requested
+			if wantsExec {
+				execReq := &persistpb.QueryTelemetryRequest{
+					JobId: resolvedUUID,
+				}
+				execStream, err := s.persistClient.QueryExecEvents(stream.Context(), execReq)
+				if err != nil {
+					log.Debug("failed to query exec events from persist", "error", err)
+				} else {
+					for {
+						execEvent, err := execStream.Recv()
+						if err != nil {
+							break // EOF or error
+						}
+						pbEvent := &pb.TelemetryEvent{
+							Timestamp: execEvent.Timestamp,
+							JobId:     execEvent.JobId,
+							Type:      "exec",
+							Data: &pb.TelemetryEvent_Exec{
+								Exec: &pb.TelemetryExecData{
+									Pid:    execEvent.Pid,
+									Ppid:   execEvent.Ppid,
+									Binary: execEvent.Filename,
+									Args:   execEvent.Args,
+								},
+							},
+						}
+						if err := stream.Send(pbEvent); err != nil {
+							log.Warn("failed to send exec event", "error", err)
+							return status.Errorf(codes.Internal, "failed to send exec event: %v", err)
+						}
+						eventCount++
+					}
+				}
+			}
+
+			// Query connect events if requested
+			if wantsConnect {
+				connectReq := &persistpb.QueryTelemetryRequest{
+					JobId: resolvedUUID,
+				}
+				connectStream, err := s.persistClient.QueryConnectEvents(stream.Context(), connectReq)
+				if err != nil {
+					log.Debug("failed to query connect events from persist", "error", err)
+				} else {
+					for {
+						connectEvent, err := connectStream.Recv()
+						if err != nil {
+							break // EOF or error
+						}
+						pbEvent := &pb.TelemetryEvent{
+							Timestamp: connectEvent.Timestamp,
+							JobId:     connectEvent.JobId,
+							Type:      "connect",
+							Data: &pb.TelemetryEvent_Connect{
+								Connect: &pb.TelemetryConnectData{
+									Pid:          connectEvent.Pid,
+									Address:      connectEvent.DstAddr,
+									Port:         connectEvent.DstPort,
+									Protocol:     connectEvent.Protocol,
+									LocalAddress: connectEvent.SrcAddr,
+									LocalPort:    connectEvent.SrcPort,
+								},
+							},
+						}
+						if err := stream.Send(pbEvent); err != nil {
+							log.Warn("failed to send connect event", "error", err)
+							return status.Errorf(codes.Internal, "failed to send connect event: %v", err)
+						}
+						eventCount++
+					}
+				}
+			}
+		}
+
+		log.Debug("telemetry streaming completed for finished job", "eventCount", eventCount)
 		return nil
 	}
 
@@ -747,14 +887,60 @@ func (s *JobServiceServer) GetJobTelemetry(req *pb.GetTelemetryRequest, stream g
 	// Query historical telemetry from persist service
 	if s.persistClient != nil {
 		// Check which event types are requested
-		wantsExec := len(filter.Types) == 0 // empty means all
+		wantsMetrics := len(filter.Types) == 0 // empty means all
+		wantsExec := len(filter.Types) == 0
 		wantsConnect := len(filter.Types) == 0
 		for _, t := range filter.Types {
+			if t == telemetry.EventTypeMetrics {
+				wantsMetrics = true
+			}
 			if t == telemetry.EventTypeExec {
 				wantsExec = true
 			}
 			if t == telemetry.EventTypeConnect {
 				wantsConnect = true
+			}
+		}
+
+		// Query metrics if requested
+		if wantsMetrics {
+			metricsReq := &persistpb.QueryMetricsRequest{
+				JobId:     resolvedUUID,
+				StartTime: req.StartTime,
+				EndTime:   req.EndTime,
+				Limit:     req.Limit,
+			}
+			metricsStream, err := s.persistClient.QueryMetrics(stream.Context(), metricsReq)
+			if err != nil {
+				log.Debug("failed to query metrics from persist", "error", err)
+			} else {
+				for {
+					metric, err := metricsStream.Recv()
+					if err != nil {
+						break // EOF or error
+					}
+					pbEvent := &pb.TelemetryEvent{
+						Timestamp: metric.Timestamp,
+						JobId:     metric.JobId,
+						Type:      "metrics",
+						Data: &pb.TelemetryEvent_Metrics{
+							Metrics: &pb.TelemetryMetricsData{
+								CpuPercent:     metric.Data.CpuUsage * 100,
+								MemoryBytes:    metric.Data.MemoryUsage,
+								GpuPercent:     metric.Data.GpuUsage * 100,
+								DiskReadBytes:  metric.Data.DiskIo.GetReadBytes(),
+								DiskWriteBytes: metric.Data.DiskIo.GetWriteBytes(),
+								NetRecvBytes:   metric.Data.NetworkIo.GetRxBytes(),
+								NetSentBytes:   metric.Data.NetworkIo.GetTxBytes(),
+							},
+						},
+					}
+					if err := stream.Send(pbEvent); err != nil {
+						log.Warn("failed to send metric event", "error", err)
+						return status.Errorf(codes.Internal, "failed to send metric event: %v", err)
+					}
+					eventCount++
+				}
 			}
 		}
 
