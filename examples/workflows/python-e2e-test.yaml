@@ -1,8 +1,0 @@
-version: 1
-jobs:
-  python-e2e-test:
-    runtime: python-3.11-ml
-    command: python3
-    args: [ "comprehensive-python-test.py" ]
-    uploads:
-      files: [ "comprehensive-python-test.py" ]

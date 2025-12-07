@@ -1,9 +1,0 @@
-# Test workflow with invalid environment variable
-environment:
-  123_INVALID: "should-fail"
-  VALID_VAR: "should-work"
-
-jobs:
-  test:
-    command: "echo"
-    args: [ "test" ]
