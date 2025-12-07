@@ -52,7 +52,7 @@ type eventBuffer struct {
 // NewCollector creates a new telemetry collector.
 func NewCollector(bufferSize int) *Collector {
 	if bufferSize <= 0 {
-		bufferSize = 1000 // Default buffer size
+		bufferSize = 100000 // Default buffer size (100k events for high-frequency eBPF)
 	}
 	return &Collector{
 		buffers:    make(map[string]*eventBuffer),

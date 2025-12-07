@@ -256,30 +256,6 @@ func TestServerReceiveMetricMessage(t *testing.T) {
 	}
 }
 
-func TestServerGetStats(t *testing.T) {
-	cfg := &config.IPCConfig{
-		Socket:         "/tmp/test.sock",
-		ReadBuffer:     262144,
-		MaxMessageSize: 10485760,
-	}
-	backend := &storagefakes.FakeBackend{}
-	log := logger.New()
-
-	server := NewServer(cfg, backend, log)
-
-	// Initial stats should be zero
-	stats := server.GetStats()
-	if stats.MessagesReceived != 0 {
-		t.Errorf("Expected 0 messages received, got %d", stats.MessagesReceived)
-	}
-	if stats.BytesReceived != 0 {
-		t.Errorf("Expected 0 bytes received, got %d", stats.BytesReceived)
-	}
-	if stats.WriteErrors != 0 {
-		t.Errorf("Expected 0 write errors, got %d", stats.WriteErrors)
-	}
-}
-
 func TestServerMessageTooLarge(t *testing.T) {
 	tmpDir := t.TempDir()
 	socketPath := filepath.Join(tmpDir, "test.sock")

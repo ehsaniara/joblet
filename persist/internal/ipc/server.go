@@ -19,6 +19,12 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
+const (
+	// writeBackpressureTimeout is how long to wait when the write pipeline is full
+	// before dropping the message. This provides backpressure to senders.
+	writeBackpressureTimeout = 5 * time.Second
+)
+
 // Server is the IPC server that receives messages from joblet-core
 type Server struct {
 	config   *config.IPCConfig
@@ -51,7 +57,7 @@ func NewServer(cfg *config.IPCConfig, backend storage.Backend, log *logger.Logge
 		config:    cfg,
 		backend:   backend,
 		logger:    log.WithField("component", "ipc-server"),
-		writePipe: make(chan *ipcpb.IPCMessage, 10000), // 10k message buffer
+		writePipe: make(chan *ipcpb.IPCMessage, 100000), // 100k message buffer for high-frequency eBPF events
 		ctx:       ctx,
 		cancel:    cancel,
 	}
@@ -201,13 +207,27 @@ func (s *Server) handleConnection(conn net.Conn) {
 		s.msgsReceived.Add(1)
 		s.bytesReceived.Add(uint64(length))
 
-		// Send to write pipeline (non-blocking)
+		// Send to write pipeline with backpressure
+		// Try non-blocking first for fast path
 		select {
 		case s.writePipe <- &msg:
 			// Queued successfully
 		default:
-			s.logger.Warn("Write pipeline full, dropping message", "jobID", msg.JobId)
-			s.writeErrors.Add(1)
+			// Pipeline full - apply backpressure with timeout
+			timer := time.NewTimer(writeBackpressureTimeout)
+			select {
+			case s.writePipe <- &msg:
+				timer.Stop()
+			case <-timer.C:
+				s.logger.Warn("Write pipeline backpressure timeout, dropping message",
+					"jobID", msg.JobId,
+					"timeout", writeBackpressureTimeout,
+					"queueSize", len(s.writePipe))
+				s.writeErrors.Add(1)
+			case <-s.ctx.Done():
+				timer.Stop()
+				return
+			}
 		}
 	}
 }
@@ -276,11 +296,16 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 	for _, msg := range batch {
 		if _, exists := jobBatches[msg.JobId]; !exists {
 			jobBatches[msg.JobId] = &JobBatch{
-				JobID:         msg.JobId,
-				Logs:          make([]*ipcpb.LogLine, 0),
-				Metrics:       make([]*ipcpb.Metric, 0),
-				ExecEvents:    make([]*ipcpb.ExecEvent, 0),
-				ConnectEvents: make([]*ipcpb.ConnectEvent, 0),
+				JobID:            msg.JobId,
+				Logs:             make([]*ipcpb.LogLine, 0),
+				Metrics:          make([]*ipcpb.Metric, 0),
+				ExecEvents:       make([]*ipcpb.ExecEvent, 0),
+				ConnectEvents:    make([]*ipcpb.ConnectEvent, 0),
+				FileEvents:       make([]*ipcpb.FileEvent, 0),
+				AcceptEvents:     make([]*ipcpb.AcceptEvent, 0),
+				SocketDataEvents: make([]*ipcpb.SocketDataEvent, 0),
+				MmapEvents:       make([]*ipcpb.MmapEvent, 0),
+				MprotectEvents:   make([]*ipcpb.MprotectEvent, 0),
 			}
 		}
 
@@ -318,6 +343,46 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 				continue
 			}
 			batch.ConnectEvents = append(batch.ConnectEvents, &connectEvent)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_FILE_EVENT:
+			var fileEvent ipcpb.FileEvent
+			if err := proto.Unmarshal(msg.Data, &fileEvent); err != nil {
+				log.Error("Failed to unmarshal file event", "error", err)
+				continue
+			}
+			batch.FileEvents = append(batch.FileEvents, &fileEvent)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_ACCEPT_EVENT:
+			var acceptEvent ipcpb.AcceptEvent
+			if err := proto.Unmarshal(msg.Data, &acceptEvent); err != nil {
+				log.Error("Failed to unmarshal accept event", "error", err)
+				continue
+			}
+			batch.AcceptEvents = append(batch.AcceptEvents, &acceptEvent)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_SOCKET_DATA_EVENT:
+			var socketDataEvent ipcpb.SocketDataEvent
+			if err := proto.Unmarshal(msg.Data, &socketDataEvent); err != nil {
+				log.Error("Failed to unmarshal socket data event", "error", err)
+				continue
+			}
+			batch.SocketDataEvents = append(batch.SocketDataEvents, &socketDataEvent)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_MMAP_EVENT:
+			var mmapEvent ipcpb.MmapEvent
+			if err := proto.Unmarshal(msg.Data, &mmapEvent); err != nil {
+				log.Error("Failed to unmarshal mmap event", "error", err)
+				continue
+			}
+			batch.MmapEvents = append(batch.MmapEvents, &mmapEvent)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_MPROTECT_EVENT:
+			var mprotectEvent ipcpb.MprotectEvent
+			if err := proto.Unmarshal(msg.Data, &mprotectEvent); err != nil {
+				log.Error("Failed to unmarshal mprotect event", "error", err)
+				continue
+			}
+			batch.MprotectEvents = append(batch.MprotectEvents, &mprotectEvent)
 		}
 	}
 
@@ -358,30 +423,64 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 				log.Info("Wrote connect events", "jobID", jobID, "count", len(jobBatch.ConnectEvents))
 			}
 		}
+
+		if len(jobBatch.FileEvents) > 0 {
+			if err := s.backend.WriteFileEvents(jobID, jobBatch.FileEvents); err != nil {
+				log.Error("Failed to write file events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote file events", "jobID", jobID, "count", len(jobBatch.FileEvents))
+			}
+		}
+
+		if len(jobBatch.AcceptEvents) > 0 {
+			if err := s.backend.WriteAcceptEvents(jobID, jobBatch.AcceptEvents); err != nil {
+				log.Error("Failed to write accept events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote accept events", "jobID", jobID, "count", len(jobBatch.AcceptEvents))
+			}
+		}
+
+		if len(jobBatch.SocketDataEvents) > 0 {
+			if err := s.backend.WriteSocketDataEvents(jobID, jobBatch.SocketDataEvents); err != nil {
+				log.Error("Failed to write socket data events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote socket data events", "jobID", jobID, "count", len(jobBatch.SocketDataEvents))
+			}
+		}
+
+		if len(jobBatch.MmapEvents) > 0 {
+			if err := s.backend.WriteMmapEvents(jobID, jobBatch.MmapEvents); err != nil {
+				log.Error("Failed to write mmap events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote mmap events", "jobID", jobID, "count", len(jobBatch.MmapEvents))
+			}
+		}
+
+		if len(jobBatch.MprotectEvents) > 0 {
+			if err := s.backend.WriteMprotectEvents(jobID, jobBatch.MprotectEvents); err != nil {
+				log.Error("Failed to write mprotect events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote mprotect events", "jobID", jobID, "count", len(jobBatch.MprotectEvents))
+			}
+		}
 	}
 }
 
 // JobBatch groups messages by job
 type JobBatch struct {
-	JobID         string
-	Logs          []*ipcpb.LogLine
-	Metrics       []*ipcpb.Metric
-	ExecEvents    []*ipcpb.ExecEvent
-	ConnectEvents []*ipcpb.ConnectEvent
-}
-
-// GetStats returns server statistics
-func (s *Server) GetStats() Stats {
-	return Stats{
-		MessagesReceived: s.msgsReceived.Load(),
-		BytesReceived:    s.bytesReceived.Load(),
-		WriteErrors:      s.writeErrors.Load(),
-	}
-}
-
-// Stats represents server statistics
-type Stats struct {
-	MessagesReceived uint64
-	BytesReceived    uint64
-	WriteErrors      uint64
+	JobID            string
+	Logs             []*ipcpb.LogLine
+	Metrics          []*ipcpb.Metric
+	ExecEvents       []*ipcpb.ExecEvent
+	ConnectEvents    []*ipcpb.ConnectEvent
+	FileEvents       []*ipcpb.FileEvent
+	AcceptEvents     []*ipcpb.AcceptEvent
+	SocketDataEvents []*ipcpb.SocketDataEvent
+	MmapEvents       []*ipcpb.MmapEvent
+	MprotectEvents   []*ipcpb.MprotectEvent
 }

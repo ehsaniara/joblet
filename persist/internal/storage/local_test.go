@@ -732,3 +732,993 @@ func TestLocalBackend_WriteExecEvents_AppendMode(t *testing.T) {
 		t.Error("Expected exec events file to have content")
 	}
 }
+
+// Tests for new eBPF event types
+
+func TestLocalBackend_WriteFileEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-file-events"
+	events := []*ipcpb.FileEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       1234,
+			Comm:      "cat",
+			Path:      "/etc/passwd",
+			Operation: "read",
+			Bytes:     0,
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       1234,
+			Comm:      "bash",
+			Path:      "/tmp/test.txt",
+			Operation: "write",
+			Bytes:     1024,
+		},
+	}
+
+	err = backend.WriteFileEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write file events: %v", err)
+	}
+
+	// Verify file events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	fileEventsPath := filepath.Join(jobEventsDir, "file_events.jsonl.gz")
+
+	if _, err := os.Stat(fileEventsPath); os.IsNotExist(err) {
+		t.Error("Expected file_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteFileEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	err = backend.WriteFileEvents("test-job", []*ipcpb.FileEvent{})
+	if err != nil {
+		t.Errorf("WriteFileEvents with empty slice should not error: %v", err)
+	}
+}
+
+func TestLocalBackend_WriteAcceptEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-accept-events"
+	events := []*ipcpb.AcceptEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       5678,
+			SrcAddr:   "192.168.1.100",
+			SrcPort:   54321,
+			DstAddr:   "0.0.0.0",
+			DstPort:   8080,
+			Protocol:  "tcp",
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       5678,
+			SrcAddr:   "10.0.0.5",
+			SrcPort:   12345,
+			DstAddr:   "0.0.0.0",
+			DstPort:   8080,
+			Protocol:  "tcp",
+		},
+	}
+
+	err = backend.WriteAcceptEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write accept events: %v", err)
+	}
+
+	// Verify accept events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	acceptEventsPath := filepath.Join(jobEventsDir, "accept_events.jsonl.gz")
+
+	if _, err := os.Stat(acceptEventsPath); os.IsNotExist(err) {
+		t.Error("Expected accept_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteAcceptEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	err = backend.WriteAcceptEvents("test-job", []*ipcpb.AcceptEvent{})
+	if err != nil {
+		t.Errorf("WriteAcceptEvents with empty slice should not error: %v", err)
+	}
+}
+
+func TestLocalBackend_WriteSocketDataEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-socket-data-events"
+	events := []*ipcpb.SocketDataEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       9012,
+			Comm:      "curl",
+			Direction: "send",
+			Addr:      "8.8.8.8",
+			Port:      443,
+			Protocol:  "TCP",
+			Bytes:     1024,
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       9012,
+			Comm:      "curl",
+			Direction: "recv",
+			Addr:      "8.8.8.8",
+			Port:      443,
+			Protocol:  "TCP",
+			Bytes:     2048,
+		},
+	}
+
+	err = backend.WriteSocketDataEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write socket data events: %v", err)
+	}
+
+	// Verify socket data events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	socketDataEventsPath := filepath.Join(jobEventsDir, "socket_data_events.jsonl.gz")
+
+	if _, err := os.Stat(socketDataEventsPath); os.IsNotExist(err) {
+		t.Error("Expected socket_data_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteSocketDataEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	err = backend.WriteSocketDataEvents("test-job", []*ipcpb.SocketDataEvent{})
+	if err != nil {
+		t.Errorf("WriteSocketDataEvents with empty slice should not error: %v", err)
+	}
+}
+
+func TestLocalBackend_WriteMmapEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-mmap-events"
+	events := []*ipcpb.MmapEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       3456,
+			Comm:      "ld-linux",
+			Addr:      0x7f0000000000,
+			Length:    4096,
+			Prot:      0x3, // PROT_READ | PROT_WRITE
+			Flags:     0x2, // MAP_PRIVATE
+			Filename:  "/lib/libc.so.6",
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       3456,
+			Comm:      "ld-linux",
+			Addr:      0x7f0000001000,
+			Length:    8192,
+			Prot:      0x5, // PROT_READ | PROT_EXEC
+			Flags:     0x2, // MAP_PRIVATE
+			Filename:  "/lib/libpthread.so.0",
+		},
+	}
+
+	err = backend.WriteMmapEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write mmap events: %v", err)
+	}
+
+	// Verify mmap events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	mmapEventsPath := filepath.Join(jobEventsDir, "mmap_events.jsonl.gz")
+
+	if _, err := os.Stat(mmapEventsPath); os.IsNotExist(err) {
+		t.Error("Expected mmap_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteMmapEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	err = backend.WriteMmapEvents("test-job", []*ipcpb.MmapEvent{})
+	if err != nil {
+		t.Errorf("WriteMmapEvents with empty slice should not error: %v", err)
+	}
+}
+
+func TestLocalBackend_WriteMprotectEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-mprotect-events"
+	events := []*ipcpb.MprotectEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       7890,
+			Comm:      "jit-compiler",
+			Addr:      0x7f0000000000,
+			Length:    4096,
+			Prot:      0x7, // PROT_READ | PROT_WRITE | PROT_EXEC
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       7890,
+			Comm:      "jit-compiler",
+			Addr:      0x7f0000001000,
+			Length:    8192,
+			Prot:      0x1, // PROT_READ
+		},
+	}
+
+	err = backend.WriteMprotectEvents(jobID, events)
+	if err != nil {
+		t.Errorf("Failed to write mprotect events: %v", err)
+	}
+
+	// Verify mprotect events file was created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	mprotectEventsPath := filepath.Join(jobEventsDir, "mprotect_events.jsonl.gz")
+
+	if _, err := os.Stat(mprotectEventsPath); os.IsNotExist(err) {
+		t.Error("Expected mprotect_events.jsonl.gz to be created")
+	}
+}
+
+func TestLocalBackend_WriteMprotectEvents_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	err = backend.WriteMprotectEvents("test-job", []*ipcpb.MprotectEvent{})
+	if err != nil {
+		t.Errorf("WriteMprotectEvents with empty slice should not error: %v", err)
+	}
+}
+
+// Read tests for new eBPF event types
+
+func TestLocalBackend_ReadFileEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-read-file-events"
+
+	// Write some events first
+	events := []*ipcpb.FileEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       1111,
+			Comm:      "cat",
+			Path:      "/etc/hosts",
+			Operation: "read",
+		},
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Pid:       1111,
+			Comm:      "bash",
+			Path:      "/tmp/output.txt",
+			Operation: "write",
+		},
+	}
+
+	err = backend.WriteFileEvents(jobID, events)
+	if err != nil {
+		t.Fatalf("Failed to write file events: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Read the events back
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadFileEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read file events: %v", err)
+	}
+
+	var readEvents []*ipcpb.FileEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading file events: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for file events")
+		}
+	}
+
+done:
+	if len(readEvents) != 2 {
+		t.Errorf("Expected 2 file events, got %d", len(readEvents))
+	}
+
+	if len(readEvents) > 0 && readEvents[0].Path != "/etc/hosts" {
+		t.Errorf("Expected first path '/etc/hosts', got '%s'", readEvents[0].Path)
+	}
+}
+
+func TestLocalBackend_ReadAcceptEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-read-accept-events"
+
+	events := []*ipcpb.AcceptEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       2222,
+			SrcAddr:   "192.168.1.50",
+			SrcPort:   12345,
+			DstPort:   80,
+		},
+	}
+
+	err = backend.WriteAcceptEvents(jobID, events)
+	if err != nil {
+		t.Fatalf("Failed to write accept events: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadAcceptEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read accept events: %v", err)
+	}
+
+	var readEvents []*ipcpb.AcceptEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading accept events: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for accept events")
+		}
+	}
+
+done:
+	if len(readEvents) != 1 {
+		t.Errorf("Expected 1 accept event, got %d", len(readEvents))
+	}
+
+	if len(readEvents) > 0 && readEvents[0].SrcAddr != "192.168.1.50" {
+		t.Errorf("Expected SrcAddr '192.168.1.50', got '%s'", readEvents[0].SrcAddr)
+	}
+}
+
+func TestLocalBackend_ReadSocketDataEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-read-socket-data-events"
+
+	events := []*ipcpb.SocketDataEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       3333,
+			Comm:      "curl",
+			Direction: "send",
+			Addr:      "8.8.8.8",
+			Port:      443,
+			Protocol:  "TCP",
+			Bytes:     512,
+		},
+	}
+
+	err = backend.WriteSocketDataEvents(jobID, events)
+	if err != nil {
+		t.Fatalf("Failed to write socket data events: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadSocketDataEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read socket data events: %v", err)
+	}
+
+	var readEvents []*ipcpb.SocketDataEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading socket data events: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for socket data events")
+		}
+	}
+
+done:
+	if len(readEvents) != 1 {
+		t.Errorf("Expected 1 socket data event, got %d", len(readEvents))
+	}
+
+	if len(readEvents) > 0 && readEvents[0].Direction != "send" {
+		t.Errorf("Expected direction 'send', got '%s'", readEvents[0].Direction)
+	}
+}
+
+func TestLocalBackend_ReadMmapEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-read-mmap-events"
+
+	events := []*ipcpb.MmapEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       4444,
+			Comm:      "ld-linux",
+			Addr:      0x7f0000000000,
+			Length:    4096,
+			Filename:  "/lib/test.so",
+		},
+	}
+
+	err = backend.WriteMmapEvents(jobID, events)
+	if err != nil {
+		t.Fatalf("Failed to write mmap events: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadMmapEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read mmap events: %v", err)
+	}
+
+	var readEvents []*ipcpb.MmapEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading mmap events: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for mmap events")
+		}
+	}
+
+done:
+	if len(readEvents) != 1 {
+		t.Errorf("Expected 1 mmap event, got %d", len(readEvents))
+	}
+
+	if len(readEvents) > 0 && readEvents[0].Filename != "/lib/test.so" {
+		t.Errorf("Expected filename '/lib/test.so', got '%s'", readEvents[0].Filename)
+	}
+}
+
+func TestLocalBackend_ReadMprotectEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-read-mprotect-events"
+
+	events := []*ipcpb.MprotectEvent{
+		{
+			JobId:     jobID,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Pid:       5555,
+			Comm:      "jit-compiler",
+			Addr:      0x7f0000000000,
+			Length:    8192,
+			Prot:      0x5, // PROT_READ | PROT_EXEC
+		},
+	}
+
+	err = backend.WriteMprotectEvents(jobID, events)
+	if err != nil {
+		t.Fatalf("Failed to write mprotect events: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadMprotectEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read mprotect events: %v", err)
+	}
+
+	var readEvents []*ipcpb.MprotectEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading mprotect events: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for mprotect events")
+		}
+	}
+
+done:
+	if len(readEvents) != 1 {
+		t.Errorf("Expected 1 mprotect event, got %d", len(readEvents))
+	}
+
+	if len(readEvents) > 0 && readEvents[0].Prot != 0x5 {
+		t.Errorf("Expected prot 0x5, got 0x%x", readEvents[0].Prot)
+	}
+}
+
+func TestLocalBackend_DeleteJob_IncludesNewEventTypes(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-delete-all-events"
+
+	// Write all event types
+	backend.WriteFileEvents(jobID, []*ipcpb.FileEvent{{JobId: jobID, Sequence: 1, Path: "/test"}})
+	backend.WriteAcceptEvents(jobID, []*ipcpb.AcceptEvent{{JobId: jobID, Sequence: 1, SrcAddr: "1.2.3.4"}})
+	backend.WriteSocketDataEvents(jobID, []*ipcpb.SocketDataEvent{{JobId: jobID, Sequence: 1, Bytes: 100}})
+	backend.WriteMmapEvents(jobID, []*ipcpb.MmapEvent{{JobId: jobID, Sequence: 1, Addr: 0x1000}})
+	backend.WriteMprotectEvents(jobID, []*ipcpb.MprotectEvent{{JobId: jobID, Sequence: 1, Addr: 0x2000}})
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify files were created
+	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	files := []string{
+		"file_events.jsonl.gz",
+		"accept_events.jsonl.gz",
+		"socket_data_events.jsonl.gz",
+		"mmap_events.jsonl.gz",
+		"mprotect_events.jsonl.gz",
+	}
+
+	for _, file := range files {
+		path := filepath.Join(jobEventsDir, file)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Errorf("Expected %s to exist before deletion", file)
+		}
+	}
+
+	// Delete the job
+	err = backend.DeleteJob(jobID)
+	if err != nil {
+		t.Errorf("Failed to delete job: %v", err)
+	}
+
+	// Verify directory is gone (all files deleted)
+	if _, err := os.Stat(jobEventsDir); !os.IsNotExist(err) {
+		t.Error("Expected job events directory to be deleted")
+	}
+}
+
+func TestLocalBackend_ReadFileEvents_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	query := &TelemetryQuery{
+		JobID: "non-existent-job",
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadFileEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("ReadFileEvents should not error for missing job: %v", err)
+	}
+
+	// Should return empty channel
+	var readEvents []*ipcpb.FileEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case <-time.After(500 * time.Millisecond):
+			goto done
+		}
+	}
+
+done:
+	if len(readEvents) != 0 {
+		t.Errorf("Expected 0 events for non-existent job, got %d", len(readEvents))
+	}
+}

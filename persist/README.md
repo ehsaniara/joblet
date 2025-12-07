@@ -42,14 +42,13 @@ persist (storage)
 ### v1.1 (Current)
 
 - ✅ **CloudWatch Logs integration** - Ship logs, metrics, and eBPF events to CloudWatch
-- ✅ **eBPF event storage** - Process execution (exec) and network connection events
+- ✅ **eBPF event storage** - All eBPF telemetry events (exec, connect, file, accept, socket_data, mmap, mprotect)
 - ✅ Multi-backend support (local + CloudWatch)
 
 ### v2.0 (Planned)
 
 - [ ] S3 archival
 - [ ] Advanced querying (full-text search, time-range aggregation)
-- [ ] File access events (eBPF)
 
 ## Building
 
@@ -99,7 +98,7 @@ Key configuration sections:
 Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.sock`:
 
 - Protocol: Length-prefixed Protobuf
-- Message types: Logs, Metrics, ExecEvents, ConnectEvents
+- Message types: Logs, Metrics, and all eBPF telemetry events
 - Format: `[4-byte length][protobuf message]`
 
 **Message Types:**
@@ -110,6 +109,11 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 | `MESSAGE_TYPE_METRIC` | Resource metrics (CPU, memory, GPU, I/O) |
 | `MESSAGE_TYPE_EXEC_EVENT` | Process execution events (from eBPF) |
 | `MESSAGE_TYPE_CONNECT_EVENT` | Network connection events (from eBPF) |
+| `MESSAGE_TYPE_FILE_EVENT` | File access events (from eBPF) |
+| `MESSAGE_TYPE_ACCEPT_EVENT` | Socket accept events (from eBPF) |
+| `MESSAGE_TYPE_SOCKET_DATA_EVENT` | Socket data transfer events (from eBPF) |
+| `MESSAGE_TYPE_MMAP_EVENT` | Memory mapping events (from eBPF) |
+| `MESSAGE_TYPE_MPROTECT_EVENT` | Memory protection change events (from eBPF) |
 
 ## Storage Layout
 
@@ -126,8 +130,13 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 │       └── metrics.jsonl.gz
 ├── events/
 │   └── <job-uuid>/
-│       ├── exec_events.jsonl.gz     # eBPF process execution events
-│       └── connect_events.jsonl.gz  # eBPF network connection events
+│       ├── exec_events.jsonl.gz         # eBPF process execution events
+│       ├── connect_events.jsonl.gz      # eBPF network connection events
+│       ├── file_events.jsonl.gz         # eBPF file access events
+│       ├── accept_events.jsonl.gz       # eBPF socket accept events
+│       ├── socket_data_events.jsonl.gz  # eBPF socket data events
+│       ├── mmap_events.jsonl.gz         # eBPF memory mapping events
+│       └── mprotect_events.jsonl.gz     # eBPF memory protection events
 └── job_index.json
 ```
 
@@ -137,10 +146,15 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams per job:
-    - {job_id}-logs           # stdout/stderr logs
-    - {job_id}-metrics        # Resource metrics (JSON)
-    - {job_id}-exec-events    # Process execution events (JSON)
-    - {job_id}-connect-events # Network connection events (JSON)
+    - {job_id}-logs                 # stdout/stderr logs
+    - {job_id}-metrics              # Resource metrics (JSON)
+    - {job_id}-exec-events          # Process execution events (JSON)
+    - {job_id}-connect-events       # Network connection events (JSON)
+    - {job_id}-file-events          # File access events (JSON)
+    - {job_id}-accept-events        # Socket accept events (JSON)
+    - {job_id}-socket-data-events   # Socket data events (JSON)
+    - {job_id}-mmap-events          # Memory mapping events (JSON)
+    - {job_id}-mprotect-events      # Memory protection events (JSON)
 ```
 
 ## Monitoring
@@ -173,8 +187,7 @@ persist/
 │   ├── query/            # Query engine (TODO)
 │   └── server/           # gRPC server
 └── pkg/
-    ├── logger/           # Logging
-    └── errors/           # Error types
+    └── logger/           # Logging
 ```
 
 ### Adding a New Storage Backend
@@ -192,7 +205,12 @@ func (b *MyBackend) WriteLogs(jobID string, logs []*ipcpb.LogLine) error { ... }
 func (b *MyBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) error { ... }
 func (b *MyBackend) WriteExecEvents(jobID string, events []*ipcpb.ExecEvent) error { ... }
 func (b *MyBackend) WriteConnectEvents(jobID string, events []*ipcpb.ConnectEvent) error { ... }
-// ... implement other interface methods
+func (b *MyBackend) WriteFileEvents(jobID string, events []*ipcpb.FileEvent) error { ... }
+func (b *MyBackend) WriteAcceptEvents(jobID string, events []*ipcpb.AcceptEvent) error { ... }
+func (b *MyBackend) WriteSocketDataEvents(jobID string, events []*ipcpb.SocketDataEvent) error { ... }
+func (b *MyBackend) WriteMmapEvents(jobID string, events []*ipcpb.MmapEvent) error { ... }
+func (b *MyBackend) WriteMprotectEvents(jobID string, events []*ipcpb.MprotectEvent) error { ... }
+// ... implement Read* and other interface methods
 ```
 
 ## License

@@ -16,12 +16,22 @@ type Backend interface {
 	WriteMetrics(jobID string, metrics []*ipcpb.Metric) error
 	WriteExecEvents(jobID string, events []*ipcpb.ExecEvent) error
 	WriteConnectEvents(jobID string, events []*ipcpb.ConnectEvent) error
+	WriteFileEvents(jobID string, events []*ipcpb.FileEvent) error
+	WriteAcceptEvents(jobID string, events []*ipcpb.AcceptEvent) error
+	WriteSocketDataEvents(jobID string, events []*ipcpb.SocketDataEvent) error
+	WriteMmapEvents(jobID string, events []*ipcpb.MmapEvent) error
+	WriteMprotectEvents(jobID string, events []*ipcpb.MprotectEvent) error
 
 	// Read operations
 	ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error)
 	ReadMetrics(ctx context.Context, query *MetricQuery) (*MetricReader, error)
 	ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*ExecEventReader, error)
 	ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*ConnectEventReader, error)
+	ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*FileEventReader, error)
+	ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*AcceptEventReader, error)
+	ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*SocketDataEventReader, error)
+	ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*MmapEventReader, error)
+	ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*MprotectEventReader, error)
 
 	// Management operations
 	DeleteJob(jobID string) error
@@ -84,6 +94,41 @@ type ExecEventReader struct {
 // ConnectEventReader provides streaming access to connect events
 type ConnectEventReader struct {
 	Channel chan *ipcpb.ConnectEvent
+	Error   chan error
+	Done    chan struct{}
+}
+
+// FileEventReader provides streaming access to file events
+type FileEventReader struct {
+	Channel chan *ipcpb.FileEvent
+	Error   chan error
+	Done    chan struct{}
+}
+
+// AcceptEventReader provides streaming access to accept events
+type AcceptEventReader struct {
+	Channel chan *ipcpb.AcceptEvent
+	Error   chan error
+	Done    chan struct{}
+}
+
+// SocketDataEventReader provides streaming access to socket data events
+type SocketDataEventReader struct {
+	Channel chan *ipcpb.SocketDataEvent
+	Error   chan error
+	Done    chan struct{}
+}
+
+// MmapEventReader provides streaming access to mmap events
+type MmapEventReader struct {
+	Channel chan *ipcpb.MmapEvent
+	Error   chan error
+	Done    chan struct{}
+}
+
+// MprotectEventReader provides streaming access to mprotect events
+type MprotectEventReader struct {
+	Channel chan *ipcpb.MprotectEvent
 	Error   chan error
 	Done    chan struct{}
 }

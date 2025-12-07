@@ -22,9 +22,10 @@ type Writer struct {
 	connMu    sync.RWMutex
 	connected atomic.Bool
 
-	// Write channel (non-blocking)
-	writeChan  chan *ipcpb.IPCMessage
-	bufferSize int
+	// Write channel with backpressure
+	writeChan    chan *ipcpb.IPCMessage
+	bufferSize   int
+	writeTimeout time.Duration
 
 	// Reconnection
 	reconnect *reconnectManager
@@ -45,6 +46,7 @@ type Writer struct {
 type Config struct {
 	Socket         string
 	BufferSize     int
+	WriteTimeout   time.Duration // Backpressure timeout (0 = 5s default)
 	ReconnectDelay time.Duration
 	MaxReconnects  int // 0 = infinite
 }
@@ -53,14 +55,20 @@ type Config struct {
 func NewWriter(cfg *Config, log *logger.Logger) *Writer {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	writeTimeout := cfg.WriteTimeout
+	if writeTimeout == 0 {
+		writeTimeout = 5 * time.Second // Default 5s backpressure timeout
+	}
+
 	w := &Writer{
-		socket:     cfg.Socket,
-		writeChan:  make(chan *ipcpb.IPCMessage, cfg.BufferSize),
-		bufferSize: cfg.BufferSize,
-		reconnect:  newReconnectManager(cfg.ReconnectDelay, cfg.MaxReconnects),
-		ctx:        ctx,
-		cancel:     cancel,
-		logger:     log.WithField("component", "ipc-writer"),
+		socket:       cfg.Socket,
+		writeChan:    make(chan *ipcpb.IPCMessage, cfg.BufferSize),
+		bufferSize:   cfg.BufferSize,
+		writeTimeout: writeTimeout,
+		reconnect:    newReconnectManager(cfg.ReconnectDelay, cfg.MaxReconnects),
+		ctx:          ctx,
+		cancel:       cancel,
+		logger:       log.WithField("component", "ipc-writer"),
 	}
 
 	// Start background workers
@@ -267,21 +275,38 @@ func (w *Writer) WriteFileEvent(event *ipcpb.FileEvent) error {
 	return w.write(msg)
 }
 
-// write sends a message (non-blocking)
+// write sends a message with backpressure (blocks up to writeTimeout)
 func (w *Writer) write(msg *ipcpb.IPCMessage) error {
 	if !w.connected.Load() {
 		w.msgsDropped.Add(1)
 		return fmt.Errorf("not connected to persist service")
 	}
 
+	// Try non-blocking first for fast path
 	select {
 	case w.writeChan <- msg:
 		return nil
 	default:
-		// Channel full - drop message
+		// Channel full - apply backpressure with timeout
+	}
+
+	// Blocking write with timeout (backpressure)
+	timer := time.NewTimer(w.writeTimeout)
+	defer timer.Stop()
+
+	select {
+	case w.writeChan <- msg:
+		return nil
+	case <-timer.C:
+		// Timeout - drop message after waiting
 		w.msgsDropped.Add(1)
-		w.logger.Warn("IPC write channel full, dropping message", "jobID", msg.JobId)
-		return fmt.Errorf("write channel full")
+		w.logger.Warn("IPC write timeout (backpressure), dropping message",
+			"jobID", msg.JobId,
+			"timeout", w.writeTimeout,
+			"queueSize", len(w.writeChan))
+		return fmt.Errorf("write timeout after %v", w.writeTimeout)
+	case <-w.ctx.Done():
+		return w.ctx.Err()
 	}
 }
 
