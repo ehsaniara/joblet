@@ -57,5 +57,127 @@ func (p *Persister) PersistConnectEvent(jobID string, timestamp int64, sequence 
 	return p.writer.WriteConnectEvent(event)
 }
 
+// PersistMetrics converts telemetry MetricsData to IPC proto and sends to persist.
+func (p *Persister) PersistMetrics(jobID string, timestamp int64, sequence uint64, data *telemetry.MetricsData) error {
+	if p.writer == nil {
+		return nil // No writer configured
+	}
+
+	metricData := &ipcpb.MetricData{
+		CpuUsage:    data.CPUPercent,
+		MemoryUsage: data.MemoryBytes,
+		GpuUsage:    data.GPUPercent,
+		DiskIo: &ipcpb.DiskIO{
+			ReadBytes:  data.DiskReadBytes,
+			WriteBytes: data.DiskWriteBytes,
+		},
+		NetworkIo: &ipcpb.NetworkIO{
+			RxBytes: data.NetRecvBytes,
+			TxBytes: data.NetSentBytes,
+		},
+	}
+
+	return p.writer.WriteMetric(jobID, timestamp, sequence, metricData)
+}
+
+// PersistAcceptEvent converts telemetry AcceptData to IPC proto and sends to persist.
+func (p *Persister) PersistAcceptEvent(jobID string, timestamp int64, sequence uint64, data *telemetry.AcceptData) error {
+	if p.writer == nil {
+		return nil // No writer configured
+	}
+
+	event := &ipcpb.AcceptEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Sequence:  sequence,
+		Pid:       data.PID,
+		SrcAddr:   data.RemoteAddr,
+		SrcPort:   data.RemotePort,
+		DstPort:   data.LocalPort,
+		Protocol:  data.Protocol,
+	}
+
+	return p.writer.WriteAcceptEvent(event)
+}
+
+// PersistSocketDataEvent converts telemetry SocketDataData to IPC proto and sends to persist.
+func (p *Persister) PersistSocketDataEvent(jobID string, timestamp int64, sequence uint64, data *telemetry.SocketDataData) error {
+	if p.writer == nil {
+		return nil // No writer configured
+	}
+
+	event := &ipcpb.SocketDataEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Sequence:  sequence,
+		Pid:       data.PID,
+		Direction: data.Direction,
+		Addr:      data.Address,
+		Port:      data.Port,
+		Protocol:  data.Protocol,
+		Bytes:     data.Bytes,
+	}
+
+	return p.writer.WriteSocketDataEvent(event)
+}
+
+// PersistMmapEvent converts telemetry MmapData to IPC proto and sends to persist.
+func (p *Persister) PersistMmapEvent(jobID string, timestamp int64, sequence uint64, data *telemetry.MmapData) error {
+	if p.writer == nil {
+		return nil // No writer configured
+	}
+
+	event := &ipcpb.MmapEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Sequence:  sequence,
+		Pid:       data.PID,
+		Addr:      data.Addr,
+		Length:    data.Length,
+		Prot:      data.Prot,
+		Flags:     data.Flags,
+	}
+
+	return p.writer.WriteMmapEvent(event)
+}
+
+// PersistMprotectEvent converts telemetry MprotectData to IPC proto and sends to persist.
+func (p *Persister) PersistMprotectEvent(jobID string, timestamp int64, sequence uint64, data *telemetry.MprotectData) error {
+	if p.writer == nil {
+		return nil // No writer configured
+	}
+
+	event := &ipcpb.MprotectEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Sequence:  sequence,
+		Pid:       data.PID,
+		Addr:      data.Addr,
+		Length:    data.Length,
+		Prot:      data.Prot,
+	}
+
+	return p.writer.WriteMprotectEvent(event)
+}
+
+// PersistFileEvent converts telemetry FileData to IPC proto and sends to persist.
+func (p *Persister) PersistFileEvent(jobID string, timestamp int64, sequence uint64, data *telemetry.FileData) error {
+	if p.writer == nil {
+		return nil // No writer configured
+	}
+
+	event := &ipcpb.FileEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Sequence:  sequence,
+		Pid:       data.PID,
+		Path:      data.Path,
+		Operation: data.Operation,
+		Bytes:     data.Bytes,
+	}
+
+	return p.writer.WriteFileEvent(event)
+}
+
 // Verify Persister implements EventPersister
 var _ telemetry.EventPersister = (*Persister)(nil)

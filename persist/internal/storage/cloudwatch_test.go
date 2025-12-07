@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	ipcpb "github.com/ehsaniara/joblet/internal/proto/gen/ipc"
@@ -293,38 +294,36 @@ func TestCloudWatchBackend_WriteLogs_StreamSeparation(t *testing.T) {
 	// 3. Code structure is correct (actual AWS interaction tested manually)
 }
 
-func TestCloudWatchBackend_RegionDetection(t *testing.T) {
-	// Test auto-detection behavior when region is empty
+func TestCloudWatchBackend_RegionRequired(t *testing.T) {
+	// Test that empty region returns an error (region must be set by installation script)
 	cfg := &config.StorageConfig{
 		Type: "cloudwatch",
 		CloudWatch: config.CloudWatchConfig{
-			Region: "", // Empty = should attempt auto-detection
+			Region: "", // Empty = should return error
 		},
 	}
 
 	log := logger.New()
 	nodeID := "region-detect-node"
 
-	// Attempt to create backend
-	// If on EC2, region should be auto-detected
-	// If not on EC2, should fall back to us-east-1 default
+	// Attempt to create backend - should fail with empty region
 	backend, err := NewCloudWatchBackend(cfg, nodeID, log)
 
-	if err == nil && backend != nil {
-		cwBackend := backend.(*CloudWatchBackend)
-
-		// Region should be set to either auto-detected value or default
-		if cwBackend.config.Region == "" {
-			t.Error("Region should not be empty after backend creation")
+	if err == nil {
+		t.Error("Expected error when region is empty, but got nil")
+		if backend != nil {
+			_ = backend.Close()
 		}
-
-		t.Logf("Region set to: %s", cwBackend.config.Region)
-
-		_ = backend.Close()
 	}
 
-	// Test passes whether running on EC2 or not
-	// We're validating the auto-detection logic exists
+	if backend != nil {
+		t.Error("Expected nil backend when region is empty")
+	}
+
+	// Verify error message mentions region requirement
+	if err != nil && !strings.Contains(err.Error(), "region") {
+		t.Errorf("Error message should mention region, got: %s", err.Error())
+	}
 }
 
 func TestCloudWatchBackend_MetricDimensions(t *testing.T) {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cloudwatchtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -51,16 +50,10 @@ func NewCloudWatchBackend(cfg *config.StorageConfig, nodeID string, log *logger.
 
 	// Set nodeID (inherited from server config)
 	cwConfig.NodeID = nodeID
+
+	// Region must be set in config (by installation script)
 	if cwConfig.Region == "" {
-		// Auto-detect region from EC2 metadata
-		region, err := detectEC2Region(context.Background())
-		if err != nil {
-			log.Warn("failed to auto-detect AWS region, using us-east-1 as default", "error", err)
-			cwConfig.Region = "us-east-1"
-		} else {
-			cwConfig.Region = region
-			log.Info("auto-detected AWS region from EC2 metadata", "region", region)
-		}
+		return nil, fmt.Errorf("cloudwatch.region is required - must be set by installation script")
 	}
 
 	// Set defaults for prefixes
@@ -120,22 +113,6 @@ func NewCloudWatchBackend(cfg *config.StorageConfig, nodeID string, log *logger.
 		"metricNamespace", cwConfig.MetricNamespace)
 
 	return backend, nil
-}
-
-// detectEC2Region attempts to detect the AWS region from EC2 metadata service
-func detectEC2Region(ctx context.Context) (string, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
-	client := imds.NewFromConfig(cfg)
-	result, err := client.GetRegion(ctx, &imds.GetRegionInput{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get region from EC2 metadata: %w", err)
-	}
-
-	return result.Region, nil
 }
 
 // WriteLogs writes log lines to CloudWatch Logs
@@ -1188,21 +1165,4 @@ func parseAddrPort(addrPort string) (string, uint32) {
 	}
 	port, _ := strconv.ParseUint(parts[1], 10, 32)
 	return parts[0], uint32(port)
-}
-
-// Helper function to convert string timestamp to int64 nanoseconds
-func parseTimestampToNanos(ts string) (int64, error) {
-	// Try parsing as RFC3339
-	t, err := time.Parse(time.RFC3339, ts)
-	if err == nil {
-		return t.UnixNano(), nil
-	}
-
-	// Try parsing as Unix timestamp (seconds)
-	seconds, err := strconv.ParseInt(ts, 10, 64)
-	if err == nil {
-		return seconds * 1_000_000_000, nil
-	}
-
-	return 0, fmt.Errorf("failed to parse timestamp: %s", ts)
 }

@@ -61,7 +61,7 @@ type LocalConfig struct {
 // CloudWatchConfig contains AWS CloudWatch storage settings
 // Authentication: Uses AWS default credential chain (IAM roles, environment variables, etc.)
 type CloudWatchConfig struct {
-	Region          string `yaml:"region"`            // AWS region (auto-detected from EC2 metadata if empty)
+	Region          string `yaml:"region"`            // AWS region (REQUIRED - must be set by installation script)
 	NodeID          string `yaml:"-"`                 // Node ID (inherited from server.nodeId, not from YAML)
 	LogGroupPrefix  string `yaml:"log_group_prefix"`  // Prefix for CloudWatch Logs groups (default: /joblet/jobs)
 	LogStreamPrefix string `yaml:"log_stream_prefix"` // Prefix for log streams (default: job-)

@@ -172,6 +172,101 @@ func (w *Writer) WriteConnectEvent(event *ipcpb.ConnectEvent) error {
 	return w.write(msg)
 }
 
+// WriteAcceptEvent sends an eBPF incoming connection accept event (non-blocking)
+func (w *Writer) WriteAcceptEvent(event *ipcpb.AcceptEvent) error {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal accept event: %w", err)
+	}
+
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_ACCEPT_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
+// WriteSocketDataEvent sends an eBPF sendto/recvfrom event (non-blocking)
+func (w *Writer) WriteSocketDataEvent(event *ipcpb.SocketDataEvent) error {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal socket data event: %w", err)
+	}
+
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_SOCKET_DATA_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
+// WriteMmapEvent sends an eBPF memory mapping event (non-blocking)
+func (w *Writer) WriteMmapEvent(event *ipcpb.MmapEvent) error {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal mmap event: %w", err)
+	}
+
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_MMAP_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
+// WriteMprotectEvent sends an eBPF memory protection change event (non-blocking)
+func (w *Writer) WriteMprotectEvent(event *ipcpb.MprotectEvent) error {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal mprotect event: %w", err)
+	}
+
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_MPROTECT_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
+// WriteFileEvent sends an eBPF file access event (non-blocking)
+func (w *Writer) WriteFileEvent(event *ipcpb.FileEvent) error {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal file event: %w", err)
+	}
+
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_FILE_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
 // write sends a message (non-blocking)
 func (w *Writer) write(msg *ipcpb.IPCMessage) error {
 	if !w.connected.Load() {
