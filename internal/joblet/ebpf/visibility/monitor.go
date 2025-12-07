@@ -428,8 +428,8 @@ func (m *Monitor) processConnectEvents() {
 			protocol = "udp"
 		}
 
-		// Port is in network byte order (big endian)
-		port := binary.BigEndian.Uint16([]byte{byte(event.Port >> 8), byte(event.Port)})
+		// Port is in network byte order (big endian), convert to host byte order
+		port := (event.Port >> 8) | (event.Port << 8)
 
 		// Emit telemetry event
 		if m.collector != nil {
@@ -592,7 +592,8 @@ func (m *Monitor) processSocketDataEvents() {
 			protocol = "udp"
 		}
 
-		port := binary.BigEndian.Uint16([]byte{byte(event.Port >> 8), byte(event.Port)})
+		// Port is in network byte order (big endian), convert to host byte order
+		port := (event.Port >> 8) | (event.Port << 8)
 
 		if m.collector != nil {
 			m.collector.EmitSocketData(jobID, &telemetry.SocketDataData{
