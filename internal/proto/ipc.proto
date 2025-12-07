@@ -28,6 +28,7 @@ enum MessageType {
   MESSAGE_TYPE_SOCKET_DATA_EVENT = 6; // eBPF sendto/recvfrom event
   MESSAGE_TYPE_MMAP_EVENT = 7;      // eBPF mmap event
   MESSAGE_TYPE_MPROTECT_EVENT = 8;  // eBPF mprotect event
+  MESSAGE_TYPE_FILE_EVENT = 9;      // eBPF file access event
 }
 
 // LogLine represents a single log line from a job
@@ -159,4 +160,16 @@ message MprotectEvent {
   uint64 addr = 6;           // Memory address
   uint64 length = 7;         // Region length
   uint32 prot = 8;           // New protection flags (PROT_READ, PROT_WRITE, PROT_EXEC)
+}
+
+// FileEvent represents file access events from eBPF visibility
+message FileEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string path = 6;           // File path
+  string operation = 7;      // "read", "write", "create", "delete"
+  int64 bytes = 8;           // Bytes read/written (if applicable)
 }

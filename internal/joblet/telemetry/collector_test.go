@@ -9,11 +9,18 @@ import (
 
 // mockPersister is a test mock for EventPersister
 type mockPersister struct {
-	mu            sync.Mutex
-	execEvents    []execEventCall
-	connectEvents []connectEventCall
-	execErr       error
-	connectErr    error
+	mu               sync.Mutex
+	execEvents       []execEventCall
+	connectEvents    []connectEventCall
+	metricsEvents    []metricsEventCall
+	acceptEvents     []acceptEventCall
+	socketDataEvents []socketDataEventCall
+	mmapEvents       []mmapEventCall
+	mprotectEvents   []mprotectEventCall
+	fileEvents       []fileEventCall
+	execErr          error
+	connectErr       error
+	metricsErr       error
 }
 
 type execEventCall struct {
@@ -30,6 +37,48 @@ type connectEventCall struct {
 	data      *ConnectData
 }
 
+type metricsEventCall struct {
+	jobID     string
+	timestamp int64
+	sequence  uint64
+	data      *MetricsData
+}
+
+type acceptEventCall struct {
+	jobID     string
+	timestamp int64
+	sequence  uint64
+	data      *AcceptData
+}
+
+type socketDataEventCall struct {
+	jobID     string
+	timestamp int64
+	sequence  uint64
+	data      *SocketDataData
+}
+
+type mmapEventCall struct {
+	jobID     string
+	timestamp int64
+	sequence  uint64
+	data      *MmapData
+}
+
+type mprotectEventCall struct {
+	jobID     string
+	timestamp int64
+	sequence  uint64
+	data      *MprotectData
+}
+
+type fileEventCall struct {
+	jobID     string
+	timestamp int64
+	sequence  uint64
+	data      *FileData
+}
+
 func (m *mockPersister) PersistExecEvent(jobID string, timestamp int64, sequence uint64, data *ExecData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -42,6 +91,48 @@ func (m *mockPersister) PersistConnectEvent(jobID string, timestamp int64, seque
 	defer m.mu.Unlock()
 	m.connectEvents = append(m.connectEvents, connectEventCall{jobID, timestamp, sequence, data})
 	return m.connectErr
+}
+
+func (m *mockPersister) PersistMetrics(jobID string, timestamp int64, sequence uint64, data *MetricsData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.metricsEvents = append(m.metricsEvents, metricsEventCall{jobID, timestamp, sequence, data})
+	return m.metricsErr
+}
+
+func (m *mockPersister) PersistAcceptEvent(jobID string, timestamp int64, sequence uint64, data *AcceptData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.acceptEvents = append(m.acceptEvents, acceptEventCall{jobID, timestamp, sequence, data})
+	return nil
+}
+
+func (m *mockPersister) PersistSocketDataEvent(jobID string, timestamp int64, sequence uint64, data *SocketDataData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.socketDataEvents = append(m.socketDataEvents, socketDataEventCall{jobID, timestamp, sequence, data})
+	return nil
+}
+
+func (m *mockPersister) PersistMmapEvent(jobID string, timestamp int64, sequence uint64, data *MmapData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mmapEvents = append(m.mmapEvents, mmapEventCall{jobID, timestamp, sequence, data})
+	return nil
+}
+
+func (m *mockPersister) PersistMprotectEvent(jobID string, timestamp int64, sequence uint64, data *MprotectData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mprotectEvents = append(m.mprotectEvents, mprotectEventCall{jobID, timestamp, sequence, data})
+	return nil
+}
+
+func (m *mockPersister) PersistFileEvent(jobID string, timestamp int64, sequence uint64, data *FileData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.fileEvents = append(m.fileEvents, fileEventCall{jobID, timestamp, sequence, data})
+	return nil
 }
 
 func (m *mockPersister) getExecEvents() []execEventCall {

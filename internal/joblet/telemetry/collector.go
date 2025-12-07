@@ -16,6 +16,18 @@ type EventPersister interface {
 	PersistExecEvent(jobID string, timestamp int64, sequence uint64, data *ExecData) error
 	// PersistConnectEvent persists a network connection event
 	PersistConnectEvent(jobID string, timestamp int64, sequence uint64, data *ConnectData) error
+	// PersistMetrics persists resource metrics (CPU, memory, disk I/O, network)
+	PersistMetrics(jobID string, timestamp int64, sequence uint64, data *MetricsData) error
+	// PersistAcceptEvent persists an incoming connection accept event
+	PersistAcceptEvent(jobID string, timestamp int64, sequence uint64, data *AcceptData) error
+	// PersistSocketDataEvent persists a sendto/recvfrom event
+	PersistSocketDataEvent(jobID string, timestamp int64, sequence uint64, data *SocketDataData) error
+	// PersistMmapEvent persists a memory mapping event
+	PersistMmapEvent(jobID string, timestamp int64, sequence uint64, data *MmapData) error
+	// PersistMprotectEvent persists a memory protection change event
+	PersistMprotectEvent(jobID string, timestamp int64, sequence uint64, data *MprotectData) error
+	// PersistFileEvent persists a file access event
+	PersistFileEvent(jobID string, timestamp int64, sequence uint64, data *FileData) error
 }
 
 // Collector manages telemetry collection and streaming for jobs.
@@ -106,7 +118,20 @@ func (c *Collector) Emit(event *Event) {
 
 // EmitMetrics is a convenience method to emit a metrics event.
 func (c *Collector) EmitMetrics(jobID string, data *MetricsData) {
-	c.Emit(NewMetricsEvent(jobID, data))
+	event := NewMetricsEvent(jobID, data)
+	c.Emit(event)
+
+	// Also persist to storage if persister is configured
+	c.mu.RLock()
+	persister := c.persister
+	c.mu.RUnlock()
+
+	if persister != nil {
+		seq := atomic.AddUint64(&c.sequence, 1)
+		if err := persister.PersistMetrics(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
+			c.logger.Warn("failed to persist metrics", "jobID", jobID, "error", err)
+		}
+	}
 }
 
 // EmitExec is a convenience method to emit a process execution event.
@@ -147,27 +172,92 @@ func (c *Collector) EmitConnect(jobID string, data *ConnectData) {
 
 // EmitFile is a convenience method to emit a file access event.
 func (c *Collector) EmitFile(jobID string, data *FileData) {
-	c.Emit(NewFileEvent(jobID, data))
+	event := NewFileEvent(jobID, data)
+	c.Emit(event)
+
+	// Also persist to storage if persister is configured
+	c.mu.RLock()
+	persister := c.persister
+	c.mu.RUnlock()
+
+	if persister != nil {
+		seq := atomic.AddUint64(&c.sequence, 1)
+		if err := persister.PersistFileEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
+			c.logger.Warn("failed to persist file event", "jobID", jobID, "error", err)
+		}
+	}
 }
 
 // EmitAccept is a convenience method to emit an incoming connection accept event.
 func (c *Collector) EmitAccept(jobID string, data *AcceptData) {
-	c.Emit(NewAcceptEvent(jobID, data))
+	event := NewAcceptEvent(jobID, data)
+	c.Emit(event)
+
+	// Also persist to storage if persister is configured
+	c.mu.RLock()
+	persister := c.persister
+	c.mu.RUnlock()
+
+	if persister != nil {
+		seq := atomic.AddUint64(&c.sequence, 1)
+		if err := persister.PersistAcceptEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
+			c.logger.Warn("failed to persist accept event", "jobID", jobID, "error", err)
+		}
+	}
 }
 
 // EmitSocketData is a convenience method to emit a sendto/recvfrom event.
 func (c *Collector) EmitSocketData(jobID string, data *SocketDataData) {
-	c.Emit(NewSocketDataEvent(jobID, data))
+	event := NewSocketDataEvent(jobID, data)
+	c.Emit(event)
+
+	// Also persist to storage if persister is configured
+	c.mu.RLock()
+	persister := c.persister
+	c.mu.RUnlock()
+
+	if persister != nil {
+		seq := atomic.AddUint64(&c.sequence, 1)
+		if err := persister.PersistSocketDataEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
+			c.logger.Warn("failed to persist socket data event", "jobID", jobID, "error", err)
+		}
+	}
 }
 
 // EmitMmap is a convenience method to emit a memory mapping event.
 func (c *Collector) EmitMmap(jobID string, data *MmapData) {
-	c.Emit(NewMmapEvent(jobID, data))
+	event := NewMmapEvent(jobID, data)
+	c.Emit(event)
+
+	// Also persist to storage if persister is configured
+	c.mu.RLock()
+	persister := c.persister
+	c.mu.RUnlock()
+
+	if persister != nil {
+		seq := atomic.AddUint64(&c.sequence, 1)
+		if err := persister.PersistMmapEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
+			c.logger.Warn("failed to persist mmap event", "jobID", jobID, "error", err)
+		}
+	}
 }
 
 // EmitMprotect is a convenience method to emit a memory protection change event.
 func (c *Collector) EmitMprotect(jobID string, data *MprotectData) {
-	c.Emit(NewMprotectEvent(jobID, data))
+	event := NewMprotectEvent(jobID, data)
+	c.Emit(event)
+
+	// Also persist to storage if persister is configured
+	c.mu.RLock()
+	persister := c.persister
+	c.mu.RUnlock()
+
+	if persister != nil {
+		seq := atomic.AddUint64(&c.sequence, 1)
+		if err := persister.PersistMprotectEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
+			c.logger.Warn("failed to persist mprotect event", "jobID", jobID, "error", err)
+		}
+	}
 }
 
 // Stream streams telemetry events for a job to the provided callback.

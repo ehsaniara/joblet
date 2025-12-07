@@ -34,6 +34,7 @@ const (
 	MessageType_MESSAGE_TYPE_SOCKET_DATA_EVENT MessageType = 6 // eBPF sendto/recvfrom event
 	MessageType_MESSAGE_TYPE_MMAP_EVENT        MessageType = 7 // eBPF mmap event
 	MessageType_MESSAGE_TYPE_MPROTECT_EVENT    MessageType = 8 // eBPF mprotect event
+	MessageType_MESSAGE_TYPE_FILE_EVENT        MessageType = 9 // eBPF file access event
 )
 
 // Enum value maps for MessageType.
@@ -48,6 +49,7 @@ var (
 		6: "MESSAGE_TYPE_SOCKET_DATA_EVENT",
 		7: "MESSAGE_TYPE_MMAP_EVENT",
 		8: "MESSAGE_TYPE_MPROTECT_EVENT",
+		9: "MESSAGE_TYPE_FILE_EVENT",
 	}
 	MessageType_value = map[string]int32{
 		"MESSAGE_TYPE_UNSPECIFIED":       0,
@@ -59,6 +61,7 @@ var (
 		"MESSAGE_TYPE_SOCKET_DATA_EVENT": 6,
 		"MESSAGE_TYPE_MMAP_EVENT":        7,
 		"MESSAGE_TYPE_MPROTECT_EVENT":    8,
+		"MESSAGE_TYPE_FILE_EVENT":        9,
 	}
 )
 
@@ -1271,6 +1274,107 @@ func (x *MprotectEvent) GetProt() uint32 {
 	return 0
 }
 
+// FileEvent represents file access events from eBPF visibility
+type FileEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
+	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
+	Comm          string                 `protobuf:"bytes,5,opt,name=comm,proto3" json:"comm,omitempty"`            // Process command name
+	Path          string                 `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`            // File path
+	Operation     string                 `protobuf:"bytes,7,opt,name=operation,proto3" json:"operation,omitempty"`  // "read", "write", "create", "delete"
+	Bytes         int64                  `protobuf:"varint,8,opt,name=bytes,proto3" json:"bytes,omitempty"`         // Bytes read/written (if applicable)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileEvent) Reset() {
+	*x = FileEvent{}
+	mi := &file_ipc_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileEvent) ProtoMessage() {}
+
+func (x *FileEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileEvent.ProtoReflect.Descriptor instead.
+func (*FileEvent) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FileEvent) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *FileEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *FileEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *FileEvent) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *FileEvent) GetComm() string {
+	if x != nil {
+		return x.Comm
+	}
+	return ""
+}
+
+func (x *FileEvent) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FileEvent) GetOperation() string {
+	if x != nil {
+		return x.Operation
+	}
+	return ""
+}
+
+func (x *FileEvent) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
 var File_ipc_proto protoreflect.FileDescriptor
 
 const file_ipc_proto_rawDesc = "" +
@@ -1386,7 +1490,16 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
 	"\x04addr\x18\x06 \x01(\x04R\x04addr\x12\x16\n" +
 	"\x06length\x18\a \x01(\x04R\x06length\x12\x12\n" +
-	"\x04prot\x18\b \x01(\rR\x04prot*\x98\x02\n" +
+	"\x04prot\x18\b \x01(\rR\x04prot\"\xca\x01\n" +
+	"\tFileEvent\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
+	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
+	"\x04path\x18\x06 \x01(\tR\x04path\x12\x1c\n" +
+	"\toperation\x18\a \x01(\tR\toperation\x12\x14\n" +
+	"\x05bytes\x18\b \x01(\x03R\x05bytes*\xb5\x02\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MESSAGE_TYPE_LOG\x10\x01\x12\x17\n" +
@@ -1396,7 +1509,8 @@ const file_ipc_proto_rawDesc = "" +
 	"\x19MESSAGE_TYPE_ACCEPT_EVENT\x10\x05\x12\"\n" +
 	"\x1eMESSAGE_TYPE_SOCKET_DATA_EVENT\x10\x06\x12\x1b\n" +
 	"\x17MESSAGE_TYPE_MMAP_EVENT\x10\a\x12\x1f\n" +
-	"\x1bMESSAGE_TYPE_MPROTECT_EVENT\x10\b*Y\n" +
+	"\x1bMESSAGE_TYPE_MPROTECT_EVENT\x10\b\x12\x1b\n" +
+	"\x17MESSAGE_TYPE_FILE_EVENT\x10\t*Y\n" +
 	"\n" +
 	"StreamType\x12\x1b\n" +
 	"\x17STREAM_TYPE_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -1416,7 +1530,7 @@ func file_ipc_proto_rawDescGZIP() []byte {
 }
 
 var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_ipc_proto_goTypes = []any{
 	(MessageType)(0),        // 0: joblet.ipc.MessageType
 	(StreamType)(0),         // 1: joblet.ipc.StreamType
@@ -1432,6 +1546,7 @@ var file_ipc_proto_goTypes = []any{
 	(*SocketDataEvent)(nil), // 11: joblet.ipc.SocketDataEvent
 	(*MmapEvent)(nil),       // 12: joblet.ipc.MmapEvent
 	(*MprotectEvent)(nil),   // 13: joblet.ipc.MprotectEvent
+	(*FileEvent)(nil),       // 14: joblet.ipc.FileEvent
 }
 var file_ipc_proto_depIdxs = []int32{
 	0, // 0: joblet.ipc.IPCMessage.type:type_name -> joblet.ipc.MessageType
@@ -1457,7 +1572,7 @@ func file_ipc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
