@@ -1,6 +1,0 @@
-jobs:
-  custom-network-test:
-    command: "python3"
-    args: [ "-c", "print('Testing custom network validation')" ]
-    runtime: "python-3.11-ml"
-    network: "custom-validation-test"

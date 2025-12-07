@@ -1,6 +1,0 @@
-jobs:
-  invalid-network-test:
-    command: "python3"
-    args: [ "-c", "print('This should fail validation')" ]
-    runtime: "python-3.11-ml"
-    network: "non-existent-network"
