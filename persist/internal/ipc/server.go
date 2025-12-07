@@ -276,9 +276,11 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 	for _, msg := range batch {
 		if _, exists := jobBatches[msg.JobId]; !exists {
 			jobBatches[msg.JobId] = &JobBatch{
-				JobID:   msg.JobId,
-				Logs:    make([]*ipcpb.LogLine, 0),
-				Metrics: make([]*ipcpb.Metric, 0),
+				JobID:         msg.JobId,
+				Logs:          make([]*ipcpb.LogLine, 0),
+				Metrics:       make([]*ipcpb.Metric, 0),
+				ExecEvents:    make([]*ipcpb.ExecEvent, 0),
+				ConnectEvents: make([]*ipcpb.ConnectEvent, 0),
 			}
 		}
 
@@ -300,6 +302,22 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 				continue
 			}
 			batch.Metrics = append(batch.Metrics, &metric)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_EXEC_EVENT:
+			var execEvent ipcpb.ExecEvent
+			if err := proto.Unmarshal(msg.Data, &execEvent); err != nil {
+				log.Error("Failed to unmarshal exec event", "error", err)
+				continue
+			}
+			batch.ExecEvents = append(batch.ExecEvents, &execEvent)
+
+		case ipcpb.MessageType_MESSAGE_TYPE_CONNECT_EVENT:
+			var connectEvent ipcpb.ConnectEvent
+			if err := proto.Unmarshal(msg.Data, &connectEvent); err != nil {
+				log.Error("Failed to unmarshal connect event", "error", err)
+				continue
+			}
+			batch.ConnectEvents = append(batch.ConnectEvents, &connectEvent)
 		}
 	}
 
@@ -322,14 +340,34 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 				log.Info("Wrote metrics", "jobID", jobID, "count", len(jobBatch.Metrics))
 			}
 		}
+
+		if len(jobBatch.ExecEvents) > 0 {
+			if err := s.backend.WriteExecEvents(jobID, jobBatch.ExecEvents); err != nil {
+				log.Error("Failed to write exec events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote exec events", "jobID", jobID, "count", len(jobBatch.ExecEvents))
+			}
+		}
+
+		if len(jobBatch.ConnectEvents) > 0 {
+			if err := s.backend.WriteConnectEvents(jobID, jobBatch.ConnectEvents); err != nil {
+				log.Error("Failed to write connect events", "jobID", jobID, "error", err)
+				s.writeErrors.Add(1)
+			} else {
+				log.Info("Wrote connect events", "jobID", jobID, "count", len(jobBatch.ConnectEvents))
+			}
+		}
 	}
 }
 
 // JobBatch groups messages by job
 type JobBatch struct {
-	JobID   string
-	Logs    []*ipcpb.LogLine
-	Metrics []*ipcpb.Metric
+	JobID         string
+	Logs          []*ipcpb.LogLine
+	Metrics       []*ipcpb.Metric
+	ExecEvents    []*ipcpb.ExecEvent
+	ConnectEvents []*ipcpb.ConnectEvent
 }
 
 // GetStats returns server statistics

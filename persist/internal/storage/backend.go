@@ -14,10 +14,14 @@ type Backend interface {
 	// Write operations
 	WriteLogs(jobID string, logs []*ipcpb.LogLine) error
 	WriteMetrics(jobID string, metrics []*ipcpb.Metric) error
+	WriteExecEvents(jobID string, events []*ipcpb.ExecEvent) error
+	WriteConnectEvents(jobID string, events []*ipcpb.ConnectEvent) error
 
 	// Read operations
 	ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error)
 	ReadMetrics(ctx context.Context, query *MetricQuery) (*MetricReader, error)
+	ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*ExecEventReader, error)
+	ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*ConnectEventReader, error)
 
 	// Management operations
 	DeleteJob(jobID string) error
@@ -57,6 +61,29 @@ type LogReader struct {
 // MetricReader provides streaming access to metrics
 type MetricReader struct {
 	Channel chan *ipcpb.Metric
+	Error   chan error
+	Done    chan struct{}
+}
+
+// TelemetryQuery parameters for exec and connect events
+type TelemetryQuery struct {
+	JobID     string
+	StartTime *int64
+	EndTime   *int64
+	Limit     int
+	Offset    int
+}
+
+// ExecEventReader provides streaming access to exec events
+type ExecEventReader struct {
+	Channel chan *ipcpb.ExecEvent
+	Error   chan error
+	Done    chan struct{}
+}
+
+// ConnectEventReader provides streaming access to connect events
+type ConnectEventReader struct {
+	Channel chan *ipcpb.ConnectEvent
 	Error   chan error
 	Done    chan struct{}
 }

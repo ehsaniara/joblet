@@ -22,6 +22,12 @@ service PersistService {
   // Query metrics for a job from disk storage
   rpc QueryMetrics(QueryMetricsRequest) returns (stream Metric);
 
+  // Query exec events (eBPF telemetry) for a job
+  rpc QueryExecEvents(QueryTelemetryRequest) returns (stream ExecEvent);
+
+  // Query connect events (eBPF telemetry) for a job
+  rpc QueryConnectEvents(QueryTelemetryRequest) returns (stream ConnectEvent);
+
   // Delete all persisted data for a job (admin only)
   rpc DeleteJob(DeleteJobRequest) returns (DeleteJobResponse);
 }
@@ -122,4 +128,45 @@ message DeleteJobRequest {
 message DeleteJobResponse {
   bool success = 1;
   string message = 2;
+}
+
+// QueryTelemetryRequest specifies parameters for telemetry event queries
+message QueryTelemetryRequest {
+  string job_id = 1;
+
+  // Time range (optional)
+  int64 start_time = 2;  // Unix nanoseconds
+  int64 end_time = 3;    // Unix nanoseconds
+
+  // Pagination
+  int32 limit = 4;       // Max events to return (0 = all)
+  int32 offset = 5;      // Skip events
+}
+
+// ExecEvent represents a process execution event from eBPF visibility
+message ExecEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  uint32 ppid = 5;           // Parent process ID
+  uint32 uid = 6;            // User ID
+  uint32 gid = 7;            // Group ID
+  string comm = 8;           // Process command name (max 16 chars)
+  string filename = 9;       // Full path to executable
+  repeated string args = 10; // Command arguments
+}
+
+// ConnectEvent represents a network connection event from eBPF visibility
+message ConnectEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string src_addr = 6;       // Source IP address
+  uint32 src_port = 7;       // Source port
+  string dst_addr = 8;       // Destination IP address
+  uint32 dst_port = 9;       // Destination port
+  string protocol = 10;      // Protocol (TCP, UDP)
 }

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -539,6 +540,128 @@ func (b *CloudWatchBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) 
 	return nil
 }
 
+// WriteExecEvents writes process execution events to CloudWatch Logs
+func (b *CloudWatchBackend) WriteExecEvents(jobID string, events []*ipcpb.ExecEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	ctx := context.Background()
+
+	// Log group and stream for exec events
+	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	logStream := fmt.Sprintf("%s-exec-events", jobID)
+
+	// Ensure log group and stream exist
+	if err := b.ensureLogGroup(ctx, logGroup); err != nil {
+		return fmt.Errorf("failed to ensure log group: %w", err)
+	}
+	if err := b.ensureLogStream(ctx, logGroup, logStream); err != nil {
+		return fmt.Errorf("failed to ensure log stream: %w", err)
+	}
+
+	// Sort events by timestamp
+	sortedEvents := make([]*ipcpb.ExecEvent, len(events))
+	copy(sortedEvents, events)
+	sort.Slice(sortedEvents, func(i, j int) bool {
+		return sortedEvents[i].Timestamp < sortedEvents[j].Timestamp
+	})
+
+	// Convert to CloudWatch log events (JSON format)
+	logEvents := make([]types.InputLogEvent, 0, len(sortedEvents))
+	for _, event := range sortedEvents {
+		// Format: JSON for structured logging
+		message := fmt.Sprintf(`{"type":"exec","pid":%d,"ppid":%d,"uid":%d,"gid":%d,"comm":%q,"filename":%q,"args":%q}`,
+			event.Pid, event.Ppid, event.Uid, event.Gid, event.Comm, event.Filename, strings.Join(event.Args, " "))
+		timestamp := event.Timestamp / 1_000_000 // Convert nanos to millis
+		logEvents = append(logEvents, types.InputLogEvent{
+			Message:   aws.String(message),
+			Timestamp: aws.Int64(timestamp),
+		})
+	}
+
+	// Batch write events
+	batchSize := b.config.LogBatchSize
+	for i := 0; i < len(logEvents); i += batchSize {
+		end := i + batchSize
+		if end > len(logEvents) {
+			end = len(logEvents)
+		}
+		if err := b.putLogEvents(ctx, logGroup, logStream, logEvents[i:end]); err != nil {
+			return fmt.Errorf("failed to put exec events: %w", err)
+		}
+	}
+
+	b.logger.Debug("wrote exec events to CloudWatch",
+		"jobId", jobID,
+		"count", len(events),
+		"logGroup", logGroup,
+		"logStream", logStream)
+
+	return nil
+}
+
+// WriteConnectEvents writes network connection events to CloudWatch Logs
+func (b *CloudWatchBackend) WriteConnectEvents(jobID string, events []*ipcpb.ConnectEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	ctx := context.Background()
+
+	// Log group and stream for connect events
+	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	logStream := fmt.Sprintf("%s-connect-events", jobID)
+
+	// Ensure log group and stream exist
+	if err := b.ensureLogGroup(ctx, logGroup); err != nil {
+		return fmt.Errorf("failed to ensure log group: %w", err)
+	}
+	if err := b.ensureLogStream(ctx, logGroup, logStream); err != nil {
+		return fmt.Errorf("failed to ensure log stream: %w", err)
+	}
+
+	// Sort events by timestamp
+	sortedEvents := make([]*ipcpb.ConnectEvent, len(events))
+	copy(sortedEvents, events)
+	sort.Slice(sortedEvents, func(i, j int) bool {
+		return sortedEvents[i].Timestamp < sortedEvents[j].Timestamp
+	})
+
+	// Convert to CloudWatch log events (JSON format)
+	logEvents := make([]types.InputLogEvent, 0, len(sortedEvents))
+	for _, event := range sortedEvents {
+		// Format: JSON for structured logging
+		message := fmt.Sprintf(`{"type":"connect","pid":%d,"comm":%q,"src":"%s:%d","dst":"%s:%d","proto":%q}`,
+			event.Pid, event.Comm, event.SrcAddr, event.SrcPort, event.DstAddr, event.DstPort, event.Protocol)
+		timestamp := event.Timestamp / 1_000_000 // Convert nanos to millis
+		logEvents = append(logEvents, types.InputLogEvent{
+			Message:   aws.String(message),
+			Timestamp: aws.Int64(timestamp),
+		})
+	}
+
+	// Batch write events
+	batchSize := b.config.LogBatchSize
+	for i := 0; i < len(logEvents); i += batchSize {
+		end := i + batchSize
+		if end > len(logEvents) {
+			end = len(logEvents)
+		}
+		if err := b.putLogEvents(ctx, logGroup, logStream, logEvents[i:end]); err != nil {
+			return fmt.Errorf("failed to put connect events: %w", err)
+		}
+	}
+
+	b.logger.Debug("wrote connect events to CloudWatch",
+		"jobId", jobID,
+		"count", len(events),
+		"logGroup", logGroup,
+		"logStream", logStream)
+
+	return nil
+}
+
 // ReadLogs reads log lines from CloudWatch Logs
 func (b *CloudWatchBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error) {
 	reader := &LogReader{
@@ -851,6 +974,220 @@ func (b *CloudWatchBackend) DeleteJob(jobID string) error {
 func (b *CloudWatchBackend) Close() error {
 	b.logger.Info("CloudWatch backend closed")
 	return nil
+}
+
+// ReadExecEvents reads process execution events from CloudWatch Logs
+func (b *CloudWatchBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*ExecEventReader, error) {
+	reader := &ExecEventReader{
+		Channel: make(chan *ipcpb.ExecEvent, 100),
+		Error:   make(chan error, 1),
+		Done:    make(chan struct{}),
+	}
+
+	go func() {
+		defer close(reader.Channel)
+		defer close(reader.Error)
+		defer close(reader.Done)
+
+		if err := b.readExecEventsFromStream(ctx, query, reader.Channel); err != nil {
+			reader.Error <- err
+		}
+	}()
+
+	return reader, nil
+}
+
+// readExecEventsFromStream retrieves exec events from CloudWatch Logs
+func (b *CloudWatchBackend) readExecEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ExecEvent) error {
+	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	logStream := fmt.Sprintf("%s-exec-events", query.JobID)
+
+	input := &cloudwatchlogs.GetLogEventsInput{
+		LogGroupName:  aws.String(logGroup),
+		LogStreamName: aws.String(logStream),
+		StartFromHead: aws.Bool(true),
+	}
+
+	if query.StartTime != nil {
+		startMs := *query.StartTime / 1_000_000
+		input.StartTime = aws.Int64(startMs)
+	}
+	if query.EndTime != nil {
+		endMs := *query.EndTime / 1_000_000
+		input.EndTime = aws.Int64(endMs)
+	}
+	if query.Limit > 0 {
+		input.Limit = aws.Int32(int32(query.Limit))
+	}
+
+	resp, err := b.logsClient.GetLogEvents(ctx, input)
+	if err != nil {
+		// Check for stream not found - not an error, just no events
+		if strings.Contains(err.Error(), "ResourceNotFoundException") {
+			b.logger.Debug("exec events stream not found", "jobId", query.JobID)
+			return nil
+		}
+		return fmt.Errorf("failed to get exec events: %w", err)
+	}
+
+	for _, event := range resp.Events {
+		execEvent, err := parseExecEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+		if err != nil {
+			b.logger.Warn("failed to parse exec event", "error", err)
+			continue
+		}
+
+		select {
+		case ch <- execEvent:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return nil
+}
+
+// ReadConnectEvents reads network connection events from CloudWatch Logs
+func (b *CloudWatchBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*ConnectEventReader, error) {
+	reader := &ConnectEventReader{
+		Channel: make(chan *ipcpb.ConnectEvent, 100),
+		Error:   make(chan error, 1),
+		Done:    make(chan struct{}),
+	}
+
+	go func() {
+		defer close(reader.Channel)
+		defer close(reader.Error)
+		defer close(reader.Done)
+
+		if err := b.readConnectEventsFromStream(ctx, query, reader.Channel); err != nil {
+			reader.Error <- err
+		}
+	}()
+
+	return reader, nil
+}
+
+// readConnectEventsFromStream retrieves connect events from CloudWatch Logs
+func (b *CloudWatchBackend) readConnectEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ConnectEvent) error {
+	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	logStream := fmt.Sprintf("%s-connect-events", query.JobID)
+
+	input := &cloudwatchlogs.GetLogEventsInput{
+		LogGroupName:  aws.String(logGroup),
+		LogStreamName: aws.String(logStream),
+		StartFromHead: aws.Bool(true),
+	}
+
+	if query.StartTime != nil {
+		startMs := *query.StartTime / 1_000_000
+		input.StartTime = aws.Int64(startMs)
+	}
+	if query.EndTime != nil {
+		endMs := *query.EndTime / 1_000_000
+		input.EndTime = aws.Int64(endMs)
+	}
+	if query.Limit > 0 {
+		input.Limit = aws.Int32(int32(query.Limit))
+	}
+
+	resp, err := b.logsClient.GetLogEvents(ctx, input)
+	if err != nil {
+		// Check for stream not found - not an error, just no events
+		if strings.Contains(err.Error(), "ResourceNotFoundException") {
+			b.logger.Debug("connect events stream not found", "jobId", query.JobID)
+			return nil
+		}
+		return fmt.Errorf("failed to get connect events: %w", err)
+	}
+
+	for _, event := range resp.Events {
+		connectEvent, err := parseConnectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+		if err != nil {
+			b.logger.Warn("failed to parse connect event", "error", err)
+			continue
+		}
+
+		select {
+		case ch <- connectEvent:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return nil
+}
+
+// parseExecEventFromJSON parses an exec event from CloudWatch JSON format
+func parseExecEventFromJSON(jsonStr string, jobID string, timestamp int64) (*ipcpb.ExecEvent, error) {
+	var data struct {
+		Type     string `json:"type"`
+		Pid      uint32 `json:"pid"`
+		Ppid     uint32 `json:"ppid"`
+		Uid      uint32 `json:"uid"`
+		Gid      uint32 `json:"gid"`
+		Comm     string `json:"comm"`
+		Filename string `json:"filename"`
+		Args     string `json:"args"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal exec event: %w", err)
+	}
+
+	return &ipcpb.ExecEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Pid:       data.Pid,
+		Ppid:      data.Ppid,
+		Uid:       data.Uid,
+		Gid:       data.Gid,
+		Comm:      data.Comm,
+		Filename:  data.Filename,
+		Args:      strings.Fields(data.Args),
+	}, nil
+}
+
+// parseConnectEventFromJSON parses a connect event from CloudWatch JSON format
+func parseConnectEventFromJSON(jsonStr string, jobID string, timestamp int64) (*ipcpb.ConnectEvent, error) {
+	var data struct {
+		Type     string `json:"type"`
+		Pid      uint32 `json:"pid"`
+		Comm     string `json:"comm"`
+		Src      string `json:"src"`
+		Dst      string `json:"dst"`
+		Protocol string `json:"proto"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal connect event: %w", err)
+	}
+
+	// Parse src:port and dst:port
+	srcAddr, srcPort := parseAddrPort(data.Src)
+	dstAddr, dstPort := parseAddrPort(data.Dst)
+
+	return &ipcpb.ConnectEvent{
+		JobId:     jobID,
+		Timestamp: timestamp,
+		Pid:       data.Pid,
+		Comm:      data.Comm,
+		SrcAddr:   srcAddr,
+		SrcPort:   srcPort,
+		DstAddr:   dstAddr,
+		DstPort:   dstPort,
+		Protocol:  data.Protocol,
+	}, nil
+}
+
+// parseAddrPort splits "addr:port" into address and port
+func parseAddrPort(addrPort string) (string, uint32) {
+	parts := strings.Split(addrPort, ":")
+	if len(parts) != 2 {
+		return addrPort, 0
+	}
+	port, _ := strconv.ParseUint(parts[1], 10, 32)
+	return parts[0], uint32(port)
 }
 
 // Helper function to convert string timestamp to int64 nanoseconds

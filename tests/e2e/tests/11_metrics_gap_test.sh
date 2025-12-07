@@ -63,13 +63,16 @@ get_metrics() {
 # Count metrics samples in output
 count_metrics_samples() {
     local metrics_output="$1"
-    echo "$metrics_output" | grep -c "Metrics Sample" || echo "0"
+    # Match "Metrics at HH:MM:SS" pattern from CLI output
+    local count=$(echo "$metrics_output" | grep -c "Metrics at" 2>/dev/null || true)
+    echo "${count:-0}"
 }
 
 # Extract timestamps from metrics output
 get_timestamps() {
     local metrics_output="$1"
-    echo "$metrics_output" | grep "Metrics Sample at" | sed 's/.*at \([0-9:]*\).*/\1/' | sort
+    # Match "═══ Metrics at HH:MM:SS ═══" pattern from CLI output
+    echo "$metrics_output" | grep "Metrics at" | sed 's/.*Metrics at \([0-9:]*\).*/\1/' | sort
 }
 
 # ============================================
@@ -134,7 +137,7 @@ test_metrics_streaming_running_job() {
         echo -e "    ${GREEN}✓ Received $sample_count metric samples${NC}"
 
         # Check for timestamps in output
-        if echo "$metrics_output" | grep -q "Metrics Sample at"; then
+        if echo "$metrics_output" | grep -q "Metrics at"; then
             echo -e "    ${GREEN}✓ Metrics contain timestamps${NC}"
         fi
         return 0

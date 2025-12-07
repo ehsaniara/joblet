@@ -23,10 +23,11 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
+	"github.com/ehsaniara/joblet/internal/joblet/ebpf/visibility"
 	"github.com/ehsaniara/joblet/internal/joblet/ipc"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
-	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
 	"github.com/ehsaniara/joblet/internal/joblet/server"
+	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
 	"github.com/ehsaniara/joblet/internal/modes/isolation"
 	"github.com/ehsaniara/joblet/internal/modes/jobexec"
 	"github.com/ehsaniara/joblet/pkg/client"
@@ -115,13 +116,12 @@ func RunServer(cfg *config.Config) error {
 		log.Info("connected to persist service for historical data deletion", "socket", persistSocketPath)
 	}
 
-	// Create pub-sub for metrics events to enable live streaming and IPC forwarding
-	metricsPubSub := pubsub.NewPubSub[adapters.MetricsEvent]()
+	// Create telemetry collector for unified telemetry streaming (ADR-014)
+	telemetryCollector := telemetry.NewCollector(1000) // Buffer up to 1000 events per job
 
 	metricsStoreAdapter := adapters.NewMetricsStoreAdapter(
-		metricsPubSub,
 		persistClient,
-		cfg.IPC.Enabled,
+		telemetryCollector,
 		logger.WithField("component", "metrics-store"),
 	)
 
@@ -143,6 +143,21 @@ func RunServer(cfg *config.Config) error {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
+	// Initialize eBPF visibility monitor for job activity tracking (ADR-014)
+	var visibilityMonitor *visibility.Monitor
+	if err := visibility.IsSupported(); err != nil {
+		log.Info("eBPF visibility not available", "reason", err)
+	} else {
+		visibilityMonitor = visibility.NewMonitor(telemetryCollector, log)
+		if err := visibilityMonitor.Start(); err != nil {
+			log.Warn("failed to start eBPF visibility monitor", "error", err)
+			visibilityMonitor = nil
+		} else {
+			log.Info("eBPF visibility monitor started successfully")
+			jobletInstance.SetVisibilityMonitor(visibilityMonitor)
+		}
+	}
+
 	// Initialize IPC manager for persist integration (logs and metrics)
 	var ipcManager *ipc.Manager
 	if cfg.IPC.Enabled {
@@ -155,11 +170,10 @@ func RunServer(cfg *config.Config) error {
 		}
 
 		var err error
-		// Pass both log and metrics pub/sub instances
+		// Pass log pub/sub (metrics are written directly to IPC)
 		ipcManager, err = ipc.NewManager(
 			ipcConfig,
 			jobStoreAdapter.PubSub(), // Log pub/sub
-			metricsPubSub,            // Metrics pub/sub
 			log,
 		)
 		if err != nil {
@@ -168,6 +182,13 @@ func RunServer(cfg *config.Config) error {
 
 		if err := ipcManager.Start(); err != nil {
 			return fmt.Errorf("failed to start IPC manager: %w", err)
+		}
+
+		// Wire telemetry collector to IPC for eBPF event persistence
+		if ipcManager.GetWriter() != nil {
+			persister := ipc.NewPersister(ipcManager.GetWriter())
+			telemetryCollector.SetPersister(persister)
+			log.Info("eBPF events will be persisted to CloudWatch via IPC")
 		}
 
 		log.Info("IPC manager started successfully (logs and metrics)", "socket", cfg.IPC.Socket)
@@ -232,7 +253,7 @@ func RunServer(cfg *config.Config) error {
 	}
 
 	// Start gRPC server with configuration using new adapters
-	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, metricsStoreAdapter, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
+	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, telemetryCollector, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
 	}
@@ -252,6 +273,15 @@ func RunServer(cfg *config.Config) error {
 
 	// Graceful shutdown
 	grpcServer.GracefulStop()
+
+	// Stop eBPF visibility monitor if it was started
+	if visibilityMonitor != nil {
+		if err := visibilityMonitor.Stop(); err != nil {
+			log.Error("error stopping eBPF visibility monitor", "error", err)
+		} else {
+			log.Info("eBPF visibility monitor stopped successfully")
+		}
+	}
 
 	// Stop IPC manager if it was started
 	if ipcManager != nil {

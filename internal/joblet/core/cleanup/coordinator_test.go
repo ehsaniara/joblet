@@ -59,6 +59,10 @@ func (m *mockResource) EnsureControllers() error {
 	return nil
 }
 
+func (m *mockResource) AddProcessToCgroup(cgroupPath string, pid int) error {
+	return nil
+}
+
 func (m *mockResource) GetCleanupCalls() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

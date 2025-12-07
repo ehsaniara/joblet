@@ -8,49 +8,33 @@ import (
 
 	"github.com/ehsaniara/joblet/internal/joblet/metrics"
 	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
-	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
+	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
 	pb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-// MetricsStoreAdapter implements metrics storage with pub-sub capabilities
-// Metrics are published to pubsub for:
-// 1. Real-time streaming to clients (StreamJobMetrics)
-// 2. IPC forwarding to persist subprocess for disk storage
-// 3. Buffering in memory to prevent gaps during persist→live transition
+// MetricsStoreAdapter manages metrics collection for jobs.
+// Metrics are collected from cgroups and emitted to the unified telemetry collector.
 type MetricsStoreAdapter struct {
-	// Pub-sub for real-time metrics streaming and IPC forwarding
-	pubsub pubsub.PubSub[MetricsEvent]
-
-	// Buffer for recent metrics to prevent gaps during persist→live transition
-	buffer *metrics.MetricsBuffer
-
 	// Persist client for deleting historical metrics
 	persistClient pb.PersistServiceClient
+
+	// Telemetry collector for unified telemetry streaming
+	telemetryCollector *telemetry.Collector
 
 	// Active collectors per job
 	collectors      map[string]*metrics.Collector
 	collectorsMutex sync.RWMutex
 
-	logger         *logger.Logger
-	closed         bool
-	persistEnabled bool // If false, skip all buffering (live streaming only)
-	closeMutex     sync.RWMutex
-}
-
-// MetricsEvent represents events published about job metrics
-type MetricsEvent struct {
-	Type      string                   `json:"type"` // METRICS_SAMPLE
-	JobID     string                   `json:"job_id"`
-	Sample    *domain.JobMetricsSample `json:"sample,omitempty"`
-	Timestamp int64                    `json:"timestamp"`
+	logger     *logger.Logger
+	closed     bool
+	closeMutex sync.RWMutex
 }
 
 // NewMetricsStoreAdapter creates a new metrics store adapter
 func NewMetricsStoreAdapter(
-	pubsub pubsub.PubSub[MetricsEvent],
 	persistClient pb.PersistServiceClient,
-	persistEnabled bool,
+	telemetryCollector *telemetry.Collector,
 	log *logger.Logger,
 ) *MetricsStoreAdapter {
 	if log == nil {
@@ -58,23 +42,18 @@ func NewMetricsStoreAdapter(
 	}
 
 	adapter := &MetricsStoreAdapter{
-		pubsub:         pubsub,
-		persistClient:  persistClient,
-		persistEnabled: persistEnabled,
-		buffer:         metrics.NewMetricsBuffer(100), // Store last 100 samples per job
-		collectors:     make(map[string]*metrics.Collector),
-		logger:         log,
-	}
-
-	// Debug log to verify pubsub is set
-	if pubsub == nil {
-		log.Warn("metrics store adapter created with nil pubsub - live streaming will not work")
-	} else {
-		log.Info("metrics store adapter created with pubsub and buffer - live streaming enabled")
+		persistClient:      persistClient,
+		telemetryCollector: telemetryCollector,
+		collectors:         make(map[string]*metrics.Collector),
+		logger:             log,
 	}
 
 	if persistClient == nil {
 		log.Warn("metrics store adapter created without persist client - historical metrics deletion will not work")
+	}
+
+	if telemetryCollector != nil {
+		log.Info("telemetry collector attached for unified telemetry streaming")
 	}
 
 	return adapter
@@ -149,214 +128,32 @@ func (a *MetricsStoreAdapter) StopCollector(jobID string) error {
 	return nil
 }
 
-// PublishMetrics implements the MetricsPublisher interface
-// This is called by the Collector to publish metrics samples
-// When persist is enabled: Buffers data + publishes to pubsub (for gap prevention, IPC, and live streaming)
-// When persist is disabled: Only publishes to pubsub (live streaming only, no buffering)
+// PublishMetrics implements the MetricsPublisher interface.
+// This is called by the Collector to publish metrics samples to the telemetry collector.
 func (a *MetricsStoreAdapter) PublishMetrics(ctx context.Context, sample *domain.JobMetricsSample) error {
-	// Only store in buffer if persist is enabled (gap prevention)
-	// When persist is disabled, skip buffering to avoid unbounded growth
-	if a.persistEnabled && a.buffer != nil {
-		a.buffer.Add(sample)
-		a.logger.Debug("stored metrics in buffer", "jobId", sample.JobID, "timestamp", sample.Timestamp)
-	} else if !a.persistEnabled {
-		a.logger.Debug("persist disabled - skipping buffer write (live streaming only)", "jobId", sample.JobID, "timestamp", sample.Timestamp)
-	}
-
-	// Always publish to pubsub for live streaming (and IPC forwarding when enabled)
-	if a.pubsub != nil {
-		event := MetricsEvent{
-			Type:      "METRICS_SAMPLE",
-			JobID:     sample.JobID,
-			Sample:    sample,
-			Timestamp: time.Now().Unix(),
+	// Emit to unified telemetry collector (for StreamJobTelemetry API)
+	if a.telemetryCollector != nil {
+		telemetryData := &telemetry.MetricsData{
+			CPUPercent:     sample.CPU.UsagePercent,
+			MemoryBytes:    int64(sample.Memory.Current),
+			MemoryLimit:    int64(sample.Memory.Max),
+			DiskReadBytes:  int64(sample.IO.TotalReadBytes),
+			DiskWriteBytes: int64(sample.IO.TotalWriteBytes),
 		}
-
-		// Publish to a single topic "metrics" for all jobs
-		// Individual job filtering happens in StreamMetrics() by jobID
-		topic := "metrics"
-		if err := a.pubsub.Publish(ctx, topic, event); err != nil {
-			a.logger.Warn("failed to publish metrics event", "jobId", sample.JobID, "error", err)
-			// Don't return error - pubsub failure shouldn't fail the collector
-		} else {
-			a.logger.Debug("published metrics sample", "jobId", sample.JobID, "timestamp", sample.Timestamp)
+		// Add network metrics if available
+		if sample.Network != nil {
+			telemetryData.NetRecvBytes = int64(sample.Network.TotalRxBytes)
+			telemetryData.NetSentBytes = int64(sample.Network.TotalTxBytes)
 		}
+		// Add GPU metrics if available (use first GPU for summary)
+		if len(sample.GPU) > 0 {
+			telemetryData.GPUPercent = sample.GPU[0].Utilization
+			telemetryData.GPUMemoryBytes = int64(sample.GPU[0].MemoryUsed)
+		}
+		a.telemetryCollector.EmitMetrics(sample.JobID, telemetryData)
 	}
 
 	return nil
-}
-
-// StreamMetrics streams real-time metrics for a job.
-// Sends buffered samples first, then subscribes to live samples from pub-sub.
-func (a *MetricsStoreAdapter) StreamMetrics(
-	ctx context.Context,
-	jobID string,
-	callback func(*domain.JobMetricsSample) error,
-) error {
-	return a.StreamMetricsWithSkip(ctx, jobID, 0, callback)
-}
-
-// StreamMetricsWithSkip streams metrics, skipping the first skipCount buffered samples
-// This is used to avoid duplicates when persist has already sent some samples
-// When persist is disabled, skips all buffer reads and only does live streaming
-func (a *MetricsStoreAdapter) StreamMetricsWithSkip(
-	ctx context.Context,
-	jobID string,
-	skipCount int,
-	callback func(*domain.JobMetricsSample) error,
-) error {
-	a.logger.Debug("starting metrics stream", "jobId", jobID, "skipCount", skipCount, "persistEnabled", a.persistEnabled)
-
-	// Check if there's an active collector for this job
-	a.collectorsMutex.RLock()
-	hasCollector := a.collectors[jobID] != nil
-	a.collectorsMutex.RUnlock()
-
-	// Track latest timestamp sent to avoid duplicates
-	var lastTimestamp time.Time
-
-	// Step 1: Send buffered samples first (prevents gaps), skipping items already sent by persist
-	// ONLY when persist is enabled - otherwise skip buffer entirely to avoid stale data
-	if a.persistEnabled && a.buffer != nil {
-		bufferedSamples := a.buffer.GetRecent(jobID, 100)
-
-		// Skip samples already sent by persist
-		if skipCount > 0 && skipCount < len(bufferedSamples) {
-			bufferedSamples = bufferedSamples[skipCount:]
-			a.logger.Debug("skipped buffered samples already sent by persist", "jobId", jobID, "skipped", skipCount, "remaining", len(bufferedSamples))
-		} else if skipCount >= len(bufferedSamples) {
-			bufferedSamples = []*domain.JobMetricsSample{}
-			a.logger.Debug("all buffered samples already sent by persist", "jobId", jobID, "skipped", len(bufferedSamples))
-		}
-
-		if len(bufferedSamples) > 0 {
-			a.logger.Debug("sending buffered metrics samples", "jobId", jobID, "count", len(bufferedSamples))
-			for _, sample := range bufferedSamples {
-				if err := callback(sample); err != nil {
-					return fmt.Errorf("error sending buffered sample: %w", err)
-				}
-				if sample.Timestamp.After(lastTimestamp) {
-					lastTimestamp = sample.Timestamp
-				}
-			}
-			a.logger.Debug("buffered samples sent", "jobId", jobID, "lastTimestamp", lastTimestamp)
-		} else {
-			a.logger.Debug("no buffered samples to send (all skipped or none available)", "jobId", jobID)
-		}
-	} else if !a.persistEnabled {
-		a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "jobId", jobID)
-	}
-
-	// If no pubsub, we can't stream live metrics beyond the buffer
-	if a.pubsub == nil {
-		a.logger.Warn("no pubsub available for live streaming", "jobId", jobID)
-		return nil
-	}
-
-	if hasCollector {
-		a.logger.Debug("streaming live metrics for running job", "jobId", jobID)
-	} else {
-		a.logger.Debug("no active collector - will stream any remaining metrics with drain timeout", "jobId", jobID)
-	}
-
-	// Step 2: Subscribe to live metrics via pub-sub (single "metrics" topic for all jobs)
-	topic := "metrics"
-	a.logger.Debug("subscribing to live metrics stream", "jobId", jobID, "topic", topic)
-
-	updates, unsubscribe, err := a.pubsub.Subscribe(ctx, topic)
-	if err != nil {
-		a.logger.Error("failed to subscribe to metrics", "jobId", jobID, "error", err)
-		return fmt.Errorf("failed to subscribe to metrics: %w", err)
-	}
-	defer unsubscribe()
-
-	a.logger.Debug("successfully subscribed to live metrics", "jobId", jobID)
-
-	// Drain timeout: if no active collector, wait for final metrics samples
-	// Metrics are sampled every ~5 seconds, so wait up to 6 seconds for any final samples
-	var drainDeadline time.Time
-	inDrainMode := !hasCollector
-	if inDrainMode {
-		drainDeadline = time.Now().Add(6 * time.Second)
-		a.logger.Debug("entering drain mode for final metrics", "jobId", jobID, "drainDeadline", drainDeadline)
-	}
-
-	receivedAnySample := false
-
-	for {
-		// If in drain mode and deadline exceeded, terminate
-		if inDrainMode && time.Now().After(drainDeadline) {
-			if receivedAnySample {
-				a.logger.Debug("drain deadline exceeded after receiving samples, ending stream", "jobId", jobID, "samplesReceived", receivedAnySample)
-			} else {
-				a.logger.Debug("drain deadline exceeded with no samples, ending stream", "jobId", jobID)
-			}
-			return nil
-		}
-
-		// Compute select timeout based on drain mode
-		var selectTimeout <-chan time.Time
-		if inDrainMode {
-			// During drain, use short timeout to check deadline frequently
-			selectTimeout = time.After(500 * time.Millisecond)
-		} else {
-			// Not in drain mode, check periodically if collector stopped
-			selectTimeout = time.After(2 * time.Second)
-		}
-
-		select {
-		case <-ctx.Done():
-			a.logger.Debug("metrics stream context cancelled", "jobId", jobID)
-			return ctx.Err()
-
-		case <-selectTimeout:
-			if !inDrainMode {
-				// Check if collector has stopped (job completed)
-				a.collectorsMutex.RLock()
-				hasCollector = a.collectors[jobID] != nil
-				a.collectorsMutex.RUnlock()
-
-				if !hasCollector {
-					// Collector stopped, enter drain mode
-					inDrainMode = true
-					drainDeadline = time.Now().Add(6 * time.Second)
-					a.logger.Debug("collector stopped, entering drain mode", "jobId", jobID, "drainDeadline", drainDeadline)
-				}
-			}
-			// Continue to check deadline at top of loop
-			continue
-
-		case msg, ok := <-updates:
-			if !ok {
-				a.logger.Debug("metrics updates channel closed", "jobId", jobID)
-				return nil
-			}
-
-			event := msg.Payload
-			// Filter for this specific job since all jobs use the same topic
-			if event.Type == "METRICS_SAMPLE" && event.Sample != nil && event.JobID == jobID {
-				// Deduplicate: skip samples we've already sent from buffer
-				if !lastTimestamp.IsZero() && !event.Sample.Timestamp.After(lastTimestamp) {
-					a.logger.Debug("skipping duplicate metric (already sent from buffer)",
-						"jobId", jobID,
-						"timestamp", event.Sample.Timestamp,
-						"lastSentTimestamp", lastTimestamp)
-					continue
-				}
-
-				receivedAnySample = true
-
-				if err := callback(event.Sample); err != nil {
-					a.logger.Warn("metrics callback error", "jobId", jobID, "error", err)
-					return err
-				}
-
-				// Update last timestamp
-				lastTimestamp = event.Sample.Timestamp
-				a.logger.Debug("streamed metrics sample", "jobId", jobID, "timestamp", event.Sample.Timestamp)
-			}
-		}
-	}
 }
 
 // DeleteJobMetrics deletes all metrics for a specific job
@@ -369,9 +166,9 @@ func (a *MetricsStoreAdapter) DeleteJobMetrics(jobID string) error {
 	}
 	a.collectorsMutex.Unlock()
 
-	// Clear buffer for this job
-	if a.buffer != nil {
-		a.buffer.Clear(jobID)
+	// Clear telemetry buffer for this job
+	if a.telemetryCollector != nil {
+		a.telemetryCollector.ClearJob(jobID)
 	}
 
 	// Metrics files are stored by persist - request deletion via persist gRPC service
@@ -397,7 +194,7 @@ func (a *MetricsStoreAdapter) DeleteJobMetrics(jobID string) error {
 		a.logger.Warn("persist client not available - cannot delete historical metrics files", "jobId", jobID)
 	}
 
-	a.logger.Info("stopped metrics collector and cleared buffer for job", "jobId", jobID)
+	a.logger.Info("stopped metrics collector and cleared telemetry for job", "jobId", jobID)
 	return nil
 }
 
@@ -420,13 +217,6 @@ func (a *MetricsStoreAdapter) Close() error {
 	}
 	a.collectors = make(map[string]*metrics.Collector)
 	a.collectorsMutex.Unlock()
-
-	// Close pub-sub (optional)
-	if a.pubsub != nil {
-		if err := a.pubsub.Close(); err != nil {
-			a.logger.Error("failed to close metrics pub-sub", "error", err)
-		}
-	}
 
 	a.logger.Info("metrics store adapter closed successfully")
 	return nil

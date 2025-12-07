@@ -130,6 +130,48 @@ func (w *Writer) WriteMetric(jobID string, timestamp int64, sequence uint64, dat
 	return w.write(msg)
 }
 
+// WriteExecEvent sends an eBPF process execution event (non-blocking)
+func (w *Writer) WriteExecEvent(event *ipcpb.ExecEvent) error {
+	// Marshal exec event
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal exec event: %w", err)
+	}
+
+	// Create IPC message
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_EXEC_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
+// WriteConnectEvent sends an eBPF network connection event (non-blocking)
+func (w *Writer) WriteConnectEvent(event *ipcpb.ConnectEvent) error {
+	// Marshal connect event
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal connect event: %w", err)
+	}
+
+	// Create IPC message
+	msg := &ipcpb.IPCMessage{
+		Version:   1,
+		Type:      ipcpb.MessageType_MESSAGE_TYPE_CONNECT_EVENT,
+		JobId:     event.JobId,
+		Timestamp: event.Timestamp,
+		Sequence:  event.Sequence,
+		Data:      data,
+	}
+
+	return w.write(msg)
+}
+
 // write sends a message (non-blocking)
 func (w *Writer) write(msg *ipcpb.IPCMessage) error {
 	if !w.connected.Load() {

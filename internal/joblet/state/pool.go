@@ -230,36 +230,6 @@ func (p *ConnectionPool) Stats() map[string]interface{} {
 	}
 }
 
-// sendMessage sends a message on a pooled connection without waiting for response
-// nolint:unused // Reserved for future fire-and-forget operations
-func (p *ConnectionPool) sendMessage(ctx context.Context, conn *pooledConn, msg Message) error {
-	// Encode message
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("failed to encode message: %w", err)
-	}
-
-	data = append(data, '\n')
-
-	// Set write deadline from context
-	if deadline, ok := ctx.Deadline(); ok {
-		if err := conn.conn.SetWriteDeadline(deadline); err != nil {
-			return fmt.Errorf("failed to set write deadline: %w", err)
-		}
-	}
-
-	// Write message
-	if _, err := conn.conn.Write(data); err != nil {
-		p.errors.Add(1)
-		return fmt.Errorf("failed to write to state socket: %w", err)
-	}
-
-	// Reset deadline
-	_ = conn.conn.SetWriteDeadline(time.Time{})
-
-	return nil
-}
-
 // sendMessageWithResponse sends a message and waits for response
 func (p *ConnectionPool) sendMessageWithResponse(ctx context.Context, conn *pooledConn, msg Message) (*Response, error) {
 	// Encode message

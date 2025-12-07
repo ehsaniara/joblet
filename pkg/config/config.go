@@ -29,6 +29,7 @@ type Config struct {
 	GPU        GPUConfig        `yaml:"gpu" json:"gpu"`
 	IPC        IPCConfig        `yaml:"ipc" json:"ipc"`
 	State      StateConfig      `yaml:"state" json:"state"`
+	Telemetry  TelemetryConfig  `yaml:"telemetry" json:"telemetry"`
 }
 
 type NetworkConfig struct {
@@ -176,6 +177,12 @@ type IPCConfig struct {
 	BufferSize     int           `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
 	ReconnectDelay time.Duration `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
 	MaxReconnects  int           `yaml:"max_reconnects" json:"max_reconnects"`   // Max reconnection attempts (0 = infinite)
+}
+
+// TelemetryConfig holds telemetry and metrics collection configuration
+type TelemetryConfig struct {
+	MetricsInterval time.Duration `yaml:"metrics_interval" json:"metrics_interval"` // How often to sample resource metrics (default: 5s)
+	EbpfEnabled     bool          `yaml:"ebpf_enabled" json:"ebpf_enabled"`         // Enable eBPF telemetry collection (default: true)
 }
 
 // StateConfig holds job state persistence configuration
@@ -344,6 +351,10 @@ var DefaultConfig = Config{
 		BufferSize:     10000,           // 10k message buffer
 		ReconnectDelay: 5 * time.Second, // Retry every 5 seconds
 		MaxReconnects:  0,               // Infinite retries
+	},
+	Telemetry: TelemetryConfig{
+		MetricsInterval: 5 * time.Second, // Sample metrics every 5 seconds
+		EbpfEnabled:     true,            // eBPF telemetry enabled by default
 	},
 }
 

@@ -11,16 +11,25 @@ func NewJobCmd() *cobra.Command {
 		Short: "Job management commands",
 		Long: `Job management commands for running and controlling jobs.
 
+All commands support short-form UUIDs (first 8 characters) if they uniquely identify a job.
+
 Available subcommands:
   run        Run a new job immediately or schedule it for later
-  list       List all jobs
-  status     Show status of a specific job
-  log        Stream logs from a job
-  metrics    View resource usage metrics for a job
-  stop       Stop a running job
+  list       List all jobs with status and details
+  status     Show comprehensive status of a specific job
+  log        Stream logs from a job (historical + live)
+  metrics    View resource metrics and eBPF telemetry (--tel flag)
+  stop       Stop a running job (sends SIGTERM/SIGKILL)
   cancel     Cancel a scheduled job (status becomes CANCELED)
-  delete     Delete a specific job
-  delete-all Delete all non-running jobs`,
+  delete     Delete a specific job and all its data
+  delete-all Delete all non-running jobs
+
+Examples:
+  rnx job run python script.py           # Run a job
+  rnx job list                           # List all jobs
+  rnx job status f47ac10b                # Check job status
+  rnx job log f47ac10b                   # Stream logs
+  rnx job metrics f47ac10b --tel         # View metrics + eBPF events`,
 	}
 
 	// Add all job-related subcommands

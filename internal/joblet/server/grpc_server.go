@@ -10,6 +10,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
+	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
 	"github.com/ehsaniara/joblet/pkg/client"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
@@ -21,7 +22,7 @@ import (
 )
 
 // StartGRPCServer initializes and starts the main Joblet gRPC server.
-func StartGRPCServer(jobStore adapters.JobStorer, metricsStore *adapters.MetricsStoreAdapter, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStorer, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
+func StartGRPCServer(jobStore adapters.JobStorer, telemetryCollector *telemetry.Collector, joblet interfaces.Joblet, cfg *config.Config, networkStore adapters.NetworkStorer, volumeManager *volume.Manager, monitoringService *monitoring.Service, platform platform.Platform) (*grpc.Server, error) {
 	serverLogger := logger.WithField("component", "grpc-server")
 	serverAddress := cfg.GetServerAddress()
 
@@ -68,7 +69,7 @@ func StartGRPCServer(jobStore adapters.JobStorer, metricsStore *adapters.Metrics
 	}
 
 	// Create job service (lean, no workflow orchestration)
-	jobService := NewJobServiceServer(auth, jobStore, metricsStore, joblet, persistClient)
+	jobService := NewJobServiceServer(auth, jobStore, telemetryCollector, joblet, persistClient)
 	pb.RegisterJobServiceServer(grpcServer, jobService)
 
 	// Create and register network service

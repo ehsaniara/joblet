@@ -135,10 +135,29 @@ func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_Ge
 	return stream, nil
 }
 
-func (c *JobClient) GetJobMetrics(ctx context.Context, id string) (pb.JobService_GetJobMetricsClient, error) {
-	stream, err := c.jobClient.GetJobMetrics(ctx, &pb.JobMetricsRequest{Uuid: id})
+// StreamJobTelemetry streams live telemetry (metrics + activity events) for a running job
+func (c *JobClient) StreamJobTelemetry(ctx context.Context, id string, types []string) (pb.JobService_StreamJobTelemetryClient, error) {
+	stream, err := c.jobClient.StreamJobTelemetry(ctx, &pb.StreamTelemetryRequest{
+		JobUuid: id,
+		Types:   types,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start metrics stream: %v", err)
+		return nil, fmt.Errorf("failed to start telemetry stream: %v", err)
+	}
+	return stream, nil
+}
+
+// GetJobTelemetry retrieves historical telemetry for a completed job
+func (c *JobClient) GetJobTelemetry(ctx context.Context, id string, types []string, startTime, endTime int64, limit int32) (pb.JobService_GetJobTelemetryClient, error) {
+	stream, err := c.jobClient.GetJobTelemetry(ctx, &pb.GetTelemetryRequest{
+		JobUuid:   id,
+		Types:     types,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get telemetry: %v", err)
 	}
 	return stream, nil
 }

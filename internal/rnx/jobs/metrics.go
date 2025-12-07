@@ -18,14 +18,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// ANSI color codes for telemetry output
+const (
+	metricsColorCyan   = "\033[36m"
+	metricsColorYellow = "\033[33m"
+	metricsColorReset  = "\033[0m"
+)
+
 func NewMetricsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "metrics <job-uuid>",
-		Short: "View job resource metrics",
+		Short: "View job resource metrics and eBPF telemetry events",
 		Long: `View resource usage metrics for a running or completed job.
 
-This command shows CPU, memory, I/O, network, and process metrics collected
-during job execution. Metrics are stored as time-series data.
+This command shows CPU, memory, I/O, network, and GPU metrics collected
+during job execution via the unified telemetry stream.
 
 For COMPLETED jobs: Shows all metrics from start to finish, then exits
 For RUNNING jobs: Shows all metrics from start to current, then continues
@@ -34,34 +41,57 @@ For RUNNING jobs: Shows all metrics from start to current, then continues
 Short-form UUIDs are supported - you can use just the first 8 characters
 if they uniquely identify a job.
 
+eBPF Telemetry (--tel flag):
+Use --tel to include eBPF visibility events for security monitoring:
+  • EXEC: Process executions (fork/exec syscalls)
+  • NET: Outgoing network connections (connect syscall)
+  • ACCEPT: Incoming network connections (accept syscall)
+  • SEND/RECV: Socket data transfers (sendto/recvfrom syscalls)
+  • MMAP: Memory mappings with executable permissions
+  • MPROTECT: Memory protection changes adding exec permission
+
 Examples:
-  # View metrics for a completed job (shows complete history)
-  rnx job metrics f47ac10b-58cc-4372-a567-0e02b2c3d479
+  # View only resource metrics
+  rnx job metrics f47ac10b
 
-  # Monitor a running job (shows history + live stream)
-  rnx job metrics a1b2c3d4
+  # View metrics + all eBPF telemetry events
+  rnx job metrics f47ac10b --tel
 
-  # Output as JSON (one sample per line)
+  # Filter specific event types with grep
+  rnx job metrics f47ac10b --tel | grep EXEC
+  rnx job metrics f47ac10b --tel | grep NET
+  rnx job metrics f47ac10b --tel | grep ACCEPT
+  rnx job metrics f47ac10b --tel | grep MMAP
+
+  # Output as JSON (one event per line)
   rnx --json job metrics f47ac10b
 
 Metrics Include:
-  • CPU: Usage %, user/system time, throttling
-  • Memory: Current/peak usage, anonymous/file cache, page faults
-  • I/O: Read/write bandwidth, IOPS, total bytes
-  • Network: RX/TX bytes/packets, bandwidth
-  • Process: Count, threads, open file descriptors
-  • GPU: Utilization, memory, temperature, power (if allocated)`,
+  • CPU: Usage percentage
+  • Memory: Current usage and limit
+  • Disk I/O: Read/write bytes
+  • Network: RX/TX bytes
+  • GPU: Utilization and memory (if allocated)`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runMetrics(cmd, args)
 		},
 	}
 
+	cmd.Flags().Bool("tel", false, "Include eBPF telemetry events (process executions + network connections)")
+
 	return cmd
 }
 
 func runMetrics(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
+	showTel, _ := cmd.Flags().GetBool("tel")
+
+	// Build list of event types to stream
+	eventTypes := []string{"metrics"}
+	if showTel {
+		eventTypes = append(eventTypes, "exec", "connect")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -76,27 +106,34 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	sampleCount := 0
+	eventCount := 0
 
 	// Connect to joblet server
-	// Note: GetJobMetrics automatically streams BOTH historical (from persist) and live metrics
-	// The server handles fetching history first, then streaming live updates seamlessly
 	jobClient, err := common.NewJobClient()
 	if err != nil {
 		return fmt.Errorf("couldn't connect to joblet server: %w", err)
 	}
 	defer jobClient.Close()
 
-	stream, err := jobClient.GetJobMetrics(ctx, jobID)
+	// Use StreamJobTelemetry for live telemetry
+	stream, err := jobClient.StreamJobTelemetry(ctx, jobID, eventTypes)
 	if err != nil {
 		return fmt.Errorf("couldn't start reading metrics: %v", err)
 	}
 
+	if !common.JSONOutput {
+		if showTel {
+			fmt.Fprintf(os.Stderr, "Streaming metrics + eBPF telemetry (Ctrl+C to stop)...\n\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Streaming metrics (Ctrl+C to stop)...\n\n")
+		}
+	}
+
 	for {
-		sample, e := stream.Recv()
+		event, e := stream.Recv()
 		if e == io.EOF {
-			if sampleCount == 0 {
-				return fmt.Errorf("no metrics available for job %s (metrics collection may not be enabled)", jobID)
+			if eventCount == 0 {
+				return fmt.Errorf("no telemetry available for job %s (metrics collection may not be enabled)", jobID)
 			}
 			return nil // Clean exit at end of stream
 		}
@@ -107,142 +144,100 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 			}
 
 			if s, ok := status.FromError(e); ok {
-				return fmt.Errorf("problem reading metrics: %v", s.Message())
+				return fmt.Errorf("problem reading telemetry: %v", s.Message())
 			}
 
-			return fmt.Errorf("error receiving metrics stream: %v", e)
+			return fmt.Errorf("error receiving telemetry stream: %v", e)
 		}
 
-		sampleCount++
+		eventCount++
 
 		if common.JSONOutput {
-			if err := outputMetricsJSON(sample); err != nil {
+			if err := outputTelemetryJSON(event); err != nil {
 				return fmt.Errorf("couldn't format output as JSON: %v", err)
 			}
 		} else {
-			outputMetricsHuman(sample)
+			outputTelemetryEventHuman(event)
 		}
 
 		// Stream continues:
-		// - For completed jobs: shows all historical metrics then exits at EOF
-		// - For running jobs: shows historical + live metrics until job completes or Ctrl+C
+		// - For completed jobs: shows all historical events then exits at EOF
+		// - For running jobs: shows historical + live events until job completes or Ctrl+C
 	}
 }
 
-// outputMetricsJSON outputs a metrics sample as a JSON object (one per line for streaming)
-func outputMetricsJSON(sample *pb.JobMetricsSample) error {
+// outputTelemetryJSON outputs a telemetry event as a JSON object (one per line for streaming)
+func outputTelemetryJSON(event *pb.TelemetryEvent) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(sample)
+	return encoder.Encode(event)
 }
 
-// outputMetricsHuman outputs metrics in a human-readable format
-func outputMetricsHuman(sample *pb.JobMetricsSample) {
-	timestamp := time.Unix(sample.Timestamp, 0).Format("15:04:05")
+// outputTelemetryEventHuman outputs a telemetry event in human-readable format
+func outputTelemetryEventHuman(event *pb.TelemetryEvent) {
+	timestamp := time.Unix(0, event.Timestamp).Format("15:04:05.000")
 
-	fmt.Printf("\n═══ Metrics Sample at %s ═══\n", timestamp)
-	fmt.Printf("Job ID: %s\n", sample.JobId)
-	fmt.Printf("Sample Interval: %ds\n\n", sample.SampleIntervalSeconds)
+	switch event.Type {
+	case "metrics":
+		metrics := event.GetMetrics()
+		if metrics == nil {
+			return
+		}
 
-	// CPU Metrics
-	if sample.Cpu != nil {
-		fmt.Println("CPU:")
-		fmt.Printf("  Usage: %.2f%%\n", sample.Cpu.UsagePercent)
-		if sample.Cpu.ThrottlePercent > 0 {
-			fmt.Printf("  Throttled: %.2f%%\n", sample.Cpu.ThrottlePercent)
-		}
-		fmt.Printf("  User Time: %d μs\n", sample.Cpu.UserUsec)
-		fmt.Printf("  System Time: %d μs\n", sample.Cpu.SystemUsec)
-		if sample.Cpu.PressureSome10 > 0 {
-			fmt.Printf("  Pressure (10s avg): %.2f%%\n", sample.Cpu.PressureSome10)
-		}
-	}
+		fmt.Printf("\n═══ Metrics at %s ═══\n", timestamp)
+		fmt.Printf("Job ID: %s\n\n", event.JobId)
 
-	// Memory Metrics
-	if sample.Memory != nil {
-		fmt.Println("\nMemory:")
-		fmt.Printf("  Current: %s (%.2f%%)\n",
-			formatBytesUint(sample.Memory.Current),
-			sample.Memory.UsagePercent)
-		fmt.Printf("  Peak: %s\n", formatBytesUint(sample.Memory.Max))
-		fmt.Printf("  Anonymous: %s\n", formatBytesUint(sample.Memory.Anon))
-		fmt.Printf("  File Cache: %s\n", formatBytesUint(sample.Memory.File))
-		if sample.Memory.PgMajFault > 0 {
-			fmt.Printf("  Major Page Faults: %d\n", sample.Memory.PgMajFault)
-		}
-		if sample.Memory.OomEvents > 0 {
-			fmt.Printf("  OOM Events: %d\n", sample.Memory.OomEvents)
-		}
-	}
+		// CPU
+		fmt.Printf("CPU: %.2f%%\n", metrics.CpuPercent)
 
-	// I/O Metrics
-	if sample.Io != nil {
-		fmt.Println("\nI/O:")
-		fmt.Printf("  Read: %s/s (%.0f ops/s)\n",
-			formatBytesFloat(sample.Io.ReadBPS),
-			sample.Io.ReadIOPS)
-		fmt.Printf("  Write: %s/s (%.0f ops/s)\n",
-			formatBytesFloat(sample.Io.WriteBPS),
-			sample.Io.WriteIOPS)
-		fmt.Printf("  Total Read: %s\n", formatBytesUint(sample.Io.TotalReadBytes))
-		fmt.Printf("  Total Write: %s\n", formatBytesUint(sample.Io.TotalWriteBytes))
-	}
+		// Memory
+		fmt.Printf("\nMemory:\n")
+		fmt.Printf("  Current: %s\n", formatBytesInt(metrics.MemoryBytes))
+		if metrics.MemoryLimit > 0 {
+			percent := float64(metrics.MemoryBytes) / float64(metrics.MemoryLimit) * 100
+			fmt.Printf("  Limit: %s (%.1f%% used)\n", formatBytesInt(metrics.MemoryLimit), percent)
+		}
 
-	// Network Metrics
-	if sample.Network != nil {
-		fmt.Println("\nNetwork:")
-		fmt.Printf("  RX: %s/s (%d packets/s)\n",
-			formatBytesFloat(sample.Network.RxBPS),
-			sample.Network.TotalRxPackets)
-		fmt.Printf("  TX: %s/s (%d packets/s)\n",
-			formatBytesFloat(sample.Network.TxBPS),
-			sample.Network.TotalTxPackets)
-		fmt.Printf("  Total RX: %s\n", formatBytesUint(sample.Network.TotalRxBytes))
-		fmt.Printf("  Total TX: %s\n", formatBytesUint(sample.Network.TotalTxBytes))
-	}
+		// Disk I/O
+		fmt.Printf("\nDisk I/O:\n")
+		fmt.Printf("  Read: %s\n", formatBytesInt(metrics.DiskReadBytes))
+		fmt.Printf("  Write: %s\n", formatBytesInt(metrics.DiskWriteBytes))
 
-	// Process Metrics
-	if sample.Process != nil {
-		fmt.Println("\nProcesses:")
-		fmt.Printf("  Count: %d (max: %d)\n", sample.Process.Current, sample.Process.Max)
-		if sample.Process.Threads > 0 {
-			fmt.Printf("  Threads: %d\n", sample.Process.Threads)
-		}
-		if sample.Process.OpenFDs > 0 {
-			fmt.Printf("  Open FDs: %d/%d\n", sample.Process.OpenFDs, sample.Process.MaxFDs)
-		}
-	}
+		// Network
+		fmt.Printf("\nNetwork:\n")
+		fmt.Printf("  RX: %s\n", formatBytesInt(metrics.NetRecvBytes))
+		fmt.Printf("  TX: %s\n", formatBytesInt(metrics.NetSentBytes))
 
-	// GPU Metrics
-	if len(sample.Gpu) > 0 {
-		fmt.Println("\nGPU:")
-		for _, gpu := range sample.Gpu {
-			fmt.Printf("  GPU %d (%s):\n", gpu.Index, gpu.Name)
-			fmt.Printf("    Utilization: %.1f%%\n", gpu.Utilization)
-			fmt.Printf("    Memory: %s / %s (%.1f%%)\n",
-				formatBytesUint(gpu.MemoryUsed),
-				formatBytesUint(gpu.MemoryTotal),
-				gpu.MemoryPercent)
-			if gpu.Temperature > 0 {
-				fmt.Printf("    Temperature: %.1f°C\n", gpu.Temperature)
-			}
-			if gpu.PowerDraw > 0 {
-				fmt.Printf("    Power: %.1fW / %.1fW\n", gpu.PowerDraw, gpu.PowerLimit)
-			}
+		// GPU (if present)
+		if metrics.GpuPercent > 0 || metrics.GpuMemoryBytes > 0 {
+			fmt.Printf("\nGPU:\n")
+			fmt.Printf("  Utilization: %.1f%%\n", metrics.GpuPercent)
+			fmt.Printf("  Memory: %s\n", formatBytesInt(metrics.GpuMemoryBytes))
 		}
-	}
 
-	// Resource Limits
-	if sample.Limits != nil {
-		fmt.Println("\nResource Limits:")
-		if sample.Limits.Cpu > 0 {
-			fmt.Printf("  CPU: %d%%\n", sample.Limits.Cpu)
+	case "exec":
+		if exec := event.GetExec(); exec != nil {
+			fmt.Printf("[%s] %sEXEC%s    pid=%d ppid=%d %s\n",
+				timestamp,
+				metricsColorCyan,
+				metricsColorReset,
+				exec.Pid,
+				exec.Ppid,
+				exec.Binary,
+			)
 		}
-		if sample.Limits.Memory > 0 {
-			fmt.Printf("  Memory: %s\n", formatBytesUint(uint64(sample.Limits.Memory)))
-		}
-		if sample.Limits.Io > 0 {
-			fmt.Printf("  I/O: %s/s\n", formatBytesUint(uint64(sample.Limits.Io)))
+
+	case "connect":
+		if conn := event.GetConnect(); conn != nil {
+			fmt.Printf("[%s] %sNET%s     pid=%d %s:%d (%s)\n",
+				timestamp,
+				metricsColorYellow,
+				metricsColorReset,
+				conn.Pid,
+				conn.Address,
+				conn.Port,
+				conn.Protocol,
+			)
 		}
 	}
 }
@@ -261,16 +256,10 @@ func formatBytesUint(bytes uint64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-// formatBytesFloat converts float64 bytes to human-readable format
-func formatBytesFloat(bytes float64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%.0f B", bytes)
+// formatBytesInt converts int64 bytes to human-readable format
+func formatBytesInt(bytes int64) string {
+	if bytes < 0 {
+		return "0 B"
 	}
-	div, exp := float64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", bytes/div, "KMGTPE"[exp])
+	return formatBytesUint(uint64(bytes))
 }

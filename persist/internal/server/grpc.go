@@ -436,3 +436,183 @@ func (s *GRPCServer) Ping(ctx context.Context, req *persistpb.PingRequest) (*per
 		Timestamp: time.Now().UnixNano(),
 	}, nil
 }
+
+// execEventIPCToGen converts an exec event from ipc to persist proto
+func execEventIPCToGen(ipc *ipcpb.ExecEvent) *persistpb.ExecEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.ExecEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Ppid:      ipc.Ppid,
+		Uid:       ipc.Uid,
+		Gid:       ipc.Gid,
+		Comm:      ipc.Comm,
+		Filename:  ipc.Filename,
+		Args:      ipc.Args,
+	}
+}
+
+// connectEventIPCToGen converts a connect event from ipc to persist proto
+func connectEventIPCToGen(ipc *ipcpb.ConnectEvent) *persistpb.ConnectEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.ConnectEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Comm:      ipc.Comm,
+		SrcAddr:   ipc.SrcAddr,
+		SrcPort:   ipc.SrcPort,
+		DstAddr:   ipc.DstAddr,
+		DstPort:   ipc.DstPort,
+		Protocol:  ipc.Protocol,
+	}
+}
+
+// QueryExecEvents implements the QueryExecEvents RPC
+func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryExecEventsServer) error {
+	// Check authorization
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QueryExecEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	// Build query
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+
+	// Add time range if specified
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	// Read exec events from backend
+	reader, err := s.backend.ReadExecEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read exec events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read exec events: %v", err)
+	}
+
+	// Stream events to client
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			s.logger.Debug("QueryExecEvents cancelled by client", "jobID", req.JobId, "eventCount", eventCount)
+			return stream.Context().Err()
+
+		case event, ok := <-reader.Channel:
+			if !ok {
+				// Channel closed, check for errors
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						s.logger.Error("Error reading exec events", "error", err, "jobID", req.JobId)
+						return status.Errorf(codes.Internal, "error reading exec events: %v", err)
+					}
+				default:
+				}
+				// Successful completion
+				s.logger.Info("QueryExecEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+
+			// Send event to client (convert from ipc to gen)
+			if err := stream.Send(execEventIPCToGen(event)); err != nil {
+				s.logger.Error("Failed to send exec event", "error", err, "jobID", req.JobId)
+				return status.Errorf(codes.Internal, "failed to send exec event: %v", err)
+			}
+			eventCount++
+
+		case err := <-reader.Error:
+			if err != nil {
+				s.logger.Error("Error from exec event reader", "error", err, "jobID", req.JobId)
+				return status.Errorf(codes.Internal, "error reading exec events: %v", err)
+			}
+		}
+	}
+}
+
+// QueryConnectEvents implements the QueryConnectEvents RPC
+func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryConnectEventsServer) error {
+	// Check authorization
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QueryConnectEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	// Build query
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+
+	// Add time range if specified
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	// Read connect events from backend
+	reader, err := s.backend.ReadConnectEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read connect events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read connect events: %v", err)
+	}
+
+	// Stream events to client
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			s.logger.Debug("QueryConnectEvents cancelled by client", "jobID", req.JobId, "eventCount", eventCount)
+			return stream.Context().Err()
+
+		case event, ok := <-reader.Channel:
+			if !ok {
+				// Channel closed, check for errors
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						s.logger.Error("Error reading connect events", "error", err, "jobID", req.JobId)
+						return status.Errorf(codes.Internal, "error reading connect events: %v", err)
+					}
+				default:
+				}
+				// Successful completion
+				s.logger.Info("QueryConnectEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+
+			// Send event to client (convert from ipc to gen)
+			if err := stream.Send(connectEventIPCToGen(event)); err != nil {
+				s.logger.Error("Failed to send connect event", "error", err, "jobID", req.JobId)
+				return status.Errorf(codes.Internal, "failed to send connect event: %v", err)
+			}
+			eventCount++
+
+		case err := <-reader.Error:
+			if err != nil {
+				s.logger.Error("Error from connect event reader", "error", err, "jobID", req.JobId)
+				return status.Errorf(codes.Internal, "error reading connect events: %v", err)
+			}
+		}
+	}
+}

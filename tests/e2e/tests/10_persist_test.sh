@@ -97,10 +97,11 @@ test_log_persistence() {
 }
 
 test_metric_persistence() {
-    echo "Testing metric persistence..."
+    echo "Testing metric collection and streaming..."
 
-    # Run a job that uses resources (simpler command for speed)
-    local job_output=$($RNX_BINARY job run --max-cpu=50 sh -c "for i in 1 2 3; do echo \$i; sleep 1; done" 2>&1)
+    # Run a job that uses resources - must run longer than metrics interval (5s)
+    # to ensure at least one metrics sample is collected
+    local job_output=$($RNX_BINARY job run --max-cpu=50 sh -c "for i in \$(seq 1 15); do echo \$i; sleep 1; done" 2>&1)
     # Strip ANSI color codes and extract job ID
     local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -E "^ID:" | awk '{print $2}' | head -1)
 
@@ -111,25 +112,31 @@ test_metric_persistence() {
 
     echo "  Job ID: $job_id"
 
-    # Wait for job to complete and metrics to be collected
-    sleep 5
+    # Wait for job to run and collect metrics
+    echo "  Waiting 10 seconds for metrics collection..."
+    sleep 10
 
-    # Check if metrics exist in persist storage
-    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/metrics/$job_id/" 2>/dev/null | grep -q "metrics.jsonl.gz"; then
-        echo "  ✓ Metrics persisted successfully"
+    # Test metrics via streaming API (telemetry collector)
+    # The metrics command streams from the telemetry collector
+    local metrics_output=$(timeout 10 ssh ${REMOTE_USER}@${REMOTE_HOST} "rnx job metrics $job_id" 2>&1 || true)
 
-        # Check metric file size
-        local size=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo stat -c%s /opt/joblet/metrics/$job_id/metrics.jsonl.gz" 2>/dev/null)
-        if [[ -n "$size" && "$size" -gt 0 ]]; then
-            echo "  ✓ Metric file size: $size bytes"
-            return 0
-        else
-            echo "  ⚠ Metric file is empty"
-            return 1
+    # Check if we got any metrics samples
+    local sample_count=$(echo "$metrics_output" | grep -c "Metrics at" 2>/dev/null || echo "0")
+
+    if [[ "$sample_count" -gt 0 ]]; then
+        echo "  ✓ Metrics streaming working - received $sample_count samples"
+
+        # Check for expected metric fields
+        if echo "$metrics_output" | grep -q "CPU:"; then
+            echo "  ✓ CPU metrics present"
         fi
+        if echo "$metrics_output" | grep -q "Memory:"; then
+            echo "  ✓ Memory metrics present"
+        fi
+        return 0
     else
-        echo "  ✗ Metrics file not found"
-        ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/metrics/" || true
+        echo "  ✗ No metrics received from streaming API"
+        echo "  Output: $metrics_output"
         return 1
     fi
 }
@@ -291,8 +298,8 @@ test_section "Log Persistence"
 run_test "Basic log persistence" test_log_persistence
 run_test "Log directory structure" test_log_directory_structure
 
-test_section "Metric Persistence"
-run_test "Basic metric persistence" test_metric_persistence
+test_section "Metric Collection & Streaming"
+run_test "Metric streaming via telemetry API" test_metric_persistence
 
 test_section "Concurrent Operations"
 run_test "Multiple jobs persistence" test_multiple_jobs_persistence

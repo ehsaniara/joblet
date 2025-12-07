@@ -67,6 +67,10 @@ type Resource interface {
 	SetGPUDevices(cgroupPath string, gpuIndices []int) error
 	CleanupCgroup(jobID string)
 	EnsureControllers() error
+	// AddProcessToCgroup adds a process to the specified cgroup by writing its PID
+	// to the cgroup.procs file. This is required for cgroup resource limits and
+	// eBPF visibility monitoring to work correctly.
+	AddProcessToCgroup(cgroupPath string, pid int) error
 }
 
 func (c *cgroup) enableControllersFromConfig() error {
@@ -551,6 +555,30 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 	} else {
 		logger.Debug("successfully removed cgroup directory")
 	}
+}
+
+// AddProcessToCgroup adds a process to the specified cgroup by writing its PID
+// to the cgroup.procs file. This enables cgroup resource limits and eBPF
+// visibility monitoring for the process.
+func (c *cgroup) AddProcessToCgroup(cgroupPath string, pid int) error {
+	log := c.logger.WithFields("cgroupPath", cgroupPath, "pid", pid)
+	log.Debug("adding process to cgroup")
+
+	// Verify the cgroup path exists
+	if _, err := os.Stat(cgroupPath); os.IsNotExist(err) {
+		return fmt.Errorf("cgroup path does not exist: %s", cgroupPath)
+	}
+
+	// Write PID to cgroup.procs
+	procsPath := filepath.Join(cgroupPath, "cgroup.procs")
+	pidBytes := []byte(fmt.Sprintf("%d", pid))
+
+	if err := os.WriteFile(procsPath, pidBytes, 0644); err != nil {
+		return fmt.Errorf("failed to add process %d to cgroup %s: %w", pid, cgroupPath, err)
+	}
+
+	log.Info("successfully added process to cgroup")
+	return nil
 }
 
 // SetGPUDevices configures GPU device access for cgroups v2

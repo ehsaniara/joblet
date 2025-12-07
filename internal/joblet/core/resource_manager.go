@@ -217,3 +217,10 @@ func (rm *ResourceManager) setupGPUDevicePermissions(job *domain.Job) error {
 	log.Info("GPU device permissions configured successfully", "allowedGPUs", gpuIndices)
 	return nil
 }
+
+// AddProcessToCgroup adds a running process to its job's cgroup.
+// This must be called after the process starts to ensure resource limits
+// and eBPF visibility monitoring work correctly.
+func (rm *ResourceManager) AddProcessToCgroup(cgroupPath string, pid int) error {
+	return rm.cgroup.AddProcessToCgroup(cgroupPath, pid)
+}

@@ -8,6 +8,18 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
+// VisibilityMonitor defines the interface for eBPF-based job visibility monitoring.
+// This interface allows the joblet to track process execution and network connections
+// for monitored jobs without creating import cycles.
+type VisibilityMonitor interface {
+	// AddJob starts monitoring a job by its cgroup ID.
+	// The cgroupID is the cgroup v2 ID used to filter eBPF events.
+	AddJob(jobID string, cgroupID uint64) error
+
+	// RemoveJob stops monitoring a job.
+	RemoveJob(jobID string) error
+}
+
 //counterfeiter:generate . Joblet
 type Joblet interface {
 	// StartJob starts a job immediately or schedules it for future execution
@@ -25,7 +37,8 @@ type Joblet interface {
 	// ExecuteScheduledJob transitions a scheduled job to execution (used by scheduler)
 	ExecuteScheduledJob(ctx context.Context, req ExecuteScheduledJobRequest) error
 
-	//SetExtraFiles(files []*os.File)
+	// SetVisibilityMonitor sets the eBPF visibility monitor for job activity tracking
+	SetVisibilityMonitor(monitor VisibilityMonitor)
 }
 
 // Import the adapters interfaces and use them directly

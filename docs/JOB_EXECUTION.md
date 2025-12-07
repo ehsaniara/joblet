@@ -12,6 +12,7 @@ management, process isolation, scheduling, and advanced orchestration capabiliti
 - [Job Scheduling](#job-scheduling)
 - [Job Lifecycle](#job-lifecycle)
 - [Output and Logging](#output-and-logging)
+- [Metrics and Telemetry](#metrics-and-telemetry)
 - [Advanced Features](#advanced-features)
 - [Best Practices](#best-practices)
 
@@ -289,11 +290,18 @@ rnx job status <job-uuid>
 Each job is assigned a unique UUID (Universally Unique Identifier) when created. Job UUIDs are in the format:
 `f47ac10b-58cc-4372-a567-0e02b2c3d479`
 
+**Short UUIDs:** All commands support short-form UUIDs (first 8 characters) if they uniquely identify a job.
+For example, `f47ac10b` instead of the full UUID.
+
 Use job UUIDs to:
 
-- Check job status: `rnx job status <job-uuid>`
-- View job logs: `rnx job log <job-uuid>`
-- Stop running jobs: `rnx job stop <job-uuid>`
+- Check job status: `rnx job status f47ac10b`
+- View job logs: `rnx job log f47ac10b`
+- View resource metrics: `rnx job metrics f47ac10b`
+- View metrics + eBPF telemetry: `rnx job metrics f47ac10b --tel`
+- Stop running jobs: `rnx job stop f47ac10b`
+- Cancel scheduled jobs: `rnx job cancel f47ac10b`
+- Delete jobs: `rnx job delete f47ac10b`
 
 ### Job States
 
@@ -385,6 +393,56 @@ rnx job run --volume=results python3 analysis.py
 # Retrieve results
 rnx job run --volume=results cat /volumes/results/report.pdf > report.pdf
 ```
+
+## Metrics and Telemetry
+
+### Resource Metrics
+
+View CPU, memory, I/O, network, and GPU metrics for a job:
+
+```bash
+# View metrics for a job (supports short UUIDs)
+rnx job metrics f47ac10b
+
+# Output as JSON
+rnx --json job metrics f47ac10b
+```
+
+### eBPF Telemetry
+
+For detailed visibility into job behavior, use the `--tel` flag to capture eBPF telemetry events:
+
+```bash
+# View metrics + eBPF telemetry events
+rnx job metrics f47ac10b --tel
+```
+
+**Available eBPF Events:**
+
+| Event Type | Description |
+|------------|-------------|
+| EXEC | Process executions (fork/exec syscalls) |
+| NET | Outgoing network connections (connect syscall) |
+| ACCEPT | Incoming network connections (accept syscall) |
+| SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
+| MMAP | Memory mappings with executable permissions |
+| MPROTECT | Memory protection changes adding exec permission |
+
+**Filtering eBPF Events:**
+
+```bash
+# Filter by event type
+rnx job metrics f47ac10b --tel | grep EXEC
+rnx job metrics f47ac10b --tel | grep NET
+rnx job metrics f47ac10b --tel | grep ACCEPT
+rnx job metrics f47ac10b --tel | grep MMAP
+```
+
+**Use Cases:**
+
+- **Security Monitoring**: Track what processes a job spawns and what network connections it makes
+- **Debugging**: Understand job behavior and dependencies
+- **Compliance**: Audit data access and external connections
 
 ## Advanced Features
 

@@ -1,15 +1,16 @@
 # Joblet Persist
 
-Dedicated persistence service for the Joblet job execution platform. Handles all log and metrics storage, queries, and
-lifecycle management.
+Dedicated persistence service for the Joblet job execution platform. Handles all log, metrics, and eBPF telemetry
+storage, queries, and lifecycle management.
 
 ## Overview
 
-`persist` is a separate service that receives logs and metrics from `joblet-core` via Unix domain sockets (IPC)
-and provides:
+`persist` is a separate service that receives logs, metrics, and eBPF events from `joblet-core` via Unix domain
+sockets (IPC) and provides:
 
-- **Persistent storage** - Local filesystem storage (v1.0) with cloud backends coming in v2.0+
-- **Historical queries** - gRPC API for querying stored logs and metrics
+- **Persistent storage** - Local filesystem storage and CloudWatch Logs integration
+- **eBPF Event Storage** - Process execution (exec) and network connection events
+- **Historical queries** - gRPC API for querying stored logs, metrics, and events
 - **Data lifecycle** - Retention policies, cleanup, compression, and rotation
 - **Multiple backends** - Pluggable storage architecture (local, CloudWatch, S3)
 
@@ -38,12 +39,17 @@ persist (storage)
 - ✅ gRPC API for historical queries
 - ✅ Batch writing for performance
 
+### v1.1 (Current)
+
+- ✅ **CloudWatch Logs integration** - Ship logs, metrics, and eBPF events to CloudWatch
+- ✅ **eBPF event storage** - Process execution (exec) and network connection events
+- ✅ Multi-backend support (local + CloudWatch)
+
 ### v2.0 (Planned)
 
-- [ ] CloudWatch Logs integration
 - [ ] S3 archival
-- [ ] Multi-backend routing
 - [ ] Advanced querying (full-text search, time-range aggregation)
+- [ ] File access events (eBPF)
 
 ## Building
 
@@ -93,10 +99,21 @@ Key configuration sections:
 Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.sock`:
 
 - Protocol: Length-prefixed Protobuf
-- Message types: Logs, Metrics
+- Message types: Logs, Metrics, ExecEvents, ConnectEvents
 - Format: `[4-byte length][protobuf message]`
 
+**Message Types:**
+
+| Type | Description |
+|------|-------------|
+| `MESSAGE_TYPE_LOG` | Job stdout/stderr log lines |
+| `MESSAGE_TYPE_METRIC` | Resource metrics (CPU, memory, GPU, I/O) |
+| `MESSAGE_TYPE_EXEC_EVENT` | Process execution events (from eBPF) |
+| `MESSAGE_TYPE_CONNECT_EVENT` | Network connection events (from eBPF) |
+
 ## Storage Layout
+
+### Local Backend
 
 ```
 /opt/joblet/
@@ -107,7 +124,23 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 ├── metrics/
 │   └── <job-uuid>/
 │       └── metrics.jsonl.gz
+├── events/
+│   └── <job-uuid>/
+│       ├── exec_events.jsonl.gz     # eBPF process execution events
+│       └── connect_events.jsonl.gz  # eBPF network connection events
 └── job_index.json
+```
+
+### CloudWatch Backend
+
+```
+CloudWatch Logs:
+  Log Group: /joblet/{node_id}
+  Log Streams per job:
+    - {job_id}-logs           # stdout/stderr logs
+    - {job_id}-metrics        # Resource metrics (JSON)
+    - {job_id}-exec-events    # Process execution events (JSON)
+    - {job_id}-connect-events # Network connection events (JSON)
 ```
 
 ## Monitoring
@@ -157,6 +190,8 @@ type MyBackend struct { ... }
 
 func (b *MyBackend) WriteLogs(jobID string, logs []*ipcpb.LogLine) error { ... }
 func (b *MyBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) error { ... }
+func (b *MyBackend) WriteExecEvents(jobID string, events []*ipcpb.ExecEvent) error { ... }
+func (b *MyBackend) WriteConnectEvents(jobID string, events []*ipcpb.ConnectEvent) error { ... }
 // ... implement other interface methods
 ```
 

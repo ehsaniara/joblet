@@ -151,13 +151,24 @@ Job Initiated:
 ### Query Job Status
 
 ```bash
+# Full UUID
 rnx job status 550e8400-e29b-41d4-a716-446655440000
+
+# Short UUID (first 8 characters) - works if it uniquely identifies the job
+rnx job status 550e8400
 ```
 
 ### Retrieve Job Output
 
 ```bash
-rnx job log 550e8400-e29b-41d4-a716-446655440000
+# Stream logs (supports short UUIDs)
+rnx job log 550e8400
+
+# View resource metrics
+rnx job metrics 550e8400
+
+# View metrics + eBPF telemetry events (process executions, network connections)
+rnx job metrics 550e8400 --tel
 ```
 
 ## Resource Management Configuration
@@ -350,15 +361,19 @@ You have successfully completed the initial Joblet deployment:
 
 ### Command Reference Summary
 
+**Note:** All commands that take a `<job-uuid>` support short-form UUIDs (first 8 characters) if they uniquely identify a job.
+
 ```bash
 # Job Management
 rnx job run <command>           # Run a job
 rnx job list                    # List all jobs
-rnx job status <job-uuid>       # Check job status
-rnx job log <job-uuid>          # View job logs
-rnx job stop <job-uuid>         # Stop running job
-rnx job cancel <job-uuid>       # Cancel scheduled job
-rnx job delete <job-uuid>       # Delete specific job
+rnx job status <job-uuid>       # Check job status (supports short UUID)
+rnx job log <job-uuid>          # View job logs (supports short UUID)
+rnx job metrics <job-uuid>      # View resource metrics (supports short UUID)
+rnx job metrics <job-uuid> --tel # View metrics + eBPF telemetry
+rnx job stop <job-uuid>         # Stop running job (supports short UUID)
+rnx job cancel <job-uuid>       # Cancel scheduled job (supports short UUID)
+rnx job delete <job-uuid>       # Delete specific job (supports short UUID)
 rnx job delete-all              # Delete all non-running jobs
 
 # Volume Management

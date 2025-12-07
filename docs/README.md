@@ -340,7 +340,6 @@ rnx job run --network=my-network --volume=data-vol app
 - **Multi-Agent Isolation**: Secure execution environments for distributed AI systems
 - **Resource Optimization**: Fine-grained control over CPU, memory, and GPU allocation
 - **ML-Ready Environments**: Pre-configured runtimes with TensorFlow, PyTorch, and CUDA libraries
-- **Pipeline Orchestration**: DAG-based workflow execution for complex ML training pipelines
 
 ---
 
