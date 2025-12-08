@@ -150,8 +150,8 @@ func (m *mockPersister) getConnectEvents() []connectEventCall {
 func TestNewCollector(t *testing.T) {
 	t.Run("default buffer size", func(t *testing.T) {
 		c := NewCollector(0)
-		if c.bufferSize != 1000 {
-			t.Errorf("expected default buffer size 1000, got %d", c.bufferSize)
+		if c.bufferSize != 100000 {
+			t.Errorf("expected default buffer size 100000, got %d", c.bufferSize)
 		}
 	})
 

@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -301,9 +300,4 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
-}
-
-// ParseDuration is a helper to parse duration from config
-func ParseDuration(s string) (time.Duration, error) {
-	return time.ParseDuration(s)
 }

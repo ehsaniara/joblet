@@ -31,6 +31,62 @@ type FakeBackend struct {
 	deleteJobReturnsOnCall map[int]struct {
 		result1 error
 	}
+	ReadAcceptEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.AcceptEventReader, error)
+	readAcceptEventsMutex       sync.RWMutex
+	readAcceptEventsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}
+	readAcceptEventsReturns struct {
+		result1 *storage.AcceptEventReader
+		result2 error
+	}
+	readAcceptEventsReturnsOnCall map[int]struct {
+		result1 *storage.AcceptEventReader
+		result2 error
+	}
+	ReadConnectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.ConnectEventReader, error)
+	readConnectEventsMutex       sync.RWMutex
+	readConnectEventsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}
+	readConnectEventsReturns struct {
+		result1 *storage.ConnectEventReader
+		result2 error
+	}
+	readConnectEventsReturnsOnCall map[int]struct {
+		result1 *storage.ConnectEventReader
+		result2 error
+	}
+	ReadExecEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.ExecEventReader, error)
+	readExecEventsMutex       sync.RWMutex
+	readExecEventsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}
+	readExecEventsReturns struct {
+		result1 *storage.ExecEventReader
+		result2 error
+	}
+	readExecEventsReturnsOnCall map[int]struct {
+		result1 *storage.ExecEventReader
+		result2 error
+	}
+	ReadFileEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.FileEventReader, error)
+	readFileEventsMutex       sync.RWMutex
+	readFileEventsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}
+	readFileEventsReturns struct {
+		result1 *storage.FileEventReader
+		result2 error
+	}
+	readFileEventsReturnsOnCall map[int]struct {
+		result1 *storage.FileEventReader
+		result2 error
+	}
 	ReadLogsStub        func(context.Context, *storage.LogQuery) (*storage.LogReader, error)
 	readLogsMutex       sync.RWMutex
 	readLogsArgsForCall []struct {
@@ -59,33 +115,95 @@ type FakeBackend struct {
 		result1 *storage.MetricReader
 		result2 error
 	}
-	ReadExecEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.ExecEventReader, error)
-	readExecEventsMutex       sync.RWMutex
-	readExecEventsArgsForCall []struct {
+	ReadMmapEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.MmapEventReader, error)
+	readMmapEventsMutex       sync.RWMutex
+	readMmapEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
-	readExecEventsReturns struct {
-		result1 *storage.ExecEventReader
+	readMmapEventsReturns struct {
+		result1 *storage.MmapEventReader
 		result2 error
 	}
-	readExecEventsReturnsOnCall map[int]struct {
-		result1 *storage.ExecEventReader
+	readMmapEventsReturnsOnCall map[int]struct {
+		result1 *storage.MmapEventReader
 		result2 error
 	}
-	ReadConnectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.ConnectEventReader, error)
-	readConnectEventsMutex       sync.RWMutex
-	readConnectEventsArgsForCall []struct {
+	ReadMprotectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.MprotectEventReader, error)
+	readMprotectEventsMutex       sync.RWMutex
+	readMprotectEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
-	readConnectEventsReturns struct {
-		result1 *storage.ConnectEventReader
+	readMprotectEventsReturns struct {
+		result1 *storage.MprotectEventReader
 		result2 error
 	}
-	readConnectEventsReturnsOnCall map[int]struct {
-		result1 *storage.ConnectEventReader
+	readMprotectEventsReturnsOnCall map[int]struct {
+		result1 *storage.MprotectEventReader
 		result2 error
+	}
+	ReadSocketDataEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.SocketDataEventReader, error)
+	readSocketDataEventsMutex       sync.RWMutex
+	readSocketDataEventsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}
+	readSocketDataEventsReturns struct {
+		result1 *storage.SocketDataEventReader
+		result2 error
+	}
+	readSocketDataEventsReturnsOnCall map[int]struct {
+		result1 *storage.SocketDataEventReader
+		result2 error
+	}
+	WriteAcceptEventsStub        func(string, []*ipc.AcceptEvent) error
+	writeAcceptEventsMutex       sync.RWMutex
+	writeAcceptEventsArgsForCall []struct {
+		arg1 string
+		arg2 []*ipc.AcceptEvent
+	}
+	writeAcceptEventsReturns struct {
+		result1 error
+	}
+	writeAcceptEventsReturnsOnCall map[int]struct {
+		result1 error
+	}
+	WriteConnectEventsStub        func(string, []*ipc.ConnectEvent) error
+	writeConnectEventsMutex       sync.RWMutex
+	writeConnectEventsArgsForCall []struct {
+		arg1 string
+		arg2 []*ipc.ConnectEvent
+	}
+	writeConnectEventsReturns struct {
+		result1 error
+	}
+	writeConnectEventsReturnsOnCall map[int]struct {
+		result1 error
+	}
+	WriteExecEventsStub        func(string, []*ipc.ExecEvent) error
+	writeExecEventsMutex       sync.RWMutex
+	writeExecEventsArgsForCall []struct {
+		arg1 string
+		arg2 []*ipc.ExecEvent
+	}
+	writeExecEventsReturns struct {
+		result1 error
+	}
+	writeExecEventsReturnsOnCall map[int]struct {
+		result1 error
+	}
+	WriteFileEventsStub        func(string, []*ipc.FileEvent) error
+	writeFileEventsMutex       sync.RWMutex
+	writeFileEventsArgsForCall []struct {
+		arg1 string
+		arg2 []*ipc.FileEvent
+	}
+	writeFileEventsReturns struct {
+		result1 error
+	}
+	writeFileEventsReturnsOnCall map[int]struct {
+		result1 error
 	}
 	WriteLogsStub        func(string, []*ipc.LogLine) error
 	writeLogsMutex       sync.RWMutex
@@ -111,28 +229,40 @@ type FakeBackend struct {
 	writeMetricsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	WriteExecEventsStub        func(string, []*ipc.ExecEvent) error
-	writeExecEventsMutex       sync.RWMutex
-	writeExecEventsArgsForCall []struct {
+	WriteMmapEventsStub        func(string, []*ipc.MmapEvent) error
+	writeMmapEventsMutex       sync.RWMutex
+	writeMmapEventsArgsForCall []struct {
 		arg1 string
-		arg2 []*ipc.ExecEvent
+		arg2 []*ipc.MmapEvent
 	}
-	writeExecEventsReturns struct {
+	writeMmapEventsReturns struct {
 		result1 error
 	}
-	writeExecEventsReturnsOnCall map[int]struct {
+	writeMmapEventsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	WriteConnectEventsStub        func(string, []*ipc.ConnectEvent) error
-	writeConnectEventsMutex       sync.RWMutex
-	writeConnectEventsArgsForCall []struct {
+	WriteMprotectEventsStub        func(string, []*ipc.MprotectEvent) error
+	writeMprotectEventsMutex       sync.RWMutex
+	writeMprotectEventsArgsForCall []struct {
 		arg1 string
-		arg2 []*ipc.ConnectEvent
+		arg2 []*ipc.MprotectEvent
 	}
-	writeConnectEventsReturns struct {
+	writeMprotectEventsReturns struct {
 		result1 error
 	}
-	writeConnectEventsReturnsOnCall map[int]struct {
+	writeMprotectEventsReturnsOnCall map[int]struct {
+		result1 error
+	}
+	WriteSocketDataEventsStub        func(string, []*ipc.SocketDataEvent) error
+	writeSocketDataEventsMutex       sync.RWMutex
+	writeSocketDataEventsArgsForCall []struct {
+		arg1 string
+		arg2 []*ipc.SocketDataEvent
+	}
+	writeSocketDataEventsReturns struct {
+		result1 error
+	}
+	writeSocketDataEventsReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -251,6 +381,266 @@ func (fake *FakeBackend) DeleteJobReturnsOnCall(i int, result1 error) {
 	fake.deleteJobReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakeBackend) ReadAcceptEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.AcceptEventReader, error) {
+	fake.readAcceptEventsMutex.Lock()
+	ret, specificReturn := fake.readAcceptEventsReturnsOnCall[len(fake.readAcceptEventsArgsForCall)]
+	fake.readAcceptEventsArgsForCall = append(fake.readAcceptEventsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}{arg1, arg2})
+	stub := fake.ReadAcceptEventsStub
+	fakeReturns := fake.readAcceptEventsReturns
+	fake.recordInvocation("ReadAcceptEvents", []interface{}{arg1, arg2})
+	fake.readAcceptEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeBackend) ReadAcceptEventsCallCount() int {
+	fake.readAcceptEventsMutex.RLock()
+	defer fake.readAcceptEventsMutex.RUnlock()
+	return len(fake.readAcceptEventsArgsForCall)
+}
+
+func (fake *FakeBackend) ReadAcceptEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.AcceptEventReader, error)) {
+	fake.readAcceptEventsMutex.Lock()
+	defer fake.readAcceptEventsMutex.Unlock()
+	fake.ReadAcceptEventsStub = stub
+}
+
+func (fake *FakeBackend) ReadAcceptEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readAcceptEventsMutex.RLock()
+	defer fake.readAcceptEventsMutex.RUnlock()
+	argsForCall := fake.readAcceptEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) ReadAcceptEventsReturns(result1 *storage.AcceptEventReader, result2 error) {
+	fake.readAcceptEventsMutex.Lock()
+	defer fake.readAcceptEventsMutex.Unlock()
+	fake.ReadAcceptEventsStub = nil
+	fake.readAcceptEventsReturns = struct {
+		result1 *storage.AcceptEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadAcceptEventsReturnsOnCall(i int, result1 *storage.AcceptEventReader, result2 error) {
+	fake.readAcceptEventsMutex.Lock()
+	defer fake.readAcceptEventsMutex.Unlock()
+	fake.ReadAcceptEventsStub = nil
+	if fake.readAcceptEventsReturnsOnCall == nil {
+		fake.readAcceptEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.AcceptEventReader
+			result2 error
+		})
+	}
+	fake.readAcceptEventsReturnsOnCall[i] = struct {
+		result1 *storage.AcceptEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadConnectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.ConnectEventReader, error) {
+	fake.readConnectEventsMutex.Lock()
+	ret, specificReturn := fake.readConnectEventsReturnsOnCall[len(fake.readConnectEventsArgsForCall)]
+	fake.readConnectEventsArgsForCall = append(fake.readConnectEventsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}{arg1, arg2})
+	stub := fake.ReadConnectEventsStub
+	fakeReturns := fake.readConnectEventsReturns
+	fake.recordInvocation("ReadConnectEvents", []interface{}{arg1, arg2})
+	fake.readConnectEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeBackend) ReadConnectEventsCallCount() int {
+	fake.readConnectEventsMutex.RLock()
+	defer fake.readConnectEventsMutex.RUnlock()
+	return len(fake.readConnectEventsArgsForCall)
+}
+
+func (fake *FakeBackend) ReadConnectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.ConnectEventReader, error)) {
+	fake.readConnectEventsMutex.Lock()
+	defer fake.readConnectEventsMutex.Unlock()
+	fake.ReadConnectEventsStub = stub
+}
+
+func (fake *FakeBackend) ReadConnectEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readConnectEventsMutex.RLock()
+	defer fake.readConnectEventsMutex.RUnlock()
+	argsForCall := fake.readConnectEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) ReadConnectEventsReturns(result1 *storage.ConnectEventReader, result2 error) {
+	fake.readConnectEventsMutex.Lock()
+	defer fake.readConnectEventsMutex.Unlock()
+	fake.ReadConnectEventsStub = nil
+	fake.readConnectEventsReturns = struct {
+		result1 *storage.ConnectEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadConnectEventsReturnsOnCall(i int, result1 *storage.ConnectEventReader, result2 error) {
+	fake.readConnectEventsMutex.Lock()
+	defer fake.readConnectEventsMutex.Unlock()
+	fake.ReadConnectEventsStub = nil
+	if fake.readConnectEventsReturnsOnCall == nil {
+		fake.readConnectEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.ConnectEventReader
+			result2 error
+		})
+	}
+	fake.readConnectEventsReturnsOnCall[i] = struct {
+		result1 *storage.ConnectEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadExecEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.ExecEventReader, error) {
+	fake.readExecEventsMutex.Lock()
+	ret, specificReturn := fake.readExecEventsReturnsOnCall[len(fake.readExecEventsArgsForCall)]
+	fake.readExecEventsArgsForCall = append(fake.readExecEventsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}{arg1, arg2})
+	stub := fake.ReadExecEventsStub
+	fakeReturns := fake.readExecEventsReturns
+	fake.recordInvocation("ReadExecEvents", []interface{}{arg1, arg2})
+	fake.readExecEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeBackend) ReadExecEventsCallCount() int {
+	fake.readExecEventsMutex.RLock()
+	defer fake.readExecEventsMutex.RUnlock()
+	return len(fake.readExecEventsArgsForCall)
+}
+
+func (fake *FakeBackend) ReadExecEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.ExecEventReader, error)) {
+	fake.readExecEventsMutex.Lock()
+	defer fake.readExecEventsMutex.Unlock()
+	fake.ReadExecEventsStub = stub
+}
+
+func (fake *FakeBackend) ReadExecEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readExecEventsMutex.RLock()
+	defer fake.readExecEventsMutex.RUnlock()
+	argsForCall := fake.readExecEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) ReadExecEventsReturns(result1 *storage.ExecEventReader, result2 error) {
+	fake.readExecEventsMutex.Lock()
+	defer fake.readExecEventsMutex.Unlock()
+	fake.ReadExecEventsStub = nil
+	fake.readExecEventsReturns = struct {
+		result1 *storage.ExecEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadExecEventsReturnsOnCall(i int, result1 *storage.ExecEventReader, result2 error) {
+	fake.readExecEventsMutex.Lock()
+	defer fake.readExecEventsMutex.Unlock()
+	fake.ReadExecEventsStub = nil
+	if fake.readExecEventsReturnsOnCall == nil {
+		fake.readExecEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.ExecEventReader
+			result2 error
+		})
+	}
+	fake.readExecEventsReturnsOnCall[i] = struct {
+		result1 *storage.ExecEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadFileEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.FileEventReader, error) {
+	fake.readFileEventsMutex.Lock()
+	ret, specificReturn := fake.readFileEventsReturnsOnCall[len(fake.readFileEventsArgsForCall)]
+	fake.readFileEventsArgsForCall = append(fake.readFileEventsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}{arg1, arg2})
+	stub := fake.ReadFileEventsStub
+	fakeReturns := fake.readFileEventsReturns
+	fake.recordInvocation("ReadFileEvents", []interface{}{arg1, arg2})
+	fake.readFileEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeBackend) ReadFileEventsCallCount() int {
+	fake.readFileEventsMutex.RLock()
+	defer fake.readFileEventsMutex.RUnlock()
+	return len(fake.readFileEventsArgsForCall)
+}
+
+func (fake *FakeBackend) ReadFileEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.FileEventReader, error)) {
+	fake.readFileEventsMutex.Lock()
+	defer fake.readFileEventsMutex.Unlock()
+	fake.ReadFileEventsStub = stub
+}
+
+func (fake *FakeBackend) ReadFileEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readFileEventsMutex.RLock()
+	defer fake.readFileEventsMutex.RUnlock()
+	argsForCall := fake.readFileEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) ReadFileEventsReturns(result1 *storage.FileEventReader, result2 error) {
+	fake.readFileEventsMutex.Lock()
+	defer fake.readFileEventsMutex.Unlock()
+	fake.ReadFileEventsStub = nil
+	fake.readFileEventsReturns = struct {
+		result1 *storage.FileEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadFileEventsReturnsOnCall(i int, result1 *storage.FileEventReader, result2 error) {
+	fake.readFileEventsMutex.Lock()
+	defer fake.readFileEventsMutex.Unlock()
+	fake.ReadFileEventsStub = nil
+	if fake.readFileEventsReturnsOnCall == nil {
+		fake.readFileEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.FileEventReader
+			result2 error
+		})
+	}
+	fake.readFileEventsReturnsOnCall[i] = struct {
+		result1 *storage.FileEventReader
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeBackend) ReadLogs(arg1 context.Context, arg2 *storage.LogQuery) (*storage.LogReader, error) {
@@ -383,17 +773,17 @@ func (fake *FakeBackend) ReadMetricsReturnsOnCall(i int, result1 *storage.Metric
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadExecEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.ExecEventReader, error) {
-	fake.readExecEventsMutex.Lock()
-	ret, specificReturn := fake.readExecEventsReturnsOnCall[len(fake.readExecEventsArgsForCall)]
-	fake.readExecEventsArgsForCall = append(fake.readExecEventsArgsForCall, struct {
+func (fake *FakeBackend) ReadMmapEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.MmapEventReader, error) {
+	fake.readMmapEventsMutex.Lock()
+	ret, specificReturn := fake.readMmapEventsReturnsOnCall[len(fake.readMmapEventsArgsForCall)]
+	fake.readMmapEventsArgsForCall = append(fake.readMmapEventsArgsForCall, struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}{arg1, arg2})
-	stub := fake.ReadExecEventsStub
-	fakeReturns := fake.readExecEventsReturns
-	fake.recordInvocation("ReadExecEvents", []interface{}{arg1, arg2})
-	fake.readExecEventsMutex.Unlock()
+	stub := fake.ReadMmapEventsStub
+	fakeReturns := fake.readMmapEventsReturns
+	fake.recordInvocation("ReadMmapEvents", []interface{}{arg1, arg2})
+	fake.readMmapEventsMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2)
 	}
@@ -403,62 +793,62 @@ func (fake *FakeBackend) ReadExecEvents(arg1 context.Context, arg2 *storage.Tele
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeBackend) ReadExecEventsCallCount() int {
-	fake.readExecEventsMutex.RLock()
-	defer fake.readExecEventsMutex.RUnlock()
-	return len(fake.readExecEventsArgsForCall)
+func (fake *FakeBackend) ReadMmapEventsCallCount() int {
+	fake.readMmapEventsMutex.RLock()
+	defer fake.readMmapEventsMutex.RUnlock()
+	return len(fake.readMmapEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadExecEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.ExecEventReader, error)) {
-	fake.readExecEventsMutex.Lock()
-	defer fake.readExecEventsMutex.Unlock()
-	fake.ReadExecEventsStub = stub
+func (fake *FakeBackend) ReadMmapEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.MmapEventReader, error)) {
+	fake.readMmapEventsMutex.Lock()
+	defer fake.readMmapEventsMutex.Unlock()
+	fake.ReadMmapEventsStub = stub
 }
 
-func (fake *FakeBackend) ReadExecEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
-	fake.readExecEventsMutex.RLock()
-	defer fake.readExecEventsMutex.RUnlock()
-	argsForCall := fake.readExecEventsArgsForCall[i]
+func (fake *FakeBackend) ReadMmapEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readMmapEventsMutex.RLock()
+	defer fake.readMmapEventsMutex.RUnlock()
+	argsForCall := fake.readMmapEventsArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadExecEventsReturns(result1 *storage.ExecEventReader, result2 error) {
-	fake.readExecEventsMutex.Lock()
-	defer fake.readExecEventsMutex.Unlock()
-	fake.ReadExecEventsStub = nil
-	fake.readExecEventsReturns = struct {
-		result1 *storage.ExecEventReader
+func (fake *FakeBackend) ReadMmapEventsReturns(result1 *storage.MmapEventReader, result2 error) {
+	fake.readMmapEventsMutex.Lock()
+	defer fake.readMmapEventsMutex.Unlock()
+	fake.ReadMmapEventsStub = nil
+	fake.readMmapEventsReturns = struct {
+		result1 *storage.MmapEventReader
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadExecEventsReturnsOnCall(i int, result1 *storage.ExecEventReader, result2 error) {
-	fake.readExecEventsMutex.Lock()
-	defer fake.readExecEventsMutex.Unlock()
-	fake.ReadExecEventsStub = nil
-	if fake.readExecEventsReturnsOnCall == nil {
-		fake.readExecEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.ExecEventReader
+func (fake *FakeBackend) ReadMmapEventsReturnsOnCall(i int, result1 *storage.MmapEventReader, result2 error) {
+	fake.readMmapEventsMutex.Lock()
+	defer fake.readMmapEventsMutex.Unlock()
+	fake.ReadMmapEventsStub = nil
+	if fake.readMmapEventsReturnsOnCall == nil {
+		fake.readMmapEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.MmapEventReader
 			result2 error
 		})
 	}
-	fake.readExecEventsReturnsOnCall[i] = struct {
-		result1 *storage.ExecEventReader
+	fake.readMmapEventsReturnsOnCall[i] = struct {
+		result1 *storage.MmapEventReader
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadConnectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.ConnectEventReader, error) {
-	fake.readConnectEventsMutex.Lock()
-	ret, specificReturn := fake.readConnectEventsReturnsOnCall[len(fake.readConnectEventsArgsForCall)]
-	fake.readConnectEventsArgsForCall = append(fake.readConnectEventsArgsForCall, struct {
+func (fake *FakeBackend) ReadMprotectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.MprotectEventReader, error) {
+	fake.readMprotectEventsMutex.Lock()
+	ret, specificReturn := fake.readMprotectEventsReturnsOnCall[len(fake.readMprotectEventsArgsForCall)]
+	fake.readMprotectEventsArgsForCall = append(fake.readMprotectEventsArgsForCall, struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}{arg1, arg2})
-	stub := fake.ReadConnectEventsStub
-	fakeReturns := fake.readConnectEventsReturns
-	fake.recordInvocation("ReadConnectEvents", []interface{}{arg1, arg2})
-	fake.readConnectEventsMutex.Unlock()
+	stub := fake.ReadMprotectEventsStub
+	fakeReturns := fake.readMprotectEventsReturns
+	fake.recordInvocation("ReadMprotectEvents", []interface{}{arg1, arg2})
+	fake.readMprotectEventsMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2)
 	}
@@ -468,49 +858,382 @@ func (fake *FakeBackend) ReadConnectEvents(arg1 context.Context, arg2 *storage.T
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeBackend) ReadConnectEventsCallCount() int {
-	fake.readConnectEventsMutex.RLock()
-	defer fake.readConnectEventsMutex.RUnlock()
-	return len(fake.readConnectEventsArgsForCall)
+func (fake *FakeBackend) ReadMprotectEventsCallCount() int {
+	fake.readMprotectEventsMutex.RLock()
+	defer fake.readMprotectEventsMutex.RUnlock()
+	return len(fake.readMprotectEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadConnectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.ConnectEventReader, error)) {
-	fake.readConnectEventsMutex.Lock()
-	defer fake.readConnectEventsMutex.Unlock()
-	fake.ReadConnectEventsStub = stub
+func (fake *FakeBackend) ReadMprotectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.MprotectEventReader, error)) {
+	fake.readMprotectEventsMutex.Lock()
+	defer fake.readMprotectEventsMutex.Unlock()
+	fake.ReadMprotectEventsStub = stub
 }
 
-func (fake *FakeBackend) ReadConnectEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
-	fake.readConnectEventsMutex.RLock()
-	defer fake.readConnectEventsMutex.RUnlock()
-	argsForCall := fake.readConnectEventsArgsForCall[i]
+func (fake *FakeBackend) ReadMprotectEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readMprotectEventsMutex.RLock()
+	defer fake.readMprotectEventsMutex.RUnlock()
+	argsForCall := fake.readMprotectEventsArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadConnectEventsReturns(result1 *storage.ConnectEventReader, result2 error) {
-	fake.readConnectEventsMutex.Lock()
-	defer fake.readConnectEventsMutex.Unlock()
-	fake.ReadConnectEventsStub = nil
-	fake.readConnectEventsReturns = struct {
-		result1 *storage.ConnectEventReader
+func (fake *FakeBackend) ReadMprotectEventsReturns(result1 *storage.MprotectEventReader, result2 error) {
+	fake.readMprotectEventsMutex.Lock()
+	defer fake.readMprotectEventsMutex.Unlock()
+	fake.ReadMprotectEventsStub = nil
+	fake.readMprotectEventsReturns = struct {
+		result1 *storage.MprotectEventReader
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadConnectEventsReturnsOnCall(i int, result1 *storage.ConnectEventReader, result2 error) {
-	fake.readConnectEventsMutex.Lock()
-	defer fake.readConnectEventsMutex.Unlock()
-	fake.ReadConnectEventsStub = nil
-	if fake.readConnectEventsReturnsOnCall == nil {
-		fake.readConnectEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.ConnectEventReader
+func (fake *FakeBackend) ReadMprotectEventsReturnsOnCall(i int, result1 *storage.MprotectEventReader, result2 error) {
+	fake.readMprotectEventsMutex.Lock()
+	defer fake.readMprotectEventsMutex.Unlock()
+	fake.ReadMprotectEventsStub = nil
+	if fake.readMprotectEventsReturnsOnCall == nil {
+		fake.readMprotectEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.MprotectEventReader
 			result2 error
 		})
 	}
-	fake.readConnectEventsReturnsOnCall[i] = struct {
-		result1 *storage.ConnectEventReader
+	fake.readMprotectEventsReturnsOnCall[i] = struct {
+		result1 *storage.MprotectEventReader
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadSocketDataEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.SocketDataEventReader, error) {
+	fake.readSocketDataEventsMutex.Lock()
+	ret, specificReturn := fake.readSocketDataEventsReturnsOnCall[len(fake.readSocketDataEventsArgsForCall)]
+	fake.readSocketDataEventsArgsForCall = append(fake.readSocketDataEventsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *storage.TelemetryQuery
+	}{arg1, arg2})
+	stub := fake.ReadSocketDataEventsStub
+	fakeReturns := fake.readSocketDataEventsReturns
+	fake.recordInvocation("ReadSocketDataEvents", []interface{}{arg1, arg2})
+	fake.readSocketDataEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeBackend) ReadSocketDataEventsCallCount() int {
+	fake.readSocketDataEventsMutex.RLock()
+	defer fake.readSocketDataEventsMutex.RUnlock()
+	return len(fake.readSocketDataEventsArgsForCall)
+}
+
+func (fake *FakeBackend) ReadSocketDataEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.SocketDataEventReader, error)) {
+	fake.readSocketDataEventsMutex.Lock()
+	defer fake.readSocketDataEventsMutex.Unlock()
+	fake.ReadSocketDataEventsStub = stub
+}
+
+func (fake *FakeBackend) ReadSocketDataEventsArgsForCall(i int) (context.Context, *storage.TelemetryQuery) {
+	fake.readSocketDataEventsMutex.RLock()
+	defer fake.readSocketDataEventsMutex.RUnlock()
+	argsForCall := fake.readSocketDataEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) ReadSocketDataEventsReturns(result1 *storage.SocketDataEventReader, result2 error) {
+	fake.readSocketDataEventsMutex.Lock()
+	defer fake.readSocketDataEventsMutex.Unlock()
+	fake.ReadSocketDataEventsStub = nil
+	fake.readSocketDataEventsReturns = struct {
+		result1 *storage.SocketDataEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) ReadSocketDataEventsReturnsOnCall(i int, result1 *storage.SocketDataEventReader, result2 error) {
+	fake.readSocketDataEventsMutex.Lock()
+	defer fake.readSocketDataEventsMutex.Unlock()
+	fake.ReadSocketDataEventsStub = nil
+	if fake.readSocketDataEventsReturnsOnCall == nil {
+		fake.readSocketDataEventsReturnsOnCall = make(map[int]struct {
+			result1 *storage.SocketDataEventReader
+			result2 error
+		})
+	}
+	fake.readSocketDataEventsReturnsOnCall[i] = struct {
+		result1 *storage.SocketDataEventReader
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeBackend) WriteAcceptEvents(arg1 string, arg2 []*ipc.AcceptEvent) error {
+	var arg2Copy []*ipc.AcceptEvent
+	if arg2 != nil {
+		arg2Copy = make([]*ipc.AcceptEvent, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.writeAcceptEventsMutex.Lock()
+	ret, specificReturn := fake.writeAcceptEventsReturnsOnCall[len(fake.writeAcceptEventsArgsForCall)]
+	fake.writeAcceptEventsArgsForCall = append(fake.writeAcceptEventsArgsForCall, struct {
+		arg1 string
+		arg2 []*ipc.AcceptEvent
+	}{arg1, arg2Copy})
+	stub := fake.WriteAcceptEventsStub
+	fakeReturns := fake.writeAcceptEventsReturns
+	fake.recordInvocation("WriteAcceptEvents", []interface{}{arg1, arg2Copy})
+	fake.writeAcceptEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBackend) WriteAcceptEventsCallCount() int {
+	fake.writeAcceptEventsMutex.RLock()
+	defer fake.writeAcceptEventsMutex.RUnlock()
+	return len(fake.writeAcceptEventsArgsForCall)
+}
+
+func (fake *FakeBackend) WriteAcceptEventsCalls(stub func(string, []*ipc.AcceptEvent) error) {
+	fake.writeAcceptEventsMutex.Lock()
+	defer fake.writeAcceptEventsMutex.Unlock()
+	fake.WriteAcceptEventsStub = stub
+}
+
+func (fake *FakeBackend) WriteAcceptEventsArgsForCall(i int) (string, []*ipc.AcceptEvent) {
+	fake.writeAcceptEventsMutex.RLock()
+	defer fake.writeAcceptEventsMutex.RUnlock()
+	argsForCall := fake.writeAcceptEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) WriteAcceptEventsReturns(result1 error) {
+	fake.writeAcceptEventsMutex.Lock()
+	defer fake.writeAcceptEventsMutex.Unlock()
+	fake.WriteAcceptEventsStub = nil
+	fake.writeAcceptEventsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteAcceptEventsReturnsOnCall(i int, result1 error) {
+	fake.writeAcceptEventsMutex.Lock()
+	defer fake.writeAcceptEventsMutex.Unlock()
+	fake.WriteAcceptEventsStub = nil
+	if fake.writeAcceptEventsReturnsOnCall == nil {
+		fake.writeAcceptEventsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeAcceptEventsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteConnectEvents(arg1 string, arg2 []*ipc.ConnectEvent) error {
+	var arg2Copy []*ipc.ConnectEvent
+	if arg2 != nil {
+		arg2Copy = make([]*ipc.ConnectEvent, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.writeConnectEventsMutex.Lock()
+	ret, specificReturn := fake.writeConnectEventsReturnsOnCall[len(fake.writeConnectEventsArgsForCall)]
+	fake.writeConnectEventsArgsForCall = append(fake.writeConnectEventsArgsForCall, struct {
+		arg1 string
+		arg2 []*ipc.ConnectEvent
+	}{arg1, arg2Copy})
+	stub := fake.WriteConnectEventsStub
+	fakeReturns := fake.writeConnectEventsReturns
+	fake.recordInvocation("WriteConnectEvents", []interface{}{arg1, arg2Copy})
+	fake.writeConnectEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBackend) WriteConnectEventsCallCount() int {
+	fake.writeConnectEventsMutex.RLock()
+	defer fake.writeConnectEventsMutex.RUnlock()
+	return len(fake.writeConnectEventsArgsForCall)
+}
+
+func (fake *FakeBackend) WriteConnectEventsCalls(stub func(string, []*ipc.ConnectEvent) error) {
+	fake.writeConnectEventsMutex.Lock()
+	defer fake.writeConnectEventsMutex.Unlock()
+	fake.WriteConnectEventsStub = stub
+}
+
+func (fake *FakeBackend) WriteConnectEventsArgsForCall(i int) (string, []*ipc.ConnectEvent) {
+	fake.writeConnectEventsMutex.RLock()
+	defer fake.writeConnectEventsMutex.RUnlock()
+	argsForCall := fake.writeConnectEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) WriteConnectEventsReturns(result1 error) {
+	fake.writeConnectEventsMutex.Lock()
+	defer fake.writeConnectEventsMutex.Unlock()
+	fake.WriteConnectEventsStub = nil
+	fake.writeConnectEventsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteConnectEventsReturnsOnCall(i int, result1 error) {
+	fake.writeConnectEventsMutex.Lock()
+	defer fake.writeConnectEventsMutex.Unlock()
+	fake.WriteConnectEventsStub = nil
+	if fake.writeConnectEventsReturnsOnCall == nil {
+		fake.writeConnectEventsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeConnectEventsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteExecEvents(arg1 string, arg2 []*ipc.ExecEvent) error {
+	var arg2Copy []*ipc.ExecEvent
+	if arg2 != nil {
+		arg2Copy = make([]*ipc.ExecEvent, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.writeExecEventsMutex.Lock()
+	ret, specificReturn := fake.writeExecEventsReturnsOnCall[len(fake.writeExecEventsArgsForCall)]
+	fake.writeExecEventsArgsForCall = append(fake.writeExecEventsArgsForCall, struct {
+		arg1 string
+		arg2 []*ipc.ExecEvent
+	}{arg1, arg2Copy})
+	stub := fake.WriteExecEventsStub
+	fakeReturns := fake.writeExecEventsReturns
+	fake.recordInvocation("WriteExecEvents", []interface{}{arg1, arg2Copy})
+	fake.writeExecEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBackend) WriteExecEventsCallCount() int {
+	fake.writeExecEventsMutex.RLock()
+	defer fake.writeExecEventsMutex.RUnlock()
+	return len(fake.writeExecEventsArgsForCall)
+}
+
+func (fake *FakeBackend) WriteExecEventsCalls(stub func(string, []*ipc.ExecEvent) error) {
+	fake.writeExecEventsMutex.Lock()
+	defer fake.writeExecEventsMutex.Unlock()
+	fake.WriteExecEventsStub = stub
+}
+
+func (fake *FakeBackend) WriteExecEventsArgsForCall(i int) (string, []*ipc.ExecEvent) {
+	fake.writeExecEventsMutex.RLock()
+	defer fake.writeExecEventsMutex.RUnlock()
+	argsForCall := fake.writeExecEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) WriteExecEventsReturns(result1 error) {
+	fake.writeExecEventsMutex.Lock()
+	defer fake.writeExecEventsMutex.Unlock()
+	fake.WriteExecEventsStub = nil
+	fake.writeExecEventsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteExecEventsReturnsOnCall(i int, result1 error) {
+	fake.writeExecEventsMutex.Lock()
+	defer fake.writeExecEventsMutex.Unlock()
+	fake.WriteExecEventsStub = nil
+	if fake.writeExecEventsReturnsOnCall == nil {
+		fake.writeExecEventsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeExecEventsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteFileEvents(arg1 string, arg2 []*ipc.FileEvent) error {
+	var arg2Copy []*ipc.FileEvent
+	if arg2 != nil {
+		arg2Copy = make([]*ipc.FileEvent, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.writeFileEventsMutex.Lock()
+	ret, specificReturn := fake.writeFileEventsReturnsOnCall[len(fake.writeFileEventsArgsForCall)]
+	fake.writeFileEventsArgsForCall = append(fake.writeFileEventsArgsForCall, struct {
+		arg1 string
+		arg2 []*ipc.FileEvent
+	}{arg1, arg2Copy})
+	stub := fake.WriteFileEventsStub
+	fakeReturns := fake.writeFileEventsReturns
+	fake.recordInvocation("WriteFileEvents", []interface{}{arg1, arg2Copy})
+	fake.writeFileEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBackend) WriteFileEventsCallCount() int {
+	fake.writeFileEventsMutex.RLock()
+	defer fake.writeFileEventsMutex.RUnlock()
+	return len(fake.writeFileEventsArgsForCall)
+}
+
+func (fake *FakeBackend) WriteFileEventsCalls(stub func(string, []*ipc.FileEvent) error) {
+	fake.writeFileEventsMutex.Lock()
+	defer fake.writeFileEventsMutex.Unlock()
+	fake.WriteFileEventsStub = stub
+}
+
+func (fake *FakeBackend) WriteFileEventsArgsForCall(i int) (string, []*ipc.FileEvent) {
+	fake.writeFileEventsMutex.RLock()
+	defer fake.writeFileEventsMutex.RUnlock()
+	argsForCall := fake.writeFileEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) WriteFileEventsReturns(result1 error) {
+	fake.writeFileEventsMutex.Lock()
+	defer fake.writeFileEventsMutex.Unlock()
+	fake.WriteFileEventsStub = nil
+	fake.writeFileEventsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteFileEventsReturnsOnCall(i int, result1 error) {
+	fake.writeFileEventsMutex.Lock()
+	defer fake.writeFileEventsMutex.Unlock()
+	fake.WriteFileEventsStub = nil
+	if fake.writeFileEventsReturnsOnCall == nil {
+		fake.writeFileEventsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeFileEventsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeBackend) WriteLogs(arg1 string, arg2 []*ipc.LogLine) error {
@@ -647,22 +1370,22 @@ func (fake *FakeBackend) WriteMetricsReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeBackend) WriteExecEvents(arg1 string, arg2 []*ipc.ExecEvent) error {
-	var arg2Copy []*ipc.ExecEvent
+func (fake *FakeBackend) WriteMmapEvents(arg1 string, arg2 []*ipc.MmapEvent) error {
+	var arg2Copy []*ipc.MmapEvent
 	if arg2 != nil {
-		arg2Copy = make([]*ipc.ExecEvent, len(arg2))
+		arg2Copy = make([]*ipc.MmapEvent, len(arg2))
 		copy(arg2Copy, arg2)
 	}
-	fake.writeExecEventsMutex.Lock()
-	ret, specificReturn := fake.writeExecEventsReturnsOnCall[len(fake.writeExecEventsArgsForCall)]
-	fake.writeExecEventsArgsForCall = append(fake.writeExecEventsArgsForCall, struct {
+	fake.writeMmapEventsMutex.Lock()
+	ret, specificReturn := fake.writeMmapEventsReturnsOnCall[len(fake.writeMmapEventsArgsForCall)]
+	fake.writeMmapEventsArgsForCall = append(fake.writeMmapEventsArgsForCall, struct {
 		arg1 string
-		arg2 []*ipc.ExecEvent
+		arg2 []*ipc.MmapEvent
 	}{arg1, arg2Copy})
-	stub := fake.WriteExecEventsStub
-	fakeReturns := fake.writeExecEventsReturns
-	fake.recordInvocation("WriteExecEvents", []interface{}{arg1, arg2Copy})
-	fake.writeExecEventsMutex.Unlock()
+	stub := fake.WriteMmapEventsStub
+	fakeReturns := fake.writeMmapEventsReturns
+	fake.recordInvocation("WriteMmapEvents", []interface{}{arg1, arg2Copy})
+	fake.writeMmapEventsMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2)
 	}
@@ -672,64 +1395,64 @@ func (fake *FakeBackend) WriteExecEvents(arg1 string, arg2 []*ipc.ExecEvent) err
 	return fakeReturns.result1
 }
 
-func (fake *FakeBackend) WriteExecEventsCallCount() int {
-	fake.writeExecEventsMutex.RLock()
-	defer fake.writeExecEventsMutex.RUnlock()
-	return len(fake.writeExecEventsArgsForCall)
+func (fake *FakeBackend) WriteMmapEventsCallCount() int {
+	fake.writeMmapEventsMutex.RLock()
+	defer fake.writeMmapEventsMutex.RUnlock()
+	return len(fake.writeMmapEventsArgsForCall)
 }
 
-func (fake *FakeBackend) WriteExecEventsCalls(stub func(string, []*ipc.ExecEvent) error) {
-	fake.writeExecEventsMutex.Lock()
-	defer fake.writeExecEventsMutex.Unlock()
-	fake.WriteExecEventsStub = stub
+func (fake *FakeBackend) WriteMmapEventsCalls(stub func(string, []*ipc.MmapEvent) error) {
+	fake.writeMmapEventsMutex.Lock()
+	defer fake.writeMmapEventsMutex.Unlock()
+	fake.WriteMmapEventsStub = stub
 }
 
-func (fake *FakeBackend) WriteExecEventsArgsForCall(i int) (string, []*ipc.ExecEvent) {
-	fake.writeExecEventsMutex.RLock()
-	defer fake.writeExecEventsMutex.RUnlock()
-	argsForCall := fake.writeExecEventsArgsForCall[i]
+func (fake *FakeBackend) WriteMmapEventsArgsForCall(i int) (string, []*ipc.MmapEvent) {
+	fake.writeMmapEventsMutex.RLock()
+	defer fake.writeMmapEventsMutex.RUnlock()
+	argsForCall := fake.writeMmapEventsArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) WriteExecEventsReturns(result1 error) {
-	fake.writeExecEventsMutex.Lock()
-	defer fake.writeExecEventsMutex.Unlock()
-	fake.WriteExecEventsStub = nil
-	fake.writeExecEventsReturns = struct {
+func (fake *FakeBackend) WriteMmapEventsReturns(result1 error) {
+	fake.writeMmapEventsMutex.Lock()
+	defer fake.writeMmapEventsMutex.Unlock()
+	fake.WriteMmapEventsStub = nil
+	fake.writeMmapEventsReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeBackend) WriteExecEventsReturnsOnCall(i int, result1 error) {
-	fake.writeExecEventsMutex.Lock()
-	defer fake.writeExecEventsMutex.Unlock()
-	fake.WriteExecEventsStub = nil
-	if fake.writeExecEventsReturnsOnCall == nil {
-		fake.writeExecEventsReturnsOnCall = make(map[int]struct {
+func (fake *FakeBackend) WriteMmapEventsReturnsOnCall(i int, result1 error) {
+	fake.writeMmapEventsMutex.Lock()
+	defer fake.writeMmapEventsMutex.Unlock()
+	fake.WriteMmapEventsStub = nil
+	if fake.writeMmapEventsReturnsOnCall == nil {
+		fake.writeMmapEventsReturnsOnCall = make(map[int]struct {
 			result1 error
 		})
 	}
-	fake.writeExecEventsReturnsOnCall[i] = struct {
+	fake.writeMmapEventsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeBackend) WriteConnectEvents(arg1 string, arg2 []*ipc.ConnectEvent) error {
-	var arg2Copy []*ipc.ConnectEvent
+func (fake *FakeBackend) WriteMprotectEvents(arg1 string, arg2 []*ipc.MprotectEvent) error {
+	var arg2Copy []*ipc.MprotectEvent
 	if arg2 != nil {
-		arg2Copy = make([]*ipc.ConnectEvent, len(arg2))
+		arg2Copy = make([]*ipc.MprotectEvent, len(arg2))
 		copy(arg2Copy, arg2)
 	}
-	fake.writeConnectEventsMutex.Lock()
-	ret, specificReturn := fake.writeConnectEventsReturnsOnCall[len(fake.writeConnectEventsArgsForCall)]
-	fake.writeConnectEventsArgsForCall = append(fake.writeConnectEventsArgsForCall, struct {
+	fake.writeMprotectEventsMutex.Lock()
+	ret, specificReturn := fake.writeMprotectEventsReturnsOnCall[len(fake.writeMprotectEventsArgsForCall)]
+	fake.writeMprotectEventsArgsForCall = append(fake.writeMprotectEventsArgsForCall, struct {
 		arg1 string
-		arg2 []*ipc.ConnectEvent
+		arg2 []*ipc.MprotectEvent
 	}{arg1, arg2Copy})
-	stub := fake.WriteConnectEventsStub
-	fakeReturns := fake.writeConnectEventsReturns
-	fake.recordInvocation("WriteConnectEvents", []interface{}{arg1, arg2Copy})
-	fake.writeConnectEventsMutex.Unlock()
+	stub := fake.WriteMprotectEventsStub
+	fakeReturns := fake.writeMprotectEventsReturns
+	fake.recordInvocation("WriteMprotectEvents", []interface{}{arg1, arg2Copy})
+	fake.writeMprotectEventsMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2)
 	}
@@ -739,44 +1462,111 @@ func (fake *FakeBackend) WriteConnectEvents(arg1 string, arg2 []*ipc.ConnectEven
 	return fakeReturns.result1
 }
 
-func (fake *FakeBackend) WriteConnectEventsCallCount() int {
-	fake.writeConnectEventsMutex.RLock()
-	defer fake.writeConnectEventsMutex.RUnlock()
-	return len(fake.writeConnectEventsArgsForCall)
+func (fake *FakeBackend) WriteMprotectEventsCallCount() int {
+	fake.writeMprotectEventsMutex.RLock()
+	defer fake.writeMprotectEventsMutex.RUnlock()
+	return len(fake.writeMprotectEventsArgsForCall)
 }
 
-func (fake *FakeBackend) WriteConnectEventsCalls(stub func(string, []*ipc.ConnectEvent) error) {
-	fake.writeConnectEventsMutex.Lock()
-	defer fake.writeConnectEventsMutex.Unlock()
-	fake.WriteConnectEventsStub = stub
+func (fake *FakeBackend) WriteMprotectEventsCalls(stub func(string, []*ipc.MprotectEvent) error) {
+	fake.writeMprotectEventsMutex.Lock()
+	defer fake.writeMprotectEventsMutex.Unlock()
+	fake.WriteMprotectEventsStub = stub
 }
 
-func (fake *FakeBackend) WriteConnectEventsArgsForCall(i int) (string, []*ipc.ConnectEvent) {
-	fake.writeConnectEventsMutex.RLock()
-	defer fake.writeConnectEventsMutex.RUnlock()
-	argsForCall := fake.writeConnectEventsArgsForCall[i]
+func (fake *FakeBackend) WriteMprotectEventsArgsForCall(i int) (string, []*ipc.MprotectEvent) {
+	fake.writeMprotectEventsMutex.RLock()
+	defer fake.writeMprotectEventsMutex.RUnlock()
+	argsForCall := fake.writeMprotectEventsArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) WriteConnectEventsReturns(result1 error) {
-	fake.writeConnectEventsMutex.Lock()
-	defer fake.writeConnectEventsMutex.Unlock()
-	fake.WriteConnectEventsStub = nil
-	fake.writeConnectEventsReturns = struct {
+func (fake *FakeBackend) WriteMprotectEventsReturns(result1 error) {
+	fake.writeMprotectEventsMutex.Lock()
+	defer fake.writeMprotectEventsMutex.Unlock()
+	fake.WriteMprotectEventsStub = nil
+	fake.writeMprotectEventsReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeBackend) WriteConnectEventsReturnsOnCall(i int, result1 error) {
-	fake.writeConnectEventsMutex.Lock()
-	defer fake.writeConnectEventsMutex.Unlock()
-	fake.WriteConnectEventsStub = nil
-	if fake.writeConnectEventsReturnsOnCall == nil {
-		fake.writeConnectEventsReturnsOnCall = make(map[int]struct {
+func (fake *FakeBackend) WriteMprotectEventsReturnsOnCall(i int, result1 error) {
+	fake.writeMprotectEventsMutex.Lock()
+	defer fake.writeMprotectEventsMutex.Unlock()
+	fake.WriteMprotectEventsStub = nil
+	if fake.writeMprotectEventsReturnsOnCall == nil {
+		fake.writeMprotectEventsReturnsOnCall = make(map[int]struct {
 			result1 error
 		})
 	}
-	fake.writeConnectEventsReturnsOnCall[i] = struct {
+	fake.writeMprotectEventsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteSocketDataEvents(arg1 string, arg2 []*ipc.SocketDataEvent) error {
+	var arg2Copy []*ipc.SocketDataEvent
+	if arg2 != nil {
+		arg2Copy = make([]*ipc.SocketDataEvent, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.writeSocketDataEventsMutex.Lock()
+	ret, specificReturn := fake.writeSocketDataEventsReturnsOnCall[len(fake.writeSocketDataEventsArgsForCall)]
+	fake.writeSocketDataEventsArgsForCall = append(fake.writeSocketDataEventsArgsForCall, struct {
+		arg1 string
+		arg2 []*ipc.SocketDataEvent
+	}{arg1, arg2Copy})
+	stub := fake.WriteSocketDataEventsStub
+	fakeReturns := fake.writeSocketDataEventsReturns
+	fake.recordInvocation("WriteSocketDataEvents", []interface{}{arg1, arg2Copy})
+	fake.writeSocketDataEventsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeBackend) WriteSocketDataEventsCallCount() int {
+	fake.writeSocketDataEventsMutex.RLock()
+	defer fake.writeSocketDataEventsMutex.RUnlock()
+	return len(fake.writeSocketDataEventsArgsForCall)
+}
+
+func (fake *FakeBackend) WriteSocketDataEventsCalls(stub func(string, []*ipc.SocketDataEvent) error) {
+	fake.writeSocketDataEventsMutex.Lock()
+	defer fake.writeSocketDataEventsMutex.Unlock()
+	fake.WriteSocketDataEventsStub = stub
+}
+
+func (fake *FakeBackend) WriteSocketDataEventsArgsForCall(i int) (string, []*ipc.SocketDataEvent) {
+	fake.writeSocketDataEventsMutex.RLock()
+	defer fake.writeSocketDataEventsMutex.RUnlock()
+	argsForCall := fake.writeSocketDataEventsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeBackend) WriteSocketDataEventsReturns(result1 error) {
+	fake.writeSocketDataEventsMutex.Lock()
+	defer fake.writeSocketDataEventsMutex.Unlock()
+	fake.WriteSocketDataEventsStub = nil
+	fake.writeSocketDataEventsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeBackend) WriteSocketDataEventsReturnsOnCall(i int, result1 error) {
+	fake.writeSocketDataEventsMutex.Lock()
+	defer fake.writeSocketDataEventsMutex.Unlock()
+	fake.WriteSocketDataEventsStub = nil
+	if fake.writeSocketDataEventsReturnsOnCall == nil {
+		fake.writeSocketDataEventsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeSocketDataEventsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
