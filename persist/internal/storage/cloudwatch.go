@@ -1337,28 +1337,43 @@ func (b *CloudWatchBackend) readExecEventsFromStream(ctx context.Context, query 
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		// Check for stream not found - not an error, just no events
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("exec events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get exec events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		execEvent, err := parseExecEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse exec event", "error", err)
-			continue
+			// Check for stream not found - not an error, just no events
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("exec events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get exec events: %w", err)
 		}
 
-		select {
-		case ch <- execEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			execEvent, err := parseExecEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse exec event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- execEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil
@@ -1408,28 +1423,43 @@ func (b *CloudWatchBackend) readConnectEventsFromStream(ctx context.Context, que
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		// Check for stream not found - not an error, just no events
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("connect events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get connect events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		connectEvent, err := parseConnectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse connect event", "error", err)
-			continue
+			// Check for stream not found - not an error, just no events
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("connect events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get connect events: %w", err)
 		}
 
-		select {
-		case ch <- connectEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			connectEvent, err := parseConnectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse connect event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- connectEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil
@@ -1479,27 +1509,42 @@ func (b *CloudWatchBackend) readFileEventsFromStream(ctx context.Context, query 
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("file events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get file events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		fileEvent, err := parseFileEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse file event", "error", err)
-			continue
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("file events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get file events: %w", err)
 		}
 
-		select {
-		case ch <- fileEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			fileEvent, err := parseFileEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse file event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- fileEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil
@@ -1549,27 +1594,42 @@ func (b *CloudWatchBackend) readAcceptEventsFromStream(ctx context.Context, quer
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("accept events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get accept events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		acceptEvent, err := parseAcceptEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse accept event", "error", err)
-			continue
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("accept events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get accept events: %w", err)
 		}
 
-		select {
-		case ch <- acceptEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			acceptEvent, err := parseAcceptEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse accept event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- acceptEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil
@@ -1619,27 +1679,42 @@ func (b *CloudWatchBackend) readSocketDataEventsFromStream(ctx context.Context, 
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("socket data events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get socket data events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		socketDataEvent, err := parseSocketDataEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse socket data event", "error", err)
-			continue
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("socket data events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get socket data events: %w", err)
 		}
 
-		select {
-		case ch <- socketDataEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			socketDataEvent, err := parseSocketDataEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse socket data event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- socketDataEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil
@@ -1689,27 +1764,42 @@ func (b *CloudWatchBackend) readMmapEventsFromStream(ctx context.Context, query 
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("mmap events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get mmap events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		mmapEvent, err := parseMmapEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse mmap event", "error", err)
-			continue
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("mmap events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get mmap events: %w", err)
 		}
 
-		select {
-		case ch <- mmapEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			mmapEvent, err := parseMmapEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse mmap event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- mmapEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil
@@ -1759,27 +1849,42 @@ func (b *CloudWatchBackend) readMprotectEventsFromStream(ctx context.Context, qu
 		input.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	resp, err := b.logsClient.GetLogEvents(ctx, input)
-	if err != nil {
-		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			b.logger.Debug("mprotect events stream not found", "jobId", query.JobID)
-			return nil
-		}
-		return fmt.Errorf("failed to get mprotect events: %w", err)
-	}
+	// Paginate through all log events
+	var nextToken *string
 
-	for _, event := range resp.Events {
-		mprotectEvent, err := parseMprotectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+	for {
+		if nextToken != nil {
+			input.NextToken = nextToken
+		}
+
+		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
-			b.logger.Warn("failed to parse mprotect event", "error", err)
-			continue
+			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+				b.logger.Debug("mprotect events stream not found", "jobId", query.JobID)
+				return nil
+			}
+			return fmt.Errorf("failed to get mprotect events: %w", err)
 		}
 
-		select {
-		case ch <- mprotectEvent:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, event := range resp.Events {
+			mprotectEvent, err := parseMprotectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			if err != nil {
+				b.logger.Warn("failed to parse mprotect event", "error", err)
+				continue
+			}
+
+			select {
+			case ch <- mprotectEvent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
+
+		// Check if we've reached the end (no new events or token unchanged)
+		if resp.NextForwardToken == nil || (nextToken != nil && *nextToken == *resp.NextForwardToken) {
+			break
+		}
+		nextToken = resp.NextForwardToken
 	}
 
 	return nil

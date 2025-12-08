@@ -623,85 +623,87 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 		}
 		defer file.Close()
 
-		gzReader, err := gzip.NewReader(file)
-		if err != nil {
-			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
-				// Empty or incomplete gzip file - this can happen if:
-				// 1. The job just started and no metrics written yet
-				// 2. The gzip writer hasn't been closed yet (job still running)
-				// Just return empty result, no error
-				lb.logger.Debug("Empty or incomplete gzip metrics file", "path", metricsPath, "jobID", query.JobID)
-				return
-			}
-			reader.Error <- fmt.Errorf("failed to create gzip reader: %w", err)
-			return
-		}
-		defer gzReader.Close()
-
-		scanner := bufio.NewScanner(gzReader)
-		// Increase buffer size for large metric lines
-		scanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB initial, 1MB max
-
 		count := 0
 		skipped := 0
 
-		for scanner.Scan() {
-			select {
-			case <-ctx.Done():
-				lb.logger.Debug("ReadMetrics cancelled", "jobID", query.JobID)
-				return
-			default:
-			}
-
-			line := scanner.Bytes()
-			if len(line) == 0 {
-				continue
-			}
-
-			var metric ipcpb.Metric
-			if err := json.Unmarshal(line, &metric); err != nil {
-				lb.logger.Warn("Failed to unmarshal metric", "error", err, "line", string(line[:min(len(line), 100)]))
-				continue
-			}
-
-			// Apply time range filter
-			if query.StartTime != nil && metric.Timestamp < *query.StartTime {
-				continue
-			}
-			if query.EndTime != nil && metric.Timestamp > *query.EndTime {
-				continue
-			}
-
-			// Apply offset
-			if skipped < query.Offset {
-				skipped++
-				continue
-			}
-
-			// Apply limit
-			if query.Limit > 0 && count >= query.Limit {
-				break
-			}
-
-			select {
-			case reader.Channel <- &metric:
-				count++
-			case <-ctx.Done():
-				lb.logger.Debug("ReadMetrics cancelled while sending", "jobID", query.JobID)
+		// Handle multi-stream gzip files (each WriteMetrics call creates a new gzip stream)
+		for {
+			gzReader, err := gzip.NewReader(file)
+			if err != nil {
+				if err == io.EOF {
+					// No more gzip streams - we're done
+					break
+				}
+				if errors.Is(err, io.ErrUnexpectedEOF) {
+					// Incomplete gzip stream (job still running)
+					lb.logger.Debug("Incomplete gzip metrics stream", "path", metricsPath, "jobID", query.JobID, "count", count)
+					break
+				}
+				reader.Error <- fmt.Errorf("failed to create gzip reader: %w", err)
 				return
 			}
-		}
 
-		if err := scanner.Err(); err != nil {
-			// If we hit unexpected EOF in the middle of reading, it means the gzip
-			// stream is incomplete (e.g., job still running and writer not closed)
-			// Return what we read so far instead of erroring
-			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
-				lb.logger.Debug("Incomplete gzip stream, returning partial metrics", "jobID", query.JobID, "count", count)
-				return
+			scanner := bufio.NewScanner(gzReader)
+			// Increase buffer size for large metric lines
+			scanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB initial, 1MB max
+
+			for scanner.Scan() {
+				select {
+				case <-ctx.Done():
+					lb.logger.Debug("ReadMetrics cancelled", "jobID", query.JobID)
+					gzReader.Close()
+					return
+				default:
+				}
+
+				line := scanner.Bytes()
+				if len(line) == 0 {
+					continue
+				}
+
+				var metric ipcpb.Metric
+				if err := json.Unmarshal(line, &metric); err != nil {
+					lb.logger.Warn("Failed to unmarshal metric", "error", err, "line", string(line[:min(len(line), 100)]))
+					continue
+				}
+
+				// Apply time range filter
+				if query.StartTime != nil && metric.Timestamp < *query.StartTime {
+					continue
+				}
+				if query.EndTime != nil && metric.Timestamp > *query.EndTime {
+					continue
+				}
+
+				// Apply offset
+				if skipped < query.Offset {
+					skipped++
+					continue
+				}
+
+				// Apply limit
+				if query.Limit > 0 && count >= query.Limit {
+					gzReader.Close()
+					lb.logger.Debug("Finished reading metrics (limit reached)", "jobID", query.JobID, "count", count, "skipped", skipped)
+					return
+				}
+
+				select {
+				case reader.Channel <- &metric:
+					count++
+				case <-ctx.Done():
+					lb.logger.Debug("ReadMetrics cancelled while sending", "jobID", query.JobID)
+					gzReader.Close()
+					return
+				}
 			}
-			reader.Error <- fmt.Errorf("error reading metrics: %w", err)
-			return
+
+			if err := scanner.Err(); err != nil {
+				// Log scanner errors but continue to next stream
+				lb.logger.Warn("Scanner error reading metrics", "error", err, "jobID", query.JobID)
+			}
+
+			gzReader.Close()
 		}
 
 		lb.logger.Debug("Finished reading metrics", "jobID", query.JobID, "count", count, "skipped", skipped)
@@ -906,56 +908,76 @@ func (lb *LocalBackend) readExecEventsFromFile(ctx context.Context, query *Telem
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.ExecEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
+				// No more gzip streams - we're done
 				break
 			}
-			// Try to continue on parse errors (multi-stream gzip)
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				// Incomplete gzip stream
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		// Apply time filters
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.ExecEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal exec event", "error", err)
+				continue
+			}
+
+			// Apply time filters
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			// Skip offset
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			// Check limit
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		// Skip offset
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		// Check limit
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil
@@ -995,56 +1017,76 @@ func (lb *LocalBackend) readConnectEventsFromFile(ctx context.Context, query *Te
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.ConnectEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
+				// No more gzip streams - we're done
 				break
 			}
-			// Try to continue on parse errors (multi-stream gzip)
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				// Incomplete gzip stream
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		// Apply time filters
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.ConnectEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal connect event", "error", err)
+				continue
+			}
+
+			// Apply time filters
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			// Skip offset
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			// Check limit
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		// Skip offset
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		// Check limit
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil
@@ -1295,52 +1337,76 @@ func (lb *LocalBackend) readFileEventsFromFile(ctx context.Context, query *Telem
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.FileEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
+				// No more gzip streams - we're done
 				break
 			}
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				// Incomplete gzip stream
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.FileEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal file event", "error", err)
+				continue
+			}
+
+			// Apply time filters
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			// Skip offset
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			// Check limit
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil
@@ -1380,52 +1446,71 @@ func (lb *LocalBackend) readAcceptEventsFromFile(ctx context.Context, query *Tel
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.AcceptEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
 				break
 			}
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.AcceptEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal accept event", "error", err)
+				continue
+			}
+
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil
@@ -1465,52 +1550,71 @@ func (lb *LocalBackend) readSocketDataEventsFromFile(ctx context.Context, query 
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.SocketDataEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
 				break
 			}
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.SocketDataEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal socket data event", "error", err)
+				continue
+			}
+
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil
@@ -1550,52 +1654,71 @@ func (lb *LocalBackend) readMmapEventsFromFile(ctx context.Context, query *Telem
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.MmapEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
 				break
 			}
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.MmapEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal mmap event", "error", err)
+				continue
+			}
+
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil
@@ -1635,52 +1758,71 @@ func (lb *LocalBackend) readMprotectEventsFromFile(ctx context.Context, query *T
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	decoder := json.NewDecoder(gzReader)
 	count := 0
+	skipped := 0
 
+	// Handle multi-stream gzip files (each write call creates a new gzip stream)
 	for {
-		var event ipcpb.MprotectEvent
-		if err := decoder.Decode(&event); err != nil {
-			if errors.Is(err, io.EOF) {
+		gzReader, err := gzip.NewReader(file)
+		if err != nil {
+			if err == io.EOF {
 				break
 			}
-			gzReader.Reset(file)
-			gzReader, err = gzip.NewReader(file)
-			if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			}
-			decoder = json.NewDecoder(gzReader)
-			continue
+			return fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 
-		if query.StartTime != nil && event.Timestamp < *query.StartTime {
-			continue
-		}
-		if query.EndTime != nil && event.Timestamp > *query.EndTime {
-			continue
+		scanner := bufio.NewScanner(gzReader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			default:
+			}
+
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			var event ipcpb.MprotectEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				lb.logger.Warn("Failed to unmarshal mprotect event", "error", err)
+				continue
+			}
+
+			if query.StartTime != nil && event.Timestamp < *query.StartTime {
+				continue
+			}
+			if query.EndTime != nil && event.Timestamp > *query.EndTime {
+				continue
+			}
+
+			if query.Offset > 0 && skipped < query.Offset {
+				skipped++
+				continue
+			}
+
+			if query.Limit > 0 && count >= query.Limit {
+				gzReader.Close()
+				return nil
+			}
+
+			select {
+			case ch <- &event:
+				count++
+			case <-ctx.Done():
+				gzReader.Close()
+				return ctx.Err()
+			}
 		}
 
-		if query.Offset > 0 && count < query.Offset {
-			count++
-			continue
-		}
-
-		select {
-		case ch <- &event:
-			count++
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		if query.Limit > 0 && count >= query.Offset+query.Limit {
-			break
-		}
+		gzReader.Close()
 	}
 
 	return nil

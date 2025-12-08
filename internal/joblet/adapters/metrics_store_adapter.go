@@ -131,7 +131,7 @@ func (a *MetricsStoreAdapter) StopCollector(jobID string) error {
 // PublishMetrics implements the MetricsPublisher interface.
 // This is called by the Collector to publish metrics samples to the telemetry collector.
 func (a *MetricsStoreAdapter) PublishMetrics(ctx context.Context, sample *domain.JobMetricsSample) error {
-	// Emit to unified telemetry collector (for StreamJobTelemetry API)
+	// Emit to telemetry collector (for StreamJobMetrics API)
 	if a.telemetryCollector != nil {
 		telemetryData := &telemetry.MetricsData{
 			CPUPercent:     sample.CPU.UsagePercent,

@@ -135,21 +135,46 @@ func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_Ge
 	return stream, nil
 }
 
-// StreamJobTelemetry streams live telemetry (metrics + activity events) for a running job
-func (c *JobClient) StreamJobTelemetry(ctx context.Context, id string, types []string) (pb.JobService_StreamJobTelemetryClient, error) {
-	stream, err := c.jobClient.StreamJobTelemetry(ctx, &pb.StreamTelemetryRequest{
+// StreamJobMetrics streams live metrics for a running job
+func (c *JobClient) StreamJobMetrics(ctx context.Context, id string) (pb.JobService_StreamJobMetricsClient, error) {
+	stream, err := c.jobClient.StreamJobMetrics(ctx, &pb.StreamJobMetricsRequest{
 		JobUuid: id,
-		Types:   types,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start telemetry stream: %v", err)
+		return nil, fmt.Errorf("failed to start metrics stream: %v", err)
 	}
 	return stream, nil
 }
 
-// GetJobTelemetry retrieves historical telemetry for a completed job
-func (c *JobClient) GetJobTelemetry(ctx context.Context, id string, types []string, startTime, endTime int64, limit int32) (pb.JobService_GetJobTelemetryClient, error) {
-	stream, err := c.jobClient.GetJobTelemetry(ctx, &pb.GetTelemetryRequest{
+// GetJobMetrics retrieves historical metrics for a completed job
+func (c *JobClient) GetJobMetrics(ctx context.Context, id string, startTime, endTime int64, limit int32) (pb.JobService_GetJobMetricsClient, error) {
+	stream, err := c.jobClient.GetJobMetrics(ctx, &pb.GetJobMetricsRequest{
+		JobUuid:   id,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metrics: %v", err)
+	}
+	return stream, nil
+}
+
+// StreamJobVisibility streams live eBPF security events for a running job
+func (c *JobClient) StreamJobVisibility(ctx context.Context, id string, types []string) (pb.JobService_StreamJobVisibilityClient, error) {
+	stream, err := c.jobClient.StreamJobVisibility(ctx, &pb.StreamJobVisibilityRequest{
+		JobUuid: id,
+		Types:   types,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start visibility stream: %v", err)
+	}
+	return stream, nil
+}
+
+// GetJobVisibility retrieves historical eBPF security events for a completed job
+func (c *JobClient) GetJobVisibility(ctx context.Context, id string, types []string, startTime, endTime int64, limit int32) (pb.JobService_GetJobVisibilityClient, error) {
+	stream, err := c.jobClient.GetJobVisibility(ctx, &pb.GetJobVisibilityRequest{
 		JobUuid:   id,
 		Types:     types,
 		StartTime: startTime,
@@ -157,7 +182,7 @@ func (c *JobClient) GetJobTelemetry(ctx context.Context, id string, types []stri
 		Limit:     limit,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get telemetry: %v", err)
+		return nil, fmt.Errorf("failed to get visibility: %v", err)
 	}
 	return stream, nil
 }

@@ -167,8 +167,8 @@ rnx job log 550e8400
 # View resource metrics
 rnx job metrics 550e8400
 
-# View metrics + eBPF telemetry events (process executions, network connections)
-rnx job metrics 550e8400 --tel
+# View eBPF visibility events (process executions, network connections)
+rnx job visibility 550e8400
 ```
 
 ## Resource Management Configuration
@@ -370,7 +370,7 @@ rnx job list                    # List all jobs
 rnx job status <job-uuid>       # Check job status (supports short UUID)
 rnx job log <job-uuid>          # View job logs (supports short UUID)
 rnx job metrics <job-uuid>      # View resource metrics (supports short UUID)
-rnx job metrics <job-uuid> --tel # View metrics + eBPF telemetry
+rnx job visibility <job-uuid>   # View eBPF visibility events (supports short UUID)
 rnx job stop <job-uuid>         # Stop running job (supports short UUID)
 rnx job cancel <job-uuid>       # Cancel scheduled job (supports short UUID)
 rnx job delete <job-uuid>       # Delete specific job (supports short UUID)

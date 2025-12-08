@@ -711,19 +711,25 @@ ssh server "df -h /opt/joblet && df -i /opt/joblet"
 
 When eBPF visibility is enabled, joblet captures process execution, network connection, and memory events from jobs. These events are shipped to CloudWatch alongside regular logs and metrics.
 
-**Viewing eBPF Telemetry via CLI:**
+**Viewing eBPF Visibility Events via CLI:**
 ```bash
-# View metrics + eBPF telemetry events for a job
-rnx job metrics <job-uuid> --tel
+# View eBPF visibility events for a job
+rnx job visibility <job-uuid>
 
 # Using short UUID (first 8 characters)
-rnx job metrics f47ac10b --tel
+rnx job visibility f47ac10b
 
 # Filter specific event types
-rnx job metrics f47ac10b --tel | grep EXEC    # Process executions
-rnx job metrics f47ac10b --tel | grep NET     # Outgoing connections
-rnx job metrics f47ac10b --tel | grep ACCEPT  # Incoming connections
-rnx job metrics f47ac10b --tel | grep MMAP    # Memory mappings with exec
+rnx job visibility f47ac10b --types exec,connect
+
+# Filter with grep
+rnx job visibility f47ac10b | grep EXEC      # Process executions
+rnx job visibility f47ac10b | grep CONNECT   # Outgoing connections
+rnx job visibility f47ac10b | grep ACCEPT    # Incoming connections
+rnx job visibility f47ac10b | grep MMAP      # Memory mappings with exec
+
+# View resource metrics separately
+rnx job metrics f47ac10b
 ```
 
 **Available eBPF Event Types:**
@@ -731,7 +737,7 @@ rnx job metrics f47ac10b --tel | grep MMAP    # Memory mappings with exec
 | Event | Display | Description |
 |-------|---------|-------------|
 | exec | EXEC | Process executions (fork/exec syscalls) |
-| connect | NET | Outgoing network connections (connect syscall) |
+| connect | CONNECT | Outgoing network connections (connect syscall) |
 | accept | ACCEPT | Incoming network connections (accept syscall) |
 | socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
 | mmap | MMAP | Memory mappings with executable permissions |
