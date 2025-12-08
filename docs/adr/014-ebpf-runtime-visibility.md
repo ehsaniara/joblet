@@ -4,6 +4,13 @@
 
 **Implemented** (December 2025)
 
+> **CLI Update (December 2025)**: The CLI interface was refined to use separate commands:
+> - `rnx job metrics <job-id>` - View resource metrics (CPU, memory, I/O, network, GPU)
+> - `rnx job visibility <job-id>` - View eBPF security events (exec, connect, accept, etc.)
+>
+> This replaces the original `--tel` flag approach, providing clearer separation of concerns.
+> The backend unified telemetry pipeline remains as described in this ADR.
+
 ## Context
 
 Joblet currently collects job metrics (CPU, memory, I/O) from cgroups v2 and stores them in the persist service. However, we have **zero visibility** into what jobs are actually doing - what binaries they execute, what network connections they make, what files they access.

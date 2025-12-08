@@ -13,6 +13,7 @@ operations.
     - [status](#rnx-job-status)
     - [log](#rnx-job-log)
     - [metrics](#rnx-job-metrics)
+    - [visibility](#rnx-job-visibility)
     - [stop](#rnx-job-stop)
     - [cancel](#rnx-job-cancel)
     - [delete](#rnx-job-delete)
@@ -329,21 +330,22 @@ rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
 
 ### `rnx job metrics`
 
-View resource usage metrics and eBPF telemetry for a job as time-series data.
+View resource usage metrics for a job as time-series data.
 
 ```bash
-rnx job metrics <job-uuid> [--tel]
+rnx job metrics <job-uuid>
 ```
 
-Shows CPU, memory, I/O, network, and process metrics collected during job execution.
+Shows CPU, memory, I/O, network, and GPU metrics collected during job execution via cgroups (sampled every ~5 seconds).
 Metrics are stored as time-series data, allowing complete historical replay of resource usage.
+
+For eBPF visibility events (process execution, network connections, etc.), use the separate `rnx job visibility` command.
 
 #### Parameters
 
-| Parameter | Description                                                    |
-|-----------|----------------------------------------------------------------|
-| `--tel`   | Include eBPF telemetry events (process executions + network)   |
-| `--json`  | Output in JSON format (global flag: `rnx --json`)              |
+| Parameter | Description                                       |
+|-----------|---------------------------------------------------|
+| `--json`  | Output in JSON format (global flag: `rnx --json`) |
 
 #### Behavior
 
@@ -359,27 +361,11 @@ Works with both running and completed jobs. Supports short UUIDs (first 8 charac
 
 | Category | Metrics                                                     |
 |----------|-------------------------------------------------------------|
-| CPU      | Usage %, user/system time, throttling                       |
-| Memory   | Current/peak usage, anonymous/file cache, page faults       |
-| I/O      | Read/write bandwidth, IOPS, total bytes                     |
-| Network  | RX/TX bytes/packets, bandwidth                              |
-| Process  | Count, threads, open file descriptors                       |
-| GPU      | Utilization, memory, temperature, power (if GPUs allocated) |
-
-#### eBPF Telemetry Events (--tel flag)
-
-When `--tel` is specified, the following eBPF visibility events are included:
-
-| Event Type | Description                                              |
-|------------|----------------------------------------------------------|
-| EXEC       | Process executions (fork/exec syscalls)                  |
-| NET        | Outgoing network connections (connect syscall)           |
-| ACCEPT     | Incoming network connections (accept syscall)            |
-| SEND/RECV  | Socket data transfers (sendto/recvfrom syscalls)         |
-| MMAP       | Memory mappings with executable permissions              |
-| MPROTECT   | Memory protection changes adding exec permission         |
-
-These events are useful for security monitoring, debugging, and understanding job behavior.
+| CPU      | Usage percentage                                            |
+| Memory   | Current usage, limit, percentage used                       |
+| I/O      | Read/write bytes                                            |
+| Network  | RX/TX bytes                                                 |
+| GPU      | Utilization, memory (if GPUs allocated)                     |
 
 #### Examples
 
@@ -390,24 +376,15 @@ rnx job metrics f47ac10b-58cc-4372-a567-0e02b2c3d479
 # Monitor a running job using short UUID
 rnx job metrics f47ac10b
 
-# View metrics + all eBPF telemetry events
-rnx job metrics f47ac10b --tel
-
-# Filter specific eBPF event types with grep
-rnx job metrics f47ac10b --tel | grep EXEC
-rnx job metrics f47ac10b --tel | grep NET
-rnx job metrics f47ac10b --tel | grep ACCEPT
-rnx job metrics f47ac10b --tel | grep MMAP
-
 # Output as JSON (one sample per line)
 rnx --json job metrics f47ac10b
 
 # Filter JSON output with jq
-rnx --json job metrics f47ac10b | jq -c '{timestamp, cpu: .cpu.usagePercent, memory: .memory.current}'
+rnx --json job metrics f47ac10b | jq -c '{timestamp, cpu: .cpuPercent, memory: .memoryBytes}'
 
 # Analyze metrics from a job
 rnx --json job metrics f47ac10b > metrics.jsonl
-cat metrics.jsonl | jq -r '[.timestamp, .cpu.usagePercent, .memory.current] | @csv' > metrics.csv
+cat metrics.jsonl | jq -r '[.timestamp, .cpuPercent, .memoryBytes] | @csv' > metrics.csv
 ```
 
 #### Storage Location
@@ -425,8 +402,84 @@ You can also read metrics files directly on the server:
 gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | head -10
 
 # Parse with jq
-gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | jq -c '{timestamp, cpu: .cpu.usage_percent}'
+gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | jq -c '{timestamp, cpu: .cpu_percent}'
 ```
+
+### `rnx job visibility`
+
+View eBPF security visibility events for a job.
+
+```bash
+rnx job visibility <job-uuid> [--types <event-types>]
+```
+
+Shows security-relevant events captured by eBPF tracing during job execution. These events are useful for security
+monitoring, debugging, and understanding job behavior.
+
+#### Parameters
+
+| Parameter         | Description                                                                         |
+|-------------------|-------------------------------------------------------------------------------------|
+| `--types`         | Filter by event types (comma-separated): exec,connect,accept,file,mmap,mprotect,socket_data |
+| `--json`          | Output in JSON format (global flag: `rnx --json`)                                   |
+
+#### Behavior
+
+Similar to `rnx job log`, this command streams all visibility events from job start:
+
+- **For completed jobs**: Shows all events from start to finish, then exits
+- **For running jobs**: Shows all events from start to current, then continues streaming live until job completes or
+  Ctrl+C
+
+Works with both running and completed jobs. Supports short UUIDs (first 8 characters).
+
+#### Event Types
+
+| Event Type  | Display   | Description                                           |
+|-------------|-----------|-------------------------------------------------------|
+| exec        | EXEC      | Process executions (fork/exec syscalls)               |
+| connect     | CONNECT   | Outgoing network connections (connect syscall)        |
+| accept      | ACCEPT    | Incoming network connections (accept syscall)         |
+| file        | FILE      | File operations (open, read, write)                   |
+| mmap        | MMAP      | Memory mappings with executable permissions           |
+| mprotect    | MPROTECT  | Memory protection changes adding exec permission      |
+| socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls)      |
+
+#### Examples
+
+```bash
+# View all visibility events for a completed job
+rnx job visibility f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+# Monitor a running job using short UUID
+rnx job visibility f47ac10b
+
+# Filter specific event types
+rnx job visibility f47ac10b --types exec,connect
+
+# Filter with grep for specific event types
+rnx job visibility f47ac10b | grep EXEC
+rnx job visibility f47ac10b | grep CONNECT
+rnx job visibility f47ac10b | grep ACCEPT
+rnx job visibility f47ac10b | grep MMAP
+
+# Output as JSON (one event per line)
+rnx --json job visibility f47ac10b
+
+# Filter JSON output with jq
+rnx --json job visibility f47ac10b | jq 'select(.type == "exec")'
+
+# Analyze visibility events from a job
+rnx --json job visibility f47ac10b > events.jsonl
+cat events.jsonl | jq -r 'select(.type == "connect") | [.timestamp, .connect.dstAddr, .connect.dstPort] | @csv'
+```
+
+#### Use Cases
+
+- **Security Monitoring**: Track all processes executed and network connections made by a job
+- **Debugging**: Understand what a job is doing at the system level
+- **Compliance**: Audit job behavior for regulatory requirements
+- **Incident Response**: Investigate suspicious job activity
 
 ### `rnx job stop`
 

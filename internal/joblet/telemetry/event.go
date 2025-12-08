@@ -5,8 +5,6 @@ package telemetry
 
 import (
 	"time"
-
-	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 )
 
 // EventType represents the type of telemetry event
@@ -115,64 +113,6 @@ type MprotectData struct {
 	Addr   uint64 // Memory address
 	Length uint64 // Region length
 	Prot   uint32 // New protection flags
-}
-
-// ToProto converts the Event to a protobuf TelemetryEvent.
-func (e *Event) ToProto() *pb.TelemetryEvent {
-	event := &pb.TelemetryEvent{
-		Timestamp: e.Timestamp.UnixNano(),
-		JobId:     e.JobID,
-		Type:      string(e.Type),
-	}
-
-	switch data := e.Data.(type) {
-	case *MetricsData:
-		event.Data = &pb.TelemetryEvent_Metrics{
-			Metrics: &pb.TelemetryMetricsData{
-				CpuPercent:     data.CPUPercent,
-				MemoryBytes:    data.MemoryBytes,
-				MemoryLimit:    data.MemoryLimit,
-				DiskReadBytes:  data.DiskReadBytes,
-				DiskWriteBytes: data.DiskWriteBytes,
-				NetRecvBytes:   data.NetRecvBytes,
-				NetSentBytes:   data.NetSentBytes,
-				GpuPercent:     data.GPUPercent,
-				GpuMemoryBytes: data.GPUMemoryBytes,
-			},
-		}
-	case *ExecData:
-		event.Data = &pb.TelemetryEvent_Exec{
-			Exec: &pb.TelemetryExecData{
-				Pid:      data.PID,
-				Ppid:     data.PPID,
-				Binary:   data.Binary,
-				Args:     data.Args,
-				ExitCode: data.ExitCode,
-			},
-		}
-	case *ConnectData:
-		event.Data = &pb.TelemetryEvent_Connect{
-			Connect: &pb.TelemetryConnectData{
-				Pid:          data.PID,
-				Address:      data.Address,
-				Port:         data.Port,
-				Protocol:     data.Protocol,
-				LocalAddress: data.LocalAddress,
-				LocalPort:    data.LocalPort,
-			},
-		}
-	case *FileData:
-		event.Data = &pb.TelemetryEvent_File{
-			File: &pb.TelemetryFileData{
-				Pid:       data.PID,
-				Path:      data.Path,
-				Operation: data.Operation,
-				Bytes:     data.Bytes,
-			},
-		}
-	}
-
-	return event
 }
 
 // NewMetricsEvent creates a new metrics telemetry event.

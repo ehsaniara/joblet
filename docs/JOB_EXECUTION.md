@@ -298,7 +298,7 @@ Use job UUIDs to:
 - Check job status: `rnx job status f47ac10b`
 - View job logs: `rnx job log f47ac10b`
 - View resource metrics: `rnx job metrics f47ac10b`
-- View metrics + eBPF telemetry: `rnx job metrics f47ac10b --tel`
+- View eBPF visibility events: `rnx job visibility f47ac10b`
 - Stop running jobs: `rnx job stop f47ac10b`
 - Cancel scheduled jobs: `rnx job cancel f47ac10b`
 - Delete jobs: `rnx job delete f47ac10b`
@@ -408,13 +408,16 @@ rnx job metrics f47ac10b
 rnx --json job metrics f47ac10b
 ```
 
-### eBPF Telemetry
+### eBPF Visibility
 
-For detailed visibility into job behavior, use the `--tel` flag to capture eBPF telemetry events:
+For detailed visibility into job behavior, use the `visibility` command to view eBPF security events:
 
 ```bash
-# View metrics + eBPF telemetry events
-rnx job metrics f47ac10b --tel
+# View eBPF visibility events
+rnx job visibility f47ac10b
+
+# Filter specific event types
+rnx job visibility f47ac10b --types exec,connect
 ```
 
 **Available eBPF Events:**
@@ -422,7 +425,7 @@ rnx job metrics f47ac10b --tel
 | Event Type | Description |
 |------------|-------------|
 | EXEC | Process executions (fork/exec syscalls) |
-| NET | Outgoing network connections (connect syscall) |
+| CONNECT | Outgoing network connections (connect syscall) |
 | ACCEPT | Incoming network connections (accept syscall) |
 | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
 | MMAP | Memory mappings with executable permissions |
@@ -431,11 +434,15 @@ rnx job metrics f47ac10b --tel
 **Filtering eBPF Events:**
 
 ```bash
-# Filter by event type
-rnx job metrics f47ac10b --tel | grep EXEC
-rnx job metrics f47ac10b --tel | grep NET
-rnx job metrics f47ac10b --tel | grep ACCEPT
-rnx job metrics f47ac10b --tel | grep MMAP
+# Filter by event type with grep
+rnx job visibility f47ac10b | grep EXEC
+rnx job visibility f47ac10b | grep CONNECT
+rnx job visibility f47ac10b | grep ACCEPT
+rnx job visibility f47ac10b | grep MMAP
+
+# Or use the --types flag
+rnx job visibility f47ac10b --types exec
+rnx job visibility f47ac10b --types exec,connect,accept
 ```
 
 **Use Cases:**

@@ -1722,3 +1722,302 @@ done:
 		t.Errorf("Expected 0 events for non-existent job, got %d", len(readEvents))
 	}
 }
+
+// TestLocalBackend_ReadMetrics_MultipleGzipStreams tests that ReadMetrics can read
+// metrics from multiple gzip streams (each WriteMetrics call creates a new stream)
+func TestLocalBackend_ReadMetrics_MultipleGzipStreams(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-multi-stream"
+
+	// Write metrics in 5 separate batches (each creates a new gzip stream)
+	totalMetrics := 0
+	for batch := 0; batch < 5; batch++ {
+		metrics := []*ipcpb.Metric{
+			{
+				JobId:     jobID,
+				Timestamp: time.Now().UnixNano() + int64(batch*1000),
+				Sequence:  uint64(batch*2 + 1),
+				Data: &ipcpb.MetricData{
+					CpuUsage:    float64(batch*10 + 1),
+					MemoryUsage: int64(batch*1000 + 100),
+				},
+			},
+			{
+				JobId:     jobID,
+				Timestamp: time.Now().UnixNano() + int64(batch*1000+500),
+				Sequence:  uint64(batch*2 + 2),
+				Data: &ipcpb.MetricData{
+					CpuUsage:    float64(batch*10 + 2),
+					MemoryUsage: int64(batch*1000 + 200),
+				},
+			},
+		}
+
+		err = backend.WriteMetrics(jobID, metrics)
+		if err != nil {
+			t.Fatalf("Failed to write metrics batch %d: %v", batch, err)
+		}
+		totalMetrics += len(metrics)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Read all metrics back - should get all 10, not just the first 2
+	query := &MetricQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadMetrics(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read metrics: %v", err)
+	}
+
+	var readMetrics []*ipcpb.Metric
+	for {
+		select {
+		case metric, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readMetrics = append(readMetrics, metric)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading metrics: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for metrics")
+		}
+	}
+
+done:
+	if len(readMetrics) != totalMetrics {
+		t.Errorf("Expected %d metrics (from 5 batches), got %d - multi-stream gzip reading may be broken", totalMetrics, len(readMetrics))
+	}
+
+	// Verify we got metrics from different batches (check CPU values)
+	seenCpuValues := make(map[float64]bool)
+	for _, m := range readMetrics {
+		seenCpuValues[m.Data.CpuUsage] = true
+	}
+
+	// Should have metrics with CPU values like 1, 2, 11, 12, 21, 22, 31, 32, 41, 42
+	if len(seenCpuValues) != totalMetrics {
+		t.Errorf("Expected %d unique CPU values, got %d - suggests some batches weren't read", totalMetrics, len(seenCpuValues))
+	}
+}
+
+// TestLocalBackend_ReadExecEvents_MultipleGzipStreams tests multi-stream reading for exec events
+func TestLocalBackend_ReadExecEvents_MultipleGzipStreams(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-exec-multi-stream"
+
+	// Write exec events in 3 separate batches
+	totalEvents := 0
+	for batch := 0; batch < 3; batch++ {
+		events := []*ipcpb.ExecEvent{
+			{
+				JobId:     jobID,
+				Timestamp: time.Now().UnixNano() + int64(batch*1000),
+				Sequence:  uint64(batch*2 + 1),
+				Pid:       uint32(1000 + batch*10 + 1),
+				Filename:  "/bin/bash",
+				Args:      []string{"-c", "echo", "batch", string(rune('0' + batch))},
+			},
+			{
+				JobId:     jobID,
+				Timestamp: time.Now().UnixNano() + int64(batch*1000+500),
+				Sequence:  uint64(batch*2 + 2),
+				Pid:       uint32(1000 + batch*10 + 2),
+				Filename:  "/usr/bin/cat",
+				Args:      []string{"/tmp/file"},
+			},
+		}
+
+		err = backend.WriteExecEvents(jobID, events)
+		if err != nil {
+			t.Fatalf("Failed to write exec events batch %d: %v", batch, err)
+		}
+		totalEvents += len(events)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Read all events back
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadExecEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read exec events: %v", err)
+	}
+
+	var readEvents []*ipcpb.ExecEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading exec events: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for exec events")
+		}
+	}
+
+done:
+	if len(readEvents) != totalEvents {
+		t.Errorf("Expected %d exec events (from 3 batches), got %d - multi-stream gzip reading may be broken", totalEvents, len(readEvents))
+	}
+
+	// Verify we got events from different batches (check PID values)
+	seenPids := make(map[uint32]bool)
+	for _, e := range readEvents {
+		seenPids[e.Pid] = true
+	}
+
+	if len(seenPids) != totalEvents {
+		t.Errorf("Expected %d unique PIDs, got %d - suggests some batches weren't read", totalEvents, len(seenPids))
+	}
+}
+
+// TestLocalBackend_ReadConnectEvents_MultipleGzipStreams tests multi-stream reading for connect events
+func TestLocalBackend_ReadConnectEvents_MultipleGzipStreams(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-connect-multi-stream"
+
+	// Write connect events in 4 separate batches
+	totalEvents := 0
+	for batch := 0; batch < 4; batch++ {
+		events := []*ipcpb.ConnectEvent{
+			{
+				JobId:     jobID,
+				Timestamp: time.Now().UnixNano() + int64(batch*1000),
+				Sequence:  uint64(batch + 1),
+				Pid:       uint32(2000 + batch),
+				DstAddr:   "192.168.1." + string(rune('1'+batch)),
+				DstPort:   uint32(8000 + batch),
+			},
+		}
+
+		err = backend.WriteConnectEvents(jobID, events)
+		if err != nil {
+			t.Fatalf("Failed to write connect events batch %d: %v", batch, err)
+		}
+		totalEvents += len(events)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Read all events back
+	query := &TelemetryQuery{
+		JobID: jobID,
+		Limit: 100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadConnectEvents(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read connect events: %v", err)
+	}
+
+	var readEvents []*ipcpb.ConnectEvent
+	for {
+		select {
+		case event, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readEvents = append(readEvents, event)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading connect events: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for connect events")
+		}
+	}
+
+done:
+	if len(readEvents) != totalEvents {
+		t.Errorf("Expected %d connect events (from 4 batches), got %d - multi-stream gzip reading may be broken", totalEvents, len(readEvents))
+	}
+
+	// Verify we got events from different batches (check port values)
+	seenPorts := make(map[uint32]bool)
+	for _, e := range readEvents {
+		seenPorts[e.DstPort] = true
+	}
+
+	if len(seenPorts) != totalEvents {
+		t.Errorf("Expected %d unique ports, got %d - suggests some batches weren't read", totalEvents, len(seenPorts))
+	}
+}
