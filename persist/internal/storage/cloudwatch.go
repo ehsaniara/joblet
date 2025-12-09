@@ -115,6 +115,16 @@ func NewCloudWatchBackend(cfg *config.StorageConfig, nodeID string, log *logger.
 	return backend, nil
 }
 
+// getLogGroupForRead returns the log group for read operations.
+// Uses the passed nodeID if set (for multi-node queries), otherwise uses the local nodeID.
+func (b *CloudWatchBackend) getLogGroupForRead(nodeID string) string {
+	effectiveNodeID := nodeID
+	if effectiveNodeID == "" {
+		effectiveNodeID = b.config.NodeID
+	}
+	return fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, effectiveNodeID)
+}
+
 // WriteLogs writes log lines to CloudWatch Logs
 func (b *CloudWatchBackend) WriteLogs(jobID string, logs []*ipcpb.LogLine) error {
 	if len(logs) == 0 {
@@ -1032,8 +1042,8 @@ func (b *CloudWatchBackend) ReadLogs(ctx context.Context, query *LogQuery) (*Log
 
 // readLogsFromStream retrieves logs from CloudWatch and sends them to the channel
 func (b *CloudWatchBackend) readLogsFromStream(ctx context.Context, query *LogQuery, ch chan<- *ipcpb.LogLine) error {
-	// Single log group per node
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 
 	// Determine stream type suffix
 	streamSuffix := "stdout"
@@ -1113,7 +1123,8 @@ func (b *CloudWatchBackend) ReadMetrics(ctx context.Context, query *MetricQuery)
 
 // readMetricsFromStream retrieves metrics from CloudWatch Logs and sends them to the channel
 func (b *CloudWatchBackend) readMetricsFromStream(ctx context.Context, query *MetricQuery, ch chan<- *ipcpb.Metric) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-metrics", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1316,7 +1327,8 @@ func (b *CloudWatchBackend) ReadExecEvents(ctx context.Context, query *Telemetry
 
 // readExecEventsFromStream retrieves exec events from CloudWatch Logs
 func (b *CloudWatchBackend) readExecEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ExecEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-exec-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1402,7 +1414,8 @@ func (b *CloudWatchBackend) ReadConnectEvents(ctx context.Context, query *Teleme
 
 // readConnectEventsFromStream retrieves connect events from CloudWatch Logs
 func (b *CloudWatchBackend) readConnectEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ConnectEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-connect-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1488,7 +1501,8 @@ func (b *CloudWatchBackend) ReadFileEvents(ctx context.Context, query *Telemetry
 
 // readFileEventsFromStream retrieves file events from CloudWatch Logs
 func (b *CloudWatchBackend) readFileEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.FileEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-file-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1573,7 +1587,8 @@ func (b *CloudWatchBackend) ReadAcceptEvents(ctx context.Context, query *Telemet
 
 // readAcceptEventsFromStream retrieves accept events from CloudWatch Logs
 func (b *CloudWatchBackend) readAcceptEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.AcceptEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-accept-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1658,7 +1673,8 @@ func (b *CloudWatchBackend) ReadSocketDataEvents(ctx context.Context, query *Tel
 
 // readSocketDataEventsFromStream retrieves socket data events from CloudWatch Logs
 func (b *CloudWatchBackend) readSocketDataEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.SocketDataEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-socket-data-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1743,7 +1759,8 @@ func (b *CloudWatchBackend) ReadMmapEvents(ctx context.Context, query *Telemetry
 
 // readMmapEventsFromStream retrieves mmap events from CloudWatch Logs
 func (b *CloudWatchBackend) readMmapEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MmapEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-mmap-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1828,7 +1845,8 @@ func (b *CloudWatchBackend) ReadMprotectEvents(ctx context.Context, query *Telem
 
 // readMprotectEventsFromStream retrieves mprotect events from CloudWatch Logs
 func (b *CloudWatchBackend) readMprotectEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MprotectEvent) error {
-	logGroup := fmt.Sprintf("%s/%s/jobs", b.config.LogGroupPrefix, b.config.NodeID)
+	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
+	logGroup := b.getLogGroupForRead(query.NodeID)
 	logStream := fmt.Sprintf("%s-mprotect-events", query.JobID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{

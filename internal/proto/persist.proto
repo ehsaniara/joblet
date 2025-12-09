@@ -59,6 +59,7 @@ message PingResponse {
 // QueryLogsRequest specifies parameters for log queries
 message QueryLogsRequest {
   string job_id = 1;
+  string node_id = 7;     // Node ID where the job ran (for CloudWatch log group lookup)
 
   // Stream filter
   StreamType stream = 2;  // STDOUT, STDERR, or both (UNSPECIFIED)
@@ -75,6 +76,7 @@ message QueryLogsRequest {
 // QueryMetricsRequest specifies parameters for metrics queries
 message QueryMetricsRequest {
   string job_id = 1;
+  string node_id = 6;     // Node ID where the job ran (for CloudWatch log group lookup)
 
   // Time range (optional)
   int64 start_time = 2;  // Unix nanoseconds
@@ -137,6 +139,7 @@ message NetworkIO {
 // DeleteJobRequest specifies the job to delete from persist storage
 message DeleteJobRequest {
   string job_id = 1;
+  string node_id = 2;     // Node ID where the job ran (for CloudWatch log group lookup)
 }
 
 // DeleteJobResponse indicates the result of the deletion
@@ -148,6 +151,7 @@ message DeleteJobResponse {
 // QueryTelemetryRequest specifies parameters for telemetry event queries
 message QueryTelemetryRequest {
   string job_id = 1;
+  string node_id = 6;     // Node ID where the job ran (for CloudWatch log group lookup)
 
   // Time range (optional)
   int64 start_time = 2;  // Unix nanoseconds

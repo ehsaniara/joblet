@@ -43,6 +43,7 @@ type Backend interface {
 // LogQuery parameters
 type LogQuery struct {
 	JobID     string
+	NodeID    string // Node ID where job ran (for CloudWatch multi-node lookup)
 	Stream    ipcpb.StreamType
 	StartTime *int64
 	EndTime   *int64
@@ -54,6 +55,7 @@ type LogQuery struct {
 // MetricQuery parameters
 type MetricQuery struct {
 	JobID       string
+	NodeID      string // Node ID where job ran (for CloudWatch multi-node lookup)
 	StartTime   *int64
 	EndTime     *int64
 	Aggregation string
@@ -78,6 +80,7 @@ type MetricReader struct {
 // TelemetryQuery parameters for exec and connect events
 type TelemetryQuery struct {
 	JobID     string
+	NodeID    string // Node ID where job ran (for CloudWatch multi-node lookup)
 	StartTime *int64
 	EndTime   *int64
 	Limit     int

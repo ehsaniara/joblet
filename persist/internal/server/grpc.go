@@ -260,6 +260,7 @@ func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb
 	// Build query
 	query := &storage.LogQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Stream: streamTypeGenToIPC(req.Stream),
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
@@ -332,6 +333,7 @@ func (s *GRPCServer) QueryMetrics(req *persistpb.QueryMetricsRequest, stream per
 	// Build query
 	query := &storage.MetricQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -578,6 +580,7 @@ func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, strea
 	// Build query
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -649,6 +652,7 @@ func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, st
 	// Build query
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -718,6 +722,7 @@ func (s *GRPCServer) QueryMmapEvents(req *persistpb.QueryTelemetryRequest, strea
 
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -773,6 +778,7 @@ func (s *GRPCServer) QueryMprotectEvents(req *persistpb.QueryTelemetryRequest, s
 
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -828,6 +834,7 @@ func (s *GRPCServer) QueryFileEvents(req *persistpb.QueryTelemetryRequest, strea
 
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -883,6 +890,7 @@ func (s *GRPCServer) QueryAcceptEvents(req *persistpb.QueryTelemetryRequest, str
 
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}
@@ -938,6 +946,7 @@ func (s *GRPCServer) QuerySocketDataEvents(req *persistpb.QueryTelemetryRequest,
 
 	query := &storage.TelemetryQuery{
 		JobID:  req.JobId,
+		NodeID: req.NodeId, // For multi-node CloudWatch queries
 		Limit:  int(req.Limit),
 		Offset: int(req.Offset),
 	}

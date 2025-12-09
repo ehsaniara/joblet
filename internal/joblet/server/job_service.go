@@ -52,6 +52,16 @@ func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStor
 	}
 }
 
+// getJobNodeId looks up a job by UUID and returns its nodeId.
+// Returns empty string if job not found (falls back to local nodeId in persist).
+func (s *JobServiceServer) getJobNodeId(jobUUID string) string {
+	job, exists := s.jobStore.JobByPrefix(jobUUID)
+	if !exists {
+		return ""
+	}
+	return job.NodeId
+}
+
 // RunJob handles gRPC requests to execute individual jobs.
 func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*pb.RunJobResponse, error) {
 	log := s.logger.WithFields(
@@ -492,6 +502,7 @@ func (s *JobServiceServer) sendHistoricalLogs(stream pb.JobService_GetJobLogsSer
 	if s.persistClient != nil {
 		persistReq := &persistpb.QueryLogsRequest{
 			JobId:  jobUUID,
+			NodeId: s.getJobNodeId(jobUUID), // For multi-node CloudWatch queries
 			Stream: persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
 		}
 
@@ -526,6 +537,7 @@ func (s *JobServiceServer) sendHistoricalLogs(stream pb.JobService_GetJobLogsSer
 func (s *JobServiceServer) queryPersistLogs(stream pb.JobService_GetJobLogsServer, jobUUID string, log *logger.Logger) (int, error) {
 	persistReq := &persistpb.QueryLogsRequest{
 		JobId:  jobUUID,
+		NodeId: s.getJobNodeId(jobUUID), // For multi-node CloudWatch queries
 		Stream: persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
 	}
 
@@ -861,6 +873,7 @@ func (s *JobServiceServer) queryPersistMetrics(stream grpc.ServerStreamingServer
 
 	metricsReq := &persistpb.QueryMetricsRequest{
 		JobId:     jobID,
+		NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 		StartTime: startTime,
 		EndTime:   endTime,
 		Limit:     limit,
@@ -1061,6 +1074,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsExec {
 		execReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
@@ -1095,6 +1109,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsConnect {
 		connectReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
@@ -1131,6 +1146,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsMmap {
 		mmapReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
@@ -1165,6 +1181,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsMprotect {
 		mprotectReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
@@ -1199,6 +1216,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsFile {
 		fileReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
@@ -1233,6 +1251,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsAccept {
 		acceptReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
@@ -1269,6 +1288,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	if wantsSocketData {
 		socketDataReq := &persistpb.QueryTelemetryRequest{
 			JobId:     jobID,
+			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
 			Limit:     limit,
