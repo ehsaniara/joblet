@@ -113,6 +113,16 @@ telemetry:
   # Captures process executions, network connections, memory mappings
   ebpf_enabled: true         # Default: true (disable to reduce overhead)
 
+  # List of enabled eBPF event types (omit or leave empty for all)
+  # Valid: exec, connect, accept, mmap, mprotect, file, socket_data
+  # Disable high-volume events (mmap, file, socket_data) to reduce overhead
+  event_types: []            # Empty = all enabled (default)
+  # Example - enable only low-volume events:
+  # event_types:
+  #   - exec
+  #   - connect
+  #   - accept
+
 # Security section will be added by certs_gen_embedded.sh
 # DO NOT ADD CERTIFICATES HERE - they will be embedded automatically
 

@@ -9,7 +9,7 @@ When you run a job with `rnx job run`, Joblet:
 
 1. **Creates a PID namespace** - The job gets its own process space
 2. **Makes job process PID 1** - Your command becomes the init process in the namespace
-3. **Isolates process visibility** - Jobs can only see their own process tree
+3. **Isolates process telematics** - Jobs can only see their own process tree
 4. **Preserves parent-child relationships** - Child processes are visible with proper PIDs
 
 ## Process Hierarchy
@@ -75,7 +75,7 @@ This demonstrates:
 
 - Background processes with subshells
 - Process synchronization using `wait`
-- Complete process lifecycle visibility
+- Complete process lifecycle telematics
 
 ## Key Benefits
 
@@ -85,7 +85,7 @@ This demonstrates:
 - Child processes get sequential PIDs (2, 3, 4, etc.)
 - No fake process renumbering or filtering
 
-### 2. **Complete Process Tree Visibility**
+### 2. **Complete Process Tree Telematics**
 
 - See all processes spawned by your job
 - Parent-child relationships are preserved
@@ -138,7 +138,7 @@ Joblet achieves process isolation through:
 | Feature                  | Joblet | Traditional Containers |
 |--------------------------|--------|------------------------|
 | Process becomes PID 1    | ✅      | ✅                      |
-| Child process visibility | ✅      | ✅                      |
+| Child process telematics | ✅      | ✅                      |
 | Host process isolation   | ✅      | ✅                      |
 | Standard process tools   | ✅      | ✅                      |
 | Resource limits          | ✅      | ✅                      |
@@ -183,7 +183,7 @@ rnx job run --runtime=python-3.11-ml bash -c "risky-task & wait \$! || echo 'Tas
 Process isolation provides strong security boundaries:
 
 - **No process interference**: Jobs cannot affect other jobs' processes
-- **No host visibility**: Cannot see or interact with host system processes
+- **No host telematics**: Cannot see or interact with host system processes
 - **Resource isolation**: Process limits are enforced at the cgroup level
 - **Signal isolation**: Cannot send signals to processes outside the namespace
 

@@ -34,8 +34,8 @@ For RUNNING jobs: Shows all metrics from start to current, then continues
 Short-form UUIDs are supported - you can use just the first 8 characters
 if they uniquely identify a job.
 
-For eBPF visibility events (process execution, network connections, etc.),
-use the separate 'rnx job visibility' command.
+For eBPF telematics events (process execution, network connections, etc.),
+use the separate 'rnx job telematics' command.
 
 Examples:
   # View resource metrics

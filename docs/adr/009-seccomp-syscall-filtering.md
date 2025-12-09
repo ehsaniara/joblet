@@ -276,7 +276,7 @@ security, we're getting a complete observability platform for free.
 Think about what we're building here:
 
 - **Multi-level security**: Choose your own adventure - from paranoid to permissive
-- **Performance monitoring**: The same hooks give us incredible visibility
+- **Performance monitoring**: The same hooks give us incredible telematics
 - **All native Linux**: No agents, no libraries, just kernel features
 - **Future-proof**: eBPF is where Linux kernel development is happening
 

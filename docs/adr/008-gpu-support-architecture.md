@@ -104,7 +104,7 @@ using `mknod` system calls with appropriate permissions, ensuring jobs cannot ac
 
 **CUDA Runtime Integration**: CUDA libraries are integrated using read-only bind mounts into each job's mount namespace.
 This approach provides necessary runtime access while preventing modification of system libraries. Environment
-variables (such as `CUDA_VISIBLE_DEVICES`) are configured to enforce memory limits and device visibility, providing an
+variables (such as `CUDA_VISIBLE_DEVICES`) are configured to enforce memory limits and device telematics, providing an
 additional layer of resource control.
 
 #### API Extensions
@@ -116,7 +116,7 @@ providing comprehensive GPU functionality.
 memory requirements, and minimum compute capability. These fields are optional, ensuring existing non-GPU workloads
 continue to function without modification.
 
-**Enhanced Status Reporting**: Job status responses include detailed GPU allocation information, providing visibility
+**Enhanced Status Reporting**: Job status responses include detailed GPU allocation information, providing telematics
 into assigned GPU indices, memory allocation, and utilization metrics. This enables users and monitoring systems to
 track GPU resource usage effectively.
 

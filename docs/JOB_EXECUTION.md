@@ -298,7 +298,7 @@ Use job UUIDs to:
 - Check job status: `rnx job status f47ac10b`
 - View job logs: `rnx job log f47ac10b`
 - View resource metrics: `rnx job metrics f47ac10b`
-- View eBPF visibility events: `rnx job visibility f47ac10b`
+- View eBPF telematics events: `rnx job telematics f47ac10b`
 - Stop running jobs: `rnx job stop f47ac10b`
 - Cancel scheduled jobs: `rnx job cancel f47ac10b`
 - Delete jobs: `rnx job delete f47ac10b`
@@ -408,16 +408,16 @@ rnx job metrics f47ac10b
 rnx --json job metrics f47ac10b
 ```
 
-### eBPF Visibility
+### eBPF Telematics
 
-For detailed visibility into job behavior, use the `visibility` command to view eBPF security events:
+For detailed telematics into job behavior, use the `telematics` command to view eBPF security events:
 
 ```bash
-# View eBPF visibility events
-rnx job visibility f47ac10b
+# View eBPF telematics events
+rnx job telematics f47ac10b
 
 # Filter specific event types
-rnx job visibility f47ac10b --types exec,connect
+rnx job telematics f47ac10b --types exec,connect
 ```
 
 **Available eBPF Events:**
@@ -435,14 +435,14 @@ rnx job visibility f47ac10b --types exec,connect
 
 ```bash
 # Filter by event type with grep
-rnx job visibility f47ac10b | grep EXEC
-rnx job visibility f47ac10b | grep CONNECT
-rnx job visibility f47ac10b | grep ACCEPT
-rnx job visibility f47ac10b | grep MMAP
+rnx job telematics f47ac10b | grep EXEC
+rnx job telematics f47ac10b | grep CONNECT
+rnx job telematics f47ac10b | grep ACCEPT
+rnx job telematics f47ac10b | grep MMAP
 
 # Or use the --types flag
-rnx job visibility f47ac10b --types exec
-rnx job visibility f47ac10b --types exec,connect,accept
+rnx job telematics f47ac10b --types exec
+rnx job telematics f47ac10b --types exec,connect,accept
 ```
 
 **Use Cases:**

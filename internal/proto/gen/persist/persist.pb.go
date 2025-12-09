@@ -866,7 +866,7 @@ func (x *QueryTelemetryRequest) GetOffset() int32 {
 	return 0
 }
 
-// ExecEvent represents a process execution event from eBPF visibility
+// ExecEvent represents a process execution event from eBPF telematics
 type ExecEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -983,7 +983,7 @@ func (x *ExecEvent) GetArgs() []string {
 	return nil
 }
 
-// ConnectEvent represents a network connection event from eBPF visibility
+// ConnectEvent represents a network connection event from eBPF telematics
 type ConnectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -1100,6 +1100,559 @@ func (x *ConnectEvent) GetProtocol() string {
 	return ""
 }
 
+// MmapEvent represents a memory mapping event from eBPF telematics
+type MmapEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
+	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
+	Comm          string                 `protobuf:"bytes,5,opt,name=comm,proto3" json:"comm,omitempty"`            // Process command name
+	Addr          uint64                 `protobuf:"varint,6,opt,name=addr,proto3" json:"addr,omitempty"`           // Memory address
+	Length        uint64                 `protobuf:"varint,7,opt,name=length,proto3" json:"length,omitempty"`       // Mapping length
+	Prot          uint32                 `protobuf:"varint,8,opt,name=prot,proto3" json:"prot,omitempty"`           // Protection flags
+	Flags         uint32                 `protobuf:"varint,9,opt,name=flags,proto3" json:"flags,omitempty"`         // Map flags
+	Filename      string                 `protobuf:"bytes,10,opt,name=filename,proto3" json:"filename,omitempty"`   // Mapped file (if file-backed)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MmapEvent) Reset() {
+	*x = MmapEvent{}
+	mi := &file_persist_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MmapEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MmapEvent) ProtoMessage() {}
+
+func (x *MmapEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_persist_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MmapEvent.ProtoReflect.Descriptor instead.
+func (*MmapEvent) Descriptor() ([]byte, []int) {
+	return file_persist_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *MmapEvent) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *MmapEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetComm() string {
+	if x != nil {
+		return x.Comm
+	}
+	return ""
+}
+
+func (x *MmapEvent) GetAddr() uint64 {
+	if x != nil {
+		return x.Addr
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetLength() uint64 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetProt() uint32 {
+	if x != nil {
+		return x.Prot
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetFlags() uint32 {
+	if x != nil {
+		return x.Flags
+	}
+	return 0
+}
+
+func (x *MmapEvent) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+// MprotectEvent represents a memory protection change event from eBPF telematics
+type MprotectEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
+	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
+	Comm          string                 `protobuf:"bytes,5,opt,name=comm,proto3" json:"comm,omitempty"`            // Process command name
+	Addr          uint64                 `protobuf:"varint,6,opt,name=addr,proto3" json:"addr,omitempty"`           // Memory address
+	Length        uint64                 `protobuf:"varint,7,opt,name=length,proto3" json:"length,omitempty"`       // Region length
+	Prot          uint32                 `protobuf:"varint,8,opt,name=prot,proto3" json:"prot,omitempty"`           // New protection flags
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MprotectEvent) Reset() {
+	*x = MprotectEvent{}
+	mi := &file_persist_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MprotectEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MprotectEvent) ProtoMessage() {}
+
+func (x *MprotectEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_persist_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MprotectEvent.ProtoReflect.Descriptor instead.
+func (*MprotectEvent) Descriptor() ([]byte, []int) {
+	return file_persist_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *MprotectEvent) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *MprotectEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *MprotectEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *MprotectEvent) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *MprotectEvent) GetComm() string {
+	if x != nil {
+		return x.Comm
+	}
+	return ""
+}
+
+func (x *MprotectEvent) GetAddr() uint64 {
+	if x != nil {
+		return x.Addr
+	}
+	return 0
+}
+
+func (x *MprotectEvent) GetLength() uint64 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+func (x *MprotectEvent) GetProt() uint32 {
+	if x != nil {
+		return x.Prot
+	}
+	return 0
+}
+
+// FileEvent represents a file operation event from eBPF telematics
+type FileEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
+	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
+	Comm          string                 `protobuf:"bytes,5,opt,name=comm,proto3" json:"comm,omitempty"`            // Process command name
+	Path          string                 `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`            // File path
+	Operation     string                 `protobuf:"bytes,7,opt,name=operation,proto3" json:"operation,omitempty"`  // Operation type (open, read, write, etc.)
+	Bytes         int64                  `protobuf:"varint,8,opt,name=bytes,proto3" json:"bytes,omitempty"`         // Bytes read/written
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileEvent) Reset() {
+	*x = FileEvent{}
+	mi := &file_persist_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileEvent) ProtoMessage() {}
+
+func (x *FileEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_persist_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileEvent.ProtoReflect.Descriptor instead.
+func (*FileEvent) Descriptor() ([]byte, []int) {
+	return file_persist_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *FileEvent) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *FileEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *FileEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *FileEvent) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *FileEvent) GetComm() string {
+	if x != nil {
+		return x.Comm
+	}
+	return ""
+}
+
+func (x *FileEvent) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FileEvent) GetOperation() string {
+	if x != nil {
+		return x.Operation
+	}
+	return ""
+}
+
+func (x *FileEvent) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+// AcceptEvent represents an incoming network connection event from eBPF telematics
+type AcceptEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
+	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
+	Comm          string                 `protobuf:"bytes,5,opt,name=comm,proto3" json:"comm,omitempty"`                       // Process command name
+	SrcAddr       string                 `protobuf:"bytes,6,opt,name=src_addr,json=srcAddr,proto3" json:"src_addr,omitempty"`  // Source IP address (remote client)
+	SrcPort       uint32                 `protobuf:"varint,7,opt,name=src_port,json=srcPort,proto3" json:"src_port,omitempty"` // Source port
+	DstAddr       string                 `protobuf:"bytes,8,opt,name=dst_addr,json=dstAddr,proto3" json:"dst_addr,omitempty"`  // Destination IP address (local server)
+	DstPort       uint32                 `protobuf:"varint,9,opt,name=dst_port,json=dstPort,proto3" json:"dst_port,omitempty"` // Destination port
+	Protocol      string                 `protobuf:"bytes,10,opt,name=protocol,proto3" json:"protocol,omitempty"`              // Protocol (TCP)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AcceptEvent) Reset() {
+	*x = AcceptEvent{}
+	mi := &file_persist_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptEvent) ProtoMessage() {}
+
+func (x *AcceptEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_persist_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptEvent.ProtoReflect.Descriptor instead.
+func (*AcceptEvent) Descriptor() ([]byte, []int) {
+	return file_persist_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *AcceptEvent) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *AcceptEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *AcceptEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *AcceptEvent) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *AcceptEvent) GetComm() string {
+	if x != nil {
+		return x.Comm
+	}
+	return ""
+}
+
+func (x *AcceptEvent) GetSrcAddr() string {
+	if x != nil {
+		return x.SrcAddr
+	}
+	return ""
+}
+
+func (x *AcceptEvent) GetSrcPort() uint32 {
+	if x != nil {
+		return x.SrcPort
+	}
+	return 0
+}
+
+func (x *AcceptEvent) GetDstAddr() string {
+	if x != nil {
+		return x.DstAddr
+	}
+	return ""
+}
+
+func (x *AcceptEvent) GetDstPort() uint32 {
+	if x != nil {
+		return x.DstPort
+	}
+	return 0
+}
+
+func (x *AcceptEvent) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+// SocketDataEvent represents socket data transfer event from eBPF telematics
+type SocketDataEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
+	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
+	Comm          string                 `protobuf:"bytes,5,opt,name=comm,proto3" json:"comm,omitempty"`                       // Process command name
+	Direction     string                 `protobuf:"bytes,6,opt,name=direction,proto3" json:"direction,omitempty"`             // Direction (send, recv)
+	DstAddr       string                 `protobuf:"bytes,7,opt,name=dst_addr,json=dstAddr,proto3" json:"dst_addr,omitempty"`  // Remote address
+	DstPort       uint32                 `protobuf:"varint,8,opt,name=dst_port,json=dstPort,proto3" json:"dst_port,omitempty"` // Remote port
+	Bytes         int64                  `protobuf:"varint,9,opt,name=bytes,proto3" json:"bytes,omitempty"`                    // Bytes transferred
+	Protocol      string                 `protobuf:"bytes,10,opt,name=protocol,proto3" json:"protocol,omitempty"`              // Protocol (TCP, UDP)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocketDataEvent) Reset() {
+	*x = SocketDataEvent{}
+	mi := &file_persist_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocketDataEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocketDataEvent) ProtoMessage() {}
+
+func (x *SocketDataEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_persist_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocketDataEvent.ProtoReflect.Descriptor instead.
+func (*SocketDataEvent) Descriptor() ([]byte, []int) {
+	return file_persist_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SocketDataEvent) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *SocketDataEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *SocketDataEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *SocketDataEvent) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *SocketDataEvent) GetComm() string {
+	if x != nil {
+		return x.Comm
+	}
+	return ""
+}
+
+func (x *SocketDataEvent) GetDirection() string {
+	if x != nil {
+		return x.Direction
+	}
+	return ""
+}
+
+func (x *SocketDataEvent) GetDstAddr() string {
+	if x != nil {
+		return x.DstAddr
+	}
+	return ""
+}
+
+func (x *SocketDataEvent) GetDstPort() uint32 {
+	if x != nil {
+		return x.DstPort
+	}
+	return 0
+}
+
+func (x *SocketDataEvent) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *SocketDataEvent) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
 var File_persist_proto protoreflect.FileDescriptor
 
 const file_persist_proto_rawDesc = "" +
@@ -1192,18 +1745,77 @@ const file_persist_proto_rawDesc = "" +
 	"\bdst_addr\x18\b \x01(\tR\adstAddr\x12\x19\n" +
 	"\bdst_port\x18\t \x01(\rR\adstPort\x12\x1a\n" +
 	"\bprotocol\x18\n" +
+	" \x01(\tR\bprotocol\"\xf4\x01\n" +
+	"\tMmapEvent\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
+	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
+	"\x04addr\x18\x06 \x01(\x04R\x04addr\x12\x16\n" +
+	"\x06length\x18\a \x01(\x04R\x06length\x12\x12\n" +
+	"\x04prot\x18\b \x01(\rR\x04prot\x12\x14\n" +
+	"\x05flags\x18\t \x01(\rR\x05flags\x12\x1a\n" +
+	"\bfilename\x18\n" +
+	" \x01(\tR\bfilename\"\xc6\x01\n" +
+	"\rMprotectEvent\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
+	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
+	"\x04addr\x18\x06 \x01(\x04R\x04addr\x12\x16\n" +
+	"\x06length\x18\a \x01(\x04R\x06length\x12\x12\n" +
+	"\x04prot\x18\b \x01(\rR\x04prot\"\xca\x01\n" +
+	"\tFileEvent\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
+	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
+	"\x04path\x18\x06 \x01(\tR\x04path\x12\x1c\n" +
+	"\toperation\x18\a \x01(\tR\toperation\x12\x14\n" +
+	"\x05bytes\x18\b \x01(\x03R\x05bytes\"\x8c\x02\n" +
+	"\vAcceptEvent\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
+	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x19\n" +
+	"\bsrc_addr\x18\x06 \x01(\tR\asrcAddr\x12\x19\n" +
+	"\bsrc_port\x18\a \x01(\rR\asrcPort\x12\x19\n" +
+	"\bdst_addr\x18\b \x01(\tR\adstAddr\x12\x19\n" +
+	"\bdst_port\x18\t \x01(\rR\adstPort\x12\x1a\n" +
+	"\bprotocol\x18\n" +
+	" \x01(\tR\bprotocol\"\x8e\x02\n" +
+	"\x0fSocketDataEvent\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
+	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x1c\n" +
+	"\tdirection\x18\x06 \x01(\tR\tdirection\x12\x19\n" +
+	"\bdst_addr\x18\a \x01(\tR\adstAddr\x12\x19\n" +
+	"\bdst_port\x18\b \x01(\rR\adstPort\x12\x14\n" +
+	"\x05bytes\x18\t \x01(\x03R\x05bytes\x12\x1a\n" +
+	"\bprotocol\x18\n" +
 	" \x01(\tR\bprotocol*Y\n" +
 	"\n" +
 	"StreamType\x12\x1b\n" +
 	"\x17STREAM_TYPE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12STREAM_TYPE_STDOUT\x10\x01\x12\x16\n" +
-	"\x12STREAM_TYPE_STDERR\x10\x022\xf2\x03\n" +
+	"\x12STREAM_TYPE_STDERR\x10\x022\xbd\a\n" +
 	"\x0ePersistService\x12A\n" +
 	"\x04Ping\x12\x1b.joblet.persist.PingRequest\x1a\x1c.joblet.persist.PingResponse\x12H\n" +
 	"\tQueryLogs\x12 .joblet.persist.QueryLogsRequest\x1a\x17.joblet.persist.LogLine0\x01\x12M\n" +
 	"\fQueryMetrics\x12#.joblet.persist.QueryMetricsRequest\x1a\x16.joblet.persist.Metric0\x01\x12U\n" +
 	"\x0fQueryExecEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x19.joblet.persist.ExecEvent0\x01\x12[\n" +
-	"\x12QueryConnectEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x1c.joblet.persist.ConnectEvent0\x01\x12P\n" +
+	"\x12QueryConnectEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x1c.joblet.persist.ConnectEvent0\x01\x12U\n" +
+	"\x0fQueryMmapEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x19.joblet.persist.MmapEvent0\x01\x12]\n" +
+	"\x13QueryMprotectEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x1d.joblet.persist.MprotectEvent0\x01\x12U\n" +
+	"\x0fQueryFileEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x19.joblet.persist.FileEvent0\x01\x12Y\n" +
+	"\x11QueryAcceptEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x1b.joblet.persist.AcceptEvent0\x01\x12a\n" +
+	"\x15QuerySocketDataEvents\x12%.joblet.persist.QueryTelemetryRequest\x1a\x1f.joblet.persist.SocketDataEvent0\x01\x12P\n" +
 	"\tDeleteJob\x12 .joblet.persist.DeleteJobRequest\x1a!.joblet.persist.DeleteJobResponseB8Z6github.com/ehsaniara/joblet/internal/proto/gen/persistb\x06proto3"
 
 var (
@@ -1219,7 +1831,7 @@ func file_persist_proto_rawDescGZIP() []byte {
 }
 
 var file_persist_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_persist_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_persist_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_persist_proto_goTypes = []any{
 	(StreamType)(0),               // 0: joblet.persist.StreamType
 	(*PingRequest)(nil),           // 1: joblet.persist.PingRequest
@@ -1236,6 +1848,11 @@ var file_persist_proto_goTypes = []any{
 	(*QueryTelemetryRequest)(nil), // 12: joblet.persist.QueryTelemetryRequest
 	(*ExecEvent)(nil),             // 13: joblet.persist.ExecEvent
 	(*ConnectEvent)(nil),          // 14: joblet.persist.ConnectEvent
+	(*MmapEvent)(nil),             // 15: joblet.persist.MmapEvent
+	(*MprotectEvent)(nil),         // 16: joblet.persist.MprotectEvent
+	(*FileEvent)(nil),             // 17: joblet.persist.FileEvent
+	(*AcceptEvent)(nil),           // 18: joblet.persist.AcceptEvent
+	(*SocketDataEvent)(nil),       // 19: joblet.persist.SocketDataEvent
 }
 var file_persist_proto_depIdxs = []int32{
 	0,  // 0: joblet.persist.QueryLogsRequest.stream:type_name -> joblet.persist.StreamType
@@ -1248,15 +1865,25 @@ var file_persist_proto_depIdxs = []int32{
 	4,  // 7: joblet.persist.PersistService.QueryMetrics:input_type -> joblet.persist.QueryMetricsRequest
 	12, // 8: joblet.persist.PersistService.QueryExecEvents:input_type -> joblet.persist.QueryTelemetryRequest
 	12, // 9: joblet.persist.PersistService.QueryConnectEvents:input_type -> joblet.persist.QueryTelemetryRequest
-	10, // 10: joblet.persist.PersistService.DeleteJob:input_type -> joblet.persist.DeleteJobRequest
-	2,  // 11: joblet.persist.PersistService.Ping:output_type -> joblet.persist.PingResponse
-	5,  // 12: joblet.persist.PersistService.QueryLogs:output_type -> joblet.persist.LogLine
-	6,  // 13: joblet.persist.PersistService.QueryMetrics:output_type -> joblet.persist.Metric
-	13, // 14: joblet.persist.PersistService.QueryExecEvents:output_type -> joblet.persist.ExecEvent
-	14, // 15: joblet.persist.PersistService.QueryConnectEvents:output_type -> joblet.persist.ConnectEvent
-	11, // 16: joblet.persist.PersistService.DeleteJob:output_type -> joblet.persist.DeleteJobResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
+	12, // 10: joblet.persist.PersistService.QueryMmapEvents:input_type -> joblet.persist.QueryTelemetryRequest
+	12, // 11: joblet.persist.PersistService.QueryMprotectEvents:input_type -> joblet.persist.QueryTelemetryRequest
+	12, // 12: joblet.persist.PersistService.QueryFileEvents:input_type -> joblet.persist.QueryTelemetryRequest
+	12, // 13: joblet.persist.PersistService.QueryAcceptEvents:input_type -> joblet.persist.QueryTelemetryRequest
+	12, // 14: joblet.persist.PersistService.QuerySocketDataEvents:input_type -> joblet.persist.QueryTelemetryRequest
+	10, // 15: joblet.persist.PersistService.DeleteJob:input_type -> joblet.persist.DeleteJobRequest
+	2,  // 16: joblet.persist.PersistService.Ping:output_type -> joblet.persist.PingResponse
+	5,  // 17: joblet.persist.PersistService.QueryLogs:output_type -> joblet.persist.LogLine
+	6,  // 18: joblet.persist.PersistService.QueryMetrics:output_type -> joblet.persist.Metric
+	13, // 19: joblet.persist.PersistService.QueryExecEvents:output_type -> joblet.persist.ExecEvent
+	14, // 20: joblet.persist.PersistService.QueryConnectEvents:output_type -> joblet.persist.ConnectEvent
+	15, // 21: joblet.persist.PersistService.QueryMmapEvents:output_type -> joblet.persist.MmapEvent
+	16, // 22: joblet.persist.PersistService.QueryMprotectEvents:output_type -> joblet.persist.MprotectEvent
+	17, // 23: joblet.persist.PersistService.QueryFileEvents:output_type -> joblet.persist.FileEvent
+	18, // 24: joblet.persist.PersistService.QueryAcceptEvents:output_type -> joblet.persist.AcceptEvent
+	19, // 25: joblet.persist.PersistService.QuerySocketDataEvents:output_type -> joblet.persist.SocketDataEvent
+	11, // 26: joblet.persist.PersistService.DeleteJob:output_type -> joblet.persist.DeleteJobResponse
+	16, // [16:27] is the sub-list for method output_type
+	5,  // [5:16] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -1273,7 +1900,7 @@ func file_persist_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_persist_proto_rawDesc), len(file_persist_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

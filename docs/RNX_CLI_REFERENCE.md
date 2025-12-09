@@ -13,7 +13,7 @@ operations.
     - [status](#rnx-job-status)
     - [log](#rnx-job-log)
     - [metrics](#rnx-job-metrics)
-    - [visibility](#rnx-job-visibility)
+    - [telematics](#rnx-job-telematics)
     - [stop](#rnx-job-stop)
     - [cancel](#rnx-job-cancel)
     - [delete](#rnx-job-delete)
@@ -339,7 +339,7 @@ rnx job metrics <job-uuid>
 Shows CPU, memory, I/O, network, and GPU metrics collected during job execution via cgroups (sampled every ~5 seconds).
 Metrics are stored as time-series data, allowing complete historical replay of resource usage.
 
-For eBPF visibility events (process execution, network connections, etc.), use the separate `rnx job visibility` command.
+For eBPF telematics events (process execution, network connections, etc.), use the separate `rnx job telematics` command.
 
 #### Parameters
 
@@ -405,12 +405,12 @@ gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | head -10
 gzip -dc /opt/joblet/metrics/<job-uuid>/*.jsonl.gz | jq -c '{timestamp, cpu: .cpu_percent}'
 ```
 
-### `rnx job visibility`
+### `rnx job telematics`
 
-View eBPF security visibility events for a job.
+View eBPF security telematics events for a job.
 
 ```bash
-rnx job visibility <job-uuid> [--types <event-types>]
+rnx job telematics <job-uuid> [--types <event-types>]
 ```
 
 Shows security-relevant events captured by eBPF tracing during job execution. These events are useful for security
@@ -425,7 +425,7 @@ monitoring, debugging, and understanding job behavior.
 
 #### Behavior
 
-Similar to `rnx job log`, this command streams all visibility events from job start:
+Similar to `rnx job log`, this command streams all telematics events from job start:
 
 - **For completed jobs**: Shows all events from start to finish, then exits
 - **For running jobs**: Shows all events from start to current, then continues streaming live until job completes or
@@ -448,29 +448,29 @@ Works with both running and completed jobs. Supports short UUIDs (first 8 charac
 #### Examples
 
 ```bash
-# View all visibility events for a completed job
-rnx job visibility f47ac10b-58cc-4372-a567-0e02b2c3d479
+# View all telematics events for a completed job
+rnx job telematics f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Monitor a running job using short UUID
-rnx job visibility f47ac10b
+rnx job telematics f47ac10b
 
 # Filter specific event types
-rnx job visibility f47ac10b --types exec,connect
+rnx job telematics f47ac10b --types exec,connect
 
 # Filter with grep for specific event types
-rnx job visibility f47ac10b | grep EXEC
-rnx job visibility f47ac10b | grep CONNECT
-rnx job visibility f47ac10b | grep ACCEPT
-rnx job visibility f47ac10b | grep MMAP
+rnx job telematics f47ac10b | grep EXEC
+rnx job telematics f47ac10b | grep CONNECT
+rnx job telematics f47ac10b | grep ACCEPT
+rnx job telematics f47ac10b | grep MMAP
 
 # Output as JSON (one event per line)
-rnx --json job visibility f47ac10b
+rnx --json job telematics f47ac10b
 
 # Filter JSON output with jq
-rnx --json job visibility f47ac10b | jq 'select(.type == "exec")'
+rnx --json job telematics f47ac10b | jq 'select(.type == "exec")'
 
-# Analyze visibility events from a job
-rnx --json job visibility f47ac10b > events.jsonl
+# Analyze telematics events from a job
+rnx --json job telematics f47ac10b > events.jsonl
 cat events.jsonl | jq -r 'select(.type == "connect") | [.timestamp, .connect.dstAddr, .connect.dstPort] | @csv'
 ```
 

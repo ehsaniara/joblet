@@ -19,7 +19,7 @@ Available subcommands:
   status     Show comprehensive status of a specific job
   log        Stream logs from a job (historical + live)
   metrics    View resource metrics (CPU, memory, I/O, network, GPU)
-  visibility View eBPF security events (exec, connect, accept, etc.)
+  telematics View eBPF security events (exec, connect, accept, etc.)
   stop       Stop a running job (sends SIGTERM/SIGKILL)
   cancel     Cancel a scheduled job (status becomes CANCELED)
   delete     Delete a specific job and all its data
@@ -31,7 +31,7 @@ Examples:
   rnx job status f47ac10b                # Check job status
   rnx job log f47ac10b                   # Stream logs
   rnx job metrics f47ac10b               # View resource metrics
-  rnx job visibility f47ac10b            # View eBPF security events`,
+  rnx job telematics f47ac10b            # View eBPF security events`,
 	}
 
 	// Add all job-related subcommands
@@ -40,7 +40,7 @@ Examples:
 	cmd.AddCommand(NewStatusCmd())
 	cmd.AddCommand(NewLogCmd())
 	cmd.AddCommand(NewMetricsCmd())
-	cmd.AddCommand(NewVisibilityCmd())
+	cmd.AddCommand(NewTelematicsCmd())
 	cmd.AddCommand(NewStopCmd())
 	cmd.AddCommand(NewCancelCmd())
 	cmd.AddCommand(NewDeleteCmd())

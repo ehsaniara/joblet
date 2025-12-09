@@ -709,24 +709,24 @@ ssh server "df -h /opt/joblet && df -i /opt/joblet"
 
 ### 8. eBPF Telemetry and CloudWatch Integration
 
-When eBPF visibility is enabled, joblet captures process execution, network connection, and memory events from jobs. These events are shipped to CloudWatch alongside regular logs and metrics.
+When eBPF telematics is enabled, joblet captures process execution, network connection, and memory events from jobs. These events are shipped to CloudWatch alongside regular logs and metrics.
 
-**Viewing eBPF Visibility Events via CLI:**
+**Viewing eBPF Telematics Events via CLI:**
 ```bash
-# View eBPF visibility events for a job
-rnx job visibility <job-uuid>
+# View eBPF telematics events for a job
+rnx job telematics <job-uuid>
 
 # Using short UUID (first 8 characters)
-rnx job visibility f47ac10b
+rnx job telematics f47ac10b
 
 # Filter specific event types
-rnx job visibility f47ac10b --types exec,connect
+rnx job telematics f47ac10b --types exec,connect
 
 # Filter with grep
-rnx job visibility f47ac10b | grep EXEC      # Process executions
-rnx job visibility f47ac10b | grep CONNECT   # Outgoing connections
-rnx job visibility f47ac10b | grep ACCEPT    # Incoming connections
-rnx job visibility f47ac10b | grep MMAP      # Memory mappings with exec
+rnx job telematics f47ac10b | grep EXEC      # Process executions
+rnx job telematics f47ac10b | grep CONNECT   # Outgoing connections
+rnx job telematics f47ac10b | grep ACCEPT    # Incoming connections
+rnx job telematics f47ac10b | grep MMAP      # Memory mappings with exec
 
 # View resource metrics separately
 rnx job metrics f47ac10b
@@ -803,7 +803,7 @@ ssh server "journalctl -u persist | grep 'Wrote.*events' | tail -20"
 
 **Configuration:**
 
-eBPF visibility is configured in joblet:
+eBPF telematics is configured in joblet:
 ```yaml
 # /opt/joblet/config/config.yml
 telemetry:

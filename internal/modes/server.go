@@ -23,7 +23,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/core/volume"
-	"github.com/ehsaniara/joblet/internal/joblet/ebpf/visibility"
+	"github.com/ehsaniara/joblet/internal/joblet/ebpf/telematics"
 	"github.com/ehsaniara/joblet/internal/joblet/ipc"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
 	"github.com/ehsaniara/joblet/internal/joblet/server"
@@ -143,18 +143,34 @@ func RunServer(cfg *config.Config) error {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
-	// Initialize eBPF visibility monitor for job activity tracking (ADR-014)
-	var visibilityMonitor *visibility.Monitor
-	if err := visibility.IsSupported(); err != nil {
-		log.Info("eBPF visibility not available", "reason", err)
+	// Initialize eBPF telematics monitor for job activity tracking (ADR-014)
+	var telematicsMonitor *telematics.Monitor
+	if err := telematics.IsSupported(); err != nil {
+		log.Info("eBPF telematics not available", "reason", err)
 	} else {
-		visibilityMonitor = visibility.NewMonitor(telemetryCollector, log)
-		if err := visibilityMonitor.Start(); err != nil {
-			log.Warn("failed to start eBPF visibility monitor", "error", err)
-			visibilityMonitor = nil
+		// Build event type config from configuration
+		// Empty/nil EventTypes = all enabled (default)
+		eventConfig := telematics.EventTypeConfig{
+			Exec:       cfg.Telemetry.IsEventTypeEnabled("exec"),
+			Connect:    cfg.Telemetry.IsEventTypeEnabled("connect"),
+			Accept:     cfg.Telemetry.IsEventTypeEnabled("accept"),
+			Mmap:       cfg.Telemetry.IsEventTypeEnabled("mmap"),
+			Mprotect:   cfg.Telemetry.IsEventTypeEnabled("mprotect"),
+			File:       cfg.Telemetry.IsEventTypeEnabled("file"),
+			SocketData: cfg.Telemetry.IsEventTypeEnabled("socket_data"),
+		}
+		telematicsMonitor = telematics.NewMonitorWithConfig(telemetryCollector, log, eventConfig)
+		if err := telematicsMonitor.Start(); err != nil {
+			log.Warn("failed to start eBPF telematics monitor", "error", err)
+			telematicsMonitor = nil
 		} else {
-			log.Info("eBPF visibility monitor started successfully")
-			jobletInstance.SetVisibilityMonitor(visibilityMonitor)
+			// Log which event types are enabled
+			enabledTypes := cfg.Telemetry.EventTypes
+			if len(enabledTypes) == 0 {
+				enabledTypes = config.AllEventTypes // All enabled
+			}
+			log.Info("eBPF telematics monitor started successfully", "enabledEventTypes", enabledTypes)
+			jobletInstance.SetTelematicsMonitor(telematicsMonitor)
 		}
 	}
 
@@ -274,12 +290,12 @@ func RunServer(cfg *config.Config) error {
 	// Graceful shutdown
 	grpcServer.GracefulStop()
 
-	// Stop eBPF visibility monitor if it was started
-	if visibilityMonitor != nil {
-		if err := visibilityMonitor.Stop(); err != nil {
-			log.Error("error stopping eBPF visibility monitor", "error", err)
+	// Stop eBPF telematics monitor if it was started
+	if telematicsMonitor != nil {
+		if err := telematicsMonitor.Stop(); err != nil {
+			log.Error("error stopping eBPF telematics monitor", "error", err)
 		} else {
-			log.Info("eBPF visibility monitor stopped successfully")
+			log.Info("eBPF telematics monitor stopped successfully")
 		}
 	}
 

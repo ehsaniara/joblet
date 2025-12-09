@@ -126,7 +126,7 @@ test_pid_namespace() {
         # Check process count
         local proc_count=$(echo "$output" | grep -E '^[0-9]+$' | tail -1)
         if [[ "$proc_count" -le 5 ]]; then
-            echo "    Limited process visibility: $proc_count processes"
+            echo "    Limited process telematics: $proc_count processes"
             return 0
         fi
     fi

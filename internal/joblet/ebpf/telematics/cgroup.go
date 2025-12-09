@@ -1,6 +1,6 @@
 //go:build linux
 
-package visibility
+package telematics
 
 import (
 	"fmt"

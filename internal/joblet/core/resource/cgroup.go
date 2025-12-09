@@ -69,7 +69,7 @@ type Resource interface {
 	EnsureControllers() error
 	// AddProcessToCgroup adds a process to the specified cgroup by writing its PID
 	// to the cgroup.procs file. This is required for cgroup resource limits and
-	// eBPF visibility monitoring to work correctly.
+	// eBPF telematics monitoring to work correctly.
 	AddProcessToCgroup(cgroupPath string, pid int) error
 }
 
@@ -559,7 +559,7 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 
 // AddProcessToCgroup adds a process to the specified cgroup by writing its PID
 // to the cgroup.procs file. This enables cgroup resource limits and eBPF
-// visibility monitoring for the process.
+// telematics monitoring for the process.
 func (c *cgroup) AddProcessToCgroup(cgroupPath string, pid int) error {
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "pid", pid)
 	log.Debug("adding process to cgroup")

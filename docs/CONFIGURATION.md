@@ -92,7 +92,7 @@ server:
 - **Automatic Generation**: During Joblet setup, a unique UUID is automatically generated and stored in the
   configuration
 - **Job Tracking**: All jobs executed on a node are tagged with the node's UUID for tracking and debugging
-- **Distributed Visibility**: In multi-node deployments, you can identify which node executed specific jobs
+- **Distributed Telematics**: In multi-node deployments, you can identify which node executed specific jobs
 - **CLI Display**: The node ID is displayed in `rnx job list` and `rnx job status` commands
 
 **Setup Process:**
@@ -410,7 +410,18 @@ telemetry:
   metrics_interval: "5s"     # Default: 5 seconds (minimum: 1s)
 
   # eBPF activity tracking (Linux 5.8+ required)
-  ebpf_enabled: true         # Enable eBPF visibility (default: true)
+  ebpf_enabled: true         # Enable eBPF telematics (default: true)
+
+  # List of enabled event types (omit or leave empty for all)
+  # Valid values: exec, connect, accept, mmap, mprotect, file, socket_data
+  event_types:
+    - exec                   # Process execution events
+    - connect                # Outbound network connections
+    - accept                 # Inbound network connections
+    # - mmap                 # Memory mappings - HIGH VOLUME
+    # - mprotect             # Memory protection changes
+    # - file                 # File operations
+    # - socket_data          # Socket send/recv - HIGH VOLUME
 ```
 
 **Metrics Interval Tuning:**
@@ -433,6 +444,31 @@ telemetry:
 | `mmap` | Memory mappings with exec permissions | Detect code loading |
 | `mprotect` | Memory protection changes adding exec | Detect JIT compilation |
 | `file` | File access (open/read/write) | Audit data access (high volume) |
+
+**Performance Tuning - Disabling High-Volume Events:**
+
+If you experience performance issues with eBPF telematics, list only the events you need:
+
+```yaml
+# Performance-optimized configuration (minimal overhead)
+# Only list the events you want - omit high-volume ones
+telemetry:
+  ebpf_enabled: true
+  # Valid: exec, connect, accept, mmap, mprotect, file, socket_data
+  event_types:
+    - exec      # Keep - low volume, high value
+    - connect   # Keep - low volume, high value
+    - accept    # Keep - low volume, high value
+    # High-volume events omitted: mmap, mprotect, file, socket_data
+```
+
+**Recommended profiles:**
+
+| Profile | Events | Config |
+|---------|--------|--------|
+| Minimal | `exec`, `connect`, `accept` | `event_types: [exec, connect, accept]` |
+| Standard | All except `socket_data` | `event_types: [exec, connect, accept, mmap, mprotect, file]` |
+| Full (default) | All events | Omit `event_types` or leave empty |
 
 **Requirements:**
 - Linux kernel 5.8+ (for eBPF ring buffer)

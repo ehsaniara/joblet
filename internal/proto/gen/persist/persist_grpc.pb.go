@@ -19,12 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PersistService_Ping_FullMethodName               = "/joblet.persist.PersistService/Ping"
-	PersistService_QueryLogs_FullMethodName          = "/joblet.persist.PersistService/QueryLogs"
-	PersistService_QueryMetrics_FullMethodName       = "/joblet.persist.PersistService/QueryMetrics"
-	PersistService_QueryExecEvents_FullMethodName    = "/joblet.persist.PersistService/QueryExecEvents"
-	PersistService_QueryConnectEvents_FullMethodName = "/joblet.persist.PersistService/QueryConnectEvents"
-	PersistService_DeleteJob_FullMethodName          = "/joblet.persist.PersistService/DeleteJob"
+	PersistService_Ping_FullMethodName                  = "/joblet.persist.PersistService/Ping"
+	PersistService_QueryLogs_FullMethodName             = "/joblet.persist.PersistService/QueryLogs"
+	PersistService_QueryMetrics_FullMethodName          = "/joblet.persist.PersistService/QueryMetrics"
+	PersistService_QueryExecEvents_FullMethodName       = "/joblet.persist.PersistService/QueryExecEvents"
+	PersistService_QueryConnectEvents_FullMethodName    = "/joblet.persist.PersistService/QueryConnectEvents"
+	PersistService_QueryMmapEvents_FullMethodName       = "/joblet.persist.PersistService/QueryMmapEvents"
+	PersistService_QueryMprotectEvents_FullMethodName   = "/joblet.persist.PersistService/QueryMprotectEvents"
+	PersistService_QueryFileEvents_FullMethodName       = "/joblet.persist.PersistService/QueryFileEvents"
+	PersistService_QueryAcceptEvents_FullMethodName     = "/joblet.persist.PersistService/QueryAcceptEvents"
+	PersistService_QuerySocketDataEvents_FullMethodName = "/joblet.persist.PersistService/QuerySocketDataEvents"
+	PersistService_DeleteJob_FullMethodName             = "/joblet.persist.PersistService/DeleteJob"
 )
 
 // PersistServiceClient is the client API for PersistService service.
@@ -51,6 +56,16 @@ type PersistServiceClient interface {
 	QueryExecEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecEvent], error)
 	// Query connect events (eBPF telemetry) for a job
 	QueryConnectEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ConnectEvent], error)
+	// Query mmap events (eBPF telemetry) for a job
+	QueryMmapEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MmapEvent], error)
+	// Query mprotect events (eBPF telemetry) for a job
+	QueryMprotectEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MprotectEvent], error)
+	// Query file events (eBPF telemetry) for a job
+	QueryFileEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileEvent], error)
+	// Query accept events (eBPF telemetry) for a job
+	QueryAcceptEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AcceptEvent], error)
+	// Query socket data events (eBPF telemetry) for a job
+	QuerySocketDataEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SocketDataEvent], error)
 	// Delete all persisted data for a job (admin only)
 	DeleteJob(ctx context.Context, in *DeleteJobRequest, opts ...grpc.CallOption) (*DeleteJobResponse, error)
 }
@@ -149,6 +164,101 @@ func (c *persistServiceClient) QueryConnectEvents(ctx context.Context, in *Query
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type PersistService_QueryConnectEventsClient = grpc.ServerStreamingClient[ConnectEvent]
 
+func (c *persistServiceClient) QueryMmapEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MmapEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &PersistService_ServiceDesc.Streams[4], PersistService_QueryMmapEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryTelemetryRequest, MmapEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryMmapEventsClient = grpc.ServerStreamingClient[MmapEvent]
+
+func (c *persistServiceClient) QueryMprotectEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MprotectEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &PersistService_ServiceDesc.Streams[5], PersistService_QueryMprotectEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryTelemetryRequest, MprotectEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryMprotectEventsClient = grpc.ServerStreamingClient[MprotectEvent]
+
+func (c *persistServiceClient) QueryFileEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &PersistService_ServiceDesc.Streams[6], PersistService_QueryFileEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryTelemetryRequest, FileEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryFileEventsClient = grpc.ServerStreamingClient[FileEvent]
+
+func (c *persistServiceClient) QueryAcceptEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AcceptEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &PersistService_ServiceDesc.Streams[7], PersistService_QueryAcceptEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryTelemetryRequest, AcceptEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryAcceptEventsClient = grpc.ServerStreamingClient[AcceptEvent]
+
+func (c *persistServiceClient) QuerySocketDataEvents(ctx context.Context, in *QueryTelemetryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SocketDataEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &PersistService_ServiceDesc.Streams[8], PersistService_QuerySocketDataEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryTelemetryRequest, SocketDataEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QuerySocketDataEventsClient = grpc.ServerStreamingClient[SocketDataEvent]
+
 func (c *persistServiceClient) DeleteJob(ctx context.Context, in *DeleteJobRequest, opts ...grpc.CallOption) (*DeleteJobResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteJobResponse)
@@ -183,6 +293,16 @@ type PersistServiceServer interface {
 	QueryExecEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[ExecEvent]) error
 	// Query connect events (eBPF telemetry) for a job
 	QueryConnectEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[ConnectEvent]) error
+	// Query mmap events (eBPF telemetry) for a job
+	QueryMmapEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[MmapEvent]) error
+	// Query mprotect events (eBPF telemetry) for a job
+	QueryMprotectEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[MprotectEvent]) error
+	// Query file events (eBPF telemetry) for a job
+	QueryFileEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[FileEvent]) error
+	// Query accept events (eBPF telemetry) for a job
+	QueryAcceptEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[AcceptEvent]) error
+	// Query socket data events (eBPF telemetry) for a job
+	QuerySocketDataEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[SocketDataEvent]) error
 	// Delete all persisted data for a job (admin only)
 	DeleteJob(context.Context, *DeleteJobRequest) (*DeleteJobResponse, error)
 	mustEmbedUnimplementedPersistServiceServer()
@@ -209,6 +329,21 @@ func (UnimplementedPersistServiceServer) QueryExecEvents(*QueryTelemetryRequest,
 }
 func (UnimplementedPersistServiceServer) QueryConnectEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[ConnectEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method QueryConnectEvents not implemented")
+}
+func (UnimplementedPersistServiceServer) QueryMmapEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[MmapEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method QueryMmapEvents not implemented")
+}
+func (UnimplementedPersistServiceServer) QueryMprotectEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[MprotectEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method QueryMprotectEvents not implemented")
+}
+func (UnimplementedPersistServiceServer) QueryFileEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[FileEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method QueryFileEvents not implemented")
+}
+func (UnimplementedPersistServiceServer) QueryAcceptEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[AcceptEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method QueryAcceptEvents not implemented")
+}
+func (UnimplementedPersistServiceServer) QuerySocketDataEvents(*QueryTelemetryRequest, grpc.ServerStreamingServer[SocketDataEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method QuerySocketDataEvents not implemented")
 }
 func (UnimplementedPersistServiceServer) DeleteJob(context.Context, *DeleteJobRequest) (*DeleteJobResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteJob not implemented")
@@ -296,6 +431,61 @@ func _PersistService_QueryConnectEvents_Handler(srv interface{}, stream grpc.Ser
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type PersistService_QueryConnectEventsServer = grpc.ServerStreamingServer[ConnectEvent]
 
+func _PersistService_QueryMmapEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryTelemetryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PersistServiceServer).QueryMmapEvents(m, &grpc.GenericServerStream[QueryTelemetryRequest, MmapEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryMmapEventsServer = grpc.ServerStreamingServer[MmapEvent]
+
+func _PersistService_QueryMprotectEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryTelemetryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PersistServiceServer).QueryMprotectEvents(m, &grpc.GenericServerStream[QueryTelemetryRequest, MprotectEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryMprotectEventsServer = grpc.ServerStreamingServer[MprotectEvent]
+
+func _PersistService_QueryFileEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryTelemetryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PersistServiceServer).QueryFileEvents(m, &grpc.GenericServerStream[QueryTelemetryRequest, FileEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryFileEventsServer = grpc.ServerStreamingServer[FileEvent]
+
+func _PersistService_QueryAcceptEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryTelemetryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PersistServiceServer).QueryAcceptEvents(m, &grpc.GenericServerStream[QueryTelemetryRequest, AcceptEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QueryAcceptEventsServer = grpc.ServerStreamingServer[AcceptEvent]
+
+func _PersistService_QuerySocketDataEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryTelemetryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PersistServiceServer).QuerySocketDataEvents(m, &grpc.GenericServerStream[QueryTelemetryRequest, SocketDataEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PersistService_QuerySocketDataEventsServer = grpc.ServerStreamingServer[SocketDataEvent]
+
 func _PersistService_DeleteJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteJobRequest)
 	if err := dec(in); err != nil {
@@ -349,6 +539,31 @@ var PersistService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "QueryConnectEvents",
 			Handler:       _PersistService_QueryConnectEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QueryMmapEvents",
+			Handler:       _PersistService_QueryMmapEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QueryMprotectEvents",
+			Handler:       _PersistService_QueryMprotectEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QueryFileEvents",
+			Handler:       _PersistService_QueryFileEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QueryAcceptEvents",
+			Handler:       _PersistService_QueryAcceptEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QuerySocketDataEvents",
+			Handler:       _PersistService_QuerySocketDataEvents_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -160,21 +160,21 @@ func (c *JobClient) GetJobMetrics(ctx context.Context, id string, startTime, end
 	return stream, nil
 }
 
-// StreamJobVisibility streams live eBPF security events for a running job
-func (c *JobClient) StreamJobVisibility(ctx context.Context, id string, types []string) (pb.JobService_StreamJobVisibilityClient, error) {
-	stream, err := c.jobClient.StreamJobVisibility(ctx, &pb.StreamJobVisibilityRequest{
+// StreamJobTelematics streams live eBPF security events for a running job
+func (c *JobClient) StreamJobTelematics(ctx context.Context, id string, types []string) (pb.JobService_StreamJobTelematicsClient, error) {
+	stream, err := c.jobClient.StreamJobTelematics(ctx, &pb.StreamJobTelematicsRequest{
 		JobUuid: id,
 		Types:   types,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start visibility stream: %v", err)
+		return nil, fmt.Errorf("failed to start telematics stream: %v", err)
 	}
 	return stream, nil
 }
 
-// GetJobVisibility retrieves historical eBPF security events for a completed job
-func (c *JobClient) GetJobVisibility(ctx context.Context, id string, types []string, startTime, endTime int64, limit int32) (pb.JobService_GetJobVisibilityClient, error) {
-	stream, err := c.jobClient.GetJobVisibility(ctx, &pb.GetJobVisibilityRequest{
+// GetJobTelematics retrieves historical eBPF security events for a completed job
+func (c *JobClient) GetJobTelematics(ctx context.Context, id string, types []string, startTime, endTime int64, limit int32) (pb.JobService_GetJobTelematicsClient, error) {
+	stream, err := c.jobClient.GetJobTelematics(ctx, &pb.GetJobTelematicsRequest{
 		JobUuid:   id,
 		Types:     types,
 		StartTime: startTime,
@@ -182,7 +182,7 @@ func (c *JobClient) GetJobVisibility(ctx context.Context, id string, types []str
 		Limit:     limit,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get visibility: %v", err)
+		return nil, fmt.Errorf("failed to get telematics: %v", err)
 	}
 	return stream, nil
 }

@@ -588,7 +588,7 @@ func (x *NetworkIO) GetTxPackets() int64 {
 	return 0
 }
 
-// ExecEvent represents a process execution event from eBPF visibility
+// ExecEvent represents a process execution event from eBPF telematics
 type ExecEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -705,7 +705,7 @@ func (x *ExecEvent) GetArgs() []string {
 	return nil
 }
 
-// ConnectEvent represents a network connection event from eBPF visibility
+// ConnectEvent represents a network connection event from eBPF telematics
 type ConnectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -822,7 +822,7 @@ func (x *ConnectEvent) GetProtocol() string {
 	return ""
 }
 
-// AcceptEvent represents an incoming connection accept from eBPF visibility
+// AcceptEvent represents an incoming connection accept from eBPF telematics
 type AcceptEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -939,7 +939,7 @@ func (x *AcceptEvent) GetProtocol() string {
 	return ""
 }
 
-// SocketDataEvent represents sendto/recvfrom events from eBPF visibility
+// SocketDataEvent represents sendto/recvfrom events from eBPF telematics
 type SocketDataEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -1056,7 +1056,7 @@ func (x *SocketDataEvent) GetBytes() int64 {
 	return 0
 }
 
-// MmapEvent represents memory mapping events from eBPF visibility
+// MmapEvent represents memory mapping events from eBPF telematics
 type MmapEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -1173,7 +1173,7 @@ func (x *MmapEvent) GetFilename() string {
 	return ""
 }
 
-// MprotectEvent represents memory protection change events from eBPF visibility
+// MprotectEvent represents memory protection change events from eBPF telematics
 type MprotectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -1274,7 +1274,7 @@ func (x *MprotectEvent) GetProt() uint32 {
 	return 0
 }
 
-// FileEvent represents file access events from eBPF visibility
+// FileEvent represents file access events from eBPF telematics
 type FileEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
