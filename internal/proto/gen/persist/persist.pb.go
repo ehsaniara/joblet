@@ -163,8 +163,9 @@ func (x *PingResponse) GetTimestamp() int64 {
 
 // QueryLogsRequest specifies parameters for log queries
 type QueryLogsRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	JobId string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	JobId  string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	NodeId string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	// Stream filter
 	Stream StreamType `protobuf:"varint,2,opt,name=stream,proto3,enum=joblet.persist.StreamType" json:"stream,omitempty"` // STDOUT, STDERR, or both (UNSPECIFIED)
 	// Time range (optional)
@@ -214,6 +215,13 @@ func (x *QueryLogsRequest) GetJobId() string {
 	return ""
 }
 
+func (x *QueryLogsRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
 func (x *QueryLogsRequest) GetStream() StreamType {
 	if x != nil {
 		return x.Stream
@@ -251,8 +259,9 @@ func (x *QueryLogsRequest) GetOffset() int32 {
 
 // QueryMetricsRequest specifies parameters for metrics queries
 type QueryMetricsRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	JobId string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	JobId  string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	NodeId string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	// Time range (optional)
 	StartTime int64 `protobuf:"varint,2,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"` // Unix nanoseconds
 	EndTime   int64 `protobuf:"varint,3,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`       // Unix nanoseconds
@@ -296,6 +305,13 @@ func (*QueryMetricsRequest) Descriptor() ([]byte, []int) {
 func (x *QueryMetricsRequest) GetJobId() string {
 	if x != nil {
 		return x.JobId
+	}
+	return ""
+}
+
+func (x *QueryMetricsRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
 	}
 	return ""
 }
@@ -693,6 +709,7 @@ func (x *NetworkIO) GetTxPackets() int64 {
 type DeleteJobRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -730,6 +747,13 @@ func (*DeleteJobRequest) Descriptor() ([]byte, []int) {
 func (x *DeleteJobRequest) GetJobId() string {
 	if x != nil {
 		return x.JobId
+	}
+	return ""
+}
+
+func (x *DeleteJobRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
 	}
 	return ""
 }
@@ -789,8 +813,9 @@ func (x *DeleteJobResponse) GetMessage() string {
 
 // QueryTelemetryRequest specifies parameters for telemetry event queries
 type QueryTelemetryRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	JobId string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	JobId  string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	NodeId string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	// Time range (optional)
 	StartTime int64 `protobuf:"varint,2,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"` // Unix nanoseconds
 	EndTime   int64 `protobuf:"varint,3,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`       // Unix nanoseconds
@@ -834,6 +859,13 @@ func (*QueryTelemetryRequest) Descriptor() ([]byte, []int) {
 func (x *QueryTelemetryRequest) GetJobId() string {
 	if x != nil {
 		return x.JobId
+	}
+	return ""
+}
+
+func (x *QueryTelemetryRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
 	}
 	return ""
 }
@@ -1661,17 +1693,19 @@ const file_persist_proto_rawDesc = "" +
 	"\vPingRequest\"F\n" +
 	"\fPingResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x1c\n" +
-	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\"\xc5\x01\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\"\xde\x01\n" +
 	"\x10QueryLogsRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x122\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\anode_id\x18\a \x01(\tR\x06nodeId\x122\n" +
 	"\x06stream\x18\x02 \x01(\x0e2\x1a.joblet.persist.StreamTypeR\x06stream\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x03 \x01(\x03R\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x04 \x01(\x03R\aendTime\x12\x14\n" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x06 \x01(\x05R\x06offset\"\x94\x01\n" +
+	"\x06offset\x18\x06 \x01(\x05R\x06offset\"\xad\x01\n" +
 	"\x13QueryMetricsRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1d\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\anode_id\x18\x06 \x01(\tR\x06nodeId\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x02 \x01(\x03R\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x03 \x01(\x03R\aendTime\x12\x14\n" +
@@ -1709,14 +1743,16 @@ const file_persist_proto_rawDesc = "" +
 	"\n" +
 	"rx_packets\x18\x03 \x01(\x03R\trxPackets\x12\x1d\n" +
 	"\n" +
-	"tx_packets\x18\x04 \x01(\x03R\ttxPackets\")\n" +
+	"tx_packets\x18\x04 \x01(\x03R\ttxPackets\"B\n" +
 	"\x10DeleteJobRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"G\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\"G\n" +
 	"\x11DeleteJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x96\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xaf\x01\n" +
 	"\x15QueryTelemetryRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1d\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\anode_id\x18\x06 \x01(\tR\x06nodeId\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x02 \x01(\x03R\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x03 \x01(\x03R\aendTime\x12\x14\n" +
