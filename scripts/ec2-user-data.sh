@@ -286,10 +286,13 @@ configure_cloudwatch() {
     # Update persist storage to CloudWatch
     sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
 
+    # Set CloudWatch region (required by persist)
+    sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+
     # Update state backend to DynamoDB
     sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
 
-    log_success "Set persist=cloudwatch, state=dynamodb"
+    log_success "Set persist=cloudwatch (region=$EC2_REGION), state=dynamodb"
 }
 
 start_joblet_service() {

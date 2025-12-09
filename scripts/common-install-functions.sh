@@ -485,6 +485,12 @@ configure_storage_backends() {
         # Update persist storage to CloudWatch
         sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
 
+        # Set CloudWatch region (required by persist)
+        if [ -n "$EC2_REGION" ]; then
+            sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+            print_success "Set CloudWatch region: $EC2_REGION"
+        fi
+
         # Update state backend to DynamoDB
         sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
 
