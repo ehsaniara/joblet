@@ -1,9 +1,9 @@
 //go:build linux && (amd64 || arm64)
 
-// Package visibility provides eBPF-based activity tracking for jobs.
+// Package telematics provides eBPF-based activity tracking for jobs.
 // It monitors process execution and network connections for job processes,
 // filtering by cgroup ID to only capture events from monitored jobs.
-package visibility
+package telematics
 
 import (
 	"bytes"
@@ -24,16 +24,41 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall -Werror" -target amd64,arm64 visibility ./bpf/visibility.c
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall -Werror" -target amd64,arm64 telematics ./bpf/telematics.c
 
-// Monitor provides eBPF-based visibility into job activity.
+// EventTypeConfig controls which eBPF event types are enabled
+type EventTypeConfig struct {
+	Exec       bool
+	Connect    bool
+	Accept     bool
+	Mmap       bool
+	Mprotect   bool
+	File       bool
+	SocketData bool
+}
+
+// DefaultEventTypeConfig returns a config with all event types enabled
+func DefaultEventTypeConfig() EventTypeConfig {
+	return EventTypeConfig{
+		Exec:       true,
+		Connect:    true,
+		Accept:     true,
+		Mmap:       true,
+		Mprotect:   true,
+		File:       true,
+		SocketData: true,
+	}
+}
+
+// Monitor provides eBPF-based telematics into job activity.
 // It tracks process execution (execve) and network connections (connect)
 // for processes running in monitored cgroups.
 type Monitor struct {
-	collector *telemetry.Collector
-	logger    *logger.Logger
+	collector   *telemetry.Collector
+	logger      *logger.Logger
+	eventConfig EventTypeConfig
 
-	objs  *visibilityObjects
+	objs  *telematicsObjects
 	links []link.Link
 
 	// Map of job IDs to their cgroup IDs
@@ -121,16 +146,23 @@ type MprotectEvent struct {
 	Length    uint64
 }
 
-// NewMonitor creates a new eBPF visibility monitor.
+// NewMonitor creates a new eBPF telematics monitor.
 // The collector is used to emit telemetry events.
 func NewMonitor(collector *telemetry.Collector, log *logger.Logger) *Monitor {
+	return NewMonitorWithConfig(collector, log, DefaultEventTypeConfig())
+}
+
+// NewMonitorWithConfig creates a new eBPF telematics monitor with custom event type configuration.
+// Use this to selectively enable/disable high-volume event types for performance tuning.
+func NewMonitorWithConfig(collector *telemetry.Collector, log *logger.Logger, eventConfig EventTypeConfig) *Monitor {
 	if log == nil {
 		log = logger.New()
 	}
 	return &Monitor{
-		collector: collector,
-		logger:    log.WithField("component", "ebpf-visibility"),
-		jobs:      make(map[string]uint64),
+		collector:   collector,
+		logger:      log.WithField("component", "ebpf-telematics"),
+		jobs:        make(map[string]uint64),
+		eventConfig: eventConfig,
 	}
 }
 
@@ -144,7 +176,7 @@ func (m *Monitor) Start() error {
 		return errors.New("monitor already running")
 	}
 
-	m.logger.Info("starting eBPF visibility monitor")
+	m.logger.Info("starting eBPF telematics monitor")
 
 	// Remove MEMLOCK rlimit for eBPF maps on kernels < 5.11
 	// This is required on older kernels that have memlock restrictions
@@ -153,84 +185,125 @@ func (m *Monitor) Start() error {
 	}
 
 	// Load pre-compiled eBPF objects
-	m.objs = &visibilityObjects{}
-	if err := loadVisibilityObjects(m.objs, nil); err != nil {
+	m.objs = &telematicsObjects{}
+	if err := loadTelematicsObjects(m.objs, nil); err != nil {
 		return fmt.Errorf("failed to load eBPF objects: %w", err)
 	}
 
-	// Attach tracepoints
-	var err error
+	// Attach tracepoints based on configuration
+	goroutineCount := 0
 
-	// execve tracepoint
-	execLink, err := link.Tracepoint("syscalls", "sys_enter_execve", m.objs.TracepointSyscallsSysEnterExecve, nil)
-	if err != nil {
-		m.objs.Close()
-		return fmt.Errorf("failed to attach execve tracepoint: %w", err)
+	// execve tracepoint (always attach if enabled)
+	if m.eventConfig.Exec {
+		execLink, err := link.Tracepoint("syscalls", "sys_enter_execve", m.objs.TracepointSyscallsSysEnterExecve, nil)
+		if err != nil {
+			m.objs.Close()
+			return fmt.Errorf("failed to attach execve tracepoint: %w", err)
+		}
+		m.links = append(m.links, execLink)
+		goroutineCount++
+	} else {
+		m.logger.Info("exec event type disabled by configuration")
 	}
-	m.links = append(m.links, execLink)
 
 	// connect tracepoint
-	connectLink, err := link.Tracepoint("syscalls", "sys_enter_connect", m.objs.TracepointSyscallsSysEnterConnect, nil)
-	if err != nil {
-		m.cleanup()
-		return fmt.Errorf("failed to attach connect tracepoint: %w", err)
+	if m.eventConfig.Connect {
+		connectLink, err := link.Tracepoint("syscalls", "sys_enter_connect", m.objs.TracepointSyscallsSysEnterConnect, nil)
+		if err != nil {
+			m.cleanup()
+			return fmt.Errorf("failed to attach connect tracepoint: %w", err)
+		}
+		m.links = append(m.links, connectLink)
+		goroutineCount++
+	} else {
+		m.logger.Info("connect event type disabled by configuration")
 	}
-	m.links = append(m.links, connectLink)
 
 	// accept4 tracepoint (for incoming connections)
-	accept4Link, err := link.Tracepoint("syscalls", "sys_exit_accept4", m.objs.TracepointSyscallsSysExitAccept4, nil)
-	if err != nil {
-		m.logger.Warn("failed to attach accept4 tracepoint", "error", err)
+	if m.eventConfig.Accept {
+		accept4Link, err := link.Tracepoint("syscalls", "sys_exit_accept4", m.objs.TracepointSyscallsSysExitAccept4, nil)
+		if err != nil {
+			m.logger.Warn("failed to attach accept4 tracepoint", "error", err)
+		} else {
+			m.links = append(m.links, accept4Link)
+			goroutineCount++
+		}
 	} else {
-		m.links = append(m.links, accept4Link)
+		m.logger.Info("accept event type disabled by configuration")
 	}
 
-	// sendto tracepoint
-	sendtoLink, err := link.Tracepoint("syscalls", "sys_enter_sendto", m.objs.TracepointSyscallsSysEnterSendto, nil)
-	if err != nil {
-		m.logger.Warn("failed to attach sendto tracepoint", "error", err)
-	} else {
-		m.links = append(m.links, sendtoLink)
-	}
+	// sendto/recvfrom tracepoints (socket data)
+	if m.eventConfig.SocketData {
+		sendtoLink, err := link.Tracepoint("syscalls", "sys_enter_sendto", m.objs.TracepointSyscallsSysEnterSendto, nil)
+		if err != nil {
+			m.logger.Warn("failed to attach sendto tracepoint", "error", err)
+		} else {
+			m.links = append(m.links, sendtoLink)
+		}
 
-	// recvfrom tracepoint
-	recvfromLink, err := link.Tracepoint("syscalls", "sys_enter_recvfrom", m.objs.TracepointSyscallsSysEnterRecvfrom, nil)
-	if err != nil {
-		m.logger.Warn("failed to attach recvfrom tracepoint", "error", err)
+		recvfromLink, err := link.Tracepoint("syscalls", "sys_enter_recvfrom", m.objs.TracepointSyscallsSysEnterRecvfrom, nil)
+		if err != nil {
+			m.logger.Warn("failed to attach recvfrom tracepoint", "error", err)
+		} else {
+			m.links = append(m.links, recvfromLink)
+		}
+		goroutineCount++
 	} else {
-		m.links = append(m.links, recvfromLink)
+		m.logger.Info("socket_data event type disabled by configuration (high volume)")
 	}
 
 	// mmap tracepoint
-	mmapLink, err := link.Tracepoint("syscalls", "sys_enter_mmap", m.objs.TracepointSyscallsSysEnterMmap, nil)
-	if err != nil {
-		m.logger.Warn("failed to attach mmap tracepoint", "error", err)
+	if m.eventConfig.Mmap {
+		mmapLink, err := link.Tracepoint("syscalls", "sys_enter_mmap", m.objs.TracepointSyscallsSysEnterMmap, nil)
+		if err != nil {
+			m.logger.Warn("failed to attach mmap tracepoint", "error", err)
+		} else {
+			m.links = append(m.links, mmapLink)
+			goroutineCount++
+		}
 	} else {
-		m.links = append(m.links, mmapLink)
+		m.logger.Info("mmap event type disabled by configuration (high volume)")
 	}
 
 	// mprotect tracepoint
-	mprotectLink, err := link.Tracepoint("syscalls", "sys_enter_mprotect", m.objs.TracepointSyscallsSysEnterMprotect, nil)
-	if err != nil {
-		m.logger.Warn("failed to attach mprotect tracepoint", "error", err)
+	if m.eventConfig.Mprotect {
+		mprotectLink, err := link.Tracepoint("syscalls", "sys_enter_mprotect", m.objs.TracepointSyscallsSysEnterMprotect, nil)
+		if err != nil {
+			m.logger.Warn("failed to attach mprotect tracepoint", "error", err)
+		} else {
+			m.links = append(m.links, mprotectLink)
+			goroutineCount++
+		}
 	} else {
-		m.links = append(m.links, mprotectLink)
+		m.logger.Info("mprotect event type disabled by configuration")
 	}
 
 	// Create ring buffer readers
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 
-	// Start event processing goroutines
-	m.wg.Add(6)
-	go m.processExecEvents()
-	go m.processConnectEvents()
-	go m.processAcceptEvents()
-	go m.processSocketDataEvents()
-	go m.processMmapEvents()
-	go m.processMprotectEvents()
+	// Start event processing goroutines based on configuration
+	m.wg.Add(goroutineCount)
+	if m.eventConfig.Exec {
+		go m.processExecEvents()
+	}
+	if m.eventConfig.Connect {
+		go m.processConnectEvents()
+	}
+	if m.eventConfig.Accept {
+		go m.processAcceptEvents()
+	}
+	if m.eventConfig.SocketData {
+		go m.processSocketDataEvents()
+	}
+	if m.eventConfig.Mmap {
+		go m.processMmapEvents()
+	}
+	if m.eventConfig.Mprotect {
+		go m.processMprotectEvents()
+	}
 
 	m.running = true
-	m.logger.Info("eBPF visibility monitor started successfully")
+	m.logger.Info("eBPF telematics monitor started successfully")
 
 	return nil
 }
@@ -244,7 +317,7 @@ func (m *Monitor) Stop() error {
 		return nil
 	}
 
-	m.logger.Info("stopping eBPF visibility monitor")
+	m.logger.Info("stopping eBPF telematics monitor")
 
 	// Signal goroutines to stop
 	m.cancel()
@@ -256,7 +329,7 @@ func (m *Monitor) Stop() error {
 	m.cleanup()
 
 	m.running = false
-	m.logger.Info("eBPF visibility monitor stopped")
+	m.logger.Info("eBPF telematics monitor stopped")
 
 	return nil
 }
@@ -717,12 +790,12 @@ func (m *Monitor) processMprotectEvents() {
 	}
 }
 
-// IsSupported checks if eBPF visibility is supported on this system.
+// IsSupported checks if eBPF telematics is supported on this system.
 // Returns nil if supported, otherwise returns an error describing why not.
 func IsSupported() error {
 	// Check if cgroup v2 is available
 	if !IsCgroupV2() {
-		return errors.New("cgroup v2 (unified hierarchy) is required for eBPF visibility")
+		return errors.New("cgroup v2 (unified hierarchy) is required for eBPF telematics")
 	}
 
 	// Check if /sys/kernel/tracing exists (for tracepoints)

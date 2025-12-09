@@ -2,7 +2,7 @@
 
 // Stub implementation for non-Linux or when eBPF is not available
 
-package visibility
+package telematics
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-var ErrNotSupported = errors.New("eBPF visibility not supported on this platform")
+var ErrNotSupported = errors.New("eBPF telematics not supported on this platform")
 
 // Monitor is a stub for non-Linux platforms
 type Monitor struct{}

@@ -20,6 +20,9 @@ func TestNewBackend_Local(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: tmpDir + "/metrics",
 			},
+			Events: config.EventStorageConfig{
+				Directory: tmpDir + "/events",
+			},
 		},
 	}
 

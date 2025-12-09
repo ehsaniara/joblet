@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ANSI color codes for visibility output
+// ANSI color codes for telematics output
 const (
 	colorCyan    = "\033[36m"
 	colorYellow  = "\033[33m"
@@ -30,11 +30,11 @@ const (
 	colorReset   = "\033[0m"
 )
 
-func NewVisibilityCmd() *cobra.Command {
+func NewTelematicsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "visibility <job-uuid>",
-		Short: "View eBPF security visibility events for a job",
-		Long: `View eBPF security visibility events for a running or completed job.
+		Use:   "telematics <job-uuid>",
+		Short: "View eBPF security telematics events for a job",
+		Long: `View eBPF security telematics events for a running or completed job.
 
 This command shows security-relevant events captured by eBPF tracing:
   - EXEC: Process executions (fork/exec syscalls)
@@ -53,21 +53,21 @@ Short-form UUIDs are supported - you can use just the first 8 characters
 if they uniquely identify a job.
 
 Examples:
-  # View all visibility events
-  rnx job visibility f47ac10b
+  # View all telematics events
+  rnx job telematics f47ac10b
 
   # Filter specific event types
-  rnx job visibility f47ac10b --types exec,connect
+  rnx job telematics f47ac10b --types exec,connect
 
   # Output as JSON (one event per line)
-  rnx --json job visibility f47ac10b
+  rnx --json job telematics f47ac10b
 
   # Filter with grep
-  rnx job visibility f47ac10b | grep EXEC
-  rnx job visibility f47ac10b | grep CONNECT`,
+  rnx job telematics f47ac10b | grep EXEC
+  rnx job telematics f47ac10b | grep CONNECT`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runVisibility(cmd, args)
+			return runTelematics(cmd, args)
 		},
 	}
 
@@ -76,7 +76,7 @@ Examples:
 	return cmd
 }
 
-func runVisibility(cmd *cobra.Command, args []string) error {
+func runTelematics(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 	types, _ := cmd.Flags().GetStringSlice("types")
 
@@ -89,7 +89,7 @@ func runVisibility(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		<-sigCh
-		fmt.Fprintln(os.Stderr, "\nStopping visibility stream...")
+		fmt.Fprintln(os.Stderr, "\nStopping telematics stream...")
 		cancel()
 	}()
 
@@ -102,17 +102,17 @@ func runVisibility(cmd *cobra.Command, args []string) error {
 	}
 	defer jobClient.Close()
 
-	// Use StreamJobVisibility for live visibility events
-	stream, err := jobClient.StreamJobVisibility(ctx, jobID, types)
+	// Use StreamJobTelematics for live telematics events
+	stream, err := jobClient.StreamJobTelematics(ctx, jobID, types)
 	if err != nil {
-		return fmt.Errorf("couldn't start reading visibility events: %v", err)
+		return fmt.Errorf("couldn't start reading telematics events: %v", err)
 	}
 
 	if !common.JSONOutput {
 		if len(types) > 0 {
-			fmt.Fprintf(os.Stderr, "Streaming visibility events [%s] (Ctrl+C to stop)...\n\n", strings.Join(types, ","))
+			fmt.Fprintf(os.Stderr, "Streaming telematics events [%s] (Ctrl+C to stop)...\n\n", strings.Join(types, ","))
 		} else {
-			fmt.Fprintf(os.Stderr, "Streaming visibility events (Ctrl+C to stop)...\n\n")
+			fmt.Fprintf(os.Stderr, "Streaming telematics events (Ctrl+C to stop)...\n\n")
 		}
 	}
 
@@ -120,7 +120,7 @@ func runVisibility(cmd *cobra.Command, args []string) error {
 		event, e := stream.Recv()
 		if e == io.EOF {
 			if eventCount == 0 {
-				return fmt.Errorf("no visibility events for job %s (eBPF tracing may not be enabled)", jobID)
+				return fmt.Errorf("no telematics events for job %s (eBPF tracing may not be enabled)", jobID)
 			}
 			return nil
 		}
@@ -130,33 +130,33 @@ func runVisibility(cmd *cobra.Command, args []string) error {
 			}
 
 			if s, ok := status.FromError(e); ok {
-				return fmt.Errorf("problem reading visibility events: %v", s.Message())
+				return fmt.Errorf("problem reading telematics events: %v", s.Message())
 			}
 
-			return fmt.Errorf("error receiving visibility stream: %v", e)
+			return fmt.Errorf("error receiving telematics stream: %v", e)
 		}
 
 		eventCount++
 
 		if common.JSONOutput {
-			if err := outputVisibilityJSON(event); err != nil {
+			if err := outputTelematicsJSON(event); err != nil {
 				return fmt.Errorf("couldn't format output as JSON: %v", err)
 			}
 		} else {
-			outputVisibilityEventHuman(event)
+			outputTelematicsEventHuman(event)
 		}
 	}
 }
 
-// outputVisibilityJSON outputs a visibility event as JSON
-func outputVisibilityJSON(event *pb.VisibilityEvent) error {
+// outputTelematicsJSON outputs a telematics event as JSON
+func outputTelematicsJSON(event *pb.TelematicsEvent) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(event)
 }
 
-// outputVisibilityEventHuman outputs a visibility event in human-readable format
-func outputVisibilityEventHuman(event *pb.VisibilityEvent) {
+// outputTelematicsEventHuman outputs a telematics event in human-readable format
+func outputTelematicsEventHuman(event *pb.TelematicsEvent) {
 	timestamp := time.Unix(0, event.Timestamp).Format("15:04:05.000")
 
 	switch event.Type {

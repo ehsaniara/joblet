@@ -227,12 +227,27 @@ func (p *memoryPubSub[T]) Subscribe(ctx context.Context, topicName string) (<-ch
 	t.subscribers[subscriberID] = sub
 	t.subMutex.Unlock()
 
-	// Update topic stats
+	// Update topic stats (while still holding subMutex from above)
+	t.subMutex.Lock()
+	subscriberCount := len(t.subscribers)
+	t.subMutex.Unlock()
 	t.statsMutex.Lock()
-	t.stats.SubscriberCount = len(t.subscribers)
+	t.stats.SubscriberCount = subscriberCount
 	t.statsMutex.Unlock()
 
+	// Track if unsubscribe has been called
+	var unsubscribed bool
+	var unsubscribeMu sync.Mutex
+
 	unsubscribe := func() {
+		unsubscribeMu.Lock()
+		if unsubscribed {
+			unsubscribeMu.Unlock()
+			return
+		}
+		unsubscribed = true
+		unsubscribeMu.Unlock()
+
 		cancel()
 
 		// Remove from topic
@@ -241,6 +256,7 @@ func (p *memoryPubSub[T]) Subscribe(ctx context.Context, topicName string) (<-ch
 			delete(t.subscribers, subscriberID)
 			close(sub.channel)
 		}
+		count := len(t.subscribers)
 		t.subMutex.Unlock()
 
 		// Update subscriber stats
@@ -250,7 +266,7 @@ func (p *memoryPubSub[T]) Subscribe(ctx context.Context, topicName string) (<-ch
 
 		// Update topic stats
 		t.statsMutex.Lock()
-		t.stats.SubscriberCount = len(t.subscribers)
+		t.stats.SubscriberCount = count
 		t.statsMutex.Unlock()
 	}
 

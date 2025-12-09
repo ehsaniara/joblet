@@ -1,6 +1,6 @@
 //go:build linux
 
-package visibility
+package telematics
 
 import (
 	"os"
@@ -134,9 +134,9 @@ func TestIsSupported(t *testing.T) {
 	err := IsSupported()
 	// Log result - may or may not be supported depending on system
 	if err != nil {
-		t.Logf("eBPF visibility not supported: %v", err)
+		t.Logf("eBPF telematics not supported: %v", err)
 	} else {
-		t.Log("eBPF visibility is supported")
+		t.Log("eBPF telematics is supported")
 	}
 }
 

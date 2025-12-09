@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -428,7 +429,10 @@ func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJ
 	}, nil
 }
 
-// GetJobLogs streams job logs to the client
+// GetJobLogs streams job logs to the client using the unified streaming pattern.
+// For running jobs: sends historical logs from buffer/persist, then streams live.
+// For completed jobs: sends all historical logs only.
+// For jobs not found locally: queries persist for historical logs.
 func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
 	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetUuid())
 	log.Debug("get job logs request received")
@@ -438,13 +442,56 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 		return err
 	}
 
-	// Fetch historical logs from persist if available
-	historicalCount := 0
-	if s.persistClient != nil {
-		log.Debug("fetching historical logs from persist")
+	jobUUID := req.GetUuid()
+	if jobUUID == "" {
+		return status.Errorf(codes.InvalidArgument, "job_uuid is required")
+	}
 
+	// Resolve short UUID to full UUID
+	resolvedUUID, err := s.jobStore.ResolveJobUUID(jobUUID)
+	if err != nil {
+		log.Debug("failed to resolve UUID, using as-is", "input", jobUUID, "error", err)
+		resolvedUUID = jobUUID
+	}
+
+	log = log.WithFields("resolvedUUID", resolvedUUID)
+
+	// Determine job state
+	job, exists := s.jobStore.Job(resolvedUUID)
+	isCompleted := exists && job.IsCompleted()
+	state := DetermineJobState(exists, isCompleted)
+
+	log.Debug("starting log stream", "state", state)
+
+	// Use unified streaming helper
+	cfg := StreamConfig{
+		JobID:  resolvedUUID,
+		Logger: log,
+		SendHistorical: func() (int, error) {
+			return s.sendHistoricalLogs(stream, resolvedUUID, log)
+		},
+		QueryPersistOnly: func() (int, error) {
+			if s.persistClient == nil {
+				return 0, nil
+			}
+			return s.queryPersistLogs(stream, resolvedUUID, log)
+		},
+		StreamLive: func() error {
+			return s.streamLiveLogs(stream, resolvedUUID, log)
+		},
+	}
+
+	return StreamWithHistory(stream.Context(), cfg, state)
+}
+
+// sendHistoricalLogs sends buffered and persisted historical logs
+func (s *JobServiceServer) sendHistoricalLogs(stream pb.JobService_GetJobLogsServer, jobUUID string, log *logger.Logger) (int, error) {
+	count := 0
+
+	// First, query persist for historical logs
+	if s.persistClient != nil {
 		persistReq := &persistpb.QueryLogsRequest{
-			JobId:  req.GetUuid(),
+			JobId:  jobUUID,
 			Stream: persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
 		}
 
@@ -456,7 +503,7 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 				logLine, err := persistStream.Recv()
 				if err != nil {
 					if err.Error() == "EOF" {
-						log.Debug("historical logs streaming completed", "count", historicalCount)
+						log.Debug("historical logs from persist completed", "count", count)
 						break
 					}
 					log.Warn("error reading historical logs", "error", err)
@@ -465,36 +512,66 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 
 				if err := stream.Send(&pb.DataChunk{Payload: logLine.Content}); err != nil {
 					log.Error("failed to send historical log to client", "error", err)
-					return status.Errorf(codes.Internal, "failed to send historical log: %v", err)
+					return count, status.Errorf(codes.Internal, "failed to send historical log: %v", err)
 				}
-				historicalCount++
+				count++
 			}
 		}
 	}
 
-	// For completed jobs with persist data, skip buffer to avoid duplicates
-	if historicalCount > 0 {
-		job, exists := s.jobStore.Job(req.GetUuid())
-		if exists && job.IsCompleted() {
-			log.Debug("job completed with persist data, skipping buffer", "historicalCount", historicalCount)
-			return nil
-		}
+	return count, nil
+}
+
+// queryPersistLogs queries persist for logs when job is not found locally
+func (s *JobServiceServer) queryPersistLogs(stream pb.JobService_GetJobLogsServer, jobUUID string, log *logger.Logger) (int, error) {
+	persistReq := &persistpb.QueryLogsRequest{
+		JobId:  jobUUID,
+		Stream: persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
 	}
 
-	// Stream live logs
+	persistStream, err := s.persistClient.QueryLogs(stream.Context(), persistReq)
+	if err != nil {
+		log.Warn("failed to query logs from persist", "error", err)
+		return 0, status.Errorf(codes.NotFound, "job not found: %s", jobUUID)
+	}
+
+	count := 0
+	for {
+		logLine, err := persistStream.Recv()
+		if err != nil {
+			if err.Error() == "EOF" {
+				log.Debug("persist logs streaming completed", "count", count)
+				break
+			}
+			log.Warn("error reading logs from persist", "error", err)
+			break
+		}
+
+		if err := stream.Send(&pb.DataChunk{Payload: logLine.Content}); err != nil {
+			log.Error("failed to send log to client", "error", err)
+			return count, status.Errorf(codes.Internal, "failed to send log: %v", err)
+		}
+		count++
+	}
+
+	return count, nil
+}
+
+// streamLiveLogs streams live logs for running jobs
+func (s *JobServiceServer) streamLiveLogs(stream pb.JobService_GetJobLogsServer, jobUUID string, log *logger.Logger) error {
 	log.Debug("starting live log streaming from buffer")
 	streamer := &grpcToDomainStreamer{stream: stream}
 
-	err := s.jobStore.SendUpdatesToClient(stream.Context(), req.GetUuid(), streamer)
+	err := s.jobStore.SendUpdatesToClient(stream.Context(), jobUUID, streamer)
 	if err != nil {
 		log.Error("failed to stream logs", "error", err)
 		if err.Error() == "job not found" {
-			return status.Errorf(codes.NotFound, "job not found: %s", req.GetUuid())
+			return status.Errorf(codes.NotFound, "job not found: %s", jobUUID)
 		}
 		return status.Errorf(codes.Internal, "failed to stream logs: %v", err)
 	}
 
-	log.Debug("log streaming completed successfully", "totalFromPersist", historicalCount)
+	log.Debug("live log streaming completed")
 	return nil
 }
 
@@ -575,31 +652,31 @@ func (s *JobServiceServer) StreamJobMetrics(req *pb.StreamJobMetricsRequest, str
 
 	log.Debug("starting metrics stream")
 
-	// Check if job is completed - if so, send buffered and persisted metrics
+	// Determine job state
 	job, exists := s.jobStore.Job(resolvedUUID)
-	if exists && job.IsCompleted() {
-		log.Debug("job completed, sending buffered and persisted metrics")
-		return s.sendHistoricalMetrics(stream, resolvedUUID, filter, 0, 0, 0, log)
+	isCompleted := exists && job.IsCompleted()
+	state := DetermineJobState(exists, isCompleted)
+
+	// Use unified streaming helper
+	cfg := StreamConfig{
+		JobID:  resolvedUUID,
+		Logger: log,
+		SendHistorical: func() (int, error) {
+			err := s.sendHistoricalMetrics(stream, resolvedUUID, filter, 0, 0, 0, log)
+			return 0, err // sendHistoricalMetrics doesn't return count
+		},
+		QueryPersistOnly: func() (int, error) {
+			if s.persistClient == nil {
+				return 0, nil
+			}
+			return s.queryPersistMetrics(stream, resolvedUUID, 0, 0, 0, log)
+		},
+		StreamLive: func() error {
+			return s.streamLiveMetrics(stream, resolvedUUID, filter, log)
+		},
 	}
 
-	// Job doesn't exist locally - check persist for historical data
-	if !exists {
-		log.Debug("job not found locally, checking persist for historical metrics")
-		if s.persistClient == nil {
-			return status.Errorf(codes.NotFound, "job not found: %s", resolvedUUID)
-		}
-		eventCount, err := s.queryPersistMetrics(stream, resolvedUUID, 0, 0, 0, log)
-		if err != nil {
-			return err
-		}
-		if eventCount == 0 {
-			return status.Errorf(codes.NotFound, "job not found: %s", resolvedUUID)
-		}
-		return nil
-	}
-
-	// Job is running - stream live metrics
-	return s.streamLiveMetrics(stream, resolvedUUID, filter, log)
+	return StreamWithHistory(stream.Context(), cfg, state)
 }
 
 // GetJobMetrics retrieves historical metrics for a job.
@@ -630,11 +707,11 @@ func (s *JobServiceServer) GetJobMetrics(req *pb.GetJobMetricsRequest, stream gr
 	return s.sendHistoricalMetrics(stream, resolvedUUID, filter, req.StartTime, req.EndTime, int(req.Limit), log)
 }
 
-// StreamJobVisibility streams live eBPF security events for a running job.
+// StreamJobTelematics streams live eBPF security events for a running job.
 // Events include exec, connect, accept, file access, mmap, and mprotect.
-func (s *JobServiceServer) StreamJobVisibility(req *pb.StreamJobVisibilityRequest, stream grpc.ServerStreamingServer[pb.VisibilityEvent]) error {
-	log := s.logger.WithFields("operation", "StreamJobVisibility", "uuid", req.JobUuid)
-	log.Debug("stream job visibility request received")
+func (s *JobServiceServer) StreamJobTelematics(req *pb.StreamJobTelematicsRequest, stream grpc.ServerStreamingServer[pb.TelematicsEvent]) error {
+	log := s.logger.WithFields("operation", "StreamJobTelematics", "uuid", req.JobUuid)
+	log.Debug("stream job telematics request received")
 
 	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
@@ -658,41 +735,41 @@ func (s *JobServiceServer) StreamJobVisibility(req *pb.StreamJobVisibilityReques
 	}
 
 	// Parse event type filter - exclude metrics
-	filter := s.parseVisibilityFilter(req.Types)
+	filter := s.parseTelematicsFilter(req.Types)
 
-	log.Debug("starting visibility stream", "types", req.Types)
+	log.Debug("starting telematics stream", "types", req.Types)
 
-	// Check if job is completed - if so, send buffered and persisted events
+	// Determine job state
 	job, exists := s.jobStore.Job(resolvedUUID)
-	if exists && job.IsCompleted() {
-		log.Debug("job completed, sending buffered and persisted visibility events")
-		return s.sendHistoricalVisibility(stream, resolvedUUID, filter, 0, 0, 0, log)
+	isCompleted := exists && job.IsCompleted()
+	state := DetermineJobState(exists, isCompleted)
+
+	// Use unified streaming helper
+	cfg := StreamConfig{
+		JobID:  resolvedUUID,
+		Logger: log,
+		SendHistorical: func() (int, error) {
+			err := s.sendHistoricalTelematics(stream, resolvedUUID, filter, 0, 0, 0, log)
+			return 0, err // sendHistoricalTelematics doesn't return count
+		},
+		QueryPersistOnly: func() (int, error) {
+			if s.persistClient == nil {
+				return 0, nil
+			}
+			return s.queryPersistTelematics(stream, resolvedUUID, filter, 0, 0, 0, log)
+		},
+		StreamLive: func() error {
+			return s.streamLiveTelematics(stream, resolvedUUID, filter, log)
+		},
 	}
 
-	// Job doesn't exist locally - check persist for historical data
-	if !exists {
-		log.Debug("job not found locally, checking persist for historical visibility")
-		if s.persistClient == nil {
-			return status.Errorf(codes.NotFound, "job not found: %s", resolvedUUID)
-		}
-		eventCount, err := s.queryPersistVisibility(stream, resolvedUUID, filter, 0, 0, 0, log)
-		if err != nil {
-			return err
-		}
-		if eventCount == 0 {
-			return status.Errorf(codes.NotFound, "job not found: %s", resolvedUUID)
-		}
-		return nil
-	}
-
-	// Job is running - stream live visibility events
-	return s.streamLiveVisibility(stream, resolvedUUID, filter, log)
+	return StreamWithHistory(stream.Context(), cfg, state)
 }
 
-// GetJobVisibility retrieves historical eBPF security events for a job.
-func (s *JobServiceServer) GetJobVisibility(req *pb.GetJobVisibilityRequest, stream grpc.ServerStreamingServer[pb.VisibilityEvent]) error {
-	log := s.logger.WithFields("operation", "GetJobVisibility", "uuid", req.JobUuid)
-	log.Debug("get job visibility request received")
+// GetJobTelematics retrieves historical eBPF security events for a job.
+func (s *JobServiceServer) GetJobTelematics(req *pb.GetJobTelematicsRequest, stream grpc.ServerStreamingServer[pb.TelematicsEvent]) error {
+	log := s.logger.WithFields("operation", "GetJobTelematics", "uuid", req.JobUuid)
+	log.Debug("get job telematics request received")
 
 	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
@@ -710,15 +787,15 @@ func (s *JobServiceServer) GetJobVisibility(req *pb.GetJobVisibilityRequest, str
 	}
 
 	// Parse event type filter - exclude metrics
-	filter := s.parseVisibilityFilter(req.Types)
+	filter := s.parseTelematicsFilter(req.Types)
 
-	return s.sendHistoricalVisibility(stream, resolvedUUID, filter, req.StartTime, req.EndTime, int(req.Limit), log)
+	return s.sendHistoricalTelematics(stream, resolvedUUID, filter, req.StartTime, req.EndTime, int(req.Limit), log)
 }
 
-// parseVisibilityFilter creates a filter for visibility event types (excluding metrics)
-func (s *JobServiceServer) parseVisibilityFilter(types []string) *telemetry.EventFilter {
+// parseTelematicsFilter creates a filter for telematics event types (excluding metrics)
+func (s *JobServiceServer) parseTelematicsFilter(types []string) *telemetry.EventFilter {
 	if len(types) == 0 {
-		// Default to all visibility events (exclude metrics)
+		// Default to all telematics events (exclude metrics)
 		return &telemetry.EventFilter{
 			Types: []telemetry.EventType{
 				telemetry.EventTypeExec,
@@ -749,8 +826,18 @@ func (s *JobServiceServer) sendHistoricalMetrics(stream grpc.ServerStreamingServ
 		endT = time.Unix(0, endTime)
 	}
 
-	// First try in-memory buffer (for recently completed jobs on same node)
-	if s.telemetryCollector != nil {
+	// First query persist for complete historical data
+	if s.persistClient != nil {
+		count, err := s.queryPersistMetrics(stream, jobID, startTime, endTime, int32(limit), log)
+		if err != nil {
+			log.Warn("failed to query persist metrics", "error", err)
+		} else {
+			eventCount += count
+		}
+	}
+
+	// If no persist data, try in-memory buffer (for recently completed jobs)
+	if eventCount == 0 && s.telemetryCollector != nil {
 		events := s.telemetryCollector.GetBufferedEvents(jobID, filter, startT, endT, limit)
 		for _, event := range events {
 			if event.Type == telemetry.EventTypeMetrics {
@@ -762,15 +849,6 @@ func (s *JobServiceServer) sendHistoricalMetrics(stream grpc.ServerStreamingServ
 				eventCount++
 			}
 		}
-	}
-
-	// If buffer is empty, query historical metrics from persist
-	if eventCount == 0 && s.persistClient != nil {
-		count, err := s.queryPersistMetrics(stream, jobID, startTime, endTime, int32(limit), log)
-		if err != nil {
-			return err
-		}
-		eventCount += count
 	}
 
 	log.Debug("metrics query completed", "eventCount", eventCount)
@@ -903,8 +981,8 @@ func (s *JobServiceServer) streamLiveMetrics(stream grpc.ServerStreamingServer[p
 	}
 }
 
-// sendHistoricalVisibility sends historical visibility events from buffer and persist
-func (s *JobServiceServer) sendHistoricalVisibility(stream grpc.ServerStreamingServer[pb.VisibilityEvent], jobID string, filter *telemetry.EventFilter, startTime, endTime int64, limit int, log *logger.Logger) error {
+// sendHistoricalTelematics sends historical telematics events from buffer and persist
+func (s *JobServiceServer) sendHistoricalTelematics(stream grpc.ServerStreamingServer[pb.TelematicsEvent], jobID string, filter *telemetry.EventFilter, startTime, endTime int64, limit int, log *logger.Logger) error {
 	eventCount := 0
 
 	// Parse time range
@@ -916,16 +994,26 @@ func (s *JobServiceServer) sendHistoricalVisibility(stream grpc.ServerStreamingS
 		endT = time.Unix(0, endTime)
 	}
 
-	// First try in-memory buffer
-	if s.telemetryCollector != nil {
+	// First query persist for complete historical data
+	if s.persistClient != nil {
+		count, err := s.queryPersistTelematics(stream, jobID, filter, startTime, endTime, int32(limit), log)
+		if err != nil {
+			log.Warn("failed to query persist telematics", "error", err)
+		} else {
+			eventCount += count
+		}
+	}
+
+	// If no persist data, try in-memory buffer (for recently completed jobs)
+	if eventCount == 0 && s.telemetryCollector != nil {
 		events := s.telemetryCollector.GetBufferedEvents(jobID, filter, startT, endT, limit)
 		for _, event := range events {
 			if event.Type != telemetry.EventTypeMetrics {
-				pbEvent := s.telemetryEventToVisibilityEvent(event)
+				pbEvent := s.telemetryEventToTelematicsEvent(event)
 				if pbEvent != nil {
 					if err := stream.Send(pbEvent); err != nil {
-						log.Warn("failed to send visibility event", "error", err)
-						return status.Errorf(codes.Internal, "failed to send visibility event: %v", err)
+						log.Warn("failed to send telematics event", "error", err)
+						return status.Errorf(codes.Internal, "failed to send telematics event: %v", err)
 					}
 					eventCount++
 				}
@@ -933,32 +1021,39 @@ func (s *JobServiceServer) sendHistoricalVisibility(stream grpc.ServerStreamingS
 		}
 	}
 
-	// If buffer is empty, query historical events from persist
-	if eventCount == 0 && s.persistClient != nil {
-		count, err := s.queryPersistVisibility(stream, jobID, filter, startTime, endTime, int32(limit), log)
-		if err != nil {
-			return err
-		}
-		eventCount += count
-	}
-
-	log.Debug("visibility query completed", "eventCount", eventCount)
+	log.Debug("telematics query completed", "eventCount", eventCount)
 	return nil
 }
 
-// queryPersistVisibility queries visibility events from persist service
-func (s *JobServiceServer) queryPersistVisibility(stream grpc.ServerStreamingServer[pb.VisibilityEvent], jobID string, filter *telemetry.EventFilter, startTime, endTime int64, limit int32, log *logger.Logger) (int, error) {
-	eventCount := 0
+// queryPersistTelematics queries telematics events from persist service
+func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingServer[pb.TelematicsEvent], jobID string, filter *telemetry.EventFilter, startTime, endTime int64, limit int32, log *logger.Logger) (int, error) {
+	// Collect all events first, then sort by timestamp
+	var allEvents []*pb.TelematicsEvent
 
-	// Check which event types are requested
+	// Check which event types are requested (empty filter = all types)
 	wantsExec := len(filter.Types) == 0
 	wantsConnect := len(filter.Types) == 0
+	wantsMmap := len(filter.Types) == 0
+	wantsMprotect := len(filter.Types) == 0
+	wantsFile := len(filter.Types) == 0
+	wantsAccept := len(filter.Types) == 0
+	wantsSocketData := len(filter.Types) == 0
 	for _, t := range filter.Types {
-		if t == telemetry.EventTypeExec {
+		switch t {
+		case telemetry.EventTypeExec:
 			wantsExec = true
-		}
-		if t == telemetry.EventTypeConnect {
+		case telemetry.EventTypeConnect:
 			wantsConnect = true
+		case telemetry.EventTypeMmap:
+			wantsMmap = true
+		case telemetry.EventTypeMprotect:
+			wantsMprotect = true
+		case telemetry.EventTypeFile:
+			wantsFile = true
+		case telemetry.EventTypeAccept:
+			wantsAccept = true
+		case telemetry.EventTypeSocketData:
+			wantsSocketData = true
 		}
 	}
 
@@ -979,24 +1074,19 @@ func (s *JobServiceServer) queryPersistVisibility(stream grpc.ServerStreamingSer
 				if err != nil {
 					break // EOF or error
 				}
-				pbEvent := &pb.VisibilityEvent{
+				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: execEvent.Timestamp,
 					JobId:     execEvent.JobId,
 					Type:      "exec",
-					Data: &pb.VisibilityEvent_Exec{
-						Exec: &pb.VisibilityExecData{
+					Data: &pb.TelematicsEvent_Exec{
+						Exec: &pb.TelematicsExecData{
 							Pid:    execEvent.Pid,
 							Ppid:   execEvent.Ppid,
 							Binary: execEvent.Filename,
 							Args:   execEvent.Args,
 						},
 					},
-				}
-				if err := stream.Send(pbEvent); err != nil {
-					log.Warn("failed to send exec event", "error", err)
-					return eventCount, status.Errorf(codes.Internal, "failed to send exec event: %v", err)
-				}
-				eventCount++
+				})
 			}
 		}
 	}
@@ -1018,12 +1108,12 @@ func (s *JobServiceServer) queryPersistVisibility(stream grpc.ServerStreamingSer
 				if err != nil {
 					break // EOF or error
 				}
-				pbEvent := &pb.VisibilityEvent{
+				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: connectEvent.Timestamp,
 					JobId:     connectEvent.JobId,
 					Type:      "connect",
-					Data: &pb.VisibilityEvent_Connect{
-						Connect: &pb.VisibilityConnectData{
+					Data: &pb.TelematicsEvent_Connect{
+						Connect: &pb.TelematicsConnectData{
 							Pid:      connectEvent.Pid,
 							DstAddr:  connectEvent.DstAddr,
 							DstPort:  connectEvent.DstPort,
@@ -1032,21 +1122,204 @@ func (s *JobServiceServer) queryPersistVisibility(stream grpc.ServerStreamingSer
 							SrcPort:  connectEvent.SrcPort,
 						},
 					},
-				}
-				if err := stream.Send(pbEvent); err != nil {
-					log.Warn("failed to send connect event", "error", err)
-					return eventCount, status.Errorf(codes.Internal, "failed to send connect event: %v", err)
-				}
-				eventCount++
+				})
 			}
 		}
+	}
+
+	// Query mmap events if requested
+	if wantsMmap {
+		mmapReq := &persistpb.QueryTelemetryRequest{
+			JobId:     jobID,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Limit:     limit,
+		}
+		mmapStream, err := s.persistClient.QueryMmapEvents(stream.Context(), mmapReq)
+		if err != nil {
+			log.Debug("failed to query mmap events from persist", "error", err)
+		} else {
+			for {
+				mmapEvent, err := mmapStream.Recv()
+				if err != nil {
+					break // EOF or error
+				}
+				allEvents = append(allEvents, &pb.TelematicsEvent{
+					Timestamp: mmapEvent.Timestamp,
+					JobId:     mmapEvent.JobId,
+					Type:      "mmap",
+					Data: &pb.TelematicsEvent_Mmap{
+						Mmap: &pb.TelematicsMmapData{
+							Pid:    mmapEvent.Pid,
+							Addr:   mmapEvent.Addr,
+							Length: mmapEvent.Length,
+							Prot:   mmapEvent.Prot,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	// Query mprotect events if requested
+	if wantsMprotect {
+		mprotectReq := &persistpb.QueryTelemetryRequest{
+			JobId:     jobID,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Limit:     limit,
+		}
+		mprotectStream, err := s.persistClient.QueryMprotectEvents(stream.Context(), mprotectReq)
+		if err != nil {
+			log.Debug("failed to query mprotect events from persist", "error", err)
+		} else {
+			for {
+				mprotectEvent, err := mprotectStream.Recv()
+				if err != nil {
+					break // EOF or error
+				}
+				allEvents = append(allEvents, &pb.TelematicsEvent{
+					Timestamp: mprotectEvent.Timestamp,
+					JobId:     mprotectEvent.JobId,
+					Type:      "mprotect",
+					Data: &pb.TelematicsEvent_Mprotect{
+						Mprotect: &pb.TelematicsMprotectData{
+							Pid:    mprotectEvent.Pid,
+							Addr:   mprotectEvent.Addr,
+							Length: mprotectEvent.Length,
+							Prot:   mprotectEvent.Prot,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	// Query file events if requested
+	if wantsFile {
+		fileReq := &persistpb.QueryTelemetryRequest{
+			JobId:     jobID,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Limit:     limit,
+		}
+		fileStream, err := s.persistClient.QueryFileEvents(stream.Context(), fileReq)
+		if err != nil {
+			log.Debug("failed to query file events from persist", "error", err)
+		} else {
+			for {
+				fileEvent, err := fileStream.Recv()
+				if err != nil {
+					break // EOF or error
+				}
+				allEvents = append(allEvents, &pb.TelematicsEvent{
+					Timestamp: fileEvent.Timestamp,
+					JobId:     fileEvent.JobId,
+					Type:      "file",
+					Data: &pb.TelematicsEvent_File{
+						File: &pb.TelematicsFileData{
+							Pid:       fileEvent.Pid,
+							Path:      fileEvent.Path,
+							Operation: fileEvent.Operation,
+							Bytes:     fileEvent.Bytes,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	// Query accept events if requested
+	if wantsAccept {
+		acceptReq := &persistpb.QueryTelemetryRequest{
+			JobId:     jobID,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Limit:     limit,
+		}
+		acceptStream, err := s.persistClient.QueryAcceptEvents(stream.Context(), acceptReq)
+		if err != nil {
+			log.Debug("failed to query accept events from persist", "error", err)
+		} else {
+			for {
+				acceptEvent, err := acceptStream.Recv()
+				if err != nil {
+					break // EOF or error
+				}
+				allEvents = append(allEvents, &pb.TelematicsEvent{
+					Timestamp: acceptEvent.Timestamp,
+					JobId:     acceptEvent.JobId,
+					Type:      "accept",
+					Data: &pb.TelematicsEvent_Accept{
+						Accept: &pb.TelematicsAcceptData{
+							Pid:      acceptEvent.Pid,
+							SrcAddr:  acceptEvent.SrcAddr,
+							SrcPort:  acceptEvent.SrcPort,
+							DstAddr:  acceptEvent.DstAddr,
+							DstPort:  acceptEvent.DstPort,
+							Protocol: acceptEvent.Protocol,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	// Query socket data events if requested
+	if wantsSocketData {
+		socketDataReq := &persistpb.QueryTelemetryRequest{
+			JobId:     jobID,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Limit:     limit,
+		}
+		socketDataStream, err := s.persistClient.QuerySocketDataEvents(stream.Context(), socketDataReq)
+		if err != nil {
+			log.Debug("failed to query socket data events from persist", "error", err)
+		} else {
+			for {
+				socketDataEvent, err := socketDataStream.Recv()
+				if err != nil {
+					break // EOF or error
+				}
+				allEvents = append(allEvents, &pb.TelematicsEvent{
+					Timestamp: socketDataEvent.Timestamp,
+					JobId:     socketDataEvent.JobId,
+					Type:      "socket_data",
+					Data: &pb.TelematicsEvent_SocketData{
+						SocketData: &pb.TelematicsSocketDataData{
+							Pid:       socketDataEvent.Pid,
+							Direction: socketDataEvent.Direction,
+							DstAddr:   socketDataEvent.DstAddr,
+							DstPort:   socketDataEvent.DstPort,
+							Bytes:     socketDataEvent.Bytes,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	// Sort all events by timestamp
+	sort.Slice(allEvents, func(i, j int) bool {
+		return allEvents[i].Timestamp < allEvents[j].Timestamp
+	})
+
+	// Stream sorted events
+	eventCount := 0
+	for _, event := range allEvents {
+		if err := stream.Send(event); err != nil {
+			log.Warn("failed to send telematics event", "error", err, "type", event.Type)
+			return eventCount, status.Errorf(codes.Internal, "failed to send telematics event: %v", err)
+		}
+		eventCount++
 	}
 
 	return eventCount, nil
 }
 
-// streamLiveVisibility streams live visibility events for a running job
-func (s *JobServiceServer) streamLiveVisibility(stream grpc.ServerStreamingServer[pb.VisibilityEvent], jobID string, filter *telemetry.EventFilter, log *logger.Logger) error {
+// streamLiveTelematics streams live telematics events for a running job
+func (s *JobServiceServer) streamLiveTelematics(stream grpc.ServerStreamingServer[pb.TelematicsEvent], jobID string, filter *telemetry.EventFilter, log *logger.Logger) error {
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
@@ -1063,7 +1336,7 @@ func (s *JobServiceServer) streamLiveVisibility(stream grpc.ServerStreamingServe
 	go func() {
 		streamErr := s.telemetryCollector.Stream(streamCtx, jobID, filter, func(event *telemetry.Event) error {
 			if event.Type != telemetry.EventTypeMetrics {
-				pbEvent := s.telemetryEventToVisibilityEvent(event)
+				pbEvent := s.telemetryEventToTelematicsEvent(event)
 				if pbEvent != nil {
 					if err := stream.Send(pbEvent); err != nil {
 						return err
@@ -1102,7 +1375,7 @@ func (s *JobServiceServer) streamLiveVisibility(stream grpc.ServerStreamingServe
 			return nil
 		case err := <-done:
 			if err != nil {
-				return status.Errorf(codes.Internal, "failed to stream visibility: %v", err)
+				return status.Errorf(codes.Internal, "failed to stream telematics: %v", err)
 			}
 			return nil
 		case <-selectTimeout:
@@ -1155,9 +1428,9 @@ func (s *JobServiceServer) telemetryEventToMetricsEvent(event *telemetry.Event) 
 	}
 }
 
-// telemetryEventToVisibilityEvent converts a telemetry event to a VisibilityEvent proto
-func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Event) *pb.VisibilityEvent {
-	pbEvent := &pb.VisibilityEvent{
+// telemetryEventToTelematicsEvent converts a telemetry event to a TelematicsEvent proto
+func (s *JobServiceServer) telemetryEventToTelematicsEvent(event *telemetry.Event) *pb.TelematicsEvent {
+	pbEvent := &pb.TelematicsEvent{
 		Timestamp: event.Timestamp.UnixNano(),
 		JobId:     event.JobID,
 		Type:      string(event.Type),
@@ -1169,8 +1442,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_Exec{
-			Exec: &pb.VisibilityExecData{
+		pbEvent.Data = &pb.TelematicsEvent_Exec{
+			Exec: &pb.TelematicsExecData{
 				Pid:      data.PID,
 				Ppid:     data.PPID,
 				Binary:   data.Binary,
@@ -1183,8 +1456,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_Connect{
-			Connect: &pb.VisibilityConnectData{
+		pbEvent.Data = &pb.TelematicsEvent_Connect{
+			Connect: &pb.TelematicsConnectData{
 				Pid:      data.PID,
 				DstAddr:  data.Address,
 				DstPort:  data.Port,
@@ -1198,8 +1471,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_Accept{
-			Accept: &pb.VisibilityAcceptData{
+		pbEvent.Data = &pb.TelematicsEvent_Accept{
+			Accept: &pb.TelematicsAcceptData{
 				Pid:      data.PID,
 				SrcAddr:  data.RemoteAddr,
 				SrcPort:  data.RemotePort,
@@ -1212,8 +1485,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_File{
-			File: &pb.VisibilityFileData{
+		pbEvent.Data = &pb.TelematicsEvent_File{
+			File: &pb.TelematicsFileData{
 				Pid:       data.PID,
 				Path:      data.Path,
 				Operation: data.Operation,
@@ -1225,8 +1498,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_Mmap{
-			Mmap: &pb.VisibilityMmapData{
+		pbEvent.Data = &pb.TelematicsEvent_Mmap{
+			Mmap: &pb.TelematicsMmapData{
 				Pid:    data.PID,
 				Addr:   data.Addr,
 				Length: data.Length,
@@ -1239,8 +1512,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_Mprotect{
-			Mprotect: &pb.VisibilityMprotectData{
+		pbEvent.Data = &pb.TelematicsEvent_Mprotect{
+			Mprotect: &pb.TelematicsMprotectData{
 				Pid:    data.PID,
 				Addr:   data.Addr,
 				Length: data.Length,
@@ -1252,8 +1525,8 @@ func (s *JobServiceServer) telemetryEventToVisibilityEvent(event *telemetry.Even
 		if !ok {
 			return nil
 		}
-		pbEvent.Data = &pb.VisibilityEvent_SocketData{
-			SocketData: &pb.VisibilitySocketDataData{
+		pbEvent.Data = &pb.TelematicsEvent_SocketData{
+			SocketData: &pb.TelematicsSocketDataData{
 				Pid:       data.PID,
 				Direction: data.Direction,
 				DstAddr:   data.Address,

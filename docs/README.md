@@ -316,7 +316,7 @@ rnx job run --network=my-network --volume=data-vol app
 ### Development Teams
 
 - **Rapid Iteration**: Immediate job execution without container build cycles
-- **Enhanced Debugging**: Direct process visibility and filesystem access for troubleshooting
+- **Enhanced Debugging**: Direct process telematics and filesystem access for troubleshooting
 - **Curated Runtimes**: Production-ready environments for Python, Java, and machine learning workloads
 - **Developer-Friendly Tooling**: Intuitive CLI and web interfaces designed for productivity
 

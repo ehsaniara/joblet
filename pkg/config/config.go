@@ -183,6 +183,27 @@ type IPCConfig struct {
 type TelemetryConfig struct {
 	MetricsInterval time.Duration `yaml:"metrics_interval" json:"metrics_interval"` // How often to sample resource metrics (default: 5s)
 	EbpfEnabled     bool          `yaml:"ebpf_enabled" json:"ebpf_enabled"`         // Enable eBPF telemetry collection (default: true)
+	// EventTypes is a list of enabled eBPF event types. Empty/nil = all enabled.
+	// Valid values: exec, connect, accept, mmap, mprotect, file, socket_data
+	EventTypes []string `yaml:"event_types" json:"event_types"`
+}
+
+// AllEventTypes lists all valid eBPF event types
+var AllEventTypes = []string{"exec", "connect", "accept", "mmap", "mprotect", "file", "socket_data"}
+
+// IsEventTypeEnabled checks if a specific event type is enabled in the config.
+// If EventTypes is empty/nil, all event types are enabled (default behavior).
+func (c *TelemetryConfig) IsEventTypeEnabled(eventType string) bool {
+	// If no event types specified, all are enabled (default)
+	if len(c.EventTypes) == 0 {
+		return true
+	}
+	for _, et := range c.EventTypes {
+		if et == eventType {
+			return true
+		}
+	}
+	return false
 }
 
 // StateConfig holds job state persistence configuration
@@ -355,6 +376,7 @@ var DefaultConfig = Config{
 	Telemetry: TelemetryConfig{
 		MetricsInterval: 5 * time.Second, // Sample metrics every 5 seconds
 		EbpfEnabled:     true,            // eBPF telemetry enabled by default
+		EventTypes:      nil,             // nil/empty = all event types enabled (default)
 	},
 }
 

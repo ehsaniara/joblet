@@ -1,4 +1,4 @@
-# ADR-014: Unified Job Telemetry with eBPF Visibility
+# ADR-014: Unified Job Telemetry with eBPF Telematics
 
 ## Status
 
@@ -6,14 +6,14 @@
 
 > **CLI Update (December 2025)**: The CLI interface was refined to use separate commands:
 > - `rnx job metrics <job-id>` - View resource metrics (CPU, memory, I/O, network, GPU)
-> - `rnx job visibility <job-id>` - View eBPF security events (exec, connect, accept, etc.)
+> - `rnx job telematics <job-id>` - View eBPF security events (exec, connect, accept, etc.)
 >
 > This replaces the original `--tel` flag approach, providing clearer separation of concerns.
 > The backend unified telemetry pipeline remains as described in this ADR.
 
 ## Context
 
-Joblet currently collects job metrics (CPU, memory, I/O) from cgroups v2 and stores them in the persist service. However, we have **zero visibility** into what jobs are actually doing - what binaries they execute, what network connections they make, what files they access.
+Joblet currently collects job metrics (CPU, memory, I/O) from cgroups v2 and stores them in the persist service. However, we have **zero telematics** into what jobs are actually doing - what binaries they execute, what network connections they make, what files they access.
 
 We want to add eBPF-based activity tracking. Rather than building a separate system, we should unify metrics and activity events into a **single telemetry pipeline** because:
 
@@ -393,12 +393,12 @@ storage:
 
 ```
 internal/joblet/ebpf/
-├── visibility/
+├── telematics/
 │   ├── monitor.go           # Go monitor, emits TelemetryEvents
 │   ├── bpf/
-│   │   ├── visibility.c     # eBPF program
+│   │   ├── telematics.c     # eBPF program
 │   │   ├── vmlinux.h
-│   │   └── visibility_bpfel.go  # Generated
+│   │   └── telematics_bpfel.go  # Generated
 │   └── cgroup.go            # Cgroup ID helpers
 ```
 
@@ -416,10 +416,10 @@ internal/joblet/
 ├── metrics/
 │   └── collector.go         # Cgroups metrics (existing, refactored)
 └── ebpf/
-    └── visibility/          # eBPF activity tracking (new)
+    └── telematics/          # eBPF activity tracking (new)
         ├── monitor.go       # Go monitor using cilium/ebpf
         ├── bpf/
-        │   ├── visibility.c # eBPF C program
+        │   ├── telematics.c # eBPF C program
         │   └── vmlinux.h
         └── cgroup.go        # Cgroup ID helpers
 
@@ -475,8 +475,8 @@ persist/internal/
 - CloudWatch storage backend (`{jobID}-exec-events`, `{jobID}-connect-events` streams)
 
 ### Phase 3: eBPF Activity Tracking ✅ COMPLETED
-- eBPF program for execve, connect (`internal/joblet/ebpf/visibility/bpf/visibility.c`)
-- Go monitor using cilium/ebpf (`internal/joblet/ebpf/visibility/monitor.go`)
+- eBPF program for execve, connect (`internal/joblet/ebpf/telematics/bpf/telematics.c`)
+- Go monitor using cilium/ebpf (`internal/joblet/ebpf/telematics/monitor.go`)
 - Integration with TelemetryCollector via EventPersister interface
 - Job lifecycle hooks (start/stop monitoring by cgroup ID)
 

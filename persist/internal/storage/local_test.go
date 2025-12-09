@@ -24,6 +24,9 @@ func TestNewLocalBackend(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -61,6 +64,9 @@ func TestLocalBackend_WriteLogs(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -121,6 +127,9 @@ func TestLocalBackend_WriteMetrics(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -180,6 +189,9 @@ func TestLocalBackend_ReadLogs(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -272,6 +284,9 @@ func TestLocalBackend_ReadMetrics(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -356,6 +371,9 @@ func TestLocalBackend_DeleteJob(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -433,6 +451,9 @@ func TestLocalBackend_Close(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -459,6 +480,9 @@ func TestLocalBackend_EmptyJobID(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -502,6 +526,9 @@ func TestLocalBackend_WriteExecEvents(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -540,7 +567,7 @@ func TestLocalBackend_WriteExecEvents(t *testing.T) {
 	}
 
 	// Verify exec events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	execEventsPath := filepath.Join(jobEventsDir, "exec_events.jsonl.gz")
 
 	if _, err := os.Stat(execEventsPath); os.IsNotExist(err) {
@@ -559,6 +586,9 @@ func TestLocalBackend_WriteExecEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -588,6 +618,9 @@ func TestLocalBackend_WriteConnectEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -629,7 +662,7 @@ func TestLocalBackend_WriteConnectEvents(t *testing.T) {
 	}
 
 	// Verify connect events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	connectEventsPath := filepath.Join(jobEventsDir, "connect_events.jsonl.gz")
 
 	if _, err := os.Stat(connectEventsPath); os.IsNotExist(err) {
@@ -648,6 +681,9 @@ func TestLocalBackend_WriteConnectEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -677,6 +713,9 @@ func TestLocalBackend_WriteExecEvents_AppendMode(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -719,7 +758,7 @@ func TestLocalBackend_WriteExecEvents_AppendMode(t *testing.T) {
 	}
 
 	// Verify file was created and has content from both writes
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	execEventsPath := filepath.Join(jobEventsDir, "exec_events.jsonl.gz")
 
 	info, err := os.Stat(execEventsPath)
@@ -746,6 +785,9 @@ func TestLocalBackend_WriteFileEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -787,7 +829,7 @@ func TestLocalBackend_WriteFileEvents(t *testing.T) {
 	}
 
 	// Verify file events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	fileEventsPath := filepath.Join(jobEventsDir, "file_events.jsonl.gz")
 
 	if _, err := os.Stat(fileEventsPath); os.IsNotExist(err) {
@@ -806,6 +848,9 @@ func TestLocalBackend_WriteFileEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -834,6 +879,9 @@ func TestLocalBackend_WriteAcceptEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -877,7 +925,7 @@ func TestLocalBackend_WriteAcceptEvents(t *testing.T) {
 	}
 
 	// Verify accept events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	acceptEventsPath := filepath.Join(jobEventsDir, "accept_events.jsonl.gz")
 
 	if _, err := os.Stat(acceptEventsPath); os.IsNotExist(err) {
@@ -896,6 +944,9 @@ func TestLocalBackend_WriteAcceptEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -924,6 +975,9 @@ func TestLocalBackend_WriteSocketDataEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -969,7 +1023,7 @@ func TestLocalBackend_WriteSocketDataEvents(t *testing.T) {
 	}
 
 	// Verify socket data events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	socketDataEventsPath := filepath.Join(jobEventsDir, "socket_data_events.jsonl.gz")
 
 	if _, err := os.Stat(socketDataEventsPath); os.IsNotExist(err) {
@@ -988,6 +1042,9 @@ func TestLocalBackend_WriteSocketDataEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1016,6 +1073,9 @@ func TestLocalBackend_WriteMmapEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1061,7 +1121,7 @@ func TestLocalBackend_WriteMmapEvents(t *testing.T) {
 	}
 
 	// Verify mmap events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	mmapEventsPath := filepath.Join(jobEventsDir, "mmap_events.jsonl.gz")
 
 	if _, err := os.Stat(mmapEventsPath); os.IsNotExist(err) {
@@ -1080,6 +1140,9 @@ func TestLocalBackend_WriteMmapEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1108,6 +1171,9 @@ func TestLocalBackend_WriteMprotectEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1149,7 +1215,7 @@ func TestLocalBackend_WriteMprotectEvents(t *testing.T) {
 	}
 
 	// Verify mprotect events file was created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	mprotectEventsPath := filepath.Join(jobEventsDir, "mprotect_events.jsonl.gz")
 
 	if _, err := os.Stat(mprotectEventsPath); os.IsNotExist(err) {
@@ -1168,6 +1234,9 @@ func TestLocalBackend_WriteMprotectEvents_Empty(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1198,6 +1267,9 @@ func TestLocalBackend_ReadFileEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1291,6 +1363,9 @@ func TestLocalBackend_ReadAcceptEvents(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -1371,6 +1446,9 @@ func TestLocalBackend_ReadSocketDataEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1456,6 +1534,9 @@ func TestLocalBackend_ReadMmapEvents(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -1537,6 +1618,9 @@ func TestLocalBackend_ReadMprotectEvents(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1620,6 +1704,9 @@ func TestLocalBackend_DeleteJob_IncludesNewEventTypes(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -1642,7 +1729,7 @@ func TestLocalBackend_DeleteJob_IncludesNewEventTypes(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify files were created
-	jobEventsDir := filepath.Join(cfg.Local.Logs.Directory, jobID)
+	jobEventsDir := filepath.Join(cfg.Local.Events.Directory, jobID)
 	files := []string{
 		"file_events.jsonl.gz",
 		"accept_events.jsonl.gz",
@@ -1681,6 +1768,9 @@ func TestLocalBackend_ReadFileEvents_NotFound(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1736,6 +1826,9 @@ func TestLocalBackend_ReadMetrics_MultipleGzipStreams(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}
@@ -1841,6 +1934,9 @@ func TestLocalBackend_ReadExecEvents_MultipleGzipStreams(t *testing.T) {
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
 			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
 		},
 	}
 
@@ -1941,6 +2037,9 @@ func TestLocalBackend_ReadConnectEvents_MultipleGzipStreams(t *testing.T) {
 			},
 			Metrics: config.MetricStorageConfig{
 				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
 			},
 		},
 	}

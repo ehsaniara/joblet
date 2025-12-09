@@ -475,6 +475,97 @@ func connectEventIPCToGen(ipc *ipcpb.ConnectEvent) *persistpb.ConnectEvent {
 	}
 }
 
+// mmapEventIPCToGen converts a mmap event from ipc to persist proto
+func mmapEventIPCToGen(ipc *ipcpb.MmapEvent) *persistpb.MmapEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.MmapEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Comm:      ipc.Comm,
+		Addr:      ipc.Addr,
+		Length:    ipc.Length,
+		Prot:      ipc.Prot,
+		Flags:     ipc.Flags,
+		Filename:  ipc.Filename,
+	}
+}
+
+// mprotectEventIPCToGen converts a mprotect event from ipc to persist proto
+func mprotectEventIPCToGen(ipc *ipcpb.MprotectEvent) *persistpb.MprotectEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.MprotectEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Comm:      ipc.Comm,
+		Addr:      ipc.Addr,
+		Length:    ipc.Length,
+		Prot:      ipc.Prot,
+	}
+}
+
+// fileEventIPCToGen converts a file event from ipc to persist proto
+func fileEventIPCToGen(ipc *ipcpb.FileEvent) *persistpb.FileEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.FileEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Comm:      ipc.Comm,
+		Path:      ipc.Path,
+		Operation: ipc.Operation,
+		Bytes:     ipc.Bytes,
+	}
+}
+
+// acceptEventIPCToGen converts an accept event from ipc to persist proto
+func acceptEventIPCToGen(ipc *ipcpb.AcceptEvent) *persistpb.AcceptEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.AcceptEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Comm:      ipc.Comm,
+		SrcAddr:   ipc.SrcAddr,
+		SrcPort:   ipc.SrcPort,
+		DstAddr:   ipc.DstAddr,
+		DstPort:   ipc.DstPort,
+		Protocol:  ipc.Protocol,
+	}
+}
+
+// socketDataEventIPCToGen converts a socket data event from ipc to persist proto
+func socketDataEventIPCToGen(ipc *ipcpb.SocketDataEvent) *persistpb.SocketDataEvent {
+	if ipc == nil {
+		return nil
+	}
+	return &persistpb.SocketDataEvent{
+		JobId:     ipc.JobId,
+		Timestamp: ipc.Timestamp,
+		Sequence:  ipc.Sequence,
+		Pid:       ipc.Pid,
+		Comm:      ipc.Comm,
+		Direction: ipc.Direction,
+		DstAddr:   ipc.Addr,
+		DstPort:   ipc.Port,
+		Bytes:     ipc.Bytes,
+		Protocol:  ipc.Protocol,
+	}
+}
+
 // QueryExecEvents implements the QueryExecEvents RPC
 func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryExecEventsServer) error {
 	// Check authorization
@@ -612,6 +703,281 @@ func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, st
 			if err != nil {
 				s.logger.Error("Error from connect event reader", "error", err, "jobID", req.JobId)
 				return status.Errorf(codes.Internal, "error reading connect events: %v", err)
+			}
+		}
+	}
+}
+
+// QueryMmapEvents implements the QueryMmapEvents RPC
+func (s *GRPCServer) QueryMmapEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryMmapEventsServer) error {
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QueryMmapEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	reader, err := s.backend.ReadMmapEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read mmap events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read mmap events: %v", err)
+	}
+
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case event, ok := <-reader.Channel:
+			if !ok {
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						return status.Errorf(codes.Internal, "error reading mmap events: %v", err)
+					}
+				default:
+				}
+				s.logger.Info("QueryMmapEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+			if err := stream.Send(mmapEventIPCToGen(event)); err != nil {
+				return status.Errorf(codes.Internal, "failed to send mmap event: %v", err)
+			}
+			eventCount++
+		case err := <-reader.Error:
+			if err != nil {
+				return status.Errorf(codes.Internal, "error reading mmap events: %v", err)
+			}
+		}
+	}
+}
+
+// QueryMprotectEvents implements the QueryMprotectEvents RPC
+func (s *GRPCServer) QueryMprotectEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryMprotectEventsServer) error {
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QueryMprotectEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	reader, err := s.backend.ReadMprotectEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read mprotect events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read mprotect events: %v", err)
+	}
+
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case event, ok := <-reader.Channel:
+			if !ok {
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						return status.Errorf(codes.Internal, "error reading mprotect events: %v", err)
+					}
+				default:
+				}
+				s.logger.Info("QueryMprotectEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+			if err := stream.Send(mprotectEventIPCToGen(event)); err != nil {
+				return status.Errorf(codes.Internal, "failed to send mprotect event: %v", err)
+			}
+			eventCount++
+		case err := <-reader.Error:
+			if err != nil {
+				return status.Errorf(codes.Internal, "error reading mprotect events: %v", err)
+			}
+		}
+	}
+}
+
+// QueryFileEvents implements the QueryFileEvents RPC
+func (s *GRPCServer) QueryFileEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryFileEventsServer) error {
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QueryFileEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	reader, err := s.backend.ReadFileEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read file events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read file events: %v", err)
+	}
+
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case event, ok := <-reader.Channel:
+			if !ok {
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						return status.Errorf(codes.Internal, "error reading file events: %v", err)
+					}
+				default:
+				}
+				s.logger.Info("QueryFileEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+			if err := stream.Send(fileEventIPCToGen(event)); err != nil {
+				return status.Errorf(codes.Internal, "failed to send file event: %v", err)
+			}
+			eventCount++
+		case err := <-reader.Error:
+			if err != nil {
+				return status.Errorf(codes.Internal, "error reading file events: %v", err)
+			}
+		}
+	}
+}
+
+// QueryAcceptEvents implements the QueryAcceptEvents RPC
+func (s *GRPCServer) QueryAcceptEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QueryAcceptEventsServer) error {
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QueryAcceptEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	reader, err := s.backend.ReadAcceptEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read accept events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read accept events: %v", err)
+	}
+
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case event, ok := <-reader.Channel:
+			if !ok {
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						return status.Errorf(codes.Internal, "error reading accept events: %v", err)
+					}
+				default:
+				}
+				s.logger.Info("QueryAcceptEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+			if err := stream.Send(acceptEventIPCToGen(event)); err != nil {
+				return status.Errorf(codes.Internal, "failed to send accept event: %v", err)
+			}
+			eventCount++
+		case err := <-reader.Error:
+			if err != nil {
+				return status.Errorf(codes.Internal, "error reading accept events: %v", err)
+			}
+		}
+	}
+}
+
+// QuerySocketDataEvents implements the QuerySocketDataEvents RPC
+func (s *GRPCServer) QuerySocketDataEvents(req *persistpb.QueryTelemetryRequest, stream persistpb.PersistService_QuerySocketDataEventsServer) error {
+	if err := s.auth.Authorized(stream.Context(), auth.QueryMetricsOp); err != nil {
+		return err
+	}
+
+	s.logger.Info("QuerySocketDataEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+
+	query := &storage.TelemetryQuery{
+		JobID:  req.JobId,
+		Limit:  int(req.Limit),
+		Offset: int(req.Offset),
+	}
+	if req.StartTime > 0 {
+		query.StartTime = &req.StartTime
+	}
+	if req.EndTime > 0 {
+		query.EndTime = &req.EndTime
+	}
+
+	reader, err := s.backend.ReadSocketDataEvents(stream.Context(), query)
+	if err != nil {
+		s.logger.Error("Failed to read socket data events", "error", err, "jobID", req.JobId)
+		return status.Errorf(codes.Internal, "failed to read socket data events: %v", err)
+	}
+
+	eventCount := 0
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case event, ok := <-reader.Channel:
+			if !ok {
+				select {
+				case err := <-reader.Error:
+					if err != nil {
+						return status.Errorf(codes.Internal, "error reading socket data events: %v", err)
+					}
+				default:
+				}
+				s.logger.Info("QuerySocketDataEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				return nil
+			}
+			if err := stream.Send(socketDataEventIPCToGen(event)); err != nil {
+				return status.Errorf(codes.Internal, "failed to send socket data event: %v", err)
+			}
+			eventCount++
+		case err := <-reader.Error:
+			if err != nil {
+				return status.Errorf(codes.Internal, "error reading socket data events: %v", err)
 			}
 		}
 	}

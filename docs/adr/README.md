@@ -39,7 +39,7 @@ Each ADR follows this structure:
 | [011](011-cqrs-architecture-with-persist.md)      | CQRS Architecture with persist Service      | Accepted    | 2025-10-*  |
 | [012](012-aws-secrets-manager-cert-storage.md)    | AWS Secrets Manager for Certificate Storage | Accepted    | 2025-10-*  |
 | [013](013-extract-workflow-to-separate-project.md) | Extract Workflow to Separate Project        | Implemented | 2025-12-03 |
-| [014](014-ebpf-runtime-visibility.md)              | Unified Job Telemetry with eBPF Visibility  | Proposed    | 2025-12-04 |
+| [014](014-ebpf-runtime-telematics.md)              | Unified Job Telemetry with eBPF Telematics  | Proposed    | 2025-12-04 |
 
 ## Creating a New ADR
 

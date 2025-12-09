@@ -326,7 +326,7 @@ rnx job run ipcs  # No shared memory/semaphores from host
 # UTS namespace - hostname isolation
 rnx job run hostname  # Job-specific hostname
 
-# Cgroup namespace - resource visibility
+# Cgroup namespace - resource telematics
 rnx job run cat /proc/cgroups  # Limited cgroup view
 ```
 

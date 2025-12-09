@@ -93,9 +93,14 @@ func NewLocalBackend(cfg *config.StorageConfig, log *logger.Logger) (*LocalBacke
 		return nil, fmt.Errorf("failed to create metrics directory: %w", err)
 	}
 
+	if err := os.MkdirAll(cfg.Local.Events.Directory, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create events directory: %w", err)
+	}
+
 	log.Info("Local storage backend initialized",
 		"logsDir", cfg.Local.Logs.Directory,
-		"metricsDir", cfg.Local.Metrics.Directory)
+		"metricsDir", cfg.Local.Metrics.Directory,
+		"eventsDir", cfg.Local.Events.Directory)
 
 	return backend, nil
 }
@@ -359,7 +364,7 @@ func (lb *LocalBackend) getOrCreateExecEventFile(jobID string) (*execEventFile, 
 	}
 
 	// Create job events directory
-	eventsDir := filepath.Join(lb.config.Local.Logs.Directory, jobID)
+	eventsDir := filepath.Join(lb.config.Local.Events.Directory, jobID)
 	if err := os.MkdirAll(eventsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create events directory: %w", err)
 	}
@@ -390,7 +395,7 @@ func (lb *LocalBackend) getOrCreateConnectEventFile(jobID string) (*connectEvent
 	}
 
 	// Create job events directory
-	eventsDir := filepath.Join(lb.config.Local.Logs.Directory, jobID)
+	eventsDir := filepath.Join(lb.config.Local.Events.Directory, jobID)
 	if err := os.MkdirAll(eventsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create events directory: %w", err)
 	}
@@ -794,6 +799,11 @@ func (lb *LocalBackend) DeleteJob(jobID string) error {
 		return fmt.Errorf("failed to delete metrics directory: %w", err)
 	}
 
+	eventsDir := filepath.Join(lb.config.Local.Events.Directory, jobID)
+	if err := os.RemoveAll(eventsDir); err != nil {
+		return fmt.Errorf("failed to delete events directory: %w", err)
+	}
+
 	lb.logger.Info("Deleted job data", "jobID", jobID)
 
 	return nil
@@ -896,7 +906,7 @@ func (lb *LocalBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuer
 }
 
 func (lb *LocalBackend) readExecEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ExecEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "exec_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "exec_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1005,7 +1015,7 @@ func (lb *LocalBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQ
 }
 
 func (lb *LocalBackend) readConnectEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ConnectEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "connect_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "connect_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1279,7 +1289,7 @@ func (lb *LocalBackend) getOrCreateEventFile(jobID, filename string, fileMap map
 	}
 
 	// Create job events directory
-	eventsDir := filepath.Join(lb.config.Local.Logs.Directory, jobID)
+	eventsDir := filepath.Join(lb.config.Local.Events.Directory, jobID)
 	if err := os.MkdirAll(eventsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create events directory: %w", err)
 	}
@@ -1325,7 +1335,7 @@ func (lb *LocalBackend) ReadFileEvents(ctx context.Context, query *TelemetryQuer
 }
 
 func (lb *LocalBackend) readFileEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.FileEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "file_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "file_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1434,7 +1444,7 @@ func (lb *LocalBackend) ReadAcceptEvents(ctx context.Context, query *TelemetryQu
 }
 
 func (lb *LocalBackend) readAcceptEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.AcceptEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "accept_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "accept_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1538,7 +1548,7 @@ func (lb *LocalBackend) ReadSocketDataEvents(ctx context.Context, query *Telemet
 }
 
 func (lb *LocalBackend) readSocketDataEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.SocketDataEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "socket_data_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "socket_data_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1642,7 +1652,7 @@ func (lb *LocalBackend) ReadMmapEvents(ctx context.Context, query *TelemetryQuer
 }
 
 func (lb *LocalBackend) readMmapEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MmapEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "mmap_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "mmap_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1746,7 +1756,7 @@ func (lb *LocalBackend) ReadMprotectEvents(ctx context.Context, query *Telemetry
 }
 
 func (lb *LocalBackend) readMprotectEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MprotectEvent) error {
-	filePath := filepath.Join(lb.config.Local.Logs.Directory, query.JobID, "mprotect_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "mprotect_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {

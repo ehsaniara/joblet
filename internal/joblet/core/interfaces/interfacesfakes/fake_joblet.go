@@ -48,10 +48,10 @@ type FakeJoblet struct {
 	executeScheduledJobReturnsOnCall map[int]struct {
 		result1 error
 	}
-	SetVisibilityMonitorStub        func(interfaces.VisibilityMonitor)
-	setVisibilityMonitorMutex       sync.RWMutex
-	setVisibilityMonitorArgsForCall []struct {
-		arg1 interfaces.VisibilityMonitor
+	SetTelematicsMonitorStub        func(interfaces.TelematicsMonitor)
+	setTelematicsMonitorMutex       sync.RWMutex
+	setTelematicsMonitorArgsForCall []struct {
+		arg1 interfaces.TelematicsMonitor
 	}
 	StartJobStub        func(context.Context, interfaces.StartJobRequest) (*domain.Job, error)
 	startJobMutex       sync.RWMutex
@@ -272,35 +272,35 @@ func (fake *FakeJoblet) ExecuteScheduledJobReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeJoblet) SetVisibilityMonitor(arg1 interfaces.VisibilityMonitor) {
-	fake.setVisibilityMonitorMutex.Lock()
-	fake.setVisibilityMonitorArgsForCall = append(fake.setVisibilityMonitorArgsForCall, struct {
-		arg1 interfaces.VisibilityMonitor
+func (fake *FakeJoblet) SetTelematicsMonitor(arg1 interfaces.TelematicsMonitor) {
+	fake.setTelematicsMonitorMutex.Lock()
+	fake.setTelematicsMonitorArgsForCall = append(fake.setTelematicsMonitorArgsForCall, struct {
+		arg1 interfaces.TelematicsMonitor
 	}{arg1})
-	stub := fake.SetVisibilityMonitorStub
-	fake.recordInvocation("SetVisibilityMonitor", []interface{}{arg1})
-	fake.setVisibilityMonitorMutex.Unlock()
+	stub := fake.SetTelematicsMonitorStub
+	fake.recordInvocation("SetTelematicsMonitor", []interface{}{arg1})
+	fake.setTelematicsMonitorMutex.Unlock()
 	if stub != nil {
-		fake.SetVisibilityMonitorStub(arg1)
+		fake.SetTelematicsMonitorStub(arg1)
 	}
 }
 
-func (fake *FakeJoblet) SetVisibilityMonitorCallCount() int {
-	fake.setVisibilityMonitorMutex.RLock()
-	defer fake.setVisibilityMonitorMutex.RUnlock()
-	return len(fake.setVisibilityMonitorArgsForCall)
+func (fake *FakeJoblet) SetTelematicsMonitorCallCount() int {
+	fake.setTelematicsMonitorMutex.RLock()
+	defer fake.setTelematicsMonitorMutex.RUnlock()
+	return len(fake.setTelematicsMonitorArgsForCall)
 }
 
-func (fake *FakeJoblet) SetVisibilityMonitorCalls(stub func(interfaces.VisibilityMonitor)) {
-	fake.setVisibilityMonitorMutex.Lock()
-	defer fake.setVisibilityMonitorMutex.Unlock()
-	fake.SetVisibilityMonitorStub = stub
+func (fake *FakeJoblet) SetTelematicsMonitorCalls(stub func(interfaces.TelematicsMonitor)) {
+	fake.setTelematicsMonitorMutex.Lock()
+	defer fake.setTelematicsMonitorMutex.Unlock()
+	fake.SetTelematicsMonitorStub = stub
 }
 
-func (fake *FakeJoblet) SetVisibilityMonitorArgsForCall(i int) interfaces.VisibilityMonitor {
-	fake.setVisibilityMonitorMutex.RLock()
-	defer fake.setVisibilityMonitorMutex.RUnlock()
-	argsForCall := fake.setVisibilityMonitorArgsForCall[i]
+func (fake *FakeJoblet) SetTelematicsMonitorArgsForCall(i int) interfaces.TelematicsMonitor {
+	fake.setTelematicsMonitorMutex.RLock()
+	defer fake.setTelematicsMonitorMutex.RUnlock()
+	argsForCall := fake.setTelematicsMonitorArgsForCall[i]
 	return argsForCall.arg1
 }
 

@@ -28,6 +28,21 @@ service PersistService {
   // Query connect events (eBPF telemetry) for a job
   rpc QueryConnectEvents(QueryTelemetryRequest) returns (stream ConnectEvent);
 
+  // Query mmap events (eBPF telemetry) for a job
+  rpc QueryMmapEvents(QueryTelemetryRequest) returns (stream MmapEvent);
+
+  // Query mprotect events (eBPF telemetry) for a job
+  rpc QueryMprotectEvents(QueryTelemetryRequest) returns (stream MprotectEvent);
+
+  // Query file events (eBPF telemetry) for a job
+  rpc QueryFileEvents(QueryTelemetryRequest) returns (stream FileEvent);
+
+  // Query accept events (eBPF telemetry) for a job
+  rpc QueryAcceptEvents(QueryTelemetryRequest) returns (stream AcceptEvent);
+
+  // Query socket data events (eBPF telemetry) for a job
+  rpc QuerySocketDataEvents(QueryTelemetryRequest) returns (stream SocketDataEvent);
+
   // Delete all persisted data for a job (admin only)
   rpc DeleteJob(DeleteJobRequest) returns (DeleteJobResponse);
 }
@@ -143,7 +158,7 @@ message QueryTelemetryRequest {
   int32 offset = 5;      // Skip events
 }
 
-// ExecEvent represents a process execution event from eBPF visibility
+// ExecEvent represents a process execution event from eBPF telematics
 message ExecEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -157,7 +172,7 @@ message ExecEvent {
   repeated string args = 10; // Command arguments
 }
 
-// ConnectEvent represents a network connection event from eBPF visibility
+// ConnectEvent represents a network connection event from eBPF telematics
 message ConnectEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -168,5 +183,71 @@ message ConnectEvent {
   uint32 src_port = 7;       // Source port
   string dst_addr = 8;       // Destination IP address
   uint32 dst_port = 9;       // Destination port
+  string protocol = 10;      // Protocol (TCP, UDP)
+}
+
+// MmapEvent represents a memory mapping event from eBPF telematics
+message MmapEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  uint64 addr = 6;           // Memory address
+  uint64 length = 7;         // Mapping length
+  uint32 prot = 8;           // Protection flags
+  uint32 flags = 9;          // Map flags
+  string filename = 10;      // Mapped file (if file-backed)
+}
+
+// MprotectEvent represents a memory protection change event from eBPF telematics
+message MprotectEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  uint64 addr = 6;           // Memory address
+  uint64 length = 7;         // Region length
+  uint32 prot = 8;           // New protection flags
+}
+
+// FileEvent represents a file operation event from eBPF telematics
+message FileEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string path = 6;           // File path
+  string operation = 7;      // Operation type (open, read, write, etc.)
+  int64 bytes = 8;           // Bytes read/written
+}
+
+// AcceptEvent represents an incoming network connection event from eBPF telematics
+message AcceptEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string src_addr = 6;       // Source IP address (remote client)
+  uint32 src_port = 7;       // Source port
+  string dst_addr = 8;       // Destination IP address (local server)
+  uint32 dst_port = 9;       // Destination port
+  string protocol = 10;      // Protocol (TCP)
+}
+
+// SocketDataEvent represents socket data transfer event from eBPF telematics
+message SocketDataEvent {
+  string job_id = 1;
+  int64 timestamp = 2;       // Unix nanoseconds
+  uint64 sequence = 3;       // Sequence number
+  uint32 pid = 4;            // Process ID
+  string comm = 5;           // Process command name
+  string direction = 6;      // Direction (send, recv)
+  string dst_addr = 7;       // Remote address
+  uint32 dst_port = 8;       // Remote port
+  int64 bytes = 9;           // Bytes transferred
   string protocol = 10;      // Protocol (TCP, UDP)
 }

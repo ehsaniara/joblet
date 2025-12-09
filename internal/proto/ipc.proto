@@ -80,7 +80,7 @@ message NetworkIO {
   int64 tx_packets = 4;
 }
 
-// ExecEvent represents a process execution event from eBPF visibility
+// ExecEvent represents a process execution event from eBPF telematics
 message ExecEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -94,7 +94,7 @@ message ExecEvent {
   repeated string args = 10; // Command arguments
 }
 
-// ConnectEvent represents a network connection event from eBPF visibility
+// ConnectEvent represents a network connection event from eBPF telematics
 message ConnectEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -108,7 +108,7 @@ message ConnectEvent {
   string protocol = 10;      // Protocol (TCP, UDP)
 }
 
-// AcceptEvent represents an incoming connection accept from eBPF visibility
+// AcceptEvent represents an incoming connection accept from eBPF telematics
 message AcceptEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -122,7 +122,7 @@ message AcceptEvent {
   string protocol = 10;      // Protocol (TCP)
 }
 
-// SocketDataEvent represents sendto/recvfrom events from eBPF visibility
+// SocketDataEvent represents sendto/recvfrom events from eBPF telematics
 message SocketDataEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -136,7 +136,7 @@ message SocketDataEvent {
   int64 bytes = 10;          // Bytes transferred
 }
 
-// MmapEvent represents memory mapping events from eBPF visibility
+// MmapEvent represents memory mapping events from eBPF telematics
 message MmapEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -150,7 +150,7 @@ message MmapEvent {
   string filename = 10;      // File being mapped (if file-backed)
 }
 
-// MprotectEvent represents memory protection change events from eBPF visibility
+// MprotectEvent represents memory protection change events from eBPF telematics
 message MprotectEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds
@@ -162,7 +162,7 @@ message MprotectEvent {
   uint32 prot = 8;           // New protection flags (PROT_READ, PROT_WRITE, PROT_EXEC)
 }
 
-// FileEvent represents file access events from eBPF visibility
+// FileEvent represents file access events from eBPF telematics
 message FileEvent {
   string job_id = 1;
   int64 timestamp = 2;       // Unix nanoseconds

@@ -21,7 +21,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/unprivileged"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
-	"github.com/ehsaniara/joblet/internal/joblet/ebpf/visibility"
+	"github.com/ehsaniara/joblet/internal/joblet/ebpf/telematics"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/scheduler"
@@ -62,8 +62,8 @@ type Joblet struct {
 	scheduler       *scheduler.Scheduler
 	cleanup         *cleanup.Coordinator
 
-	// Optional eBPF visibility monitor for tracking job activity
-	visibilityMonitor interfaces.VisibilityMonitor
+	// Optional eBPF telematics monitor for tracking job activity
+	telematicsMonitor interfaces.TelematicsMonitor
 }
 
 // NewPlatformJoblet creates a new Linux platform joblet with specialized components.
@@ -315,23 +315,23 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 		}
 	}
 
-	// Start eBPF visibility monitoring if enabled
+	// Start eBPF telematics monitoring if enabled
 	// Note: Processes run in the "proc" subdirectory of the job cgroup, so we need
 	// to use that path for cgroup ID lookup to match what eBPF's bpf_get_current_cgroup_id() returns
-	if j.visibilityMonitor != nil && job.CgroupPath != "" {
+	if j.telematicsMonitor != nil && job.CgroupPath != "" {
 		procCgroupPath := filepath.Join(job.CgroupPath, "proc")
-		cgroupID, err := visibility.CgroupIDFromPath(procCgroupPath)
+		cgroupID, err := telematics.CgroupIDFromPath(procCgroupPath)
 		if err != nil {
-			log.Warn("failed to get cgroup ID for visibility monitoring", "error", err, "path", procCgroupPath)
+			log.Warn("failed to get cgroup ID for telematics monitoring", "error", err, "path", procCgroupPath)
 		} else {
-			if err := j.visibilityMonitor.AddJob(job.Uuid, cgroupID); err != nil {
-				log.Warn("failed to add job to visibility monitor", "error", err)
+			if err := j.telematicsMonitor.AddJob(job.Uuid, cgroupID); err != nil {
+				log.Warn("failed to add job to telematics monitor", "error", err)
 			} else {
-				log.Info("eBPF visibility monitoring started for job", "cgroupId", cgroupID, "cgroupPath", procCgroupPath)
+				log.Info("eBPF telematics monitoring started for job", "cgroupId", cgroupID, "cgroupPath", procCgroupPath)
 			}
 		}
 	} else {
-		log.Debug("eBPF visibility monitoring skipped", "hasMonitor", j.visibilityMonitor != nil, "hasCgroupPath", job.CgroupPath != "")
+		log.Debug("eBPF telematics monitoring skipped", "hasMonitor", j.telematicsMonitor != nil, "hasCgroupPath", job.CgroupPath != "")
 	}
 
 	// Monitor asynchronously
@@ -620,12 +620,12 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		}
 	}
 
-	// Stop eBPF visibility monitoring if enabled
-	if j.visibilityMonitor != nil {
-		if err := j.visibilityMonitor.RemoveJob(job.Uuid); err != nil {
-			log.Warn("failed to remove job from visibility monitor", "error", err)
+	// Stop eBPF telematics monitoring if enabled
+	if j.telematicsMonitor != nil {
+		if err := j.telematicsMonitor.RemoveJob(job.Uuid); err != nil {
+			log.Warn("failed to remove job from telematics monitor", "error", err)
 		} else {
-			log.Debug("eBPF visibility monitoring stopped")
+			log.Debug("eBPF telematics monitoring stopped")
 		}
 	}
 
@@ -806,12 +806,12 @@ func createGPUManager(gpuConfig config.GPUConfig, platform platform.Platform, lo
 	return gpuManager
 }
 
-// SetVisibilityMonitor sets the eBPF visibility monitor for job activity tracking.
+// SetTelematicsMonitor sets the eBPF telematics monitor for job activity tracking.
 // This is called after joblet creation to inject the optional eBPF monitor.
 // If the monitor is nil, visibility tracking is disabled.
-func (j *Joblet) SetVisibilityMonitor(monitor interfaces.VisibilityMonitor) {
-	j.visibilityMonitor = monitor
+func (j *Joblet) SetTelematicsMonitor(monitor interfaces.TelematicsMonitor) {
+	j.telematicsMonitor = monitor
 	if monitor != nil {
-		j.logger.Info("eBPF visibility monitor enabled for job activity tracking")
+		j.logger.Info("eBPF telematics monitor enabled for job activity tracking")
 	}
 }

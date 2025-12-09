@@ -42,7 +42,7 @@ that all jobs run in properly isolated environments with effective resource limi
 ### ✅ Process Isolation
 
 - **PID Namespace**: Each job runs in its own PID namespace
-- **Process Visibility**: Jobs only see their own processes (verified with `ps aux`)
+- **Process Telematics**: Jobs only see their own processes (verified with `ps aux`)
 - **Init Process**: Job process becomes PID 1 in its namespace
 - **Process Count**: Only 5-6 processes visible (vs hundreds on host)
 
@@ -146,7 +146,7 @@ total 12
 
 ### Test Methodology
 
-1. **Process Isolation Test**: Run `ps aux` to verify process visibility
+1. **Process Isolation Test**: Run `ps aux` to verify process telematics
 2. **Filesystem Isolation Test**: Run `ls -la /` to verify filesystem boundaries
 3. **Upload Security Test**: Upload files/directories and verify isolation
 4. **Resource Limits Test**: Apply limits and verify cgroup assignment

@@ -55,6 +55,14 @@ type StorageConfig struct {
 type LocalConfig struct {
 	Logs    LogStorageConfig    `yaml:"logs"`
 	Metrics MetricStorageConfig `yaml:"metrics"`
+	Events  EventStorageConfig  `yaml:"events"`
+}
+
+// EventStorageConfig contains telematics event storage settings
+type EventStorageConfig struct {
+	Directory string         `yaml:"directory"`
+	Format    string         `yaml:"format"` // "jsonl.gz"
+	Rotation  RotationConfig `yaml:"rotation"`
 }
 
 // CloudWatchConfig contains AWS CloudWatch storage settings
@@ -188,6 +196,12 @@ func Load(path string) (*LoadResult, error) {
 			rootCfg.Persist.IPC.Socket = rootCfg.IPC.Socket
 		}
 
+		// Apply defaults for missing storage configurations (backward compatibility)
+		defaults := DefaultConfig()
+		if rootCfg.Persist.Storage.Local.Events.Directory == "" {
+			rootCfg.Persist.Storage.Local.Events = defaults.Storage.Local.Events
+		}
+
 		// Validate after inheritance so inherited values are checked
 		if err := rootCfg.Persist.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid persist configuration: %w", err)
@@ -268,6 +282,15 @@ func DefaultConfig() *Config {
 					Rotation: RotationConfig{
 						MaxSizeMB:       50,
 						MaxFiles:        5,
+						CompressRotated: true,
+					},
+				},
+				Events: EventStorageConfig{
+					Directory: "/opt/joblet/events",
+					Format:    "jsonl.gz",
+					Rotation: RotationConfig{
+						MaxSizeMB:       100,
+						MaxFiles:        10,
 						CompressRotated: true,
 					},
 				},
