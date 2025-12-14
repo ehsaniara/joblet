@@ -51,9 +51,10 @@ type Filter struct {
 // Config holds backend configuration
 // All operations are async fire-and-forget for high performance
 type Config struct {
-	Backend  string          `yaml:"backend" json:"backend"` // "memory", "dynamodb", "redis"
+	Backend  string          `yaml:"backend" json:"backend"` // "memory", "dynamodb", "redis", "local"
 	DynamoDB *DynamoDBConfig `yaml:"dynamodb" json:"dynamodb"`
 	Redis    *RedisConfig    `yaml:"redis" json:"redis"`
+	Local    *LocalConfig    `yaml:"local" json:"local"`
 }
 
 // DynamoDBConfig holds DynamoDB-specific configuration
@@ -82,6 +83,8 @@ func NewBackend(cfg *Config) (Backend, error) {
 	switch cfg.Backend {
 	case "memory", "":
 		return NewMemoryBackend(), nil
+	case "local":
+		return NewLocalBackend(cfg.Local)
 	case "dynamodb":
 		return NewDynamoDBBackend(cfg.DynamoDB)
 	case "redis":
