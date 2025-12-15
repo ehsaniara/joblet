@@ -149,9 +149,11 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 	var domainUploads []domain.FileUpload
 	for _, upload := range req.Uploads {
 		domainUploads = append(domainUploads, domain.FileUpload{
-			Path:    upload.Path,
-			Content: upload.Content,
-			Size:    int64(len(upload.Content)),
+			Path:        upload.Path,
+			Content:     upload.Content,
+			Mode:        upload.Mode,
+			IsDirectory: upload.IsDirectory,
+			Size:        int64(len(upload.Content)),
 		})
 	}
 

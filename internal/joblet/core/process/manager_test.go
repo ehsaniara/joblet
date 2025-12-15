@@ -244,6 +244,8 @@ func TestCreateSysProcAttr(t *testing.T) {
 	t.Run("always has required namespaces", func(t *testing.T) {
 		attr := mgr.CreateSysProcAttr(false)
 		// Should always have PID, Mount, IPC, UTS, Cgroup namespaces
+		// Note: We don't use CLONE_NEWUSER because it breaks mounts.
+		// Privilege dropping happens via setuid/setgid before exec.
 		assert.True(t, attr.Cloneflags&syscall.CLONE_NEWPID != 0)
 		assert.True(t, attr.Cloneflags&syscall.CLONE_NEWNS != 0)
 		assert.True(t, attr.Cloneflags&syscall.CLONE_NEWIPC != 0)

@@ -110,9 +110,14 @@ func (r *Receiver) processFilesFromPipe(pipe io.Reader, workspacePath string) er
 
 		if isDirectory {
 			// Create directory
-			fileMode := os.FileMode(mode)
+			// Extract permission bits only (mask out file type bits)
+			fileMode := os.FileMode(mode) & os.ModePerm
 			if fileMode == 0 {
 				fileMode = 0755
+			}
+			// Ensure at least read/execute permission for others (job runs as nobody)
+			if fileMode&0005 == 0 {
+				fileMode |= 0005
 			}
 			if err := r.platform.MkdirAll(fullPath, fileMode); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", filePath, err)
@@ -126,9 +131,15 @@ func (r *Receiver) processFilesFromPipe(pipe io.Reader, workspacePath string) er
 			}
 
 			// Create file and copy content
-			fileMode := os.FileMode(mode)
+			// Extract permission bits only (mask out file type bits)
+			// Also ensure files are readable by unprivileged job user (others read)
+			fileMode := os.FileMode(mode) & os.ModePerm
 			if fileMode == 0 {
 				fileMode = 0644
+			}
+			// Ensure at least read permission for others (job runs as nobody)
+			if fileMode&0004 == 0 {
+				fileMode |= 0004
 			}
 
 			file, err := r.platform.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileMode)

@@ -34,20 +34,49 @@ TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
 
+# Helper function to wait for job completion by polling status
+# Usage: wait_for_job <job_id> [timeout_seconds]
+wait_for_job() {
+    local job_id="$1"
+    local timeout="${2:-30}"  # Default 30 second timeout
+    local elapsed=0
+    local interval=1
+
+    while [[ $elapsed -lt $timeout ]]; do
+        local status=$("$RNX_BINARY" job status "$job_id" 2>&1 | grep "Status:" | head -1)
+
+        # Check if job completed (COMPLETED or FAILED)
+        if echo "$status" | grep -qE "COMPLETED|FAILED"; then
+            # Give logs a moment to be fully persisted
+            sleep 1
+            return 0
+        fi
+
+        sleep $interval
+        elapsed=$((elapsed + interval))
+    done
+
+    # Timeout - job didn't complete in time
+    return 1
+}
+
 # Helper function to run command and get output
 run_remote_job() {
     local cmd="$1"
     local job_output=$("$RNX_BINARY" job run sh -c "$cmd" 2>&1)
     local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
-    
+
     if [[ -z "$job_id" ]]; then
         echo "ERROR: Failed to start job"
         return 1
     fi
-    
-    # Wait for job completion
-    sleep 3
-    
+
+    # Poll for job completion (timeout 30s)
+    if ! wait_for_job "$job_id" 30; then
+        echo "ERROR: Job timed out"
+        return 1
+    fi
+
     # Get logs
     "$RNX_BINARY" job log "$job_id" 2>/dev/null | grep -v "^\[" | grep -v "^$"
 }
@@ -89,7 +118,12 @@ test_two_stage_execution() {
         return 1
     fi
 
-    sleep 3
+    # Poll for job completion (timeout 30s)
+    if ! wait_for_job "$job_id" 30; then
+        echo "    Job timed out waiting for completion"
+        return 1
+    fi
+
     local logs=$("$RNX_BINARY" job log "$job_id" 2>&1)
 
     # Verify user command output appears (proves init exec'd successfully)
@@ -276,26 +310,40 @@ run_test_check "Mount namespace isolation" test_mount_namespace
 run_test_check "Filesystem isolation" test_filesystem_isolation
 run_test_check "Chroot environment" test_chroot_environment
 
-echo -e "\n${YELLOW}▶ 5. User Namespace Isolation${NC}"
+echo -e "\n${YELLOW}▶ 5. Privilege Dropping${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 
-test_user_namespace() {
-    local output=$(run_remote_job "id && cat /proc/self/uid_map 2>/dev/null | head -1")
-    
-    if echo "$output" | grep -q "uid=0.*gid=0"; then
-        echo "    Running as root in container namespace"
-        
-        # Check UID mapping
-        if echo "$output" | grep -E "[0-9]+\s+[0-9]+\s+[0-9]+"; then
-            echo "    User namespace mapping active"
+# Joblet drops privileges before exec for security:
+# - Filesystem setup runs as root (needed for mounts)
+# - Job command runs as nobody (uid=65534, gid=65534)
+# - Even if job escapes chroot, it's unprivileged on host
+test_privilege_drop() {
+    local output=$(run_remote_job "id")
+
+    # Job should run as nobody (65534), not root
+    if echo "$output" | grep -q "uid=65534"; then
+        echo "    Job runs as unprivileged user (uid=65534/nobody)"
+
+        # Also verify group
+        if echo "$output" | grep -q "gid=65534"; then
+            echo "    Job runs with unprivileged group (gid=65534/nogroup)"
+            echo "    SECURE: Even if job escapes chroot, it's unprivileged"
             return 0
         fi
     fi
-    echo "    User namespace not configured"
+
+    # Check if running as root (INSECURE)
+    if echo "$output" | grep -q "uid=0"; then
+        echo "    WARNING: Job running as root (INSECURE)"
+        echo "    Privilege dropping may have failed"
+        return 1
+    fi
+
+    echo "    Unexpected user context: $output"
     return 1
 }
 
-run_test_check "User namespace isolation" test_user_namespace
+run_test_check "Privilege dropping (runs as nobody)" test_privilege_drop
 
 echo -e "\n${YELLOW}▶ 6. Cgroup Limits & Resource Management${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"

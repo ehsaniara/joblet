@@ -375,6 +375,9 @@ rnx job run ls /root  # Permission denied
 rnx job run ls /etc/shadow  # Permission denied
 ```
 
+**Note**: Runtime-build jobs (e.g., `rnx runtime install`) are an exception and run as root to allow package
+installation via `apt`. Standard jobs submitted via `rnx job run` always run as the unprivileged `nobody` user.
+
 ### Resource Limits (Security)
 
 ```bash

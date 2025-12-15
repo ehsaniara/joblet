@@ -4,7 +4,9 @@
 
 set -e
 
-RNX_BINARY="${RNX_BINARY:-./bin/rnx}"
+# Source test framework for RNX_BINARY and JOBLET_ROOT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/test_framework.sh"
 
 if [ ! -f "$RNX_BINARY" ]; then
     echo "❌ RNX binary not found at $RNX_BINARY"
