@@ -603,12 +603,20 @@ func (f *JobFilesystem) createEssentialDevices() error {
 			return fmt.Errorf("failed to create /dev/null: %w", err)
 		}
 	}
+	// Chmod to ensure proper permissions regardless of umask
+	if err := os.Chmod("/dev/null", 0666); err != nil {
+		f.logger.Debug("failed to chmod /dev/null", "error", err)
+	}
 
 	// Create /dev/zero
 	if err := syscall.Mknod("/dev/zero", syscall.S_IFCHR|0666, int(makedev(1, 5))); err != nil {
 		if !f.platform.IsExist(err) {
 			return fmt.Errorf("failed to create /dev/zero: %w", err)
 		}
+	}
+	// Chmod to ensure proper permissions regardless of umask
+	if err := os.Chmod("/dev/zero", 0666); err != nil {
+		f.logger.Debug("failed to chmod /dev/zero", "error", err)
 	}
 
 	// Create /dev/random
@@ -617,12 +625,20 @@ func (f *JobFilesystem) createEssentialDevices() error {
 			f.logger.Debug("failed to create /dev/random", "error", err)
 		}
 	}
+	// Chmod to ensure proper permissions regardless of umask
+	if err := os.Chmod("/dev/random", 0666); err != nil {
+		f.logger.Debug("failed to chmod /dev/random", "error", err)
+	}
 
 	// Create /dev/urandom
 	if err := syscall.Mknod("/dev/urandom", syscall.S_IFCHR|0666, int(makedev(1, 9))); err != nil {
 		if !f.platform.IsExist(err) {
 			f.logger.Debug("failed to create /dev/urandom", "error", err)
 		}
+	}
+	// Chmod to ensure proper permissions regardless of umask
+	if err := os.Chmod("/dev/urandom", 0666); err != nil {
+		f.logger.Debug("failed to chmod /dev/urandom", "error", err)
 	}
 
 	return nil

@@ -70,6 +70,8 @@ We didn't just accept the network sharing blindly. The other namespace isolation
 - Jobs can't access the host filesystem beyond their chroot, so they can't steal credentials
 - Jobs are resource-limited through cgroups, so they can't DoS the network
 - Jobs run with limited capabilities, reducing what they can do even with network access
+- **Jobs run as unprivileged user (nobody/65534)** - Even if a job escapes the chroot, it cannot elevate privileges or
+  damage the host system. This privilege dropping happens after isolation setup but before the job command executes.
 
 We also made it clear in documentation that Joblet provides process and filesystem isolation, not full container-style
 network isolation. Users who need network isolation can run Joblet inside a container or VM.

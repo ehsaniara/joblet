@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
@@ -15,6 +16,13 @@ import (
 	"github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
+)
+
+const (
+	// UnprivilegedUID is the UID jobs run as (nobody = 65534)
+	UnprivilegedUID = 65534
+	// UnprivilegedGID is the GID jobs run as (nogroup = 65534)
+	UnprivilegedGID = 65534
 )
 
 // JobExecutor handles job execution in init mode with consolidated environment handling
@@ -168,7 +176,19 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	// Prepare arguments for exec - argv[0] should be the command name
 	argv := append([]string{commandPath}, config.Args...)
 
-	// About to exec to replace init process
+	// SECURITY: Drop privileges before exec (except for runtime-build jobs)
+	// Runtime-build jobs need root to run apt install, configure runtimes, etc.
+	// Standard jobs run as unprivileged user (nobody/65534) for security.
+	jobType := je.platform.Getenv("JOB_TYPE")
+	if jobType == "runtime-build" {
+		je.logger.Info("skipping privilege drop for runtime-build job (needs root for apt)")
+	} else {
+		// Standard job - drop to unprivileged user
+		if err := je.dropPrivileges(); err != nil {
+			je.logger.Error("failed to drop privileges", "error", err)
+			return fmt.Errorf("security: failed to drop privileges: %w", err)
+		}
+	}
 
 	// Use exec to replace the current process (init) with the job command
 	// This makes the job command become PID 1 in the namespace, providing proper isolation
@@ -176,6 +196,43 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 	// If we reach this point, exec failed
 	je.logger.Error("exec failed - job will not appear as PID 1", "error", err)
 	return fmt.Errorf("execution failed: %w", err)
+}
+
+// dropPrivileges drops root privileges to unprivileged user (nobody/65534)
+// This is a critical security measure - even if the job escapes the chroot,
+// it runs as an unprivileged user and cannot damage the host system.
+// Order matters: must set GID before UID (can't change groups after dropping root)
+func (je *JobExecutor) dropPrivileges() error {
+	je.logger.Info("dropping privileges to unprivileged user",
+		"targetUID", UnprivilegedUID,
+		"targetGID", UnprivilegedGID)
+
+	// Set supplementary groups to empty (drop all group memberships)
+	if err := syscall.Setgroups([]int{}); err != nil {
+		return fmt.Errorf("failed to clear supplementary groups: %w", err)
+	}
+
+	// Set GID first (must be done before dropping root UID)
+	if err := syscall.Setgid(UnprivilegedGID); err != nil {
+		return fmt.Errorf("failed to set GID to %d: %w", UnprivilegedGID, err)
+	}
+
+	// Set UID last (after this, we're no longer root)
+	if err := syscall.Setuid(UnprivilegedUID); err != nil {
+		return fmt.Errorf("failed to set UID to %d: %w", UnprivilegedUID, err)
+	}
+
+	// Verify we actually dropped privileges
+	if syscall.Getuid() != UnprivilegedUID || syscall.Getgid() != UnprivilegedGID {
+		return fmt.Errorf("privilege drop verification failed: uid=%d gid=%d",
+			syscall.Getuid(), syscall.Getgid())
+	}
+
+	je.logger.Info("privileges dropped successfully",
+		"uid", syscall.Getuid(),
+		"gid", syscall.Getgid())
+
+	return nil
 }
 
 // resolveCommandPath resolves the full path for a command

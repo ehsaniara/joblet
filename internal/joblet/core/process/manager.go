@@ -454,6 +454,8 @@ func (m *Manager) ResolveCommand(command string) (string, error) {
 }
 
 // CreateSysProcAttr creates syscall process attributes for namespace isolation
+// Note: We don't use CLONE_NEWUSER because it breaks mount operations.
+// Privilege dropping (setuid/setgid to nobody) happens in init before exec.
 func (m *Manager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
 	sysProcAttr := m.platform.CreateProcessGroup()
 
@@ -471,7 +473,8 @@ func (m *Manager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
 
 	m.logger.Debug("created process attributes",
 		"flags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
-		"networkNS", enableNetworkNS)
+		"networkNS", enableNetworkNS,
+		"privilegeDrop", "before-exec")
 
 	return sysProcAttr
 }

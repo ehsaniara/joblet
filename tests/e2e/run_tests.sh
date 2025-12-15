@@ -36,8 +36,11 @@ build_and_deploy() {
         echo -e "${RED}Deployment failed!${NC}"
         exit 1
     fi
-    
-    echo -e "${GREEN}✓ Build and deployment successful${NC}\n"
+
+    echo -e "${GREEN}✓ Build and deployment successful${NC}"
+    echo -e "${BLUE}Waiting for service to stabilize...${NC}"
+    sleep 5
+    echo -e "${GREEN}✓ Service ready${NC}\n"
     cd "$SCRIPT_DIR"
 }
 

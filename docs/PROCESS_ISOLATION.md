@@ -178,6 +178,33 @@ Handle process failures gracefully:
 rnx job run --runtime=python-3.11-ml bash -c "risky-task & wait \$! || echo 'Task failed'"
 ```
 
+## Privilege Dropping
+
+Joblet implements defense-in-depth by dropping privileges before executing job commands:
+
+### Standard Jobs
+
+```bash
+# Jobs run as unprivileged user (nobody)
+rnx job run id
+# Output: uid=65534(nobody) gid=65534(nogroup)
+```
+
+- **UID/GID**: Jobs run as `nobody` (65534/65534)
+- **No sudo**: Even if a job escapes the chroot, it cannot elevate privileges
+- **Supplementary groups**: All group memberships are cleared
+
+### Runtime-Build Jobs (Exception)
+
+Runtime installation jobs require root privileges for package management:
+
+```bash
+# Runtime builds run as root (internal use only)
+rnx runtime install python:3.11  # Needs apt install
+```
+
+This exception is handled automatically - standard jobs submitted via `rnx job run` always run unprivileged.
+
 ## Security Implications
 
 Process isolation provides strong security boundaries:
@@ -186,5 +213,6 @@ Process isolation provides strong security boundaries:
 - **No host telematics**: Cannot see or interact with host system processes
 - **Resource isolation**: Process limits are enforced at the cgroup level
 - **Signal isolation**: Cannot send signals to processes outside the namespace
+- **Privilege separation**: Jobs run as unprivileged user even if they escape isolation
 
 This ensures complete process-level security between jobs and from the host system.
