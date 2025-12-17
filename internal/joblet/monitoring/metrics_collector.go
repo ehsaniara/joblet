@@ -134,9 +134,10 @@ func (s *Service) SetVolumeManager(volumeManager interface {
 // and creates a new Service instance. This bridges the gap between the config package
 // and the monitoring domain package types.
 // Returns a new Service instance configured with the provided settings.
+// Note: Monitoring is always enabled - there is no disable option.
 func NewServiceFromConfig(cfg *config.MonitoringConfig) *Service {
 	domainConfig := &domain.MonitoringConfig{
-		Enabled: cfg.Enabled,
+		Enabled: true, // Monitoring is always enabled
 		Collection: domain.CollectionConfig{
 			SystemInterval: cfg.SystemInterval,
 			CloudDetection: cfg.CloudDetection,

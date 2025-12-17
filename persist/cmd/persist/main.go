@@ -78,20 +78,10 @@ func main() {
 				Logs: config.LogStorageConfig{
 					Directory: "/opt/joblet/logs",
 					Format:    "jsonl",
-					Rotation: config.RotationConfig{
-						MaxSizeMB:       100,
-						MaxFiles:        10,
-						CompressRotated: true,
-					},
 				},
 				Metrics: config.MetricStorageConfig{
 					Directory: "/opt/joblet/metrics",
 					Format:    "jsonl.gz",
-					Rotation: config.RotationConfig{
-						MaxSizeMB:       50,
-						MaxFiles:        5,
-						CompressRotated: true,
-					},
 				},
 			},
 		}

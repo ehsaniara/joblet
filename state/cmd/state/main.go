@@ -196,15 +196,5 @@ func convertToStorageConfig(stateConfig *config.StateConfig) *storage.Config {
 		}
 	}
 
-	// Convert Redis config (future)
-	if stateConfig.Storage.Redis != nil {
-		storageConfig.Redis = &storage.RedisConfig{
-			Endpoint: stateConfig.Storage.Redis.Endpoint,
-			Password: stateConfig.Storage.Redis.Password,
-			DB:       stateConfig.Storage.Redis.DB,
-			TTLDays:  stateConfig.Storage.Redis.TTLDays,
-		}
-	}
-
 	return storageConfig
 }
