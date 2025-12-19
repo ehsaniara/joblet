@@ -15,7 +15,6 @@ import (
 )
 
 // Resolver provides basic runtime listing functionality for CLI commands
-// This replaces the complex Manager/Resolver that was unused by job execution
 type Resolver struct {
 	runtimesPath string
 	platform     platform.Platform

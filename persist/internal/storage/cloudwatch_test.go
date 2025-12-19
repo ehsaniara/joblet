@@ -134,8 +134,6 @@ func TestCloudWatchBackend_DefaultValues(t *testing.T) {
 			t.Errorf("Expected default log_group_prefix '/joblet', got '%s'", cwBackend.config.LogGroupPrefix)
 		}
 
-		// LogStreamPrefix is deprecated - no longer checked
-
 		if cwBackend.config.MetricNamespace != "Joblet/Jobs" {
 			t.Errorf("Expected default metric_namespace 'Joblet/Jobs', got '%s'", cwBackend.config.MetricNamespace)
 		}

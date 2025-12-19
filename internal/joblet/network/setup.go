@@ -24,7 +24,7 @@ type NetworkSetup struct {
 // and network store packages. It provides access to network configuration data
 // needed for bridge and IP address management.
 type NetworkStoreInterface interface {
-	GetNetworkConfig(name string) (*NetworkConfig, error)
+	NetworkConfig(name string) (*NetworkConfig, error)
 }
 
 // NewNetworkSetup creates a new network setup instance with platform abstraction.
@@ -479,7 +479,7 @@ func (ns *NetworkSetup) execInNamespace(netnsPath string, args ...string) error 
 // getNetworkCIDR retrieves the CIDR block for a named network
 func (ns *NetworkSetup) getNetworkCIDR(networkName string) string {
 	if ns.networkStore != nil {
-		config, err := ns.networkStore.GetNetworkConfig(networkName)
+		config, err := ns.networkStore.NetworkConfig(networkName)
 		if err == nil && config != nil {
 			return config.CIDR
 		}

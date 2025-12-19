@@ -85,7 +85,7 @@ func (c *CUDADetector) DetectCUDAInstallations() ([]CUDAInstallation, error) {
 	return installations, nil
 }
 
-// DetectCUDA finds CUDA installation paths (legacy method for backward compatibility)
+// DetectCUDA finds CUDA installation paths and returns them as a string slice
 func (c *CUDADetector) DetectCUDA() ([]string, error) {
 	c.logger.Debug("detecting CUDA installations")
 

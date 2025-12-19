@@ -23,10 +23,8 @@ type ServerConfig struct {
 	TLS            *TLSConfig `yaml:"tls,omitempty"` // Optional: defaults to inherited security
 }
 
-// TLSConfig contains TLS/mTLS settings
-// TLS is MANDATORY for persist service (authentication requires it)
+// TLSConfig contains TLS/mTLS settings (TLS is always enabled)
 type TLSConfig struct {
-	// Enabled is removed - TLS is always enabled
 	CertFile   string `yaml:"cert_file"`   // Empty = inherit from parent's security section
 	KeyFile    string `yaml:"key_file"`    // Empty = inherit from parent's security section
 	CAFile     string `yaml:"ca_file"`     // Empty = inherit from parent's security section

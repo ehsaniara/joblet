@@ -4,7 +4,6 @@ package modes
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -494,7 +493,7 @@ func processUploadsFromJSON(uploadsJSON []byte, cfg *config.Config, logger *logg
 }
 
 // processUploadsInCgroup processes uploads within cgroup limits.
-// Decodes base64-encoded upload data from environment variables,
+// Reads upload data from a file (JOB_UPLOADS_FILE env var),
 // creates workspace directory, and processes each file/directory
 // within memory and I/O resource constraints enforced by cgroups.
 //
@@ -505,25 +504,11 @@ func processUploadsFromJSON(uploadsJSON []byte, cfg *config.Config, logger *logg
 //
 // Returns: Error if upload decoding or file processing fails
 func processUploadsInCgroup(cfg *config.Config, logger *logger.Logger, platform platform.Platform) error {
-	// Get upload data from file instead of environment variable to avoid "argument list too long"
 	uploadsFile := platform.Getenv("JOB_UPLOADS_FILE")
 	if uploadsFile == "" {
-		// Fallback to old environment variable approach for backward compatibility
-		uploadsB64 := platform.Getenv("JOB_UPLOADS_DATA")
-		if uploadsB64 == "" {
-			return fmt.Errorf("no upload data provided")
-		}
-
-		// Decode base64 for old approach
-		uploadsJSON, err := base64.StdEncoding.DecodeString(uploadsB64)
-		if err != nil {
-			return fmt.Errorf("failed to decode upload data: %w", err)
-		}
-
-		return processUploadsFromJSON(uploadsJSON, cfg, logger)
+		return fmt.Errorf("JOB_UPLOADS_FILE environment variable not set")
 	}
 
-	// New approach: Read upload data from file
 	uploadsJSON, err := os.ReadFile(uploadsFile)
 	if err != nil {
 		return fmt.Errorf("failed to read uploads file %s: %w", uploadsFile, err)

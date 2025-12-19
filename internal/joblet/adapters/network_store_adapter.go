@@ -181,11 +181,6 @@ func (a *networkStoreAdapter) NetworkConfig(name string) (*network.NetworkConfig
 	}, nil
 }
 
-// GetNetworkConfig is an alias for NetworkConfig for backwards compatibility with network.NetworkStoreInterface
-func (a *networkStoreAdapter) GetNetworkConfig(name string) (*network.NetworkConfig, error) {
-	return a.NetworkConfig(name)
-}
-
 // ListNetworks returns all network configurations.
 // Creates deep copies of all configurations to prevent external modification.
 // Returns empty slice on error or when adapter is closed.

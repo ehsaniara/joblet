@@ -264,7 +264,7 @@ func (s *Server) handleList(ctx context.Context, msg Message) *Response {
 }
 
 func (s *Server) handleSync(ctx context.Context, msg Message) *Response {
-	if msg.Jobs == nil || len(msg.Jobs) == 0 {
+	if len(msg.Jobs) == 0 {
 		return s.makeError(msg.RequestID, "SYNC_ERROR", "jobs array is required")
 	}
 

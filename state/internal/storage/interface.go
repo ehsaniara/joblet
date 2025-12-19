@@ -11,7 +11,7 @@ import (
 //counterfeiter:generate . Backend
 
 // Backend defines the interface for job state storage backends.
-// Implementations: memory, DynamoDB, Redis, PostgreSQL, etc.
+// Implementations: memory, local, DynamoDB
 type Backend interface {
 	// Create a new job state
 	Create(ctx context.Context, job *domain.Job) error
