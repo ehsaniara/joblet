@@ -9,6 +9,40 @@ import (
 )
 
 type FakeSyscallOperations struct {
+	ChdirStub        func(string) error
+	chdirMutex       sync.RWMutex
+	chdirArgsForCall []struct {
+		arg1 string
+	}
+	chdirReturns struct {
+		result1 error
+	}
+	chdirReturnsOnCall map[int]struct {
+		result1 error
+	}
+	ChmodStub        func(string, uint32) error
+	chmodMutex       sync.RWMutex
+	chmodArgsForCall []struct {
+		arg1 string
+		arg2 uint32
+	}
+	chmodReturns struct {
+		result1 error
+	}
+	chmodReturnsOnCall map[int]struct {
+		result1 error
+	}
+	ChrootStub        func(string) error
+	chrootMutex       sync.RWMutex
+	chrootArgsForCall []struct {
+		arg1 string
+	}
+	chrootReturns struct {
+		result1 error
+	}
+	chrootReturnsOnCall map[int]struct {
+		result1 error
+	}
 	CreateProcessGroupStub        func() *syscall.SysProcAttr
 	createProcessGroupMutex       sync.RWMutex
 	createProcessGroupArgsForCall []struct {
@@ -44,6 +78,31 @@ type FakeSyscallOperations struct {
 	killReturnsOnCall map[int]struct {
 		result1 error
 	}
+	MkfifoStub        func(string, uint32) error
+	mkfifoMutex       sync.RWMutex
+	mkfifoArgsForCall []struct {
+		arg1 string
+		arg2 uint32
+	}
+	mkfifoReturns struct {
+		result1 error
+	}
+	mkfifoReturnsOnCall map[int]struct {
+		result1 error
+	}
+	MknodStub        func(string, uint32, int) error
+	mknodMutex       sync.RWMutex
+	mknodArgsForCall []struct {
+		arg1 string
+		arg2 uint32
+		arg3 int
+	}
+	mknodReturns struct {
+		result1 error
+	}
+	mknodReturnsOnCall map[int]struct {
+		result1 error
+	}
 	MountStub        func(string, string, string, uintptr, string) error
 	mountMutex       sync.RWMutex
 	mountArgsForCall []struct {
@@ -57,6 +116,30 @@ type FakeSyscallOperations struct {
 		result1 error
 	}
 	mountReturnsOnCall map[int]struct {
+		result1 error
+	}
+	SetNonblockStub        func(int, bool) error
+	setNonblockMutex       sync.RWMutex
+	setNonblockArgsForCall []struct {
+		arg1 int
+		arg2 bool
+	}
+	setNonblockReturns struct {
+		result1 error
+	}
+	setNonblockReturnsOnCall map[int]struct {
+		result1 error
+	}
+	StatfsStub        func(string, *syscall.Statfs_t) error
+	statfsMutex       sync.RWMutex
+	statfsArgsForCall []struct {
+		arg1 string
+		arg2 *syscall.Statfs_t
+	}
+	statfsReturns struct {
+		result1 error
+	}
+	statfsReturnsOnCall map[int]struct {
 		result1 error
 	}
 	UnmountStub        func(string, int) error
@@ -73,6 +156,190 @@ type FakeSyscallOperations struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeSyscallOperations) Chdir(arg1 string) error {
+	fake.chdirMutex.Lock()
+	ret, specificReturn := fake.chdirReturnsOnCall[len(fake.chdirArgsForCall)]
+	fake.chdirArgsForCall = append(fake.chdirArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ChdirStub
+	fakeReturns := fake.chdirReturns
+	fake.recordInvocation("Chdir", []interface{}{arg1})
+	fake.chdirMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) ChdirCallCount() int {
+	fake.chdirMutex.RLock()
+	defer fake.chdirMutex.RUnlock()
+	return len(fake.chdirArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) ChdirCalls(stub func(string) error) {
+	fake.chdirMutex.Lock()
+	defer fake.chdirMutex.Unlock()
+	fake.ChdirStub = stub
+}
+
+func (fake *FakeSyscallOperations) ChdirArgsForCall(i int) string {
+	fake.chdirMutex.RLock()
+	defer fake.chdirMutex.RUnlock()
+	argsForCall := fake.chdirArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeSyscallOperations) ChdirReturns(result1 error) {
+	fake.chdirMutex.Lock()
+	defer fake.chdirMutex.Unlock()
+	fake.ChdirStub = nil
+	fake.chdirReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) ChdirReturnsOnCall(i int, result1 error) {
+	fake.chdirMutex.Lock()
+	defer fake.chdirMutex.Unlock()
+	fake.ChdirStub = nil
+	if fake.chdirReturnsOnCall == nil {
+		fake.chdirReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.chdirReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) Chmod(arg1 string, arg2 uint32) error {
+	fake.chmodMutex.Lock()
+	ret, specificReturn := fake.chmodReturnsOnCall[len(fake.chmodArgsForCall)]
+	fake.chmodArgsForCall = append(fake.chmodArgsForCall, struct {
+		arg1 string
+		arg2 uint32
+	}{arg1, arg2})
+	stub := fake.ChmodStub
+	fakeReturns := fake.chmodReturns
+	fake.recordInvocation("Chmod", []interface{}{arg1, arg2})
+	fake.chmodMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) ChmodCallCount() int {
+	fake.chmodMutex.RLock()
+	defer fake.chmodMutex.RUnlock()
+	return len(fake.chmodArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) ChmodCalls(stub func(string, uint32) error) {
+	fake.chmodMutex.Lock()
+	defer fake.chmodMutex.Unlock()
+	fake.ChmodStub = stub
+}
+
+func (fake *FakeSyscallOperations) ChmodArgsForCall(i int) (string, uint32) {
+	fake.chmodMutex.RLock()
+	defer fake.chmodMutex.RUnlock()
+	argsForCall := fake.chmodArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSyscallOperations) ChmodReturns(result1 error) {
+	fake.chmodMutex.Lock()
+	defer fake.chmodMutex.Unlock()
+	fake.ChmodStub = nil
+	fake.chmodReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) ChmodReturnsOnCall(i int, result1 error) {
+	fake.chmodMutex.Lock()
+	defer fake.chmodMutex.Unlock()
+	fake.ChmodStub = nil
+	if fake.chmodReturnsOnCall == nil {
+		fake.chmodReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.chmodReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) Chroot(arg1 string) error {
+	fake.chrootMutex.Lock()
+	ret, specificReturn := fake.chrootReturnsOnCall[len(fake.chrootArgsForCall)]
+	fake.chrootArgsForCall = append(fake.chrootArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.ChrootStub
+	fakeReturns := fake.chrootReturns
+	fake.recordInvocation("Chroot", []interface{}{arg1})
+	fake.chrootMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) ChrootCallCount() int {
+	fake.chrootMutex.RLock()
+	defer fake.chrootMutex.RUnlock()
+	return len(fake.chrootArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) ChrootCalls(stub func(string) error) {
+	fake.chrootMutex.Lock()
+	defer fake.chrootMutex.Unlock()
+	fake.ChrootStub = stub
+}
+
+func (fake *FakeSyscallOperations) ChrootArgsForCall(i int) string {
+	fake.chrootMutex.RLock()
+	defer fake.chrootMutex.RUnlock()
+	argsForCall := fake.chrootArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeSyscallOperations) ChrootReturns(result1 error) {
+	fake.chrootMutex.Lock()
+	defer fake.chrootMutex.Unlock()
+	fake.ChrootStub = nil
+	fake.chrootReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) ChrootReturnsOnCall(i int, result1 error) {
+	fake.chrootMutex.Lock()
+	defer fake.chrootMutex.Unlock()
+	fake.ChrootStub = nil
+	if fake.chrootReturnsOnCall == nil {
+		fake.chrootReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.chrootReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeSyscallOperations) CreateProcessGroup() *syscall.SysProcAttr {
@@ -263,6 +530,131 @@ func (fake *FakeSyscallOperations) KillReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeSyscallOperations) Mkfifo(arg1 string, arg2 uint32) error {
+	fake.mkfifoMutex.Lock()
+	ret, specificReturn := fake.mkfifoReturnsOnCall[len(fake.mkfifoArgsForCall)]
+	fake.mkfifoArgsForCall = append(fake.mkfifoArgsForCall, struct {
+		arg1 string
+		arg2 uint32
+	}{arg1, arg2})
+	stub := fake.MkfifoStub
+	fakeReturns := fake.mkfifoReturns
+	fake.recordInvocation("Mkfifo", []interface{}{arg1, arg2})
+	fake.mkfifoMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) MkfifoCallCount() int {
+	fake.mkfifoMutex.RLock()
+	defer fake.mkfifoMutex.RUnlock()
+	return len(fake.mkfifoArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) MkfifoCalls(stub func(string, uint32) error) {
+	fake.mkfifoMutex.Lock()
+	defer fake.mkfifoMutex.Unlock()
+	fake.MkfifoStub = stub
+}
+
+func (fake *FakeSyscallOperations) MkfifoArgsForCall(i int) (string, uint32) {
+	fake.mkfifoMutex.RLock()
+	defer fake.mkfifoMutex.RUnlock()
+	argsForCall := fake.mkfifoArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSyscallOperations) MkfifoReturns(result1 error) {
+	fake.mkfifoMutex.Lock()
+	defer fake.mkfifoMutex.Unlock()
+	fake.MkfifoStub = nil
+	fake.mkfifoReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) MkfifoReturnsOnCall(i int, result1 error) {
+	fake.mkfifoMutex.Lock()
+	defer fake.mkfifoMutex.Unlock()
+	fake.MkfifoStub = nil
+	if fake.mkfifoReturnsOnCall == nil {
+		fake.mkfifoReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.mkfifoReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) Mknod(arg1 string, arg2 uint32, arg3 int) error {
+	fake.mknodMutex.Lock()
+	ret, specificReturn := fake.mknodReturnsOnCall[len(fake.mknodArgsForCall)]
+	fake.mknodArgsForCall = append(fake.mknodArgsForCall, struct {
+		arg1 string
+		arg2 uint32
+		arg3 int
+	}{arg1, arg2, arg3})
+	stub := fake.MknodStub
+	fakeReturns := fake.mknodReturns
+	fake.recordInvocation("Mknod", []interface{}{arg1, arg2, arg3})
+	fake.mknodMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) MknodCallCount() int {
+	fake.mknodMutex.RLock()
+	defer fake.mknodMutex.RUnlock()
+	return len(fake.mknodArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) MknodCalls(stub func(string, uint32, int) error) {
+	fake.mknodMutex.Lock()
+	defer fake.mknodMutex.Unlock()
+	fake.MknodStub = stub
+}
+
+func (fake *FakeSyscallOperations) MknodArgsForCall(i int) (string, uint32, int) {
+	fake.mknodMutex.RLock()
+	defer fake.mknodMutex.RUnlock()
+	argsForCall := fake.mknodArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeSyscallOperations) MknodReturns(result1 error) {
+	fake.mknodMutex.Lock()
+	defer fake.mknodMutex.Unlock()
+	fake.MknodStub = nil
+	fake.mknodReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) MknodReturnsOnCall(i int, result1 error) {
+	fake.mknodMutex.Lock()
+	defer fake.mknodMutex.Unlock()
+	fake.MknodStub = nil
+	if fake.mknodReturnsOnCall == nil {
+		fake.mknodReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.mknodReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeSyscallOperations) Mount(arg1 string, arg2 string, arg3 string, arg4 uintptr, arg5 string) error {
 	fake.mountMutex.Lock()
 	ret, specificReturn := fake.mountReturnsOnCall[len(fake.mountArgsForCall)]
@@ -324,6 +716,130 @@ func (fake *FakeSyscallOperations) MountReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.mountReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) SetNonblock(arg1 int, arg2 bool) error {
+	fake.setNonblockMutex.Lock()
+	ret, specificReturn := fake.setNonblockReturnsOnCall[len(fake.setNonblockArgsForCall)]
+	fake.setNonblockArgsForCall = append(fake.setNonblockArgsForCall, struct {
+		arg1 int
+		arg2 bool
+	}{arg1, arg2})
+	stub := fake.SetNonblockStub
+	fakeReturns := fake.setNonblockReturns
+	fake.recordInvocation("SetNonblock", []interface{}{arg1, arg2})
+	fake.setNonblockMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) SetNonblockCallCount() int {
+	fake.setNonblockMutex.RLock()
+	defer fake.setNonblockMutex.RUnlock()
+	return len(fake.setNonblockArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) SetNonblockCalls(stub func(int, bool) error) {
+	fake.setNonblockMutex.Lock()
+	defer fake.setNonblockMutex.Unlock()
+	fake.SetNonblockStub = stub
+}
+
+func (fake *FakeSyscallOperations) SetNonblockArgsForCall(i int) (int, bool) {
+	fake.setNonblockMutex.RLock()
+	defer fake.setNonblockMutex.RUnlock()
+	argsForCall := fake.setNonblockArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSyscallOperations) SetNonblockReturns(result1 error) {
+	fake.setNonblockMutex.Lock()
+	defer fake.setNonblockMutex.Unlock()
+	fake.SetNonblockStub = nil
+	fake.setNonblockReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) SetNonblockReturnsOnCall(i int, result1 error) {
+	fake.setNonblockMutex.Lock()
+	defer fake.setNonblockMutex.Unlock()
+	fake.SetNonblockStub = nil
+	if fake.setNonblockReturnsOnCall == nil {
+		fake.setNonblockReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.setNonblockReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) Statfs(arg1 string, arg2 *syscall.Statfs_t) error {
+	fake.statfsMutex.Lock()
+	ret, specificReturn := fake.statfsReturnsOnCall[len(fake.statfsArgsForCall)]
+	fake.statfsArgsForCall = append(fake.statfsArgsForCall, struct {
+		arg1 string
+		arg2 *syscall.Statfs_t
+	}{arg1, arg2})
+	stub := fake.StatfsStub
+	fakeReturns := fake.statfsReturns
+	fake.recordInvocation("Statfs", []interface{}{arg1, arg2})
+	fake.statfsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSyscallOperations) StatfsCallCount() int {
+	fake.statfsMutex.RLock()
+	defer fake.statfsMutex.RUnlock()
+	return len(fake.statfsArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) StatfsCalls(stub func(string, *syscall.Statfs_t) error) {
+	fake.statfsMutex.Lock()
+	defer fake.statfsMutex.Unlock()
+	fake.StatfsStub = stub
+}
+
+func (fake *FakeSyscallOperations) StatfsArgsForCall(i int) (string, *syscall.Statfs_t) {
+	fake.statfsMutex.RLock()
+	defer fake.statfsMutex.RUnlock()
+	argsForCall := fake.statfsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSyscallOperations) StatfsReturns(result1 error) {
+	fake.statfsMutex.Lock()
+	defer fake.statfsMutex.Unlock()
+	fake.StatfsStub = nil
+	fake.statfsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSyscallOperations) StatfsReturnsOnCall(i int, result1 error) {
+	fake.statfsMutex.Lock()
+	defer fake.statfsMutex.Unlock()
+	fake.StatfsStub = nil
+	if fake.statfsReturnsOnCall == nil {
+		fake.statfsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.statfsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }

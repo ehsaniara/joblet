@@ -599,17 +599,17 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 	var mountedPaths []string
 	for _, m := range specialMounts {
 		if m.fstype != "" && m.fstype != "tmpfs" {
-			if err := syscall.Mount(m.source, m.target, m.fstype, m.flags, ""); err != nil {
+			if err := ri.platform.Mount(m.source, m.target, m.fstype, m.flags, ""); err != nil {
 				ri.logger.Debug("special mount failed", "source", m.source, "target", m.target, "error", err)
 				continue
 			}
 		} else if m.fstype == "tmpfs" {
-			if err := syscall.Mount(m.source, m.target, m.fstype, m.flags, "size=1G"); err != nil {
+			if err := ri.platform.Mount(m.source, m.target, m.fstype, m.flags, "size=1G"); err != nil {
 				ri.logger.Debug("tmpfs mount failed", "target", m.target, "error", err)
 				continue
 			}
 		} else {
-			if err := syscall.Mount(m.source, m.target, "", m.flags, ""); err != nil {
+			if err := ri.platform.Mount(m.source, m.target, "", m.flags, ""); err != nil {
 				ri.logger.Debug("bind mount failed", "source", m.source, "target", m.target, "error", err)
 				continue
 			}
@@ -624,16 +624,16 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 			target := filepath.Join(chrootDir, dir)
 			// CRITICAL: Mount as READ-ONLY to prevent host contamination
 			// Setup scripts can read host binaries/libraries but cannot modify them
-			if err := syscall.Mount(dir, target, "", syscall.MS_BIND, ""); err != nil {
+			if err := ri.platform.Mount(dir, target, "", syscall.MS_BIND, ""); err != nil {
 				ri.logger.Debug("host bind mount failed", "source", dir, "target", target, "error", err)
 				continue
 			}
 			// Make the bind mount read-only (requires remount)
 			// CRITICAL: If this fails, we MUST unmount to prevent host contamination
-			if err := syscall.Mount("", target, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
+			if err := ri.platform.Mount("", target, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
 				ri.logger.Warn("failed to make bind mount read-only, unmounting for safety", "target", target, "error", err)
 				// Unmount the writable bind mount to prevent host contamination
-				if unmountErr := syscall.Unmount(target, syscall.MNT_DETACH); unmountErr != nil {
+				if unmountErr := ri.platform.Unmount(target, syscall.MNT_DETACH); unmountErr != nil {
 					ri.logger.Error("failed to unmount writable bind mount", "target", target, "error", unmountErr)
 				}
 				continue
@@ -650,7 +650,7 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 			ri.logger.Debug("failed to create writable dir", "path", targetDir, "error", err)
 			continue
 		}
-		if err := syscall.Mount("tmpfs", targetDir, "tmpfs", 0, "size=2G"); err != nil {
+		if err := ri.platform.Mount("tmpfs", targetDir, "tmpfs", 0, "size=2G"); err != nil {
 			ri.logger.Debug("failed to mount tmpfs", "target", targetDir, "error", err)
 			continue
 		}
@@ -695,7 +695,7 @@ func (ri *RuntimeInstaller) createSimpleChroot() (string, func(), error) {
 	cleanup := func() {
 		// Unmount all mounted paths in reverse order
 		for i := len(mountedPaths) - 1; i >= 0; i-- {
-			if err := syscall.Unmount(mountedPaths[i], syscall.MNT_DETACH); err != nil {
+			if err := ri.platform.Unmount(mountedPaths[i], syscall.MNT_DETACH); err != nil {
 				// Log but don't fail on unmount errors during cleanup
 				fmt.Printf("Warning: failed to unmount %s: %v\n", mountedPaths[i], err)
 			}
@@ -722,7 +722,7 @@ func (ri *RuntimeInstaller) createDeviceNodes(chrootDir string) error {
 
 	for _, dev := range devices {
 		devPath := filepath.Join(chrootDir, dev.path)
-		if err := syscall.Mknod(devPath, dev.mode, int(ri.makedev(dev.major, dev.minor))); err != nil {
+		if err := ri.platform.Mknod(devPath, dev.mode, int(ri.makedev(dev.major, dev.minor))); err != nil {
 			ri.logger.Debug("failed to create device node", "path", devPath, "error", err)
 		}
 	}
@@ -781,7 +781,7 @@ func (ri *RuntimeInstaller) ensureDNSResolution(chrootDir string) (string, error
 	}
 
 	// Bind mount our temp file over the chroot's resolv.conf
-	if err := syscall.Mount(tmpPath, chrootResolv, "", syscall.MS_BIND, ""); err != nil {
+	if err := ri.platform.Mount(tmpPath, chrootResolv, "", syscall.MS_BIND, ""); err != nil {
 		os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to bind mount %s: %w", hostResolvConf, err)
 	}
