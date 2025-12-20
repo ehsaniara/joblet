@@ -2,11 +2,13 @@
 
 ## Overview
 
-This document describes how Joblet integrates with AWS Secrets Manager to enable horizontal scaling across multiple EC2 instances while maintaining a shared Certificate Authority (CA) and client certificates.
+This document describes how Joblet integrates with AWS Secrets Manager to enable horizontal scaling across multiple EC2
+instances while maintaining a shared Certificate Authority (CA) and client certificates.
 
 ## The Scaling Challenge
 
 **Without Secrets Manager (Current Default):**
+
 - Each EC2 instance generates its own CA certificate
 - Each EC2 instance generates its own client certificates
 - Clients need different config files for each server
@@ -14,6 +16,7 @@ This document describes how Joblet integrates with AWS Secrets Manager to enable
 - Certificate rotation requires updating all clients
 
 **With Secrets Manager:**
+
 - First instance generates CA + client certs → Stores in Secrets Manager
 - Subsequent instances retrieve shared CA + client certs → Generate only server cert
 - All instances share the same CA and client certificates
@@ -188,6 +191,7 @@ chmod +x /tmp/joblet-install.sh
 ### Step 3: Launch First Instance
 
 The first instance will:
+
 1. Generate CA certificate and key
 2. Generate admin client certificate and key
 3. Store them in Secrets Manager
@@ -202,6 +206,7 @@ aws secretsmanager list-secrets \
 ```
 
 Expected output:
+
 ```
 ----------------------------------------
 |            ListSecrets                |
@@ -216,6 +221,7 @@ Expected output:
 ### Step 4: Launch Additional Instances
 
 Subsequent instances will:
+
 1. Retrieve existing CA from Secrets Manager
 2. Retrieve existing client certificates from Secrets Manager
 3. Generate NEW instance-specific server certificate
@@ -286,6 +292,7 @@ USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
 ```
 
 ⚠️ **Warning:** Rotating CA requires:
+
 1. Regenerating server certs on all instances
 2. Distributing new client config to all clients
 3. Brief service interruption during rollout
@@ -294,43 +301,47 @@ USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
 
 ### Environment Variables
 
-| Variable               | Default | Description                                    |
-|------------------------|---------|------------------------------------------------|
-| `USE_SECRETS_MANAGER`  | `auto`  | Enable Secrets Manager (`true`, `false`, `auto`) |
-| `SECRETS_PREFIX`       | `joblet`| Prefix for secret names                        |
-| `FORCE_REGENERATE`     | `false` | Force regenerate even if secrets exist         |
-| `EC2_REGION`           | auto    | AWS region (auto-detected from EC2 metadata)   |
+| Variable              | Default  | Description                                      |
+|-----------------------|----------|--------------------------------------------------|
+| `USE_SECRETS_MANAGER` | `auto`   | Enable Secrets Manager (`true`, `false`, `auto`) |
+| `SECRETS_PREFIX`      | `joblet` | Prefix for secret names                          |
+| `FORCE_REGENERATE`    | `false`  | Force regenerate even if secrets exist           |
+| `EC2_REGION`          | auto     | AWS region (auto-detected from EC2 metadata)     |
 
 ### Examples
 
 **Enable explicitly:**
+
 ```bash
 USE_SECRETS_MANAGER=true ./certs_gen_with_secretsmanager.sh
 ```
 
 **Disable explicitly:**
+
 ```bash
 USE_SECRETS_MANAGER=false ./certs_gen_with_secretsmanager.sh
 ```
 
 **Auto-detect (default on EC2):**
+
 ```bash
 ./certs_gen_with_secretsmanager.sh
 # Automatically enables if running on EC2 and AWS CLI is available
 ```
 
 **Custom prefix:**
+
 ```bash
 USE_SECRETS_MANAGER=true SECRETS_PREFIX=my-app/joblet \
   ./certs_gen_with_secretsmanager.sh
 ```
 
 **Force regenerate everything:**
+
 ```bash
 USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
   ./certs_gen_with_secretsmanager.sh
 ```
-
 
 ### Secrets Manager Benefits
 
@@ -376,6 +387,7 @@ For read-only instances (workers that don't create/update secrets).
 ### Server Certificate Security
 
 Each instance gets a **unique** server certificate:
+
 - Compromising one server doesn't compromise others
 - Can revoke individual server certs without affecting the fleet
 - Follows security best practice of instance-specific credentials
@@ -444,6 +456,7 @@ This is **not supported**. You must choose one approach:
 - **Option B**: All instances use embedded certs (no scaling)
 
 Migration path:
+
 1. Generate initial certs with Secrets Manager
 2. Terminate all old instances
 3. Launch new instances with `USE_SECRETS_MANAGER=true`
@@ -503,44 +516,44 @@ aws secretsmanager delete-secret \
 
 ## Comparison: Embedded vs. Secrets Manager
 
-| Feature                          | Embedded Certs | Secrets Manager |
-|----------------------------------|----------------|-----------------|
-| Setup Complexity                 | ⭐⭐⭐⭐⭐       | ⭐⭐⭐⭐          |
-| Horizontal Scaling               | ❌             | ✅              |
-| Load Balancer Support            | ❌             | ✅              |
-| One Client Config                | ❌             | ✅              |
-| Certificate Rotation             | Manual, complex | Centralized     |
-| Compliance (Audit Logs)          | ❌             | ✅              |
-| Disaster Recovery                | Manual backup  | Built-in        |
-| Multi-Region                     | Manual         | Replicate       |
-| Offline / No Internet            | ✅             | ❌              |
+| Feature                 | Embedded Certs  | Secrets Manager |
+|-------------------------|-----------------|-----------------|
+| Setup Complexity        | ⭐⭐⭐⭐⭐           | ⭐⭐⭐⭐            |
+| Horizontal Scaling      | ❌               | ✅               |
+| Load Balancer Support   | ❌               | ✅               |
+| One Client Config       | ❌               | ✅               |
+| Certificate Rotation    | Manual, complex | Centralized     |
+| Compliance (Audit Logs) | ❌               | ✅               |
+| Disaster Recovery       | Manual backup   | Built-in        |
+| Multi-Region            | Manual          | Replicate       |
+| Offline / No Internet   | ✅               | ❌               |
 
 ## Best Practices
 
 1. **Enable Secrets Manager for production EC2 deployments**
-   - Required for auto-scaling
+    - Required for auto-scaling
 
 2. **Use embedded certs for:**
-   - Development/testing
-   - On-premises deployments
-   - Single-instance deployments
-   - Air-gapped environments
+    - Development/testing
+    - On-premises deployments
+    - Single-instance deployments
+    - Air-gapped environments
 
 3. **Protect your secrets:**
-   - Use IAM policies to restrict access
-   - Enable CloudTrail logging
-   - Set up alerts for unexpected access
-   - Regular certificate rotation
+    - Use IAM policies to restrict access
+    - Enable CloudTrail logging
+    - Set up alerts for unexpected access
+    - Regular certificate rotation
 
 4. **Plan for rotation:**
-   - Server certs: Rotate annually per instance
-   - Client certs: Rotate every 2 years (requires client updates)
-   - CA cert: Rotate every 3 years (requires full fleet update)
+    - Server certs: Rotate annually per instance
+    - Client certs: Rotate every 2 years (requires client updates)
+    - CA cert: Rotate every 3 years (requires full fleet update)
 
 5. **Test your DR plan:**
-   - Verify cross-region replication
-   - Test recovery from secret deletion
-   - Document rollback procedures
+    - Verify cross-region replication
+    - Test recovery from secret deletion
+    - Document rollback procedures
 
 ## See Also
 

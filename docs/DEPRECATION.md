@@ -27,7 +27,8 @@ All features listed below have been **REMOVED** in v5.0.0. See migration guide a
 **Current Location**: `internal/joblet/server/job_service.go`
 
 **Description**:
-The `JobServiceServer` handles all job-related gRPC operations including job submission, status queries, and lifecycle management.
+The `JobServiceServer` handles all job-related gRPC operations including job submission, status queries, and lifecycle
+management.
 
 **Current Status**:
 

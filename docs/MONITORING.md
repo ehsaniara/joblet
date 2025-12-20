@@ -709,9 +709,11 @@ ssh server "df -h /opt/joblet && df -i /opt/joblet"
 
 ### 8. eBPF Telemetry and CloudWatch Integration
 
-When eBPF telematics is enabled, joblet captures process execution, network connection, and memory events from jobs. These events are shipped to CloudWatch alongside regular logs and metrics.
+When eBPF telematics is enabled, joblet captures process execution, network connection, and memory events from jobs.
+These events are shipped to CloudWatch alongside regular logs and metrics.
 
 **Viewing eBPF Telematics Events via CLI:**
+
 ```bash
 # View eBPF telematics events for a job
 rnx job telematics <job-uuid>
@@ -734,21 +736,23 @@ rnx job metrics f47ac10b
 
 **Available eBPF Event Types:**
 
-| Event | Display | Description |
-|-------|---------|-------------|
-| exec | EXEC | Process executions (fork/exec syscalls) |
-| connect | CONNECT | Outgoing network connections (connect syscall) |
-| accept | ACCEPT | Incoming network connections (accept syscall) |
+| Event       | Display   | Description                                      |
+|-------------|-----------|--------------------------------------------------|
+| exec        | EXEC      | Process executions (fork/exec syscalls)          |
+| connect     | CONNECT   | Outgoing network connections (connect syscall)   |
+| accept      | ACCEPT    | Incoming network connections (accept syscall)    |
 | socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
-| mmap | MMAP | Memory mappings with executable permissions |
-| mprotect | MPROTECT | Memory protection changes adding exec permission |
+| mmap        | MMAP      | Memory mappings with executable permissions      |
+| mprotect    | MPROTECT  | Memory protection changes adding exec permission |
 
 **Data Flow:**
+
 ```
 eBPF Monitor → Telemetry Collector → IPC Writer → Persist Service → CloudWatch Logs
 ```
 
 **CloudWatch Log Streams (per job):**
+
 ```
 Log Group: /joblet/{node_id}
   - {job_id}-logs           # stdout/stderr logs
@@ -786,6 +790,7 @@ fields @timestamp, @logStream
 **Local Storage (when CloudWatch is disabled):**
 
 eBPF events are stored locally in compressed JSONL format:
+
 ```
 /opt/joblet/events/{job-uuid}/
 ├── exec_events.jsonl.gz     # Process execution events
@@ -793,6 +798,7 @@ eBPF events are stored locally in compressed JSONL format:
 ```
 
 **Monitoring eBPF Event Volume:**
+
 ```bash
 # Check eBPF event storage usage
 ssh server "du -sh /opt/joblet/events/*"
@@ -804,6 +810,7 @@ ssh server "journalctl -u persist | grep 'Wrote.*events' | tail -20"
 **Configuration:**
 
 eBPF telematics is configured in joblet:
+
 ```yaml
 # /opt/joblet/config/config.yml
 telemetry:
@@ -816,6 +823,7 @@ telemetry:
 ```
 
 CloudWatch storage is configured in persist:
+
 ```yaml
 # /opt/joblet/config/persist.yml
 storage:

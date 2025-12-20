@@ -361,7 +361,8 @@ You have successfully completed the initial Joblet deployment:
 
 ### Command Reference Summary
 
-**Note:** All commands that take a `<job-uuid>` support short-form UUIDs (first 8 characters) if they uniquely identify a job.
+**Note:** All commands that take a `<job-uuid>` support short-form UUIDs (first 8 characters) if they uniquely identify
+a job.
 
 ```bash
 # Job Management

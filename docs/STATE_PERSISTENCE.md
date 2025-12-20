@@ -11,7 +11,8 @@ storage backends: in-memory (default) and AWS DynamoDB (for EC2 deployments only
 ### Process Model
 
 > **⚠️ CRITICAL REQUIREMENT:** Joblet main process **cannot start without** a healthy state service. The startup
-> sequence includes a 30-second health check with retries to ensure state service is ready before accepting job requests.
+> sequence includes a 30-second health check with retries to ensure state service is ready before accepting job
+> requests.
 
 ```
 ┌─────────────────────────────────────────────────────┐

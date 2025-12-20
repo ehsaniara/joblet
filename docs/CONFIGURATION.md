@@ -26,18 +26,20 @@ Comprehensive guide to configuring Joblet server and RNX client.
 
 Joblet uses a **split configuration architecture** for cross-distribution compatibility:
 
-| File | Purpose | Location |
-|------|---------|----------|
-| `joblet-config.yml` | Core joblet config (server, IPC, persist, state) | `/opt/joblet/config/` |
-| `runtime-config.yml` | Distro-specific runtime settings | `/opt/joblet/config/` |
+| File                 | Purpose                                          | Location              |
+|----------------------|--------------------------------------------------|-----------------------|
+| `joblet-config.yml`  | Core joblet config (server, IPC, persist, state) | `/opt/joblet/config/` |
+| `runtime-config.yml` | Distro-specific runtime settings                 | `/opt/joblet/config/` |
 
 ### Configuration Files
 
 **Main config:** `/opt/joblet/config/joblet-config.yml`
+
 - Server settings, IPC, persistence, state, security
 - Distro-agnostic settings
 
 **Runtime config:** `/opt/joblet/config/runtime-config.yml`
+
 - Package manager paths (apt/yum/dnf/apk)
 - Library paths for the specific Linux distribution
 - Automatically selected during installation based on OS detection
@@ -46,12 +48,12 @@ Joblet uses a **split configuration architecture** for cross-distribution compat
 
 During installation, Joblet automatically detects your Linux distribution and installs the appropriate runtime config:
 
-| Distribution | Runtime Config Selected |
-|--------------|------------------------|
-| Ubuntu, Debian, Linux Mint | `runtime-config-ubuntu.yml` |
-| RHEL, CentOS, Rocky, AlmaLinux | `runtime-config-rhel.yml` |
-| Fedora, Amazon Linux 2023+ | `runtime-config-fedora.yml` |
-| Alpine Linux | `runtime-config-alpine.yml` |
+| Distribution                   | Runtime Config Selected     |
+|--------------------------------|-----------------------------|
+| Ubuntu, Debian, Linux Mint     | `runtime-config-ubuntu.yml` |
+| RHEL, CentOS, Rocky, AlmaLinux | `runtime-config-rhel.yml`   |
+| Fedora, Amazon Linux 2023+     | `runtime-config-fedora.yml` |
+| Alpine Linux                   | `runtime-config-alpine.yml` |
 
 The detection uses `/etc/os-release` and falls back to package manager detection.
 
@@ -286,12 +288,12 @@ runtime:
 
 **Distro-specific `install_writable_paths` examples:**
 
-| Distribution | Package Manager | Writable Paths |
-|--------------|-----------------|----------------|
-| Ubuntu/Debian | apt/dpkg | `/var/cache/apt`, `/var/lib/apt`, `/var/lib/dpkg` |
-| RHEL/CentOS | yum/rpm | `/var/cache/yum`, `/var/lib/rpm`, `/var/lib/yum` |
-| Fedora/Amazon Linux | dnf/rpm | `/var/cache/dnf`, `/var/lib/dnf`, `/var/lib/rpm` |
-| Alpine | apk | `/var/cache/apk`, `/lib/apk`, `/etc/apk` |
+| Distribution        | Package Manager | Writable Paths                                    |
+|---------------------|-----------------|---------------------------------------------------|
+| Ubuntu/Debian       | apt/dpkg        | `/var/cache/apt`, `/var/lib/apt`, `/var/lib/dpkg` |
+| RHEL/CentOS         | yum/rpm         | `/var/cache/yum`, `/var/lib/rpm`, `/var/lib/yum`  |
+| Fedora/Amazon Linux | dnf/rpm         | `/var/cache/dnf`, `/var/lib/dnf`, `/var/lib/rpm`  |
+| Alpine              | apk             | `/var/cache/apk`, `/lib/apk`, `/etc/apk`          |
 
 ### Security Settings
 
@@ -426,24 +428,24 @@ telemetry:
 
 **Metrics Interval Tuning:**
 
-| Interval | Use Case | Trade-off |
-|----------|----------|-----------|
-| `1s` | High-resolution debugging | Higher CPU overhead, more data |
-| `5s` | Default, balanced | Good for most workloads |
-| `10s` | Long-running jobs | Lower overhead, less granular |
-| `30s` | Cost-sensitive/high-volume | Minimal overhead, coarse data |
+| Interval | Use Case                   | Trade-off                      |
+|----------|----------------------------|--------------------------------|
+| `1s`     | High-resolution debugging  | Higher CPU overhead, more data |
+| `5s`     | Default, balanced          | Good for most workloads        |
+| `10s`    | Long-running jobs          | Lower overhead, less granular  |
+| `30s`    | Cost-sensitive/high-volume | Minimal overhead, coarse data  |
 
 **eBPF Event Types:**
 
-| Event | Description | Use Case |
-|-------|-------------|----------|
-| `exec` | Process execution (fork/exec syscalls) | Debug what binaries jobs run |
-| `connect` | Outgoing network connections (connect syscall) | Track external service dependencies |
-| `accept` | Incoming network connections (accept syscall) | Monitor server connections |
-| `socket_data` | Socket data transfers (sendto/recvfrom) | Monitor data flow |
-| `mmap` | Memory mappings with exec permissions | Detect code loading |
-| `mprotect` | Memory protection changes adding exec | Detect JIT compilation |
-| `file` | File access (open/read/write) | Audit data access (high volume) |
+| Event         | Description                                    | Use Case                            |
+|---------------|------------------------------------------------|-------------------------------------|
+| `exec`        | Process execution (fork/exec syscalls)         | Debug what binaries jobs run        |
+| `connect`     | Outgoing network connections (connect syscall) | Track external service dependencies |
+| `accept`      | Incoming network connections (accept syscall)  | Monitor server connections          |
+| `socket_data` | Socket data transfers (sendto/recvfrom)        | Monitor data flow                   |
+| `mmap`        | Memory mappings with exec permissions          | Detect code loading                 |
+| `mprotect`    | Memory protection changes adding exec          | Detect JIT compilation              |
+| `file`        | File access (open/read/write)                  | Audit data access (high volume)     |
 
 **Performance Tuning - Disabling High-Volume Events:**
 
@@ -464,19 +466,21 @@ telemetry:
 
 **Recommended profiles:**
 
-| Profile | Events | Config |
-|---------|--------|--------|
-| Minimal | `exec`, `connect`, `accept` | `event_types: [exec, connect, accept]` |
-| Standard | All except `socket_data` | `event_types: [exec, connect, accept, mmap, mprotect, file]` |
-| Full (default) | All events | Omit `event_types` or leave empty |
+| Profile        | Events                      | Config                                                       |
+|----------------|-----------------------------|--------------------------------------------------------------|
+| Minimal        | `exec`, `connect`, `accept` | `event_types: [exec, connect, accept]`                       |
+| Standard       | All except `socket_data`    | `event_types: [exec, connect, accept, mmap, mprotect, file]` |
+| Full (default) | All events                  | Omit `event_types` or leave empty                            |
 
 **Requirements:**
+
 - Linux kernel 5.8+ (for eBPF ring buffer)
 - `CAP_BPF` and `CAP_PERFMON` capabilities (joblet runs as root)
 
 **CloudWatch Integration:**
 
 When using CloudWatch storage backend, eBPF events are shipped to dedicated log streams:
+
 ```
 Log Group: /joblet/{node_id}
   {job_id}-exec-events     # Process execution events (JSON)
@@ -484,6 +488,7 @@ Log Group: /joblet/{node_id}
 ```
 
 Query eBPF events with CloudWatch Insights:
+
 ```sql
 -- Find all network connections to a specific host
 fields @timestamp, job_id, pid, dst_addr, dst_port
@@ -856,16 +861,16 @@ openssl req -new -key client-key.pem -out viewer.csr \
 
 ### Server Environment Variables
 
-| Variable                     | Description                        | Default                                |
-|------------------------------|------------------------------------|----------------------------------------|
-| `JOBLET_CONFIG_PATH`         | Path to main configuration file    | `/opt/joblet/config/joblet-config.yml` |
+| Variable                     | Description                        | Default                                 |
+|------------------------------|------------------------------------|-----------------------------------------|
+| `JOBLET_CONFIG_PATH`         | Path to main configuration file    | `/opt/joblet/config/joblet-config.yml`  |
 | `JOBLET_RUNTIME_CONFIG_PATH` | Path to runtime configuration file | `/opt/joblet/config/runtime-config.yml` |
-| `JOBLET_LOG_LEVEL`           | Log level override                 | from config                            |
-| `JOBLET_SERVER_ADDRESS`      | Server address override            | from config                            |
-| `JOBLET_SERVER_PORT`         | Server port override               | from config                            |
-| `JOBLET_NODE_ID`             | Node identifier override           | from config                            |
-| `JOBLET_MAX_JOBS`            | Maximum concurrent jobs            | from config                            |
-| `JOBLET_CI_MODE`             | Enable CI mode (relaxed isolation) | `false`                                |
+| `JOBLET_LOG_LEVEL`           | Log level override                 | from config                             |
+| `JOBLET_SERVER_ADDRESS`      | Server address override            | from config                             |
+| `JOBLET_SERVER_PORT`         | Server port override               | from config                             |
+| `JOBLET_NODE_ID`             | Node identifier override           | from config                             |
+| `JOBLET_MAX_JOBS`            | Maximum concurrent jobs            | from config                             |
+| `JOBLET_CI_MODE`             | Enable CI mode (relaxed isolation) | `false`                                 |
 
 ### Client Environment Variables
 

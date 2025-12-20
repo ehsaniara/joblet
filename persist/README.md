@@ -103,17 +103,17 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 
 **Message Types:**
 
-| Type | Description |
-|------|-------------|
-| `MESSAGE_TYPE_LOG` | Job stdout/stderr log lines |
-| `MESSAGE_TYPE_METRIC` | Resource metrics (CPU, memory, GPU, I/O) |
-| `MESSAGE_TYPE_EXEC_EVENT` | Process execution events (from eBPF) |
-| `MESSAGE_TYPE_CONNECT_EVENT` | Network connection events (from eBPF) |
-| `MESSAGE_TYPE_FILE_EVENT` | File access events (from eBPF) |
-| `MESSAGE_TYPE_ACCEPT_EVENT` | Socket accept events (from eBPF) |
-| `MESSAGE_TYPE_SOCKET_DATA_EVENT` | Socket data transfer events (from eBPF) |
-| `MESSAGE_TYPE_MMAP_EVENT` | Memory mapping events (from eBPF) |
-| `MESSAGE_TYPE_MPROTECT_EVENT` | Memory protection change events (from eBPF) |
+| Type                             | Description                                 |
+|----------------------------------|---------------------------------------------|
+| `MESSAGE_TYPE_LOG`               | Job stdout/stderr log lines                 |
+| `MESSAGE_TYPE_METRIC`            | Resource metrics (CPU, memory, GPU, I/O)    |
+| `MESSAGE_TYPE_EXEC_EVENT`        | Process execution events (from eBPF)        |
+| `MESSAGE_TYPE_CONNECT_EVENT`     | Network connection events (from eBPF)       |
+| `MESSAGE_TYPE_FILE_EVENT`        | File access events (from eBPF)              |
+| `MESSAGE_TYPE_ACCEPT_EVENT`      | Socket accept events (from eBPF)            |
+| `MESSAGE_TYPE_SOCKET_DATA_EVENT` | Socket data transfer events (from eBPF)     |
+| `MESSAGE_TYPE_MMAP_EVENT`        | Memory mapping events (from eBPF)           |
+| `MESSAGE_TYPE_MPROTECT_EVENT`    | Memory protection change events (from eBPF) |
 
 ## Storage Layout
 

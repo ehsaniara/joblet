@@ -20,6 +20,7 @@ This interactive script creates:
 - **CA and client certificates** in AWS Secrets Manager (for horizontal scaling)
 
 The script will:
+
 1. Ask you to select a VPC for the EC2 instance
 2. Check if a DynamoDB VPC Endpoint exists in that VPC
 3. Let you select an existing endpoint or create a new one
@@ -170,12 +171,13 @@ sudo systemctl status joblet
 
 Joblet is designed to **always start**, even if AWS services are unavailable:
 
-| Service | Primary | Fallback | Behavior |
-|---------|---------|----------|----------|
-| **State** | DynamoDB | In-memory | Jobs work, but state lost on restart |
-| **Persist** | CloudWatch | Local disk | Logs stored at `/opt/joblet/logs` |
+| Service     | Primary    | Fallback   | Behavior                             |
+|-------------|------------|------------|--------------------------------------|
+| **State**   | DynamoDB   | In-memory  | Jobs work, but state lost on restart |
+| **Persist** | CloudWatch | Local disk | Logs stored at `/opt/joblet/logs`    |
 
-When running in fallback mode, Joblet logs **prominent warnings** so you know AWS integration is not working. This ensures Joblet remains functional for development/testing even without proper AWS setup.
+When running in fallback mode, Joblet logs **prominent warnings** so you know AWS integration is not working. This
+ensures Joblet remains functional for development/testing even without proper AWS setup.
 
 ---
 
@@ -294,22 +296,22 @@ Or:
 
 **This means Joblet is running but with reduced functionality:**
 
-| Service | Normal Mode | Fallback Mode | Impact |
-|---------|-------------|---------------|--------|
-| **State** | DynamoDB | In-memory | Job state lost on restart |
-| **Persist** | CloudWatch | Local disk | Logs only on EC2, not in CloudWatch |
+| Service     | Normal Mode | Fallback Mode | Impact                              |
+|-------------|-------------|---------------|-------------------------------------|
+| **State**   | DynamoDB    | In-memory     | Job state lost on restart           |
+| **Persist** | CloudWatch  | Local disk    | Logs only on EC2, not in CloudWatch |
 
 **Common causes and fixes:**
 
 1. **DynamoDB fallback** (State service):
-   - VPC Endpoint not configured → Run pre-setup script or create manually
-   - VPC Endpoint in wrong VPC → Ensure EC2 is in the same VPC
-   - IAM role not attached → Attach `JobletEC2Role` to EC2 instance
-   - DynamoDB table doesn't exist → Table should be created by pre-setup script
+    - VPC Endpoint not configured → Run pre-setup script or create manually
+    - VPC Endpoint in wrong VPC → Ensure EC2 is in the same VPC
+    - IAM role not attached → Attach `JobletEC2Role` to EC2 instance
+    - DynamoDB table doesn't exist → Table should be created by pre-setup script
 
 2. **CloudWatch fallback** (Persist service):
-   - IAM role missing CloudWatch permissions → Check `JobletEC2Role` policy
-   - IAM role not attached → Attach `JobletEC2Role` to EC2 instance
+    - IAM role missing CloudWatch permissions → Check `JobletEC2Role` policy
+    - IAM role not attached → Attach `JobletEC2Role` to EC2 instance
 
 **To verify and fix:**
 

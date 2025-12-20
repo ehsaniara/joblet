@@ -12,6 +12,7 @@ orchestration will be developed as a separate project that uses joblet's Job API
 The following changes were made to implement this decision:
 
 **Code Removal (Complete):**
+
 - Removed `WorkflowUuid` and `Dependencies` fields from `internal/joblet/domain/job.go`
 - Removed `WorkflowUuid` and `Dependencies` from `internal/joblet/core/interfaces/requests.go`
 - Removed workflow fields from `internal/joblet/core/job/builder.go`
@@ -23,6 +24,7 @@ The following changes were made to implement this decision:
 - Updated test files to remove workflow-specific references
 
 **Documentation Updates:**
+
 - Removed `docs/WORKFLOWS.md`
 - Removed `docs/adr/002-workflow-vs-job-separation.md` (superseded by this ADR)
 - Updated `docs/README.md`, `docs/API.md`, `docs/ARCHITECTURE.md`
@@ -33,11 +35,13 @@ The following changes were made to implement this decision:
 - Updated `docs/adr/README.md` to remove workflow ADR reference
 
 **Test Updates:**
+
 - Removed `tests/e2e/tests/06_workflow_test.sh` (obsolete E2E test)
 - Updated `state/internal/storage/dynamodb_test.go` to remove workflow assertions
 - All remaining E2E tests pass
 
 **Proto Compatibility:**
+
 - Proto definitions in external `joblet-proto` repository remain unchanged
 - Joblet ignores workflow fields from proto but does not send them in responses
 
@@ -48,6 +52,7 @@ between workflow and job service layers, both still live within the same binary 
 become a constraint as the project evolves.
 
 The workflow orchestration code includes:
+
 - **Server-side**: `internal/joblet/workflow/` - DAG resolution, dependency tracking, orchestration loop
 - **Client-side**: `internal/rnx/workflows/` - YAML parsing, validation, file extraction
 - **gRPC service**: `internal/joblet/server/workflow_service.go`
@@ -200,6 +205,7 @@ for execution. Joblet becomes a universal job executor.
 catching interface issues early.
 
 **New capabilities**: The orchestrator can add features that don't belong in joblet:
+
 - Web UI for workflow visualization
 - Multi-cluster job distribution
 - Advanced retry policies with backoff
@@ -224,18 +230,21 @@ YAML format, provide migration scripts.
 ### What This Enables
 
 **Multi-node workflows**: Orchestrator can schedule jobs across multiple joblet instances, enabling:
+
 - Job affinity/anti-affinity
 - Resource-aware scheduling
 - Geographic distribution
 - Failure domain isolation
 
 **Pluggable backends**: The orchestrator could support multiple execution backends:
+
 - Joblet (primary)
 - Docker/Podman (alternative)
 - Kubernetes (for hybrid deployments)
 - SSH (for legacy systems)
 
 **Workflow-as-Code**: Without being tied to joblet's release cycle, the orchestrator can experiment with:
+
 - Go SDK for programmatic workflows
 - Python DSL
 - TypeScript support
@@ -269,6 +278,7 @@ existing orchestrators. Our orchestrator becomes one option among many, not a re
 ### Proto Changes
 
 The `joblet-proto` workflow messages can either:
+
 1. Move to a new `orchestrator-proto` repository
 2. Stay in `joblet-proto` but be consumed only by orchestrator
 
@@ -277,6 +287,7 @@ Option 2 is simpler for migration. The Job API messages stay unchanged.
 ### CLI Integration
 
 Two options for the CLI:
+
 1. **Separate binary**: `rnx-workflow` for workflows, `rnx` for jobs
 2. **Unified with subcommand**: `rnx workflow run` calls orchestrator, `rnx job run` calls joblet
 

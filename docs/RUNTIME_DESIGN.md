@@ -194,17 +194,17 @@ When a user runs `rnx job run --runtime=python-3.11 "python script.py"`, the fol
 
 ### Key Components
 
-| Component | File | Key Functions |
-|-----------|------|---------------|
-| CLI Run Command | `internal/rnx/jobs/run.go` | `runRun()` (lines 137-376) |
-| Job Handler | `internal/joblet/core/joblet.go` | `StartJob()` (lines 99-160) |
-| Execution Coordinator | `internal/joblet/core/execution/coordinator.go` | `StartJob()` (lines 52-184) |
-| Environment Builder | `internal/joblet/core/execution/environment_service.go` | `BuildEnvironment()` (lines 44-107) |
-| Filesystem Isolator | `internal/joblet/core/filesystem/isolator.go` | `Setup()` (lines 336-436) |
-| Runtime Mounting | `internal/joblet/core/filesystem/isolator.go` | `mountRuntime()` (lines 1204-1227) |
-| Mount Manager | `internal/joblet/core/filesystem/isolator.go` | `mountRuntimeWithManager()` (lines 1230-1402) |
-| Runtime Resolver | `internal/joblet/runtime/resolver.go` | `FindRuntimeDirectory()` (lines 214-307) |
-| Job Execution | `internal/modes/jobexec/jobexec.go` | `ExecuteJob()` (lines 83-107) |
+| Component             | File                                                    | Key Functions                                 |
+|-----------------------|---------------------------------------------------------|-----------------------------------------------|
+| CLI Run Command       | `internal/rnx/jobs/run.go`                              | `runRun()` (lines 137-376)                    |
+| Job Handler           | `internal/joblet/core/joblet.go`                        | `StartJob()` (lines 99-160)                   |
+| Execution Coordinator | `internal/joblet/core/execution/coordinator.go`         | `StartJob()` (lines 52-184)                   |
+| Environment Builder   | `internal/joblet/core/execution/environment_service.go` | `BuildEnvironment()` (lines 44-107)           |
+| Filesystem Isolator   | `internal/joblet/core/filesystem/isolator.go`           | `Setup()` (lines 336-436)                     |
+| Runtime Mounting      | `internal/joblet/core/filesystem/isolator.go`           | `mountRuntime()` (lines 1204-1227)            |
+| Mount Manager         | `internal/joblet/core/filesystem/isolator.go`           | `mountRuntimeWithManager()` (lines 1230-1402) |
+| Runtime Resolver      | `internal/joblet/runtime/resolver.go`                   | `FindRuntimeDirectory()` (lines 214-307)      |
+| Job Execution         | `internal/modes/jobexec/jobexec.go`                     | `ExecuteJob()` (lines 83-107)                 |
 
 ### Environment Variable Flow
 
@@ -257,6 +257,7 @@ The resolver (`internal/joblet/runtime/resolver.go`) finds the runtime directory
 ```
 
 **Supported Specification Formats:**
+
 - `python-3.11` - Direct name match
 - `python-3.11@1.3.1` - Name with version (npm-style)
 - `python-3.11@latest` - Latest version
@@ -266,6 +267,7 @@ The resolver (`internal/joblet/runtime/resolver.go`) finds the runtime directory
 Runtime mounting in `mountRuntimeWithManager()` uses a two-phase approach to avoid read-only parent directory issues:
 
 **Phase 1: Create Mount Points** (before any mounts)
+
 ```go
 for _, mount := range config.Mounts {
     // 1. Check if source exists in runtime directory
@@ -275,6 +277,7 @@ for _, mount := range config.Mounts {
 ```
 
 **Phase 2: Bind Mount** (after all directories created)
+
 ```go
 for _, mount := range config.Mounts {
     // 1. Bind mount: mount(source, target, "", MS_BIND, "")
@@ -283,6 +286,7 @@ for _, mount := range config.Mounts {
 ```
 
 **Example Mount from Python 3.11:**
+
 ```
 Source: /opt/joblet/runtimes/python-3.11/1.3.1/bin
 Target: /usr/local/bin (in chroot)
@@ -306,7 +310,8 @@ The `JobFilesystem.Setup()` function (lines 336-436) performs isolation in this 
 
 ### Runtime Environment Loading
 
-The environment service (`internal/joblet/core/execution/environment_service.go`) loads runtime-specific environment variables:
+The environment service (`internal/joblet/core/execution/environment_service.go`) loads runtime-specific environment
+variables:
 
 ```go
 // getRuntimeEnvironment(runtimeSpec string) []string
@@ -318,6 +323,7 @@ The environment service (`internal/joblet/core/execution/environment_service.go`
 ```
 
 **Example runtime.yml environment:**
+
 ```yaml
 environment:
   PATH_PREPEND: "/usr/local/bin"
@@ -326,6 +332,7 @@ environment:
 ```
 
 **Result in job process:**
+
 ```
 PATH=/usr/local/bin:$ORIGINAL_PATH
 PYTHONPATH=/usr/local/lib/python3.11/site-packages
@@ -334,7 +341,8 @@ PYTHON_VERSION=3.11
 
 ### Critical Design Points
 
-1. **Mount Order Matters**: Runtime mounting happens AFTER allowed directories but BEFORE chroot, allowing runtime files to override host defaults
+1. **Mount Order Matters**: Runtime mounting happens AFTER allowed directories but BEFORE chroot, allowing runtime files
+   to override host defaults
 
 2. **Environment Variable Bridge**: `JOB_RUNTIME` env var bridges CLI input through server to filesystem isolation layer
 
@@ -346,16 +354,16 @@ PYTHON_VERSION=3.11
 
 ### Data Flow Summary
 
-| Stage | Component | Data | Key Variable |
-|-------|-----------|------|--------------|
-| CLI | run.go | "python-3.11" | Command line arg |
-| gRPC | RunJobRequest | runtime field | Protobuf field |
-| Server | domain.Job | Job.Runtime | Struct field |
-| Execution | Coordinator | Build environment | JOB_RUNTIME env |
-| Isolation | JobFilesystem | loadRuntime() | Reads env var |
-| Mount | Resolver | FindRuntimeDirectory() | Returns path |
-| Config | runtime.yml | mounts & environment | YAML config |
-| Process | Job | Runtime in PATH | Modified PATH |
+| Stage     | Component     | Data                   | Key Variable     |
+|-----------|---------------|------------------------|------------------|
+| CLI       | run.go        | "python-3.11"          | Command line arg |
+| gRPC      | RunJobRequest | runtime field          | Protobuf field   |
+| Server    | domain.Job    | Job.Runtime            | Struct field     |
+| Execution | Coordinator   | Build environment      | JOB_RUNTIME env  |
+| Isolation | JobFilesystem | loadRuntime()          | Reads env var    |
+| Mount     | Resolver      | FindRuntimeDirectory() | Returns path     |
+| Config    | runtime.yml   | mounts & environment   | YAML config      |
+| Process   | Job           | Runtime in PATH        | Modified PATH    |
 
 ### Network Integration
 
