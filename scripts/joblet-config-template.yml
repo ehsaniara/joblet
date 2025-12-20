@@ -14,7 +14,6 @@ server:
   address: "0.0.0.0"
   port: 50051
   mode: "server"
-  timeout: "10s"
   nodeId: ""  # Will be generated during setup
 
 joblet:
@@ -41,7 +40,6 @@ network:
   state_dir: "/opt/joblet/network"
   default_network: "bridge"
   allow_custom_networks: true
-  max_custom_networks: 0       # No limit on custom networks (0 = unlimited)
   # Network storage configuration - file-based persistence
   storage:
     path: "/opt/joblet/network"  # Directory for network state files
@@ -54,7 +52,6 @@ filesystem:
   baseDir: "/opt/joblet/jobs"
   tmpDir: "/tmp/job-{JOB_ID}"
   workspaceDir: "/work"         # Directory for job uploads and execution
-  blockDevices: false
 
 grpc:
   # Production-grade gRPC settings for high-performance traffic
@@ -65,9 +62,6 @@ grpc:
   keepAliveTimeout: "3s"           # Faster timeout detection
   maxConcurrentStreams: 1000       # High concurrent stream limit
   connectionTimeout: "10s"         # Connection establishment timeout
-  maxConnectionIdle: "300s"        # 5min idle before cleanup
-  maxConnectionAge: "1800s"        # 30min max connection lifetime
-  maxConnectionAgeGrace: "30s"     # Grace period for connection shutdown
 
 logging:
   level: "INFO"
@@ -203,7 +197,7 @@ persist:
 # Job State Persistence Configuration (Optional - for EC2/Cloud deployments)
 # When enabled, job states survive joblet restarts
 state:
-  backend: "memory"  # Options: "memory", "dynamodb", "redis"
+  backend: "memory"  # Options: "memory", "dynamodb"
   socket: "/opt/joblet/run/state-ipc.sock"
   buffer_size: 10000
   reconnect_delay: "5s"
@@ -221,10 +215,3 @@ state:
       write_capacity: 5  # 0 for on-demand pricing
       batch_size: 25
       batch_interval: "100ms"
-
-    # Redis configuration (future - when backend: "redis")
-    # redis:
-    #   endpoint: "localhost:6379"
-    #   password: ""
-    #   db: 0
-    #   ttl_days: 30

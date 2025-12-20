@@ -11,7 +11,7 @@ import (
 //counterfeiter:generate . Backend
 
 // Backend defines the interface for job state storage backends.
-// Implementations: memory, DynamoDB, Redis, PostgreSQL, etc.
+// Implementations: memory, local, DynamoDB
 type Backend interface {
 	// Create a new job state
 	Create(ctx context.Context, job *domain.Job) error
@@ -51,9 +51,8 @@ type Filter struct {
 // Config holds backend configuration
 // All operations are async fire-and-forget for high performance
 type Config struct {
-	Backend  string          `yaml:"backend" json:"backend"` // "memory", "dynamodb", "redis", "local"
+	Backend  string          `yaml:"backend" json:"backend"` // "memory", "dynamodb", "local"
 	DynamoDB *DynamoDBConfig `yaml:"dynamodb" json:"dynamodb"`
-	Redis    *RedisConfig    `yaml:"redis" json:"redis"`
 	Local    *LocalConfig    `yaml:"local" json:"local"`
 }
 
@@ -70,14 +69,6 @@ type DynamoDBConfig struct {
 	BatchInterval string `yaml:"batch_interval" json:"batch_interval"`
 }
 
-// RedisConfig holds Redis-specific configuration (future)
-type RedisConfig struct {
-	Endpoint string `yaml:"endpoint" json:"endpoint"`
-	Password string `yaml:"password" json:"password"`
-	DB       int    `yaml:"db" json:"db"`
-	TTLDays  int    `yaml:"ttl_days" json:"ttl_days"`
-}
-
 // NewBackend creates a new storage backend based on configuration
 func NewBackend(cfg *Config) (Backend, error) {
 	switch cfg.Backend {
@@ -87,9 +78,6 @@ func NewBackend(cfg *Config) (Backend, error) {
 		return NewLocalBackend(cfg.Local)
 	case "dynamodb":
 		return NewDynamoDBBackend(cfg.DynamoDB)
-	case "redis":
-		// Future implementation
-		return nil, ErrBackendNotImplemented
 	default:
 		return nil, ErrInvalidBackend
 	}
@@ -97,12 +85,11 @@ func NewBackend(cfg *Config) (Backend, error) {
 
 // Error types
 var (
-	ErrJobNotFound           = &StorageError{Code: "JOB_NOT_FOUND", Message: "job not found"}
-	ErrJobAlreadyExists      = &StorageError{Code: "JOB_EXISTS", Message: "job already exists"}
-	ErrOptimisticLockFailed  = &StorageError{Code: "LOCK_FAILED", Message: "optimistic lock failed"}
-	ErrInvalidBackend        = &StorageError{Code: "INVALID_BACKEND", Message: "invalid storage backend"}
-	ErrBackendNotImplemented = &StorageError{Code: "NOT_IMPLEMENTED", Message: "backend not implemented"}
-	ErrBackendUnavailable    = &StorageError{Code: "UNAVAILABLE", Message: "backend unavailable"}
+	ErrJobNotFound          = &StorageError{Code: "JOB_NOT_FOUND", Message: "job not found"}
+	ErrJobAlreadyExists     = &StorageError{Code: "JOB_EXISTS", Message: "job already exists"}
+	ErrOptimisticLockFailed = &StorageError{Code: "LOCK_FAILED", Message: "optimistic lock failed"}
+	ErrInvalidBackend       = &StorageError{Code: "INVALID_BACKEND", Message: "invalid storage backend"}
+	ErrBackendUnavailable   = &StorageError{Code: "UNAVAILABLE", Message: "backend unavailable"}
 )
 
 // StorageError represents a storage operation error

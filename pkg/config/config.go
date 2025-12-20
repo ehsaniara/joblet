@@ -38,7 +38,6 @@ type NetworkConfig struct {
 	DefaultNetwork      string                       `yaml:"default_network"`
 	Networks            map[string]NetworkDefinition `yaml:"networks"`
 	AllowCustomNetworks bool                         `yaml:"allow_custom_networks"`
-	MaxCustomNetworks   int                          `yaml:"max_custom_networks"`
 	Storage             NetworkStorageConfig         `yaml:"storage"`
 }
 
@@ -58,11 +57,10 @@ type NetworkStorageConfig struct {
 
 // ServerConfig holds server-specific configuration
 type ServerConfig struct {
-	Address string        `yaml:"address" json:"address"`
-	Port    int           `yaml:"port" json:"port"`
-	Mode    string        `yaml:"mode" json:"mode"`
-	Timeout time.Duration `yaml:"timeout" json:"timeout"`
-	NodeId  string        `yaml:"nodeId" json:"nodeId"`
+	Address string `yaml:"address" json:"address"`
+	Port    int    `yaml:"port" json:"port"`
+	Mode    string `yaml:"mode" json:"mode"`
+	NodeId  string `yaml:"nodeId" json:"nodeId"`
 }
 
 // SecurityConfig holds all certificates as embedded PEM content
@@ -95,21 +93,17 @@ type FilesystemConfig struct {
 	BaseDir      string `yaml:"baseDir" json:"baseDir"`
 	TmpDir       string `yaml:"tmpDir" json:"tmpDir"`
 	WorkspaceDir string `yaml:"workspaceDir" json:"workspaceDir"`
-	BlockDevices bool   `yaml:"blockDevices" json:"blockDevices"`
 }
 
 // GRPCConfig holds gRPC-specific configuration
 type GRPCConfig struct {
-	MaxRecvMsgSize        int32         `yaml:"maxRecvMsgSize" json:"maxRecvMsgSize"`
-	MaxSendMsgSize        int32         `yaml:"maxSendMsgSize" json:"maxSendMsgSize"`
-	MaxHeaderListSize     int32         `yaml:"maxHeaderListSize" json:"maxHeaderListSize"`
-	KeepAliveTime         time.Duration `yaml:"keepAliveTime" json:"keepAliveTime"`
-	KeepAliveTimeout      time.Duration `yaml:"keepAliveTimeout" json:"keepAliveTimeout"`
-	MaxConcurrentStreams  uint32        `yaml:"maxConcurrentStreams" json:"maxConcurrentStreams"`
-	ConnectionTimeout     time.Duration `yaml:"connectionTimeout" json:"connectionTimeout"`
-	MaxConnectionIdle     time.Duration `yaml:"maxConnectionIdle" json:"maxConnectionIdle"`
-	MaxConnectionAge      time.Duration `yaml:"maxConnectionAge" json:"maxConnectionAge"`
-	MaxConnectionAgeGrace time.Duration `yaml:"maxConnectionAgeGrace" json:"maxConnectionAgeGrace"`
+	MaxRecvMsgSize       int32         `yaml:"maxRecvMsgSize" json:"maxRecvMsgSize"`
+	MaxSendMsgSize       int32         `yaml:"maxSendMsgSize" json:"maxSendMsgSize"`
+	MaxHeaderListSize    int32         `yaml:"maxHeaderListSize" json:"maxHeaderListSize"`
+	KeepAliveTime        time.Duration `yaml:"keepAliveTime" json:"keepAliveTime"`
+	KeepAliveTimeout     time.Duration `yaml:"keepAliveTimeout" json:"keepAliveTimeout"`
+	MaxConcurrentStreams uint32        `yaml:"maxConcurrentStreams" json:"maxConcurrentStreams"`
+	ConnectionTimeout    time.Duration `yaml:"connectionTimeout" json:"connectionTimeout"`
 }
 
 // LoggingConfig holds logging configuration
@@ -121,7 +115,6 @@ type LoggingConfig struct {
 
 // MonitoringConfig holds monitoring system configuration
 type MonitoringConfig struct {
-	Enabled        bool          `yaml:"enabled" json:"enabled"`
 	SystemInterval time.Duration `yaml:"system_interval" json:"system_interval"`
 	CloudDetection bool          `yaml:"cloud_detection" json:"cloud_detection"`
 }
@@ -210,7 +203,7 @@ func (c *TelemetryConfig) IsEventTypeEnabled(eventType string) bool {
 // State is mandatory - it's the backbone of joblet that ensures jobs survive restarts
 // All state operations are async fire-and-forget for maximum performance
 type StateConfig struct {
-	Backend        string             `yaml:"backend" json:"backend"`                 // "memory", "dynamodb", "redis"
+	Backend        string             `yaml:"backend" json:"backend"`                 // "memory", "dynamodb"
 	Socket         string             `yaml:"socket" json:"socket"`                   // Unix socket path
 	BufferSize     int                `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
 	ReconnectDelay time.Duration      `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
@@ -221,7 +214,6 @@ type StateConfig struct {
 // StateStorageConfig holds backend-specific storage configuration
 type StateStorageConfig struct {
 	DynamoDB *DynamoDBStateConfig `yaml:"dynamodb" json:"dynamodb"` // DynamoDB configuration
-	Redis    *RedisStateConfig    `yaml:"redis" json:"redis"`       // Redis configuration
 }
 
 // DynamoDBStateConfig holds DynamoDB-specific state configuration
@@ -237,14 +229,6 @@ type DynamoDBStateConfig struct {
 	BatchInterval string `yaml:"batch_interval" json:"batch_interval"`
 }
 
-// RedisStateConfig holds Redis-specific state configuration
-type RedisStateConfig struct {
-	Endpoint string `yaml:"endpoint" json:"endpoint"`
-	Password string `yaml:"password" json:"password"`
-	DB       int    `yaml:"db" json:"db"`
-	TTLDays  int    `yaml:"ttl_days" json:"ttl_days"`
-}
-
 // DefaultConfig provides default configuration values
 var DefaultConfig = Config{
 	Version: "3.0",
@@ -252,7 +236,6 @@ var DefaultConfig = Config{
 		Address: "0.0.0.0",
 		Port:    50051,
 		Mode:    "server",
-		Timeout: 30 * time.Second,
 	},
 	Security: SecurityConfig{
 		// Will be populated by certificate generation
@@ -278,19 +261,15 @@ var DefaultConfig = Config{
 		BaseDir:      "/opt/joblet/jobs",
 		TmpDir:       "/tmp/job-{JOB_ID}",
 		WorkspaceDir: "/work",
-		BlockDevices: false,
 	},
 	GRPC: GRPCConfig{
-		MaxRecvMsgSize:        134217728,          // 128MB for production traffic
-		MaxSendMsgSize:        134217728,          // 128MB for production traffic
-		MaxHeaderListSize:     16777216,           // 16MB for production traffic
-		KeepAliveTime:         10 * time.Second,   // More frequent keepalives
-		KeepAliveTimeout:      3 * time.Second,    // Faster timeout detection
-		MaxConcurrentStreams:  1000,               // High concurrent streams
-		ConnectionTimeout:     10 * time.Second,   // Connection timeout
-		MaxConnectionIdle:     300 * time.Second,  // 5min idle
-		MaxConnectionAge:      1800 * time.Second, // 30min max age
-		MaxConnectionAgeGrace: 30 * time.Second,   // 30s grace period
+		MaxRecvMsgSize:       134217728,        // 128MB for production traffic
+		MaxSendMsgSize:       134217728,        // 128MB for production traffic
+		MaxHeaderListSize:    16777216,         // 16MB for production traffic
+		KeepAliveTime:        10 * time.Second, // More frequent keepalives
+		KeepAliveTimeout:     3 * time.Second,  // Faster timeout detection
+		MaxConcurrentStreams: 1000,             // High concurrent streams
+		ConnectionTimeout:    10 * time.Second, // Connection timeout
 	},
 	Logging: LoggingConfig{
 		Level:  "INFO",
@@ -302,7 +281,6 @@ var DefaultConfig = Config{
 		Enabled:             true,
 		DefaultNetwork:      "bridge",
 		AllowCustomNetworks: true,
-		MaxCustomNetworks:   50,
 		Storage: NetworkStorageConfig{
 			Path: "/opt/joblet/network",
 		},
@@ -314,7 +292,6 @@ var DefaultConfig = Config{
 		},
 	},
 	Monitoring: MonitoringConfig{
-		Enabled:        true,
 		SystemInterval: 10 * time.Second,
 		CloudDetection: true,
 	},

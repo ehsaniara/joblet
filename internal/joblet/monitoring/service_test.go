@@ -105,7 +105,6 @@ func TestNewService_NilConfig(t *testing.T) {
 func TestNewServiceFromConfig(t *testing.T) {
 	// Test with custom config
 	cfg := &config.MonitoringConfig{
-		Enabled:        false,
 		SystemInterval: 30 * time.Second,
 		CloudDetection: false,
 	}
@@ -120,9 +119,9 @@ func TestNewServiceFromConfig(t *testing.T) {
 		t.Fatal("Expected config to be set")
 	}
 
-	// Verify config conversion
-	if service.config.Enabled != false {
-		t.Error("Expected monitoring to be disabled")
+	// Monitoring is always enabled
+	if !service.config.Enabled {
+		t.Error("Expected monitoring to be enabled (always on)")
 	}
 
 	if service.config.Collection.SystemInterval != 30*time.Second {
@@ -134,10 +133,9 @@ func TestNewServiceFromConfig(t *testing.T) {
 	}
 }
 
-func TestNewServiceFromConfig_EnabledConfig(t *testing.T) {
-	// Test with enabled monitoring
+func TestNewServiceFromConfig_WithCloudDetection(t *testing.T) {
+	// Test with cloud detection enabled
 	cfg := &config.MonitoringConfig{
-		Enabled:        true,
 		SystemInterval: 5 * time.Second,
 		CloudDetection: true,
 	}
@@ -148,8 +146,9 @@ func TestNewServiceFromConfig_EnabledConfig(t *testing.T) {
 		t.Fatal("Expected non-nil service")
 	}
 
+	// Monitoring is always enabled
 	if !service.config.Enabled {
-		t.Error("Expected monitoring to be enabled")
+		t.Error("Expected monitoring to be enabled (always on)")
 	}
 
 	if service.config.Collection.SystemInterval != 5*time.Second {

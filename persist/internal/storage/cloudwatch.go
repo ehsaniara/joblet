@@ -60,7 +60,6 @@ func NewCloudWatchBackend(cfg *config.StorageConfig, nodeID string, log *logger.
 	if cwConfig.LogGroupPrefix == "" {
 		cwConfig.LogGroupPrefix = "/joblet"
 	}
-	// LogStreamPrefix is deprecated - log streams now use format: {jobID}-{streamType}
 	if cwConfig.MetricNamespace == "" {
 		cwConfig.MetricNamespace = "Joblet/Jobs"
 	}

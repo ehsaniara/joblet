@@ -164,15 +164,6 @@ func TestRuntimeInstaller_StreamingInterface(t *testing.T) {
 	assert.Equal(t, []byte("Configuration complete"), streamer.logData[1])
 }
 
-// The following methods were removed during simplification:
-// - buildPathFromConfig: PATH environment building (now internal)
-// - getRuntimePath: Direct runtime path mapping
-// - autoDetectRuntimePath: Auto-detection of runtime paths
-// - writeFilesToChroot: File writing to chroot (consolidated)
-// - findLocalRuntime: Local runtime discovery (simplified)
-
-// Tests for config-driven runtime installation settings
-
 func TestRuntimeConfig_InstallWritablePaths(t *testing.T) {
 	tests := []struct {
 		name          string

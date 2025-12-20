@@ -59,7 +59,7 @@ type GPUManagerInterface interface {
 //
 //counterfeiter:generate . CUDADetectorInterface
 type CUDADetectorInterface interface {
-	// DetectCUDA finds CUDA installation paths (legacy method)
+	// DetectCUDA finds CUDA installation paths
 	DetectCUDA() ([]string, error)
 	// GetCUDAEnvironment returns environment variables for CUDA
 	GetCUDAEnvironment(cudaPath string) map[string]string

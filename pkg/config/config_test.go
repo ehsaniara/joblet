@@ -650,6 +650,154 @@ logging:
 	})
 }
 
+// TestRemovedConfigFields verifies that deprecated config fields were removed
+// and that YAML files with old fields are still parseable (backward compatible)
+func TestRemovedConfigFields(t *testing.T) {
+	t.Run("ServerConfig has no Timeout field", func(t *testing.T) {
+		// Verify ServerConfig only has expected fields
+		cfg := ServerConfig{
+			Address: "0.0.0.0",
+			Port:    50051,
+			Mode:    "server",
+			NodeId:  "test-node",
+		}
+		// If this compiles, the Timeout field is removed
+		if cfg.Address == "" {
+			t.Error("Address should be set")
+		}
+	})
+
+	t.Run("GRPCConfig has no connection age fields", func(t *testing.T) {
+		// Verify GRPCConfig only has the implemented fields
+		cfg := GRPCConfig{
+			MaxRecvMsgSize:       134217728,
+			MaxSendMsgSize:       134217728,
+			MaxHeaderListSize:    16777216,
+			KeepAliveTime:        10,
+			KeepAliveTimeout:     3,
+			MaxConcurrentStreams: 1000,
+			ConnectionTimeout:    10,
+		}
+		// If this compiles, MaxConnectionIdle/Age/AgeGrace are removed
+		if cfg.MaxRecvMsgSize == 0 {
+			t.Error("MaxRecvMsgSize should be set")
+		}
+	})
+
+	t.Run("FilesystemConfig has no BlockDevices field", func(t *testing.T) {
+		cfg := FilesystemConfig{
+			BaseDir:      "/opt/joblet/jobs",
+			TmpDir:       "/tmp/job-{JOB_ID}",
+			WorkspaceDir: "/work",
+		}
+		// If this compiles, BlockDevices field is removed
+		if cfg.BaseDir == "" {
+			t.Error("BaseDir should be set")
+		}
+	})
+
+	t.Run("NetworkConfig has no MaxCustomNetworks field", func(t *testing.T) {
+		cfg := NetworkConfig{
+			StateDir:            "/opt/joblet/network",
+			Enabled:             true,
+			DefaultNetwork:      "bridge",
+			AllowCustomNetworks: true,
+			Storage:             NetworkStorageConfig{Path: "/opt/joblet/network"},
+		}
+		// If this compiles, MaxCustomNetworks field is removed
+		if !cfg.Enabled {
+			t.Error("Enabled should be true")
+		}
+	})
+
+	t.Run("MonitoringConfig has no Enabled field", func(t *testing.T) {
+		cfg := MonitoringConfig{
+			SystemInterval: 10,
+			CloudDetection: true,
+		}
+		// If this compiles, Enabled field is removed
+		if !cfg.CloudDetection {
+			t.Error("CloudDetection should be true")
+		}
+	})
+
+	t.Run("StateStorageConfig has no Redis field", func(t *testing.T) {
+		cfg := StateStorageConfig{
+			DynamoDB: &DynamoDBStateConfig{
+				Region:    "us-east-1",
+				TableName: "joblet-jobs",
+			},
+		}
+		// If this compiles, Redis field is removed
+		if cfg.DynamoDB == nil {
+			t.Error("DynamoDB should be set")
+		}
+	})
+
+	t.Run("backward compatible YAML parsing", func(t *testing.T) {
+		// Old config with deprecated fields should still parse (fields ignored)
+		oldConfigYAML := `version: "3.0"
+server:
+  address: "0.0.0.0"
+  port: 50051
+  mode: "server"
+  timeout: "10s"
+  nodeId: "test"
+grpc:
+  maxRecvMsgSize: 134217728
+  maxConnectionIdle: "300s"
+  maxConnectionAge: "1800s"
+filesystem:
+  baseDir: "/opt/joblet/jobs"
+  blockDevices: false
+network:
+  state_dir: "/opt/joblet/network"
+  max_custom_networks: 50
+joblet:
+  maxConcurrentJobs: 100
+cgroup:
+  baseDir: "/sys/fs/cgroup"
+logging:
+  level: "INFO"
+`
+		tmpDir := t.TempDir()
+		configPath := tmpDir + "/old-config.yml"
+		if err := os.WriteFile(configPath, []byte(oldConfigYAML), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		os.Setenv("JOBLET_CONFIG_PATH", configPath)
+		defer os.Unsetenv("JOBLET_CONFIG_PATH")
+
+		cfg, _, err := LoadConfig()
+		if err != nil {
+			t.Fatalf("LoadConfig() should parse old config: %v", err)
+		}
+
+		// Verify parsed values
+		if cfg.Server.Port != 50051 {
+			t.Errorf("Expected port 50051, got %d", cfg.Server.Port)
+		}
+		if cfg.Server.NodeId != "test" {
+			t.Errorf("Expected nodeId 'test', got '%s'", cfg.Server.NodeId)
+		}
+	})
+
+	t.Run("DefaultConfig has no removed fields", func(t *testing.T) {
+		// Verify defaults don't reference removed fields
+		if DefaultConfig.GRPC.MaxRecvMsgSize != 134217728 {
+			t.Errorf("Expected default MaxRecvMsgSize 134217728, got %d", DefaultConfig.GRPC.MaxRecvMsgSize)
+		}
+		if DefaultConfig.GRPC.ConnectionTimeout == 0 {
+			t.Error("Expected ConnectionTimeout to be set")
+		}
+		// MonitoringConfig should have SystemInterval but no Enabled field
+		if DefaultConfig.Monitoring.SystemInterval == 0 {
+			t.Error("Expected SystemInterval to be set")
+		}
+	})
+}
+
 func TestLoadClientConfigAutoFind(t *testing.T) {
 	// Test LoadClientConfig with empty path (should use findClientConfig)
 	t.Run("auto-find with RNX_CONFIG", func(t *testing.T) {

@@ -23,10 +23,8 @@ type ServerConfig struct {
 	TLS            *TLSConfig `yaml:"tls,omitempty"` // Optional: defaults to inherited security
 }
 
-// TLSConfig contains TLS/mTLS settings
-// TLS is MANDATORY for persist service (authentication requires it)
+// TLSConfig contains TLS/mTLS settings (TLS is always enabled)
 type TLSConfig struct {
-	// Enabled is removed - TLS is always enabled
 	CertFile   string `yaml:"cert_file"`   // Empty = inherit from parent's security section
 	KeyFile    string `yaml:"key_file"`    // Empty = inherit from parent's security section
 	CAFile     string `yaml:"ca_file"`     // Empty = inherit from parent's security section
@@ -44,11 +42,9 @@ type IPCConfig struct {
 
 // StorageConfig contains storage backend settings
 type StorageConfig struct {
-	Type        string            `yaml:"type"` // "local", "cloudwatch", "s3"
-	Local       LocalConfig       `yaml:"local"`
-	CloudWatch  CloudWatchConfig  `yaml:"cloudwatch"`
-	Retention   RetentionConfig   `yaml:"retention"`
-	Compression CompressionConfig `yaml:"compression"`
+	Type       string           `yaml:"type"` // "local", "cloudwatch", "s3"
+	Local      LocalConfig      `yaml:"local"`
+	CloudWatch CloudWatchConfig `yaml:"cloudwatch"`
 }
 
 // LocalConfig contains local filesystem storage settings
@@ -60,9 +56,8 @@ type LocalConfig struct {
 
 // EventStorageConfig contains telematics event storage settings
 type EventStorageConfig struct {
-	Directory string         `yaml:"directory"`
-	Format    string         `yaml:"format"` // "jsonl.gz"
-	Rotation  RotationConfig `yaml:"rotation"`
+	Directory string `yaml:"directory"`
+	Format    string `yaml:"format"` // "jsonl.gz"
 }
 
 // CloudWatchConfig contains AWS CloudWatch storage settings
@@ -89,39 +84,14 @@ type CloudWatchConfig struct {
 
 // LogStorageConfig contains log storage settings
 type LogStorageConfig struct {
-	Directory string         `yaml:"directory"`
-	Format    string         `yaml:"format"` // "jsonl"
-	Rotation  RotationConfig `yaml:"rotation"`
+	Directory string `yaml:"directory"`
+	Format    string `yaml:"format"` // "jsonl"
 }
 
 // MetricStorageConfig contains metric storage settings
 type MetricStorageConfig struct {
-	Directory string         `yaml:"directory"`
-	Format    string         `yaml:"format"` // "jsonl.gz"
-	Rotation  RotationConfig `yaml:"rotation"`
-}
-
-// RotationConfig contains file rotation settings
-type RotationConfig struct {
-	MaxSizeMB       int  `yaml:"max_size_mb"`
-	MaxFiles        int  `yaml:"max_files"`
-	CompressRotated bool `yaml:"compress_rotated"`
-}
-
-// RetentionConfig contains data retention policies
-type RetentionConfig struct {
-	LogsDays            int    `yaml:"logs_days"`
-	MetricsDays         int    `yaml:"metrics_days"`
-	CleanupSchedule     string `yaml:"cleanup_schedule"`
-	ArchiveBeforeDelete bool   `yaml:"archive_before_delete"`
-}
-
-// CompressionConfig contains compression settings
-type CompressionConfig struct {
-	Enabled            bool     `yaml:"enabled"`
-	Algorithm          string   `yaml:"algorithm"` // "gzip"
-	Level              int      `yaml:"level"`     // 1-9
-	CompressExtensions []string `yaml:"compress_extensions"`
+	Directory string `yaml:"directory"`
+	Format    string `yaml:"format"` // "jsonl.gz"
 }
 
 // LoggingConfig contains logging settings
@@ -270,42 +240,15 @@ func DefaultConfig() *Config {
 				Logs: LogStorageConfig{
 					Directory: "/opt/joblet/logs",
 					Format:    "jsonl",
-					Rotation: RotationConfig{
-						MaxSizeMB:       100,
-						MaxFiles:        10,
-						CompressRotated: true,
-					},
 				},
 				Metrics: MetricStorageConfig{
 					Directory: "/opt/joblet/metrics",
 					Format:    "jsonl.gz",
-					Rotation: RotationConfig{
-						MaxSizeMB:       50,
-						MaxFiles:        5,
-						CompressRotated: true,
-					},
 				},
 				Events: EventStorageConfig{
 					Directory: "/opt/joblet/events",
 					Format:    "jsonl.gz",
-					Rotation: RotationConfig{
-						MaxSizeMB:       100,
-						MaxFiles:        10,
-						CompressRotated: true,
-					},
 				},
-			},
-			Retention: RetentionConfig{
-				LogsDays:            7,
-				MetricsDays:         30,
-				CleanupSchedule:     "0 2 * * *",
-				ArchiveBeforeDelete: false,
-			},
-			Compression: CompressionConfig{
-				Enabled:            true,
-				Algorithm:          "gzip",
-				Level:              6,
-				CompressExtensions: []string{".log", ".jsonl"},
 			},
 		},
 		// Note: Logging config now comes from root level (shared with main joblet)

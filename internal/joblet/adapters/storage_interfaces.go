@@ -57,8 +57,7 @@ type NetworkStorer interface {
 	// Setting up and managing network configs
 	CreateNetwork(config *NetworkConfig) error
 	Network(name string) (*NetworkConfig, bool)
-	NetworkConfig(name string) (*network.NetworkConfig, error)    // For network.NetworkSetup compatibility
-	GetNetworkConfig(name string) (*network.NetworkConfig, error) // Deprecated: use NetworkConfig
+	NetworkConfig(name string) (*network.NetworkConfig, error)
 	ListNetworks() []*NetworkConfig
 	RemoveNetwork(name string) error
 
