@@ -21,6 +21,10 @@ set -e
 # Configuration Variables (can be customized via environment variables)
 # ============================================================================
 
+# JOBLET_HOME defines the installation directory (default: /opt/joblet)
+JOBLET_HOME="${JOBLET_HOME:-/opt/joblet}"
+export JOBLET_HOME
+
 # Joblet version to install (default: latest)
 JOBLET_VERSION="${JOBLET_VERSION:-latest}"
 
@@ -274,7 +278,7 @@ configure_cloudwatch() {
         return 0
     fi
 
-    CONFIG_FILE="/opt/joblet/config/joblet-config.yml"
+    CONFIG_FILE="${JOBLET_HOME}/config/joblet-config.yml"
 
     if [ ! -f "$CONFIG_FILE" ]; then
         log_error "Configuration file not found: $CONFIG_FILE"
@@ -408,9 +412,9 @@ display_summary() {
     log ""
     log "Client Configuration:"
     log "  1. Copy config from server:"
-    log "     scp <EC2_USER>@$EC2_INTERNAL_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/"
+    log "     scp <EC2_USER>@$EC2_INTERNAL_IP:${JOBLET_HOME}/config/rnx-config.yml ~/.rnx/"
     if [ -n "$EC2_PUBLIC_IP" ]; then
-        log "     Or: scp <EC2_USER>@$EC2_PUBLIC_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/"
+        log "     Or: scp <EC2_USER>@$EC2_PUBLIC_IP:${JOBLET_HOME}/config/rnx-config.yml ~/.rnx/"
     fi
     log "     (Use 'ubuntu' for Ubuntu, 'ec2-user' for Amazon Linux)"
     log ""

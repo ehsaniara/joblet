@@ -202,6 +202,7 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/p
 
 ```bash
 # Get the instance IP from EC2 Console
+# JOBLET_HOME defaults to /opt/joblet
 scp -i ~/.ssh/your-key.pem ubuntu@<PUBLIC_IP>:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 

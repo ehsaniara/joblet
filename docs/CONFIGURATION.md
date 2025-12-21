@@ -246,29 +246,12 @@ runtime:
     - "/usr/local/node"
     - "/usr/local/go"
 
-  # Distro-specific: Package manager writable paths for runtime installation
-  # These get tmpfs overlays during chroot-based runtime builds
-  install_writable_paths:
-    - "/var/cache/apt"      # Ubuntu/Debian: apt cache
-    - "/var/lib/apt"        # Ubuntu/Debian: apt state
-    - "/var/lib/dpkg"       # Ubuntu/Debian: dpkg database
-    - "/etc/apt"            # Ubuntu/Debian: apt config
-    - "/var/log/apt"        # Ubuntu/Debian: apt logs
+  # Note: Runtime builds use OverlayFS-based isolation (see pkg/builder/isolation.go)
+  # The entire host filesystem is mounted read-only as the lower layer,
+  # and all package installations write to an ephemeral upper layer.
+  # No additional configuration is needed for runtime builds.
 
-  # Host directories bind-mounted read-only during runtime installation
-  install_host_binds:
-    - "/usr"
-    - "/lib"
-    - "/lib64"
-    - "/bin"
-    - "/sbin"
-    - "/etc"
-    - "/var"
-
-  # PATH for runtime installation chroot
-  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
-
-  # Paths mounted read-only into job sandbox
+  # Paths mounted read-only into job sandbox (for job execution, not builds)
   allowed_mounts:
     - "/usr/bin"
     - "/bin"
@@ -285,15 +268,6 @@ runtime:
     - "/etc/ca-certificates"
     - "/usr/share/ca-certificates"
 ```
-
-**Distro-specific `install_writable_paths` examples:**
-
-| Distribution        | Package Manager | Writable Paths                                    |
-|---------------------|-----------------|---------------------------------------------------|
-| Ubuntu/Debian       | apt/dpkg        | `/var/cache/apt`, `/var/lib/apt`, `/var/lib/dpkg` |
-| RHEL/CentOS         | yum/rpm         | `/var/cache/yum`, `/var/lib/rpm`, `/var/lib/yum`  |
-| Fedora/Amazon Linux | dnf/rpm         | `/var/cache/dnf`, `/var/lib/dnf`, `/var/lib/rpm`  |
-| Alpine              | apk             | `/var/cache/apk`, `/lib/apk`, `/etc/apk`          |
 
 ### Security Settings
 

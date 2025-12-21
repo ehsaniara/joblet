@@ -147,7 +147,7 @@ environment:
   PYTHONUNBUFFERED: "1"
 EOF
 
-# Validate the specification
+# Validate the specification (comprehensive server-side validation)
 rnx runtime validate ./runtime.yaml
 
 # Build the runtime on the remote server
@@ -156,13 +156,13 @@ rnx runtime build ./runtime.yaml
 # Or with verbose output
 rnx runtime build -v ./runtime.yaml
 
-# Preview without building (dry-run)
-rnx runtime build --dry-run ./runtime.yaml
+# Force rebuild (overwrite existing runtime)
+rnx runtime build --force ./runtime.yaml
 ```
 
 **Build Options:**
 
-- `--dry-run`: Preview the build without executing (validates and shows what would be installed)
+- `--force` or `-f`: Overwrite existing runtime if it already exists
 - `-v` or `--verbose`: Enable verbose output showing all build phases and logs
 
 **Architecture Benefits:**
@@ -332,10 +332,10 @@ rnx runtime build <path-to-runtime.yaml>
 # Build with verbose output
 rnx runtime build -v <path-to-runtime.yaml>
 
-# Preview build without executing (dry-run)
-rnx runtime build --dry-run <path-to-runtime.yaml>
+# Force rebuild (overwrite existing runtime)
+rnx runtime build --force <path-to-runtime.yaml>
 
-# Validate runtime YAML specification
+# Validate runtime YAML specification (comprehensive server-side validation)
 rnx runtime validate <path-to-runtime.yaml>
 
 # Remove an installed runtime

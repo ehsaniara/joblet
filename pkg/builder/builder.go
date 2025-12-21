@@ -420,9 +420,20 @@ func (b *Builder) phase8InstallPackages(ctx context.Context, buildCtx *BuildCont
 	phaseStart := time.Now()
 	b.logger.Phase(8, totalPhases, PhaseInstallPackages.String(), "Installing language packages")
 
-	// Install pip packages
+	// Install pip packages inside the isolated environment
+	// This uses the Python/pip installed in phase 7, NOT the host's Python
 	if len(buildCtx.Spec.Pip) > 0 {
-		if err := InstallPipPackages(ctx, buildCtx.Spec.Pip, buildCtx.Spec.PipOptions, buildCtx.IsolatedDir, buildCtx.Spec.Base.Version, b.logger); err != nil {
+		if buildCtx.IsolatedEnv == nil {
+			result.Phases = append(result.Phases, PhaseResult{
+				Phase:   8,
+				Name:    PhaseInstallPackages.String(),
+				Success: false,
+				Error:   fmt.Errorf("isolated environment not available for pip installation"),
+			})
+			return fmt.Errorf("isolated environment not available for pip installation")
+		}
+
+		if err := buildCtx.IsolatedEnv.InstallPipPackagesIsolated(buildCtx.Spec.Pip, buildCtx.Spec.PipOptions, buildCtx.Spec.Base.Version); err != nil {
 			result.Phases = append(result.Phases, PhaseResult{
 				Phase:   8,
 				Name:    PhaseInstallPackages.String(),
@@ -433,9 +444,20 @@ func (b *Builder) phase8InstallPackages(ctx context.Context, buildCtx *BuildCont
 		}
 	}
 
-	// Install npm packages
+	// Install npm packages inside the isolated environment
+	// This uses the npm installed in phase 7, NOT the host's npm
 	if len(buildCtx.Spec.Npm) > 0 {
-		if err := InstallNpmPackages(ctx, buildCtx.Spec.Npm, buildCtx.IsolatedDir, b.logger); err != nil {
+		if buildCtx.IsolatedEnv == nil {
+			result.Phases = append(result.Phases, PhaseResult{
+				Phase:   8,
+				Name:    PhaseInstallPackages.String(),
+				Success: false,
+				Error:   fmt.Errorf("isolated environment not available for npm installation"),
+			})
+			return fmt.Errorf("isolated environment not available for npm installation")
+		}
+
+		if err := buildCtx.IsolatedEnv.InstallNpmPackagesIsolated(buildCtx.Spec.Npm); err != nil {
 			result.Phases = append(result.Phases, PhaseResult{
 				Phase:   8,
 				Name:    PhaseInstallPackages.String(),

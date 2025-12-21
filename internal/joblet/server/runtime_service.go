@@ -398,6 +398,13 @@ func (s *RuntimeServiceServer) BuildRuntime(req *pb.BuildRuntimeRequest, stream 
 }
 
 // ValidateRuntimeYAML validates a runtime YAML specification without building
+// This performs comprehensive validation including:
+// - YAML syntax and schema validation
+// - Spec name and version format validation
+// - Platform detection
+// - Disk space availability check
+// - Package validation (base packages, pip, npm)
+// - Existing runtime conflict detection
 func (s *RuntimeServiceServer) ValidateRuntimeYAML(ctx context.Context, req *pb.ValidateRuntimeYAMLRequest) (*pb.ValidateRuntimeYAMLResponse, error) {
 	log := s.logger.WithField("operation", "ValidateRuntimeYAML")
 
@@ -416,23 +423,59 @@ func (s *RuntimeServiceServer) ValidateRuntimeYAML(ctx context.Context, req *pb.
 		}, nil
 	}
 
-	// Parse and validate the YAML
-	spec, err := builder.ParseRuntimeYAML([]byte(req.YamlContent))
+	// Create builder for comprehensive validation (dry run mode)
+	b := builder.NewBuilder(s.runtimesPath, nil)
+
+	// Run dry-run build which performs phases 1-4:
+	// 1. Parse & Validate YAML
+	// 2. Detect Platform
+	// 3. Check Disk Space
+	// 4. Validate Packages
+	result, err := b.Build(ctx, req.YamlContent, true) // dryRun = true
+
+	var errors []string
+	var warnings []string
+
+	// Collect errors from phases
 	if err != nil {
-		return &pb.ValidateRuntimeYAMLResponse{
-			Valid:   false,
-			Message: "Invalid YAML specification",
-			Errors:  []string{err.Error()},
-		}, nil
+		errors = append(errors, err.Error())
+	}
+	for _, phase := range result.Phases {
+		if !phase.Success && phase.Error != nil {
+			errors = append(errors, fmt.Sprintf("Phase %d (%s): %s", phase.Phase, phase.Name, phase.Error.Error()))
+		}
 	}
 
-	// Validate the spec
-	if err := builder.ValidateSpec(spec); err != nil {
+	// If there are errors, return failure
+	if len(errors) > 0 {
 		return &pb.ValidateRuntimeYAMLResponse{
 			Valid:   false,
 			Message: "Validation failed",
-			Errors:  []string{err.Error()},
+			Errors:  errors,
 		}, nil
+	}
+
+	// Parse the spec to get details (already validated by builder)
+	spec, _ := builder.ParseRuntimeYAML([]byte(req.YamlContent))
+
+	// Check if runtime already exists
+	runtimePath := filepath.Join(s.runtimesPath, spec.Name, spec.Version)
+	if _, err := os.Stat(runtimePath); err == nil {
+		warnings = append(warnings, fmt.Sprintf("Runtime '%s' version '%s' already exists at %s", spec.Name, spec.Version, runtimePath))
+	}
+
+	// Check if other versions exist
+	runtimeDir := filepath.Join(s.runtimesPath, spec.Name)
+	if entries, err := os.ReadDir(runtimeDir); err == nil && len(entries) > 0 {
+		var versions []string
+		for _, e := range entries {
+			if e.IsDir() && e.Name() != spec.Version {
+				versions = append(versions, e.Name())
+			}
+		}
+		if len(versions) > 0 {
+			warnings = append(warnings, fmt.Sprintf("Other versions of '%s' exist: %v", spec.Name, versions))
+		}
 	}
 
 	// Build spec info
@@ -448,9 +491,17 @@ func (s *RuntimeServiceServer) ValidateRuntimeYAML(ctx context.Context, req *pb.
 		RequiresGpu:     spec.Requirements != nil && spec.Requirements.GPU,
 	}
 
+	message := "YAML specification is valid"
+	if len(warnings) > 0 {
+		message = fmt.Sprintf("YAML specification is valid (with %d warning(s))", len(warnings))
+	}
+
+	log.Info("validation completed", "runtime", spec.Name, "version", spec.Version, "warnings", len(warnings))
+
 	return &pb.ValidateRuntimeYAMLResponse{
 		Valid:    true,
-		Message:  "YAML specification is valid",
+		Message:  message,
+		Warnings: warnings,
 		SpecInfo: specInfo,
 	}, nil
 }

@@ -2,6 +2,10 @@
 # Common installation functions for Joblet
 # Used by both Debian (.deb) and RPM (.rpm) packages
 
+# JOBLET_HOME defines the installation directory (default: /opt/joblet)
+JOBLET_HOME="${JOBLET_HOME:-/opt/joblet}"
+export JOBLET_HOME
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -88,8 +92,8 @@ detect_linux_distro() {
 # Select and copy the appropriate runtime config for this distro
 # This function should be called during package installation
 select_runtime_config() {
-    local scripts_dir="${1:-/opt/joblet/scripts}"
-    local config_dir="${2:-/opt/joblet/config}"
+    local scripts_dir="${1:-${JOBLET_HOME}/scripts}"
+    local config_dir="${2:-${JOBLET_HOME}/config}"
 
     local distro=$(detect_linux_distro)
     local runtime_config_src="${scripts_dir}/runtime-config-${distro}.yml"
@@ -140,7 +144,7 @@ check_network_conflicts() {
         print_error "Network conflict detected!"
         print_error "The 172.20.0.0/16 range is already in use: $conflicting_route"
         print_warning "Joblet requires 172.20.0.0/16 for job isolation"
-        print_warning "Please remove conflicting network configuration or modify /opt/joblet/config/joblet-config.yml"
+        print_warning "Please remove conflicting network configuration or modify ${JOBLET_HOME}/config/joblet-config.yml"
         print_warning "Continuing anyway, but network isolation may not work correctly..."
         return 1
     fi
@@ -446,7 +450,7 @@ display_aws_quickstart() {
         print_info "🌩️  AWS CloudWatch Logs Configuration:"
         echo "  View logs: AWS Console → CloudWatch → Logs → /joblet"
         echo "  Query logs: aws logs filter-log-events --log-group-name-prefix '/joblet/'"
-        echo "  Config file: /opt/joblet/config/joblet-config.yml"
+        echo "  Config file: ${JOBLET_HOME}/config/joblet-config.yml"
         echo "  Storage type: persist.storage.type = cloudwatch"
         echo "  Documentation: https://docs.aws.amazon.com/cloudwatch/"
         echo ""
@@ -458,7 +462,7 @@ display_aws_quickstart() {
         echo "  Table: joblet-jobs"
         echo "  View jobs: AWS Console → DynamoDB → Tables → joblet-jobs"
         echo "  Query jobs: aws dynamodb scan --table-name joblet-jobs --region ${EC2_REGION:-us-east-1}"
-        echo "  Config file: /opt/joblet/config/joblet-config.yml"
+        echo "  Config file: ${JOBLET_HOME}/config/joblet-config.yml"
         echo "  Backend type: state.backend = dynamodb"
         echo "  Features:"
         echo "    • Job state persists across restarts"
@@ -473,7 +477,7 @@ configure_storage_backends() {
     # Configure storage backends based on detected environment
     # Must be called after detect_aws_environment() and after config file exists
 
-    CONFIG_FILE="/opt/joblet/config/joblet-config.yml"
+    CONFIG_FILE="${JOBLET_HOME}/config/joblet-config.yml"
 
     if [ ! -f "$CONFIG_FILE" ]; then
         return 1
@@ -547,19 +551,19 @@ generate_and_embed_certificates() {
             print_success "Certificates generated successfully"
 
             # Update the server configuration with the actual bind address and port
-            if [ -f /opt/joblet/config/joblet-config.yml ]; then
+            if [ -f ${JOBLET_HOME}/config/joblet-config.yml ]; then
                 # Update server bind address and port in the config
-                sed -i "s/^  address:.*/  address: \"$JOBLET_SERVER_ADDRESS\"/" /opt/joblet/config/joblet-config.yml
-                sed -i "s/^  port:.*/  port: $JOBLET_SERVER_PORT/" /opt/joblet/config/joblet-config.yml
+                sed -i "s/^  address:.*/  address: \"$JOBLET_SERVER_ADDRESS\"/" ${JOBLET_HOME}/config/joblet-config.yml
+                sed -i "s/^  port:.*/  port: $JOBLET_SERVER_PORT/" ${JOBLET_HOME}/config/joblet-config.yml
                 print_success "Updated server configuration: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
             fi
 
             # Update client configuration files with all valid connection endpoints
-            if [ -f /opt/joblet/config/rnx-config.yml ]; then
+            if [ -f ${JOBLET_HOME}/config/rnx-config.yml ]; then
                 # For each node in the client config, we need to update the address
                 # The address in rnx-config.yml should be how clients connect, not the bind address
                 # Use the certificate primary address as it's what clients should connect to
-                sed -i "s/address: \"[^:]*:50051\"/address: \"$JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT\"/" /opt/joblet/config/rnx-config.yml
+                sed -i "s/address: \"[^:]*:50051\"/address: \"$JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT\"/" ${JOBLET_HOME}/config/rnx-config.yml
                 print_success "Updated client configuration with connection endpoint: $JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT"
             fi
 
@@ -591,14 +595,14 @@ display_system_changes_warning() {
     echo "🔐 SECURITY CONSIDERATIONS:"
     echo "   • Joblet service runs as ROOT (required for namespaces/cgroups)"
     echo "   • TLS certificates with private keys will be embedded in config files"
-    echo "   • Config files will be stored in /opt/joblet/config/ (chmod 600)"
+    echo "   • Config files will be stored in ${JOBLET_HOME}/config/ (chmod 600)"
     echo "   • Network isolation uses Linux namespaces and bridge networking"
     echo ""
     echo "📁 FILES AND DIRECTORIES CREATED:"
-    echo "   • /opt/joblet/                 - Main installation directory"
-    echo "   • /opt/joblet/config/          - Configuration and certificates"
-    echo "   • /opt/joblet/logs/            - Job logs and output"
-    echo "   • /opt/joblet/volumes/         - Persistent job volumes"
+    echo "   • ${JOBLET_HOME}/                 - Main installation directory"
+    echo "   • ${JOBLET_HOME}/config/          - Configuration and certificates"
+    echo "   • ${JOBLET_HOME}/logs/            - Job logs and output"
+    echo "   • ${JOBLET_HOME}/volumes/         - Persistent job volumes"
     echo "   • /var/log/joblet/             - System logs"
     echo "   • /etc/systemd/system/joblet.service - Systemd service"
     echo ""
@@ -641,8 +645,8 @@ display_quickstart_info() {
     fi
     echo ""
     print_info "📋 Client Configuration:"
-    echo "  Copy /opt/joblet/config/rnx-config.yml to client machines"
-    echo "  Or use: scp root@$JOBLET_CERT_PRIMARY:/opt/joblet/config/rnx-config.yml ~/.rnx/"
+    echo "  Copy ${JOBLET_HOME}/config/rnx-config.yml to client machines"
+    echo "  Or use: scp root@$JOBLET_CERT_PRIMARY:${JOBLET_HOME}/config/rnx-config.yml ~/.rnx/"
     echo ""
 
     # Display AWS-specific information

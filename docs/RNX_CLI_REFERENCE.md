@@ -813,10 +813,10 @@ rnx runtime build <path> [flags]
 
 #### Flags
 
-| Flag        | Short | Description                            | Default |
-|-------------|-------|----------------------------------------|---------|
-| `--dry-run` |       | Preview build without executing        | false   |
-| `--verbose` | `-v`  | Enable verbose output with debug logs  | false   |
+| Flag        | Short | Description                                      | Default |
+|-------------|-------|--------------------------------------------------|---------|
+| `--force`   | `-f`  | Overwrite existing runtime if it already exists  | false   |
+| `--verbose` | `-v`  | Enable verbose output with debug logs            | false   |
 
 #### Description
 
@@ -825,17 +825,21 @@ The build command reads a `runtime.yaml` specification file, sends it to the rem
 
 **Build Phases:**
 
+The build uses OverlayFS-based isolation to ensure the host system is never modified.
+System packages are installed in an isolated chroot, and only the resulting
+binaries/libraries are copied to the runtime directory.
+
 1. Parse & Validate YAML specification
 2. Detect platform (distro, architecture, package manager)
 3. Check disk space
 4. Validate package availability
 5. Prepare directories
 6. Run pre-install hook (if defined)
-7. Install base language packages
+7. Install base language packages (in OverlayFS-isolated chroot)
 8. Install language packages (pip/npm)
 9. Run post-install hook (if defined)
-10. Copy binaries
-11. Copy libraries
+10. Copy binaries from isolated overlay
+11. Copy libraries from isolated overlay
 12. Copy configuration
 13. Generate runtime.yml config
 14. Validate build
@@ -853,14 +857,17 @@ rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 # Build from a directory (looks for runtime.yaml inside)
 rnx runtime build ./examples/python-3.11-ml/
 
-# Preview build without executing (dry-run)
-rnx runtime build --dry-run ./examples/openjdk-21/runtime.yaml
-
 # Build with verbose output
 rnx runtime build -v ./examples/python-analytics/runtime.yaml
 
+# Force rebuild (overwrite existing runtime)
+rnx runtime build --force ./examples/python-3.11-ml/runtime.yaml
+
 # Build with JSON output
 rnx --json runtime build ./examples/python/runtime.yaml
+
+# Validate before building
+rnx runtime validate ./examples/python-3.11-ml/runtime.yaml
 ```
 
 #### Example runtime.yaml
@@ -918,7 +925,7 @@ rnx runtime remove openjdk-21
 
 ### `rnx runtime validate`
 
-Validate a runtime.yaml specification file without building.
+Validate a runtime.yaml specification file comprehensively without building.
 
 ```bash
 rnx runtime validate <path>
@@ -930,15 +937,22 @@ rnx runtime validate <path>
 
 #### Description
 
-Parses and validates the runtime YAML specification, checking:
+Performs comprehensive server-side validation of the runtime YAML specification. This command sends the specification to the Joblet server for validation, which runs the first 4 phases of the build pipeline without actually building.
 
+**Validation checks include:**
+
+- YAML syntax and schema validation
 - Schema version compatibility
 - Required fields (name, version, description, base)
 - Name format (lowercase, hyphens, dots, max 64 chars)
 - Version format (semantic versioning X.Y.Z)
 - Language support (python, java, node, go, rust)
-- Platform support
-- Hook timeout format
+- Platform detection (distro, architecture, package manager)
+- Disk space availability
+- Package validation (base packages, pip, npm)
+- Existing runtime conflict detection (warns if runtime already exists)
+
+This is the recommended way to check your runtime specification before building. It provides the same validation as `rnx runtime build` without actually installing anything.
 
 #### Examples
 
@@ -950,14 +964,27 @@ rnx runtime validate ./examples/python-3.11-ml/runtime.yaml
 rnx runtime validate ./examples/openjdk-21/
 
 # Example output:
-# Runtime specification is valid
+# ✓ Runtime specification is valid
 #
-# Parsed Information:
+# Spec Information:
 #   Name: python-3.11-ml
 #   Version: 1.0.0
 #   Description: Python 3.11 with ML packages
 #   Language: python 3.11
-#   Pip packages: numpy, pandas, scikit-learn
+#
+# Platform:
+#   Distro: ubuntu
+#   Version: 22.04
+#   Architecture: amd64
+#   Package Manager: apt
+#
+# Packages:
+#   System: python3.11, python3.11-dev, python3.11-venv
+#   Pip: numpy, pandas, scikit-learn
+#
+# Warnings:
+#   Runtime 'python-3.11-ml' version '1.0.0' already exists at /opt/joblet/runtimes/python-3.11-ml/1.0.0
+#   Use --force with 'rnx runtime build' to overwrite
 ```
 
 ## System Commands

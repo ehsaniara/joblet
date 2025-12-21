@@ -84,13 +84,42 @@ func (e *IsolatedEnvironment) Setup() error {
 		return fmt.Errorf("failed to mount essential filesystems: %w", err)
 	}
 
-	// Setup DNS resolution
+	// Setup DNS resolution - this is critical for package installation
 	if err := e.setupDNS(); err != nil {
-		e.logger.Warn("Failed to setup DNS: %v", err)
-		// Continue anyway - might still work
+		_ = e.Cleanup()
+		return fmt.Errorf("failed to setup DNS resolution: %w (pip/npm installs require network access)", err)
+	}
+
+	// Verify DNS is working by testing resolution
+	if err := e.verifyDNS(); err != nil {
+		_ = e.Cleanup()
+		return fmt.Errorf("DNS verification failed: %w (check network connectivity and /etc/resolv.conf)", err)
 	}
 
 	e.logger.Info("Isolated environment ready")
+	return nil
+}
+
+// verifyDNS tests that DNS resolution works inside the chroot
+func (e *IsolatedEnvironment) verifyDNS() error {
+	e.logger.Debug("Verifying DNS resolution in isolated environment")
+
+	// Try to resolve a well-known domain using getent or nslookup
+	// We use getent as it's more commonly available
+	output, err := e.RunInChroot("getent", "hosts", "google.com")
+	if err != nil {
+		// Try nslookup as fallback
+		output, err = e.RunInChroot("nslookup", "google.com")
+		if err != nil {
+			// Try a simple ping (just DNS resolution, not full ping)
+			output, err = e.RunInChroot("host", "google.com")
+			if err != nil {
+				return fmt.Errorf("cannot resolve DNS names - tried getent, nslookup, host: %s", string(output))
+			}
+		}
+	}
+
+	e.logger.Debug("DNS resolution verified: %s", strings.TrimSpace(string(output)))
 	return nil
 }
 
@@ -194,11 +223,10 @@ func (e *IsolatedEnvironment) InstallPackagesIsolated(pkgManager string, package
 
 	switch pkgManager {
 	case "apt":
-		// Update package list
+		// Update package list - this is required for fresh installs
 		e.logger.Debug("Running apt-get update in chroot")
 		if output, err := e.RunInChroot("apt-get", "update", "-qq"); err != nil {
-			e.logger.Warn("apt-get update warning: %s", string(output))
-			// Continue anyway - cache might be sufficient
+			return fmt.Errorf("apt-get update failed: %w\nOutput: %s\n\nThis usually means:\n  - Network connectivity issues\n  - DNS resolution problems\n  - Invalid apt sources in /etc/apt/sources.list", err, string(output))
 		}
 
 		// Install packages
@@ -210,6 +238,12 @@ func (e *IsolatedEnvironment) InstallPackagesIsolated(pkgManager string, package
 		e.logger.Debug("apt-get install output: %s", string(output))
 
 	case "yum":
+		// Clean and update yum cache
+		e.logger.Debug("Running yum makecache in chroot")
+		if output, err := e.RunInChroot("yum", "makecache", "-q"); err != nil {
+			return fmt.Errorf("yum makecache failed: %w\nOutput: %s\n\nThis usually means:\n  - Network connectivity issues\n  - DNS resolution problems\n  - Invalid yum repositories", err, string(output))
+		}
+
 		args := append([]string{"install", "-y"}, packages...)
 		output, err := e.RunInChroot("yum", args...)
 		if err != nil {
@@ -218,6 +252,12 @@ func (e *IsolatedEnvironment) InstallPackagesIsolated(pkgManager string, package
 		e.logger.Debug("yum install output: %s", string(output))
 
 	case "dnf":
+		// Clean and update dnf cache
+		e.logger.Debug("Running dnf makecache in chroot")
+		if output, err := e.RunInChroot("dnf", "makecache", "-q"); err != nil {
+			return fmt.Errorf("dnf makecache failed: %w\nOutput: %s\n\nThis usually means:\n  - Network connectivity issues\n  - DNS resolution problems\n  - Invalid dnf repositories", err, string(output))
+		}
+
 		args := append([]string{"install", "-y"}, packages...)
 		output, err := e.RunInChroot("dnf", args...)
 		if err != nil {
@@ -230,6 +270,90 @@ func (e *IsolatedEnvironment) InstallPackagesIsolated(pkgManager string, package
 	}
 
 	e.logger.Info("Packages installed successfully in isolated environment")
+	return nil
+}
+
+// InstallPipPackagesIsolated installs Python packages using pip inside the isolated environment
+// This ensures we use the Python/pip that was installed in phase 7, not the host's Python
+func (e *IsolatedEnvironment) InstallPipPackagesIsolated(packages []string, pipOptions string, pythonVersion string) error {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	e.logger.Info("Installing pip packages in isolated environment: %s", strings.Join(packages, ", "))
+
+	// Build the pip install command
+	// Use python3.X -m pip to ensure we use the correct Python version
+	pythonBinary := fmt.Sprintf("python%s", pythonVersion)
+
+	// First, verify Python is available in the isolated environment
+	e.logger.Debug("Verifying Python is available in isolated environment")
+	if output, err := e.RunInChroot(pythonBinary, "--version"); err != nil {
+		return fmt.Errorf("Python %s not found in isolated environment: %w\nOutput: %s\n\nMake sure the base Python package was installed in phase 7", pythonVersion, err, string(output))
+	}
+
+	// Ensure pip is available
+	e.logger.Debug("Ensuring pip is available in isolated environment")
+	if output, err := e.RunInChroot(pythonBinary, "-m", "ensurepip", "--upgrade"); err != nil {
+		e.logger.Debug("ensurepip output: %s", string(output))
+		// ensurepip might fail if pip is already installed, verify pip works
+	}
+
+	// Verify pip is actually available
+	if output, err := e.RunInChroot(pythonBinary, "-m", "pip", "--version"); err != nil {
+		return fmt.Errorf("pip not available in isolated environment: %w\nOutput: %s\n\nTried ensurepip but pip is still not working. Check if python3-pip package is installed.", err, string(output))
+	}
+
+	// Build pip install arguments
+	args := []string{"-m", "pip", "install", "--no-cache-dir"}
+
+	// Add pip options if specified (e.g., --index-url)
+	if pipOptions != "" {
+		optionParts := strings.Fields(pipOptions)
+		args = append(args, optionParts...)
+	}
+
+	// Add packages
+	args = append(args, packages...)
+
+	// Run pip install inside the chroot
+	output, err := e.RunInChroot(pythonBinary, args...)
+	if err != nil {
+		return fmt.Errorf("pip install failed in isolated environment: %w\nOutput: %s", err, string(output))
+	}
+
+	e.logger.Debug("Pip installation output: %s", string(output))
+	e.logger.Info("Pip packages installed successfully in isolated environment")
+	return nil
+}
+
+// InstallNpmPackagesIsolated installs Node.js packages using npm inside the isolated environment
+// This ensures we use the npm that was installed in phase 7, not the host's npm
+func (e *IsolatedEnvironment) InstallNpmPackagesIsolated(packages []string) error {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	e.logger.Info("Installing npm packages in isolated environment: %s", strings.Join(packages, ", "))
+
+	// First, verify npm is available in the isolated environment
+	e.logger.Debug("Verifying npm is available in isolated environment")
+	if output, err := e.RunInChroot("npm", "--version"); err != nil {
+		return fmt.Errorf("npm not found in isolated environment: %w\nOutput: %s\n\nMake sure nodejs/npm packages were installed in phase 7", err, string(output))
+	}
+
+	// Build npm install arguments - install globally
+	args := []string{"install", "-g"}
+	args = append(args, packages...)
+
+	// Run npm install inside the chroot
+	output, err := e.RunInChroot("npm", args...)
+	if err != nil {
+		return fmt.Errorf("npm install failed in isolated environment: %w\nOutput: %s", err, string(output))
+	}
+
+	e.logger.Debug("npm installation output: %s", string(output))
+	e.logger.Info("npm packages installed successfully in isolated environment")
 	return nil
 }
 

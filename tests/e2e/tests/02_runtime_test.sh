@@ -8,7 +8,8 @@
 source "$(dirname "$0")/../lib/test_framework.sh"
 
 # Get the joblet root directory for finding example runtime.yaml files
-JOBLET_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Go up 3 levels: tests/e2e/tests -> tests/e2e -> tests -> joblet root
+JOBLET_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 
 # Runtimes that will be tested (these have example runtime.yaml files)
 AVAILABLE_RUNTIMES=("openjdk-21" "openjdk-17" "python-3.11-ml" "python-3.11" "python-analytics")

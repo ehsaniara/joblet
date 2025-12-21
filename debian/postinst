@@ -1,12 +1,16 @@
 #!/bin/bash
 set -e
 
+# JOBLET_HOME defines the installation directory (default: /opt/joblet)
+JOBLET_HOME="${JOBLET_HOME:-/opt/joblet}"
+export JOBLET_HOME
+
 # Source debconf library
 . /usr/share/debconf/confmodule
 
 # Source common installation functions
-if [ -f /opt/joblet/scripts/common-install-functions.sh ]; then
-    . /opt/joblet/scripts/common-install-functions.sh
+if [ -f ${JOBLET_HOME}/scripts/common-install-functions.sh ]; then
+    . ${JOBLET_HOME}/scripts/common-install-functions.sh
 else
     echo "ERROR: Common installation functions not found!"
     exit 1
@@ -99,31 +103,31 @@ case "$1" in
         echo
 
         # Set basic permissions first
-        chown -R root:root /opt/joblet
-        chmod 755 /opt/joblet
-        chmod 755 /opt/joblet/bin
-        chmod 755 /opt/joblet/bin/joblet
-        chmod 755 /opt/joblet/bin/rnx
-        chmod 755 /opt/joblet/bin/persist
-        chmod 755 /opt/joblet/bin/state
-        chmod 755 /opt/joblet/scripts
-        chmod 644 /opt/joblet/scripts/joblet-config-template.yml
-        chmod 644 /opt/joblet/scripts/rnx-config-template.yml
+        chown -R root:root ${JOBLET_HOME}
+        chmod 755 ${JOBLET_HOME}
+        chmod 755 ${JOBLET_HOME}/bin
+        chmod 755 ${JOBLET_HOME}/bin/joblet
+        chmod 755 ${JOBLET_HOME}/bin/rnx
+        chmod 755 ${JOBLET_HOME}/bin/persist
+        chmod 755 ${JOBLET_HOME}/bin/state
+        chmod 755 ${JOBLET_HOME}/scripts
+        chmod 644 ${JOBLET_HOME}/scripts/joblet-config-template.yml
+        chmod 644 ${JOBLET_HOME}/scripts/rnx-config-template.yml
         chmod +x /usr/local/bin/certs_gen_embedded.sh
 
-        mkdir -p /opt/joblet/config
-        chmod 755 /opt/joblet/config  # Directory needs to be accessible for rnx client
+        mkdir -p ${JOBLET_HOME}/config
+        chmod 755 ${JOBLET_HOME}/config  # Directory needs to be accessible for rnx client
 
         # Select and install the appropriate runtime config for this distro
-        select_runtime_config /opt/joblet/scripts /opt/joblet/config
+        select_runtime_config ${JOBLET_HOME}/scripts ${JOBLET_HOME}/config
 
         # Create symlinks
         if [ ! -L /usr/bin/rnx ]; then
-            ln -sf /opt/joblet/bin/rnx /usr/bin/rnx
+            ln -sf ${JOBLET_HOME}/bin/rnx /usr/bin/rnx
         fi
 
         if [ ! -L /usr/local/bin/rnx ]; then
-            ln -sf /opt/joblet/bin/rnx /usr/local/bin/rnx
+            ln -sf ${JOBLET_HOME}/bin/rnx /usr/local/bin/rnx
         fi
 
         get_configuration_debian
@@ -148,10 +152,10 @@ case "$1" in
             configure_storage_backends
 
             # Set secure permissions on config files (they now contain private keys)
-            chmod 600 /opt/joblet/config/joblet-config.yml
+            chmod 600 ${JOBLET_HOME}/config/joblet-config.yml
             # rnx-config.yml needs to be readable for client usage
             # Users can copy to ~/.rnx/ for personal use or use directly
-            chmod 644 /opt/joblet/config/rnx-config.yml
+            chmod 644 ${JOBLET_HOME}/config/rnx-config.yml
 
         else
             print_error "Failed to generate certificates"
@@ -163,17 +167,17 @@ case "$1" in
 
         # Create runtime directories
         mkdir -p /var/log/joblet
-        mkdir -p /opt/joblet/logs
-        mkdir -p /opt/joblet/metrics
-        mkdir -p /opt/joblet/network
-        mkdir -p /opt/joblet/volumes
-        mkdir -p /opt/joblet/jobs
-        mkdir -p /opt/joblet/run
-        mkdir -p /opt/joblet/runtimes
+        mkdir -p ${JOBLET_HOME}/logs
+        mkdir -p ${JOBLET_HOME}/metrics
+        mkdir -p ${JOBLET_HOME}/network
+        mkdir -p ${JOBLET_HOME}/volumes
+        mkdir -p ${JOBLET_HOME}/jobs
+        mkdir -p ${JOBLET_HOME}/run
+        mkdir -p ${JOBLET_HOME}/runtimes
 
         # Set ownership and permissions
-        chown root:root /var/log/joblet /opt/joblet/logs /opt/joblet/metrics /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs /opt/joblet/run /opt/joblet/runtimes
-        chmod 755 /var/log/joblet /opt/joblet/logs /opt/joblet/metrics /opt/joblet/network /opt/joblet/volumes /opt/joblet/jobs /opt/joblet/run /opt/joblet/runtimes
+        chown root:root /var/log/joblet ${JOBLET_HOME}/logs ${JOBLET_HOME}/metrics ${JOBLET_HOME}/network ${JOBLET_HOME}/volumes ${JOBLET_HOME}/jobs ${JOBLET_HOME}/run ${JOBLET_HOME}/runtimes
+        chmod 755 /var/log/joblet ${JOBLET_HOME}/logs ${JOBLET_HOME}/metrics ${JOBLET_HOME}/network ${JOBLET_HOME}/volumes ${JOBLET_HOME}/jobs ${JOBLET_HOME}/run ${JOBLET_HOME}/runtimes
 
         # Setup cgroup delegation
         if [ -d /sys/fs/cgroup ]; then
