@@ -1,0 +1,11 @@
+schema_version: "1.0"
+name: openjdk-21
+version: 1.0.0
+description: OpenJDK 21 LTS runtime for Java applications
+
+base:
+  language: java
+  version: "21"
+
+environment:
+  JAVA_TOOL_OPTIONS: "-Xmx512m"

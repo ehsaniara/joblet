@@ -1,0 +1,16 @@
+schema_version: "1.0"
+name: python-ml
+version: 1.0.0
+description: Python ML runtime with numpy and scikit-learn
+
+base:
+  language: python
+  version: "3.11"
+
+pip:
+  - numpy==1.26.2
+  - scikit-learn==1.3.2
+
+hooks:
+  pre_install: |
+    apt-get install -y libopenblas-dev || yum install -y openblas-devel

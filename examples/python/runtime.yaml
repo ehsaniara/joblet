@@ -1,0 +1,11 @@
+schema_version: "1.0"
+name: python-3.11
+version: 1.0.0
+description: Lightweight Python 3.11 runtime for scripts and utilities
+
+base:
+  language: python
+  version: "3.11"
+
+environment:
+  PYTHONUNBUFFERED: "1"
