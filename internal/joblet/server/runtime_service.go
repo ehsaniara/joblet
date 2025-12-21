@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/auth"
-	"github.com/ehsaniara/joblet/internal/joblet/core"
 	"github.com/ehsaniara/joblet/internal/joblet/runtime"
-	"github.com/ehsaniara/joblet/pkg/config"
+	"github.com/ehsaniara/joblet/pkg/builder"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 
@@ -22,25 +22,23 @@ import (
 // RuntimeServiceServer implements the RuntimeService gRPC interface
 type RuntimeServiceServer struct {
 	pb.UnimplementedRuntimeServiceServer
-	auth             auth.GRPCAuthorization
-	resolver         *runtime.Resolver
-	runtimeInstaller *core.RuntimeInstaller
-	runtimesPath     string
-	logger           *logger.Logger
+	auth         auth.GRPCAuthorization
+	resolver     *runtime.Resolver
+	runtimesPath string
+	logger       *logger.Logger
 }
 
 var _ pb.RuntimeServiceServer = (*RuntimeServiceServer)(nil)
 
 // NewRuntimeServiceServer creates a new gRPC runtime service for managing execution environments
-func NewRuntimeServiceServer(auth auth.GRPCAuthorization, runtimesBasePath string, platform platform.Platform, config *config.Config) *RuntimeServiceServer {
+func NewRuntimeServiceServer(auth auth.GRPCAuthorization, runtimesBasePath string, platform platform.Platform) *RuntimeServiceServer {
 	runtimeLogger := logger.New().WithField("component", "runtime-grpc")
 
 	return &RuntimeServiceServer{
-		auth:             auth,
-		resolver:         runtime.NewResolver(runtimesBasePath, platform),
-		runtimeInstaller: core.NewRuntimeInstaller(config, runtimeLogger, platform),
-		runtimesPath:     runtimesBasePath,
-		logger:           runtimeLogger,
+		auth:         auth,
+		resolver:     runtime.NewResolver(runtimesBasePath, platform),
+		runtimesPath: runtimesBasePath,
+		logger:       runtimeLogger,
 	}
 }
 
@@ -181,124 +179,6 @@ func extractLanguageFromName(name string) string {
 	return name // No hyphen found, return whole name
 }
 
-// InstallRuntimeFromGithub installs a runtime from a GitHub repository using dedicated chroot (no job system)
-func (s *RuntimeServiceServer) InstallRuntimeFromGithub(ctx context.Context, req *pb.InstallRuntimeRequest) (*pb.InstallRuntimeResponse, error) {
-	log := s.logger.WithFields(
-		"operation", "InstallRuntimeFromGithub",
-		"runtimeSpec", req.RuntimeSpec,
-		"repository", req.Repository,
-		"branch", req.Branch,
-		"path", req.Path,
-		"forceReinstall", req.ForceReinstall,
-	)
-
-	log.Info("direct runtime installation request received (no job system)")
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.RunJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if req.RuntimeSpec == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "runtime spec is required")
-	}
-
-	// Set defaults
-	repository := req.Repository
-	if repository == "" {
-		repository = "ehsaniara/joblet"
-	}
-
-	branch := req.Branch
-	if branch == "" {
-		branch = "main"
-	}
-
-	resolvedPath := req.Path
-	if resolvedPath == "" {
-		// Auto-detect path based on runtime spec
-		resolvedPath = s.autoDetectRuntimePath(req.RuntimeSpec)
-	}
-
-	log.Info("executing direct runtime installation", "repository", repository, "branch", branch, "path", resolvedPath)
-
-	// Use direct runtime installer (no job system, no namespaces, no cgroups)
-	installReq := &core.RuntimeInstallRequest{
-		RuntimeSpec:    req.RuntimeSpec,
-		Repository:     repository,
-		Branch:         branch,
-		Path:           resolvedPath,
-		ForceReinstall: req.ForceReinstall,
-	}
-
-	result, err := s.runtimeInstaller.InstallFromGithub(ctx, installReq)
-	if err != nil {
-		log.Error("direct runtime installation failed", "error", err)
-		return &pb.InstallRuntimeResponse{
-			BuildJobUuid: "", // No job UUID since this is direct execution
-			RuntimeSpec:  req.RuntimeSpec,
-			Status:       "failed",
-			Message:      fmt.Sprintf("Installation failed: %v", err),
-			Repository:   repository,
-			ResolvedPath: resolvedPath,
-		}, status.Errorf(codes.Internal, "runtime installation failed: %v", err)
-	}
-
-	var responseStatus string
-	if result.Success {
-		responseStatus = "completed"
-		log.Info("direct runtime installation completed successfully", "duration", result.Duration)
-	} else {
-		responseStatus = "failed"
-		log.Error("direct runtime installation failed", "message", result.Message)
-	}
-
-	return &pb.InstallRuntimeResponse{
-		BuildJobUuid: "", // No job UUID since this is direct execution
-		RuntimeSpec:  req.RuntimeSpec,
-		Status:       responseStatus,
-		Message:      result.Message,
-		Repository:   repository,
-		ResolvedPath: resolvedPath,
-	}, nil
-}
-
-// ValidateRuntimeSpec validates a runtime specification
-func (s *RuntimeServiceServer) ValidateRuntimeSpec(ctx context.Context, req *pb.ValidateRuntimeSpecRequest) (*pb.ValidateRuntimeSpecResponse, error) {
-	log := s.logger.WithFields(
-		"operation", "ValidateRuntimeSpec",
-		"runtimeSpec", req.RuntimeSpec,
-	)
-
-	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
-		log.Warn("authorization failed", "error", err)
-		return nil, err
-	}
-
-	if req.RuntimeSpec == "" {
-		return &pb.ValidateRuntimeSpecResponse{
-			Valid:   false,
-			Message: "Runtime spec cannot be empty",
-		}, nil
-	}
-
-	// Parse and validate runtime spec
-	specInfo, valid, message := s.parseRuntimeSpec(req.RuntimeSpec)
-
-	normalizedSpec := req.RuntimeSpec
-	if valid {
-		normalizedSpec = s.normalizeRuntimeSpec(specInfo)
-	}
-
-	return &pb.ValidateRuntimeSpecResponse{
-		Valid:          valid,
-		Message:        message,
-		NormalizedSpec: normalizedSpec,
-		SpecInfo:       specInfo,
-	}, nil
-}
 
 // RemoveRuntime removes an installed runtime and cleans up its files
 func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.RuntimeRemoveReq) (*pb.RuntimeRemoveRes, error) {
@@ -387,108 +267,78 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 	}, nil
 }
 
-func (s *RuntimeServiceServer) autoDetectRuntimePath(runtimeSpec string) string {
-	// Parse runtime spec to determine path in the main repository
-	// e.g., "python:3.11-ml" -> "runtimes/python-3.11-ml"
-	parts := strings.Split(runtimeSpec, ":")
-	if len(parts) == 2 {
-		return fmt.Sprintf("runtimes/%s-%s", parts[0], parts[1])
-	}
-	return fmt.Sprintf("runtimes/%s", runtimeSpec)
+// grpcBuildLogger implements builder.BuildLogger and streams logs via gRPC
+type grpcBuildLogger struct {
+	stream  pb.RuntimeService_BuildRuntimeServer
+	verbose bool
 }
 
-func (s *RuntimeServiceServer) parseRuntimeSpec(spec string) (*pb.RuntimeSpecInfo, bool, string) {
-	if spec == "" {
-		return nil, false, "Runtime spec cannot be empty"
+func (l *grpcBuildLogger) Debug(format string, args ...interface{}) {
+	if l.verbose {
+		l.stream.Send(&pb.BuildRuntimeProgress{
+			ProgressType: &pb.BuildRuntimeProgress_Log{
+				Log: &pb.BuildLogLine{
+					Level:     "debug",
+					Message:   fmt.Sprintf(format, args...),
+					Timestamp: time.Now().UnixNano(),
+				},
+			},
+		})
 	}
-
-	// Parse format: language:version[-variant1[-variant2...]][@architecture]
-	// Examples: python-3.11-ml, openjdk-21, golang-1.21@arm64
-
-	// Split by @ for architecture
-	parts := strings.Split(spec, "@")
-	mainPart := parts[0]
-	architecture := "amd64" // default
-	if len(parts) > 1 {
-		architecture = parts[1]
-	}
-
-	// Split by : for language:version
-	langVersion := strings.Split(mainPart, ":")
-	if len(langVersion) != 2 {
-		return nil, false, "Runtime spec must be in format language:version (e.g., python:3.11)"
-	}
-
-	language := langVersion[0]
-	versionPart := langVersion[1]
-
-	// Split version part by - for variants
-	versionVariants := strings.Split(versionPart, "-")
-	version := versionVariants[0]
-	variants := versionVariants[1:] // remaining parts are variants
-
-	// Validate language
-	validLanguages := []string{"python", "java", "golang", "node", "ruby", "php"}
-	validLang := false
-	for _, valid := range validLanguages {
-		if language == valid {
-			validLang = true
-			break
-		}
-	}
-	if !validLang {
-		return nil, false, fmt.Sprintf("Unsupported language: %s. Supported: %s", language, strings.Join(validLanguages, ", "))
-	}
-
-	// Validate architecture
-	validArchs := []string{"amd64", "arm64", "x86_64"}
-	validArch := false
-	for _, valid := range validArchs {
-		if architecture == valid {
-			validArch = true
-			break
-		}
-	}
-	if !validArch {
-		return nil, false, fmt.Sprintf("Unsupported architecture: %s. Supported: %s", architecture, strings.Join(validArchs, ", "))
-	}
-
-	specInfo := &pb.RuntimeSpecInfo{
-		Language:     language,
-		Version:      version,
-		Variants:     variants,
-		Architecture: architecture,
-	}
-
-	return specInfo, true, "Runtime spec is valid"
 }
 
-func (s *RuntimeServiceServer) normalizeRuntimeSpec(specInfo *pb.RuntimeSpecInfo) string {
-	normalized := fmt.Sprintf("%s:%s", specInfo.Language, specInfo.Version)
-
-	if len(specInfo.Variants) > 0 {
-		normalized += "-" + strings.Join(specInfo.Variants, "-")
-	}
-
-	if specInfo.Architecture != "amd64" {
-		normalized += "@" + specInfo.Architecture
-	}
-
-	return normalized
+func (l *grpcBuildLogger) Info(format string, args ...interface{}) {
+	l.stream.Send(&pb.BuildRuntimeProgress{
+		ProgressType: &pb.BuildRuntimeProgress_Log{
+			Log: &pb.BuildLogLine{
+				Level:     "info",
+				Message:   fmt.Sprintf(format, args...),
+				Timestamp: time.Now().UnixNano(),
+			},
+		},
+	})
 }
 
-// StreamingInstallRuntimeFromGithub streams runtime installation from GitHub repository
-func (s *RuntimeServiceServer) StreamingInstallRuntimeFromGithub(req *pb.InstallRuntimeRequest, stream pb.RuntimeService_StreamingInstallRuntimeFromGithubServer) error {
-	log := s.logger.WithFields(
-		"operation", "StreamingInstallRuntimeFromGithub",
-		"runtimeSpec", req.RuntimeSpec,
-		"repository", req.Repository,
-		"branch", req.Branch,
-		"path", req.Path,
-		"forceReinstall", req.ForceReinstall,
-	)
+func (l *grpcBuildLogger) Warn(format string, args ...interface{}) {
+	l.stream.Send(&pb.BuildRuntimeProgress{
+		ProgressType: &pb.BuildRuntimeProgress_Log{
+			Log: &pb.BuildLogLine{
+				Level:     "warn",
+				Message:   fmt.Sprintf(format, args...),
+				Timestamp: time.Now().UnixNano(),
+			},
+		},
+	})
+}
 
-	log.Info("streaming runtime installation request received")
+func (l *grpcBuildLogger) Error(format string, args ...interface{}) {
+	l.stream.Send(&pb.BuildRuntimeProgress{
+		ProgressType: &pb.BuildRuntimeProgress_Log{
+			Log: &pb.BuildLogLine{
+				Level:     "error",
+				Message:   fmt.Sprintf(format, args...),
+				Timestamp: time.Now().UnixNano(),
+			},
+		},
+	})
+}
+
+func (l *grpcBuildLogger) Phase(phase int, total int, name string, message string) {
+	l.stream.Send(&pb.BuildRuntimeProgress{
+		ProgressType: &pb.BuildRuntimeProgress_Phase{
+			Phase: &pb.BuildPhaseProgress{
+				PhaseNumber: int32(phase),
+				TotalPhases: int32(total),
+				PhaseName:   name,
+				Message:     message,
+			},
+		},
+	})
+}
+
+// BuildRuntime builds a runtime from a YAML specification
+func (s *RuntimeServiceServer) BuildRuntime(req *pb.BuildRuntimeRequest, stream pb.RuntimeService_BuildRuntimeServer) error {
+	log := s.logger.WithField("operation", "BuildRuntime")
 
 	// Authorization check
 	if err := s.auth.Authorized(stream.Context(), auth.RunJobOp); err != nil {
@@ -496,175 +346,112 @@ func (s *RuntimeServiceServer) StreamingInstallRuntimeFromGithub(req *pb.Install
 		return err
 	}
 
-	if req.RuntimeSpec == "" {
-		return status.Errorf(codes.InvalidArgument, "runtime spec is required")
+	// Validate request
+	if req.YamlContent == "" {
+		return status.Errorf(codes.InvalidArgument, "yaml_content is required")
 	}
 
-	// Route based on Repository field:
-	// - If Repository is empty -> use external registry (DEFAULT)
-	// - If Repository is provided -> use GitHub direct installation
-	if req.Repository == "" {
-		log.Info("no repository specified, using external registry")
-		return s.installFromRegistryStreaming(req, stream)
+	startTime := time.Now()
+
+	// Create gRPC logger
+	grpcLogger := &grpcBuildLogger{
+		stream:  stream,
+		verbose: req.Verbose,
 	}
 
-	// Set defaults for GitHub installation
-	repository := req.Repository
+	// Create builder with gRPC logger
+	b := builder.NewBuilder(s.runtimesPath, grpcLogger)
 
-	branch := req.Branch
-	if branch == "" {
-		branch = "main"
-	}
-
-	resolvedPath := req.Path
-	if resolvedPath == "" {
-		resolvedPath = s.autoDetectRuntimePath(req.RuntimeSpec)
-	}
-
-	log.Info("starting streaming runtime installation from GitHub", "repository", repository, "branch", branch, "resolvedPath", resolvedPath)
-
-	// Create streaming adapter
-	streamer := &grpcRuntimeStreamer{stream: stream}
-
-	// Create request with streaming support
-	installReq := &core.RuntimeInstallRequest{
-		RuntimeSpec:    req.RuntimeSpec,
-		Repository:     repository,
-		Branch:         branch,
-		Path:           resolvedPath,
-		ForceReinstall: req.ForceReinstall,
-		Streamer:       streamer, // Add streaming support
-	}
-
-	result, err := s.runtimeInstaller.InstallFromGithub(stream.Context(), installReq)
-
-	// Send final result
-	var success bool
-	var message string
-	var installPath string
-
+	// Build the runtime
+	result, err := b.Build(stream.Context(), req.YamlContent, req.DryRun)
 	if err != nil {
-		log.Error("streaming runtime installation failed", "error", err)
-		success = false
-		message = fmt.Sprintf("Runtime installation failed: %v", err)
-	} else {
-		success = result.Success
-		message = result.Message
-		installPath = result.InstallPath
+		log.Error("build failed", "error", err)
+		// Send failure result
+		stream.Send(&pb.BuildRuntimeProgress{
+			ProgressType: &pb.BuildRuntimeProgress_Result{
+				Result: &pb.BuildResult{
+					Success:         false,
+					Message:         err.Error(),
+					BuildDurationMs: time.Since(startTime).Milliseconds(),
+				},
+			},
+		})
+		return nil // Don't return error, we sent it in the stream
 	}
 
-	finalChunk := &pb.RuntimeInstallationChunk{
-		ChunkType: &pb.RuntimeInstallationChunk_Result{
-			Result: &pb.RuntimeInstallationResult{
-				Success:     success,
-				Message:     message,
-				RuntimeSpec: req.RuntimeSpec,
-				InstallPath: installPath,
+	// Send success result
+	stream.Send(&pb.BuildRuntimeProgress{
+		ProgressType: &pb.BuildRuntimeProgress_Result{
+			Result: &pb.BuildResult{
+				Success:         true,
+				Message:         "Build completed successfully",
+				RuntimeName:     result.Name,
+				RuntimeVersion:  result.Version,
+				InstallPath:     result.InstallPath,
+				SizeBytes:       result.SizeBytes,
+				BuildDurationMs: time.Since(startTime).Milliseconds(),
 			},
 		},
-	}
+	})
 
-	if err := stream.Send(finalChunk); err != nil {
-		log.Error("failed to send final result", "error", err)
-		return err
-	}
-
-	log.Info("streaming runtime installation completed")
+	log.Info("build completed", "runtime", result.Name, "version", result.Version, "duration", time.Since(startTime))
 	return nil
 }
 
-// installFromRegistryStreaming handles streaming installation from external registry
-func (s *RuntimeServiceServer) installFromRegistryStreaming(req *pb.InstallRuntimeRequest, stream pb.RuntimeService_StreamingInstallRuntimeFromGithubServer) error {
-	log := s.logger.WithFields(
-		"operation", "installFromRegistryStreaming",
-		"runtimeSpec", req.RuntimeSpec,
-		"forceReinstall", req.ForceReinstall,
-	)
+// ValidateRuntimeYAML validates a runtime YAML specification without building
+func (s *RuntimeServiceServer) ValidateRuntimeYAML(ctx context.Context, req *pb.ValidateRuntimeYAMLRequest) (*pb.ValidateRuntimeYAMLResponse, error) {
+	log := s.logger.WithField("operation", "ValidateRuntimeYAML")
 
-	log.Info("installing runtime from external registry with streaming")
-
-	// Create streaming adapter
-	streamer := &grpcRuntimeStreamer{stream: stream}
-
-	// Send initial progress
-	if err := streamer.SendProgress("🚀 Starting installation from external registry"); err != nil {
-		return err
+	// Authorization check
+	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
+		log.Warn("authorization failed", "error", err)
+		return nil, err
 	}
 
-	// Extract registry URL from dedicated field
-	registryURL := req.RegistryUrl
-
-	// Create registry install request
-	registryReq := &core.RuntimeInstallFromRegistryRequest{
-		RuntimeSpec:    req.RuntimeSpec,
-		ForceReinstall: req.ForceReinstall,
-		RegistryURL:    registryURL, // Custom registry URL (empty = use default)
-		Streamer:       streamer,
+	// Validate request
+	if req.YamlContent == "" {
+		return &pb.ValidateRuntimeYAMLResponse{
+			Valid:   false,
+			Message: "yaml_content is required",
+			Errors:  []string{"yaml_content cannot be empty"},
+		}, nil
 	}
 
-	// Install from registry
-	result, err := s.runtimeInstaller.InstallFromRegistry(stream.Context(), registryReq)
-
-	// Send final result
-	var success bool
-	var message string
-	var installPath string
-
+	// Parse and validate the YAML
+	spec, err := builder.ParseRuntimeYAML([]byte(req.YamlContent))
 	if err != nil {
-		log.Error("registry installation failed", "error", err)
-		success = false
-		message = fmt.Sprintf("Runtime installation failed: %v", err)
-	} else {
-		success = result.Success
-		message = result.Message
-		installPath = result.InstallPath
+		return &pb.ValidateRuntimeYAMLResponse{
+			Valid:   false,
+			Message: "Invalid YAML specification",
+			Errors:  []string{err.Error()},
+		}, nil
 	}
 
-	finalChunk := &pb.RuntimeInstallationChunk{
-		ChunkType: &pb.RuntimeInstallationChunk_Result{
-			Result: &pb.RuntimeInstallationResult{
-				Success:     success,
-				Message:     message,
-				RuntimeSpec: req.RuntimeSpec,
-				InstallPath: installPath,
-			},
-		},
+	// Validate the spec
+	if err := builder.ValidateSpec(spec); err != nil {
+		return &pb.ValidateRuntimeYAMLResponse{
+			Valid:   false,
+			Message: "Validation failed",
+			Errors:  []string{err.Error()},
+		}, nil
 	}
 
-	if err := stream.Send(finalChunk); err != nil {
-		log.Error("failed to send final result", "error", err)
-		return err
+	// Build spec info
+	specInfo := &pb.RuntimeYAMLInfo{
+		Name:            spec.Name,
+		Version:         spec.Version,
+		Language:        spec.Base.Language,
+		LanguageVersion: spec.Base.Version,
+		Description:     spec.Description,
+		PipPackages:     spec.Pip,
+		NpmPackages:     spec.Npm,
+		HasHooks:        spec.Hooks != nil && (spec.Hooks.PreInstall != "" || spec.Hooks.PostInstall != ""),
+		RequiresGpu:     spec.Requirements != nil && spec.Requirements.GPU,
 	}
 
-	log.Info("streaming registry installation completed", "success", success)
-	return nil
-}
-
-// grpcRuntimeStreamer adapts gRPC stream to RuntimeInstallationStreamer interface
-type grpcRuntimeStreamer struct {
-	stream interface {
-		Send(*pb.RuntimeInstallationChunk) error
-	}
-}
-
-func (g *grpcRuntimeStreamer) SendProgress(message string) error {
-	chunk := &pb.RuntimeInstallationChunk{
-		ChunkType: &pb.RuntimeInstallationChunk_Progress{
-			Progress: &pb.RuntimeInstallationProgress{
-				Message: message,
-			},
-		},
-	}
-	return g.stream.Send(chunk)
-}
-
-func (g *grpcRuntimeStreamer) SendLog(data []byte) error {
-	chunk := &pb.RuntimeInstallationChunk{
-		ChunkType: &pb.RuntimeInstallationChunk_Log{
-			Log: &pb.RuntimeInstallationLog{
-				Data: data,
-			},
-		},
-	}
-	return g.stream.Send(chunk)
+	return &pb.ValidateRuntimeYAMLResponse{
+		Valid:    true,
+		Message:  "YAML specification is valid",
+		SpecInfo: specInfo,
+	}, nil
 }

@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/auth/authfakes"
-	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"github.com/stretchr/testify/assert"
@@ -18,14 +17,12 @@ import (
 func TestNewRuntimeServiceServer(t *testing.T) {
 	fakeAuth := &authfakes.FakeGRPCAuthorization{}
 	testPlatform := platform.NewPlatform()
-	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/opt/joblet/runtimes", testPlatform, testConfig)
+	server := NewRuntimeServiceServer(fakeAuth, "/opt/joblet/runtimes", testPlatform)
 
 	assert.NotNil(t, server)
 	assert.Equal(t, fakeAuth, server.auth)
 	assert.NotNil(t, server.resolver)
-	assert.NotNil(t, server.runtimeInstaller)
 	assert.Equal(t, "/opt/joblet/runtimes", server.runtimesPath)
 }
 
@@ -34,9 +31,8 @@ func TestRuntimeServiceServer_ListRuntimes_AuthorizationFailed(t *testing.T) {
 	fakeAuth.AuthorizedReturns(status.Errorf(codes.PermissionDenied, "access denied"))
 
 	testPlatform := platform.NewPlatform()
-	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig)
+	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform)
 
 	req := &pb.EmptyRequest{}
 	resp, err := server.ListRuntimes(context.Background(), req)
@@ -51,9 +47,8 @@ func TestRuntimeServiceServer_GetRuntimeInfo_EmptyRuntime(t *testing.T) {
 	fakeAuth.AuthorizedReturns(nil)
 
 	testPlatform := platform.NewPlatform()
-	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig)
+	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform)
 
 	req := &pb.RuntimeInfoReq{Runtime: ""}
 	resp, err := server.GetRuntimeInfo(context.Background(), req)
@@ -66,22 +61,21 @@ func TestRuntimeServiceServer_GetRuntimeInfo_EmptyRuntime(t *testing.T) {
 	assert.Contains(t, grpcStatus.Message(), "runtime name is required")
 }
 
-func TestRuntimeServiceServer_ValidateRuntimeSpec_EmptySpec(t *testing.T) {
+func TestRuntimeServiceServer_ValidateRuntimeYAML_EmptyYAML(t *testing.T) {
 	fakeAuth := &authfakes.FakeGRPCAuthorization{}
 	fakeAuth.AuthorizedReturns(nil)
 
 	testPlatform := platform.NewPlatform()
-	testConfig := &config.Config{}
 
-	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform, testConfig)
+	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform)
 
-	req := &pb.ValidateRuntimeSpecRequest{RuntimeSpec: ""}
-	resp, err := server.ValidateRuntimeSpec(context.Background(), req)
+	req := &pb.ValidateRuntimeYAMLRequest{YamlContent: ""}
+	resp, err := server.ValidateRuntimeYAML(context.Background(), req)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.False(t, resp.Valid)
-	assert.Contains(t, resp.Message, "cannot be empty")
+	assert.Contains(t, resp.Message, "required")
 }
 
 func TestExtractLanguageFromName(t *testing.T) {
