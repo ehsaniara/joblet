@@ -7,6 +7,13 @@
 #   - RHEL 9+ (uses dnf)
 #   - CentOS Stream 9+
 #   - Any dnf-based distribution
+#
+# Runtime Build Isolation:
+#   Runtime builds use OverlayFS-based chroot isolation. The host filesystem
+#   is mounted read-only as the lower layer, and all package installations
+#   (dnf, pip, etc.) write to an ephemeral upper layer. Only the resulting
+#   binaries and libraries are copied to the runtime directory.
+#   See: pkg/builder/isolation.go
 
 # Runtime System Configuration
 runtime:
@@ -20,31 +27,8 @@ runtime:
     - "/usr/local/node"
     - "/usr/local/go"
 
-  # Writable tmpfs mounts for runtime installation (package manager support)
-  # These directories get tmpfs overlays during chroot-based runtime installation
-  # Fedora/Amazon Linux 2023+ use dnf package management
-  install_writable_paths:
-    - "/var/cache/dnf"           # dnf package cache
-    - "/var/lib/dnf"             # dnf state
-    - "/var/lib/rpm"             # rpm database
-    - "/etc/dnf"                 # dnf config
-    - "/var/log/dnf.log"         # dnf logs
-    - "/usr/local"               # pip installs packages here
-
-  # Host directories to bind-mount read-only during runtime installation
-  # These provide access to host binaries/libraries for setup scripts
-  # FHS-compliant paths that work across all Linux distributions
-  install_host_binds:
-    - "/usr"
-    - "/lib"
-    - "/lib64"
-    - "/bin"
-    - "/sbin"
-    - "/etc"
-    - "/var"
-
-  # PATH environment variable for runtime installation chroot
-  install_env_path: "/usr/bin:/bin:/sbin:/usr/sbin"
+  # Package manager for this distribution (used by OverlayFS isolation)
+  package_manager: "dnf"
 
   # Paths mounted read-only into job sandbox
   # These provide essential binaries and libraries for job execution

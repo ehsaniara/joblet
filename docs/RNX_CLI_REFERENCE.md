@@ -825,17 +825,21 @@ The build command reads a `runtime.yaml` specification file, sends it to the rem
 
 **Build Phases:**
 
+The build uses OverlayFS-based isolation to ensure the host system is never modified.
+System packages are installed in an isolated chroot, and only the resulting
+binaries/libraries are copied to the runtime directory.
+
 1. Parse & Validate YAML specification
 2. Detect platform (distro, architecture, package manager)
 3. Check disk space
 4. Validate package availability
 5. Prepare directories
 6. Run pre-install hook (if defined)
-7. Install base language packages
+7. Install base language packages (in OverlayFS-isolated chroot)
 8. Install language packages (pip/npm)
 9. Run post-install hook (if defined)
-10. Copy binaries
-11. Copy libraries
+10. Copy binaries from isolated overlay
+11. Copy libraries from isolated overlay
 12. Copy configuration
 13. Generate runtime.yml config
 14. Validate build

@@ -381,6 +381,10 @@ func NewRuntimeBuildCmd() *cobra.Command {
 		Short: "Build a runtime from a YAML specification",
 		Long: `Build a runtime environment from a runtime.yaml specification file.
 
+The build process uses OverlayFS-based isolation to ensure the host system
+is never modified. System packages are installed in an isolated chroot,
+and only the resulting binaries/libraries are copied to the runtime directory.
+
 The build process follows a 14-phase pipeline:
   1. Parse and validate YAML specification
   2. Detect platform (distro, architecture, package manager)
@@ -388,11 +392,11 @@ The build process follows a 14-phase pipeline:
   4. Validate that required packages exist
   5. Prepare runtime directories
   6. Execute pre_install hook (if defined)
-  7. Install base language packages
+  7. Install base language packages (in OverlayFS-isolated chroot)
   8. Install language-specific packages (pip, npm)
   9. Execute post_install hook (if defined)
-  10. Copy binaries to isolated directory
-  11. Copy libraries to isolated directory
+  10. Copy binaries from isolated overlay to runtime directory
+  11. Copy libraries from isolated overlay to runtime directory
   12. Copy configuration files
   13. Generate runtime.yml for the server
   14. Validate the build
@@ -527,13 +531,13 @@ func runRuntimeBuild(ctx context.Context, path string, dryRun bool, verbose bool
 
 func outputBuildResultFromProto(result *pb.BuildResult) error {
 	type jsonResult struct {
-		Success       bool   `json:"success"`
-		Name          string `json:"name"`
-		Version       string `json:"version"`
-		InstallPath   string `json:"install_path,omitempty"`
-		SizeBytes     int64  `json:"size_bytes,omitempty"`
-		DurationMs    int64  `json:"duration_ms"`
-		Message       string `json:"message,omitempty"`
+		Success     bool   `json:"success"`
+		Name        string `json:"name"`
+		Version     string `json:"version"`
+		InstallPath string `json:"install_path,omitempty"`
+		SizeBytes   int64  `json:"size_bytes,omitempty"`
+		DurationMs  int64  `json:"duration_ms"`
+		Message     string `json:"message,omitempty"`
 	}
 
 	output := jsonResult{
@@ -550,7 +554,6 @@ func outputBuildResultFromProto(result *pb.BuildResult) error {
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)
 }
-
 
 func NewRuntimeInstallCmd() *cobra.Command {
 	cmd := &cobra.Command{

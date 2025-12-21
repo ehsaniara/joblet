@@ -148,12 +148,12 @@ type VolumesConfig struct {
 
 // RuntimeConfig holds runtime system configuration
 type RuntimeConfig struct {
-	BasePath             string   `yaml:"base_path" json:"base_path"`
-	CommonPaths          []string `yaml:"common_paths" json:"common_paths"`
-	AllowedMounts        []string `yaml:"allowed_mounts" json:"allowed_mounts"`                 // Paths mounted read-only into job sandbox
-	InstallWritablePaths []string `yaml:"install_writable_paths" json:"install_writable_paths"` // Writable tmpfs mounts for runtime installation
-	InstallHostBinds     []string `yaml:"install_host_binds" json:"install_host_binds"`         // Host directories to bind-mount read-only during installation
-	InstallEnvPath       string   `yaml:"install_env_path" json:"install_env_path"`             // PATH environment for install chroot
+	BasePath      string   `yaml:"base_path" json:"base_path"`
+	CommonPaths   []string `yaml:"common_paths" json:"common_paths"`
+	AllowedMounts []string `yaml:"allowed_mounts" json:"allowed_mounts"` // Paths mounted read-only into job sandbox
+	// Note: Runtime builds now use OverlayFS isolation (see pkg/builder/isolation.go)
+	// The entire host filesystem is mounted read-only as the lower layer,
+	// so InstallWritablePaths, InstallHostBinds, and InstallEnvPath are no longer needed.
 }
 
 // GPUConfig holds GPU support configuration
@@ -304,8 +304,7 @@ var DefaultConfig = Config{
 		DefaultDiskQuotaBytes: 1048576, // 1MB default
 	},
 	// Runtime configuration
-	// IMPORTANT: Distro-specific settings (InstallWritablePaths) must be configured
-	// in joblet-config.yml. See scripts/joblet-config-template.yml for examples.
+	// Note: Runtime builds use OverlayFS isolation (see pkg/builder/isolation.go)
 	Runtime: RuntimeConfig{
 		BasePath: "/opt/joblet/runtimes",
 		CommonPaths: []string{ // Common runtime installation paths (FHS-compliant)
@@ -321,19 +320,7 @@ var DefaultConfig = Config{
 			"/lib",
 			"/lib64",
 		},
-		// Distro-specific: MUST be configured in joblet-config.yml
-		// See scripts/joblet-config-template.yml for Ubuntu, RHEL, Fedora, Alpine examples
-		InstallWritablePaths: []string{},
-		InstallHostBinds: []string{ // FHS-compliant - works on all distros
-			"/usr",
-			"/lib",
-			"/lib64",
-			"/bin",
-			"/sbin",
-			"/etc",
-			"/var",
-		},
-		InstallEnvPath: "/usr/bin:/bin:/sbin:/usr/sbin", // Standard PATH - works on all distros
+		// Note: Runtime builds use OverlayFS isolation - no additional config needed
 	},
 	GPU: GPUConfig{
 		Enabled:            false,       // Off by default - opt-in only
@@ -578,18 +565,11 @@ func loadRuntimeConfig(config *Config) (string, error) {
 		if len(runtimeWrapper.Runtime.CommonPaths) > 0 {
 			config.Runtime.CommonPaths = runtimeWrapper.Runtime.CommonPaths
 		}
-		if len(runtimeWrapper.Runtime.InstallWritablePaths) > 0 {
-			config.Runtime.InstallWritablePaths = runtimeWrapper.Runtime.InstallWritablePaths
-		}
-		if len(runtimeWrapper.Runtime.InstallHostBinds) > 0 {
-			config.Runtime.InstallHostBinds = runtimeWrapper.Runtime.InstallHostBinds
-		}
-		if runtimeWrapper.Runtime.InstallEnvPath != "" {
-			config.Runtime.InstallEnvPath = runtimeWrapper.Runtime.InstallEnvPath
-		}
 		if len(runtimeWrapper.Runtime.AllowedMounts) > 0 {
 			config.Runtime.AllowedMounts = runtimeWrapper.Runtime.AllowedMounts
 		}
+		// Note: InstallWritablePaths, InstallHostBinds, InstallEnvPath are no longer used
+		// Runtime builds now use OverlayFS isolation (see pkg/builder/isolation.go)
 
 		return path, nil
 	}
