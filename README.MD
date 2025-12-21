@@ -27,8 +27,7 @@ letting you focus on your applications rather than infrastructure complexity.
 - **⏰ Job Scheduling**: Execute jobs immediately, schedule for specific times, or set delayed execution
 - **🛡️ Enterprise Security**: mTLS encryption with certificate-based authentication and role-based
   access control
-- **🐍 Runtime**: Configured Python ML, Java, and GraalVM runtime environments
-  management
+- **🐍 Runtime Environments**: Build Python ML, Java, and custom runtime environments from declarative YAML specifications
 
 ## Getting Started
 
@@ -138,10 +137,11 @@ rnx workflow status <workflow-uuid>
 rnx job run echo "Hello World"
 rnx job run --max-cpu=50 --max-memory=512 python3 script.py
 
-# Pre-built runtime environments
-rnx job run --runtime=python-3.11-ml python analysis.py    # ML-ready Python environment
-rnx job run --runtime=openjdk-21 java App.java
-rnx job run --runtime=graalvmjdk-21 java GraalApp.java
+# Build and use runtime environments
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml   # Build Python ML runtime
+rnx runtime build ./examples/java-21/runtime.yaml          # Build Java 21 runtime
+rnx job run --runtime=python-3.11-ml python analysis.py    # Use Python ML runtime
+rnx job run --runtime=openjdk-21 java App.java             # Use Java runtime
 
 # GPU acceleration for compute-intensive workloads
 rnx job run --gpu=1 --gpu-memory=8GB python train_model.py
@@ -218,10 +218,11 @@ npm run dev
 - **[Installation Guide](docs/INSTALLATION.md)** - Comprehensive installation procedures for all platforms
 - **[AWS Deployment Guide](docs/AWS_DEPLOYMENT.md)** - Deploy Joblet on AWS EC2 with CloudWatch integration
 - **[GPU Support Guide](docs/GPU_SUPPORT.md)** - Complete guide to NVIDIA GPU acceleration and CUDA integration
+- **[Runtime System Guide](docs/RUNTIME_SYSTEM.md)** - Build and manage runtime environments from YAML specifications
 - **[Job Execution Guide](docs/JOB_EXECUTION.md)** - Detailed job management and execution patterns
 - **[RNX CLI Reference](docs/RNX_CLI_REFERENCE.md)** - Complete command reference with examples
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
-- **[Working Examples](examples/)** - Production-ready workflow templates and configurations
+- **[Working Examples](examples/)** - Production-ready workflow templates and runtime configurations
 
 ## Related Projects
 
@@ -229,7 +230,6 @@ npm run dev
 - **[Joblet Proto](https://github.com/ehsaniara/joblet-proto)**
 - **[Joblet Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)**
 - **[Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server)**
-- **[Joblet Runtimes](https://github.com/ehsaniara/joblet-runtimes)**
 
 **Developing a custom client?** Start with the [protocol definitions](https://github.com/ehsaniara/joblet-proto) to
 generate language-specific bindings.

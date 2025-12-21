@@ -314,10 +314,10 @@ func CopyConfiguration(isolatedDir string, logger BuildLogger) error {
 
 	// Copy essential config files
 	configFiles := map[string]string{
-		"/etc/resolv.conf": filepath.Join(etcDir, "resolv.conf"),
-		"/etc/hosts":       filepath.Join(etcDir, "hosts"),
-		"/etc/passwd":      filepath.Join(etcDir, "passwd"),
-		"/etc/group":       filepath.Join(etcDir, "group"),
+		"/etc/resolv.conf":   filepath.Join(etcDir, "resolv.conf"),
+		"/etc/hosts":         filepath.Join(etcDir, "hosts"),
+		"/etc/passwd":        filepath.Join(etcDir, "passwd"),
+		"/etc/group":         filepath.Join(etcDir, "group"),
 		"/etc/nsswitch.conf": filepath.Join(etcDir, "nsswitch.conf"),
 	}
 
@@ -374,4 +374,239 @@ func copyFile(src, dest string) error {
 
 	_, err = io.Copy(destFile, srcFile)
 	return err
+}
+
+// CopyBinariesFromPath copies binaries from a specific root path (e.g., overlay merged dir)
+// instead of from the host system. This is used for isolated builds.
+func CopyBinariesFromPath(rootPath string, platform *PlatformInfo, profile *LanguageProfile, isolatedDir string, logger BuildLogger) error {
+	binDir := filepath.Join(isolatedDir, "usr", "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		return fmt.Errorf("failed to create bin directory: %w", err)
+	}
+
+	// Collect all binaries to copy
+	binaries := make([]string, 0)
+	binaries = append(binaries, essentialBinaries...)
+	if profile != nil {
+		binaries = append(binaries, profile.Binaries...)
+	}
+
+	// Search paths within the root
+	searchPaths := []string{
+		filepath.Join(rootPath, "usr", "bin"),
+		filepath.Join(rootPath, "usr", "local", "bin"),
+		filepath.Join(rootPath, "bin"),
+	}
+
+	// Track which versioned binaries we copied for symlink fixup
+	copiedBinaries := make(map[string]bool)
+
+	for _, binary := range binaries {
+		var binaryPath string
+		var found bool
+
+		// Search for binary in the root path
+		for _, searchPath := range searchPaths {
+			candidatePath := filepath.Join(searchPath, binary)
+			if _, err := os.Stat(candidatePath); err == nil {
+				binaryPath = candidatePath
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			logger.Warn("Binary not found in isolated environment, skipping: %s", binary)
+			continue
+		}
+
+		// Resolve symlinks
+		realPath, err := filepath.EvalSymlinks(binaryPath)
+		if err != nil {
+			logger.Warn("Failed to resolve symlink for %s: %v", binary, err)
+			realPath = binaryPath
+		}
+
+		// Copy the binary
+		destPath := filepath.Join(binDir, filepath.Base(binaryPath))
+		if err := copyFile(realPath, destPath); err != nil {
+			return fmt.Errorf("failed to copy binary %s: %w", binary, err)
+		}
+
+		// Track which binaries we copied
+		copiedBinaries[binary] = true
+
+		// Create symlink if original was a symlink
+		if binaryPath != realPath {
+			linkPath := filepath.Join(binDir, filepath.Base(binaryPath))
+			realName := filepath.Base(realPath)
+			os.Remove(linkPath) // Remove if exists
+			if err := os.Symlink(realName, linkPath); err != nil {
+				logger.Warn("Failed to create symlink for %s: %v", binary, err)
+			}
+		}
+
+		logger.Debug("Copied binary from isolated env: %s", binary)
+	}
+
+	// Fix up symlinks for language runtimes
+	if profile != nil {
+		fixupSymlinks(binDir, profile, copiedBinaries, logger)
+	}
+
+	return nil
+}
+
+// CopyJavaRuntimeFromPath copies JVM from a specific root path (overlay)
+func CopyJavaRuntimeFromPath(rootPath string, profile *LanguageProfile, isolatedDir string, logger BuildLogger) error {
+	if profile == nil || profile.Language != "java" {
+		return nil
+	}
+
+	// Find the JVM installation directory within the root path
+	jvmPaths := []string{
+		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("java-%s-openjdk-amd64", profile.Version)),
+		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("java-%s-openjdk", profile.Version)),
+		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("openjdk-%s", profile.Version)),
+	}
+
+	var jvmSrc string
+	for _, path := range jvmPaths {
+		if _, err := os.Stat(path); err == nil {
+			jvmSrc = path
+			break
+		}
+	}
+
+	if jvmSrc == "" {
+		return fmt.Errorf("JVM installation not found in isolated environment for Java %s", profile.Version)
+	}
+
+	// Create destination directory
+	jvmDest := filepath.Join(isolatedDir, "usr", "lib", "jvm", filepath.Base(jvmSrc))
+	if err := os.MkdirAll(filepath.Dir(jvmDest), 0755); err != nil {
+		return fmt.Errorf("failed to create JVM directory: %w", err)
+	}
+
+	// Copy the entire JVM directory using cp -r
+	logger.Info("Copying JVM from isolated environment: %s", jvmSrc)
+	cmd := exec.Command("cp", "-r", jvmSrc, jvmDest)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to copy JVM: %w\nOutput: %s", err, string(output))
+	}
+
+	logger.Debug("Copied JVM to %s", jvmDest)
+
+	// Create symlinks in /usr/bin for java, javac, jar
+	binDir := filepath.Join(isolatedDir, "usr", "bin")
+	jvmBinDir := filepath.Join(jvmDest, "bin")
+
+	javaBinaries := []string{"java", "javac", "jar", "jshell", "keytool"}
+	for _, bin := range javaBinaries {
+		srcBin := filepath.Join(jvmBinDir, bin)
+		if _, err := os.Stat(srcBin); os.IsNotExist(err) {
+			continue
+		}
+
+		destBin := filepath.Join(binDir, bin)
+		os.Remove(destBin) // Remove any existing file/symlink
+
+		// Create relative symlink
+		relPath := fmt.Sprintf("../lib/jvm/%s/bin/%s", filepath.Base(jvmSrc), bin)
+		if err := os.Symlink(relPath, destBin); err != nil {
+			logger.Warn("Failed to create symlink for %s: %v", bin, err)
+		} else {
+			logger.Debug("Created symlink: %s -> %s", bin, relPath)
+		}
+	}
+
+	return nil
+}
+
+// CopyLibrariesFromPath copies libraries from a specific root path (overlay)
+func CopyLibrariesFromPath(rootPath string, platform *PlatformInfo, profile *LanguageProfile, isolatedDir string, logger BuildLogger) error {
+	libDir := filepath.Join(isolatedDir, "lib")
+	lib64Dir := filepath.Join(isolatedDir, "lib64")
+	usrLibDir := filepath.Join(isolatedDir, "usr", "lib")
+
+	for _, dir := range []string{libDir, lib64Dir, usrLibDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create lib directory %s: %w", dir, err)
+		}
+	}
+
+	// Collect all library patterns
+	patterns := make([]string, 0)
+	patterns = append(patterns, essentialLibraryPatterns...)
+	if profile != nil {
+		patterns = append(patterns, profile.LibraryPatterns...)
+	}
+
+	// Search directories within the root path
+	// Determine lib path based on platform
+	var platformLibPath string
+	if platform.Arch == "amd64" {
+		platformLibPath = filepath.Join(rootPath, "lib", "x86_64-linux-gnu")
+	} else {
+		platformLibPath = filepath.Join(rootPath, "lib", "aarch64-linux-gnu")
+	}
+
+	searchDirs := []string{
+		platformLibPath,
+		filepath.Join(rootPath, "lib"),
+		filepath.Join(rootPath, "lib64"),
+		filepath.Join(rootPath, "usr", "lib"),
+		filepath.Join(rootPath, "usr", "lib64"),
+	}
+
+	copiedLibs := make(map[string]bool)
+
+	for _, searchDir := range searchDirs {
+		if _, err := os.Stat(searchDir); os.IsNotExist(err) {
+			continue
+		}
+
+		for _, pattern := range patterns {
+			matches, err := filepath.Glob(filepath.Join(searchDir, pattern))
+			if err != nil {
+				continue
+			}
+
+			for _, match := range matches {
+				// Determine destination directory
+				var destDir string
+				if strings.Contains(searchDir, "lib64") {
+					destDir = lib64Dir
+				} else if strings.Contains(searchDir, "usr") {
+					destDir = usrLibDir
+				} else {
+					destDir = libDir
+				}
+
+				destPath := filepath.Join(destDir, filepath.Base(match))
+
+				// Skip if already copied
+				if copiedLibs[destPath] {
+					continue
+				}
+
+				// Resolve symlinks
+				realPath, err := filepath.EvalSymlinks(match)
+				if err != nil {
+					realPath = match
+				}
+
+				// Copy the library
+				if err := copyFile(realPath, destPath); err != nil {
+					logger.Warn("Failed to copy library %s: %v", match, err)
+					continue
+				}
+
+				copiedLibs[destPath] = true
+				logger.Debug("Copied library from isolated env: %s", filepath.Base(match))
+			}
+		}
+	}
+
+	return nil
 }

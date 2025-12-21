@@ -58,6 +58,10 @@ type BuildContext struct {
 	IsolatedDir string // /opt/joblet/runtimes/{name}/{version}/isolated
 	DryRun      bool
 	Verbose     bool
+
+	// Isolation
+	IsolatedEnv     *IsolatedEnvironment // OverlayFS isolated environment for package installation
+	IsolationTmpDir string               // Temporary directory for overlay filesystem
 }
 
 // BuildResult contains build outcome
