@@ -236,16 +236,34 @@ runtime_exists() {
     "$RNX_BINARY" runtime list 2>/dev/null | grep -q "$runtime"
 }
 
+# Map runtime name to example directory name
+get_runtime_example_dir() {
+    local runtime="$1"
+    case "$runtime" in
+        openjdk-21) echo "java-21" ;;
+        openjdk-17) echo "java-17" ;;
+        python-3.11) echo "python" ;;
+        *) echo "$runtime" ;;
+    esac
+}
+
 # Install runtime if not exists
 ensure_runtime() {
     local runtime="$1"
-    
+
     if runtime_exists "$runtime"; then
         return 0
     else
-        echo -e "  ${YELLOW}Installing runtime: $runtime${NC}"
-        # Run from project root to find runtime sources
-        timeout "$RUNTIME_TIMEOUT" bash -c "cd '$JOBLET_ROOT' && '$RNX_BINARY' runtime install '$runtime'" >/dev/null 2>&1
+        echo -e "  ${YELLOW}Building runtime: $runtime${NC}"
+        # Map runtime name to example directory
+        local example_dir=$(get_runtime_example_dir "$runtime")
+        local runtime_yaml="${JOBLET_ROOT}/examples/${example_dir}/runtime.yaml"
+        if [[ -f "$runtime_yaml" ]]; then
+            timeout "$RUNTIME_TIMEOUT" bash -c "'$RNX_BINARY' runtime build '$runtime_yaml'" >/dev/null 2>&1
+        else
+            echo -e "  ${RED}Runtime YAML not found: $runtime_yaml${NC}"
+            return 1
+        fi
     fi
 }
 
@@ -373,6 +391,6 @@ get_test_host_display() {
 export -f test_suite_init test_section run_test skip_test
 export -f assert_equals assert_contains assert_numeric_le assert_file_exists
 export -f run_job run_python_job get_job_logs get_clean_output check_job_status
-export -f runtime_exists ensure_runtime get_runtime_info
+export -f runtime_exists ensure_runtime get_runtime_info get_runtime_example_dir
 export -f test_suite_summary check_prerequisites cleanup_test_artifacts
 export -f run_remote_command run_rnx_command get_test_host_display
