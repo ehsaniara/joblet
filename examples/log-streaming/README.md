@@ -1,325 +1,97 @@
-# Log Streaming Example - Async Log System Performance Demo
+# Log Streaming Examples
 
-This example demonstrates Joblet's **rate-decoupled async log persistence system** optimized for HPC workloads.
-Experience real-time log streaming with microsecond write latency and 5M+ writes/second capability.
+Demonstrates Joblet's real-time log streaming capabilities.
 
-## 🎯 What This Example Demonstrates
+## Quick Start
 
-### **Rate-Decoupled Async Architecture**
-
-- **Microsecond Writes**: Jobs write to channels instantly, never waiting for disk I/O
-- **Producer-Consumer Pattern**: Background disk writer handles batching and optimization
-- **Overflow Protection**: Four strategies (compress/spill/sample/alert) prevent data loss
-- **HPC Optimization**: Handles 1000+ concurrent jobs with GB-scale logs
-
-### **Real-Time Log Streaming**
-
-- **Live Updates**: Watch logs appear instantly with `rnx job log -f`
-- **Historical Access**: View complete job logs from start to finish
-- **Multiple Clients**: Concurrent streaming to multiple terminals
-- **Backpressure Handling**: Automatic cleanup of slow clients
-
-### **Performance Validation**
-
-- **High-Frequency Logging**: 10-100 logs/second sustained rates
-- **Burst Patterns**: Rapid log generation to test overflow strategies
-- **Concurrent Jobs**: Multiple simultaneous high-frequency loggers
-- **Memory Management**: Bounded memory usage with configurable limits
-
-## 🚀 Quick Start
-
-### **Option 1: Interactive Demo Script**
+### Run the Demo
 
 ```bash
 cd examples/log-streaming
 ./run_demo.sh
 ```
 
-Choose from:
+The demo script offers:
 
-- **Quick Demo** (10 seconds): Basic functionality showcase
+- **Quick Demo** (10 seconds): Basic functionality
 - **Standard Demo** (~5 minutes): Comprehensive features
 - **Full Demo** (~10 minutes): All features including stress tests
 
-### **Option 2: Individual Jobs**
-
-```bash
-# Quick 10-second demo (100 counts at 10 logs/second)
-rnx workflow run jobs.yaml
-
-# Standard demo (1000 counts at 10 logs/second) 
-rnx workflow run jobs.yaml
-
-# High-frequency test (20 logs/second)
-rnx workflow run jobs.yaml
-
-# Burst test (50 logs/second - tests async overflow)
-rnx workflow run jobs.yaml
-
-# HPC simulation (10,000 counts over ~16 minutes)
-rnx workflow run jobs.yaml
-
-# Stress test (100 logs/second)
-rnx workflow run jobs.yaml
-```
-
-### **Option 3: Real-Time Streaming**
+### Manual Examples
 
 ```bash
 # Start a logging job
-JOB_ID=$(rnx workflow run jobs.yaml | grep -o '[0-9a-f\-]*')
+JOB_ID=$(rnx job run python3 examples/log-streaming/simple_logger.py 2>&1 | grep -oP 'ID: \K[a-f0-9-]+')
 
-# Stream logs in real-time (watch async system in action)
+# Stream logs in real-time
 rnx job log -f $JOB_ID
 
-# View complete logs after job finishes
-rnx job log --follow=false $JOB_ID
+# High-frequency logging test
+rnx job run --upload=examples/log-streaming/high_frequency_logger.py \
+  python3 high_frequency_logger.py --count=1000 --rate=50
 ```
 
-## 📊 Available Logging Patterns
+## Features Demonstrated
 
-### **Pre-configured Jobs**
+### Real-Time Streaming
 
-| Job Name         | Rate    | Count  | Duration | Purpose                     |
-|------------------|---------|--------|----------|-----------------------------|
-| `quick-demo`     | 10/sec  | 100    | 10s      | Basic functionality demo    |
-| `standard-demo`  | 10/sec  | 1,000  | ~100s    | Standard performance test   |
-| `high-frequency` | 20/sec  | 1,000  | ~50s     | High-rate sustained logging |
-| `burst-test`     | 50/sec  | 500    | ~10s     | Async overflow testing      |
-| `hpc-simulation` | 10/sec  | 10,000 | ~16min   | HPC workload simulation     |
-| `stress-test`    | 100/sec | 2,000  | ~20s     | Maximum rate validation     |
+- Live log updates with `rnx job log -f`
+- Multiple concurrent log viewers
+- Backpressure handling for slow clients
 
-### **Custom Configuration**
+### Rate-Decoupled Architecture
+
+- Microsecond write latency
+- Background disk writer with batching
+- Overflow protection strategies
+
+### Performance Testing
+
+- High-frequency logging (10-100+ logs/second)
+- Burst patterns for overflow testing
+- Concurrent job logging
+
+## Example Files
+
+### simple_logger.py
+
+Basic logging script that outputs timestamped messages:
+
+```python
+import time
+import datetime
+
+for i in range(100):
+    print(f"[{datetime.datetime.now()}] Log message {i}")
+    time.sleep(0.1)
+```
+
+### high_frequency_logger.py
+
+Configurable high-frequency logging for performance testing:
 
 ```bash
-# Configure your own logging pattern
-START_NUM=0 END_NUM=5000 INTERVAL=0.05 rnx workflow run jobs.yaml
+# 1000 logs at 50/second
+python3 high_frequency_logger.py --count=1000 --rate=50
+
+# Burst mode
+python3 high_frequency_logger.py --count=500 --rate=100
 ```
 
-Environment variables:
-
-- `START_NUM`: Starting count (default: 0)
-- `END_NUM`: Ending count (default: 10000)
-- `INTERVAL`: Seconds between logs (default: 0.1)
-
-## 🔄 Concurrent Logging Demo
-
-Test multiple high-frequency loggers simultaneously:
+## Viewing Logs
 
 ```bash
-# Run multiple concurrent loggers
-rnx workflow run concurrent-logging.yaml
+# Follow logs in real-time
+rnx job log -f <job-id>
 
-# Or start them individually
-rnx workflow run jobs.yaml &
-rnx workflow run jobs.yaml &
-rnx workflow run jobs.yaml &
+# View complete logs
+rnx job log <job-id>
 
-# Monitor all jobs
-rnx job list
+# View last N lines
+rnx job log --tail=50 <job-id>
 ```
 
-## 📈 Performance Monitoring
+## Related
 
-### **Real-Time System Monitoring**
-
-```bash
-# Monitor system performance during logging
-rnx monitor status
-
-# View all active jobs
-rnx job list
-
-# Check specific job status
-rnx job status <job-uuid>
-```
-
-### **Log Analysis**
-
-```bash
-# Count total log entries
-rnx job log --follow=false <job-uuid> | wc -l
-
-# Analyze timestamp precision
-rnx job log --follow=false <job-uuid> | head -20
-
-# Check for burst patterns
-rnx job log --follow=false <job-uuid> | grep "BURST"
-
-# Verify HPC simulation patterns
-rnx job log --follow=false <job-uuid> | grep "PHASE\|ALLOC"
-```
-
-## 🎛️ Logging Script Features
-
-The `high_frequency_logger.py` script includes:
-
-### **Burst Testing**
-
-- Initial burst of 100 rapid log entries
-- Periodic bursts every 5,000 counts
-- Final burst before completion
-- Tests async system overflow handling
-
-### **HPC Simulation**
-
-- Memory allocation phase logging
-- Computational phase simulation
-- Resource cleanup tracking
-- Realistic HPC workload patterns
-
-### **Rich Log Content**
-
-- Precise timestamps with millisecond precision
-- Progress indicators and milestones
-- Varying content patterns for compression testing
-- Performance metrics and rates
-
-### **Configurable Parameters**
-
-- Adjustable count ranges
-- Variable logging intervals
-- Burst pattern configuration
-- Resource limit testing
-
-## 🔧 Async Log System Configuration
-
-The example uses these settings to demonstrate optimal performance:
-
-```yaml
-# Resource limits for different test patterns
-max_cpu: 25-80     # CPU percentage limit
-max_memory: 128-512 # Memory limit in MB
-
-# Logging rates for different scenarios
-interval: 0.01-0.1  # Seconds between logs (10-100 logs/second)
-```
-
-### **System Configuration**
-
-For production HPC workloads, tune these async log system parameters:
-
-```yaml
-log_persistence:
-  queue_size: 100000              # Large queue for burst handling
-  memory_limit: 1073741824        # 1GB overflow protection
-  batch_size: 100                 # Efficient disk batching
-  flush_interval: "100ms"         # Low-latency periodic flush
-  overflow_strategy: "compress"   # Memory-efficient default
-```
-
-## 🎯 Expected Output Examples
-
-### **Quick Demo Output**
-
-```
-[2025-01-22 10:30:00.123] 🎯 Starting high-frequency logger
-[2025-01-22 10:30:00.124] 📊 Configuration: range=0-100, interval=0.1s
-[2025-01-22 10:30:00.125] 🚀 Starting burst logging simulation...
-[2025-01-22 10:30:00.126] BURST-001: Rapid log entry for async system testing
-[2025-01-22 10:30:00.127] BURST-002: Rapid log entry for async system testing
-...
-[2025-01-22 10:30:00.234] ✅ Burst complete: 100 entries in 0.108s (925.9 logs/sec)
-[2025-01-22 10:30:00.235] 🔄 Beginning main counting loop...
-[2025-01-22 10:30:00.336] COUNT: 1
-[2025-01-22 10:30:00.437] COUNT: 2
-...
-[2025-01-22 10:30:10.123] ✅ High-frequency logging complete!
-```
-
-### **Streaming Display**
-
-```bash
-$ rnx job log -f f47ac10b-58cc-4372-a567-0e02b2c3d479
-
-Logs for job f47ac10b-58cc-4372-a567-0e02b2c3d479 (Press Ctrl+C to exit):
-[2025-01-22 10:30:00.123] 🎯 Starting high-frequency logger
-[2025-01-22 10:30:00.124] 📊 Configuration: range=0-1000, interval=0.1s
-[2025-01-22 10:30:00.125] 🚀 Starting burst logging simulation...
-[2025-01-22 10:30:00.126] BURST-001: Rapid log entry for async system testing
-# ... logs continue streaming in real-time ...
-```
-
-## 🏆 What Makes This Special
-
-### **Async Log System Benefits**
-
-1. **Zero Job Impact**: Jobs never wait for disk I/O regardless of log volume
-2. **Complete Data Integrity**: All logs preserved with overflow protection
-3. **Real-Time Streaming**: Instant log availability for monitoring
-4. **HPC Optimized**: Handles extreme workloads (1000+ jobs, GB logs)
-5. **Configurable Protection**: Multiple overflow strategies for different scenarios
-
-### **Rate Decoupling**
-
-- **Producer Side**: Jobs write to channels instantly (microseconds)
-- **Consumer Side**: Background worker optimizes disk I/O with batching
-- **Overflow Protection**: Multiple strategies prevent data loss under load
-- **Monitoring**: Real-time metrics and performance tracking
-
-### **Production Ready**
-
-- Tested with 5M+ writes/second sustained throughput
-- Memory usage bounded by configuration (1GB default)
-- Comprehensive overflow handling and recovery
-- Complete integration with job lifecycle and streaming
-
-## 🔍 Troubleshooting
-
-### **Common Issues**
-
-**Logs not appearing in real-time:**
-
-```bash
-# Check job status
-rnx job status <job-uuid>
-
-# Verify async log system configuration
-cat /opt/joblet/config/joblet-config.yml | grep -A 10 log_persistence
-```
-
-**High CPU during burst tests:**
-
-```bash
-# Normal for stress tests - verify limits
-rnx job status <job-uuid>
-
-# Monitor system resources
-rnx monitor status
-```
-
-**Jobs finishing too quickly:**
-
-```bash
-# Check interval configuration
-rnx job status <job-uuid>
-
-# Use longer-running jobs
-rnx workflow run jobs.yaml
-```
-
-### **Performance Validation**
-
-```bash
-# Verify async system is handling load
-grep "async" /var/log/joblet/joblet.log
-
-# Check overflow protection activation
-grep "overflow" /var/log/joblet/joblet.log
-
-# Monitor memory usage
-cat /sys/fs/cgroup/joblet.slice/joblet.service/memory.current
-```
-
-## 🌟 Next Steps
-
-After running this example:
-
-1. **Explore Real Workloads**: Apply these patterns to your actual HPC jobs
-2. **Tune Configuration**: Adjust async system parameters for your workload
-3. **Monitor Production**: Use these techniques to monitor production jobs
-4. **Scale Testing**: Test with more concurrent jobs and higher rates
-5. **Custom Scripts**: Create your own high-frequency logging applications
-
-The async log system ensures your critical HPC workloads maintain optimal performance while providing complete
-observability and real-time monitoring capabilities.
+- [Basic Usage Examples](../basic-usage/README.md)
+- [Advanced Examples](../advanced/README.md)
