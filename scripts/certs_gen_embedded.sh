@@ -2,6 +2,10 @@
 
 set -e
 
+# JOBLET_HOME defines the installation directory (default: /opt/joblet)
+JOBLET_HOME="${JOBLET_HOME:-/opt/joblet}"
+export JOBLET_HOME
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -67,9 +71,9 @@ echo "🔐 Generating certificates and embedding them in config files..."
 
 # Determine working directory
 if [ "$(uname)" = "Linux" ]; then
-    WORK_DIR="/opt/joblet"
-    CONFIG_DIR="/opt/joblet/config"
-    TEMPLATE_DIR="/opt/joblet/scripts"
+    WORK_DIR="${JOBLET_HOME}"
+    CONFIG_DIR="${JOBLET_HOME}/config"
+    TEMPLATE_DIR="${JOBLET_HOME}/scripts"
     print_info "Using production directories: $WORK_DIR"
 else
     WORK_DIR="."

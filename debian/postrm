@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# JOBLET_HOME defines the installation directory (default: /opt/joblet)
+JOBLET_HOME="${JOBLET_HOME:-/opt/joblet}"
+
 case "$1" in
     remove)
         # Clean up cgroup directories
@@ -15,10 +18,10 @@ case "$1" in
         rm -f /usr/bin/joblet
         rm -f /usr/bin/rnx
 
-        # Note: Job logs in /opt/joblet/logs are preserved
+        # Note: Job logs in ${JOBLET_HOME}/logs are preserved
         # Use 'apt purge joblet' to remove all data including job logs
-        if [ -d "/opt/joblet/logs" ] && [ "$(ls -A /opt/joblet/logs 2>/dev/null)" ]; then
-            echo "Note: Job logs preserved in /opt/joblet/logs"
+        if [ -d "${JOBLET_HOME}/logs" ] && [ "$(ls -A ${JOBLET_HOME}/logs 2>/dev/null)" ]; then
+            echo "Note: Job logs preserved in ${JOBLET_HOME}/logs"
             echo "Use 'apt purge joblet' to remove all data"
         fi
 
@@ -33,12 +36,12 @@ case "$1" in
 
         # Count log files before removal
         LOG_COUNT=0
-        if [ -d "/opt/joblet/logs" ]; then
-            LOG_COUNT=$(find /opt/joblet/logs -name "*.log" -type f 2>/dev/null | wc -l)
+        if [ -d "${JOBLET_HOME}/logs" ]; then
+            LOG_COUNT=$(find ${JOBLET_HOME}/logs -name "*.log" -type f 2>/dev/null | wc -l)
         fi
 
         # Remove all joblet files including job logs, volumes, and configuration
-        rm -rf /opt/joblet
+        rm -rf ${JOBLET_HOME}
         rm -rf /var/log/joblet
 
         # Remove symlinks

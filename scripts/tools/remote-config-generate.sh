@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# JOBLET_HOME defines the installation directory (default: /opt/joblet)
+JOBLET_HOME="${JOBLET_HOME:-/opt/joblet}"
+
 # Remote configuration generation script
 # Usage: ./scripts/remote-config-generate.sh [REMOTE_HOST]
 
@@ -26,10 +29,10 @@ echo "🏗️  Generating configuration with embedded certificates on remote ser
 echo "⚠️  Note: This requires passwordless sudo to be configured"
 ssh $REMOTE_USER@$REMOTE_HOST "
     chmod +x /tmp/certs_gen_embedded.sh
-    sudo JOBLET_SERVER_ADDRESS=$REMOTE_HOST /tmp/certs_gen_embedded.sh
+    sudo JOBLET_HOME=${JOBLET_HOME} JOBLET_SERVER_ADDRESS=$REMOTE_HOST /tmp/certs_gen_embedded.sh
     echo ""
     echo "📋 Configuration files created:"
-    sudo ls -la /opt/joblet/config/ 2>/dev/null || echo "No configuration found"
+    sudo ls -la ${JOBLET_HOME}/config/ 2>/dev/null || echo "No configuration found"
     rm -f /tmp/certs_gen_embedded.sh
 "
 

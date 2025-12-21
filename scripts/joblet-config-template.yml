@@ -1,6 +1,9 @@
 # Unified Joblet Configuration
 # This file configures both joblet (main service) and persist (persistence service)
 #
+# JOBLET_HOME: The installation directory (default: /opt/joblet)
+# All paths below use /opt/joblet as the default JOBLET_HOME.
+#
 # Runtime configuration is in a SEPARATE file: runtime-config.yml
 # The installer automatically selects the correct runtime config for your distro.
 
