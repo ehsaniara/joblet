@@ -422,14 +422,14 @@ rnx job telematics f47ac10b --types exec,connect
 
 **Available eBPF Events:**
 
-| Event Type | Description |
-|------------|-------------|
-| EXEC | Process executions (fork/exec syscalls) |
-| CONNECT | Outgoing network connections (connect syscall) |
-| ACCEPT | Incoming network connections (accept syscall) |
-| SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
-| MMAP | Memory mappings with executable permissions |
-| MPROTECT | Memory protection changes adding exec permission |
+| Event Type | Description                                      |
+|------------|--------------------------------------------------|
+| EXEC       | Process executions (fork/exec syscalls)          |
+| CONNECT    | Outgoing network connections (connect syscall)   |
+| ACCEPT     | Incoming network connections (accept syscall)    |
+| SEND/RECV  | Socket data transfers (sendto/recvfrom syscalls) |
+| MMAP       | Memory mappings with executable permissions      |
+| MPROTECT   | Memory protection changes adding exec permission |
 
 **Filtering eBPF Events:**
 

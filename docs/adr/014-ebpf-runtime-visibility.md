@@ -13,9 +13,12 @@
 
 ## Context
 
-Joblet currently collects job metrics (CPU, memory, I/O) from cgroups v2 and stores them in the persist service. However, we have **zero telematics** into what jobs are actually doing - what binaries they execute, what network connections they make, what files they access.
+Joblet currently collects job metrics (CPU, memory, I/O) from cgroups v2 and stores them in the persist service.
+However, we have **zero telematics** into what jobs are actually doing - what binaries they execute, what network
+connections they make, what files they access.
 
-We want to add eBPF-based activity tracking. Rather than building a separate system, we should unify metrics and activity events into a **single telemetry pipeline** because:
+We want to add eBPF-based activity tracking. Rather than building a separate system, we should unify metrics and
+activity events into a **single telemetry pipeline** because:
 
 1. Both are time-series data about job behavior
 2. Both need the same storage backends (local persist or CloudWatch)
@@ -47,7 +50,8 @@ Metrics (cgroups v2)     Activity (eBPF)
 
 ## Decision
 
-Implement a **unified telemetry system** that treats metrics and activity events as two types of job telemetry, flowing through the same pipeline to the same storage backends.
+Implement a **unified telemetry system** that treats metrics and activity events as two types of job telemetry, flowing
+through the same pipeline to the same storage backends.
 
 ### Unified View
 
@@ -79,22 +83,22 @@ CONNECTIONS:
 
 ### Telemetry Types
 
-| Type | Source | Frequency | Data |
-|------|--------|-----------|------|
-| **Metrics** | cgroups v2 | Periodic (1-5s) | CPU, memory, disk I/O, network bytes, GPU |
-| **Activity** | eBPF | Event-driven | Process exec, network connect/accept, socket data, memory mappings, file access |
+| Type         | Source     | Frequency       | Data                                                                            |
+|--------------|------------|-----------------|---------------------------------------------------------------------------------|
+| **Metrics**  | cgroups v2 | Periodic (1-5s) | CPU, memory, disk I/O, network bytes, GPU                                       |
+| **Activity** | eBPF       | Event-driven    | Process exec, network connect/accept, socket data, memory mappings, file access |
 
 **eBPF Event Types:**
 
-| Event | CLI Display | Description |
-|-------|------------|-------------|
-| exec | EXEC | Process executions (fork/exec syscalls) |
-| connect | NET | Outgoing network connections (connect syscall) |
-| accept | ACCEPT | Incoming network connections (accept syscall) |
-| socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
-| mmap | MMAP | Memory mappings with executable permissions |
-| mprotect | MPROTECT | Memory protection changes adding exec permission |
-| file | FILE | File access (open/read/write) - optional, high volume |
+| Event       | CLI Display | Description                                           |
+|-------------|-------------|-------------------------------------------------------|
+| exec        | EXEC        | Process executions (fork/exec syscalls)               |
+| connect     | NET         | Outgoing network connections (connect syscall)        |
+| accept      | ACCEPT      | Incoming network connections (accept syscall)         |
+| socket_data | SEND/RECV   | Socket data transfers (sendto/recvfrom syscalls)      |
+| mmap        | MMAP        | Memory mappings with executable permissions           |
+| mprotect    | MPROTECT    | Memory protection changes adding exec permission      |
+| file        | FILE        | File access (open/read/write) - optional, high volume |
 
 ### Unified Event Model
 
@@ -213,6 +217,7 @@ type FileData struct {
 ```
 
 Format:
+
 ```json
 {"timestamp":"2025-12-04T10:30:00Z","job_id":"abc123","type":"metrics","data":{"cpu_percent":45.2,"memory_bytes":2147483648}}
 {"timestamp":"2025-12-04T10:30:01Z","job_id":"abc123","type":"exec","data":{"pid":1234,"binary":"python","args":["train.py"]}}
@@ -238,6 +243,7 @@ CloudWatch Metrics (for dashboards):
 ```
 
 CloudWatch Insights query examples:
+
 ```sql
 -- Query exec events for a job
 fields @timestamp, pid, filename, args
@@ -464,28 +470,33 @@ persist/internal/
 ## Implementation Plan
 
 ### Phase 1: Unified Telemetry Framework ✅ COMPLETED
+
 - Define TelemetryEvent types in joblet (`internal/joblet/telemetry/event.go`)
 - Implement TelemetryCollector (`internal/joblet/telemetry/collector.go`)
 - Refactor existing metrics to emit TelemetryEvents
 - IPC sender to persist service (`internal/joblet/ipc/persister.go`)
 
 ### Phase 2: Persist Service Updates ✅ COMPLETED
+
 - Update persist to receive telemetry events (exec, connect events via IPC)
 - Local storage backend for telemetry (`exec_events.jsonl.gz`, `connect_events.jsonl.gz`)
 - CloudWatch storage backend (`{jobID}-exec-events`, `{jobID}-connect-events` streams)
 
 ### Phase 3: eBPF Activity Tracking ✅ COMPLETED
+
 - eBPF program for execve, connect (`internal/joblet/ebpf/telematics/bpf/telematics.c`)
 - Go monitor using cilium/ebpf (`internal/joblet/ebpf/telematics/monitor.go`)
 - Integration with TelemetryCollector via EventPersister interface
 - Job lifecycle hooks (start/stop monitoring by cgroup ID)
 
 ### Phase 4: gRPC API ✅ COMPLETED
+
 - StreamJobTelemetry RPC (live)
 - GetJobTelemetry RPC (historical)
 - Single unified response format
 
 ### Phase 5: CLI ✅ COMPLETED
+
 - `rnx job metrics --tel` command for unified metrics + eBPF telemetry
 - Smart live/historical behavior (like `rnx job log`)
 - Short UUID support (first 8 characters)
@@ -494,6 +505,7 @@ persist/internal/
 ## Requirements
 
 **Joblet core:**
+
 - Linux kernel 5.8+ (for eBPF ring buffer)
 - `CAP_BPF` and `CAP_PERFMON` (joblet runs as root)
 - Build: `clang`, `llvm`, kernel headers (for eBPF C program)
@@ -501,6 +513,7 @@ persist/internal/
 - Runtime: No additional dependencies (eBPF bytecode embedded)
 
 **Persist service:**
+
 - Optional: AWS SDK (only if CloudWatch storage configured)
 
 ## References

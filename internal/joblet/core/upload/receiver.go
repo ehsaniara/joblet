@@ -47,7 +47,7 @@ func (r *Receiver) ProcessAllFiles(pipePath string, workspacePath string) error 
 	}
 
 	// Remove O_NONBLOCK after opening
-	if e := syscall.SetNonblock(int(pipe.Fd()), false); e != nil {
+	if e := r.platform.SetNonblock(int(pipe.Fd()), false); e != nil {
 		pipe.Close()
 		return fmt.Errorf("failed to set blocking mode: %w", e)
 	}

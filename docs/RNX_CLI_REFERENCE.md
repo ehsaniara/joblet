@@ -339,7 +339,8 @@ rnx job metrics <job-uuid>
 Shows CPU, memory, I/O, network, and GPU metrics collected during job execution via cgroups (sampled every ~5 seconds).
 Metrics are stored as time-series data, allowing complete historical replay of resource usage.
 
-For eBPF telematics events (process execution, network connections, etc.), use the separate `rnx job telematics` command.
+For eBPF telematics events (process execution, network connections, etc.), use the separate `rnx job telematics`
+command.
 
 #### Parameters
 
@@ -359,13 +360,13 @@ Works with both running and completed jobs. Supports short UUIDs (first 8 charac
 
 #### Metrics Collected
 
-| Category | Metrics                                                     |
-|----------|-------------------------------------------------------------|
-| CPU      | Usage percentage                                            |
-| Memory   | Current usage, limit, percentage used                       |
-| I/O      | Read/write bytes                                            |
-| Network  | RX/TX bytes                                                 |
-| GPU      | Utilization, memory (if GPUs allocated)                     |
+| Category | Metrics                                 |
+|----------|-----------------------------------------|
+| CPU      | Usage percentage                        |
+| Memory   | Current usage, limit, percentage used   |
+| I/O      | Read/write bytes                        |
+| Network  | RX/TX bytes                             |
+| GPU      | Utilization, memory (if GPUs allocated) |
 
 #### Examples
 
@@ -418,10 +419,10 @@ monitoring, debugging, and understanding job behavior.
 
 #### Parameters
 
-| Parameter         | Description                                                                         |
-|-------------------|-------------------------------------------------------------------------------------|
-| `--types`         | Filter by event types (comma-separated): exec,connect,accept,file,mmap,mprotect,socket_data |
-| `--json`          | Output in JSON format (global flag: `rnx --json`)                                   |
+| Parameter | Description                                                                                 |
+|-----------|---------------------------------------------------------------------------------------------|
+| `--types` | Filter by event types (comma-separated): exec,connect,accept,file,mmap,mprotect,socket_data |
+| `--json`  | Output in JSON format (global flag: `rnx --json`)                                           |
 
 #### Behavior
 
@@ -435,15 +436,15 @@ Works with both running and completed jobs. Supports short UUIDs (first 8 charac
 
 #### Event Types
 
-| Event Type  | Display   | Description                                           |
-|-------------|-----------|-------------------------------------------------------|
-| exec        | EXEC      | Process executions (fork/exec syscalls)               |
-| connect     | CONNECT   | Outgoing network connections (connect syscall)        |
-| accept      | ACCEPT    | Incoming network connections (accept syscall)         |
-| file        | FILE      | File operations (open, read, write)                   |
-| mmap        | MMAP      | Memory mappings with executable permissions           |
-| mprotect    | MPROTECT  | Memory protection changes adding exec permission      |
-| socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls)      |
+| Event Type  | Display   | Description                                      |
+|-------------|-----------|--------------------------------------------------|
+| exec        | EXEC      | Process executions (fork/exec syscalls)          |
+| connect     | CONNECT   | Outgoing network connections (connect syscall)   |
+| accept      | ACCEPT    | Incoming network connections (accept syscall)    |
+| file        | FILE      | File operations (open, read, write)              |
+| mmap        | MMAP      | Memory mappings with executable permissions      |
+| mprotect    | MPROTECT  | Memory protection changes adding exec permission |
+| socket_data | SEND/RECV | Socket data transfers (sendto/recvfrom syscalls) |
 
 #### Examples
 
@@ -768,10 +769,10 @@ rnx runtime list [flags]
 
 #### Flags
 
-| Flag            | Description                                                                                           | Default |
-|-----------------|-------------------------------------------------------------------------------------------------------|---------|
-| `--json`        | Output in JSON format                                                                                 | false   |
-| `--registry`    | List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo | ""      |
+| Flag         | Description                                                                                           | Default |
+|--------------|-------------------------------------------------------------------------------------------------------|---------|
+| `--json`     | Output in JSON format                                                                                 | false   |
+| `--registry` | List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo | ""      |
 
 #### Description
 

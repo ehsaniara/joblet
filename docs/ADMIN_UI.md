@@ -1,6 +1,7 @@
 # Joblet Web Admin UI
 
-The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs and monitoring system performance.
+The Joblet Web Admin UI provides a comprehensive React-based interface for managing jobs and monitoring system
+performance.
 The admin UI is now available as a standalone package in
 the [joblet-admin repository](https://github.com/ehsaniara/joblet-admin),
 connecting directly to the Joblet server via gRPC.

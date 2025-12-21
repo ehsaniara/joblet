@@ -531,12 +531,12 @@ func (f *JobFilesystem) performChroot() error {
 	log := f.logger.WithField("operation", "chroot")
 
 	// Change to the new root directory
-	if err := syscall.Chdir(f.RootDir); err != nil {
+	if err := f.platform.Chdir(f.RootDir); err != nil {
 		return fmt.Errorf("failed to change to new root directory: %w", err)
 	}
 
 	// Perform chroot
-	if err := syscall.Chroot(f.RootDir); err != nil {
+	if err := f.platform.Chroot(f.RootDir); err != nil {
 		return fmt.Errorf("chroot operation failed: %w", err)
 	}
 
@@ -545,11 +545,11 @@ func (f *JobFilesystem) performChroot() error {
 	if workspaceDir == "" {
 		workspaceDir = "/work" // fallback to default
 	}
-	if err := syscall.Chdir(workspaceDir); err != nil {
+	if err := f.platform.Chdir(workspaceDir); err != nil {
 		// If workspace doesn't exist, go to /tmp
-		if er := syscall.Chdir("/tmp"); er != nil {
+		if er := f.platform.Chdir("/tmp"); er != nil {
 			// Last resort: stay in /
-			if e := syscall.Chdir("/"); e != nil {
+			if e := f.platform.Chdir("/"); e != nil {
 				return fmt.Errorf("failed to change to any working directory after chroot: %w", e)
 			}
 		}
@@ -598,7 +598,7 @@ func (f *JobFilesystem) createEssentialDevices() error {
 	}
 
 	// Create /dev/null
-	if err := syscall.Mknod("/dev/null", syscall.S_IFCHR|0666, int(makedev(1, 3))); err != nil {
+	if err := f.platform.Mknod("/dev/null", syscall.S_IFCHR|0666, int(makedev(1, 3))); err != nil {
 		if !f.platform.IsExist(err) {
 			return fmt.Errorf("failed to create /dev/null: %w", err)
 		}
@@ -609,7 +609,7 @@ func (f *JobFilesystem) createEssentialDevices() error {
 	}
 
 	// Create /dev/zero
-	if err := syscall.Mknod("/dev/zero", syscall.S_IFCHR|0666, int(makedev(1, 5))); err != nil {
+	if err := f.platform.Mknod("/dev/zero", syscall.S_IFCHR|0666, int(makedev(1, 5))); err != nil {
 		if !f.platform.IsExist(err) {
 			return fmt.Errorf("failed to create /dev/zero: %w", err)
 		}
@@ -620,7 +620,7 @@ func (f *JobFilesystem) createEssentialDevices() error {
 	}
 
 	// Create /dev/random
-	if err := syscall.Mknod("/dev/random", syscall.S_IFCHR|0666, int(makedev(1, 8))); err != nil {
+	if err := f.platform.Mknod("/dev/random", syscall.S_IFCHR|0666, int(makedev(1, 8))); err != nil {
 		if !f.platform.IsExist(err) {
 			f.logger.Debug("failed to create /dev/random", "error", err)
 		}
@@ -631,7 +631,7 @@ func (f *JobFilesystem) createEssentialDevices() error {
 	}
 
 	// Create /dev/urandom
-	if err := syscall.Mknod("/dev/urandom", syscall.S_IFCHR|0666, int(makedev(1, 9))); err != nil {
+	if err := f.platform.Mknod("/dev/urandom", syscall.S_IFCHR|0666, int(makedev(1, 9))); err != nil {
 		if !f.platform.IsExist(err) {
 			f.logger.Debug("failed to create /dev/urandom", "error", err)
 		}
@@ -671,7 +671,7 @@ func (f *JobFilesystem) CreateGPUDeviceNodes(gpuIndices []int) error {
 	}
 
 	for _, device := range commonDevices {
-		if err := syscall.Mknod(device.path, syscall.S_IFCHR|0666, int(makedev(uint32(device.major), uint32(device.minor)))); err != nil {
+		if err := f.platform.Mknod(device.path, syscall.S_IFCHR|0666, int(makedev(uint32(device.major), uint32(device.minor)))); err != nil {
 			if !f.platform.IsExist(err) {
 				log.Warn("failed to create common GPU device", "device", device.path, "error", err)
 			} else {
@@ -686,7 +686,7 @@ func (f *JobFilesystem) CreateGPUDeviceNodes(gpuIndices []int) error {
 	for _, gpuIndex := range gpuIndices {
 		devicePath := fmt.Sprintf("/dev/nvidia%d", gpuIndex)
 
-		if err := syscall.Mknod(devicePath, syscall.S_IFCHR|0666, int(makedev(195, uint32(gpuIndex)))); err != nil {
+		if err := f.platform.Mknod(devicePath, syscall.S_IFCHR|0666, int(makedev(195, uint32(gpuIndex)))); err != nil {
 			if !f.platform.IsExist(err) {
 				log.Warn("failed to create GPU device node", "device", devicePath, "gpuIndex", gpuIndex, "error", err)
 			} else {

@@ -352,7 +352,7 @@ func (m *Manager) GetVolumeUsage(volumeName string) (used int64, available int64
 
 	// Get filesystem stats
 	var stat syscall.Statfs_t
-	if err := syscall.Statfs(dataDir, &stat); err != nil {
+	if err := m.platform.Statfs(dataDir, &stat); err != nil {
 		return 0, 0, fmt.Errorf("failed to get filesystem stats: %w", err)
 	}
 
@@ -417,7 +417,7 @@ func (m *Manager) createLoopFilesystem(volume *domain.Volume, dataDir string) er
 	}
 
 	// Set proper permissions on mounted directory
-	if err := syscall.Chmod(dataDir, 0755); err != nil {
+	if err := m.platform.Chmod(dataDir, 0755); err != nil {
 		log.Warn("failed to set permissions on volume", "error", err)
 	}
 

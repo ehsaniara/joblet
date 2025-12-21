@@ -275,7 +275,6 @@ scp ec2-user@<instance-ip>:/opt/joblet/config/rnx-config.yml ~/.rnx/
 # Step 4: Distribute to all clients
 ```
 
-
 ### CloudWatch Metrics
 
 ```bash
@@ -315,12 +314,14 @@ aws cloudtrail lookup-events \
 ### Problem: New instances can't get certificates
 
 **Symptom:**
+
 ```
 ERROR: Failed to retrieve secret joblet/ca-cert
 ERROR: Permission denied
 ```
 
 **Solution:**
+
 ```bash
 # Check IAM role
 aws ec2 describe-instances --instance-ids i-xxx \
@@ -338,12 +339,14 @@ aws ec2 terminate-instances --instance-ids i-xxx
 ### Problem: Certificates expired
 
 **Symptom:**
+
 ```
 ERROR: Certificate expired
 ERROR: Certificate verification failed
 ```
 
 **Solution:**
+
 ```bash
 # Force regenerate
 USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
@@ -360,6 +363,7 @@ aws autoscaling start-instance-refresh \
 Some instances work, others don't. Client gets intermittent connection errors.
 
 **Solution:**
+
 ```bash
 # This means some instances have old certs
 # Force refresh all instances
@@ -371,29 +375,29 @@ aws autoscaling start-instance-refresh \
 ## Best Practices
 
 1. **Always use Secrets Manager for production ASGs**
-   - Required for auto-scaling
+    - Required for auto-scaling
 
 2. **Use Network Load Balancer (NLB)**
-   - Better for gRPC/TLS passthrough
-   - Lower latency than ALB
+    - Better for gRPC/TLS passthrough
+    - Lower latency than ALB
 
 3. **Enable CloudTrail logging**
-   - Audit who accesses secrets
-   - Compliance requirement
+    - Audit who accesses secrets
+    - Compliance requirement
 
 4. **Set up certificate expiration alerts**
-   - CloudWatch alarm 30 days before expiry
-   - Automated rotation (future)
+    - CloudWatch alarm 30 days before expiry
+    - Automated rotation (future)
 
 5. **Test your scaling before production**
-   - Verify new instances get shared certs
-   - Verify client can connect to all instances
-   - Test auto-scaling triggers
+    - Verify new instances get shared certs
+    - Verify client can connect to all instances
+    - Test auto-scaling triggers
 
 6. **Plan certificate rotation**
-   - Server certs: Annually (per-instance, easy)
-   - Client certs: Every 2 years (requires client updates)
-   - CA cert: Every 3 years (full fleet update)
+    - Server certs: Annually (per-instance, easy)
+    - Client certs: Every 2 years (requires client updates)
+    - CA cert: Every 3 years (full fleet update)
 
 ## See Also
 

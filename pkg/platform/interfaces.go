@@ -63,6 +63,17 @@ type SyscallOperations interface {
 	// Mount operations (Linux-specific, no-op on other platforms)
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
 	Unmount(target string, flags int) error
+
+	// Filesystem operations
+	Chdir(path string) error
+	Chroot(path string) error
+	Mknod(path string, mode uint32, dev int) error
+	Mkfifo(path string, mode uint32) error
+	Chmod(path string, mode uint32) error
+	Statfs(path string, buf *syscall.Statfs_t) error
+
+	// File descriptor operations
+	SetNonblock(fd int, nonblocking bool) error
 }
 
 // CommandFactory creates and manages command execution

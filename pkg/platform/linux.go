@@ -5,6 +5,8 @@ package platform
 import (
 	"runtime"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // Mount Linux-specific mount operations (override default)
@@ -32,4 +34,39 @@ func (lp *LinuxPlatform) GetInfo() *Info {
 		OS:           "linux",
 		Architecture: runtime.GOARCH,
 	}
+}
+
+// Chdir changes the current working directory
+func (lp *LinuxPlatform) Chdir(path string) error {
+	return syscall.Chdir(path)
+}
+
+// Chroot changes the root directory
+func (lp *LinuxPlatform) Chroot(path string) error {
+	return syscall.Chroot(path)
+}
+
+// Mknod creates a device node
+func (lp *LinuxPlatform) Mknod(path string, mode uint32, dev int) error {
+	return syscall.Mknod(path, mode, dev)
+}
+
+// Mkfifo creates a named pipe (FIFO)
+func (lp *LinuxPlatform) Mkfifo(path string, mode uint32) error {
+	return unix.Mkfifo(path, mode)
+}
+
+// Chmod changes file permissions
+func (lp *LinuxPlatform) Chmod(path string, mode uint32) error {
+	return syscall.Chmod(path, mode)
+}
+
+// Statfs returns filesystem statistics
+func (lp *LinuxPlatform) Statfs(path string, buf *syscall.Statfs_t) error {
+	return syscall.Statfs(path, buf)
+}
+
+// SetNonblock sets or clears the O_NONBLOCK flag on a file descriptor
+func (lp *LinuxPlatform) SetNonblock(fd int, nonblocking bool) error {
+	return syscall.SetNonblock(fd, nonblocking)
 }

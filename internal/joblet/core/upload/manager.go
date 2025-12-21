@@ -3,7 +3,6 @@ package upload
 import (
 	"fmt"
 	"path/filepath"
-	"syscall"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/logger"
@@ -76,7 +75,7 @@ func (m *Manager) CreateTransport(jobID string) (domain.UploadTransport, error) 
 	pipePath := filepath.Join(pipeDir, "upload.fifo")
 
 	// Create named pipe
-	if err := syscall.Mkfifo(pipePath, 0600); err != nil {
+	if err := m.platform.Mkfifo(pipePath, 0600); err != nil {
 		return nil, fmt.Errorf("failed to create named pipe: %w", err)
 	}
 

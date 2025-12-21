@@ -3,7 +3,8 @@
 *From zero to running distributed jobs in 30 minutes*
 
 > **⚡ Quick Start**: For a faster, automated installation approach, see [AWS_DEPLOYMENT.md](../AWS_DEPLOYMENT.md) which
-> uses EC2 user data scripts for one-command deployment with automatic certificate management, CloudWatch integration, and
+> uses EC2 user data scripts for one-command deployment with automatic certificate management, CloudWatch integration,
+> and
 > support for multi-instance deployments via AWS Secrets Manager.
 >
 > This guide provides a detailed manual walkthrough for educational purposes and custom setups.

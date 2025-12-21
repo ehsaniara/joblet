@@ -121,6 +121,7 @@ Joblet automatically spawns and supervises two subprocesses:
 - **State**: Handles job state persistence
 
 Both subprocesses are managed with:
+
 - **Auto-restart**: Exponential backoff (1s → 30s max) on crash
 - **Graceful shutdown**: SIGTERM with 10s timeout before SIGKILL
 - **Parent death signal**: `Pdeathsig: SIGTERM` ensures children terminate when parent dies

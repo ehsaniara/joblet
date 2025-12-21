@@ -262,7 +262,8 @@ rnx job run \
   python train.py
 ```
 
-Variables `WANDB_API_KEY`, `HF_TOKEN`, `AWS_ACCESS_KEY`, and `AWS_SECRET_KEY` are automatically detected as secrets by their naming patterns.
+Variables `WANDB_API_KEY`, `HF_TOKEN`, `AWS_ACCESS_KEY`, and `AWS_SECRET_KEY` are automatically detected as secrets by
+their naming patterns.
 
 ### Example 2: Data Processing
 
