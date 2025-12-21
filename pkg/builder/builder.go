@@ -104,13 +104,21 @@ func (b *Builder) Build(ctx context.Context, yamlContent string, dryRun bool) (*
 		return result, err
 	}
 
+	// Setup isolated environment for system package installation
+	// This ensures packages are installed in an OverlayFS chroot, not on host
+	if err := b.setupIsolatedEnvironment(buildCtx); err != nil {
+		return result, fmt.Errorf("failed to setup isolated environment: %w", err)
+	}
+	// Ensure cleanup happens even on error
+	defer b.cleanupIsolatedEnvironment(buildCtx)
+
 	// Phase 6: Pre-install Hook
 	if err := b.phase6PreInstallHook(ctx, buildCtx, result); err != nil {
 		return result, err
 	}
 
-	// Phase 7: Install Base
-	if err := b.phase7InstallBase(ctx, buildCtx, profile, result); err != nil {
+	// Phase 7: Install Base (now runs in isolated environment)
+	if err := b.phase7InstallBaseIsolated(ctx, buildCtx, profile, result); err != nil {
 		return result, err
 	}
 
@@ -124,13 +132,13 @@ func (b *Builder) Build(ctx context.Context, yamlContent string, dryRun bool) (*
 		return result, err
 	}
 
-	// Phase 10: Copy Binaries
-	if err := b.phase10CopyBinaries(buildCtx, profile, result); err != nil {
+	// Phase 10: Copy Binaries (from isolated environment)
+	if err := b.phase10CopyBinariesFromIsolated(buildCtx, profile, result); err != nil {
 		return result, err
 	}
 
-	// Phase 11: Copy Libraries
-	if err := b.phase11CopyLibraries(buildCtx, profile, result); err != nil {
+	// Phase 11: Copy Libraries (from isolated environment)
+	if err := b.phase11CopyLibrariesFromIsolated(buildCtx, profile, result); err != nil {
 		return result, err
 	}
 
@@ -408,40 +416,6 @@ func (b *Builder) phase6PreInstallHook(ctx context.Context, buildCtx *BuildConte
 	return nil
 }
 
-func (b *Builder) phase7InstallBase(ctx context.Context, buildCtx *BuildContext, profile *LanguageProfile, result *BuildResult) error {
-	phaseStart := time.Now()
-	b.logger.Phase(7, totalPhases, PhaseInstallBase.String(), "Installing base language packages")
-
-	var packages []string
-	switch buildCtx.Platform.PkgManager {
-	case "apt":
-		packages = profile.AptPackages
-	case "yum", "dnf":
-		packages = profile.YumPackages
-	}
-
-	if err := InstallSystemPackages(ctx, buildCtx.Platform, packages, b.logger); err != nil {
-		result.Phases = append(result.Phases, PhaseResult{
-			Phase:   7,
-			Name:    PhaseInstallBase.String(),
-			Success: false,
-			Error:   err,
-		})
-		return err
-	}
-
-	result.Phases = append(result.Phases, PhaseResult{
-		Phase:    7,
-		Name:     PhaseInstallBase.String(),
-		Success:  true,
-		Duration: time.Since(phaseStart),
-		Message:  fmt.Sprintf("Installed %d packages", len(packages)),
-	})
-
-	b.logger.Info("Installed %d base packages", len(packages))
-	return nil
-}
-
 func (b *Builder) phase8InstallPackages(ctx context.Context, buildCtx *BuildContext, result *BuildResult) error {
 	phaseStart := time.Now()
 	b.logger.Phase(8, totalPhases, PhaseInstallPackages.String(), "Installing language packages")
@@ -514,67 +488,6 @@ func (b *Builder) phase9PostInstallHook(ctx context.Context, buildCtx *BuildCont
 	result.Phases = append(result.Phases, PhaseResult{
 		Phase:    9,
 		Name:     PhasePostInstallHook.String(),
-		Success:  true,
-		Duration: time.Since(phaseStart),
-		Message:  "Completed",
-	})
-
-	return nil
-}
-
-func (b *Builder) phase10CopyBinaries(buildCtx *BuildContext, profile *LanguageProfile, result *BuildResult) error {
-	phaseStart := time.Now()
-	b.logger.Phase(10, totalPhases, PhaseCopyBinaries.String(), "Copying binaries")
-
-	if err := CopyBinaries(buildCtx.Platform, profile, buildCtx.IsolatedDir, b.logger); err != nil {
-		result.Phases = append(result.Phases, PhaseResult{
-			Phase:   10,
-			Name:    PhaseCopyBinaries.String(),
-			Success: false,
-			Error:   err,
-		})
-		return err
-	}
-
-	// For Java runtimes, copy the entire JVM installation
-	if err := CopyJavaRuntime(profile, buildCtx.IsolatedDir, b.logger); err != nil {
-		result.Phases = append(result.Phases, PhaseResult{
-			Phase:   10,
-			Name:    PhaseCopyBinaries.String(),
-			Success: false,
-			Error:   err,
-		})
-		return err
-	}
-
-	result.Phases = append(result.Phases, PhaseResult{
-		Phase:    10,
-		Name:     PhaseCopyBinaries.String(),
-		Success:  true,
-		Duration: time.Since(phaseStart),
-		Message:  "Completed",
-	})
-
-	return nil
-}
-
-func (b *Builder) phase11CopyLibraries(buildCtx *BuildContext, profile *LanguageProfile, result *BuildResult) error {
-	phaseStart := time.Now()
-	b.logger.Phase(11, totalPhases, PhaseCopyLibraries.String(), "Copying libraries")
-
-	if err := CopyLibraries(buildCtx.Platform, profile, buildCtx.IsolatedDir, b.logger); err != nil {
-		result.Phases = append(result.Phases, PhaseResult{
-			Phase:   11,
-			Name:    PhaseCopyLibraries.String(),
-			Success: false,
-			Error:   err,
-		})
-		return err
-	}
-
-	result.Phases = append(result.Phases, PhaseResult{
-		Phase:    11,
-		Name:     PhaseCopyLibraries.String(),
 		Success:  true,
 		Duration: time.Since(phaseStart),
 		Message:  "Completed",
@@ -687,5 +600,159 @@ func (b *Builder) phase14ValidateBuild(buildCtx *BuildContext, result *BuildResu
 	})
 
 	b.logger.Info("Build validated: %d files, %d MB", fileCount, totalSize/1024/1024)
+	return nil
+}
+
+// setupIsolatedEnvironment creates an OverlayFS-based chroot for isolated package installation
+// This ensures system packages are NOT installed on the host
+func (b *Builder) setupIsolatedEnvironment(buildCtx *BuildContext) error {
+	b.logger.Info("Setting up isolated build environment (OverlayFS)")
+
+	// Create temporary directory for overlay filesystem
+	tmpDir, err := os.MkdirTemp("", "joblet-build-overlay-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory for overlay: %w", err)
+	}
+	buildCtx.IsolationTmpDir = tmpDir
+
+	// Create isolated environment
+	isolatedEnv, err := NewIsolatedEnvironment(tmpDir, b.logger)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		return fmt.Errorf("failed to create isolated environment: %w", err)
+	}
+
+	// Setup the overlay filesystem
+	if err := isolatedEnv.Setup(); err != nil {
+		os.RemoveAll(tmpDir)
+		return fmt.Errorf("failed to setup isolated environment: %w", err)
+	}
+
+	buildCtx.IsolatedEnv = isolatedEnv
+	b.logger.Info("Isolated environment ready - host will NOT be modified")
+	return nil
+}
+
+// cleanupIsolatedEnvironment cleans up the OverlayFS environment
+func (b *Builder) cleanupIsolatedEnvironment(buildCtx *BuildContext) {
+	if buildCtx.IsolatedEnv != nil {
+		b.logger.Debug("Cleaning up isolated environment")
+		if err := buildCtx.IsolatedEnv.Cleanup(); err != nil {
+			b.logger.Warn("Failed to cleanup isolated environment: %v", err)
+		}
+		buildCtx.IsolatedEnv = nil
+	}
+}
+
+// phase7InstallBaseIsolated installs base language packages in the isolated environment
+func (b *Builder) phase7InstallBaseIsolated(ctx context.Context, buildCtx *BuildContext, profile *LanguageProfile, result *BuildResult) error {
+	phaseStart := time.Now()
+	b.logger.Phase(7, totalPhases, PhaseInstallBase.String(), "Installing base language packages (isolated)")
+
+	if buildCtx.IsolatedEnv == nil {
+		return fmt.Errorf("isolated environment not initialized")
+	}
+
+	var packages []string
+	switch buildCtx.Platform.PkgManager {
+	case "apt":
+		packages = profile.AptPackages
+	case "yum", "dnf":
+		packages = profile.YumPackages
+	}
+
+	// Install packages in the isolated environment (not on host!)
+	if err := buildCtx.IsolatedEnv.InstallPackagesIsolated(buildCtx.Platform.PkgManager, packages); err != nil {
+		result.Phases = append(result.Phases, PhaseResult{
+			Phase:   7,
+			Name:    PhaseInstallBase.String(),
+			Success: false,
+			Error:   err,
+		})
+		return err
+	}
+
+	result.Phases = append(result.Phases, PhaseResult{
+		Phase:    7,
+		Name:     PhaseInstallBase.String(),
+		Success:  true,
+		Duration: time.Since(phaseStart),
+		Message:  fmt.Sprintf("Installed %d packages (isolated)", len(packages)),
+	})
+
+	b.logger.Info("Installed %d base packages in isolated environment", len(packages))
+	return nil
+}
+
+// phase10CopyBinariesFromIsolated copies binaries from the isolated environment
+func (b *Builder) phase10CopyBinariesFromIsolated(buildCtx *BuildContext, profile *LanguageProfile, result *BuildResult) error {
+	phaseStart := time.Now()
+	b.logger.Phase(10, totalPhases, PhaseCopyBinaries.String(), "Copying binaries from isolated environment")
+
+	if buildCtx.IsolatedEnv == nil {
+		return fmt.Errorf("isolated environment not initialized")
+	}
+
+	// Copy binaries from the merged overlay view
+	if err := CopyBinariesFromPath(buildCtx.IsolatedEnv.GetMergedPath(""), buildCtx.Platform, profile, buildCtx.IsolatedDir, b.logger); err != nil {
+		result.Phases = append(result.Phases, PhaseResult{
+			Phase:   10,
+			Name:    PhaseCopyBinaries.String(),
+			Success: false,
+			Error:   err,
+		})
+		return err
+	}
+
+	// For Java runtimes, copy the entire JVM installation from the isolated environment
+	if err := CopyJavaRuntimeFromPath(buildCtx.IsolatedEnv.GetMergedPath(""), profile, buildCtx.IsolatedDir, b.logger); err != nil {
+		result.Phases = append(result.Phases, PhaseResult{
+			Phase:   10,
+			Name:    PhaseCopyBinaries.String(),
+			Success: false,
+			Error:   err,
+		})
+		return err
+	}
+
+	result.Phases = append(result.Phases, PhaseResult{
+		Phase:    10,
+		Name:     PhaseCopyBinaries.String(),
+		Success:  true,
+		Duration: time.Since(phaseStart),
+		Message:  "Completed (from isolated)",
+	})
+
+	return nil
+}
+
+// phase11CopyLibrariesFromIsolated copies libraries from the isolated environment
+func (b *Builder) phase11CopyLibrariesFromIsolated(buildCtx *BuildContext, profile *LanguageProfile, result *BuildResult) error {
+	phaseStart := time.Now()
+	b.logger.Phase(11, totalPhases, PhaseCopyLibraries.String(), "Copying libraries from isolated environment")
+
+	if buildCtx.IsolatedEnv == nil {
+		return fmt.Errorf("isolated environment not initialized")
+	}
+
+	// Copy libraries from the merged overlay view
+	if err := CopyLibrariesFromPath(buildCtx.IsolatedEnv.GetMergedPath(""), buildCtx.Platform, profile, buildCtx.IsolatedDir, b.logger); err != nil {
+		result.Phases = append(result.Phases, PhaseResult{
+			Phase:   11,
+			Name:    PhaseCopyLibraries.String(),
+			Success: false,
+			Error:   err,
+		})
+		return err
+	}
+
+	result.Phases = append(result.Phases, PhaseResult{
+		Phase:    11,
+		Name:     PhaseCopyLibraries.String(),
+		Success:  true,
+		Duration: time.Since(phaseStart),
+		Message:  "Completed (from isolated)",
+	})
+
 	return nil
 }

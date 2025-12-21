@@ -2,22 +2,60 @@
 
 ## Overview
 
-Joblet implements a robust dual-chroot architecture that ensures complete host system protection during runtime builds.
+Joblet implements a robust isolation architecture that ensures complete host system protection during runtime builds.
 This document details the security mechanisms, isolation guarantees, and verification procedures that prevent host
 contamination.
 
 ## Key Protection Mechanisms
 
-### 1. Dual Chroot Architecture
+### 1. OverlayFS-Based Isolation for Runtime Builds
+
+Runtime builds use **OverlayFS** to provide complete host isolation. This is the primary mechanism that ensures
+system packages can be installed without contaminating the host system.
+
+**How OverlayFS Isolation Works:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    OverlayFS Mount                          │
+├─────────────────────────────────────────────────────────────┤
+│  Lower Layer (read-only):  /  (host root)                   │
+│  Upper Layer (read-write): /tmp/rnx-isolation-XXXXX/upper   │
+│  Work Directory:           /tmp/rnx-isolation-XXXXX/work    │
+│  Merged View:              /tmp/rnx-isolation-XXXXX/merged  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Package installation (apt-get, yum, pip) runs in chroot    │
+│  inside the merged view. All writes go to Upper Layer.      │
+│  Host system (Lower Layer) remains completely untouched.    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  After installation, binaries and libraries are copied      │
+│  from Upper Layer to /opt/joblet/runtimes/<name>/<version>/ │
+│  Overlay is then unmounted and temp directory is removed.   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Benefits:**
+- **Zero Host Contamination**: All package writes go to the ephemeral upper layer
+- **Full Package Manager Support**: apt-get, yum, dnf, pip all work normally
+- **Automatic Cleanup**: Overlay and temp directories are removed after build
+- **Selective Copy**: Only needed binaries/libraries are copied to runtime directory
+
+### 2. Dual Isolation Architecture
 
 Joblet uses two distinct isolation levels:
 
-| Type                | Purpose            | Filesystem Access                | Host Protection    |
-|---------------------|--------------------|----------------------------------|--------------------|
-| **Production Jobs** | Run user workloads | Minimal chroot (~50MB)           | Complete isolation |
-| **Runtime Builds**  | Install runtimes   | Full host OS minus `/opt/joblet` | Chroot isolation   |
+| Type                | Purpose            | Isolation Method                 | Host Protection        |
+|---------------------|--------------------|----------------------------------|------------------------|
+| **Production Jobs** | Run user workloads | Minimal chroot (~50MB)           | Complete isolation     |
+| **Runtime Builds**  | Install runtimes   | OverlayFS chroot                 | Zero host modification |
 
-### 2. Critical Safety Features
+### 3. Critical Safety Features
 
 #### 2.1 `/opt/joblet` Exclusion
 
@@ -84,6 +122,68 @@ Joblet uses two distinct isolation levels:
 
 ## Implementation Details
 
+### OverlayFS Isolation Implementation
+
+The runtime builder uses OverlayFS to create an isolated environment for package installation.
+The implementation is in `pkg/builder/isolation.go`.
+
+**Setup Phase:**
+```go
+// Create overlay directories
+upperDir  := filepath.Join(baseDir, "upper")   // Captures all writes
+workDir   := filepath.Join(baseDir, "work")    // Required by OverlayFS
+mergedDir := filepath.Join(baseDir, "merged")  // Chroot target
+
+// Mount OverlayFS
+opts := "lowerdir=/,upperdir={upper},workdir={work}"
+syscall.Mount("overlay", mergedDir, "overlay", 0, opts)
+
+// Mount essential filesystems inside overlay
+mount("proc", mergedDir+"/proc", "proc")
+mount("sysfs", mergedDir+"/sys", "sysfs", MS_RDONLY)
+mount("/dev", mergedDir+"/dev", "", MS_BIND|MS_REC)
+```
+
+**Package Installation Phase:**
+```go
+// Run apt-get install inside chroot
+cmd := exec.Command("chroot", mergedDir, "apt-get", "install", "-y", packages...)
+cmd.Env = []string{
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "DEBIAN_FRONTEND=noninteractive",
+}
+cmd.Run()
+```
+
+**Copy Phase:**
+```go
+// Copy binaries from upper layer (only new/modified files)
+// Upper layer contains ONLY the changes from package installation
+copyFromPath(upperDir+"/usr/bin", runtimeDir+"/bin", binaries)
+copyFromPath(upperDir+"/usr/lib", runtimeDir+"/lib", libraries)
+```
+
+**Cleanup Phase:**
+```go
+// Unmount in reverse order
+syscall.Unmount(mergedDir+"/dev", MNT_DETACH)
+syscall.Unmount(mergedDir+"/sys", MNT_DETACH)
+syscall.Unmount(mergedDir+"/proc", MNT_DETACH)
+syscall.Unmount(mergedDir, MNT_DETACH)
+
+// Remove temp directory
+os.RemoveAll(baseDir)
+```
+
+### Key Source Files
+
+| File | Purpose |
+|------|---------|
+| `pkg/builder/isolation.go` | OverlayFS isolation environment |
+| `pkg/builder/system_ops.go` | System operations interface (for testing) |
+| `pkg/builder/builder.go` | Main build orchestration with isolated phases |
+| `pkg/builder/copier.go` | Copy binaries/libraries from overlay |
+
 ### Environment Detection
 
 Runtime scripts can detect their execution context:
@@ -100,26 +200,6 @@ else
     # Should prompt for confirmation
 fi
 ```
-
-### Mount Configuration
-
-The builder filesystem setup (`SetupBuilder()`) performs:
-
-1. **Create base directories** in `/opt/joblet/jobs/{BUILD_ID}/`
-2. **Mount host filesystem** excluding `/opt/joblet`:
-   ```go
-   // Skip /opt/joblet to prevent recursion
-   if dirName == "joblet" {
-       log.Debug("skipping /opt/joblet to prevent recursion")
-       continue
-   }
-   ```
-3. **Bind mount runtimes** as read-write:
-   ```go
-   mount --bind /opt/joblet/runtimes /opt/joblet/jobs/{BUILD_ID}/opt/joblet/runtimes
-   ```
-4. **Perform chroot** to builder environment
-5. **Mount essential filesystems** (/proc, /dev) inside chroot
 
 ### Service-Based Routing
 
@@ -269,13 +349,21 @@ All runtime installations logged with:
 
 ## Summary
 
-Joblet's builder runtime architecture provides industrial-strength host protection through:
+Joblet's runtime build architecture provides industrial-strength host protection through:
 
-1. **Complete isolation** via chroot jails
-2. **Selective mounting** with `/opt/joblet` exclusion
-3. **Read-only system** directory protection
-4. **Automatic cleanup** of build environments
-5. **Comprehensive validation** before execution
+1. **OverlayFS isolation** - All package installations happen in an ephemeral overlay filesystem
+2. **Chroot enforcement** - Package managers run inside chroot targeting the overlay merged view
+3. **Zero host modification** - Lower layer (host root) is mounted read-only, all writes go to upper layer
+4. **Selective copy** - Only needed binaries/libraries are copied from overlay to runtime directory
+5. **Automatic cleanup** - Overlay is unmounted and temp directory removed after build
+6. **Testable design** - SystemOps interface allows unit testing with mocked system operations
 
 The system ensures that runtime builds can safely install packages and compile software without any risk of host
 contamination, while maintaining the ability to produce persistent runtime environments for production use.
+
+### Implementation References
+
+- **Isolation Environment**: `pkg/builder/isolation.go`
+- **System Operations Interface**: `pkg/builder/system_ops.go`
+- **Build Orchestration**: `pkg/builder/builder.go`
+- **Unit Tests**: `pkg/builder/isolation_test.go`

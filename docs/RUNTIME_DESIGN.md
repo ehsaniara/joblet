@@ -379,10 +379,39 @@ PYTHON_VERSION=3.11
 
 ## Installation Process
 
+### OverlayFS-Based Host Isolation
+
+Runtime builds use **OverlayFS** to ensure complete host system protection during package installation.
+This mechanism allows the builder to run apt-get, yum, pip, and other package managers without
+modifying the host system.
+
+**How It Works:**
+
+1. **Setup**: An OverlayFS is mounted with the host root as read-only lower layer
+2. **Install**: Package managers run inside chroot targeting the overlay merged view
+3. **Copy**: Installed binaries/libraries are copied from the upper layer to the runtime directory
+4. **Cleanup**: Overlay is unmounted and temp directory is removed
+
+```
+Host Root (/)          →  Lower Layer (read-only)
+                           ↓
+Temp Directory         →  Upper Layer (captures all writes)
+                           ↓
+Merged View            →  Chroot target for package installation
+                           ↓
+Runtime Directory      ←  Copy binaries/libraries from upper layer
+```
+
+**Key Files:**
+- `pkg/builder/isolation.go` - OverlayFS isolation implementation
+- `pkg/builder/system_ops.go` - System operations interface (for testing)
+- `pkg/builder/isolation_test.go` - Unit tests with mocked system operations
+
 ### Automated Setup
 
 The runtime installation system provides:
 
+- OverlayFS-based host isolation for package installation
 - Command-line options for selective installation
 - Pre-installation checks (disk space, network)
 - Automatic dependency removal
@@ -406,6 +435,7 @@ rnx runtime build --dry-run ./runtime.yaml
 - Joblet configuration automatically updated
 - Runtime support enabled
 - Service restart recommended
+- OverlayFS environment automatically cleaned up
 
 ## Security Considerations
 
@@ -418,10 +448,14 @@ rnx runtime build --dry-run ./runtime.yaml
 
 ### Build Security
 
+- **OverlayFS isolation**: All package installations happen in an ephemeral overlay
+- **Zero host contamination**: Host filesystem is mounted read-only as lower layer
+- **Selective copy**: Only needed binaries/libraries are copied to runtime
 - Build dependencies removed after installation
 - No build tools remain on host system
 - Source code cleanup after compilation
 - Minimal runtime footprint
+- **Testable design**: SystemOps interface enables unit testing with mocks
 
 ## Performance Optimization
 
