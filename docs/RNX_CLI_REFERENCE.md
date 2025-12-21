@@ -29,9 +29,9 @@ operations.
 - [Runtime Commands](#runtime-commands)
     - [runtime list](#rnx-runtime-list)
     - [runtime info](#rnx-runtime-info)
-    - [runtime install](#rnx-runtime-install)
-    - [runtime test](#rnx-runtime-test)
+    - [runtime build](#rnx-runtime-build)
     - [runtime validate](#rnx-runtime-validate)
+    - [runtime test](#rnx-runtime-test)
     - [runtime remove](#rnx-runtime-remove)
 - [System Commands](#system-commands)
     - [version](#rnx-version)
@@ -761,7 +761,7 @@ rnx network list --json | jq -r '.networks[] | select(.builtin == false) | .name
 
 ### `rnx runtime list`
 
-List all installed runtime environments or available runtimes from external sources.
+List all installed runtime environments on the remote server.
 
 ```bash
 rnx runtime list [flags]
@@ -769,18 +769,9 @@ rnx runtime list [flags]
 
 #### Flags
 
-| Flag         | Description                                                                                           | Default |
-|--------------|-------------------------------------------------------------------------------------------------------|---------|
-| `--json`     | Output in JSON format                                                                                 | false   |
-| `--registry` | List available runtimes from GitHub registry (default: ehsaniara/joblet-runtimes). Format: owner/repo | ""      |
-
-#### Description
-
-The list command can show:
-
-1. **Locally installed runtimes** (default) - Shows runtimes already installed on the server
-2. **Available runtimes from registry** (with `--registry` flag) - Shows runtimes available for installation from GitHub
-   registries
+| Flag     | Description           | Default |
+|----------|-----------------------|---------|
+| `--json` | Output in JSON format | false   |
 
 #### Examples
 
@@ -790,12 +781,6 @@ rnx runtime list
 
 # JSON output for installed runtimes
 rnx runtime list --json
-
-# List available runtimes from default registry
-rnx runtime list --registry
-
-# List available runtimes from custom registry
-rnx runtime list --registry=myorg/custom-runtimes
 ```
 
 ### `rnx runtime info`
@@ -814,67 +799,89 @@ rnx runtime info python-3.11-ml
 rnx runtime info openjdk:21
 ```
 
-### `rnx runtime install`
+### `rnx runtime build`
 
-Install a runtime environment from an external registry.
+Build a runtime environment on the remote server from a YAML specification file.
 
 ```bash
-rnx runtime install <runtime-spec> [flags]
+rnx runtime build <path> [flags]
 ```
 
-#### Runtime Specification Format
+#### Arguments
 
-- `<runtime-name>@<version>` - Install specific version (e.g., `python-3.11-ml@1.0.2`)
-- `<runtime-name>@latest` - Install latest version explicitly
-- `<runtime-name>` - Install latest version (implicit `@latest`)
+- `<path>` - Path to a `runtime.yaml` file or directory containing one
 
 #### Flags
 
-| Flag         | Short | Description                                  | Default                   |
-|--------------|-------|----------------------------------------------|---------------------------|
-| `--force`    | `-f`  | Force reinstall by deleting existing runtime | false                     |
-| `--registry` |       | GitHub runtime registry (format: owner/repo) | ehsaniara/joblet-runtimes |
+| Flag        | Short | Description                            | Default |
+|-------------|-------|----------------------------------------|---------|
+| `--dry-run` |       | Preview build without executing        | false   |
+| `--verbose` | `-v`  | Enable verbose output with debug logs  | false   |
 
 #### Description
 
-The install command downloads pre-packaged runtime archives (.tar.gz) from an external registry, verifies checksums, and
-extracts them to versioned installation paths.
+The build command reads a `runtime.yaml` specification file, sends it to the remote joblet server, and executes the
+14-phase build process on the server. Build progress is streamed back to the client in real-time.
 
-**Installation Sources:**
+**Build Phases:**
 
-1. **Default Registry** - `https://github.com/ehsaniara/joblet-runtimes` (public registry)
-2. **Custom Registry** - Specified via `--registry` flag
-3. **Local Fallback** - Local `runtimes/` directory if registry installation fails
+1. Parse & Validate YAML specification
+2. Detect platform (distro, architecture, package manager)
+3. Check disk space
+4. Validate package availability
+5. Prepare directories
+6. Run pre-install hook (if defined)
+7. Install base language packages
+8. Install language packages (pip/npm)
+9. Run post-install hook (if defined)
+10. Copy binaries
+11. Copy libraries
+12. Copy configuration
+13. Generate runtime.yml config
+14. Validate build
 
-**Versioned Installation:**
-Runtimes are installed to: `/opt/joblet/runtimes/{name}-{version}/`
+**Runtime YAML Format:**
 
-This allows multiple versions of the same runtime to coexist.
-
-When using `--force`, the command will:
-
-1. Delete the existing runtime at the versioned path if it exists
-2. Proceed with fresh installation
-3. Continue even if deletion fails (with warning)
+See `examples/` directory for sample runtime.yaml files or run `rnx runtime validate` to check your specification.
 
 #### Examples
 
 ```bash
-# Install latest version from default registry
-rnx runtime install python-3.11-ml
-rnx runtime install openjdk-21
+# Build a runtime from a YAML file
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 
-# Install specific version
-rnx runtime install python-3.11-ml@1.0.2
-rnx runtime install openjdk-21@1.0.3
+# Build from a directory (looks for runtime.yaml inside)
+rnx runtime build ./examples/python-3.11-ml/
 
-# Install from custom GitHub registry (format: owner/repo)
-rnx runtime install custom-runtime --registry=myorg/runtimes
-rnx runtime install custom-runtime@2.0.0 --registry=acme/private-runtimes
+# Preview build without executing (dry-run)
+rnx runtime build --dry-run ./examples/openjdk-21/runtime.yaml
 
-# Force reinstall (delete existing runtime first)
-rnx runtime install python-3.11-ml@1.0.2 --force
-rnx runtime install openjdk-21 -f
+# Build with verbose output
+rnx runtime build -v ./examples/python-analytics/runtime.yaml
+
+# Build with JSON output
+rnx --json runtime build ./examples/python/runtime.yaml
+```
+
+#### Example runtime.yaml
+
+```yaml
+schema_version: "1.0"
+name: python-3.11-ml
+version: 1.0.0
+description: Python 3.11 with ML packages
+
+base:
+  language: python
+  version: "3.11"
+
+pip:
+  - numpy
+  - pandas
+  - scikit-learn
+
+environment:
+  PYTHONUNBUFFERED: "1"
 ```
 
 ### `rnx runtime test`
@@ -911,20 +918,46 @@ rnx runtime remove openjdk-21
 
 ### `rnx runtime validate`
 
-Validate a runtime specification format and check if it's supported.
+Validate a runtime.yaml specification file without building.
 
 ```bash
-rnx runtime validate <runtime-spec>
+rnx runtime validate <path>
 ```
+
+#### Arguments
+
+- `<path>` - Path to a `runtime.yaml` file or directory containing one
+
+#### Description
+
+Parses and validates the runtime YAML specification, checking:
+
+- Schema version compatibility
+- Required fields (name, version, description, base)
+- Name format (lowercase, hyphens, dots, max 64 chars)
+- Version format (semantic versioning X.Y.Z)
+- Language support (python, java, node, go, rust)
+- Platform support
+- Hook timeout format
 
 #### Examples
 
 ```bash
-# Validate basic spec
-rnx runtime validate python-3.11-ml
+# Validate a runtime.yaml file
+rnx runtime validate ./examples/python-3.11-ml/runtime.yaml
 
-# Validate spec with variants
-rnx runtime validate openjdk:21
+# Validate from a directory
+rnx runtime validate ./examples/openjdk-21/
+
+# Example output:
+# Runtime specification is valid
+#
+# Parsed Information:
+#   Name: python-3.11-ml
+#   Version: 1.0.0
+#   Description: Python 3.11 with ML packages
+#   Language: python 3.11
+#   Pip packages: numpy, pandas, scikit-learn
 ```
 
 ## System Commands
