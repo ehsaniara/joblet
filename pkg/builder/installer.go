@@ -50,65 +50,6 @@ func InstallSystemPackages(ctx context.Context, platform *PlatformInfo, packages
 	return nil
 }
 
-// InstallPipPackages installs Python packages using pip
-func InstallPipPackages(ctx context.Context, packages []string, pipOptions string, isolatedDir string, pythonVersion string, logger BuildLogger) error {
-	if len(packages) == 0 {
-		return nil
-	}
-
-	logger.Info("Installing pip packages: %s", strings.Join(packages, ", "))
-
-	// Build pip install command using the specific Python version's pip
-	// Use python3.X -m pip to ensure we use the correct Python version
-	pythonBinary := fmt.Sprintf("python%s", pythonVersion)
-	args := []string{"-m", "pip", "install", "--no-cache-dir"}
-
-	// Add pip options if specified
-	if pipOptions != "" {
-		optionParts := strings.Fields(pipOptions)
-		args = append(args, optionParts...)
-	}
-
-	// Add target directory for isolated installation
-	args = append(args, "--target", fmt.Sprintf("%s/usr/local/lib/python3/site-packages", isolatedDir))
-
-	// Add packages
-	args = append(args, packages...)
-
-	cmd := exec.CommandContext(ctx, pythonBinary, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Fail fast on pip errors
-		return fmt.Errorf("pip install failed: %w\nOutput: %s", err, string(output))
-	}
-
-	logger.Debug("Pip installation output: %s", string(output))
-	return nil
-}
-
-// InstallNpmPackages installs Node.js packages using npm
-func InstallNpmPackages(ctx context.Context, packages []string, isolatedDir string, logger BuildLogger) error {
-	if len(packages) == 0 {
-		return nil
-	}
-
-	logger.Info("Installing npm packages: %s", strings.Join(packages, ", "))
-
-	// Build npm install command
-	args := []string{"install", "-g", "--prefix", fmt.Sprintf("%s/usr/local", isolatedDir)}
-	args = append(args, packages...)
-
-	cmd := exec.CommandContext(ctx, "npm", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Fail fast on npm errors
-		return fmt.Errorf("npm install failed: %w\nOutput: %s", err, string(output))
-	}
-
-	logger.Debug("npm installation output: %s", string(output))
-	return nil
-}
-
 // ValidatePackageAvailability checks if packages are available in the package manager
 func ValidatePackageAvailability(ctx context.Context, platform *PlatformInfo, packages []string, logger BuildLogger) error {
 	if len(packages) == 0 {

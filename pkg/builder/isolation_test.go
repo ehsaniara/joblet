@@ -68,6 +68,7 @@ func TestNewIsolatedEnvironmentWithOps(t *testing.T) {
 func TestIsolatedEnvironment_Setup(t *testing.T) {
 	t.Run("creates directories and mounts overlay", func(t *testing.T) {
 		fakeSysOps := &builderfakes.FakeSystemOps{}
+		fakeCmdRunner := &builderfakes.FakeCmdRunner{}
 		logger := builder.NewBuildLogger(false)
 		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
 
@@ -75,6 +76,9 @@ func TestIsolatedEnvironment_Setup(t *testing.T) {
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		// Mock ReadFile for /etc/resolv.conf
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		// Mock Command for DNS verification (getent hosts google.com)
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 
 		err := env.Setup()
 
@@ -150,6 +154,9 @@ func TestIsolatedEnvironment_RunInChroot(t *testing.T) {
 		// Setup the environment first (to set mounted = true)
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		// Mock Command for DNS verification during Setup
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 		_ = env.Setup()
 
 		// Reset command stub for the actual test
@@ -179,12 +186,15 @@ func TestIsolatedEnvironment_RunInChroot(t *testing.T) {
 func TestIsolatedEnvironment_InstallPackagesIsolated(t *testing.T) {
 	t.Run("skips when no packages", func(t *testing.T) {
 		fakeSysOps := &builderfakes.FakeSystemOps{}
+		fakeCmdRunner := &builderfakes.FakeCmdRunner{}
 		logger := builder.NewBuildLogger(false)
 		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
 
 		// Setup the environment first
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 		_ = env.Setup()
 
 		initialCalls := fakeSysOps.CommandCallCount()
@@ -205,6 +215,8 @@ func TestIsolatedEnvironment_InstallPackagesIsolated(t *testing.T) {
 		// Setup the environment first
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 		_ = env.Setup()
 
 		initialCalls := fakeSysOps.CommandCallCount()
@@ -222,12 +234,15 @@ func TestIsolatedEnvironment_InstallPackagesIsolated(t *testing.T) {
 
 	t.Run("returns error on unsupported package manager", func(t *testing.T) {
 		fakeSysOps := &builderfakes.FakeSystemOps{}
+		fakeCmdRunner := &builderfakes.FakeCmdRunner{}
 		logger := builder.NewBuildLogger(false)
 		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
 
 		// Setup the environment first
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 		_ = env.Setup()
 
 		err := env.InstallPackagesIsolated("pacman", []string{"curl"})
@@ -240,12 +255,15 @@ func TestIsolatedEnvironment_InstallPackagesIsolated(t *testing.T) {
 func TestIsolatedEnvironment_Cleanup(t *testing.T) {
 	t.Run("unmounts filesystems in reverse order", func(t *testing.T) {
 		fakeSysOps := &builderfakes.FakeSystemOps{}
+		fakeCmdRunner := &builderfakes.FakeCmdRunner{}
 		logger := builder.NewBuildLogger(false)
 		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
 
 		// Setup the environment first to set mounted = true
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 		_ = env.Setup()
 
 		assert.True(t, env.IsMounted())
@@ -294,12 +312,15 @@ func TestIsolatedEnvironment_Cleanup(t *testing.T) {
 
 	t.Run("collects errors but continues cleanup", func(t *testing.T) {
 		fakeSysOps := &builderfakes.FakeSystemOps{}
+		fakeCmdRunner := &builderfakes.FakeCmdRunner{}
 		logger := builder.NewBuildLogger(false)
 		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
 
 		// Setup the environment first
 		fakeSysOps.StatReturns(nil, os.ErrNotExist)
 		fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+		fakeSysOps.CommandReturns(fakeCmdRunner)
+		fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 		_ = env.Setup()
 
 		fakeSysOps.UnmountReturns(errors.New("device busy"))
@@ -333,6 +354,7 @@ func TestIsolatedEnvironment_GetPaths(t *testing.T) {
 
 func TestIsolatedEnvironment_IsMounted(t *testing.T) {
 	fakeSysOps := &builderfakes.FakeSystemOps{}
+	fakeCmdRunner := &builderfakes.FakeCmdRunner{}
 	logger := builder.NewBuildLogger(false)
 	env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
 
@@ -341,6 +363,8 @@ func TestIsolatedEnvironment_IsMounted(t *testing.T) {
 	// Setup to make it mounted
 	fakeSysOps.StatReturns(nil, os.ErrNotExist)
 	fakeSysOps.ReadFileReturns([]byte("nameserver 8.8.8.8\n"), nil)
+	fakeSysOps.CommandReturns(fakeCmdRunner)
+	fakeCmdRunner.CombinedOutputReturns([]byte("142.250.80.46 google.com"), nil)
 	_ = env.Setup()
 
 	assert.True(t, env.IsMounted())

@@ -426,8 +426,11 @@ rnx runtime build ./runtime.yaml
 # Build with verbose output
 rnx runtime build -v ./runtime.yaml
 
-# Preview without building (dry-run)
-rnx runtime build --dry-run ./runtime.yaml
+# Force rebuild (overwrite existing runtime)
+rnx runtime build --force ./runtime.yaml
+
+# Validate before building (comprehensive server-side validation)
+rnx runtime validate ./runtime.yaml
 ```
 
 ### Post-Installation

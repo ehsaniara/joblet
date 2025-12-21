@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/rnx/common"
-	"github.com/ehsaniara/joblet/pkg/builder"
 	"github.com/ehsaniara/joblet/pkg/runtime"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
@@ -373,8 +372,8 @@ func formatSize(bytes int64) string {
 }
 
 func NewRuntimeBuildCmd() *cobra.Command {
-	var dryRun bool
 	var verbose bool
+	var forceRebuild bool
 
 	cmd := &cobra.Command{
 		Use:   "build <path>",
@@ -401,6 +400,8 @@ The build process follows a 14-phase pipeline:
   13. Generate runtime.yml for the server
   14. Validate the build
 
+To validate without building, use 'rnx runtime validate <path>'.
+
 Examples:
   # Build from a runtime.yaml file
   rnx runtime build ./python-ml/runtime.yaml
@@ -408,26 +409,29 @@ Examples:
   # Build from a directory (looks for runtime.yaml)
   rnx runtime build ./python-ml
 
-  # Preview build without executing (dry-run)
-  rnx runtime build --dry-run ./python-ml
-
   # Build with verbose output
   rnx runtime build --verbose ./python-ml
+
+  # Force rebuild even if runtime exists
+  rnx runtime build --force ./python-ml
+
+  # Validate without building
+  rnx runtime validate ./python-ml
 
 See docs/design/RUNTIME_YAML_QUICKREF.md for the runtime.yaml format.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRuntimeBuild(cmd.Context(), args[0], dryRun, verbose)
+			return runRuntimeBuild(cmd.Context(), args[0], verbose, forceRebuild)
 		},
 	}
 
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview the build without executing")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	cmd.Flags().BoolVarP(&forceRebuild, "force", "f", false, "Force rebuild even if runtime already exists")
 
 	return cmd
 }
 
-func runRuntimeBuild(ctx context.Context, path string, dryRun bool, verbose bool) error {
+func runRuntimeBuild(ctx context.Context, path string, verbose bool, forceRebuild bool) error {
 	// Read the YAML file
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -453,9 +457,9 @@ func runRuntimeBuild(ctx context.Context, path string, dryRun bool, verbose bool
 	// Call BuildRuntime RPC
 	req := &pb.BuildRuntimeRequest{
 		YamlContent:  string(content),
-		DryRun:       dryRun,
+		DryRun:       false, // Validation is now done via 'rnx runtime validate'
 		Verbose:      verbose,
-		ForceRebuild: false,
+		ForceRebuild: forceRebuild,
 	}
 
 	stream, err := client.BuildRuntime(ctx, req)
@@ -582,30 +586,35 @@ See docs/design/RUNTIME_YAML_QUICKREF.md for the runtime.yaml format.`,
 
 func NewRuntimeValidateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "validate <runtime-spec>",
-		Short: "Validate a runtime name specification",
-		Long: `Validate a runtime name specification format.
+		Use:   "validate <path>",
+		Short: "Validate a runtime YAML specification",
+		Long: `Validate a runtime YAML specification comprehensively.
 
-This validates runtime names like "python-3.11-ml" or "openjdk-21@1.0.0".
-To validate a runtime.yaml file, use 'rnx runtime build --dry-run <path>'.
+This command performs server-side validation including:
+  - YAML syntax and schema validation
+  - Runtime name and version format validation
+  - Platform detection (distro, architecture)
+  - Disk space availability check
+  - Package validation (base packages, pip, npm)
+  - Existing runtime conflict detection
 
 Examples:
-  # Validate runtime name
-  rnx runtime validate python-3.11-ml
+  # Validate a runtime.yaml file
+  rnx runtime validate ./python-ml/runtime.yaml
 
-  # Validate runtime name with version
-  rnx runtime validate openjdk-21@1.0.0
+  # Validate from a directory (looks for runtime.yaml)
+  rnx runtime validate ./python-ml
 
-  # To validate a runtime.yaml file, use:
-  rnx runtime build --dry-run ./my-runtime/runtime.yaml`,
+  # Validate with JSON output
+  rnx runtime validate --json ./python-ml`,
 		Args: cobra.ExactArgs(1),
-		RunE: runRuntimeValidate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRuntimeValidate(cmd.Context(), args[0])
+		},
 	}
 }
 
-func runRuntimeValidate(cmd *cobra.Command, args []string) error {
-	path := args[0]
-
+func runRuntimeValidate(ctx context.Context, path string) error {
 	// Read the YAML file
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -621,45 +630,113 @@ func runRuntimeValidate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Parse the YAML
-	spec, err := builder.ParseRuntimeYAML(content)
+	// Create gRPC client
+	client, err := common.NewJobClient()
 	if err != nil {
-		fmt.Printf("Runtime specification is invalid\n")
-		fmt.Printf("Parse error: %s\n", err)
-		return fmt.Errorf("invalid runtime specification")
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
+	// Call ValidateRuntimeYAML RPC
+	req := &pb.ValidateRuntimeYAMLRequest{
+		YamlContent: string(content),
 	}
 
-	// Validate the spec
-	if err := builder.ValidateSpec(spec); err != nil {
-		fmt.Printf("Runtime specification is invalid\n")
-		fmt.Printf("Validation error: %s\n", err)
-		return fmt.Errorf("invalid runtime specification")
+	resp, err := client.ValidateRuntimeYAML(ctx, req)
+	if err != nil {
+		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	fmt.Printf("Runtime specification is valid\n")
-	fmt.Printf("\nParsed Information:\n")
-	fmt.Printf("  Name: %s\n", spec.Name)
-	fmt.Printf("  Version: %s\n", spec.Version)
-	fmt.Printf("  Description: %s\n", spec.Description)
-	fmt.Printf("  Language: %s %s\n", spec.Base.Language, spec.Base.Version)
-
-	if len(spec.Pip) > 0 {
-		fmt.Printf("  Pip packages: %s\n", strings.Join(spec.Pip, ", "))
+	// Output results
+	if common.JSONOutput {
+		return outputValidateResultJSON(resp)
 	}
 
-	if len(spec.Npm) > 0 {
-		fmt.Printf("  NPM packages: %s\n", strings.Join(spec.Npm, ", "))
+	// Text output
+	if resp.Valid {
+		fmt.Printf("✓ Runtime specification is valid\n")
+	} else {
+		fmt.Printf("✗ Runtime specification is invalid\n")
 	}
 
-	if spec.Hooks != nil {
-		if spec.Hooks.PreInstall != "" {
-			fmt.Printf("  Pre-install hook: defined\n")
-		}
-		if spec.Hooks.PostInstall != "" {
-			fmt.Printf("  Post-install hook: defined\n")
+	// Show errors
+	if len(resp.Errors) > 0 {
+		fmt.Printf("\nErrors:\n")
+		for _, e := range resp.Errors {
+			fmt.Printf("  • %s\n", e)
 		}
 	}
 
+	// Show warnings
+	if len(resp.Warnings) > 0 {
+		fmt.Printf("\nWarnings:\n")
+		for _, w := range resp.Warnings {
+			fmt.Printf("  ⚠ %s\n", w)
+		}
+	}
+
+	// Show spec info if valid
+	if resp.Valid && resp.SpecInfo != nil {
+		info := resp.SpecInfo
+		fmt.Printf("\nSpecification:\n")
+		fmt.Printf("  Name:        %s\n", info.Name)
+		fmt.Printf("  Version:     %s\n", info.Version)
+		fmt.Printf("  Language:    %s %s\n", info.Language, info.LanguageVersion)
+		if info.Description != "" {
+			fmt.Printf("  Description: %s\n", info.Description)
+		}
+
+		if len(info.PipPackages) > 0 {
+			fmt.Printf("  Pip:         %s\n", strings.Join(info.PipPackages, ", "))
+		}
+
+		if len(info.NpmPackages) > 0 {
+			fmt.Printf("  NPM:         %s\n", strings.Join(info.NpmPackages, ", "))
+		}
+
+		if info.HasHooks {
+			fmt.Printf("  Hooks:       defined\n")
+		}
+
+		if info.RequiresGpu {
+			fmt.Printf("  GPU:         required\n")
+		}
+	}
+
+	if !resp.Valid {
+		return fmt.Errorf("validation failed")
+	}
+
+	return nil
+}
+
+func outputValidateResultJSON(resp *pb.ValidateRuntimeYAMLResponse) error {
+	output := map[string]interface{}{
+		"valid":    resp.Valid,
+		"message":  resp.Message,
+		"errors":   resp.Errors,
+		"warnings": resp.Warnings,
+	}
+
+	if resp.SpecInfo != nil {
+		output["spec_info"] = map[string]interface{}{
+			"name":             resp.SpecInfo.Name,
+			"version":          resp.SpecInfo.Version,
+			"language":         resp.SpecInfo.Language,
+			"language_version": resp.SpecInfo.LanguageVersion,
+			"description":      resp.SpecInfo.Description,
+			"pip_packages":     resp.SpecInfo.PipPackages,
+			"npm_packages":     resp.SpecInfo.NpmPackages,
+			"has_hooks":        resp.SpecInfo.HasHooks,
+			"requires_gpu":     resp.SpecInfo.RequiresGpu,
+		}
+	}
+
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
 	return nil
 }
 

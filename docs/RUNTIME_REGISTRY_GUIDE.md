@@ -62,8 +62,8 @@ rnx runtime build ./runtime.yaml
 # Or with verbose output
 rnx runtime build -v ./runtime.yaml
 
-# Preview without building (dry-run)
-rnx runtime build --dry-run ./runtime.yaml
+# Validate before building (comprehensive server-side validation)
+rnx runtime validate ./runtime.yaml
 ```
 
 ### 4. Use the runtime
@@ -440,9 +440,9 @@ hooks:
    rnx runtime validate ./runtime.yaml
    ```
 
-4. **Use dry-run** - Preview build before executing:
+4. **Use validate** - Comprehensive server-side validation before building:
    ```bash
-   rnx runtime build --dry-run ./runtime.yaml
+   rnx runtime validate ./runtime.yaml
    ```
 
 5. **Semantic versioning** - Use proper version numbers for your runtimes
