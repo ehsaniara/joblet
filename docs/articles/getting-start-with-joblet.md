@@ -281,7 +281,7 @@ execution:
 
 ```bash
 # Python with ML libraries (NumPy, Pandas, Scikit-learn)
-# Note: Make sure you've installed the runtime first with: rnx runtime install python-3.11-ml
+# Note: Build the runtime first with: rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 rnx job run --runtime=python-3.11-ml python3 -c "
 import numpy as np
 import pandas as pd
@@ -292,11 +292,11 @@ print(f'Pandas version: {pd.__version__}')
 "
 
 # Java application
-# Note: Install first with: rnx runtime install openjdk-21
+# Note: Build first with: rnx runtime build ./examples/java-21/runtime.yaml
 rnx job run --runtime=openjdk-21 java -version
 
 # GraalVM for high-performance Java
-# Note: Install first with: rnx runtime install graalvmjdk-21
+# Note: Build first with: rnx runtime build ./examples/graalvmjdk-21/runtime.yaml
 rnx job run --runtime=graalvmjdk-21 java -version
 ```
 

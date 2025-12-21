@@ -179,7 +179,6 @@ func extractLanguageFromName(name string) string {
 	return name // No hyphen found, return whole name
 }
 
-
 // RemoveRuntime removes an installed runtime and cleans up its files
 func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.RuntimeRemoveReq) (*pb.RuntimeRemoveRes, error) {
 	log := s.logger.WithFields(
@@ -275,7 +274,7 @@ type grpcBuildLogger struct {
 
 func (l *grpcBuildLogger) Debug(format string, args ...interface{}) {
 	if l.verbose {
-		l.stream.Send(&pb.BuildRuntimeProgress{
+		_ = l.stream.Send(&pb.BuildRuntimeProgress{
 			ProgressType: &pb.BuildRuntimeProgress_Log{
 				Log: &pb.BuildLogLine{
 					Level:     "debug",
@@ -288,7 +287,7 @@ func (l *grpcBuildLogger) Debug(format string, args ...interface{}) {
 }
 
 func (l *grpcBuildLogger) Info(format string, args ...interface{}) {
-	l.stream.Send(&pb.BuildRuntimeProgress{
+	_ = l.stream.Send(&pb.BuildRuntimeProgress{
 		ProgressType: &pb.BuildRuntimeProgress_Log{
 			Log: &pb.BuildLogLine{
 				Level:     "info",
@@ -300,7 +299,7 @@ func (l *grpcBuildLogger) Info(format string, args ...interface{}) {
 }
 
 func (l *grpcBuildLogger) Warn(format string, args ...interface{}) {
-	l.stream.Send(&pb.BuildRuntimeProgress{
+	_ = l.stream.Send(&pb.BuildRuntimeProgress{
 		ProgressType: &pb.BuildRuntimeProgress_Log{
 			Log: &pb.BuildLogLine{
 				Level:     "warn",
@@ -312,7 +311,7 @@ func (l *grpcBuildLogger) Warn(format string, args ...interface{}) {
 }
 
 func (l *grpcBuildLogger) Error(format string, args ...interface{}) {
-	l.stream.Send(&pb.BuildRuntimeProgress{
+	_ = l.stream.Send(&pb.BuildRuntimeProgress{
 		ProgressType: &pb.BuildRuntimeProgress_Log{
 			Log: &pb.BuildLogLine{
 				Level:     "error",
@@ -324,7 +323,7 @@ func (l *grpcBuildLogger) Error(format string, args ...interface{}) {
 }
 
 func (l *grpcBuildLogger) Phase(phase int, total int, name string, message string) {
-	l.stream.Send(&pb.BuildRuntimeProgress{
+	_ = l.stream.Send(&pb.BuildRuntimeProgress{
 		ProgressType: &pb.BuildRuntimeProgress_Phase{
 			Phase: &pb.BuildPhaseProgress{
 				PhaseNumber: int32(phase),
@@ -367,7 +366,7 @@ func (s *RuntimeServiceServer) BuildRuntime(req *pb.BuildRuntimeRequest, stream 
 	if err != nil {
 		log.Error("build failed", "error", err)
 		// Send failure result
-		stream.Send(&pb.BuildRuntimeProgress{
+		_ = stream.Send(&pb.BuildRuntimeProgress{
 			ProgressType: &pb.BuildRuntimeProgress_Result{
 				Result: &pb.BuildResult{
 					Success:         false,
@@ -380,7 +379,7 @@ func (s *RuntimeServiceServer) BuildRuntime(req *pb.BuildRuntimeRequest, stream 
 	}
 
 	// Send success result
-	stream.Send(&pb.BuildRuntimeProgress{
+	_ = stream.Send(&pb.BuildRuntimeProgress{
 		ProgressType: &pb.BuildRuntimeProgress_Result{
 			Result: &pb.BuildResult{
 				Success:         true,

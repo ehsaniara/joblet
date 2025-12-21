@@ -999,9 +999,9 @@ sudo systemctl restart amazon-cloudwatch-agent
 
 Now that Joblet is running on EC2:
 
-1. ✅ **Install Runtimes** - Get Python, Java, etc.
+1. ✅ **Build Runtimes** - Get Python, Java, etc.
    ```bash
-   rnx runtime install python-3.11-ml
+   rnx runtime build ./examples/python-3.11-ml/runtime.yaml
    ```
 
 2. ✅ **Create Volumes** - For data sharing

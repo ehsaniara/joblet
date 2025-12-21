@@ -200,7 +200,7 @@ Runtime installation jobs require root privileges for package management:
 
 ```bash
 # Runtime builds run as root (internal use only)
-rnx runtime install python:3.11  # Needs apt install
+rnx runtime build ./examples/python/runtime.yaml  # Needs apt install
 ```
 
 This exception is handled automatically - standard jobs submitted via `rnx job run` always run unprivileged.
