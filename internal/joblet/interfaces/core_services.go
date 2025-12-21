@@ -72,8 +72,6 @@ type MonitoringService interface {
 type RuntimeService interface {
 	// ListRuntimes returns all available runtime environments in the system
 	ListRuntimes(ctx context.Context) ([]string, error)
-	// InstallRuntime downloads and installs a new runtime environment by specification
-	InstallRuntime(ctx context.Context, spec string) error
 	// RemoveRuntime uninstalls a runtime environment and cleans up its files
 	RemoveRuntime(ctx context.Context, spec string) error
 	// ValidateRuntime checks if a runtime specification is valid and available

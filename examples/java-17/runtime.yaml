@@ -1,0 +1,11 @@
+schema_version: "1.0"
+name: openjdk-17
+version: 1.0.0
+description: OpenJDK 17 LTS runtime for Java applications
+
+base:
+  language: java
+  version: "17"
+
+environment:
+  JAVA_TOOL_OPTIONS: "-Xmx512m"

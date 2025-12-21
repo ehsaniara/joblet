@@ -81,11 +81,11 @@ just tar up the isolated directory. No complex packaging, no dependency specific
 Here's what happened when a user needed to run both Python 3.11 ML workloads and legacy Python 2.7 scripts:
 
 ```bash
-# Install modern ML runtime
-rnx runtime install python-3.11-ml
+# Build modern ML runtime
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 
-# Install legacy runtime (with old glibc)
-rnx runtime install python-2.7-legacy
+# Build legacy runtime (with old glibc)
+rnx runtime build ./examples/python-2.7-legacy/runtime.yaml
 
 # Both work perfectly, in complete isolation
 rnx job run --runtime=python-3.11-ml python -c "import torch; print(torch.__version__)"

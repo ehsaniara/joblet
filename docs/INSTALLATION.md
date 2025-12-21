@@ -937,7 +937,7 @@ Joblet provides native Linux process isolation with:
 **Joblet Commands:**
 
 - `rnx job run` - Execute isolated processes
-- `rnx runtime install` - Install pre-built runtime environments
+- `rnx runtime build` - Build runtime environments from YAML specifications
 
 ## ✅ Post-Installation Verification
 

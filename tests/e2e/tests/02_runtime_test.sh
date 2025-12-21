@@ -2,13 +2,16 @@
 
 # Test 02: Complete Runtime Lifecycle Tests
 # Tests full runtime management lifecycle against remote host
-# Ensures clean state, installs all 4 runtimes, tests each individually, verifies no host contamination
+# Builds runtimes from YAML specifications, tests each individually, verifies no host contamination
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# All available runtimes from manifest
-AVAILABLE_RUNTIMES=("graalvmjdk-21" "openjdk-21" "python-3.11-ml" "python-3.11")
+# Get the joblet root directory for finding example runtime.yaml files
+JOBLET_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+
+# Runtimes that will be tested (these have example runtime.yaml files)
+AVAILABLE_RUNTIMES=("openjdk-21" "openjdk-17" "python-3.11-ml" "python-3.11" "python-analytics")
 REMOTE_HOST="192.168.1.161"
 REMOTE_USER="jay"
 
@@ -104,18 +107,26 @@ remove_all_runtimes() {
     fi
 }
 
-install_runtime_with_timeout() {
+build_runtime_with_timeout() {
     local runtime="$1"
     local timeout_duration="$2"
-    
-    echo "    Installing $runtime (timeout: ${timeout_duration}s)..."
-    
-    # Install with timeout
-    if timeout "$timeout_duration" "$RNX_BINARY" runtime install "$runtime" >/dev/null 2>&1; then
-        echo "    ✓ $runtime installed successfully"
+
+    echo "    Building $runtime (timeout: ${timeout_duration}s)..."
+
+    # Map runtime name to example directory using framework function
+    local example_dir=$(get_runtime_example_dir "$runtime")
+    local runtime_yaml="${JOBLET_ROOT}/examples/${example_dir}/runtime.yaml"
+    if [[ ! -f "$runtime_yaml" ]]; then
+        echo "    ✗ Runtime YAML not found: $runtime_yaml"
+        return 1
+    fi
+
+    # Build with timeout
+    if timeout "$timeout_duration" "$RNX_BINARY" runtime build "$runtime_yaml" >/dev/null 2>&1; then
+        echo "    ✓ $runtime built successfully"
         return 0
     else
-        echo "    ✗ $runtime installation failed or timed out"
+        echo "    ✗ $runtime build failed or timed out"
         return 1
     fi
 }
@@ -221,36 +232,40 @@ test_clean_slate() {
     return 0
 }
 
-test_install_all_runtimes() {
-    echo "  Installing all 4 runtimes sequentially..."
-    
+test_build_all_runtimes() {
+    echo "  Building runtimes from YAML specifications..."
+
+    # Use the runtime names (these get mapped to example directories by get_runtime_example_dir)
+    # Runtime names match what's in the runtime.yaml 'name' field
+    local BUILDABLE_RUNTIMES=("python-3.11-ml" "python-3.11" "python-analytics" "openjdk-17" "openjdk-21")
+
     local success_count=0
-    local total_count=${#AVAILABLE_RUNTIMES[@]}
-    
-    for runtime in "${AVAILABLE_RUNTIMES[@]}"; do
-        echo "    [$((success_count + 1))/$total_count] Installing $runtime..."
-        
+    local total_count=${#BUILDABLE_RUNTIMES[@]}
+
+    for runtime in "${BUILDABLE_RUNTIMES[@]}"; do
+        echo "    [$((success_count + 1))/$total_count] Building $runtime..."
+
         # Set timeout based on runtime type (Python runtimes take longer)
         local timeout_duration=300  # 5 minutes default
         if [[ "$runtime" == "python-"* ]]; then
             timeout_duration=600  # 10 minutes for Python runtimes
         fi
-        
-        if install_runtime_with_timeout "$runtime" "$timeout_duration"; then
+
+        if build_runtime_with_timeout "$runtime" "$timeout_duration"; then
             ((success_count++))
-            
-            # Verify it appears in list
+
+            # Verify it appears in list (runtime name should match what we built)
             if "$RNX_BINARY" runtime list | grep -q "$runtime"; then
                 echo "      ✓ $runtime confirmed in runtime list"
             else
-                echo "      ⚠ $runtime not found in runtime list after installation"
+                echo "      ⚠ $runtime not found in runtime list after build"
                 ((success_count--))
             fi
         fi
     done
-    
-    echo "    Installed $success_count out of $total_count runtimes"
-    
+
+    echo "    Built $success_count out of $total_count runtimes"
+
     # Require at least 2 runtimes to pass (in case some fail due to network/compilation issues)
     if [[ "$success_count" -ge 2 ]]; then
         return 0
@@ -381,9 +396,9 @@ echo -e "\n${YELLOW}▶ 2. Environment Preparation${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 run_test_check "Clean slate preparation" test_clean_slate
 
-echo -e "\n${YELLOW}▶ 3. Runtime Installation Lifecycle${NC}"
+echo -e "\n${YELLOW}▶ 3. Runtime Build Lifecycle${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
-run_test_check "Install all 4 runtimes sequentially" test_install_all_runtimes
+run_test_check "Build runtimes from YAML specifications" test_build_all_runtimes
 
 echo -e "\n${YELLOW}▶ 4. Individual Runtime Testing${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"

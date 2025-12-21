@@ -629,16 +629,16 @@ sudo journalctl -u joblet | tail -100
 
 ## Runtime and Isolation Issues
 
-### Runtime Installation Problems
+### Runtime Build Problems
 
-**Problem: Runtime installation fails**
+**Problem: Runtime build fails**
 
 ```bash
 # Check build job status
-rnx runtime install openjdk:21
+rnx runtime build ./examples/java-21/runtime.yaml
 # ERROR: Runtime build failed
 
-# Check build job logs  
+# Check build job logs
 rnx job status <build-job-uuid>
 rnx job log <build-job-uuid>
 ```
@@ -647,12 +647,13 @@ rnx job log <build-job-uuid>
 
 ```bash
 # 1. Check if previous build exists
-ls -la /opt/joblet/runtimes/openjdk/
+ls -la /opt/joblet/runtimes/java/openjdk-21/
 
-# 2. Force reinstall if needed
-rnx runtime install openjdk:21 --force
+# 2. Remove and rebuild if needed
+rnx runtime remove openjdk-21
+rnx runtime build ./examples/java-21/runtime.yaml
 
-# 3. Check disk space for runtime installation
+# 3. Check disk space for runtime build
 df -h /opt/joblet/runtimes/
 
 # 4. Verify network access for downloads
@@ -685,7 +686,7 @@ grep "source:" /opt/joblet/runtimes/java/openjdk-21/runtime.yml
 
 # 3. Rebuild runtime if cleanup failed
 rm -rf /opt/joblet/runtimes/java/openjdk-21
-rnx runtime install java:21
+rnx runtime build ./examples/java-21/runtime.yaml
 ```
 
 ### Service-Based Isolation Problems
@@ -697,9 +698,9 @@ rnx runtime install java:21
 rnx job run env | grep JOB_TYPE
 # Should show: JOB_TYPE=standard (for production jobs)
 
-# Check if runtime installation uses isolated environment
-rnx runtime install test:1.0
-# Should automatically use isolated installation environment
+# Check if runtime build uses isolated environment
+rnx runtime build ./examples/python/runtime.yaml
+# Should automatically use isolated build environment
 ```
 
 **Solutions:**
@@ -769,9 +770,9 @@ rnx runtime list
 **Solution:** Use system-based setup approach:
 
 ```bash
-# Remove failed runtime and reinstall
-rnx runtime remove openjdk:21 --force
-rnx runtime install openjdk:21
+# Remove failed runtime and rebuild
+rnx runtime remove openjdk-21
+rnx runtime build ./examples/java-21/runtime.yaml
 
 # Verify proper size
 rnx runtime list

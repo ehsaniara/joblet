@@ -4,11 +4,11 @@ go 1.24.0
 
 require (
 	github.com/cilium/ebpf v0.20.0
-	github.com/ehsaniara/joblet-proto/v2 v2.5.4
+	github.com/ehsaniara/joblet-proto/v2 v2.5.5
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.38.0
+	golang.org/x/sys v0.39.0
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1

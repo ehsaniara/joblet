@@ -1,0 +1,8 @@
+schema_version: "1.0"
+name: Invalid_Name
+version: 1.0.0
+description: Runtime with invalid name
+
+base:
+  language: python
+  version: "3.11"

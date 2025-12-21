@@ -1,0 +1,27 @@
+schema_version: "1.0"
+name: python-3.11-ml
+version: 1.0.0
+description: Python 3.11 with machine learning and data science packages
+
+base:
+  language: python
+  version: "3.11"
+
+pip:
+  - numpy==1.26.2
+  - pandas==2.1.3
+  - scikit-learn==1.3.2
+  - matplotlib==3.8.2
+  - seaborn==0.13.0
+  - joblib==1.3.2
+
+environment:
+  PYTHONUNBUFFERED: "1"
+  MPLBACKEND: "Agg"
+
+hooks:
+  pre_install: |
+    # Install system libraries needed for numpy/scipy
+    apt-get update && apt-get install -y libopenblas-dev || \
+    yum install -y openblas-devel || \
+    dnf install -y openblas-devel || true

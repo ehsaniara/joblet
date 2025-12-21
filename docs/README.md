@@ -278,11 +278,10 @@ rnx runtime list
 # Get runtime information
 rnx runtime info python-3.11-ml
 
-# Install runtimes
-rnx runtime install python-3.11-ml
-rnx runtime install python-3.11
-rnx runtime install openjdk-21
-rnx runtime install graalvmjdk-21
+# Build runtimes from YAML specifications
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
+rnx runtime build ./examples/python/runtime.yaml
+rnx runtime build ./examples/java-21/runtime.yaml
 
 # Remove runtimes
 rnx runtime remove python-3.11-ml

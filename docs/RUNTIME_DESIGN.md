@@ -388,17 +388,17 @@ The runtime installation system provides:
 - Automatic dependency removal
 - Configuration integration with Joblet
 
-### Installation Options
+### Building Runtimes
 
 ```bash
-# Install from default registry
-rnx runtime install python-3.11-ml
+# Build from YAML specification
+rnx runtime build ./runtime.yaml
 
-# Install specific version
-rnx runtime install python-3.11-ml@1.0.2
+# Build with verbose output
+rnx runtime build -v ./runtime.yaml
 
-# Install from custom registry
-rnx runtime install custom-runtime --registry=myorg/runtimes
+# Preview without building (dry-run)
+rnx runtime build --dry-run ./runtime.yaml
 ```
 
 ### Post-Installation
@@ -954,6 +954,6 @@ rnx job run --runtime=java:17 \
 ## See Also
 
 - [RUNTIME_SYSTEM.md](./RUNTIME_SYSTEM.md) - User guide for runtime system
-- [RUNTIME_REGISTRY_GUIDE.md](./RUNTIME_REGISTRY_GUIDE.md) - Registry usage and custom registries
+- [RUNTIME_REGISTRY_GUIDE.md](./RUNTIME_REGISTRY_GUIDE.md) - Declarative runtime builder guide
 - [RUNTIME_ADVANCED.md](./RUNTIME_ADVANCED.md) - Advanced implementation details
 - [RNX_CLI_REFERENCE.md](./RNX_CLI_REFERENCE.md) - Complete CLI reference

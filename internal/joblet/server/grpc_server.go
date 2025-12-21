@@ -84,8 +84,8 @@ func StartGRPCServer(jobStore adapters.JobStorer, telemetryCollector *telemetry.
 	monitoringGrpcService := NewMonitoringServiceServer(monitoringService, cfg)
 	pb.RegisterMonitoringServiceServer(grpcServer, monitoringGrpcService)
 
-	// Create and register runtime service with direct installation capabilities (no job system)
-	runtimeService := NewRuntimeServiceServer(auth, cfg.Runtime.BasePath, platform, cfg)
+	// Create and register runtime service
+	runtimeService := NewRuntimeServiceServer(auth, cfg.Runtime.BasePath, platform)
 	pb.RegisterRuntimeServiceServer(grpcServer, runtimeService)
 
 	lis, err := net.Listen("tcp", serverAddress)

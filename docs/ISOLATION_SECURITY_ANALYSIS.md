@@ -334,7 +334,7 @@ mounts:
 
 ### Enhanced Isolation Solution ✅
 
-**Runtime Cleanup Process:** After successful runtime installation, a cleanup phase creates an isolated, self-contained
+**Runtime Cleanup Process:** After successful runtime build, a cleanup phase creates an isolated, self-contained
 runtime structure:
 
 ```bash

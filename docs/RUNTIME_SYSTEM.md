@@ -122,35 +122,56 @@ rnx job run --runtime=graalvmjdk-21 js --version
 
 ## 🚀 Getting Started
 
-### 1. Install Runtime Environments
+### 1. Build Runtime Environments
 
-Runtimes are installed using the RNX CLI, which automatically uses the RuntimeService for safe installation:
+Runtimes are built using the RNX CLI with a declarative YAML specification. The build executes remotely on the Joblet server:
 
 ```bash
-# From any RNX client (automatically routes to RuntimeService)
-rnx runtime install python-3.11-ml
-rnx runtime install python-3.11
-rnx runtime install openjdk-21
-rnx runtime install graalvmjdk-21
+# Create a runtime.yaml specification
+cat > runtime.yaml << 'EOF'
+schema_version: "1.0"
+name: python-3.11-ml
+version: 1.0.0
+description: Python 3.11 with ML packages
 
-# Force reinstall if runtime already exists
-rnx runtime install python-3.11-ml --force
-rnx runtime install openjdk-21 -f
+base:
+  language: python
+  version: "3.11"
+
+pip:
+  - numpy
+  - pandas
+  - scikit-learn
+
+environment:
+  PYTHONUNBUFFERED: "1"
+EOF
+
+# Validate the specification
+rnx runtime validate ./runtime.yaml
+
+# Build the runtime on the remote server
+rnx runtime build ./runtime.yaml
+
+# Or with verbose output
+rnx runtime build -v ./runtime.yaml
+
+# Preview without building (dry-run)
+rnx runtime build --dry-run ./runtime.yaml
 ```
 
-**Installation Options:**
+**Build Options:**
 
-- `--force` or `-f`: Force reinstall by deleting existing runtime before installation
-    - Removes `/opt/joblet/runtimes/<runtime-name>` if it exists
-    - Useful for updating runtimes or fixing corrupted installations
-    - Installation continues even if deletion fails (with warning)
+- `--dry-run`: Preview the build without executing (validates and shows what would be installed)
+- `-v` or `--verbose`: Enable verbose output showing all build phases and logs
 
 **Architecture Benefits:**
 
-- **Service-Based**: Runtime installations automatically use builder chroot via RuntimeService
+- **Declarative YAML**: Define runtimes with simple, version-controlled YAML files
+- **Remote Building**: Build executes on the Joblet server, not locally
+- **14-Phase Pipeline**: Comprehensive build process with progress streaming
 - **Zero Host Contamination**: Build tools and packages installed only in isolated environment
-- **Automatic Routing**: No manual specification of build mode required
-- **Remote Installation**: Can install runtimes on remote Joblet servers safely
+- **Language Profiles**: Pre-defined packages for Python, Java, Node.js, Go, Rust
 
 ### 2. List Available Runtimes
 
@@ -224,52 +245,72 @@ To test the runtime in a job:
 
 ## 📦 Runtime Deployment
 
-The runtime system supports **zero-contamination deployment** for production environments. Build runtimes once on
-development hosts, then deploy clean packages anywhere without installing build tools.
+The runtime system supports **remote building** for production environments. Build runtimes directly on the Joblet
+server using declarative YAML specifications.
 
 ### Quick Deployment Workflow
 
 ```bash
-# Step 1: Build runtime (on development/build host)
-sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
-# ✅ Creates: /tmp/runtime-deployments/python-3.11-ml-runtime.zip
+# Step 1: Create runtime.yaml specification locally
+cat > runtime.yaml << 'EOF'
+schema_version: "1.0"
+name: python-3.11-ml
+version: 1.0.0
+description: Python 3.11 with ML packages
 
-# Step 2: Copy to workstation
-scp build-host:/tmp/runtime-deployments/python-3.11-ml-runtime.zip .
+base:
+  language: python
+  version: "3.11"
 
-# Step 3: Deploy to production (zero contamination)
-sudo unzip python-3.11-ml-runtime.zip -d /opt/joblet/runtimes/
-# ✅ Deploys to: /opt/joblet/runtimes/python/python-3.11-ml
+pip:
+  - numpy
+  - pandas
+  - scikit-learn
+EOF
+
+# Step 2: Build runtime on remote Joblet server
+rnx runtime build ./runtime.yaml
+# ✅ Builds to: /opt/joblet/runtimes/python-3.11-ml/1.0.0/
+
+# Step 3: Verify installation
+rnx runtime list
+rnx runtime info python-3.11-ml
 ```
 
-### Benefits of Runtime Deployment
+### Benefits of Declarative Runtime Building
 
-- **Zero Contamination**: Production hosts need no compilers, package managers, or build tools
-- **Consistent Environments**: Same runtime package works identically across all hosts
-- **Fast Deployment**: 2-3 seconds vs 5-45 minutes for package installation
-- **Build Once, Deploy Many**: Single build creates package for unlimited deployments
+- **Version Controlled**: Runtime specifications are simple YAML files that can be versioned in git
+- **Reproducible Builds**: Same specification produces identical runtimes across environments
+- **Remote Execution**: Build happens on the Joblet server, not locally
+- **14-Phase Pipeline**: Comprehensive build process with progress streaming
+- **Language Profiles**: Pre-defined packages for Python, Java, Node.js, Go, Rust
 
 ### Multi-Host Deployment
 
 ```bash
-# Deploy to multiple production hosts
-for host in prod-01 prod-02 prod-03; do
-    scp python-3.11-ml-runtime.zip admin@$host:/tmp/
-    ssh admin@$host "sudo unzip /tmp/python-3.11-ml-runtime.zip -d /opt/joblet/runtimes/"
+# Deploy to multiple Joblet servers
+for host in joblet-01 joblet-02 joblet-03; do
+    # Configure rnx to point to each server and build
+    RNX_SERVER=$host rnx runtime build ./runtime.yaml
 done
 ```
 
-### Package Contents
+### Runtime Directory Structure
 
-Each runtime package is a self-contained zip file containing:
+Each runtime is installed as a self-contained environment:
 
-- Complete runtime environment (binaries, libraries)
-- All pre-installed packages and dependencies
-- Runtime metadata for auto-detection
-- Proper directory structure for deployment
+```
+/opt/joblet/runtimes/python-3.11-ml/1.0.0/
+├── runtime.yml              # Generated runtime configuration
+└── isolated/                # Complete isolated filesystem
+    ├── usr/bin/             # Language binaries
+    ├── usr/lib/             # Libraries and packages
+    ├── etc/                 # Configuration files
+    └── lib/                 # System libraries
+```
 
-> **📚 Detailed Guide**: See [RUNTIME_ADVANCED.md](RUNTIME_ADVANCED.md) for comprehensive deployment documentation,
-> CI/CD integration, and advanced scenarios.
+> **📚 Detailed Guide**: See [RUNTIME_REGISTRY_GUIDE.md](RUNTIME_REGISTRY_GUIDE.md) for complete YAML specification,
+> supported languages, hooks, and troubleshooting.
 
 ## 🎯 Runtime Management
 
@@ -282,39 +323,45 @@ rnx runtime list
 # Get detailed information about a runtime
 rnx runtime info <runtime-name>
 
-# Test runtime functionality  
+# Test runtime functionality
 rnx runtime test <runtime-name>
 
-# Install a runtime from local codebase
-rnx runtime install <runtime-name>
+# Build a runtime from YAML specification
+rnx runtime build <path-to-runtime.yaml>
+
+# Build with verbose output
+rnx runtime build -v <path-to-runtime.yaml>
+
+# Preview build without executing (dry-run)
+rnx runtime build --dry-run <path-to-runtime.yaml>
+
+# Validate runtime YAML specification
+rnx runtime validate <path-to-runtime.yaml>
 
 # Remove an installed runtime
 rnx runtime remove <runtime-name>
 
-# Build a runtime from custom source
-rnx runtime build <runtime-name> [--repository=...] [--branch=...]
-
-# Validate runtime specification
-rnx runtime validate <runtime-name>
+# Remove specific version
+rnx runtime remove <runtime-name>@<version>
 ```
 
-### Runtime Installation and Management
+### Runtime Building and Management
 
 ```bash
-# Install Python runtime
-rnx runtime install python-3.11-ml
+# Build Python ML runtime from specification
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 
-# Install Java runtime
-rnx runtime install openjdk-21
+# Build Java runtime
+rnx runtime build ./examples/java-21/runtime.yaml
 
-# Check installation status
+# Check installed runtime details
 rnx runtime info python-3.11-ml
 
 # Remove runtime when no longer needed
 rnx runtime remove python-3.11-ml
 
-# Check runtime installation status
-rnx runtime status
+# List all installed runtimes
+rnx runtime list
 ```
 
 ### Using Runtimes in Jobs
@@ -708,25 +755,28 @@ EOF
 
 **Error**: `runtime not found: python-3.11-ml`
 
-**Solution**: Install the runtime on the server
+**Solution**: Build the runtime from a YAML specification
 
 ```bash
-# On Joblet server
-sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+# Build the runtime
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
+
+# Verify it was installed
+rnx runtime list
 ```
 
 #### 2. Library Loading Errors
 
 **Error**: `error while loading shared libraries: libpython3.11.so.1.0: cannot open shared object file`
 
-**Solution**: Runtime installation includes library fixes. Reinstall:
+**Solution**: Remove and rebuild the runtime:
 
 ```bash
 # Remove old installation
-sudo rm -rf /opt/joblet/runtimes/python/python-3.11-ml
+rnx runtime remove python-3.11-ml
 
-# Reinstall with updated script
-sudo /opt/joblet/runtimes/python-3.11-ml/setup_python_3_11_ml.sh
+# Rebuild from specification
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 ```
 
 #### 3. Memory Issues

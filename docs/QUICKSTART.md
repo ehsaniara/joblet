@@ -191,14 +191,14 @@ Resource constraints applied:
 Joblet's runtime environments provide production-ready, pre-configured execution contexts that eliminate dependency
 management overhead and ensure consistent application behavior across deployments:
 
-### Runtime Installation Procedures
+### Runtime Build Procedures
 
 ```bash
-# Install Python with ML packages (475MB, instant startup)
-rnx runtime install python-3.11-ml
+# Build Python with ML packages
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 
-# Install Java OpenJDK 21 (292MB, instant startup)  
-rnx runtime install openjdk:21
+# Build Java OpenJDK 21
+rnx runtime build ./examples/java-21/runtime.yaml
 
 # List installed runtimes
 rnx runtime list
@@ -288,22 +288,23 @@ rnx job run --schedule="2025-08-03T15:00:00" echo "Scheduled for 3 PM"
 The runtime system provides containerized language environments with pre-installed dependencies, enabling immediate job
 execution without environment preparation overhead:
 
-### Runtime Deployment Process
+### Runtime Build Process
 
 ```bash
-# Install Java 21 runtime (automatically uses builder isolation)
-rnx runtime install openjdk-21
+# Build Java 21 runtime from YAML specification
+rnx runtime build ./examples/java-21/runtime.yaml
 
-# Install Python ML runtime with data science packages
-rnx runtime install python-3.11-ml
+# Build Python ML runtime with data science packages
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 ```
 
-**Installation Workflow:**
+**Build Workflow:**
 
-1. **RuntimeService Initialization**: Automatically configures builder chroot environment
-2. **Isolated Installation**: Downloads and installs runtime components in sandboxed builder context
-3. **Cleanup and Packaging**: Creates isolated runtime structure with dependency resolution
-4. **Production Deployment**: Runtime available for secure job execution
+1. **YAML Parsing**: Parse and validate runtime.yaml specification
+2. **Platform Detection**: Detect OS distribution and package manager
+3. **Isolated Build**: Install runtime components in sandboxed builder context
+4. **Cleanup and Packaging**: Create isolated runtime structure with dependency resolution
+5. **Production Deployment**: Runtime available for secure job execution
 
 ### Runtime Execution
 

@@ -1,176 +1,97 @@
-# Python 3.11 ML Example
+# Python 3.11 ML Runtime
 
-This example demonstrates **two different runtime approaches** for the same ML code:
+Python 3.11 runtime with machine learning and data science packages pre-installed.
 
-1. **`python-3.11-ml` runtime** - Heavy runtime with ML libraries pre-installed on host
-2. **`python-3.11` runtime** - Lightweight runtime with dependencies packaged locally
+## Quick Start
 
-## 🎯 Runtime Comparison
-
-| Runtime Approach         | Runtime Size | Dependencies     | Upload Size | Total  | Use Case                   |
-|--------------------------|--------------|------------------|-------------|--------|----------------------------| 
-| **`python-3.11-ml`**     | 500MB+       | Pre-installed    | ~5KB        | 500MB+ | Quick ML jobs, no setup    |
-| **`python-3.11` + deps** | 50MB         | Packaged locally | ~150MB      | 200MB  | Custom versions, isolation |
-
-## 🚀 Quick Start
-
-### Using YAML Workflows (NEW - Recommended)
+### 1. Build the Runtime
 
 ```bash
-# Run ML analysis examples using the workflow
-rnx workflow run jobs.yaml           # Data analysis with pre-installed ML libs
-rnx workflow run jobs.yaml           # Same analysis with packaged dependencies
-rnx workflow run jobs.yaml   # Feature engineering pipeline
-rnx workflow run jobs.yaml        # Model training and evaluation
-rnx workflow run jobs.yaml         # Data visualization generation
-rnx workflow run jobs.yaml           # Complete ML pipeline
+# Build the runtime (requires root)
+sudo rnx runtime build examples/python-3.11-ml/runtime.yaml
+
+# Or preview without building
+rnx runtime build --dry-run examples/python-3.11-ml/runtime.yaml
 ```
 
-### Option 1: Heavy Runtime (`python-3.11-ml`)
+### 2. Verify Installation
 
 ```bash
-cd examples/python-3.11-ml
+# List available runtimes
+rnx runtime list
 
-# No setup needed - ML libs pre-installed on host
-rnx job run --runtime=python-3.11-ml python example_data_analysis.py
+# Test the runtime
+rnx runtime test python-3.11-ml
+
+# Check Python version
+rnx job run --runtime=python-3.11-ml python3 --version
+
+# Test ML packages
+rnx job run --runtime=python-3.11-ml python3 -c "import numpy; import pandas; import sklearn; print('ML packages loaded!')"
 ```
 
-### Option 2: Packaged Dependencies (`python-3.11`)
+### 3. Run Examples
 
 ```bash
-cd examples/python-3.11-ml
+# Run the data analysis example
+rnx job run --runtime=python-3.11-ml --upload=examples/python-3.11-ml/example_data_analysis.py \
+  python3 example_data_analysis.py
 
-# Install dependencies locally first
-./setup.sh              # Installs all ML dependencies
+# Quick ML test
+rnx job run --runtime=python-3.11-ml python3 -c "
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 
-# Upload entire project including dependencies
-rnx job run --runtime=python-3.11 --upload-dir=. python example_data_analysis.py
+X = np.random.randn(100, 4)
+y = (X[:, 0] > 0).astype(int)
+clf = RandomForestClassifier(n_estimators=10)
+clf.fit(X, y)
+print(f'Model accuracy: {clf.score(X, y):.2f}')
+"
 ```
 
-## 📦 Example Included
+## Pre-installed Packages
 
-### `example_data_analysis.py` - ML Pipeline
+The runtime includes these ML/data science packages:
 
-Works with **both runtime approaches**:
+| Package | Version | Purpose |
+|---------|---------|---------|
+| numpy | 1.26.2 | Numerical computing |
+| pandas | 2.1.3 | Data manipulation |
+| scikit-learn | 1.3.2 | Machine learning |
+| matplotlib | 3.8.2 | Data visualization |
+| seaborn | 0.13.0 | Statistical plotting |
+| joblib | 1.3.2 | Model persistence |
 
-- **Full ML Libraries**:
-    - `pandas==2.1.0` - Data manipulation and analysis
-    - `numpy==1.24.3` - Numerical computing
-    - `scikit-learn==1.3.0` - Machine learning
-    - `matplotlib==3.7.2` - Data visualization
-    - `seaborn==0.12.2` - Statistical plotting
-    - `scipy==1.11.4` - Scientific computing
-    - `requests==2.31.0` - HTTP requests
+## Example Files
 
-## 🔄 Runtime Benefits Comparison
+### example_data_analysis.py
 
-### `python-3.11-ml` Runtime
+Complete ML pipeline demonstrating:
 
-✅ **No setup** - ML libraries pre-installed on host  
-✅ **Instant deployment** - Just upload your script  
-✅ **No gRPC limits** - Upload only your code (~5KB)  
-❌ **Fixed versions** - Can't customize library versions  
-❌ **Larger host** - 500MB+ runtime footprint
+- Data generation with NumPy
+- Data manipulation with Pandas
+- Model training with scikit-learn
+- Visualization with Matplotlib
 
-### `python-3.11` + Packaged Dependencies
+### requirements.txt
 
-✅ **Exact versions** - Use precisely the packages you need  
-✅ **Reproducibility** - Dependencies travel with code  
-✅ **No version conflicts** - Each project has isolated dependencies  
-✅ **Lighter host** - 50MB runtime footprint  
-❌ **Setup required** - Must package dependencies first  
-❌ **Upload size** - Need to upload dependencies (~150MB)
+Package list for reference or local development.
 
-## 📋 Usage Instructions
+### setup.sh
 
-### For `python-3.11-ml` Runtime (Pre-installed ML)
+Helper script for local development setup.
 
-```bash
-cd examples/python-3.11-ml
+## Use Cases
 
-# No setup needed - run directly
-rnx job run --runtime=python-3.11-ml python example_data_analysis.py
-```
+- Machine learning model training
+- Data analysis and exploration
+- Statistical computing
+- Data visualization
+- Feature engineering
 
-### For `python-3.11` Runtime (Packaged Dependencies)
+## Related
 
-```bash
-cd examples/python-3.11-ml
-
-# 1. Package dependencies locally
-./setup.sh              # Installs all ML dependencies
-
-# 2. Test locally (optional)
-python3 example_data_analysis.py
-
-# 3. Deploy with dependencies
-rnx job run --runtime=python:3.11 --upload-dir=. python example_data_analysis.py
-```
-
-## 📊 What the Example Does
-
-The `example_data_analysis.py` script demonstrates an ML workflow:
-
-### 🔢 Data Generation & Analysis
-
-- Creates synthetic dataset (1000 samples, 5 features)
-- Generates binary classification target
-- Displays dataset statistics using Pandas
-
-### 🤖 Machine Learning Pipeline
-
-- Trains Random Forest classifier with Scikit-learn
-- Evaluates model performance with accuracy and classification report
-- Analyzes feature importance rankings
-
-### 📈 Data Visualization
-
-- Feature distribution histograms
-- Correlation heatmap between features
-- Feature importance bar chart
-- Target class distribution pie chart
-- Saves results as `ml_analysis_results.png`
-
-### 🌐 Network Testing
-
-- Tests HTTP connectivity using Requests library
-- Demonstrates external API access capability
-
-## 📁 Project Structure
-
-```
-python-3.11-ml/
-├── README.md                    # This documentation
-├── requirements.txt             # ML dependencies list
-├── example_data_analysis.py     # Complete ML example
-├── setup.sh                     # Dependency installer
-└── lib/                         # Dependencies (after setup.sh)
-    ├── pandas/                  # Data manipulation  
-    ├── numpy/                   # Numerical computing
-    ├── sklearn/                 # Machine learning
-    ├── matplotlib/              # Plotting
-    ├── seaborn/                 # Statistical plots  
-    ├── scipy/                   # Scientific computing
-    ├── requests/                # HTTP client
-    └── ... (other dependencies)
-```
-
-## 🎯 When to Use Each Runtime
-
-### Use `python-3.11-ml` when:
-
-- Quick prototyping and testing
-- Standard ML workflows with common packages
-- Don't need specific package versions
-- Want zero setup time
-
-### Use `python:3.11` + packaged deps when:
-
-- Need specific package versions
-- Want reproducibility
-- Deploying to production environments
-- Multiple projects with different requirements
-- Want isolated, controlled environments
-
-This example demonstrates **both approaches working with the same ML code** - choose the runtime that best fits your
-workflow!
+- [Python Basic Runtime](../python/README.md) - Lightweight Python without ML packages
+- [Python Analytics](../python-analytics/README.md) - Analytics-focused examples
+- [Runtime YAML Reference](../../docs/design/RUNTIME_YAML_QUICKREF.md)

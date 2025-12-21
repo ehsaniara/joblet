@@ -134,7 +134,7 @@ Once you complete either guide, you'll have:
 
 4. **Ready for workloads**
    ```bash
-   rnx runtime install python-3.11-ml
+   rnx runtime build ./examples/python-3.11-ml/runtime.yaml
    rnx volume create ml-data --size=10GB
    rnx job run echo "Hello from cloud!"
    ```
@@ -153,16 +153,16 @@ Run your first machine learning pipeline with Joblet.
 - [ML Demo Quick Start](../../examples/ml-demo/QUICKSTART.md)
 - [ML Demo Medium Article](../../examples/ml-demo/MEDIUM_ARTICLE.md)
 
-### Install Runtimes
+### Build Runtimes
 
-Get Python, Java, and other execution environments.
+Build Python, Java, and other execution environments from YAML specifications.
 
 ```bash
 # Python for ML
-rnx runtime install python-3.11-ml
+rnx runtime build ./examples/python-3.11-ml/runtime.yaml
 
 # Java for enterprise
-rnx runtime install openjdk-21
+rnx runtime build ./examples/java-21/runtime.yaml
 
 # Check what's available
 rnx runtime list

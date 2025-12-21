@@ -35,8 +35,8 @@ The Joblet runtime system provides a sophisticated isolation and mounting archit
     - Simplified structure supporting self-contained runtimes
 
 4. **CLI Integration** (`internal/rnx/resources/runtime.go`)
-    - Runtime management commands (`rnx runtime install/list/info`)
-    - Runtime installation using platform-specific setup scripts
+    - Runtime management commands (`rnx runtime build/list/info`)
+    - Runtime build using declarative YAML specifications
 
 ### Directory Structure
 
@@ -86,26 +86,26 @@ environment:
   LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib/jvm/lib"
 ```
 
-## Template-Based Installation System
+## Declarative Runtime Builder
 
-Runtime installation uses a modular, template-based architecture:
+Runtime building uses a 14-phase declarative pipeline:
 
-### Strategy Pattern Components
+### Builder Components
 
-1. **Runtime Installer Interface** (`internal/joblet/runtime/installers/interfaces.go`)
-    - Unified interface for all runtime installation types
-    - Standardized InstallSpec and InstallResult structures
-    - Support for GitHub, local, and script-based sources
+1. **Runtime Builder** (`pkg/builder/builder.go`)
+    - 14-phase build orchestration
+    - Platform detection and package management
+    - Progress streaming via gRPC
 
-2. **Installer Manager** (`internal/joblet/runtime/installers/manager.go`)
-    - Central coordinator that delegates to appropriate installers
-    - Source type detection and routing
-    - Error handling and validation
+2. **YAML Parser** (`pkg/builder/parser.go`)
+    - Schema validation for runtime.yaml
+    - Support for pip, npm, and custom hooks
+    - Environment variable configuration
 
-3. **Template Engine** (`internal/joblet/runtime/installers/base.go`)
-    - Go template rendering with embedded template files
-    - Parameterized shell script generation
-    - Runtime-specific variable substitution
+3. **Language Profiles** (`pkg/builder/profiles.go`)
+    - Pre-defined packages for Python, Java, Node.js, Go, Rust
+    - System-level dependencies per language
+    - Version-specific package selection
 
 ## Basic Usage Examples
 
@@ -533,6 +533,6 @@ rnx job run --runtime=python-3.11-ml python -c "import numpy; print('✅ Runtime
 
 - [RUNTIME_SYSTEM.md](./RUNTIME_SYSTEM.md) - User guide for runtime system
 - [RUNTIME_DESIGN.md](./RUNTIME_DESIGN.md) - Design document and examples
-- [RUNTIME_REGISTRY_GUIDE.md](./RUNTIME_REGISTRY_GUIDE.md) - Registry usage
+- [RUNTIME_REGISTRY_GUIDE.md](./RUNTIME_REGISTRY_GUIDE.md) - Declarative runtime builder guide
 - [SECURITY.md](./SECURITY.md) - Security considerations
 - [RNX_CLI_REFERENCE.md](./RNX_CLI_REFERENCE.md) - Complete CLI reference
