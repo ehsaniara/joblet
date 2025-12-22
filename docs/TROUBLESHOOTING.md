@@ -647,7 +647,7 @@ rnx job log <build-job-uuid>
 
 ```bash
 # 1. Check if previous build exists
-ls -la /opt/joblet/runtimes/java/openjdk-21/
+ls -la /opt/joblet/runtimes/openjdk-21/
 
 # 2. Remove and rebuild if needed
 rnx runtime remove openjdk-21
@@ -666,26 +666,25 @@ ping archive.ubuntu.com
 
 ```bash
 # Check if runtime has isolated structure
-ls -la /opt/joblet/runtimes/java/openjdk-21/
-# Should see 'isolated/' directory
+ls -la /opt/joblet/runtimes/openjdk-21/
+# Should see version directory with 'isolated/' inside
 
 # Check runtime.yml for isolated paths
-cat /opt/joblet/runtimes/java/openjdk-21/runtime.yml
+cat /opt/joblet/runtimes/openjdk-21/1.0.0/runtime.yml
 # Mounts should use "isolated/" prefix
 ```
 
 **Solutions:**
 
 ```bash
-# 1. Manually trigger cleanup (if implemented)
-joblet cleanup-runtime /opt/joblet/runtimes/java/openjdk-21
+# 1. Remove the runtime
+rnx runtime remove openjdk-21
 
 # 2. Verify runtime.yml uses isolated paths
-grep "source:" /opt/joblet/runtimes/java/openjdk-21/runtime.yml
+grep "source:" /opt/joblet/runtimes/openjdk-21/1.0.0/runtime.yml
 # Should show: source: "isolated/usr/lib/jvm/..."
 
-# 3. Rebuild runtime if cleanup failed
-rm -rf /opt/joblet/runtimes/java/openjdk-21
+# 3. Rebuild runtime
 rnx runtime build ./examples/java-21/runtime.yaml
 ```
 
