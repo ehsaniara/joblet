@@ -108,6 +108,12 @@ npm:
   - express
   - lodash
 
+# Optional: Additional library patterns to copy to isolated runtime
+# Use this for system libraries installed via pre_install hooks
+libraries:
+  - libopenblas*
+  - libgfortran*
+
 # Optional: Environment variables
 environment:
   PYTHONUNBUFFERED: "1"
@@ -147,6 +153,7 @@ hooks:
 | `pip` | No | List of Python packages |
 | `pip_options` | No | Additional pip install options |
 | `npm` | No | List of Node.js packages |
+| `libraries` | No | Additional library patterns to copy (e.g., `libopenblas*`) |
 | `environment` | No | Environment variables |
 | `requirements` | No | GPU and memory requirements |
 | `platforms` | No | Supported platforms |
@@ -272,8 +279,18 @@ pip:
   - scikit-learn
   - matplotlib
 
+# Copy system libraries needed by ML packages
+libraries:
+  - libopenblas*
+  - libgfortran*
+  - libgomp*
+
 environment:
   PYTHONUNBUFFERED: "1"
+
+hooks:
+  pre_install: |
+    apt-get install -y libopenblas-dev || yum install -y openblas-devel
 ```
 
 ### Java 21 Runtime

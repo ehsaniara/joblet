@@ -60,10 +60,22 @@ func getPythonProfile(version string) *LanguageProfile {
 			"libssl*",
 			"libcrypto*",
 			"libz*",
+			"libzstd*",
 			"libffi*",
+			"libexpat*",    // XML parsing
+			"libbz2*",      // bzip2 compression
+			"liblzma*",     // LZMA compression
+			"libsqlite3*",  // SQLite support
+			"libuuid*",     // UUID generation
+			"libncurses*",  // Terminal handling
+			"libreadline*", // Readline support
+			"libtinfo*",    // Terminal info (ncurses dependency)
+			"libgcc_s*",    // GCC runtime
+			"libstdc++*",   // C++ standard library
+			"libmpdec*",    // Decimal arithmetic
 		},
 		Environment: map[string]string{
-			"PYTHONUNBUFFERED": "1",
+			"PYTHONUNBUFFERED":        "1",
 			"PYTHONDONTWRITEBYTECODE": "1",
 		},
 	}

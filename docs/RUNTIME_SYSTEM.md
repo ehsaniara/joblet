@@ -143,8 +143,17 @@ pip:
   - pandas
   - scikit-learn
 
+# Optional: Additional libraries to copy (for system dependencies)
+libraries:
+  - libopenblas*
+  - libgfortran*
+
 environment:
   PYTHONUNBUFFERED: "1"
+
+hooks:
+  pre_install: |
+    apt-get install -y libopenblas-dev || yum install -y openblas-devel
 EOF
 
 # Validate the specification (comprehensive server-side validation)
@@ -266,6 +275,14 @@ pip:
   - numpy
   - pandas
   - scikit-learn
+
+libraries:
+  - libopenblas*
+  - libgfortran*
+
+hooks:
+  pre_install: |
+    apt-get install -y libopenblas-dev || yum install -y openblas-devel
 EOF
 
 # Step 2: Build runtime on remote Joblet server

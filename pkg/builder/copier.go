@@ -523,8 +523,86 @@ func CopyJavaRuntimeFromPath(rootPath string, profile *LanguageProfile, isolated
 	return nil
 }
 
+// CopyPythonRuntimeFromPath copies the Python standard library and site-packages from an overlay
+func CopyPythonRuntimeFromPath(rootPath string, profile *LanguageProfile, isolatedDir string, logger BuildLogger) error {
+	if profile == nil || profile.Language != "python" {
+		return nil
+	}
+
+	// Find the Python stdlib directory within the root path
+	pythonVersion := fmt.Sprintf("python%s", profile.Version)
+	stdlibPaths := []string{
+		filepath.Join(rootPath, "usr", "lib", pythonVersion),
+		filepath.Join(rootPath, "usr", "lib", "python3"),
+	}
+
+	var stdlibSrc string
+	for _, path := range stdlibPaths {
+		if _, err := os.Stat(path); err == nil {
+			stdlibSrc = path
+			break
+		}
+	}
+
+	if stdlibSrc == "" {
+		return fmt.Errorf("Python stdlib not found in isolated environment for Python %s", profile.Version)
+	}
+
+	// Create destination directory
+	stdlibDest := filepath.Join(isolatedDir, "usr", "lib", filepath.Base(stdlibSrc))
+	if err := os.MkdirAll(filepath.Dir(stdlibDest), 0755); err != nil {
+		return fmt.Errorf("failed to create Python lib directory: %w", err)
+	}
+
+	// Copy the entire Python stdlib using cp -r
+	logger.Info("Copying Python stdlib from isolated environment: %s", stdlibSrc)
+	cmd := exec.Command("cp", "-r", stdlibSrc, stdlibDest)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to copy Python stdlib: %w\nOutput: %s", err, string(output))
+	}
+
+	logger.Debug("Copied Python stdlib to %s", stdlibDest)
+
+	// Also copy site-packages from /usr/local/lib/pythonX.Y/
+	localSitePackages := filepath.Join(rootPath, "usr", "local", "lib", pythonVersion, "dist-packages")
+	if _, err := os.Stat(localSitePackages); err == nil {
+		destSitePackages := filepath.Join(isolatedDir, "usr", "local", "lib", pythonVersion, "dist-packages")
+		if err := os.MkdirAll(filepath.Dir(destSitePackages), 0755); err != nil {
+			return fmt.Errorf("failed to create site-packages directory: %w", err)
+		}
+
+		logger.Info("Copying Python site-packages from isolated environment")
+		cmd := exec.Command("cp", "-r", localSitePackages, destSitePackages)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			logger.Warn("Failed to copy site-packages: %v\nOutput: %s", err, string(output))
+		} else {
+			logger.Debug("Copied site-packages to %s", destSitePackages)
+		}
+	}
+
+	// Also check for pip-installed packages in /usr/lib/python3/dist-packages
+	python3DistPackages := filepath.Join(rootPath, "usr", "lib", "python3", "dist-packages")
+	if _, err := os.Stat(python3DistPackages); err == nil {
+		destDistPackages := filepath.Join(isolatedDir, "usr", "lib", "python3", "dist-packages")
+		if err := os.MkdirAll(filepath.Dir(destDistPackages), 0755); err != nil {
+			return fmt.Errorf("failed to create dist-packages directory: %w", err)
+		}
+
+		logger.Info("Copying Python dist-packages from isolated environment")
+		cmd := exec.Command("cp", "-r", python3DistPackages, destDistPackages)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			logger.Warn("Failed to copy dist-packages: %v\nOutput: %s", err, string(output))
+		} else {
+			logger.Debug("Copied dist-packages to %s", destDistPackages)
+		}
+	}
+
+	return nil
+}
+
 // CopyLibrariesFromPath copies libraries from a specific root path (overlay)
-func CopyLibrariesFromPath(rootPath string, platform *PlatformInfo, profile *LanguageProfile, isolatedDir string, logger BuildLogger) error {
+// extraPatterns allows runtime.yaml to specify additional library patterns
+func CopyLibrariesFromPath(rootPath string, platform *PlatformInfo, profile *LanguageProfile, isolatedDir string, extraPatterns []string, logger BuildLogger) error {
 	libDir := filepath.Join(isolatedDir, "lib")
 	lib64Dir := filepath.Join(isolatedDir, "lib64")
 	usrLibDir := filepath.Join(isolatedDir, "usr", "lib")
@@ -535,12 +613,16 @@ func CopyLibrariesFromPath(rootPath string, platform *PlatformInfo, profile *Lan
 		}
 	}
 
-	// Collect all library patterns
+	// Collect all library patterns:
+	// 1. Essential patterns (libc, libm, etc.)
+	// 2. Language profile patterns (libpython*, libssl*, etc.)
+	// 3. Extra patterns from runtime.yaml (user-specified)
 	patterns := make([]string, 0)
 	patterns = append(patterns, essentialLibraryPatterns...)
 	if profile != nil {
 		patterns = append(patterns, profile.LibraryPatterns...)
 	}
+	patterns = append(patterns, extraPatterns...)
 
 	// Search directories within the root path
 	// Determine lib path based on platform
