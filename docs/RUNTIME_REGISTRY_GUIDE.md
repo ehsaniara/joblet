@@ -187,7 +187,7 @@ Runtimes are installed to: `/opt/joblet/runtimes/{name}/{version}/`
 Directory structure:
 ```
 /opt/joblet/runtimes/python-3.11-ml/1.0.0/
-├── runtime.yml           # Runtime configuration
+├── runtime.yml           # Generated runtime configuration
 └── isolated/             # Isolated filesystem
     ├── usr/
     │   ├── bin/          # Binaries (python3, pip, etc.)
@@ -195,6 +195,38 @@ Directory structure:
     ├── lib/              # System libraries
     ├── etc/              # Configuration files
     └── tmp/              # Temporary directory
+```
+
+### Generated `runtime.yml`
+
+The build generates a `runtime.yml` with comprehensive metadata:
+
+```yaml
+name: python-3.11-ml
+language: python
+language_version: "3.11"
+version: 1.0.0
+description: Python 3.11 with machine learning packages
+mounts: [...]
+environment:
+  PYTHONUNBUFFERED: "1"
+  PATH: /usr/local/bin:/usr/bin:/bin
+packages:
+  - numpy==1.26.2
+  - pandas==2.1.3
+libraries:
+  - libopenblas*
+  - libgfortran*
+requirements:
+  architectures: [amd64]
+build_info:
+  built_at: "2025-12-22T17:43:00Z"
+  platform: ubuntu-amd64
+```
+
+View runtime details:
+```bash
+rnx runtime info python-3.11-ml
 ```
 
 ## Supported Languages

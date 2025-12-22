@@ -13,15 +13,18 @@ import (
 
 // RuntimeConfig represents the generated runtime.yml for the joblet server
 type RuntimeConfig struct {
-	Name         string            `yaml:"name"`
-	Language     string            `yaml:"language"`
-	Version      string            `yaml:"version"`
-	Description  string            `yaml:"description"`
-	Mounts       []MountSpec       `yaml:"mounts"`
-	Environment  map[string]string `yaml:"environment,omitempty"`
-	Packages     []string          `yaml:"packages,omitempty"`
-	Requirements RuntimeRequirements `yaml:"requirements,omitempty"`
-	BuildInfo    BuildInfoSpec     `yaml:"build_info"`
+	Name            string              `yaml:"name"`
+	Language        string              `yaml:"language"`
+	LanguageVersion string              `yaml:"language_version"`
+	Version         string              `yaml:"version"`
+	Description     string              `yaml:"description"`
+	Mounts          []MountSpec         `yaml:"mounts"`
+	Environment     map[string]string   `yaml:"environment,omitempty"`
+	Packages        []string            `yaml:"packages,omitempty"`
+	Libraries       []string            `yaml:"libraries,omitempty"`
+	Requirements    RuntimeRequirements `yaml:"requirements,omitempty"`
+	BuildInfo       BuildInfoSpec       `yaml:"build_info"`
+	OriginalYAML    string              `yaml:"original_yaml,omitempty"`
 }
 
 // MountSpec defines a mount point
@@ -51,12 +54,15 @@ func GenerateRuntimeConfig(buildCtx *BuildContext, logger BuildLogger) error {
 	mounts := generateMounts(buildCtx.IsolatedDir)
 
 	config := RuntimeConfig{
-		Name:        buildCtx.Spec.Name,
-		Language:    buildCtx.Spec.Base.Language,
-		Version:     buildCtx.Spec.Version,
-		Description: buildCtx.Spec.Description,
-		Mounts:      mounts,
-		Environment: generateEnvironment(buildCtx),
+		Name:            buildCtx.Spec.Name,
+		Language:        buildCtx.Spec.Base.Language,
+		LanguageVersion: buildCtx.Spec.Base.Version,
+		Version:         buildCtx.Spec.Version,
+		Description:     buildCtx.Spec.Description,
+		Mounts:          mounts,
+		Environment:     generateEnvironment(buildCtx),
+		Libraries:       buildCtx.Spec.Libraries,
+		OriginalYAML:    buildCtx.OriginalYAML,
 		BuildInfo: BuildInfoSpec{
 			BuiltAt:   time.Now().UTC().Format(time.RFC3339),
 			BuiltWith: "joblet-builder",

@@ -355,10 +355,10 @@ echo "Job completed with exit code: $(rnx job status --json $JOB_UUID | jq .exit
 
 ```bash
 # Save logs to file
-rnx job log <job-uuid> > output.log
+rnx job log <job-uuid> > error.log
 
 # Example with actual UUID:
-rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > error.log
 
 # Stream to file
 rnx job log <job-uuid> | tee running.log
@@ -609,7 +609,7 @@ JOB_UUID=$(rnx job run --json \
 # Save all job info
 mkdir -p logs/$JOB_UUID
 rnx job status $JOB_UUID > logs/$JOB_UUID/status.txt
-rnx job log $JOB_UUID > logs/$JOB_UUID/output.log
+rnx job log $JOB_UUID > logs/$JOB_UUID/error.log
 ```
 
 ### 5. Security

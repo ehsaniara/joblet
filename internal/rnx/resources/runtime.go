@@ -201,6 +201,16 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Description: %s\n", rt.Description)
 
+	// Display language info
+	if rt.Language != "" || rt.LanguageVersion != "" {
+		fmt.Printf("\nLanguage: %s %s\n", rt.Language, rt.LanguageVersion)
+	}
+
+	// Display size
+	if rt.SizeBytes > 0 {
+		fmt.Printf("Size: %s\n", formatSize(rt.SizeBytes))
+	}
+
 	// Display requirements
 	if rt.Requirements != nil && (len(rt.Requirements.Architectures) > 0 || rt.Requirements.Gpu) {
 		fmt.Println("\nRequirements:")
@@ -220,6 +230,35 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Display libraries (if any)
+	if len(rt.Libraries) > 0 {
+		fmt.Println("\nLibrary Patterns:")
+		for _, lib := range rt.Libraries {
+			fmt.Printf("  - %s\n", lib)
+		}
+	}
+
+	// Display environment variables (if any)
+	if len(rt.Environment) > 0 {
+		fmt.Println("\nEnvironment Variables:")
+		for k, v := range rt.Environment {
+			// Truncate long values
+			if len(v) > 60 {
+				v = v[:57] + "..."
+			}
+			fmt.Printf("  %s=%s\n", k, v)
+		}
+	}
+
+	// Display build info
+	if rt.BuildInfo != nil && rt.BuildInfo.BuiltAt != "" {
+		fmt.Println("\nBuild Info:")
+		fmt.Printf("  Built: %s\n", rt.BuildInfo.BuiltAt)
+		if rt.BuildInfo.Platform != "" {
+			fmt.Printf("  Platform: %s\n", rt.BuildInfo.Platform)
+		}
+	}
+
 	fmt.Println("\nUsage:")
 	fmt.Printf("  rnx job run --runtime=%s <command>\n", runtimeSpec)
 
@@ -229,11 +268,17 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 func outputRuntimeInfoJSON(rt *pb.RuntimeInfo, runtimeSpec string) error {
 	// Create JSON output structure
 	output := map[string]interface{}{
-		"name":        rt.Name,
-		"version":     rt.Version,
-		"description": rt.Description,
-		"packages":    rt.Packages,
-		"usage":       fmt.Sprintf("rnx job run --runtime=%s <command>", runtimeSpec),
+		"name":             rt.Name,
+		"version":          rt.Version,
+		"description":      rt.Description,
+		"language":         rt.Language,
+		"language_version": rt.LanguageVersion,
+		"size_bytes":       rt.SizeBytes,
+		"size":             formatSize(rt.SizeBytes),
+		"packages":         rt.Packages,
+		"libraries":        rt.Libraries,
+		"environment":      rt.Environment,
+		"usage":            fmt.Sprintf("rnx job run --runtime=%s <command>", runtimeSpec),
 	}
 
 	// Add requirements if they exist
@@ -248,6 +293,20 @@ func outputRuntimeInfoJSON(rt *pb.RuntimeInfo, runtimeSpec string) error {
 		if len(requirements) > 0 {
 			output["requirements"] = requirements
 		}
+	}
+
+	// Add build info if available
+	if rt.BuildInfo != nil {
+		output["build_info"] = map[string]interface{}{
+			"built_at":   rt.BuildInfo.BuiltAt,
+			"built_with": rt.BuildInfo.BuiltWith,
+			"platform":   rt.BuildInfo.Platform,
+		}
+	}
+
+	// Add original YAML if available
+	if rt.OriginalYaml != "" {
+		output["original_yaml"] = rt.OriginalYaml
 	}
 
 	// Marshal and print JSON

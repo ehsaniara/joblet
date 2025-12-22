@@ -325,7 +325,7 @@ rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 | tail -100
 rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 | grep ERROR
 
 # Save logs to file
-rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > output.log
+rnx job log f47ac10b-58cc-4372-a567-0e02b2c3d479 > error.log
 ```
 
 ### `rnx job metrics`
@@ -796,7 +796,61 @@ rnx runtime info <runtime-spec>
 ```bash
 # Get runtime details
 rnx runtime info python-3.11-ml
-rnx runtime info openjdk:21
+rnx runtime info openjdk-21
+
+# JSON output for scripting
+rnx runtime info python-3.11-ml --json
+```
+
+#### Output Fields
+
+The command displays comprehensive runtime information:
+
+| Field | Description |
+|-------|-------------|
+| Runtime | Runtime name |
+| Version | Runtime version (e.g., "1.0.0") |
+| Description | Human-readable description |
+| Language | Language and version (e.g., "python 3.11") |
+| Size | Total runtime size |
+| Requirements | GPU requirements and supported architectures |
+| Pre-installed Packages | Pip/npm packages included |
+| Library Patterns | Shared library patterns copied |
+| Environment Variables | Pre-configured environment |
+| Build Info | When built, platform used |
+
+#### Example Output
+
+```
+Runtime: python-3.11-ml
+Version: 1.0.0
+Description: Python 3.11 with machine learning and data science packages
+
+Language: python 3.11
+Size: 1.3GB
+
+Requirements:
+  Architectures: amd64
+
+Pre-installed Packages:
+  - numpy==1.26.2
+  - pandas==2.1.3
+  - scikit-learn==1.3.2
+
+Library Patterns:
+  - libopenblas*
+  - libgfortran*
+
+Environment Variables:
+  PYTHONUNBUFFERED=1
+  PYTHONPATH=/usr/local/lib/python3/site-packages
+
+Build Info:
+  Built: 2025-12-22T17:43:00Z
+  Platform: ubuntu-amd64
+
+Usage:
+  rnx job run --runtime=python-3.11-ml <command>
 ```
 
 ### `rnx runtime build`

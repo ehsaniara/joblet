@@ -596,7 +596,7 @@ rnx job log <job-id>
 rnx job log <job-id> | grep ERROR
 
 # Save logs for analysis
-rnx job log <job-id> > job-output.log
+rnx job log <job-id> > job-error.log
 ```
 
 ### Audit Logs
