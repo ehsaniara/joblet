@@ -159,12 +159,13 @@ func (e *IsolatedEnvironment) mountEssentialFS() error {
 // setupDNS copies resolv.conf for DNS resolution inside the chroot
 func (e *IsolatedEnvironment) setupDNS() error {
 	// The overlay already has /etc/resolv.conf from the host
-	// But we may need to ensure it's accessible
+	// But on EC2/systemd systems, it's often a symlink to /run/systemd/resolve/stub-resolv.conf
+	// which doesn't exist in the overlay. We need to replace it with a real file.
 	resolvPath := filepath.Join(e.mergedDir, "etc", "resolv.conf")
 
-	// Check if resolv.conf exists and is readable
-	if _, err := e.sysOps.Stat(resolvPath); err == nil {
-		return nil // Already exists from overlay
+	// Check if resolv.conf exists and is readable (not a broken symlink)
+	if content, err := e.sysOps.ReadFile(resolvPath); err == nil && len(content) > 0 {
+		return nil // Already exists and readable from overlay
 	}
 
 	// Create /etc if needed
@@ -173,10 +174,16 @@ func (e *IsolatedEnvironment) setupDNS() error {
 		return fmt.Errorf("failed to create /etc: %w", err)
 	}
 
-	// Copy resolv.conf from host
+	// Remove any existing broken symlink (common on EC2/systemd systems)
+	// On systemd systems, /etc/resolv.conf is often a symlink to:
+	// /run/systemd/resolve/stub-resolv.conf (which doesn't exist in overlay)
+	_ = e.sysOps.RemoveAll(resolvPath) // Ignore error if doesn't exist
+
+	// Read DNS config from host (follow symlinks to get actual content)
 	content, err := e.sysOps.ReadFile("/etc/resolv.conf")
 	if err != nil {
-		// Create a fallback
+		// Create a fallback with public DNS servers
+		e.logger.Debug("Could not read host /etc/resolv.conf, using fallback DNS servers")
 		content = []byte("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
 	}
 
@@ -184,6 +191,7 @@ func (e *IsolatedEnvironment) setupDNS() error {
 		return fmt.Errorf("failed to write resolv.conf: %w", err)
 	}
 
+	e.logger.Debug("DNS configured in isolated environment")
 	return nil
 }
 
