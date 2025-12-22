@@ -57,20 +57,23 @@ environments without contaminating the host system.
 
 ```
 /opt/joblet/runtimes/
-├── python/
-│   ├── python-3.11-ml/          # Python 3.11 + ML packages
-│   │   ├── runtime.yml          # Runtime configuration
-│   │   ├── python-install/      # Isolated Python installation
-│   │   ├── ml-venv/            # Virtual environment with ML packages
-│   │   ├── bin/                # Symlinks for mounting
-│   │   └── lib/                # Library symlinks
-│   └── python-3.12/            # Python 3.12 modern features
-├── java/
-│   ├── java-17/                # OpenJDK 17 LTS
-│   └── java-21/                # OpenJDK 21 with modern features
-├── node/
-│   └── node-18/                # Node.js 18 LTS
-└── [future runtimes]
+├── python-3.11-ml/
+│   └── 1.0.0/                   # Version directory
+│       ├── runtime.yml          # Runtime configuration
+│       └── isolated/            # Complete isolated filesystem
+│           ├── usr/bin/         # Binaries (python3, pip)
+│           ├── usr/lib/         # Libraries and packages
+│           ├── lib/             # System libraries
+│           └── etc/             # Configuration files
+├── openjdk-21/
+│   └── 1.0.0/
+│       ├── runtime.yml
+│       └── isolated/
+├── python-3.12/
+│   └── 1.0.0/
+│       ├── runtime.yml
+│       └── isolated/
+└── [additional runtimes]
 ```
 
 ### Runtime Configuration
@@ -128,7 +131,7 @@ Runtimes that provide complete language environments with interpreters/compilers
 ### Runtime Resolution
 
 1. Job specifies runtime via `--runtime=python-3.11-ml`
-2. Runtime manager resolves to `/opt/joblet/runtimes/python/python-3.11-ml/`
+2. Runtime manager resolves to `/opt/joblet/runtimes/python-3.11-ml/{version}/`
 3. Configuration loaded from `runtime.yml`
 4. Mount points prepared for job container
 

@@ -339,7 +339,7 @@ runtime structure:
 
 ```bash
 # In builder chroot during setup:
-/opt/joblet/runtimes/java/openjdk-21/
+/opt/joblet/runtimes/openjdk-21/1.0.0/
 ├── isolated/                    # NEW: Isolated runtime files
 │   ├── usr/lib/jvm/            # Copied from host, not mounted
 │   ├── usr/bin/                # Java binaries (isolated copies)

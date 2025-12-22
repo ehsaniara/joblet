@@ -213,6 +213,45 @@ func (e *IsolatedEnvironment) RunInChroot(name string, args ...string) ([]byte, 
 	return output, nil
 }
 
+// AddDeadsnakesPPA adds the deadsnakes PPA for newer Python versions on Ubuntu
+// IMPORTANT: This runs inside the OverlayFS chroot - the host system is NOT modified.
+// The PPA is added to the overlay's upper layer which is discarded after build.
+func (e *IsolatedEnvironment) AddDeadsnakesPPA() error {
+	if !e.mounted {
+		return fmt.Errorf("cannot add PPA: isolated environment not mounted")
+	}
+
+	e.logger.Info("Adding deadsnakes PPA in isolated environment (host is protected by OverlayFS)")
+	e.logger.Debug("PPA changes will be written to overlay upper layer: %s", e.upperDir)
+
+	// Install software-properties-common for add-apt-repository
+	// This runs inside chroot, so it installs to the overlay, not the host
+	if output, err := e.RunInChroot("apt-get", "install", "-y", "software-properties-common"); err != nil {
+		return fmt.Errorf("failed to install software-properties-common: %w\nOutput: %s", err, string(output))
+	}
+
+	// Add deadsnakes PPA inside the chroot
+	// The PPA file will be created in the overlay's upper layer at:
+	// {upperDir}/etc/apt/sources.list.d/deadsnakes-ubuntu-ppa-*.list
+	if output, err := e.RunInChroot("add-apt-repository", "-y", "ppa:deadsnakes/ppa"); err != nil {
+		return fmt.Errorf("failed to add deadsnakes PPA: %w\nOutput: %s", err, string(output))
+	}
+
+	e.logger.Info("Deadsnakes PPA added successfully (isolated, host unchanged)")
+	return nil
+}
+
+// needsDeadsnakesPPA checks if any package requires the deadsnakes PPA
+func needsDeadsnakesPPA(packages []string) bool {
+	for _, pkg := range packages {
+		// Check for python3.X packages where X >= 10 (python3.10, python3.11, python3.12, etc.)
+		if strings.HasPrefix(pkg, "python3.1") || strings.HasPrefix(pkg, "python3.2") {
+			return true
+		}
+	}
+	return false
+}
+
 // InstallPackagesIsolated installs system packages inside the isolated environment
 func (e *IsolatedEnvironment) InstallPackagesIsolated(pkgManager string, packages []string) error {
 	if len(packages) == 0 {
@@ -227,6 +266,25 @@ func (e *IsolatedEnvironment) InstallPackagesIsolated(pkgManager string, package
 		e.logger.Debug("Running apt-get update in chroot")
 		if output, err := e.RunInChroot("apt-get", "update", "-qq"); err != nil {
 			return fmt.Errorf("apt-get update failed: %w\nOutput: %s\n\nThis usually means:\n  - Network connectivity issues\n  - DNS resolution problems\n  - Invalid apt sources in /etc/apt/sources.list", err, string(output))
+		}
+
+		// Check if we need deadsnakes PPA for Python packages
+		if needsDeadsnakesPPA(packages) {
+			// Try to install packages first - if it fails, add PPA and retry
+			args := append([]string{"install", "-y", "--no-install-recommends"}, packages...)
+			if _, err := e.RunInChroot("apt-get", args...); err != nil {
+				e.logger.Info("Package not found in default repos, adding deadsnakes PPA...")
+				if err := e.AddDeadsnakesPPA(); err != nil {
+					return fmt.Errorf("failed to add deadsnakes PPA: %w", err)
+				}
+				// Update after adding PPA
+				if output, err := e.RunInChroot("apt-get", "update", "-qq"); err != nil {
+					return fmt.Errorf("apt-get update after PPA failed: %w\nOutput: %s", err, string(output))
+				}
+			} else {
+				// First attempt succeeded
+				return nil
+			}
 		}
 
 		// Install packages

@@ -175,41 +175,34 @@ The cleanup system transforms runtime installations into isolated, self-containe
 8. Secure Runtime Ready for Production
 ```
 
-### Directory Structure Transformation
+### Directory Structure
 
-**Before Cleanup:**
-
-```
-/opt/joblet/runtimes/java/openjdk-21/
-├── runtime.yml                # Points to host OS paths
-└── setup.sh
-```
-
-**After Cleanup (SECURE):**
+The runtime builder automatically creates this structure:
 
 ```
-/opt/joblet/runtimes/java/openjdk-21/
-├── isolated/                 # Self-contained runtime files
-│   ├── usr/
-│   │   ├── lib/jvm/          # Copied Java installation
-│   │   └── bin/              # Copied Java binaries
-│   └── etc/ssl/certs/        # Copied certificates
-├── runtime.yml               # Updated with isolated paths
-├── runtime.yml.original      # Backup of original
-└── setup.sh
+/opt/joblet/runtimes/openjdk-21/1.0.0/
+├── runtime.yml               # Runtime configuration with isolated paths
+└── isolated/                 # Self-contained runtime files
+    ├── usr/
+    │   ├── lib/jvm/          # Copied Java installation
+    │   └── bin/              # Copied Java binaries
+    ├── lib/                  # System libraries
+    └── etc/ssl/certs/        # Copied certificates
 ```
 
-### File Copying Strategy
+### How the Builder Creates Isolated Runtimes
+
+The `rnx runtime build` command uses OverlayFS to install packages in isolation and then copies the results:
 
 ```bash
-# Java Runtime Cleanup Example
-mkdir -p "/opt/joblet/runtimes/java/openjdk-21/isolated/usr/lib/jvm"
-cp -r "/usr/lib/jvm/java-21-openjdk-amd64" \
-      "/opt/joblet/runtimes/java/openjdk-21/isolated/usr/lib/jvm/"
+# Build creates the isolated structure automatically
+rnx runtime build ./examples/java-21/runtime.yaml
 
-mkdir -p "/opt/joblet/runtimes/java/openjdk-21/isolated/usr/bin"
-cp "/usr/bin/java" "/opt/joblet/runtimes/java/openjdk-21/isolated/usr/bin/"
-cp "/usr/bin/javac" "/opt/joblet/runtimes/java/openjdk-21/isolated/usr/bin/"
+# The builder performs these steps internally:
+# 1. Creates OverlayFS with host as read-only lower layer
+# 2. Installs packages in the overlay (changes captured in upper layer)
+# 3. Copies binaries/libraries from upper layer to isolated/ directory
+# 4. Generates runtime.yml with isolated paths
 ```
 
 ### Configuration Update
@@ -260,8 +253,8 @@ All runtimes use direct extraction for deployment:
 # - java-21-runtime-complete.tar.gz (208MB)
 
 # Extract directly to runtimes directory
-sudo tar -xzf python-3.11-ml-runtime.tar.gz -C /opt/joblet/runtimes/python/
-sudo tar -xzf java-17-runtime-complete.tar.gz -C /opt/joblet/runtimes/java/
+sudo tar -xzf python-3.11-ml-runtime.tar.gz -C /opt/joblet/runtimes/
+sudo tar -xzf java-17-runtime-complete.tar.gz -C /opt/joblet/runtimes/
 
 # Set proper permissions
 sudo chown -R joblet:joblet /opt/joblet/runtimes/
@@ -400,7 +393,7 @@ deploy_runtime_blue_green() {
     }
 
     # Step 3: Update symlink for seamless cutover
-    ssh admin@$host "sudo ln -sfn /opt/joblet/runtimes/python/python-3.11-ml-v2.0 /opt/joblet/runtimes/python/python-3.11-ml"
+    ssh admin@$host "sudo ln -sfn /opt/joblet/runtimes/python-3.11-ml-v2.0 /opt/joblet/runtimes/python-3.11-ml"
 
     # Step 4: Verify production traffic
     ssh admin@$host "rnx job run --runtime=python-3.11-ml python -c 'print(\"✅ Production ready\")'"

@@ -665,41 +665,40 @@ requirements:
 
 ### Custom Runtime Example
 
-Here's a basic Python runtime structure:
+The recommended way to create custom runtimes is using the declarative YAML builder:
+
+```yaml
+# runtime.yaml
+schema_version: "1.0"
+name: python-3.12-custom
+version: 1.0.0
+description: Python 3.12 with custom packages
+
+base:
+  language: python
+  version: "3.12"
+
+pip:
+  - requests
+  - pyyaml
+
+hooks:
+  post_install: |
+    echo "Custom setup complete"
+```
 
 ```bash
-# 1. Create directory structure
-sudo mkdir -p /opt/joblet/runtimes/python/python-3.12-custom
-cd /opt/joblet/runtimes/python/python-3.12-custom
+# Build the runtime on the server
+rnx runtime build ./runtime.yaml
 
-# 2. Install Python from source or binaries
-# ... installation steps ...
-
-# 3. Create runtime.yml
-sudo tee runtime.yml << EOF
-name: "python-3.12-custom"
-type: "managed"
-version: "3.12.0"
-description: "Python 3.12 with custom packages"
-
-mounts:
-  - source: "bin"
-    target: "/usr/local/bin"
-    readonly: true
-    selective: ["python3", "pip", "pip3"]
-  - source: "lib"
-    target: "/usr/local/lib"
-    readonly: true
-
-environment:
-  PYTHON_HOME: "/usr/local"
-  PATH_PREPEND: "/usr/local/bin"
-
-package_manager:
-  type: "pip"
-  cache_volume: "pip-cache"
-EOF
+# Verify installation
+rnx runtime list
+rnx runtime info python-3.12-custom
 ```
+
+The runtime will be installed to `/opt/joblet/runtimes/python-3.12-custom/1.0.0/` with the complete isolated filesystem.
+
+> **Note**: See [RUNTIME_REGISTRY_GUIDE.md](RUNTIME_REGISTRY_GUIDE.md) for the complete YAML specification and advanced customization options.
 
 ## ✅ Best Practices
 
