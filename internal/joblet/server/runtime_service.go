@@ -107,18 +107,39 @@ func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.Runti
 		}, nil
 	}
 
+	// Calculate runtime size
+	runtimePath, _ := s.resolver.FindRuntimeDirectory(req.Runtime)
+	var sizeBytes int64
+	if runtimePath != "" {
+		_ = filepath.Walk(runtimePath, func(path string, info os.FileInfo, err error) error {
+			if err == nil && !info.IsDir() {
+				sizeBytes += info.Size()
+			}
+			return nil
+		})
+	}
+
 	// Convert to protobuf format
 	pbRuntime := &pb.RuntimeInfo{
-		Name:        config.Name,
-		Language:    extractLanguageFromName(config.Name),
-		Version:     config.Version,
-		Description: config.Description,
-		SizeBytes:   0, // Would need to calculate
-		Packages:    config.Packages,
-		Available:   true,
+		Name:            config.Name,
+		Language:        config.Language,
+		Version:         config.Version,
+		Description:     config.Description,
+		SizeBytes:       sizeBytes,
+		Packages:        config.Packages,
+		Available:       true,
+		LanguageVersion: config.LanguageVersion,
+		Libraries:       config.Libraries,
+		Environment:     config.Environment,
+		OriginalYaml:    config.OriginalYAML,
 		Requirements: &pb.RuntimeRequirements{
 			Architectures: config.Requirements.Architectures,
-			Gpu:           true, // GPU support is now implemented
+			Gpu:           config.Requirements.GPU,
+		},
+		BuildInfo: &pb.RuntimeBuildInfo{
+			BuiltAt:   config.BuildInfo.BuiltAt,
+			BuiltWith: config.BuildInfo.BuiltWith,
+			Platform:  config.BuildInfo.Platform,
 		},
 	}
 

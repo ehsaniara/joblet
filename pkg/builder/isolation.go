@@ -371,7 +371,8 @@ func (e *IsolatedEnvironment) InstallPipPackagesIsolated(packages []string, pipO
 	}
 
 	// Build pip install arguments
-	args := []string{"-m", "pip", "install", "--no-cache-dir"}
+	// --ignore-installed allows upgrading system packages that were installed by apt/yum
+	args := []string{"-m", "pip", "install", "--no-cache-dir", "--ignore-installed"}
 
 	// Add pip options if specified (e.g., --index-url)
 	if pipOptions != "" {

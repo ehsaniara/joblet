@@ -65,12 +65,13 @@ func (b *Builder) Build(ctx context.Context, yamlContent string, dryRun bool) (*
 	isolatedDir := filepath.Join(runtimeDir, "isolated")
 
 	buildCtx := &BuildContext{
-		Spec:        spec,
-		Platform:    platform,
-		RuntimeDir:  runtimeDir,
-		IsolatedDir: isolatedDir,
-		DryRun:      dryRun,
-		Verbose:     false,
+		Spec:         spec,
+		Platform:     platform,
+		RuntimeDir:   runtimeDir,
+		IsolatedDir:  isolatedDir,
+		DryRun:       dryRun,
+		Verbose:      false,
+		OriginalYAML: yamlContent,
 	}
 
 	// Phase 3: Check Disk Space
@@ -651,7 +652,7 @@ func (b *Builder) setupIsolatedEnvironment(buildCtx *BuildContext) error {
 	}
 
 	buildCtx.IsolatedEnv = isolatedEnv
-	b.logger.Info("Isolated environment ready - host will NOT be modified")
+	b.logger.Debug("Isolated environment ready - host will NOT be modified")
 	return nil
 }
 

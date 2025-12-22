@@ -518,66 +518,96 @@ in its `isolated/` directory. This eliminates dependency on host system files du
 
 ### Runtime Configuration (`runtime.yml`)
 
+The generated `runtime.yml` contains all metadata about the built runtime:
+
 ```yaml
-name: "python-3.11-ml"
-version: "3.11"
-description: "Python with ML packages - self-contained (7785 files)"
+name: python-3.11-ml
+language: python
+language_version: "3.11"
+version: 1.0.0
+description: Python 3.11 with machine learning and data science packages
 
 # All mounts from isolated/ - no host dependencies
 mounts:
-  # System directories
-  - source: "isolated/bin"
-    target: "/bin"
+  - source: isolated/usr/local/lib
+    target: /usr/local/lib
     readonly: true
-  - source: "isolated/lib"
-    target: "/lib"
+  - source: isolated/usr/bin
+    target: /usr/bin
     readonly: true
-  - source: "isolated/lib64"
-    target: "/lib64"
+  - source: isolated/bin
+    target: /bin
     readonly: true
-  - source: "isolated/usr/bin"
-    target: "/usr/bin"
+  - source: isolated/lib
+    target: /lib
     readonly: true
-  - source: "isolated/usr/lib"
-    target: "/usr/lib"
+  - source: isolated/lib64
+    target: /lib64
     readonly: true
-  - source: "isolated/usr/lib64"
-    target: "/usr/lib64"
+  - source: isolated/usr/lib
+    target: /usr/lib
     readonly: true
-  
-  # Architecture-specific libraries (AMD64 example)
-  - source: "isolated/lib/x86_64-linux-gnu"
-    target: "/lib/x86_64-linux-gnu"
-    readonly: true
-  - source: "isolated/usr/lib/x86_64-linux-gnu"
-    target: "/usr/lib/x86_64-linux-gnu"
-    readonly: true
-  
-  # System configuration
-  - source: "isolated/etc/ssl"
-    target: "/etc/ssl"
-    readonly: true
-  - source: "isolated/etc/ca-certificates"
-    target: "/etc/ca-certificates"
-    readonly: true
-  - source: "isolated/usr/share/ca-certificates"
-    target: "/usr/share/ca-certificates"
-    readonly: true
-  
-  # Python-specific mounts
-  - source: "isolated/usr/lib/python3/dist-packages"
-    target: "/usr/local/lib/python3.11/site-packages"
-    readonly: true
-  - source: "isolated/usr/local/bin"
-    target: "/usr/local/bin"
+  - source: isolated/etc/ssl
+    target: /etc/ssl
     readonly: true
 
+# Environment variables configured for the runtime
 environment:
-  PYTHON_HOME: "/usr/local"
-  PYTHONPATH: "/usr/local/lib/python3.11/site-packages"
-  PATH: "/usr/local/bin:/usr/bin:/bin"
-  LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/lib64:/usr/lib:/lib"
+  MPLBACKEND: Agg
+  PATH: /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+  PYTHONPATH: /usr/local/lib/python3/site-packages
+  PYTHONUNBUFFERED: "1"
+
+# Pre-installed packages (pip/npm)
+packages:
+  - numpy==1.26.2
+  - pandas==2.1.3
+  - scikit-learn==1.3.2
+  - matplotlib==3.8.2
+  - seaborn==0.13.0
+
+# Additional library patterns copied from runtime.yaml
+libraries:
+  - libopenblas*
+  - libgfortran*
+  - libquadmath*
+  - libgomp*
+
+# System requirements
+requirements:
+  architectures:
+    - amd64
+  gpu: false
+
+# Build metadata
+build_info:
+  built_at: "2025-12-22T17:43:00Z"
+  built_with: joblet-builder
+  platform: ubuntu-amd64
+
+# Original runtime.yaml (preserved for reference)
+original_yaml: |
+  schema_version: "1.0"
+  name: python-3.11-ml
+  ...
 ```
+
+#### Runtime Configuration Fields
+
+| Field | Description |
+|-------|-------------|
+| `name` | Runtime name (e.g., "python-3.11-ml") |
+| `language` | Base language (python, java, node, go, rust) |
+| `language_version` | Language version (e.g., "3.11") |
+| `version` | Runtime version (semantic versioning) |
+| `description` | Human-readable description |
+| `mounts` | Filesystem mount points from isolated/ directory |
+| `environment` | Environment variables set for jobs |
+| `packages` | Pre-installed pip/npm packages |
+| `libraries` | Custom library patterns copied |
+| `requirements` | System requirements (architectures, GPU) |
+| `build_info` | Build timestamp, builder version, platform |
+| `original_yaml` | Original runtime.yaml content (for reference) |
 
 ### Isolation Mechanism
 

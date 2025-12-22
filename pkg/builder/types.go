@@ -53,12 +53,13 @@ type PlatformInfo struct {
 
 // BuildContext holds state during build
 type BuildContext struct {
-	Spec        *RuntimeYAMLSpec
-	Platform    *PlatformInfo
-	RuntimeDir  string // /opt/joblet/runtimes/{name}/{version}
-	IsolatedDir string // /opt/joblet/runtimes/{name}/{version}/isolated
-	DryRun      bool
-	Verbose     bool
+	Spec         *RuntimeYAMLSpec
+	Platform     *PlatformInfo
+	RuntimeDir   string // /opt/joblet/runtimes/{name}/{version}
+	IsolatedDir  string // /opt/joblet/runtimes/{name}/{version}/isolated
+	DryRun       bool
+	Verbose      bool
+	OriginalYAML string // Original runtime.yaml content for storage
 
 	// Isolation
 	IsolatedEnv     *IsolatedEnvironment // OverlayFS isolated environment for package installation
