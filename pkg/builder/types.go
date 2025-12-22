@@ -20,6 +20,7 @@ type RuntimeYAMLSpec struct {
 	Requirements  *Requirements     `yaml:"requirements,omitempty"`
 	Platforms     []string          `yaml:"platforms,omitempty"` // e.g., ["ubuntu-amd64", "rhel-arm64"]
 	Hooks         *Hooks            `yaml:"hooks,omitempty"`
+	Libraries     []string          `yaml:"libraries,omitempty"` // Additional library patterns to copy, e.g., ["libcustom*", "libopenblas*"]
 }
 
 // BaseConfig defines the base language and version

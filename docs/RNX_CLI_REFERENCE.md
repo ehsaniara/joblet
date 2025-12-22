@@ -887,8 +887,17 @@ pip:
   - pandas
   - scikit-learn
 
+# Optional: Additional library patterns to copy to runtime
+libraries:
+  - libopenblas*
+  - libgfortran*
+
 environment:
   PYTHONUNBUFFERED: "1"
+
+hooks:
+  pre_install: |
+    apt-get install -y libopenblas-dev || yum install -y openblas-devel
 ```
 
 ### `rnx runtime test`

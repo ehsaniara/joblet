@@ -15,6 +15,14 @@ pip:
   - seaborn==0.13.0
   - joblib==1.3.2
 
+# Additional libraries to copy to the isolated runtime
+# These patterns match .so files installed by pre_install or pip dependencies
+libraries:
+  - libopenblas*
+  - libgfortran*
+  - libquadmath*
+  - libgomp*
+
 environment:
   PYTHONUNBUFFERED: "1"
   MPLBACKEND: "Agg"

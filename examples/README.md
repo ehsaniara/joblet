@@ -6,19 +6,20 @@ This directory contains example code and runtime definitions for testing Joblet.
 
 ```
 examples/
-├── python/             # Basic Python runtime and examples
-│   └── runtime.yaml    # Python 3.11 runtime definition
-├── python-3.11-ml/     # Python ML runtime and examples
-│   └── runtime.yaml    # Python 3.11 + ML packages
+├── python/             # Basic Python 3.11 runtime
+│   └── runtime.yaml    # Lightweight Python runtime
+├── python-3.11-ml/     # Python ML runtime
+│   └── runtime.yaml    # Python + NumPy, Pandas, scikit-learn
 ├── python-analytics/   # Python analytics runtime
-│   └── runtime.yaml    # Python 3.11 + analytics packages
+│   └── runtime.yaml    # Python + Pandas, Matplotlib
 ├── java-21/            # OpenJDK 21 runtime
-│   └── runtime.yaml    # OpenJDK 21 runtime definition
+│   └── runtime.yaml    # Java 21 LTS with virtual threads
 ├── java-17/            # OpenJDK 17 runtime
-│   └── runtime.yaml    # OpenJDK 17 runtime definition
+│   └── runtime.yaml    # Java 17 LTS
 ├── java/               # Java source files
 ├── basic-usage/        # Basic usage shell scripts
-└── log-streaming/      # Log streaming examples
+├── log-streaming/      # Log streaming examples
+└── advanced/           # Multi-job coordination patterns
 ```
 
 ## Quick Start
@@ -94,6 +95,10 @@ pip:
   - numpy==1.26.2
   - pandas==2.1.3
   - scikit-learn==1.3.2
+
+libraries:
+  - libopenblas*
+  - libgfortran*
 ```
 
 ### OpenJDK 21
@@ -130,6 +135,13 @@ base:
 - Standard Java applications
 - Enterprise development
 - Spring Boot applications
+- Virtual threads (Project Loom)
+
+### Choose `openjdk-17` for:
+
+- LTS stability requirements
+- Compatibility with older libraries
+- Records and sealed classes
 
 ## Java Examples
 
@@ -166,6 +178,21 @@ cd examples/basic-usage
 ./05_job_monitoring.sh
 ```
 
+## Advanced Examples
+
+The `advanced/` directory contains patterns for multi-job coordination:
+
+```bash
+# Run job coordination demo
+cd examples/advanced
+./job_coordination.sh
+```
+
+This demonstrates:
+- Sequential job processing with dependencies
+- Data exchange via shared volumes
+- Job synchronization patterns
+
 ## Creating Custom Runtimes
 
 See `docs/design/RUNTIME_YAML_QUICKREF.md` for the complete runtime.yaml specification.
@@ -185,6 +212,10 @@ base:
 # Optional: language-specific packages
 pip:
   - requests==2.31.0
+
+# Optional: additional shared libraries to copy
+libraries:
+  - libmylib*
 
 # Optional: environment variables
 environment:

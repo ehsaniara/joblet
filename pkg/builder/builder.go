@@ -737,6 +737,17 @@ func (b *Builder) phase10CopyBinariesFromIsolated(buildCtx *BuildContext, profil
 		return err
 	}
 
+	// For Python runtimes, copy the stdlib and site-packages from the isolated environment
+	if err := CopyPythonRuntimeFromPath(buildCtx.IsolatedEnv.GetMergedPath(""), profile, buildCtx.IsolatedDir, b.logger); err != nil {
+		result.Phases = append(result.Phases, PhaseResult{
+			Phase:   10,
+			Name:    PhaseCopyBinaries.String(),
+			Success: false,
+			Error:   err,
+		})
+		return err
+	}
+
 	result.Phases = append(result.Phases, PhaseResult{
 		Phase:    10,
 		Name:     PhaseCopyBinaries.String(),
@@ -758,7 +769,9 @@ func (b *Builder) phase11CopyLibrariesFromIsolated(buildCtx *BuildContext, profi
 	}
 
 	// Copy libraries from the merged overlay view
-	if err := CopyLibrariesFromPath(buildCtx.IsolatedEnv.GetMergedPath(""), buildCtx.Platform, profile, buildCtx.IsolatedDir, b.logger); err != nil {
+	// Include any additional library patterns specified in runtime.yaml
+	extraLibPatterns := buildCtx.Spec.Libraries
+	if err := CopyLibrariesFromPath(buildCtx.IsolatedEnv.GetMergedPath(""), buildCtx.Platform, profile, buildCtx.IsolatedDir, extraLibPatterns, b.logger); err != nil {
 		result.Phases = append(result.Phases, PhaseResult{
 			Phase:   11,
 			Name:    PhaseCopyLibraries.String(),
