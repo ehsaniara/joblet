@@ -66,6 +66,19 @@ type FakeSyscallOperations struct {
 	execReturnsOnCall map[int]struct {
 		result1 error
 	}
+	FstatStub        func(int) (uint64, error)
+	fstatMutex       sync.RWMutex
+	fstatArgsForCall []struct {
+		arg1 int
+	}
+	fstatReturns struct {
+		result1 uint64
+		result2 error
+	}
+	fstatReturnsOnCall map[int]struct {
+		result1 uint64
+		result2 error
+	}
 	KillStub        func(int, syscall.Signal) error
 	killMutex       sync.RWMutex
 	killArgsForCall []struct {
@@ -141,6 +154,22 @@ type FakeSyscallOperations struct {
 	}
 	statfsReturnsOnCall map[int]struct {
 		result1 error
+	}
+	StatxStub        func(int, string, int, int) (uint64, error)
+	statxMutex       sync.RWMutex
+	statxArgsForCall []struct {
+		arg1 int
+		arg2 string
+		arg3 int
+		arg4 int
+	}
+	statxReturns struct {
+		result1 uint64
+		result2 error
+	}
+	statxReturnsOnCall map[int]struct {
+		result1 uint64
+		result2 error
 	}
 	UnmountStub        func(string, int) error
 	unmountMutex       sync.RWMutex
@@ -466,6 +495,70 @@ func (fake *FakeSyscallOperations) ExecReturnsOnCall(i int, result1 error) {
 	fake.execReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakeSyscallOperations) Fstat(arg1 int) (uint64, error) {
+	fake.fstatMutex.Lock()
+	ret, specificReturn := fake.fstatReturnsOnCall[len(fake.fstatArgsForCall)]
+	fake.fstatArgsForCall = append(fake.fstatArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	stub := fake.FstatStub
+	fakeReturns := fake.fstatReturns
+	fake.recordInvocation("Fstat", []interface{}{arg1})
+	fake.fstatMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeSyscallOperations) FstatCallCount() int {
+	fake.fstatMutex.RLock()
+	defer fake.fstatMutex.RUnlock()
+	return len(fake.fstatArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) FstatCalls(stub func(int) (uint64, error)) {
+	fake.fstatMutex.Lock()
+	defer fake.fstatMutex.Unlock()
+	fake.FstatStub = stub
+}
+
+func (fake *FakeSyscallOperations) FstatArgsForCall(i int) int {
+	fake.fstatMutex.RLock()
+	defer fake.fstatMutex.RUnlock()
+	argsForCall := fake.fstatArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeSyscallOperations) FstatReturns(result1 uint64, result2 error) {
+	fake.fstatMutex.Lock()
+	defer fake.fstatMutex.Unlock()
+	fake.FstatStub = nil
+	fake.fstatReturns = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeSyscallOperations) FstatReturnsOnCall(i int, result1 uint64, result2 error) {
+	fake.fstatMutex.Lock()
+	defer fake.fstatMutex.Unlock()
+	fake.FstatStub = nil
+	if fake.fstatReturnsOnCall == nil {
+		fake.fstatReturnsOnCall = make(map[int]struct {
+			result1 uint64
+			result2 error
+		})
+	}
+	fake.fstatReturnsOnCall[i] = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeSyscallOperations) Kill(arg1 int, arg2 syscall.Signal) error {
@@ -842,6 +935,73 @@ func (fake *FakeSyscallOperations) StatfsReturnsOnCall(i int, result1 error) {
 	fake.statfsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakeSyscallOperations) Statx(arg1 int, arg2 string, arg3 int, arg4 int) (uint64, error) {
+	fake.statxMutex.Lock()
+	ret, specificReturn := fake.statxReturnsOnCall[len(fake.statxArgsForCall)]
+	fake.statxArgsForCall = append(fake.statxArgsForCall, struct {
+		arg1 int
+		arg2 string
+		arg3 int
+		arg4 int
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.StatxStub
+	fakeReturns := fake.statxReturns
+	fake.recordInvocation("Statx", []interface{}{arg1, arg2, arg3, arg4})
+	fake.statxMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeSyscallOperations) StatxCallCount() int {
+	fake.statxMutex.RLock()
+	defer fake.statxMutex.RUnlock()
+	return len(fake.statxArgsForCall)
+}
+
+func (fake *FakeSyscallOperations) StatxCalls(stub func(int, string, int, int) (uint64, error)) {
+	fake.statxMutex.Lock()
+	defer fake.statxMutex.Unlock()
+	fake.StatxStub = stub
+}
+
+func (fake *FakeSyscallOperations) StatxArgsForCall(i int) (int, string, int, int) {
+	fake.statxMutex.RLock()
+	defer fake.statxMutex.RUnlock()
+	argsForCall := fake.statxArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakeSyscallOperations) StatxReturns(result1 uint64, result2 error) {
+	fake.statxMutex.Lock()
+	defer fake.statxMutex.Unlock()
+	fake.StatxStub = nil
+	fake.statxReturns = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeSyscallOperations) StatxReturnsOnCall(i int, result1 uint64, result2 error) {
+	fake.statxMutex.Lock()
+	defer fake.statxMutex.Unlock()
+	fake.StatxStub = nil
+	if fake.statxReturnsOnCall == nil {
+		fake.statxReturnsOnCall = make(map[int]struct {
+			result1 uint64
+			result2 error
+		})
+	}
+	fake.statxReturnsOnCall[i] = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeSyscallOperations) Unmount(arg1 string, arg2 int) error {

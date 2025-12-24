@@ -33,7 +33,6 @@ type BaseConfig struct {
 type Requirements struct {
 	GPU         bool   `yaml:"gpu,omitempty"`
 	CUDAVersion string `yaml:"cuda_version,omitempty"`
-	MinMemory   string `yaml:"min_memory,omitempty"` // e.g., "256MB", "2GB"
 }
 
 // Hooks defines pre and post install hooks

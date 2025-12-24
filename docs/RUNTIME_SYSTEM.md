@@ -695,8 +695,6 @@ environment:
   LD_LIBRARY_PATH: "/usr/lib:/lib"
 
 requirements:
-  min_memory: "256MB"
-  recommended_memory: "1GB"
   architectures: [ "x86_64", "amd64" ]
 ```
 

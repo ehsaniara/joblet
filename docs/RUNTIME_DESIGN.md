@@ -109,8 +109,7 @@ environment:
   PATH_PREPEND: "/usr/local/bin"
 
 requirements:
-  min_memory: "512MB"
-  recommended_memory: "2GB"
+  gpu: false
 ```
 
 ## Runtime Types

@@ -2,7 +2,11 @@
 
 package platform
 
-import "syscall"
+import (
+	"syscall"
+
+	"golang.org/x/sys/unix"
+)
 
 // Linux-specific syscall constants
 const (
@@ -34,4 +38,8 @@ const (
 	CloneNewUTS    = syscall.CLONE_NEWUTS
 	CloneNewUser   = syscall.CLONE_NEWUSER
 	CloneNewCgroup = syscall.CLONE_NEWCGROUP
+
+	// Statx constants for cgroup ID retrieval
+	AT_FDCWD  = unix.AT_FDCWD
+	STATX_INO = unix.STATX_INO
 )

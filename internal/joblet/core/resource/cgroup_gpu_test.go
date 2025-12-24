@@ -8,6 +8,7 @@ import (
 
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,8 +38,9 @@ func TestSetGPUDevices_CgroupsV2(t *testing.T) {
 	}
 
 	cg := &cgroup{
-		logger: logger.New().WithField("component", "test"),
-		config: cfg,
+		logger:   logger.New().WithField("component", "test"),
+		config:   cfg,
+		platform: platform.NewPlatform(),
 	}
 
 	// Test GPU device configuration
@@ -82,8 +84,9 @@ func TestSetGPUDevices_CgroupsV1(t *testing.T) {
 	}
 
 	cg := &cgroup{
-		logger: logger.New().WithField("component", "test"),
-		config: cfg,
+		logger:   logger.New().WithField("component", "test"),
+		config:   cfg,
+		platform: platform.NewPlatform(),
 	}
 
 	// Test GPU device configuration
@@ -161,8 +164,9 @@ func TestDetectCgroupVersion(t *testing.T) {
 			}
 
 			cg := &cgroup{
-				logger: logger.New().WithField("component", "test"),
-				config: cfg,
+				logger:   logger.New().WithField("component", "test"),
+				config:   cfg,
+				platform: platform.NewPlatform(),
 			}
 
 			version := cg.detectCgroupVersion()
@@ -183,8 +187,9 @@ func TestSetGPUDevicesV2_NonexistentCgroup(t *testing.T) {
 	}
 
 	cg := &cgroup{
-		logger: logger.New().WithField("component", "test"),
-		config: cfg,
+		logger:   logger.New().WithField("component", "test"),
+		config:   cfg,
+		platform: platform.NewPlatform(),
 	}
 
 	// Test with non-existent cgroup directory

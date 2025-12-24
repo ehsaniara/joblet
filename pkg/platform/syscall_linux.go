@@ -33,4 +33,8 @@ const (
 	CloneNewUTS    = 0x04000000
 	CloneNewUser   = 0x10000000
 	CloneNewCgroup = 0x02000000
+
+	// Statx constants (dummy values for non-Linux)
+	AT_FDCWD  = -100
+	STATX_INO = 0x100
 )

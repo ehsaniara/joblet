@@ -203,7 +203,7 @@ func (je *JobExecutor) executeCommand(config *environment.JobConfig) error {
 // it runs as an unprivileged user and cannot damage the host system.
 // Order matters: must set GID before UID (can't change groups after dropping root)
 func (je *JobExecutor) dropPrivileges() error {
-	je.logger.Info("dropping privileges to unprivileged user",
+	je.logger.Debug("dropping privileges to unprivileged user",
 		"targetUID", UnprivilegedUID,
 		"targetGID", UnprivilegedGID)
 
@@ -228,7 +228,7 @@ func (je *JobExecutor) dropPrivileges() error {
 			syscall.Getuid(), syscall.Getgid())
 	}
 
-	je.logger.Info("privileges dropped successfully",
+	je.logger.Debug("privileges dropped successfully",
 		"uid", syscall.Getuid(),
 		"gid", syscall.Getgid())
 

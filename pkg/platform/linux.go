@@ -70,3 +70,24 @@ func (lp *LinuxPlatform) Statfs(path string, buf *syscall.Statfs_t) error {
 func (lp *LinuxPlatform) SetNonblock(fd int, nonblocking bool) error {
 	return syscall.SetNonblock(fd, nonblocking)
 }
+
+// Statx returns the inode number for a path using the statx syscall.
+// This is used for cgroup ID retrieval.
+func (lp *LinuxPlatform) Statx(dirfd int, path string, flags int, mask int) (ino uint64, err error) {
+	var stat unix.Statx_t
+	err = unix.Statx(dirfd, path, flags, mask, &stat)
+	if err != nil {
+		return 0, err
+	}
+	return stat.Ino, nil
+}
+
+// Fstat returns the inode number for a file descriptor.
+// This is used for cgroup ID retrieval.
+func (lp *LinuxPlatform) Fstat(fd int) (ino uint64, err error) {
+	var stat unix.Stat_t
+	if err := unix.Fstat(fd, &stat); err != nil {
+		return 0, err
+	}
+	return stat.Ino, nil
+}

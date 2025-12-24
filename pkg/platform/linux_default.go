@@ -76,3 +76,13 @@ func (lp *LinuxPlatform) SetNonblock(fd int, nonblocking bool) error {
 	lp.logger.Warn("attempting Linux setnonblock operation on non-Linux platform", "fd", fd)
 	return fmt.Errorf("setnonblock operation not supported on non-Linux platform")
 }
+
+func (lp *LinuxPlatform) Statx(dirfd int, path string, flags int, mask int) (ino uint64, err error) {
+	lp.logger.Warn("attempting Linux statx operation on non-Linux platform", "path", path)
+	return 0, fmt.Errorf("statx operation not supported on non-Linux platform")
+}
+
+func (lp *LinuxPlatform) Fstat(fd int) (ino uint64, err error) {
+	lp.logger.Warn("attempting Linux fstat operation on non-Linux platform", "fd", fd)
+	return 0, fmt.Errorf("fstat operation not supported on non-Linux platform")
+}

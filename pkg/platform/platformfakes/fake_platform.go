@@ -141,6 +141,32 @@ type FakePlatform struct {
 	fileExistsReturnsOnCall map[int]struct {
 		result1 bool
 	}
+	FindProcessStub        func(int) (*os.Process, error)
+	findProcessMutex       sync.RWMutex
+	findProcessArgsForCall []struct {
+		arg1 int
+	}
+	findProcessReturns struct {
+		result1 *os.Process
+		result2 error
+	}
+	findProcessReturnsOnCall map[int]struct {
+		result1 *os.Process
+		result2 error
+	}
+	FstatStub        func(int) (uint64, error)
+	fstatMutex       sync.RWMutex
+	fstatArgsForCall []struct {
+		arg1 int
+	}
+	fstatReturns struct {
+		result1 uint64
+		result2 error
+	}
+	fstatReturnsOnCall map[int]struct {
+		result1 uint64
+		result2 error
+	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
 	getenvArgsForCall []struct {
@@ -360,6 +386,22 @@ type FakePlatform struct {
 	}
 	statfsReturnsOnCall map[int]struct {
 		result1 error
+	}
+	StatxStub        func(int, string, int, int) (uint64, error)
+	statxMutex       sync.RWMutex
+	statxArgsForCall []struct {
+		arg1 int
+		arg2 string
+		arg3 int
+		arg4 int
+	}
+	statxReturns struct {
+		result1 uint64
+		result2 error
+	}
+	statxReturnsOnCall map[int]struct {
+		result1 uint64
+		result2 error
 	}
 	SymlinkStub        func(string, string) error
 	symlinkMutex       sync.RWMutex
@@ -1098,6 +1140,134 @@ func (fake *FakePlatform) FileExistsReturnsOnCall(i int, result1 bool) {
 	fake.fileExistsReturnsOnCall[i] = struct {
 		result1 bool
 	}{result1}
+}
+
+func (fake *FakePlatform) FindProcess(arg1 int) (*os.Process, error) {
+	fake.findProcessMutex.Lock()
+	ret, specificReturn := fake.findProcessReturnsOnCall[len(fake.findProcessArgsForCall)]
+	fake.findProcessArgsForCall = append(fake.findProcessArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	stub := fake.FindProcessStub
+	fakeReturns := fake.findProcessReturns
+	fake.recordInvocation("FindProcess", []interface{}{arg1})
+	fake.findProcessMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakePlatform) FindProcessCallCount() int {
+	fake.findProcessMutex.RLock()
+	defer fake.findProcessMutex.RUnlock()
+	return len(fake.findProcessArgsForCall)
+}
+
+func (fake *FakePlatform) FindProcessCalls(stub func(int) (*os.Process, error)) {
+	fake.findProcessMutex.Lock()
+	defer fake.findProcessMutex.Unlock()
+	fake.FindProcessStub = stub
+}
+
+func (fake *FakePlatform) FindProcessArgsForCall(i int) int {
+	fake.findProcessMutex.RLock()
+	defer fake.findProcessMutex.RUnlock()
+	argsForCall := fake.findProcessArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) FindProcessReturns(result1 *os.Process, result2 error) {
+	fake.findProcessMutex.Lock()
+	defer fake.findProcessMutex.Unlock()
+	fake.FindProcessStub = nil
+	fake.findProcessReturns = struct {
+		result1 *os.Process
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePlatform) FindProcessReturnsOnCall(i int, result1 *os.Process, result2 error) {
+	fake.findProcessMutex.Lock()
+	defer fake.findProcessMutex.Unlock()
+	fake.FindProcessStub = nil
+	if fake.findProcessReturnsOnCall == nil {
+		fake.findProcessReturnsOnCall = make(map[int]struct {
+			result1 *os.Process
+			result2 error
+		})
+	}
+	fake.findProcessReturnsOnCall[i] = struct {
+		result1 *os.Process
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePlatform) Fstat(arg1 int) (uint64, error) {
+	fake.fstatMutex.Lock()
+	ret, specificReturn := fake.fstatReturnsOnCall[len(fake.fstatArgsForCall)]
+	fake.fstatArgsForCall = append(fake.fstatArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	stub := fake.FstatStub
+	fakeReturns := fake.fstatReturns
+	fake.recordInvocation("Fstat", []interface{}{arg1})
+	fake.fstatMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakePlatform) FstatCallCount() int {
+	fake.fstatMutex.RLock()
+	defer fake.fstatMutex.RUnlock()
+	return len(fake.fstatArgsForCall)
+}
+
+func (fake *FakePlatform) FstatCalls(stub func(int) (uint64, error)) {
+	fake.fstatMutex.Lock()
+	defer fake.fstatMutex.Unlock()
+	fake.FstatStub = stub
+}
+
+func (fake *FakePlatform) FstatArgsForCall(i int) int {
+	fake.fstatMutex.RLock()
+	defer fake.fstatMutex.RUnlock()
+	argsForCall := fake.fstatArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePlatform) FstatReturns(result1 uint64, result2 error) {
+	fake.fstatMutex.Lock()
+	defer fake.fstatMutex.Unlock()
+	fake.FstatStub = nil
+	fake.fstatReturns = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePlatform) FstatReturnsOnCall(i int, result1 uint64, result2 error) {
+	fake.fstatMutex.Lock()
+	defer fake.fstatMutex.Unlock()
+	fake.FstatStub = nil
+	if fake.fstatReturnsOnCall == nil {
+		fake.fstatReturnsOnCall = make(map[int]struct {
+			result1 uint64
+			result2 error
+		})
+	}
+	fake.fstatReturnsOnCall[i] = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakePlatform) Getenv(arg1 string) string {
@@ -2216,6 +2386,73 @@ func (fake *FakePlatform) StatfsReturnsOnCall(i int, result1 error) {
 	fake.statfsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakePlatform) Statx(arg1 int, arg2 string, arg3 int, arg4 int) (uint64, error) {
+	fake.statxMutex.Lock()
+	ret, specificReturn := fake.statxReturnsOnCall[len(fake.statxArgsForCall)]
+	fake.statxArgsForCall = append(fake.statxArgsForCall, struct {
+		arg1 int
+		arg2 string
+		arg3 int
+		arg4 int
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.StatxStub
+	fakeReturns := fake.statxReturns
+	fake.recordInvocation("Statx", []interface{}{arg1, arg2, arg3, arg4})
+	fake.statxMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakePlatform) StatxCallCount() int {
+	fake.statxMutex.RLock()
+	defer fake.statxMutex.RUnlock()
+	return len(fake.statxArgsForCall)
+}
+
+func (fake *FakePlatform) StatxCalls(stub func(int, string, int, int) (uint64, error)) {
+	fake.statxMutex.Lock()
+	defer fake.statxMutex.Unlock()
+	fake.StatxStub = stub
+}
+
+func (fake *FakePlatform) StatxArgsForCall(i int) (int, string, int, int) {
+	fake.statxMutex.RLock()
+	defer fake.statxMutex.RUnlock()
+	argsForCall := fake.statxArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakePlatform) StatxReturns(result1 uint64, result2 error) {
+	fake.statxMutex.Lock()
+	defer fake.statxMutex.Unlock()
+	fake.StatxStub = nil
+	fake.statxReturns = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePlatform) StatxReturnsOnCall(i int, result1 uint64, result2 error) {
+	fake.statxMutex.Lock()
+	defer fake.statxMutex.Unlock()
+	fake.StatxStub = nil
+	if fake.statxReturnsOnCall == nil {
+		fake.statxReturnsOnCall = make(map[int]struct {
+			result1 uint64
+			result2 error
+		})
+	}
+	fake.statxReturnsOnCall[i] = struct {
+		result1 uint64
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakePlatform) Symlink(arg1 string, arg2 string) error {
