@@ -41,7 +41,7 @@ environments without contaminating the host system.
 
 ### 2. Version-Specific Support
 
-- Support multiple versions of the same language (e.g., `python-3.11-ml`, `python-3.12`)
+- Support multiple versions of the same language (e.g., `python-3.11-ml`, `python-3.11`)
 - Each runtime is completely independent
 - Version-specific directory structure prevents conflicts
 
@@ -69,7 +69,7 @@ environments without contaminating the host system.
 │   └── 1.0.0/
 │       ├── runtime.yml
 │       └── isolated/
-├── python-3.12/
+├── python-3.11/
 │   └── 1.0.0/
 │       ├── runtime.yml
 │       └── isolated/
@@ -121,9 +121,9 @@ Runtimes that provide complete language environments with interpreters/compilers
 **Examples:**
 
 - `python-3.11-ml` - Python 3.11 with NumPy, Pandas, Scikit-learn
-- `python-3.12` - Python 3.12 with modern features
-- `java:17` - OpenJDK 17 LTS with Maven
-- `java:21` - OpenJDK 21 with Virtual Threads
+- `python-3.11` - Python 3.11 standard runtime
+- `openjdk-17` - OpenJDK 17 LTS
+- `openjdk-21` - OpenJDK 21 with Virtual Threads
 
 ## Implementation Details
 
@@ -476,22 +476,6 @@ rnx runtime validate ./runtime.yaml
 - CPU affinity support for multi-core runtimes
 - Disk space monitoring and cleanup
 
-## Future Extensions
-
-### Planned Runtimes
-
-- `python:3.13` - Latest Python features
-- `go:1.22` - Latest Go version
-- `rust:stable` - Rust stable toolchain
-- `dotnet:8` - .NET 8 runtime
-
-### Advanced Features
-
-- Custom runtime definitions
-- Runtime inheritance and composition
-- Multi-architecture support (ARM64)
-- GPU-enabled ML runtimes
-
 ## Troubleshooting
 
 ### Common Issues
@@ -551,7 +535,7 @@ data.to_json('/volumes/analysis-results/summary.json')
 
 ```bash
 # Using Python 3.12 modern syntax
-rnx job run --runtime=python-3.12 \
+rnx job run --runtime=python-3.11 \
         --upload=modern_app.py \
         python modern_app.py
 ```
@@ -573,7 +557,7 @@ rnx job run --runtime=python-3.11-ml \
 
 ```bash
 # Compile and run Java application
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --upload=Application.java \
         --volume=maven-cache \
         bash -c "javac Application.java && java Application"
@@ -583,7 +567,7 @@ rnx job run --runtime=java:17 \
 
 ```bash
 # High-concurrency application using Virtual Threads
-rnx job run --runtime=java:21 \
+rnx job run --runtime=openjdk-21 \
         --upload=VirtualThreadApp.java \
         --max-memory=1024 \
         bash -c "javac VirtualThreadApp.java && java VirtualThreadApp"
@@ -593,7 +577,7 @@ rnx job run --runtime=java:21 \
 
 ```bash
 # Build entire Maven project
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --upload-dir=spring-project \
         --volume=maven-cache \
         --max-memory=2048 \
@@ -604,7 +588,7 @@ rnx job run --runtime=java:17 \
 
 ```bash
 # Run Spring Boot application with external access
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --upload=application.jar \
         --upload=application.properties \
         --network=web \
@@ -654,7 +638,7 @@ joblib.dump(model, '/volumes/pipeline-data/model.pkl')
 
 ```bash
 # Generate PDF reports
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --volume=pipeline-data \
         --upload=ReportGenerator.java \
         bash -c "
@@ -669,7 +653,7 @@ java ReportGenerator /volumes/pipeline-data/model.pkl
 
 ```bash
 # Test package in isolated environment
-rnx job run --runtime=python-3.12 \
+rnx job run --runtime=python-3.11 \
         --upload-dir=my-package \
         --volume=dev-pip-cache \
         bash -c "
@@ -685,7 +669,7 @@ python setup.py sdist
 ```bash
 # Multi-version compatibility testing
 # Test on Java 17
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --upload-dir=java-library \
         --volume=test-results \
         bash -c "
@@ -695,7 +679,7 @@ cp target/surefire-reports/* /volumes/test-results/java17-
 "
 
 # Test on Java 21
-rnx job run --runtime=java:21 \
+rnx job run --runtime=openjdk-21 \
         --upload-dir=java-library \
         --volume=test-results \
         bash -c "
@@ -711,7 +695,7 @@ cp target/surefire-reports/* /volumes/test-results/java21-
 
 ```bash
 # Frontend build (Java-based)
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --upload-dir=frontend \
         --volume=frontend-dist \
         bash -c "
@@ -808,7 +792,7 @@ for i in range(100):
 "
 
 # Consumer (Java)
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --network=message-queue \
         --upload=Consumer.java \
         java Consumer
@@ -881,7 +865,7 @@ if __name__ == '__main__':
 
 ```bash
 # Test script across multiple Python versions
-for runtime in python-3.11-ml python-3.12; do
+for runtime in python-3.11-ml python-3.11; do
     echo "Testing on $runtime"
     rnx job run --runtime=$runtime \
             --upload=compatibility_test.py \
@@ -906,7 +890,7 @@ rnx job run --runtime=python-3.11-ml \
         python test_api.py
 
 # Frontend testing (Java-based)
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --network=test-net \
         --upload-dir=frontend-tests \
         bash -c "cd frontend-tests && mvn test"
@@ -961,7 +945,7 @@ rnx job run --runtime=python-3.11-ml \
 
 ```bash
 # Persistent data and cache management
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --volume=maven-cache \     # Persistent Maven cache
         --volume=project-data \    # Persistent project data
         --upload-dir=java-app \
@@ -982,7 +966,7 @@ rnx job run --runtime=python-3.11-ml \
         python data_processor.py
 
 # Web service with controlled access
-rnx job run --runtime=java:17 \
+rnx job run --runtime=openjdk-17 \
         --network=web \          # External web access
         --upload=ApiServer.java \
         java ApiServer

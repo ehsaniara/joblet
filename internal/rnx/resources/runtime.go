@@ -630,8 +630,8 @@ Use 'rnx runtime build' to build runtimes from YAML specifications:
   # Build a runtime from a YAML file
   rnx runtime build ./my-runtime/runtime.yaml
 
-  # Preview a build without executing
-  rnx runtime build --dry-run ./my-runtime
+  # Validate a runtime specification before building
+  rnx runtime validate ./my-runtime/runtime.yaml
 
 See docs/design/RUNTIME_YAML_QUICKREF.md for the runtime.yaml format.`,
 		Args: cobra.ExactArgs(1),

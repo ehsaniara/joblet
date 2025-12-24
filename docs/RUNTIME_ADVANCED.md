@@ -265,40 +265,50 @@ rnx runtime list
 
 ## Step-by-Step Deployment
 
-### Step 1: Build Runtime (Development Host)
+### Step 1: Create Runtime Specification
 
-```bash
-# Build on development host where contamination is acceptable
-sudo ./runtimes/python-3.11-ml/setup_python_3_11_ml.sh
-sudo ./runtimes/java-17/setup_java_17.sh
-sudo ./runtimes/java-21/setup_java_21.sh
+```yaml
+# runtime.yaml
+schema_version: "1.0"
+name: python-3.11-ml
+version: 1.0.0
+description: Python 3.11 with ML packages
+
+base:
+  language: python
+  version: "3.11"
+
+pip:
+  - numpy
+  - pandas
+  - scikit-learn
 ```
 
-Each script automatically:
-
-1. Builds the complete runtime environment
-2. Installs all dependencies and packages
-3. Creates deployment package at `/tmp/runtime-deployments/[runtime]-runtime.zip`
-4. Includes metadata for auto-detection
-
-### Step 2: Copy Runtime Package
+### Step 2: Build Runtime on Target Host
 
 ```bash
-# Copy from build host
-scp build-host:/tmp/runtime-deployments/python-3.11-ml-runtime.zip .
-scp build-host:/tmp/runtime-deployments/java-17-runtime.zip .
+# Build runtime directly on production host using YAML builder
+rnx runtime build ./runtime.yaml
+
+# Or build with verbose output
+rnx runtime build -v ./runtime.yaml
 ```
 
-### Step 3: Deploy to Production Hosts
+The builder automatically:
+
+1. Validates the YAML specification
+2. Creates isolated build environment using OverlayFS
+3. Installs all dependencies and packages
+4. Copies binaries/libraries to `/opt/joblet/runtimes/{name}/{version}/`
+5. Generates runtime.yml configuration
+
+### Step 3: Multi-Host Deployment
 
 ```bash
-# Single host deployment
-sudo unzip python-3.11-ml-runtime.zip -d /opt/joblet/runtimes/
-
-# Multi-host deployment
+# Deploy to multiple hosts by building on each
 for host in prod-01 prod-02 prod-03; do
-    scp python-3.11-ml-runtime.zip admin@$host:/tmp/
-    ssh admin@$host "sudo unzip /tmp/python-3.11-ml-runtime.zip -d /opt/joblet/runtimes/"
+    scp runtime.yaml admin@$host:/tmp/
+    ssh admin@$host "rnx runtime build /tmp/runtime.yaml"
 done
 ```
 
@@ -340,29 +350,29 @@ rnx job run --runtime=python-3.11-ml python script.py
 #!/bin/bash
 # runtime_promotion.sh - Promote runtimes through environments
 
-RUNTIME="python-3.11-ml"
+RUNTIME_YAML="./runtimes/python-3.11-ml/runtime.yaml"
 ENVIRONMENTS=("staging" "prod-eu" "prod-us" "prod-asia")
-ARTIFACT_REGISTRY="https://artifacts.company.com/joblet-runtimes"
 
-# Download certified runtime from artifact registry
-curl -H "Authorization: Bearer $REGISTRY_TOKEN" \
-     "$ARTIFACT_REGISTRY/$RUNTIME-runtime.zip" \
-     -o "$RUNTIME-runtime.zip"
-
-# Deploy to all environments
+# Deploy to all environments by building from YAML specification
 for env in "${ENVIRONMENTS[@]}"; do
-    echo "🚀 Deploying $RUNTIME to $env..."
+    echo "🚀 Deploying runtime to $env..."
 
     # Get environment host list
     hosts=$(kubectl get nodes -l environment=$env --no-headers | awk '{print $1}')
 
     for host in $hosts; do
-        scp "$RUNTIME-runtime.zip" admin@$host:/tmp/
-        ssh admin@$host "sudo unzip /tmp/$RUNTIME-runtime.zip -d /opt/joblet/runtimes/"
+        # Copy runtime specification to host
+        scp "$RUNTIME_YAML" admin@$host:/tmp/runtime.yaml
+
+        # Build runtime on target host
+        ssh admin@$host "rnx runtime build /tmp/runtime.yaml" || {
+            echo "❌ Failed to build runtime on $host"
+            exit 1
+        }
 
         # Verify deployment
-        ssh admin@$host "rnx runtime test $RUNTIME" || {
-            echo "❌ Failed to deploy $RUNTIME on $host"
+        ssh admin@$host "rnx runtime test python-3.11-ml" || {
+            echo "❌ Runtime test failed on $host"
             exit 1
         }
     done
@@ -375,27 +385,29 @@ done
 
 ```bash
 #!/bin/bash
-# blue_green_runtime.sh - Zero-downtime runtime updates
+# blue_green_runtime.sh - Zero-downtime runtime updates using versioned runtimes
 
 deploy_runtime_blue_green() {
     local host=$1
-    local runtime_file=$2
+    local runtime_yaml=$2
+    local new_version=$3
 
     echo "🔄 Starting blue-green deployment on $host"
 
-    # Step 1: Deploy new runtime with versioned name
-    ssh admin@$host "sudo unzip /tmp/$runtime_file -d /opt/joblet/runtimes/"
+    # Step 1: Copy and build new runtime version
+    scp "$runtime_yaml" admin@$host:/tmp/runtime.yaml
+    ssh admin@$host "rnx runtime build /tmp/runtime.yaml" || {
+        echo "❌ Build failed on $host"
+        return 1
+    }
 
-    # Step 2: Health check new runtime
-    ssh admin@$host "rnx job run --runtime=python-3.11-ml-v2.0 python health_check.py" || {
+    # Step 2: Health check new runtime (using versioned name from YAML)
+    ssh admin@$host "rnx job run --runtime=python-3.11-ml@${new_version} python health_check.py" || {
         echo "❌ Health check failed on $host"
         return 1
     }
 
-    # Step 3: Update symlink for seamless cutover
-    ssh admin@$host "sudo ln -sfn /opt/joblet/runtimes/python-3.11-ml-v2.0 /opt/joblet/runtimes/python-3.11-ml"
-
-    # Step 4: Verify production traffic
+    # Step 3: Verify production traffic
     ssh admin@$host "rnx job run --runtime=python-3.11-ml python -c 'print(\"✅ Production ready\")'"
 
     echo "✅ Blue-green deployment complete on $host"
@@ -404,7 +416,7 @@ deploy_runtime_blue_green() {
 # Deploy to production cluster
 PROD_HOSTS=("prod-web-01" "prod-web-02" "prod-worker-01" "prod-worker-02")
 for host in "${PROD_HOSTS[@]}"; do
-    deploy_runtime_blue_green "$host" "$NEW_RUNTIME_FILE"
+    deploy_runtime_blue_green "$host" "./runtime.yaml" "2.0.0"
 done
 ```
 
@@ -415,53 +427,37 @@ name: Runtime Build & Deploy Pipeline
 on:
   push:
     paths:
-      - 'runtimes/**'
+      - 'runtimes/**/runtime.yaml'
 
 jobs:
-  build-runtime:
-    runs-on: [self-hosted, linux, build-cluster]
+  validate-runtimes:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        runtime: [python-3.11-ml, node-18, java-17]
+        runtime: [python-3.11-ml, openjdk-17, openjdk-21]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Runtime
+      - name: Validate Runtime YAML
         run: |
-          sudo ./runtimes/${{ matrix.runtime }}/setup_${{ matrix.runtime }}.sh
-
-      - name: Security Scan
-        run: |
-          trivy fs /opt/joblet/runtimes/ --format table --exit-code 1
-
-      - name: Package Verification
-        run: |
-          zip -T /tmp/runtime-deployments/${{ matrix.runtime }}-runtime.zip
-
-      - name: Upload to Registry
-        run: |
-          curl -X PUT \
-               -H "Authorization: Bearer ${{ secrets.REGISTRY_TOKEN }}" \
-               -F "file=@/tmp/runtime-deployments/${{ matrix.runtime }}-runtime.zip" \
-               "${{ secrets.ARTIFACT_REGISTRY }}/${{ matrix.runtime }}-runtime.zip"
+          rnx runtime validate ./runtimes/${{ matrix.runtime }}/runtime.yaml
 
   deploy-staging:
-    needs: build-runtime
+    needs: validate-runtimes
     runs-on: ubuntu-latest
     environment: staging
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy to Staging
         run: |
-          for runtime in python-3.11-ml node-18 java-17; do
+          for runtime in python-3.11-ml openjdk-17 openjdk-21; do
             for host in ${{ secrets.STAGING_HOSTS }}; do
-              curl -H "Authorization: Bearer ${{ secrets.REGISTRY_TOKEN }}" \
-                   "${{ secrets.ARTIFACT_REGISTRY }}/${runtime}-runtime.zip" \
-                   -o "${runtime}-runtime.zip"
-
-              scp "${runtime}-runtime.zip" admin@${host}:/tmp/
-              ssh admin@${host} "sudo unzip /tmp/${runtime}-runtime.zip -d /opt/joblet/runtimes/"
+              # Copy runtime.yaml to host and build
+              scp "./runtimes/${runtime}/runtime.yaml" admin@${host}:/tmp/runtime.yaml
+              ssh admin@${host} "rnx runtime build /tmp/runtime.yaml"
               ssh admin@${host} "rnx runtime test ${runtime}"
             done
           done
@@ -472,27 +468,35 @@ jobs:
     environment: production
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Production Deployment
         run: |
           echo "🚀 Starting production deployment..."
-          ./scripts/production_runtime_deploy.sh
+          for runtime in python-3.11-ml openjdk-17 openjdk-21; do
+            for host in ${{ secrets.PROD_HOSTS }}; do
+              scp "./runtimes/${runtime}/runtime.yaml" admin@${host}:/tmp/runtime.yaml
+              ssh admin@${host} "rnx runtime build /tmp/runtime.yaml"
+              ssh admin@${host} "rnx runtime test ${runtime}"
+            done
+          done
 ```
 
 ## Batch Runtime Updates
 
 ```bash
 #!/bin/bash
-# Update all runtimes across fleet
+# Update all runtimes across fleet using YAML builder
 
-RUNTIMES=("python-3.11-ml" "node-18" "java-17")
+RUNTIMES=("python-3.11-ml" "openjdk-17" "openjdk-21")
 HOSTS=("prod-01" "prod-02" "prod-03")
 
 for runtime in "${RUNTIMES[@]}"; do
     echo "Deploying $runtime to all hosts..."
     for host in "${HOSTS[@]}"; do
         echo "  -> $host"
-        scp "${runtime}-runtime.zip" admin@$host:/tmp/
-        ssh admin@$host "sudo unzip /tmp/${runtime}-runtime.zip -d /opt/joblet/runtimes/"
+        scp "./runtimes/${runtime}/runtime.yaml" admin@$host:/tmp/runtime.yaml
+        ssh admin@$host "rnx runtime build /tmp/runtime.yaml"
     done
 done
 ```
@@ -516,9 +520,9 @@ rnx job run --runtime=python-3.11-ml python -c "import numpy; print('✅ Runtime
 
 | Issue                                    | Solution                                                       |
 |------------------------------------------|----------------------------------------------------------------|
-| `runtime error: invalid zip file`        | Ensure zip was created properly, not corrupted during transfer |
-| `could not detect runtime name`          | Verify zip contains proper directory structure with metadata   |
-| `grpc: received message larger than max` | Use local copy approach for runtimes >128MB                    |
+| `runtime not found`                      | Verify runtime was built with `rnx runtime build`              |
+| `validation errors`                      | Check runtime.yaml syntax with `rnx runtime validate`          |
+| `build failed`                           | Check disk space and network connectivity on target host       |
 
 ---
 

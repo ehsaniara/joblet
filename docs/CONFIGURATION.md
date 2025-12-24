@@ -848,13 +848,11 @@ openssl req -new -key client-key.pem -out viewer.csr \
 
 ### Client Environment Variables
 
-| Variable            | Description                | Default                     |
-|---------------------|----------------------------|-----------------------------|
-| `RNX_CONFIG`        | Path to configuration file | searches standard locations |
-| `RNX_NODE`          | Default node to use        | `default`                   |
-| `RNX_OUTPUT_FORMAT` | Output format (table/json) | `table`                     |
-| `RNX_NO_COLOR`      | Disable colored output     | `false`                     |
-| `RNX_TIMEOUT`       | Request timeout            | `30s`                       |
+| Variable     | Description                | Default                     |
+|--------------|----------------------------|-----------------------------|
+| `RNX_CONFIG` | Path to configuration file | searches standard locations |
+
+> **Note**: Use `--config`, `--node`, and `--json` flags for node selection and output format control.
 
 ## Configuration Examples
 

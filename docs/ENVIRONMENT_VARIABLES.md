@@ -16,10 +16,14 @@ variables allow you to pass configuration, secrets, and runtime parameters to yo
 
 ## Overview
 
-**v5.0.0 Update**: Joblet now uses a unified `environment` field with automatic secret detection by naming convention.
+Joblet provides two methods for setting secret environment variables:
+
+1. **Explicit `--secret-env` flag**: Explicitly mark variables as secrets
+2. **Automatic detection**: Variables matching naming patterns are auto-detected as secrets
 
 ### Key Features
 
+- **Explicit secret flag** (`--secret-env` / `-s` for explicit secret marking)
 - **Automatic secret detection** (based on variable naming conventions)
 - **Multiple input methods** (command line flags)
 - **Variable templating** (`${VAR_NAME}` syntax for referencing other variables)
@@ -28,12 +32,6 @@ variables allow you to pass configuration, secrets, and runtime parameters to yo
 - **Security design** (secret variables hidden from logs)
 - **Reserved variable warnings** (system variables like PATH, HOME)
 
-### Breaking Changes in v5.0.0
-
-❌ **REMOVED**: Separate `secret_environment` field
-✅ **NEW**: Automatic secret detection by naming convention
-✅ **NEW**: Single `environment` field for all variables
-
 ## CLI Usage
 
 ### Basic Syntax
@@ -41,17 +39,22 @@ variables allow you to pass configuration, secrets, and runtime parameters to yo
 ```bash
 # Regular environment variables (visible in logs)
 rnx job run --env="KEY=value" command
+rnx job run -e "KEY=value" command
 
-# Secret environment variables (auto-detected by naming)
-rnx job run --env="SECRET_KEY=secret_value" command
-rnx job run --env="DATABASE_PASSWORD=pass123" command
-rnx job run --env="API_TOKEN=token123" command
+# Secret environment variables - Method 1: Explicit flag (always hidden)
+rnx job run --secret-env="API_KEY=secret_value" command
+rnx job run -s "API_KEY=secret_value" command
+
+# Secret environment variables - Method 2: Auto-detected by naming
+rnx job run --env="SECRET_KEY=secret_value" command      # SECRET_ prefix
+rnx job run --env="DATABASE_PASSWORD=pass123" command    # _PASSWORD suffix
+rnx job run --env="API_TOKEN=token123" command           # _TOKEN suffix
 
 # Multiple variables
 rnx job run --env="VAR1=value1" --env="VAR2=value2" command
 
-# Mixed usage (secrets auto-detected)
-rnx job run --env="NODE_ENV=production" --env="SECRET_API_KEY=secret" command
+# Mixed usage
+rnx job run --env="NODE_ENV=production" --secret-env="API_KEY=secret" command
 ```
 
 ### Examples
@@ -373,19 +376,21 @@ rnx job run \
   make deploy
 ```
 
-## Migration from v4.x to v5.0.0
+## Secret Environment Options
 
-### Before (v4.x) - DEPRECATED
+You can use either explicit `--secret-env` or rely on automatic detection:
+
+### Option 1: Explicit --secret-env Flag
 
 ```bash
-# v4.x - Separate secret flag (No longer supported)
-rnx job run --env="PUBLIC_VAR=value" --secret-env="API_KEY=secret" app
+# Use --secret-env for any variable you want hidden (regardless of name)
+rnx job run --env="PUBLIC_VAR=value" --secret-env="MY_VAR=secret" app
 ```
 
-### After (v5.0.0) - REQUIRED
+### Option 2: Automatic Detection by Naming
 
 ```bash
-# v5.0.0 - Single --env flag with auto-detection
+# Variables with secret naming patterns are auto-detected
 rnx job run --env="PUBLIC_VAR=value" --env="API_KEY=secret" app
 # API_KEY auto-detected as secret by _KEY suffix
 ```
