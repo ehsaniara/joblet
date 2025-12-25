@@ -101,24 +101,19 @@ rnx job run --runtime=openjdk-21 --upload=HelloWorld.java javac HelloWorld.java
 rnx job run --runtime=openjdk-21 java HelloWorld
 ```
 
-### GraalVM JDK 21 (`graalvmjdk-21`)
+### OpenJDK 17 (`openjdk-17`)
 
-**High-performance Java with native compilation and polyglot support**
+**Java 17 Long Term Support**
 
-- **GraalVM**: Community Edition JDK 21 with native-image
-- **Advanced Features**:
-    - Native image compilation (AOT)
-    - Polyglot programming (JavaScript, Python, Ruby on JVM)
-    - Superior performance for microservices
-    - Faster startup times
-- **Build Tools**: java, javac, native-image, gu, js, node, npm
-- **Use Cases**: High-performance microservices, native binaries, polyglot applications
+- **Java**: OpenJDK 17 (Long Term Support)
+- **Build Tools**: javac, jar, javap, jshell (built-in)
+- **Use Cases**: Enterprise applications, legacy Java support
 
 ```bash
 # Usage examples
-rnx job run --runtime=graalvmjdk-21 java -version
-rnx job run --runtime=graalvmjdk-21 native-image --version
-rnx job run --runtime=graalvmjdk-21 js --version
+rnx job run --runtime=openjdk-17 java -version
+rnx job run --runtime=openjdk-17 --upload=App.java javac App.java
+```
 
 ## 🚀 Getting Started
 
@@ -194,10 +189,10 @@ rnx runtime list
 ```
 RUNTIME         VERSION  TYPE    SIZE     DESCRIPTION
 -------         -------  ----    ----     -----------
-python-3.11-ml  3.11     system  475MB    Python 3.11 with ML packages for AI development
-python-3.11     3.11     system  200MB    Lightweight Python for general development
-openjdk-21      21.0     system  371MB    OpenJDK 21 LTS for enterprise applications
-graalvmjdk-21   21.0     system  490MB    GraalVM JDK 21 with native-image and polyglot
+python-3.11-ml  1.0.0    system  475MB    Python 3.11 with ML packages for AI development
+python-3.11     1.0.0    system  200MB    Lightweight Python for general development
+openjdk-21      1.0.0    system  371MB    OpenJDK 21 LTS for enterprise applications
+openjdk-17      1.0.0    system  350MB    OpenJDK 17 LTS for enterprise applications
 
 Total runtimes: 4
 ```
@@ -695,8 +690,6 @@ environment:
   LD_LIBRARY_PATH: "/usr/lib:/lib"
 
 requirements:
-  min_memory: "256MB"
-  recommended_memory: "1GB"
   architectures: [ "x86_64", "amd64" ]
 ```
 

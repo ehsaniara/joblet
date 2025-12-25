@@ -1,71 +1,105 @@
-//go:build linux
-
 package telematics
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"golang.org/x/sys/unix"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
+
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
+// CgroupOps provides operations for cgroup ID retrieval and validation.
+// This interface allows mocking for testing.
+//
+//counterfeiter:generate . CgroupOps
+type CgroupOps interface {
+	// GetCgroupID returns the cgroup v2 ID for a given cgroup path.
+	// The path should be relative to /sys/fs/cgroup.
+	GetCgroupID(cgroupPath string) (uint64, error)
+
+	// GetCgroupIDFromFD returns the cgroup v2 ID from an open file descriptor.
+	GetCgroupIDFromFD(fd int) (uint64, error)
+
+	// GetProcessCgroupID returns the cgroup v2 ID for a given process.
+	GetProcessCgroupID(pid int) (uint64, error)
+
+	// GetProcessCgroupPath returns the cgroup v2 path for a given process.
+	GetProcessCgroupPath(pid int) (string, error)
+
+	// CgroupIDFromPath returns the cgroup ID for an absolute cgroup path.
+	CgroupIDFromPath(jobletCgroupPath string) (uint64, error)
+
+	// ValidateCgroupPath checks if a cgroup path exists and is a directory.
+	ValidateCgroupPath(cgroupPath string) error
+
+	// IsCgroupV2 checks if the system is using cgroup v2.
+	IsCgroupV2() bool
+
+	// GetCgroupControllers returns the list of controllers enabled for a cgroup.
+	GetCgroupControllers(cgroupPath string) ([]string, error)
+
+	// ReadCgroupStat reads a specific stat from a cgroup.
+	ReadCgroupStat(cgroupPath, statName string) (uint64, error)
+}
+
+// cgroupOps implements CgroupOps using the platform interface.
+type cgroupOps struct {
+	platform platform.Platform
+}
+
+// NewCgroupOps creates a new CgroupOps instance.
+func NewCgroupOps(p platform.Platform) CgroupOps {
+	return &cgroupOps{platform: p}
+}
 
 // GetCgroupID returns the cgroup v2 ID for a given cgroup path.
 // The path should be relative to /sys/fs/cgroup, e.g., "joblet/job-abc123".
-func GetCgroupID(cgroupPath string) (uint64, error) {
-	// Build full path
+func (c *cgroupOps) GetCgroupID(cgroupPath string) (uint64, error) {
 	fullPath := filepath.Join("/sys/fs/cgroup", cgroupPath)
-
-	// Get the cgroup ID using statx
-	var stat unix.Statx_t
-	err := unix.Statx(unix.AT_FDCWD, fullPath, 0, unix.STATX_INO, &stat)
+	ino, err := c.platform.Statx(platform.AT_FDCWD, fullPath, 0, platform.STATX_INO)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get cgroup ID for %s: %w", fullPath, err)
 	}
-
-	// The cgroup ID is the inode number
-	return stat.Ino, nil
+	return ino, nil
 }
 
 // GetCgroupIDFromFD returns the cgroup v2 ID from an open file descriptor.
 // This is useful when you have a handle to the cgroup directory.
-func GetCgroupIDFromFD(fd int) (uint64, error) {
-	var stat unix.Stat_t
-	if err := unix.Fstat(fd, &stat); err != nil {
+func (c *cgroupOps) GetCgroupIDFromFD(fd int) (uint64, error) {
+	ino, err := c.platform.Fstat(fd)
+	if err != nil {
 		return 0, fmt.Errorf("failed to fstat cgroup fd: %w", err)
 	}
-	return stat.Ino, nil
+	return ino, nil
 }
 
 // GetProcessCgroupID returns the cgroup v2 ID for a given process.
-func GetProcessCgroupID(pid int) (uint64, error) {
-	cgroupPath, err := GetProcessCgroupPath(pid)
+func (c *cgroupOps) GetProcessCgroupID(pid int) (uint64, error) {
+	cgroupPath, err := c.GetProcessCgroupPath(pid)
 	if err != nil {
 		return 0, err
 	}
-	return GetCgroupID(cgroupPath)
+	return c.GetCgroupID(cgroupPath)
 }
 
 // GetProcessCgroupPath returns the cgroup v2 path for a given process.
 // The returned path is relative to /sys/fs/cgroup.
-func GetProcessCgroupPath(pid int) (string, error) {
-	// Read /proc/<pid>/cgroup
-	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+func (c *cgroupOps) GetProcessCgroupPath(pid int) (string, error) {
+	data, err := c.platform.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", fmt.Errorf("failed to read process cgroup: %w", err)
 	}
 
-	// Parse cgroup v2 entry (format: "0::/path")
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		parts := strings.SplitN(line, ":", 3)
 		if len(parts) == 3 && parts[0] == "0" {
-			// cgroup v2 entry
 			path := strings.TrimSpace(parts[2])
 			if path == "/" {
-				return "", nil // Root cgroup
+				return "", nil
 			}
 			return strings.TrimPrefix(path, "/"), nil
 		}
@@ -77,21 +111,18 @@ func GetProcessCgroupPath(pid int) (string, error) {
 // CgroupIDFromPath is a convenience function that handles full cgroup paths.
 // It takes the job's cgroup path (as created by joblet, which is already absolute)
 // and returns its cgroup ID.
-func CgroupIDFromPath(jobletCgroupPath string) (uint64, error) {
-	// The job.CgroupPath is already an absolute path like /sys/fs/cgroup/joblet.slice/...
-	// so we use it directly without prepending /sys/fs/cgroup again
-	var stat unix.Statx_t
-	err := unix.Statx(unix.AT_FDCWD, jobletCgroupPath, 0, unix.STATX_INO, &stat)
+func (c *cgroupOps) CgroupIDFromPath(jobletCgroupPath string) (uint64, error) {
+	ino, err := c.platform.Statx(platform.AT_FDCWD, jobletCgroupPath, 0, platform.STATX_INO)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get cgroup ID for %s: %w", jobletCgroupPath, err)
 	}
-	return stat.Ino, nil
+	return ino, nil
 }
 
 // ValidateCgroupPath checks if a cgroup path exists and is a directory.
-func ValidateCgroupPath(cgroupPath string) error {
+func (c *cgroupOps) ValidateCgroupPath(cgroupPath string) error {
 	fullPath := filepath.Join("/sys/fs/cgroup", cgroupPath)
-	info, err := os.Stat(fullPath)
+	info, err := c.platform.Stat(fullPath)
 	if err != nil {
 		return fmt.Errorf("cgroup path does not exist: %w", err)
 	}
@@ -102,9 +133,8 @@ func ValidateCgroupPath(cgroupPath string) error {
 }
 
 // IsCgroupV2 checks if the system is using cgroup v2 (unified hierarchy).
-func IsCgroupV2() bool {
-	// Check if /sys/fs/cgroup is a cgroup2 mount
-	data, err := os.ReadFile("/proc/mounts")
+func (c *cgroupOps) IsCgroupV2() bool {
+	data, err := c.platform.ReadFile("/proc/mounts")
 	if err != nil {
 		return false
 	}
@@ -120,9 +150,9 @@ func IsCgroupV2() bool {
 }
 
 // GetCgroupControllers returns the list of controllers enabled for a cgroup.
-func GetCgroupControllers(cgroupPath string) ([]string, error) {
+func (c *cgroupOps) GetCgroupControllers(cgroupPath string) ([]string, error) {
 	controllersPath := filepath.Join("/sys/fs/cgroup", cgroupPath, "cgroup.controllers")
-	data, err := os.ReadFile(controllersPath)
+	data, err := c.platform.ReadFile(controllersPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cgroup controllers: %w", err)
 	}
@@ -132,9 +162,9 @@ func GetCgroupControllers(cgroupPath string) ([]string, error) {
 }
 
 // ReadCgroupStat reads a specific stat from a cgroup.
-func ReadCgroupStat(cgroupPath, statName string) (uint64, error) {
+func (c *cgroupOps) ReadCgroupStat(cgroupPath, statName string) (uint64, error) {
 	statPath := filepath.Join("/sys/fs/cgroup", cgroupPath, statName)
-	data, err := os.ReadFile(statPath)
+	data, err := c.platform.ReadFile(statPath)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read cgroup stat %s: %w", statName, err)
 	}
@@ -145,4 +175,58 @@ func ReadCgroupStat(cgroupPath, statName string) (uint64, error) {
 	}
 
 	return value, nil
+}
+
+// Package-level convenience functions for backward compatibility.
+// These use the default platform implementation.
+
+var defaultPlatform platform.Platform
+
+func init() {
+	defaultPlatform = platform.NewLinuxPlatform()
+}
+
+// GetCgroupID returns the cgroup v2 ID for a given cgroup path.
+func GetCgroupID(cgroupPath string) (uint64, error) {
+	return NewCgroupOps(defaultPlatform).GetCgroupID(cgroupPath)
+}
+
+// GetCgroupIDFromFD returns the cgroup v2 ID from an open file descriptor.
+func GetCgroupIDFromFD(fd int) (uint64, error) {
+	return NewCgroupOps(defaultPlatform).GetCgroupIDFromFD(fd)
+}
+
+// GetProcessCgroupID returns the cgroup v2 ID for a given process.
+func GetProcessCgroupID(pid int) (uint64, error) {
+	return NewCgroupOps(defaultPlatform).GetProcessCgroupID(pid)
+}
+
+// GetProcessCgroupPath returns the cgroup v2 path for a given process.
+func GetProcessCgroupPath(pid int) (string, error) {
+	return NewCgroupOps(defaultPlatform).GetProcessCgroupPath(pid)
+}
+
+// CgroupIDFromPath returns the cgroup ID for an absolute cgroup path.
+func CgroupIDFromPath(jobletCgroupPath string) (uint64, error) {
+	return NewCgroupOps(defaultPlatform).CgroupIDFromPath(jobletCgroupPath)
+}
+
+// ValidateCgroupPath checks if a cgroup path exists and is a directory.
+func ValidateCgroupPath(cgroupPath string) error {
+	return NewCgroupOps(defaultPlatform).ValidateCgroupPath(cgroupPath)
+}
+
+// IsCgroupV2 checks if the system is using cgroup v2.
+func IsCgroupV2() bool {
+	return NewCgroupOps(defaultPlatform).IsCgroupV2()
+}
+
+// GetCgroupControllers returns the list of controllers enabled for a cgroup.
+func GetCgroupControllers(cgroupPath string) ([]string, error) {
+	return NewCgroupOps(defaultPlatform).GetCgroupControllers(cgroupPath)
+}
+
+// ReadCgroupStat reads a specific stat from a cgroup.
+func ReadCgroupStat(cgroupPath, statName string) (uint64, error) {
+	return NewCgroupOps(defaultPlatform).ReadCgroupStat(cgroupPath, statName)
 }

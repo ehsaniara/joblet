@@ -175,31 +175,23 @@ initPath, err := envService.GetRuntimeInitPath(ctx, "python-3.11")
 
 ---
 
-### 5. Separate Secret Environment Flag
+### 5. Secret Environment Variables
 
-**Status**: ✅ **REMOVED** in v5.0.0
+**Status**: ✅ **ACTIVE** in v5.0.0
 
-**Removed CLI Flag**:
-
-```bash
-# OLD - No longer supported
-rnx job run --env="PUBLIC_VAR=value" --secret-env="API_KEY=secret" app
-```
-
-**Migration** (Required for v5.0.0):
-
-Use single `--env` flag with naming conventions for automatic secret detection.
-
-#### After (v5.0.0 - Required):
+**Available CLI Flags**:
 
 ```bash
-# NEW - Use single --env flag
-rnx job run --env="PUBLIC_VAR=value" --env="API_KEY=secret" app
-# API_KEY auto-detected as secret by _KEY suffix
+# Explicit secret flag (always hides value from logs)
+rnx job run --secret-env="API_KEY=secret" app
+rnx job run -s "API_KEY=secret" app
+
+# Auto-detection by naming convention
+rnx job run --env="API_KEY=secret" app  # _KEY suffix auto-detected
 ```
 
-**Secret Detection** (New in v5.0.0):
-Secrets are automatically detected by naming convention:
+**Secret Detection** (v5.0.0):
+Secrets are automatically detected by naming convention when using `--env`:
 
 - `SECRET_*` prefix (e.g., `SECRET_DATABASE_PASSWORD`)
 - `*_TOKEN` suffix (e.g., `GITHUB_TOKEN`)
@@ -207,7 +199,10 @@ Secrets are automatically detected by naming convention:
 - `*_PASSWORD` suffix (e.g., `DATABASE_PASSWORD`)
 - `*_SECRET` suffix (e.g., `OAUTH_SECRET`)
 
-**Impact**: Medium - Breaking change, CLI usage must be updated
+**Note**: Both `--secret-env` and automatic detection are supported. Use `--secret-env` when you want to explicitly mark
+a variable as secret regardless of its name.
+
+**Impact**: None - Both methods work
 
 ---
 
@@ -222,11 +217,10 @@ Breaking Changes Applied:
 - ✅ Removed legacy `JobStatus*` constants
 - ✅ Removed sequential ID generator methods
 - ✅ Removed `GetRuntimeInitPath` method
-- ✅ Removed `--secret-env` CLI flag
 - ✅ Removed network ready FD fallback (`NETWORK_READY_FD`)
 - ✅ Removed legacy Job struct fields (`StartedAt`, `CompletedAt` aliases)
 - ✅ Removed workflow orchestration (moved to separate project per ADR-013)
-- ✅ Added automatic secret detection by naming convention
+- ✅ Added automatic secret detection by naming convention (in addition to `--secret-env`)
 
 Migration Support:
 
@@ -256,8 +250,8 @@ Manual updates:
 
 - Replace `JobStatus*` → `Status*` in Go code
 - Replace `NewSequentialIDGenerator` → `NewUUIDGenerator`
-- Replace `--secret-env` → `--env` with naming conventions for secrets
 - Update `NETWORK_READY_FD` → `NETWORK_READY_FILE` in deployment scripts
+- Note: `--secret-env` still works, but you can also use naming conventions for auto-detection
 
 ### 3. Test Changes
 

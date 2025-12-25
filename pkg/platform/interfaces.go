@@ -37,6 +37,7 @@ type OSOperations interface {
 	Executable() (string, error)
 	Getpid() int
 	Exit(code int)
+	FindProcess(pid int) (*os.Process, error)
 
 	// Environment
 	Environ() []string
@@ -74,6 +75,10 @@ type SyscallOperations interface {
 
 	// File descriptor operations
 	SetNonblock(fd int, nonblocking bool) error
+
+	// Extended stat operations (for cgroup ID retrieval)
+	Statx(dirfd int, path string, flags int, mask int) (ino uint64, err error)
+	Fstat(fd int) (ino uint64, err error)
 }
 
 // CommandFactory creates and manages command execution

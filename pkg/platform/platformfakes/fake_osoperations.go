@@ -58,6 +58,19 @@ type FakeOSOperations struct {
 	fileExistsReturnsOnCall map[int]struct {
 		result1 bool
 	}
+	FindProcessStub        func(int) (*os.Process, error)
+	findProcessMutex       sync.RWMutex
+	findProcessArgsForCall []struct {
+		arg1 int
+	}
+	findProcessReturns struct {
+		result1 *os.Process
+		result2 error
+	}
+	findProcessReturnsOnCall map[int]struct {
+		result1 *os.Process
+		result2 error
+	}
 	GetenvStub        func(string) string
 	getenvMutex       sync.RWMutex
 	getenvArgsForCall []struct {
@@ -479,6 +492,70 @@ func (fake *FakeOSOperations) FileExistsReturnsOnCall(i int, result1 bool) {
 	fake.fileExistsReturnsOnCall[i] = struct {
 		result1 bool
 	}{result1}
+}
+
+func (fake *FakeOSOperations) FindProcess(arg1 int) (*os.Process, error) {
+	fake.findProcessMutex.Lock()
+	ret, specificReturn := fake.findProcessReturnsOnCall[len(fake.findProcessArgsForCall)]
+	fake.findProcessArgsForCall = append(fake.findProcessArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	stub := fake.FindProcessStub
+	fakeReturns := fake.findProcessReturns
+	fake.recordInvocation("FindProcess", []interface{}{arg1})
+	fake.findProcessMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeOSOperations) FindProcessCallCount() int {
+	fake.findProcessMutex.RLock()
+	defer fake.findProcessMutex.RUnlock()
+	return len(fake.findProcessArgsForCall)
+}
+
+func (fake *FakeOSOperations) FindProcessCalls(stub func(int) (*os.Process, error)) {
+	fake.findProcessMutex.Lock()
+	defer fake.findProcessMutex.Unlock()
+	fake.FindProcessStub = stub
+}
+
+func (fake *FakeOSOperations) FindProcessArgsForCall(i int) int {
+	fake.findProcessMutex.RLock()
+	defer fake.findProcessMutex.RUnlock()
+	argsForCall := fake.findProcessArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeOSOperations) FindProcessReturns(result1 *os.Process, result2 error) {
+	fake.findProcessMutex.Lock()
+	defer fake.findProcessMutex.Unlock()
+	fake.FindProcessStub = nil
+	fake.findProcessReturns = struct {
+		result1 *os.Process
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeOSOperations) FindProcessReturnsOnCall(i int, result1 *os.Process, result2 error) {
+	fake.findProcessMutex.Lock()
+	defer fake.findProcessMutex.Unlock()
+	fake.FindProcessStub = nil
+	if fake.findProcessReturnsOnCall == nil {
+		fake.findProcessReturnsOnCall = make(map[int]struct {
+			result1 *os.Process
+			result2 error
+		})
+	}
+	fake.findProcessReturnsOnCall[i] = struct {
+		result1 *os.Process
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeOSOperations) Getenv(arg1 string) string {

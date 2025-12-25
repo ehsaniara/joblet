@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -20,12 +20,20 @@ type cgroup struct {
 	logger      *logger.Logger
 	initialized bool
 	config      config.CgroupConfig
+	platform    platform.Platform
 }
 
+// New creates a new Resource using the default platform.
 func New(cfg config.CgroupConfig) Resource {
+	return NewWithPlatform(cfg, platform.NewPlatform())
+}
+
+// NewWithPlatform creates a new Resource with a custom platform (for testing).
+func NewWithPlatform(cfg config.CgroupConfig, p platform.Platform) Resource {
 	return &cgroup{
-		logger: logger.New().WithField("component", "resource-manager"),
-		config: cfg,
+		logger:   logger.New().WithField("component", "resource-manager"),
+		config:   cfg,
+		platform: p,
 	}
 }
 
@@ -80,7 +88,7 @@ func (c *cgroup) enableControllersFromConfig() error {
 
 	// Check available controllers
 	controllersFile := filepath.Join(c.config.BaseDir, "cgroup.controllers")
-	availableBytes, err := os.ReadFile(controllersFile)
+	availableBytes, err := c.platform.ReadFile(controllersFile)
 	if err != nil {
 		return fmt.Errorf("failed to read available controllers: %w", err)
 	}
@@ -106,7 +114,7 @@ func (c *cgroup) enableControllersFromConfig() error {
 
 	// Write enabled controllers
 	controllersToEnable := strings.Join(enabledControllers, " ")
-	if err := os.WriteFile(subtreeControlFile, []byte(controllersToEnable), 0644); err != nil {
+	if err := c.platform.WriteFile(subtreeControlFile, []byte(controllersToEnable), 0644); err != nil {
 		return fmt.Errorf("failed to enable controllers: %w", err)
 	}
 
@@ -124,16 +132,16 @@ func (c *cgroup) moveJobletProcessToSubgroup() error {
 
 	// Create a subgroup for the main joblet process
 	jobletSubgroup := filepath.Join(c.config.BaseDir, "joblet-main")
-	if err := os.MkdirAll(jobletSubgroup, 0755); err != nil {
+	if err := c.platform.MkdirAll(jobletSubgroup, 0755); err != nil {
 		return fmt.Errorf("failed to create joblet subgroup: %w", err)
 	}
 
 	// Move current process to the subgroup
-	currentPID := os.Getpid()
+	currentPID := c.platform.Getpid()
 	procsFile := filepath.Join(jobletSubgroup, "cgroup.procs")
 	pidBytes := []byte(fmt.Sprintf("%d", currentPID))
 
-	if err := os.WriteFile(procsFile, pidBytes, 0644); err != nil {
+	if err := c.platform.WriteFile(procsFile, pidBytes, 0644); err != nil {
 		return fmt.Errorf("failed to move joblet process to subgroup: %w", err)
 	}
 
@@ -171,7 +179,7 @@ func (c *cgroup) enableSubtreeControl(cgroupPath string) error {
 	controllersStr := strings.Join(controllersToEnable, " ")
 
 	// Write the controllers to the subtree_control file
-	if err := os.WriteFile(subtreeControlFile, []byte(controllersStr), 0644); err != nil {
+	if err := c.platform.WriteFile(subtreeControlFile, []byte(controllersStr), 0644); err != nil {
 		return fmt.Errorf("failed to enable subtree control: %w", err)
 	}
 
@@ -201,13 +209,13 @@ func (c *cgroup) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxI
 	}
 
 	// Create the cgroup directory
-	if err := os.MkdirAll(cgroupJobDir, 0755); err != nil {
+	if err := c.platform.MkdirAll(cgroupJobDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cgroup directory: %w", err)
 	}
 
 	// Create a process subgroup to satisfy "no internal processes" rule
 	processSubgroup := filepath.Join(cgroupJobDir, "proc")
-	if err := os.MkdirAll(processSubgroup, 0755); err != nil {
+	if err := c.platform.MkdirAll(processSubgroup, 0755); err != nil {
 		return fmt.Errorf("failed to create process subgroup: %w", err)
 	}
 
@@ -285,13 +293,13 @@ func (c *cgroup) SetCPUCores(cgroupPath string, cores string) error {
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "cores", cores)
 
 	cpusetPath := filepath.Join(cgroupPath, "cpuset.cpus")
-	if err := os.WriteFile(cpusetPath, []byte(cores), 0644); err != nil {
+	if err := c.platform.WriteFile(cpusetPath, []byte(cores), 0644); err != nil {
 		return fmt.Errorf("failed to set CPU cores: %w", err)
 	}
 
 	// Set memory nodes (required for cpuset)
 	memsPath := filepath.Join(cgroupPath, "cpuset.mems")
-	if err := os.WriteFile(memsPath, []byte("0"), 0644); err != nil {
+	if err := c.platform.WriteFile(memsPath, []byte("0"), 0644); err != nil {
 		log.Warn("failed to set memory nodes", "error", err)
 	}
 
@@ -305,13 +313,13 @@ func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 
 	// Check if io.max exists to confirm cgroup v2
 	ioMaxPath := filepath.Join(cgroupPath, "io.max")
-	if _, err := os.Stat(ioMaxPath); os.IsNotExist(err) {
+	if _, err := c.platform.Stat(ioMaxPath); c.platform.IsNotExist(err) {
 		log.Debug("io.max not found, IO limiting not available")
 		return fmt.Errorf("io.max not found, cgroup v2 IO limiting not available")
 	}
 
 	// Check current device format by reading io.max
-	if currentConfig, err := os.ReadFile(ioMaxPath); err == nil {
+	if currentConfig, err := c.platform.ReadFile(ioMaxPath); err == nil {
 		log.Debug("current io.max content", "content", string(currentConfig))
 	}
 
@@ -331,7 +339,7 @@ func (c *cgroup) SetIOLimit(cgroupPath string, ioBPS int) error {
 	for _, format := range formats {
 		log.Debug("trying IO limit format", "format", format)
 
-		if e := os.WriteFile(ioMaxPath, []byte(format), 0644); e != nil {
+		if e := c.platform.WriteFile(ioMaxPath, []byte(format), 0644); e != nil {
 			log.Debug("IO limit format failed", "format", format, "error", e)
 			lastErr = e
 		} else {
@@ -353,13 +361,13 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 	cpuWeightPath := filepath.Join(cgroupPath, "cpu.weight")
 
 	// Try cpu.max (cgroup v2)
-	if _, err := os.Stat(cpuMaxPath); err == nil {
+	if _, err := c.platform.Stat(cpuMaxPath); err == nil {
 		// Format: $MAX $PERIOD
 		// Convert percentage to microseconds: 100% = 100000/100000, 50% = 50000/100000
 		quota := (cpuLimit * 100000) / 100
 		limit := fmt.Sprintf("%d 100000", quota)
 
-		if e := os.WriteFile(cpuMaxPath, []byte(limit), 0644); e != nil {
+		if e := c.platform.WriteFile(cpuMaxPath, []byte(limit), 0644); e != nil {
 			log.Error("failed to write to cpu.max", "limit", limit, "error", e)
 			return fmt.Errorf("failed to write to cpu.max: %w", e)
 		}
@@ -368,7 +376,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 	}
 
 	// Try cpu.weight as fallback (cgroup v2 alternative)
-	if _, err := os.Stat(cpuWeightPath); err == nil {
+	if _, err := c.platform.Stat(cpuWeightPath); err == nil {
 		// Convert CPU limit to weight (1-10000)
 		// Default weight is 100, so scale accordingly
 		weight := 100 // Default
@@ -382,7 +390,7 @@ func (c *cgroup) SetCPULimit(cgroupPath string, cpuLimit int) error {
 			}
 		}
 
-		if e := os.WriteFile(cpuWeightPath, []byte(fmt.Sprintf("%d", weight)), 0644); e != nil {
+		if e := c.platform.WriteFile(cpuWeightPath, []byte(fmt.Sprintf("%d", weight)), 0644); e != nil {
 			log.Error("failed to write to cpu.weight", "weight", weight, "error", e)
 			return fmt.Errorf("failed to write to cpu.weight: %w", e)
 		}
@@ -409,8 +417,8 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 	var setMax, setHigh bool
 
 	// Set memory.max hard limit
-	if _, err := os.Stat(memoryMaxPath); err == nil {
-		if e := os.WriteFile(memoryMaxPath, []byte(fmt.Sprintf("%d", memoryLimitBytes)), 0644); e != nil {
+	if _, err := c.platform.Stat(memoryMaxPath); err == nil {
+		if e := c.platform.WriteFile(memoryMaxPath, []byte(fmt.Sprintf("%d", memoryLimitBytes)), 0644); e != nil {
 			log.Warn("failed to write to memory.max", "memoryLimitBytes", memoryLimitBytes, "error", e)
 		} else {
 			setMax = true
@@ -419,9 +427,9 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 	}
 
 	// Set memory.high soft limit (90% of hard limit)
-	if _, err := os.Stat(memoryHighPath); err == nil {
+	if _, err := c.platform.Stat(memoryHighPath); err == nil {
 		softLimit := int64(float64(memoryLimitBytes) * 0.9)
-		if e := os.WriteFile(memoryHighPath, []byte(fmt.Sprintf("%d", softLimit)), 0644); e != nil {
+		if e := c.platform.WriteFile(memoryHighPath, []byte(fmt.Sprintf("%d", softLimit)), 0644); e != nil {
 			log.Warn("failed to write to memory.high", "softLimit", softLimit, "error", e)
 		} else {
 			setHigh = true
@@ -449,7 +457,7 @@ func (c *cgroup) CleanupCgroup(jobID string) {
 
 		done := make(chan bool)
 		go func() {
-			cleanupJobCgroup(jobID, cleanupLogger, &c.config)
+			c.cleanupJobCgroup(jobID, cleanupLogger)
 			done <- true
 		}()
 
@@ -464,26 +472,26 @@ func (c *cgroup) CleanupCgroup(jobID string) {
 }
 
 // cleanupJobCgroup clean process first SIGTERM and SIGKILL then remove the cgroupPath items
-func cleanupJobCgroup(jobID string, logger *logger.Logger, cfg *config.CgroupConfig) {
+func (c *cgroup) cleanupJobCgroup(jobID string, logger *logger.Logger) {
 	// Use the delegated cgroup path
-	cgroupPath := filepath.Join(cfg.BaseDir, "job-"+jobID)
+	cgroupPath := filepath.Join(c.config.BaseDir, "job-"+jobID)
 	cleanupLogger := logger.WithField("cgroupPath", cgroupPath)
 
 	// Security check: ensure we're only cleaning up within our delegated subtree
-	if !strings.HasPrefix(cgroupPath, cfg.BaseDir+"/job-") {
+	if !strings.HasPrefix(cgroupPath, c.config.BaseDir+"/job-") {
 		cleanupLogger.Error("security violation: attempted to clean up non-job cgroup", "path", cgroupPath)
 		return
 	}
 
 	// Check if the cgroup exists
-	if _, err := os.Stat(cgroupPath); os.IsNotExist(err) {
+	if _, err := c.platform.Stat(cgroupPath); c.platform.IsNotExist(err) {
 		cleanupLogger.Debug("cgroup directory does not exist, skipping cleanup")
 		return
 	}
 
 	// Try to kill any processes still in the cgroup
 	procsPath := filepath.Join(cgroupPath, "cgroup.procs")
-	if procsData, err := os.ReadFile(procsPath); err == nil {
+	if procsData, err := c.platform.ReadFile(procsPath); err == nil {
 		pids := strings.Split(string(procsData), "\n")
 		activePids := []string{}
 
@@ -497,7 +505,7 @@ func cleanupJobCgroup(jobID string, logger *logger.Logger, cfg *config.CgroupCon
 				cleanupLogger.Debug("terminating process in cgroup", "pid", pid)
 
 				// Try to terminate the process
-				proc, e2 := os.FindProcess(pid)
+				proc, e2 := c.platform.FindProcess(pid)
 				if e2 == nil {
 					// Try SIGTERM first
 					_ = proc.Signal(syscall.SIGTERM)
@@ -519,14 +527,14 @@ func cleanupJobCgroup(jobID string, logger *logger.Logger, cfg *config.CgroupCon
 		}
 	}
 
-	cgroupPathRemoveAll(cgroupPath, cleanupLogger)
+	c.cgroupPathRemoveAll(cgroupPath, cleanupLogger)
 }
 
-func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
-	if err := os.RemoveAll(cgroupPath); err != nil {
+func (c *cgroup) cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
+	if err := c.platform.RemoveAll(cgroupPath); err != nil {
 		logger.Warn("failed to remove cgroup directory", "error", err)
 
-		files, _ := os.ReadDir(cgroupPath)
+		files, _ := c.platform.ReadDir(cgroupPath)
 		removedFiles := []string{}
 
 		for _, file := range files {
@@ -537,7 +545,7 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 
 			// Remove each file one by one
 			filePath := filepath.Join(cgroupPath, file.Name())
-			if e := os.Remove(filePath); e == nil {
+			if e := c.platform.Remove(filePath); e == nil {
 				removedFiles = append(removedFiles, file.Name())
 			}
 		}
@@ -547,7 +555,7 @@ func cgroupPathRemoveAll(cgroupPath string, logger *logger.Logger) {
 		}
 
 		// Try to remove the directory again
-		if e := os.Remove(cgroupPath); e != nil {
+		if e := c.platform.Remove(cgroupPath); e != nil {
 			logger.Debug("could not remove cgroup directory completely, will be cleaned up later", "error", e)
 		} else {
 			logger.Debug("successfully removed cgroup directory on retry")
@@ -565,7 +573,7 @@ func (c *cgroup) AddProcessToCgroup(cgroupPath string, pid int) error {
 	log.Debug("adding process to cgroup")
 
 	// Verify the cgroup path exists
-	if _, err := os.Stat(cgroupPath); os.IsNotExist(err) {
+	if _, err := c.platform.Stat(cgroupPath); c.platform.IsNotExist(err) {
 		return fmt.Errorf("cgroup path does not exist: %s", cgroupPath)
 	}
 
@@ -573,7 +581,7 @@ func (c *cgroup) AddProcessToCgroup(cgroupPath string, pid int) error {
 	procsPath := filepath.Join(cgroupPath, "cgroup.procs")
 	pidBytes := []byte(fmt.Sprintf("%d", pid))
 
-	if err := os.WriteFile(procsPath, pidBytes, 0644); err != nil {
+	if err := c.platform.WriteFile(procsPath, pidBytes, 0644); err != nil {
 		return fmt.Errorf("failed to add process %d to cgroup %s: %w", pid, cgroupPath, err)
 	}
 
@@ -606,13 +614,13 @@ func (c *cgroup) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
 func (c *cgroup) detectCgroupVersion() int {
 	// Check if devices.allow exists (cgroups v1)
 	devicesAllowPath := filepath.Join(c.config.BaseDir, "devices.allow")
-	if _, err := os.Stat(devicesAllowPath); err == nil {
+	if _, err := c.platform.Stat(devicesAllowPath); err == nil {
 		return 1
 	}
 
 	// Check for cgroup.controllers (cgroups v2)
 	controllersPath := filepath.Join(c.config.BaseDir, "cgroup.controllers")
-	if _, err := os.Stat(controllersPath); err == nil {
+	if _, err := c.platform.Stat(controllersPath); err == nil {
 		return 2
 	}
 
@@ -626,7 +634,7 @@ func (c *cgroup) setGPUDevicesV1(cgroupPath string, gpuIndices []int, log *logge
 
 	// Check if devices controller is available
 	devicesAllowPath := filepath.Join(cgroupPath, "devices.allow")
-	if _, err := os.Stat(devicesAllowPath); os.IsNotExist(err) {
+	if _, err := c.platform.Stat(devicesAllowPath); c.platform.IsNotExist(err) {
 		log.Debug("devices controller not available in cgroups v1")
 		return fmt.Errorf("devices controller not available at %s", devicesAllowPath)
 	}
@@ -643,7 +651,7 @@ func (c *cgroup) setGPUDevicesV1(cgroupPath string, gpuIndices []int, log *logge
 	}
 
 	for _, deviceRule := range commonDevices {
-		if err := os.WriteFile(devicesAllowPath, []byte(deviceRule), 0644); err != nil {
+		if err := c.platform.WriteFile(devicesAllowPath, []byte(deviceRule), 0644); err != nil {
 			log.Warn("failed to allow common GPU device", "device", deviceRule, "error", err)
 		} else {
 			log.Debug("allowed common GPU device", "device", deviceRule)
@@ -656,7 +664,7 @@ func (c *cgroup) setGPUDevicesV1(cgroupPath string, gpuIndices []int, log *logge
 		// Major number 195, minor number = GPU index
 		deviceRule := fmt.Sprintf("c 195:%d rwm", gpuIndex)
 
-		if err := os.WriteFile(devicesAllowPath, []byte(deviceRule), 0644); err != nil {
+		if err := c.platform.WriteFile(devicesAllowPath, []byte(deviceRule), 0644); err != nil {
 			log.Warn("failed to allow GPU device", "gpuIndex", gpuIndex, "device", deviceRule, "error", err)
 		} else {
 			log.Debug("allowed GPU device", "gpuIndex", gpuIndex, "device", deviceRule)
@@ -678,7 +686,7 @@ func (c *cgroup) setGPUDevicesV2(cgroupPath string, gpuIndices []int, log *logge
 	// 3. Optional: eBPF programs for fine-grained control (not implemented here)
 
 	// Validate that the cgroup exists
-	if _, err := os.Stat(cgroupPath); os.IsNotExist(err) {
+	if _, err := c.platform.Stat(cgroupPath); c.platform.IsNotExist(err) {
 		return fmt.Errorf("cgroup path does not exist: %s", cgroupPath)
 	}
 

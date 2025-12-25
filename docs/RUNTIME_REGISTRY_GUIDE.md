@@ -123,7 +123,6 @@ environment:
 requirements:
   gpu: false
   cuda_version: "12.0"
-  min_memory: "256MB"
 
 # Optional: Supported platforms (default: all)
 platforms:

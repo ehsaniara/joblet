@@ -66,6 +66,10 @@ func (bp *BasePlatform) Exit(code int) {
 	os.Exit(code)
 }
 
+func (bp *BasePlatform) FindProcess(pid int) (*os.Process, error) {
+	return os.FindProcess(pid)
+}
+
 func (bp *BasePlatform) Environ() []string {
 	return os.Environ()
 }

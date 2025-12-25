@@ -572,11 +572,15 @@ message Job {
 ### Job Status Values
 
 ```
+PENDING       - Job queued, waiting to be processed
 INITIALIZING  - Job created, setting up isolation and resources
+SCHEDULED     - Job scheduled for future execution
 RUNNING       - Process executing in isolated namespace
+STOPPING      - Stop requested, waiting for graceful shutdown
 COMPLETED     - Process finished successfully (exit code 0)
 FAILED        - Process finished with error (exit code != 0)
 STOPPED       - Process terminated by user request or timeout
+CANCELED      - Scheduled job canceled before execution
 ```
 
 ### Resource Limits
@@ -1115,29 +1119,21 @@ find /opt/joblet/metrics -type d -mtime +90 -exec rm -rf {} \;
 
 ### Future Enhancements
 
-**Planned Features**:
+> **Note**: The features listed below are **not yet implemented**.
 
-- Cloud storage backends (S3, CloudWatch Logs)
+**Planned Features** (not implemented):
+
+- S3 storage backend for long-term archival
 - Advanced query filters (regex, time ranges)
 - Metric aggregation and rollups
 - Web UI for log browsing
 - Prometheus metrics export
 - Data archival to cold storage
 
-**Configuration (Future)**:
+**Currently Supported Backends**:
 
-```yaml
-persist:
-  storage:
-    type: "cloud"  # "local" or "cloud"
-    cloud:
-      provider: "aws"
-      s3:
-        bucket: "joblet-logs"
-        region: "us-west-2"
-      cloudwatch:
-        log_group: "/joblet/jobs"
-```
+- Local filesystem storage (default)
+- CloudWatch Logs and Metrics (AWS)
 
 ---
 
