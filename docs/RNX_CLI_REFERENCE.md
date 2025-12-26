@@ -84,8 +84,7 @@ rnx job run [parameters] <command> [arguments...]
 | `--gpu-memory`     | Minimum GPU memory required (e.g., "8GB", "4096MB")        | none           |
 | `--network`        | Network mode: bridge, isolated, none, or custom            | "bridge"       |
 | `--volume`         | Volume to mount (can be specified multiple times)          | none           |
-| `--upload`         | Upload file to workspace (can be specified multiple times) | none           |
-| `--upload-dir`     | Upload directory to workspace                              | none           |
+| `--upload`         | Upload file or directory to workspace (auto-detects, can be specified multiple times) | none           |
 | `--runtime`        | Use pre-built runtime (e.g., openjdk-21, python-3.11-ml)   | none           |
 | `--env, -e`        | Environment variable (KEY=VALUE, visible in logs)          | none           |
 | `--secret-env, -s` | Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
@@ -126,7 +125,7 @@ rnx job run --upload=script.py --upload=data.csv \
   python3 script.py data.csv
 
 # Directory upload
-rnx job run --upload-dir=./project \
+rnx job run --upload=./project \
   npm start
 
 # Scheduled execution
@@ -155,7 +154,7 @@ rnx job run \
   --network=mynet \
   --volume=persistent-data \
   --env=PYTHONPATH=/app \
-  --upload-dir=./src \
+  --upload=./src \
   --runtime=python-3.11-ml \
   python3 gpu_training.py --epochs=100
 ```
@@ -1387,7 +1386,7 @@ done
       --max-cpu=400 \
       --max-memory=4096 \
       --volume=test-results \
-      --upload-dir=. \
+      --upload=. \
       --env=CI=true \
       npm test
 

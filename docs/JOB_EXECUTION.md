@@ -157,13 +157,13 @@ rnx job run --upload=local.txt cat local.txt
 
 ```bash
 # Upload entire directory
-rnx job run --upload-dir=./project npm start
+rnx job run --upload=./project npm start
 
 # Upload directory with specific structure
-rnx job run --upload-dir=./src python3 -m src.main
+rnx job run --upload=./src python3 -m src.main
 
 # Large directory upload
-rnx job run --upload-dir=./dataset python3 train_model.py
+rnx job run --upload=./dataset python3 train_model.py
 ```
 
 ### Working Directory
@@ -173,7 +173,7 @@ rnx job run --upload-dir=./dataset python3 train_model.py
 rnx job run pwd  # Output: /work
 
 # Files uploaded are available in /work
-rnx job run --upload-dir=./app ls -la
+rnx job run --upload=./app ls -la
 ```
 
 ### File Access in Jobs
@@ -183,7 +183,7 @@ rnx job run --upload-dir=./app ls -la
 rnx job run --upload=data.txt cat data.txt
 
 # Access uploaded directory contents
-rnx job run --upload-dir=./config ls -la
+rnx job run --upload=./config ls -la
 
 # Write output files
 rnx job run --volume=output python3 -c "

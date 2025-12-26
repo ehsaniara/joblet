@@ -679,13 +679,13 @@ rnx network create data-processing-net --cidr=10.80.3.0/24
 # Training job with GPUs
 rnx job run \
   --network=training-net \
-  --upload-dir=./models \
+  --upload=./models \
   python3 train_model.py --epochs=100 --batch-size=128
 
 # Inference/evaluation job
 rnx job run \
   --network=inference-net \
-  --upload-dir=./models \
+  --upload=./models \
   python3 evaluate.py --model-path=/volumes/models/latest
 
 # Data preprocessing
@@ -708,7 +708,7 @@ rnx job run \
 # Run integration tests
 rnx job run \
   --network=test-env \
-  --upload-dir=./tests \
+  --upload=./tests \
   pytest integration_tests/
 ```
 
@@ -728,7 +728,7 @@ rnx job run --network=ml-dev --name=tensorboard tensorboard --logdir=/volumes/lo
 rnx job run \
   --network=ml-dev \
   --volume=experiments \
-  --upload-dir=./experiments \
+  --upload=./experiments \
   python3 experiment.py --tensorboard-host=tensorboard
 ```
 

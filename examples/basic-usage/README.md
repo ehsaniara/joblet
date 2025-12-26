@@ -59,7 +59,7 @@ Working with files:
 rnx job run --upload=script.py python3 script.py
 
 # Upload a directory
-rnx job run --upload-dir=./myproject python3 main.py
+rnx job run --upload=./myproject python3 main.py
 
 # Multiple uploads
 rnx job run --upload=data.csv --upload=process.py python3 process.py

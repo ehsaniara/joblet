@@ -279,7 +279,7 @@ rnx job run --workdir=/work/app npm start
 rnx job run python3 /work/script.py
 
 # 4. Check uploaded directory structure
-rnx job run --upload-dir=./project find /work -type f
+rnx job run --upload=./project find /work -type f
 ```
 
 ## Resource and Performance
