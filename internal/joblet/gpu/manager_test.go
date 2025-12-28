@@ -80,8 +80,8 @@ func TestManager_AllocateGPUs_Success(t *testing.T) {
 	if len(allocation.GPUIndices) != 1 {
 		t.Errorf("Expected 1 GPU allocated, got %d", len(allocation.GPUIndices))
 	}
-	if allocation.JobID != "test-job" {
-		t.Errorf("Expected job ID 'test-job', got '%s'", allocation.JobID)
+	if allocation.JobUUID != "test-job" {
+		t.Errorf("Expected job ID 'test-job', got '%s'", allocation.JobUUID)
 	}
 }
 

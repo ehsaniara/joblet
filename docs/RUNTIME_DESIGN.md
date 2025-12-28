@@ -578,7 +578,7 @@ rnx job run --runtime=openjdk-21 \
 ```bash
 # Build entire Maven project
 rnx job run --runtime=openjdk-17 \
-        --upload-dir=spring-project \
+        --upload=spring-project \
         --volume=maven-cache \
         --max-memory=2048 \
         mvn clean package
@@ -654,7 +654,7 @@ java ReportGenerator /volumes/pipeline-data/model.pkl
 ```bash
 # Test package in isolated environment
 rnx job run --runtime=python-3.11 \
-        --upload-dir=my-package \
+        --upload=my-package \
         --volume=dev-pip-cache \
         bash -c "
 cd my-package
@@ -670,7 +670,7 @@ python setup.py sdist
 # Multi-version compatibility testing
 # Test on Java 17
 rnx job run --runtime=openjdk-17 \
-        --upload-dir=java-library \
+        --upload=java-library \
         --volume=test-results \
         bash -c "
 cd java-library
@@ -680,7 +680,7 @@ cp target/surefire-reports/* /volumes/test-results/java17-
 
 # Test on Java 21
 rnx job run --runtime=openjdk-21 \
-        --upload-dir=java-library \
+        --upload=java-library \
         --volume=test-results \
         bash -c "
 cd java-library
@@ -696,7 +696,7 @@ cp target/surefire-reports/* /volumes/test-results/java21-
 ```bash
 # Frontend build (Java-based)
 rnx job run --runtime=openjdk-17 \
-        --upload-dir=frontend \
+        --upload=frontend \
         --volume=frontend-dist \
         bash -c "
 cd frontend
@@ -706,7 +706,7 @@ cp -r target/* /volumes/frontend-dist/
 
 # Backend API (Python)
 rnx job run --runtime=python-3.11-ml \
-        --upload-dir=backend \
+        --upload=backend \
         --volume=frontend-dist \
         --network=web \
         python -c "
@@ -892,7 +892,7 @@ rnx job run --runtime=python-3.11-ml \
 # Frontend testing (Java-based)
 rnx job run --runtime=openjdk-17 \
         --network=test-net \
-        --upload-dir=frontend-tests \
+        --upload=frontend-tests \
         bash -c "cd frontend-tests && mvn test"
 ```
 
@@ -948,7 +948,7 @@ rnx job run --runtime=python-3.11-ml \
 rnx job run --runtime=openjdk-17 \
         --volume=maven-cache \     # Persistent Maven cache
         --volume=project-data \    # Persistent project data
-        --upload-dir=java-app \
+        --upload=java-app \
         bash -c "
 cd java-app
 mvn install  # Uses cached dependencies

@@ -14,7 +14,7 @@ test_immediate_job() {
     # Test a job that runs immediately
     # Use a simple echo command that works without any runtime
     local job_output=$("$RNX_BINARY" job run echo "IMMEDIATE_JOB_RAN" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
     if [[ -z "$job_id" ]]; then
         echo -e "    ${RED}Failed to extract job ID${NC}"
@@ -35,7 +35,7 @@ test_delayed_job() {
     local job_output=$("$RNX_BINARY" job run --schedule="10s" echo "DELAYED_JOB_RAN" 2>&1)
     
     if echo "$job_output" | grep -q "ID:"; then
-        local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+        local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
         
         # Check status immediately (should be SCHEDULED)
         local initial_status=$(check_job_status "$job_id")
@@ -81,7 +81,7 @@ test_schedule_formats() {
             echo "SCHEDULED_FORMAT_TEST" 2>&1)
 
         if echo "$job_output" | grep -q "ID:"; then
-            local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+            local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
             job_ids+=("$job_id")
 
             # Verify job is in SCHEDULED state
@@ -117,7 +117,7 @@ test_scheduled_job_execution() {
         return 1
     fi
     
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
     # Verify initial status is SCHEDULED
     local initial_status=$(check_job_status "$job_id")
@@ -157,7 +157,7 @@ test_multiple_scheduled_jobs() {
     # Schedule 3 jobs using simple echo commands
     for i in 1 2 3; do
         local job_output=$("$RNX_BINARY" job run sh -c "echo 'SCHEDULED_JOB_$i'; sleep 1" 2>&1)
-        local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+        local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
         if [[ -n "$job_id" ]]; then
             job_ids+=("$job_id")
         fi
@@ -186,15 +186,15 @@ test_multiple_scheduled_jobs() {
 test_job_queue_ordering() {
     # Test that jobs are executed in order
     local job_output1=$("$RNX_BINARY" job run echo "FIRST" 2>&1)
-    local job1=$(echo "$job_output1" | grep "ID:" | awk '{print $2}')
+    local job1=$(echo "$job_output1" | grep "^ID:" | awk '{print $2}')
     sleep 0.5
     
     local job_output2=$("$RNX_BINARY" job run echo "SECOND" 2>&1)
-    local job2=$(echo "$job_output2" | grep "ID:" | awk '{print $2}')
+    local job2=$(echo "$job_output2" | grep "^ID:" | awk '{print $2}')
     sleep 0.5
     
     local job_output3=$("$RNX_BINARY" job run echo "THIRD" 2>&1)
-    local job3=$(echo "$job_output3" | grep "ID:" | awk '{print $2}')
+    local job3=$(echo "$job_output3" | grep "^ID:" | awk '{print $2}')
     
     sleep 5
     
@@ -230,7 +230,7 @@ test_recurring_schedule() {
 test_schedule_cancellation() {
     # Test cancelling a scheduled job
     local job_output=$("$RNX_BINARY" job run sh -c "sleep 10; echo 'SHOULD_NOT_COMPLETE'" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
     # Give it a moment to start
     sleep 2
@@ -295,7 +295,7 @@ test_scheduled_time_display() {
         return 1
     fi
 
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     echo -e "    ${GREEN}Created scheduled job: $job_id${NC}"
 
     # Get the job list output
@@ -313,10 +313,10 @@ test_scheduled_time_display() {
     echo -e "    Job list line: $job_line"
 
     # Extract the displayed time from the list output (START TIME column)
-    # The format is: UUID NAME STATUS START_TIME COMMAND
-    # We need to extract the time portion which should be in format YYYY-MM-DD HH:MM:SS
-    # Strip ANSI color codes first, then extract columns 5 and 6 (date and time)
-    local displayed_time=$(echo "$job_line" | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $5 " " $6}')
+    # The format is: UUID NODE_ID STATUS DATE TIME COMMAND
+    # We need to extract the date portion which should be in format YYYY-MM-DD
+    # Strip ANSI color codes first, then extract column 4 (date)
+    local displayed_time=$(echo "$job_line" | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $4}')
 
     echo -e "    Current time:   $current_time"
     echo -e "    Displayed time: $displayed_time"

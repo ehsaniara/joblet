@@ -502,8 +502,7 @@ Additional context included with each metric sample:
 
 | Field              | Description                   |
 |--------------------|-------------------------------|
-| `job_id`           | Unique job identifier         |
-| `job_name`         | User-provided job name        |
+| `job_uuid`           | Unique job identifier (UUID)  |
 | `runtime`          | Runtime environment (if used) |
 | `timestamp`        | Collection time (RFC3339)     |
 | `sample_interval`  | Current sampling interval     |

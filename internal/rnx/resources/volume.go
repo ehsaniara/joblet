@@ -104,7 +104,7 @@ func runVolumeCreate(name, size, volumeType string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req := &pb.CreateVolumeReq{
+	req := &pb.CreateVolumeRequest{
 		Name: name,
 		Size: size,
 		Type: volumeType,
@@ -223,7 +223,7 @@ func runVolumeRemove(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req := &pb.RemoveVolumeReq{
+	req := &pb.RemoveVolumeRequest{
 		Name: name,
 	}
 

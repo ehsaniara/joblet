@@ -89,7 +89,7 @@ func TestStreamTypeConversion(t *testing.T) {
 func TestLogLineConversion(t *testing.T) {
 	now := time.Now().UnixNano()
 	ipcLog := &ipcpb.LogLine{
-		JobId:     "test-job",
+		JobUuid:   "test-job",
 		Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 		Timestamp: now,
 		Sequence:  42,
@@ -98,8 +98,8 @@ func TestLogLineConversion(t *testing.T) {
 
 	genLog := logLineIPCToGen(ipcLog)
 
-	if genLog.JobId != ipcLog.JobId {
-		t.Errorf("JobId mismatch: got %s, want %s", genLog.JobId, ipcLog.JobId)
+	if genLog.JobUuid != ipcLog.JobUuid {
+		t.Errorf("JobId mismatch: got %s, want %s", genLog.JobUuid, ipcLog.JobUuid)
 	}
 
 	if genLog.Timestamp != ipcLog.Timestamp {
@@ -124,7 +124,7 @@ func TestLogLineConversion(t *testing.T) {
 func TestMetricConversion(t *testing.T) {
 	now := time.Now().UnixNano()
 	ipcMetric := &ipcpb.Metric{
-		JobId:     "test-job",
+		JobUuid:   "test-job",
 		Timestamp: now,
 		Sequence:  100,
 		Data: &ipcpb.MetricData{
@@ -148,8 +148,8 @@ func TestMetricConversion(t *testing.T) {
 
 	genMetric := metricIPCToGen(ipcMetric)
 
-	if genMetric.JobId != ipcMetric.JobId {
-		t.Errorf("JobId mismatch: got %s, want %s", genMetric.JobId, ipcMetric.JobId)
+	if genMetric.JobUuid != ipcMetric.JobUuid {
+		t.Errorf("JobId mismatch: got %s, want %s", genMetric.JobUuid, ipcMetric.JobUuid)
 	}
 
 	if genMetric.Timestamp != ipcMetric.Timestamp {
@@ -210,7 +210,7 @@ func TestQueryLogsAuthorization(t *testing.T) {
 	server := NewGRPCServer(cfg, backend, log, authorization, security)
 
 	req := &persistpb.QueryLogsRequest{
-		JobId: "test-job",
+		JobUuid: "test-job",
 	}
 
 	mockStream := &mockQueryLogsServer{
@@ -248,7 +248,7 @@ func TestQueryLogsSuccess(t *testing.T) {
 	// Send test log and close channel
 	go func() {
 		reader.Channel <- &ipcpb.LogLine{
-			JobId:     "test-job",
+			JobUuid:   "test-job",
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
@@ -265,9 +265,9 @@ func TestQueryLogsSuccess(t *testing.T) {
 	server := NewGRPCServer(cfg, backend, log, authorization, security)
 
 	req := &persistpb.QueryLogsRequest{
-		JobId:  "test-job",
-		Stream: persistpb.StreamType_STREAM_TYPE_STDOUT,
-		Limit:  100,
+		JobUuid: "test-job",
+		Stream:  persistpb.StreamType_STREAM_TYPE_STDOUT,
+		Limit:   100,
 	}
 
 	mockStream := &mockQueryLogsServer{
@@ -287,8 +287,8 @@ func TestQueryLogsSuccess(t *testing.T) {
 
 	if len(mockStream.sentLogs) > 0 {
 		sentLog := mockStream.sentLogs[0]
-		if sentLog.JobId != "test-job" {
-			t.Errorf("Expected job ID 'test-job', got '%s'", sentLog.JobId)
+		if sentLog.JobUuid != "test-job" {
+			t.Errorf("Expected job ID 'test-job', got '%s'", sentLog.JobUuid)
 		}
 		if string(sentLog.Content) != "test log" {
 			t.Errorf("Expected content 'test log', got '%s'", string(sentLog.Content))
@@ -328,7 +328,7 @@ func TestQueryMetricsSuccess(t *testing.T) {
 
 	go func() {
 		reader.Channel <- &ipcpb.Metric{
-			JobId:     "test-job",
+			JobUuid:   "test-job",
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Data: &ipcpb.MetricData{
@@ -347,8 +347,8 @@ func TestQueryMetricsSuccess(t *testing.T) {
 	server := NewGRPCServer(cfg, backend, log, authorization, security)
 
 	req := &persistpb.QueryMetricsRequest{
-		JobId: "test-job",
-		Limit: 100,
+		JobUuid: "test-job",
+		Limit:   100,
 	}
 
 	mockStream := &mockQueryMetricsServer{
@@ -382,7 +382,7 @@ func TestDeleteJobSuccess(t *testing.T) {
 	server := NewGRPCServer(cfg, backend, log, authorization, security)
 
 	req := &persistpb.DeleteJobRequest{
-		JobId: "test-job",
+		JobUuid: "test-job",
 	}
 
 	resp, err := server.DeleteJob(context.Background(), req)
@@ -426,7 +426,7 @@ func TestDeleteJobEmptyID(t *testing.T) {
 	server := NewGRPCServer(cfg, backend, log, authorization, security)
 
 	req := &persistpb.DeleteJobRequest{
-		JobId: "",
+		JobUuid: "",
 	}
 
 	resp, err := server.DeleteJob(context.Background(), req)

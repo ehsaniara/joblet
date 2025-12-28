@@ -49,7 +49,7 @@ func NewExecutionCoordinator(
 // Main execution entry point: creates isolation, prepares workspace, sets up networking,
 // builds environment, and launches process with unified init system for logging.
 func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
-	log := ec.logger.WithField("jobID", opts.Job.Uuid)
+	log := ec.logger.WithField("job_uuid", opts.Job.Uuid)
 	log.Debug("coordinating job start", "hasUploads", len(opts.Uploads) > 0, "jobType", opts.Job.GetType())
 
 	// 1. Create isolation environment based on job type
@@ -138,7 +138,7 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 	// 8. Launch process
 	launchConfig := &LaunchConfig{
 		InitPath:    initPath, // Use resolved absolute path
-		JobID:       opts.Job.Uuid,
+		JobUUID:     opts.Job.Uuid,
 		JobType:     opts.Job.Type, // Pass job type for isolation configuration
 		Command:     opts.Job.Command,
 		Args:        opts.Job.Args,
@@ -185,7 +185,7 @@ func (ec *ExecutionCoordinator) StartJob(ctx context.Context, opts *StartProcess
 
 // StopJob implements JobExecutor interface
 func (ec *ExecutionCoordinator) StopJob(ctx context.Context, jobID string) error {
-	log := ec.logger.WithField("jobID", jobID)
+	log := ec.logger.WithField("job_uuid", jobID)
 	log.Debug("coordinating job stop")
 
 	var errs []error
@@ -219,11 +219,11 @@ func (ec *ExecutionCoordinator) StopJob(ctx context.Context, jobID string) error
 // cleanup performs cleanup operations
 func (ec *ExecutionCoordinator) cleanup(jobID, workspaceDir string) {
 	if err := ec.environmentManager.CleanupWorkspace(jobID); err != nil {
-		ec.logger.Warn("workspace cleanup failed during error recovery", "jobID", jobID, "error", err)
+		ec.logger.Warn("workspace cleanup failed during error recovery", "job_uuid", jobID, "error", err)
 	}
 
 	if err := ec.isolationManager.DestroyIsolatedEnvironment(jobID); err != nil {
-		ec.logger.Warn("isolation cleanup failed during error recovery", "jobID", jobID, "error", err)
+		ec.logger.Warn("isolation cleanup failed during error recovery", "job_uuid", jobID, "error", err)
 	}
 }
 
@@ -231,7 +231,7 @@ func (ec *ExecutionCoordinator) cleanup(jobID, workspaceDir string) {
 func (ec *ExecutionCoordinator) cleanupGPU(ctx context.Context, jobID string, gpuAllocation interface{}) {
 	if gpuAllocation != nil {
 		if err := ec.gpuManager.ReleaseGPU(ctx, jobID); err != nil {
-			ec.logger.Warn("GPU cleanup failed during error recovery", "jobID", jobID, "error", err)
+			ec.logger.Warn("GPU cleanup failed during error recovery", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -242,7 +242,7 @@ func (ec *ExecutionCoordinator) setupGPUEnvironment(ctx context.Context, job *do
 		return nil // No setup needed if no GPUs allocated
 	}
 
-	log := ec.logger.WithField("jobID", job.Uuid)
+	log := ec.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("setting up GPU environment", "gpuIndices", job.GPUIndices)
 
 	// 1. Create GPU device nodes in isolated filesystem

@@ -300,7 +300,7 @@ func handleMockConnection(conn net.Conn) {
 		// For get/list operations, include data
 		if msg.Operation == "get" {
 			response.Job = &domain.Job{
-				Uuid:      msg.JobID,
+				Uuid:      msg.JobUUID,
 				Status:    "RUNNING",
 				StartTime: time.Now(),
 			}

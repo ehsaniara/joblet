@@ -49,13 +49,13 @@ var (
 
 // JobError represents an error related to a specific job
 type JobError struct {
-	JobID     string
+	JobUUID   string
 	Operation string
 	Err       error
 }
 
 func (e *JobError) Error() string {
-	return fmt.Sprintf("job %s: operation %s: %v", e.JobID, e.Operation, e.Err)
+	return fmt.Sprintf("job %s: operation %s: %v", e.JobUUID, e.Operation, e.Err)
 }
 
 func (e *JobError) Unwrap() error {
@@ -145,7 +145,7 @@ func WrapJobError(jobID, operation string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return &JobError{JobID: jobID, Operation: operation, Err: err}
+	return &JobError{JobUUID: jobID, Operation: operation, Err: err}
 }
 
 func WrapRuntimeError(runtime, operation string, err error) error {
@@ -240,7 +240,7 @@ func IsPermissionError(err error) bool {
 func GetJobID(err error) (string, bool) {
 	var je *JobError
 	if errors.As(err, &je) {
-		return je.JobID, true
+		return je.JobUUID, true
 	}
 	return "", false
 }

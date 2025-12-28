@@ -43,14 +43,14 @@ func TestDomainToProtobuf(t *testing.T) {
 			t.Errorf("Expected arg[%d] %v, got %v", i, arg, pbJob.Args[i])
 		}
 	}
-	if pbJob.MaxCPU != job.Limits.CPU.Value() {
-		t.Errorf("Expected MaxCPU %v, got %v", job.Limits.CPU.Value(), pbJob.MaxCPU)
+	if pbJob.MaxCpu != job.Limits.CPU.Value() {
+		t.Errorf("Expected MaxCPU %v, got %v", job.Limits.CPU.Value(), pbJob.MaxCpu)
 	}
 	if pbJob.MaxMemory != job.Limits.Memory.Megabytes() {
 		t.Errorf("Expected MaxMemory %v, got %v", job.Limits.Memory.Megabytes(), pbJob.MaxMemory)
 	}
-	if pbJob.MaxIOBPS != int32(job.Limits.IOBandwidth.BytesPerSecond()) {
-		t.Errorf("Expected MaxIOBPS %v, got %v", job.Limits.IOBandwidth.BytesPerSecond(), pbJob.MaxIOBPS)
+	if pbJob.MaxIoBps != int32(job.Limits.IOBandwidth.BytesPerSecond()) {
+		t.Errorf("Expected MaxIOBPS %v, got %v", job.Limits.IOBandwidth.BytesPerSecond(), pbJob.MaxIoBps)
 	}
 	if pbJob.Status != string(job.Status) {
 		t.Errorf("Expected status %v, got %v", string(job.Status), pbJob.Status)
@@ -128,12 +128,9 @@ func TestDomainToRunJobResponse(t *testing.T) {
 	mapper := NewJobMapper()
 	response := mapper.DomainToRunJobResponse(job)
 
-	// Verify it's a proper RunJobResponse
+	// Verify it's a proper RunJobResponse (simplified to just job_uuid and status)
 	if response.JobUuid != job.Uuid {
 		t.Errorf("Expected ID %v, got %v", job.Uuid, response.JobUuid)
-	}
-	if response.Command != job.Command {
-		t.Errorf("Expected command %v, got %v", job.Command, response.Command)
 	}
 	if response.Status != string(job.Status) {
 		t.Errorf("Expected status %v, got %v", string(job.Status), response.Status)
@@ -225,14 +222,14 @@ func TestResourceLimitsMapping(t *testing.T) {
 			actualMemory := job.Limits.Memory.Megabytes()
 			actualIOBPS := job.Limits.IOBandwidth.BytesPerSecond()
 
-			if pbJob.MaxCPU != actualCPU {
-				t.Errorf("Expected MaxCPU %v, got %v", actualCPU, pbJob.MaxCPU)
+			if pbJob.MaxCpu != actualCPU {
+				t.Errorf("Expected MaxCPU %v, got %v", actualCPU, pbJob.MaxCpu)
 			}
 			if pbJob.MaxMemory != actualMemory {
 				t.Errorf("Expected MaxMemory %v, got %v", actualMemory, pbJob.MaxMemory)
 			}
-			if pbJob.MaxIOBPS != int32(actualIOBPS) {
-				t.Errorf("Expected MaxIOBPS %v, got %v", actualIOBPS, pbJob.MaxIOBPS)
+			if pbJob.MaxIoBps != int32(actualIOBPS) {
+				t.Errorf("Expected MaxIOBPS %v, got %v", actualIOBPS, pbJob.MaxIoBps)
 			}
 		})
 	}

@@ -119,7 +119,7 @@ echo "File 1 content" > demo_dir/file1.txt
 echo "File 2 content" > demo_dir/file2.txt
 echo "Subdirectory file" > demo_dir/subdir/file3.txt
 
-rnx job run --upload-dir=demo_dir bash -c "
+rnx job run --upload=demo_dir bash -c "
 echo 'Uploaded directory structure:'
 find demo_dir -type f -exec echo '{}:' \; -exec cat {} \; -exec echo '' \;
 echo ''
@@ -162,8 +162,7 @@ echo ""
 echo "✅ File Operations Demo Complete!"
 echo ""
 echo "🎓 What you learned:"
-echo "  • How to upload single files with --upload"
-echo "  • How to upload directories with --upload-dir"
+echo "  • How to upload files and directories with --upload (auto-detects type)"
 echo "  • Understanding the /work workspace directory"
 echo "  • File processing within isolated job environments"
 echo "  • Creating and manipulating files during job execution"

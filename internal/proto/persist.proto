@@ -58,7 +58,7 @@ message PingResponse {
 
 // QueryLogsRequest specifies parameters for log queries
 message QueryLogsRequest {
-  string job_id = 1;
+  string job_uuid = 1;
   string node_id = 7;     // Node ID where the job ran (for CloudWatch log group lookup)
 
   // Stream filter
@@ -75,7 +75,7 @@ message QueryLogsRequest {
 
 // QueryMetricsRequest specifies parameters for metrics queries
 message QueryMetricsRequest {
-  string job_id = 1;
+  string job_uuid = 1;
   string node_id = 6;     // Node ID where the job ran (for CloudWatch log group lookup)
 
   // Time range (optional)
@@ -89,7 +89,7 @@ message QueryMetricsRequest {
 
 // LogLine represents a single log line from a job
 message LogLine {
-  string job_id = 1;
+  string job_uuid = 1;
   StreamType stream = 2;     // stdout or stderr
   int64 timestamp = 3;       // Unix nanoseconds
   uint64 sequence = 4;       // Sequence number
@@ -105,7 +105,7 @@ enum StreamType {
 
 // Metric represents a metrics sample from a job
 message Metric {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   MetricData data = 4;       // Metric values
@@ -138,7 +138,7 @@ message NetworkIO {
 
 // DeleteJobRequest specifies the job to delete from persist storage
 message DeleteJobRequest {
-  string job_id = 1;
+  string job_uuid = 1;
   string node_id = 2;     // Node ID where the job ran (for CloudWatch log group lookup)
 }
 
@@ -150,7 +150,7 @@ message DeleteJobResponse {
 
 // QueryTelemetryRequest specifies parameters for telemetry event queries
 message QueryTelemetryRequest {
-  string job_id = 1;
+  string job_uuid = 1;
   string node_id = 6;     // Node ID where the job ran (for CloudWatch log group lookup)
 
   // Time range (optional)
@@ -164,7 +164,7 @@ message QueryTelemetryRequest {
 
 // ExecEvent represents a process execution event from eBPF telematics
 message ExecEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -178,7 +178,7 @@ message ExecEvent {
 
 // ConnectEvent represents a network connection event from eBPF telematics
 message ConnectEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -192,7 +192,7 @@ message ConnectEvent {
 
 // MmapEvent represents a memory mapping event from eBPF telematics
 message MmapEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -206,7 +206,7 @@ message MmapEvent {
 
 // MprotectEvent represents a memory protection change event from eBPF telematics
 message MprotectEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -218,7 +218,7 @@ message MprotectEvent {
 
 // FileEvent represents a file operation event from eBPF telematics
 message FileEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -230,7 +230,7 @@ message FileEvent {
 
 // AcceptEvent represents an incoming network connection event from eBPF telematics
 message AcceptEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -244,7 +244,7 @@ message AcceptEvent {
 
 // SocketDataEvent represents socket data transfer event from eBPF telematics
 message SocketDataEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID

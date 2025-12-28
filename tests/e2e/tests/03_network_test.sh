@@ -119,7 +119,7 @@ run_job_with_network() {
     else
         job_output=$("$RNX_BINARY" job run --runtime="$runtime" "$command" 2>&1)
     fi
-    echo "$job_output" | grep "ID:" | awk '{print $2}'
+    echo "$job_output" | grep "^ID:" | awk '{print $2}'
 }
 
 run_python_network_job() {
@@ -131,7 +131,7 @@ run_python_network_job() {
     else
         local job_output=$("$RNX_BINARY" job run --runtime="$DEFAULT_RUNTIME" python3 -c "$python_code" 2>&1)
     fi
-    echo "$job_output" | grep "ID:" | awk '{print $2}'
+    echo "$job_output" | grep "^ID:" | awk '{print $2}'
 }
 
 cleanup_test_networks() {

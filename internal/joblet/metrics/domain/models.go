@@ -6,7 +6,7 @@ import (
 
 // JobMetricsSample represents a single metrics sample for a job at a specific point in time
 type JobMetricsSample struct {
-	JobID     string    `json:"job_id"`
+	JobUUID   string    `json:"job_uuid"`
 	Timestamp time.Time `json:"timestamp"`
 
 	// Metadata

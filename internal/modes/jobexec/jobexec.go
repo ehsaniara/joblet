@@ -59,7 +59,7 @@ func (je *JobExecutor) ExecuteInInitMode() error {
 		return errors.WrapConfigError("job", "config", err)
 	}
 
-	log := je.logger.WithField("jobID", config.JobID).
+	log := je.logger.WithField("job_uuid", config.JobUUID).
 		WithField("totalFiles", config.TotalFiles)
 
 	// Executing job with provided configuration

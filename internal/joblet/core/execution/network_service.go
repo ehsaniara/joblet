@@ -32,7 +32,7 @@ type NetworkStoreInterface interface {
 
 // JobNetworkAllocation represents a job's network allocation
 type JobNetworkAllocation struct {
-	JobID       string
+	JobUUID     string
 	NetworkName string
 	IPAddress   string
 	Hostname    string
@@ -54,13 +54,13 @@ func NewNetworkService(
 
 // SetupNetworking allocates network resources for a job (phase 1 - before process launch)
 func (ns *NetworkService) SetupNetworking(ctx context.Context, jobID, networkName string) (*NetworkAllocation, error) {
-	log := ns.logger.WithField("jobID", jobID).WithField("network", networkName)
+	log := ns.logger.WithField("job_uuid", jobID).WithField("network", networkName)
 	log.Debug("allocating network resources for job")
 
 	// Handle isolated network case
 	if networkName == "isolated" {
 		return &NetworkAllocation{
-			JobID:   jobID,
+			JobUUID: jobID,
 			Network: "isolated",
 		}, nil
 	}
@@ -68,7 +68,7 @@ func (ns *NetworkService) SetupNetworking(ctx context.Context, jobID, networkNam
 	// Handle none network case
 	if networkName == "none" {
 		return &NetworkAllocation{
-			JobID:   jobID,
+			JobUUID: jobID,
 			Network: "none",
 		}, nil
 	}
@@ -82,7 +82,7 @@ func (ns *NetworkService) SetupNetworking(ctx context.Context, jobID, networkNam
 	// Create network allocation record
 	hostname := fmt.Sprintf("job_%s", jobID[:8])
 	allocation := &JobNetworkAllocation{
-		JobID:       jobID,
+		JobUUID:     jobID,
 		NetworkName: networkName,
 		IPAddress:   ipAddress,
 		Hostname:    hostname,
@@ -101,7 +101,7 @@ func (ns *NetworkService) SetupNetworking(ctx context.Context, jobID, networkNam
 	// Convert to execution layer format
 	// Note: Actual namespace setup will happen in ConfigureNetworkNamespace after process launch
 	netAlloc := &NetworkAllocation{
-		JobID:    jobID,
+		JobUUID:  jobID,
 		Network:  networkName,
 		IP:       ipAddress,
 		Hostname: hostname,
@@ -113,7 +113,7 @@ func (ns *NetworkService) SetupNetworking(ctx context.Context, jobID, networkNam
 
 // ConfigureNetworkNamespace sets up the network namespace for a job (phase 2 - after process launch)
 func (ns *NetworkService) ConfigureNetworkNamespace(ctx context.Context, jobID string, pid int) error {
-	log := ns.logger.WithField("jobID", jobID).WithField("pid", pid)
+	log := ns.logger.WithField("job_uuid", jobID).WithField("pid", pid)
 	log.Debug("configuring network namespace for job")
 
 	// Get the allocation info from store
@@ -130,7 +130,7 @@ func (ns *NetworkService) ConfigureNetworkNamespace(ctx context.Context, jobID s
 
 	// Create the network.JobAllocation structure for the setup
 	netAllocation := &network.JobAllocation{
-		JobID:    jobID,
+		JobUUID:  jobID,
 		Network:  allocInfo.NetworkName,
 		IP:       net.ParseIP(allocInfo.IPAddress),
 		Hostname: allocInfo.Hostname,
@@ -150,7 +150,7 @@ func (ns *NetworkService) ConfigureNetworkNamespace(ctx context.Context, jobID s
 
 // CleanupNetworking cleans up networking for a job
 func (ns *NetworkService) CleanupNetworking(ctx context.Context, jobID string) error {
-	log := ns.logger.WithField("jobID", jobID)
+	log := ns.logger.WithField("job_uuid", jobID)
 	log.Debug("cleaning up job networking")
 
 	// Remove job from network store

@@ -625,7 +625,7 @@ rnx volume create build-cache --size=2GB --type=memory
 # Use for faster builds
 rnx job run \
   --volume=build-cache \
-  --upload-dir=./src \
+  --upload=./src \
   --env=MAVEN_CACHE_DIR=/volumes/build-cache/maven \
   --runtime=java:17 \
   bash -c "

@@ -755,10 +755,10 @@ eBPF Monitor → Telemetry Collector → IPC Writer → Persist Service → Clou
 
 ```
 Log Group: /joblet/{node_id}
-  - {job_id}-logs           # stdout/stderr logs
-  - {job_id}-metrics        # Resource metrics
-  - {job_id}-exec-events    # Process execution events (eBPF)
-  - {job_id}-connect-events # Network connection events (eBPF)
+  - {job_uuid}-logs           # stdout/stderr logs
+  - {job_uuid}-metrics        # Resource metrics
+  - {job_uuid}-exec-events    # Process execution events (eBPF)
+  - {job_uuid}-connect-events # Network connection events (eBPF)
 ```
 
 **Querying eBPF Events in CloudWatch Insights:**
@@ -776,7 +776,7 @@ fields @timestamp, pid, dst_addr, dst_port, protocol
 | sort @timestamp desc
 
 -- Find jobs connecting to a specific database
-fields @timestamp, job_id, pid, comm, dst_addr, dst_port
+fields @timestamp, job_uuid, pid, comm, dst_addr, dst_port
 | filter dst_addr = "10.0.1.50" and dst_port = 5432
 | sort @timestamp desc
 

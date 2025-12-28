@@ -43,7 +43,7 @@ func NewNetworkSetup(platform platform.Platform, networkStore NetworkStoreInterf
 // This method is called by the network manager after IP allocation to set up
 // the actual network interfaces and routing within the job's namespace.
 func (ns *NetworkSetup) SetupNamespace(jobID string, allocation *JobAllocation) error {
-	log := ns.logger.WithFields("jobID", jobID, "network", allocation.Network)
+	log := ns.logger.WithFields("job_uuid", jobID, "network", allocation.Network)
 	log.Info("SetupNamespace called for job", "ip", allocation.IP, "vethPeer", allocation.VethPeer)
 
 	// Find the process PID from the cgroup - this is critical for namespace setup
@@ -98,7 +98,7 @@ func (ns *NetworkSetup) findJobPID(jobID string) (int, error) {
 // The method ensures proper network namespace configuration and resource allocation.
 func (ns *NetworkSetup) SetupJobNetwork(alloc *JobAllocation, pid int) error {
 	log := ns.logger.WithFields(
-		"jobID", alloc.JobID,
+		"job_uuid", alloc.JobUUID,
 		"network", alloc.Network,
 		"pid", pid)
 
@@ -397,8 +397,8 @@ func (ns *NetworkSetup) ensureBridge(networkName string) error {
 // Namespace destruction automatically removes namespace-side interfaces.
 func (ns *NetworkSetup) CleanupJobNetwork(alloc *JobAllocation) error {
 	// Clean up hosts file if it exists (for all network types except none)
-	if alloc.Network != "none" && alloc.JobID != "" {
-		hostsPath := fmt.Sprintf("/tmp/joblet-hosts-%s", alloc.JobID)
+	if alloc.Network != "none" && alloc.JobUUID != "" {
+		hostsPath := fmt.Sprintf("/tmp/joblet-hosts-%s", alloc.JobUUID)
 		// Try to unmount first (it might be bind mounted)
 		if err := ns.execCommand("umount", hostsPath); err != nil {
 			// Ignore unmount errors - might not be mounted
@@ -536,7 +536,7 @@ func (ns *NetworkSetup) setupHostsFile(pid int, alloc *JobAllocation) error {
 `, alloc.IP.String(), alloc.Hostname)
 
 	// Write to a temporary file
-	hostsPath := fmt.Sprintf("/tmp/joblet-hosts-%s", alloc.JobID)
+	hostsPath := fmt.Sprintf("/tmp/joblet-hosts-%s", alloc.JobUUID)
 	if err := ns.platform.WriteFile(hostsPath, []byte(hostsContent), 0644); err != nil {
 		return err
 	}

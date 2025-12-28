@@ -53,7 +53,7 @@ func TestLaunchConfig(t *testing.T) {
 	config := &execution.LaunchConfig{
 		InitPath:    "/usr/bin/python3",
 		Environment: []string{"PATH=/usr/bin", "HOME=/root"},
-		JobID:       "test-job-123",
+		JobUUID:     "test-job-123",
 		Command:     "python3",
 		Args:        []string{"script.py", "--verbose"},
 	}
@@ -62,8 +62,8 @@ func TestLaunchConfig(t *testing.T) {
 	if config.InitPath != "/usr/bin/python3" {
 		t.Errorf("Expected InitPath '/usr/bin/python3', got: %s", config.InitPath)
 	}
-	if config.JobID != "test-job-123" {
-		t.Errorf("Expected JobID 'test-job-123', got: %s", config.JobID)
+	if config.JobUUID != "test-job-123" {
+		t.Errorf("Expected JobID 'test-job-123', got: %s", config.JobUUID)
 	}
 	if config.Command != "python3" {
 		t.Errorf("Expected Command 'python3', got: %s", config.Command)
@@ -95,15 +95,15 @@ func TestProcessResult(t *testing.T) {
 
 func TestNetworkAllocation(t *testing.T) {
 	allocation := &execution.NetworkAllocation{
-		JobID:    "job-123",
+		JobUUID:  "job-123",
 		Network:  "test-network",
 		IP:       "192.168.1.100",
 		Hostname: "job-123.test-network",
 	}
 
 	// Verify struct fields
-	if allocation.JobID != "job-123" {
-		t.Errorf("Expected JobID 'job-123', got: %s", allocation.JobID)
+	if allocation.JobUUID != "job-123" {
+		t.Errorf("Expected JobID 'job-123', got: %s", allocation.JobUUID)
 	}
 	if allocation.Network != "test-network" {
 		t.Errorf("Expected Network 'test-network', got: %s", allocation.Network)
@@ -118,15 +118,15 @@ func TestNetworkAllocation(t *testing.T) {
 
 func TestIsolationContext(t *testing.T) {
 	context := &execution.IsolationContext{
-		JobID:        "job-123",
+		JobUUID:      "job-123",
 		Namespace:    "job-ns-123",
 		CgroupPath:   "/sys/fs/cgroup/joblet/job-123",
 		WorkspaceDir: "/tmp/jobs/job-123/work",
 	}
 
 	// Verify struct fields
-	if context.JobID != "job-123" {
-		t.Errorf("Expected JobID 'job-123', got: %s", context.JobID)
+	if context.JobUUID != "job-123" {
+		t.Errorf("Expected JobID 'job-123', got: %s", context.JobUUID)
 	}
 	if context.Namespace != "job-ns-123" {
 		t.Errorf("Expected Namespace 'job-ns-123', got: %s", context.Namespace)

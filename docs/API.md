@@ -142,16 +142,16 @@ process isolation.
 **Authorization**: Admin only
 
 ```protobuf
-rpc RunJob(RunJobReq) returns (RunJobRes);
+rpc RunJob(RunJobRequest) returns (RunJobResponse);
 ```
 
 **Request Parameters**:
 
 - `command` (string): Command to execute (required)
 - `args` (repeated string): Command arguments (optional)
-- `maxCPU` (int32): CPU limit percentage (optional, default: 100)
-- `maxMemory` (int32): Memory limit in MB (optional, default: 512)
-- `maxIOBPS` (int32): I/O bandwidth limit in bytes/sec (optional, default: 0=unlimited)
+- `max_cpu` (int32): CPU limit percentage (optional, default: 100)
+- `max_memory` (int32): Memory limit in MB (optional, default: 512)
+- `max_io_bps` (int32): I/O bandwidth limit in bytes/sec (optional, default: 0=unlimited)
 
 **Job Execution Environment**:
 
@@ -548,24 +548,25 @@ Core job representation used across all API responses.
 
 ```protobuf
 message Job {
-  string id = 1;                    // Unique job UUID identifier
-  string name = 2;                  // Readable job name
-  string command = 3;               // Command being executed
-  repeated string args = 4;         // Command arguments
-  int32 maxCPU = 5;                // CPU limit in percent
-  string cpuCores = 6;             // CPU core binding specification
-  int32 maxMemory = 7;             // Memory limit in MB
-  int32 maxIOBPS = 8;              // IO limit in bytes per second
-  string status = 9;               // Current job status
-  string startTime = 10;           // Start time (RFC3339 format)
-  string endTime = 11;             // End time (RFC3339 format, empty if running)
-  int32 exitCode = 12;             // Process exit code
-  string scheduledTime = 13;       // Scheduled execution time (RFC3339 format)
-  string runtime = 14;             // Runtime specification used
+  string uuid = 1;                         // Unique job UUID identifier
+  string command = 3;                      // Command being executed
+  repeated string args = 4;                // Command arguments
+  int32 max_cpu = 5;                       // CPU limit in percent
+  string cpu_cores = 6;                    // CPU core binding specification
+  int32 max_memory = 7;                    // Memory limit in MB
+  int32 max_io_bps = 8;                    // IO limit in bytes per second
+  string status = 9;                       // Current job status
+  string start_time = 10;                  // Start time (RFC3339 format)
+  string end_time = 11;                    // End time (RFC3339 format, empty if running)
+  int32 exit_code = 12;                    // Process exit code
+  string scheduled_time = 13;              // Scheduled execution time (RFC3339 format)
+  string runtime = 14;                     // Runtime specification used
   map<string, string> environment = 15;       // Regular environment variables (visible)
   map<string, string> secret_environment = 16; // Secret environment variables (masked)
-  // Additional fields
-  string nodeId = 20;              // Unique identifier of the Joblet node that executed this job
+  repeated int32 gpu_indices = 17;         // Which GPUs allocated
+  int32 gpu_count = 18;                    // Number of GPUs requested/allocated
+  int32 gpu_memory_mb = 19;                // GPU memory requirement (MB)
+  string node_id = 20;                     // Unique identifier of the Joblet node that executed this job
 }
 ```
 
@@ -593,48 +594,58 @@ DefaultMemoryLimitMB = 512   // 512 MB
 DefaultIOBPS = 0 // Unlimited I/O
 ```
 
-### RunJobReq
+### RunJobRequest
 
 ```protobuf
-message RunJobReq {
-  string command = 1;              // Required: command to execute
-  repeated string args = 2;        // Optional: command arguments
-  int32 maxCPU = 3;               // Optional: CPU limit percentage
-  int32 maxMemory = 4;            // Optional: memory limit in MB
-  int32 maxIOBPS = 5;             // Optional: I/O bandwidth limit
+message RunJobRequest {
+  string command = 2;                           // Required: command to execute
+  repeated string args = 3;                     // Optional: command arguments
+  int32 max_cpu = 4;                            // Optional: CPU limit percentage
+  string cpu_cores = 5;                         // Optional: CPU core binding
+  int32 max_memory = 6;                         // Optional: memory limit in MB
+  int32 max_io_bps = 7;                         // Optional: I/O bandwidth limit
+  repeated FileUpload uploads = 8;              // Optional: files to upload
+  string schedule = 9;                          // Optional: schedule time (RFC3339)
+  string network = 10;                          // Optional: network name
+  repeated string volumes = 11;                 // Optional: volume names
+  string runtime = 12;                          // Optional: runtime specification
+  string work_dir = 13;                         // Optional: working directory
+  map<string, string> environment = 14;         // Optional: environment variables
+  map<string, string> secret_environment = 18;  // Optional: secret env vars
+  int32 gpu_count = 19;                         // Optional: number of GPUs
+  int32 gpu_memory_mb = 20;                     // Optional: GPU memory in MB
 }
 ```
 
-### GetJobStatusRes
+### GetJobStatusResponse
 
 Response message for job status requests, including node identification.
 
 ```protobuf
-message GetJobStatusRes {
-  string uuid = 1;                  // Job UUID
-  string name = 2;                  // Job name
-  string command = 3;               // Command being executed
-  repeated string args = 4;         // Command arguments
-  int32 maxCPU = 5;                // CPU limit in percent
-  string cpuCores = 6;             // CPU core binding specification
-  int32 maxMemory = 7;             // Memory limit in MB
-  int64 maxIOBPS = 8;              // IO limit in bytes per second
-  string status = 9;               // Current job status
-  string startTime = 10;           // Start time (RFC3339 format)
-  string endTime = 11;             // End time (RFC3339 format, empty if running)
-  int32 exitCode = 12;             // Process exit code
-  string scheduledTime = 13;       // Scheduled execution time (RFC3339 format)
-  string runtime = 14;             // Runtime specification used
-  map<string, string> environment = 15;       // Regular environment variables (visible)
-  map<string, string> secret_environment = 16; // Secret environment variables (masked)
-  string network = 17;             // Network configuration
-  repeated string volumes = 18;     // Volume names
-  string workDir = 19;             // Working directory
-  repeated FileUpload uploads = 20; // File uploads
-  int32 gpuCount = 21;             // Number of GPUs allocated
-  repeated int32 gpuIndices = 22;   // GPU indices allocated
-  int64 gpuMemoryMB = 23;          // GPU memory in MB
-  string nodeId = 24;              // Unique identifier of the Joblet node that executed this job
+message GetJobStatusResponse {
+  string uuid = 1;                          // Job UUID
+  string command = 3;                       // Command being executed
+  repeated string args = 4;                 // Command arguments
+  int32 max_cpu = 5;                        // CPU limit in percent
+  string cpu_cores = 6;                     // CPU core binding specification
+  int32 max_memory = 7;                     // Memory limit in MB
+  int32 max_io_bps = 8;                     // IO limit in bytes per second
+  string status = 9;                        // Current job status
+  string start_time = 10;                   // Start time (RFC3339 format)
+  string end_time = 11;                     // End time (RFC3339 format, empty if running)
+  int32 exit_code = 12;                     // Process exit code
+  string scheduled_time = 13;               // Scheduled execution time (RFC3339 format)
+  map<string, string> environment = 14;     // Regular environment variables (visible)
+  map<string, string> secret_environment = 15; // Secret environment variables (masked)
+  string network = 16;                      // Network configuration
+  repeated string volumes = 17;             // Volume names
+  string runtime = 18;                      // Runtime specification used
+  string work_dir = 19;                     // Working directory
+  repeated string uploads = 20;             // Uploaded file paths
+  repeated int32 gpu_indices = 23;          // GPU indices allocated
+  int32 gpu_count = 24;                     // Number of GPUs allocated
+  int32 gpu_memory_mb = 25;                 // GPU memory in MB
+  string node_id = 26;                      // Unique identifier of the Joblet node that executed this job
 }
 ```
 
@@ -699,7 +710,7 @@ Error: job is not running: 6ba7b810-9dad-11d1-80b4-00c04fd430c8 (current status:
 Error: invalid command: command contains dangerous characters
 
 # Resource limits exceeded
-Error: job creation failed: maxMemory exceeds system limits
+Error: job creation failed: max_memory exceeds system limits
 ```
 
 #### Platform Errors
@@ -866,7 +877,7 @@ WARN  - Resource limit violations, slow clients, recoverable errors
 ERROR - Job failures, system errors, authentication failures
 
 # Example log entry
-[2024-01-15T10:30:00Z] [INFO] job started successfully | jobId=f47ac10b-58cc-4372-a567-0e02b2c3d479 pid=12345 command="python3 script.py" duration=50ms
+[2024-01-15T10:30:00Z] [INFO] job started successfully | job_uuid=f47ac10b-58cc-4372-a567-0e02b2c3d479 pid=12345 command="python3 script.py" duration=50ms
 ```
 
 ### Health Checks
@@ -982,7 +993,7 @@ Retrieves historical logs for a completed or running job.
 
 ```protobuf
 message QueryLogsRequest {
-  string job_id = 1;           // Job UUID (required)
+  string job_uuid = 1;           // Job UUID (required)
   string stream = 2;           // "stdout" or "stderr" (optional, default: both)
   int64 start_time = 3;        // Unix timestamp (optional)
   int64 end_time = 4;          // Unix timestamp (optional)
@@ -1007,7 +1018,7 @@ message LogEntry {
 **Storage Location**:
 
 ```
-/opt/joblet/logs/{job_id}/
+/opt/joblet/logs/{job_uuid}/
 ├── stdout.log.gz    # Compressed stdout
 └── stderr.log.gz    # Compressed stderr
 ```
@@ -1029,7 +1040,7 @@ Retrieves historical metrics for a job.
 
 ```protobuf
 message QueryMetricsRequest {
-  string job_id = 1;           // Job UUID (required)
+  string job_uuid = 1;           // Job UUID (required)
   string metric_type = 2;      // "cpu", "memory", "io", "gpu" (optional)
   int64 start_time = 3;        // Unix timestamp (optional)
   int64 end_time = 4;          // Unix timestamp (optional)
@@ -1054,7 +1065,7 @@ message MetricSample {
 **Storage Location**:
 
 ```
-/opt/joblet/metrics/{job_id}/
+/opt/joblet/metrics/{job_uuid}/
 └── metrics.jsonl.gz    # Compressed JSON Lines metrics
 ```
 

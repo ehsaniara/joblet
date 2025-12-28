@@ -321,7 +321,7 @@ func (lb *LocalBackend) getOrCreateLogFile(jobID string) (*logFile, error) {
 	}
 
 	lb.logFiles[jobID] = lf
-	lb.logger.Debug("Created log files", "jobID", jobID)
+	lb.logger.Debug("Created log files", "job_uuid", jobID)
 
 	return lf, nil
 }
@@ -352,7 +352,7 @@ func (lb *LocalBackend) getOrCreateMetricFile(jobID string) (*metricFile, error)
 	}
 
 	lb.metricFiles[jobID] = mf
-	lb.logger.Debug("Created metric file", "jobID", jobID)
+	lb.logger.Debug("Created metric file", "job_uuid", jobID)
 
 	return mf, nil
 }
@@ -383,7 +383,7 @@ func (lb *LocalBackend) getOrCreateExecEventFile(jobID string) (*execEventFile, 
 	}
 
 	lb.execEventFiles[jobID] = ef
-	lb.logger.Debug("Created exec events file", "jobID", jobID)
+	lb.logger.Debug("Created exec events file", "job_uuid", jobID)
 
 	return ef, nil
 }
@@ -414,22 +414,22 @@ func (lb *LocalBackend) getOrCreateConnectEventFile(jobID string) (*connectEvent
 	}
 
 	lb.connectEventFiles[jobID] = cf
-	lb.logger.Debug("Created connect events file", "jobID", jobID)
+	lb.logger.Debug("Created connect events file", "job_uuid", jobID)
 
 	return cf, nil
 }
 
 // ReadLogs returns a log reader for streaming logs
 func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error) {
-	lb.logger.Debug("ReadLogs called", "jobID", query.JobID, "stream", query.Stream, "limit", query.Limit, "offset", query.Offset)
+	lb.logger.Debug("ReadLogs called", "job_uuid", query.JobUUID, "stream", query.Stream, "limit", query.Limit, "offset", query.Offset)
 
 	// Build log directory path
-	logDir := filepath.Join(lb.config.Local.Logs.Directory, query.JobID)
+	logDir := filepath.Join(lb.config.Local.Logs.Directory, query.JobUUID)
 
 	// Check if directory exists
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
-		lb.logger.Debug("No log directory found", "jobID", query.JobID, "path", logDir)
-		return nil, fmt.Errorf("no logs found for job %s", query.JobID)
+		lb.logger.Debug("No log directory found", "job_uuid", query.JobUUID, "path", logDir)
+		return nil, fmt.Errorf("no logs found for job %s", query.JobUUID)
 	}
 
 	// Create reader
@@ -507,7 +507,7 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 				case <-ctx.Done():
 					gzReader.Close()
 					file.Close()
-					lb.logger.Debug("ReadLogs cancelled", "jobID", query.JobID)
+					lb.logger.Debug("ReadLogs cancelled", "job_uuid", query.JobUUID)
 					return
 				default:
 				}
@@ -555,7 +555,7 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 				case <-ctx.Done():
 					gzReader.Close()
 					file.Close()
-					lb.logger.Debug("ReadLogs cancelled while sending", "jobID", query.JobID)
+					lb.logger.Debug("ReadLogs cancelled while sending", "job_uuid", query.JobUUID)
 					return
 				}
 			}
@@ -571,7 +571,7 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 			file.Close()
 		}
 
-		lb.logger.Debug("Finished reading logs", "jobID", query.JobID, "count", count, "skipped", skipped)
+		lb.logger.Debug("Finished reading logs", "job_uuid", query.JobUUID, "count", count, "skipped", skipped)
 	}()
 
 	return reader, nil
@@ -597,15 +597,15 @@ func indexSubstring(s, substr string) int {
 
 // ReadMetrics returns a metric reader for streaming metrics
 func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*MetricReader, error) {
-	lb.logger.Debug("ReadMetrics called", "jobID", query.JobID, "limit", query.Limit, "offset", query.Offset)
+	lb.logger.Debug("ReadMetrics called", "job_uuid", query.JobUUID, "limit", query.Limit, "offset", query.Offset)
 
 	// Build metrics file path
-	metricsPath := filepath.Join(lb.config.Local.Metrics.Directory, query.JobID, "metrics.jsonl.gz")
+	metricsPath := filepath.Join(lb.config.Local.Metrics.Directory, query.JobUUID, "metrics.jsonl.gz")
 
 	// Check if file exists
 	if _, err := os.Stat(metricsPath); os.IsNotExist(err) {
-		lb.logger.Debug("No metrics file found", "jobID", query.JobID, "path", metricsPath)
-		return nil, fmt.Errorf("no metrics found for job %s", query.JobID)
+		lb.logger.Debug("No metrics file found", "job_uuid", query.JobUUID, "path", metricsPath)
+		return nil, fmt.Errorf("no metrics found for job %s", query.JobUUID)
 	}
 
 	// Create reader
@@ -641,7 +641,7 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 				}
 				if errors.Is(err, io.ErrUnexpectedEOF) {
 					// Incomplete gzip stream (job still running)
-					lb.logger.Debug("Incomplete gzip metrics stream", "path", metricsPath, "jobID", query.JobID, "count", count)
+					lb.logger.Debug("Incomplete gzip metrics stream", "path", metricsPath, "job_uuid", query.JobUUID, "count", count)
 					break
 				}
 				reader.Error <- fmt.Errorf("failed to create gzip reader: %w", err)
@@ -655,7 +655,7 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 			for scanner.Scan() {
 				select {
 				case <-ctx.Done():
-					lb.logger.Debug("ReadMetrics cancelled", "jobID", query.JobID)
+					lb.logger.Debug("ReadMetrics cancelled", "job_uuid", query.JobUUID)
 					gzReader.Close()
 					return
 				default:
@@ -689,7 +689,7 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 				// Apply limit
 				if query.Limit > 0 && count >= query.Limit {
 					gzReader.Close()
-					lb.logger.Debug("Finished reading metrics (limit reached)", "jobID", query.JobID, "count", count, "skipped", skipped)
+					lb.logger.Debug("Finished reading metrics (limit reached)", "job_uuid", query.JobUUID, "count", count, "skipped", skipped)
 					return
 				}
 
@@ -697,7 +697,7 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 				case reader.Channel <- &metric:
 					count++
 				case <-ctx.Done():
-					lb.logger.Debug("ReadMetrics cancelled while sending", "jobID", query.JobID)
+					lb.logger.Debug("ReadMetrics cancelled while sending", "job_uuid", query.JobUUID)
 					gzReader.Close()
 					return
 				}
@@ -705,13 +705,13 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 
 			if err := scanner.Err(); err != nil {
 				// Log scanner errors but continue to next stream
-				lb.logger.Warn("Scanner error reading metrics", "error", err, "jobID", query.JobID)
+				lb.logger.Warn("Scanner error reading metrics", "error", err, "job_uuid", query.JobUUID)
 			}
 
 			gzReader.Close()
 		}
 
-		lb.logger.Debug("Finished reading metrics", "jobID", query.JobID, "count", count, "skipped", skipped)
+		lb.logger.Debug("Finished reading metrics", "job_uuid", query.JobUUID, "count", count, "skipped", skipped)
 	}()
 
 	return reader, nil
@@ -804,7 +804,7 @@ func (lb *LocalBackend) DeleteJob(jobID string) error {
 		return fmt.Errorf("failed to delete events directory: %w", err)
 	}
 
-	lb.logger.Info("Deleted job data", "jobID", jobID)
+	lb.logger.Info("Deleted job data", "job_uuid", jobID)
 
 	return nil
 }
@@ -820,63 +820,63 @@ func (lb *LocalBackend) Close() error {
 		lf.gzStderr.Close()
 		lf.stdout.Close()
 		lf.stderr.Close()
-		lb.logger.Debug("Closed log files", "jobID", jobID)
+		lb.logger.Debug("Closed log files", "job_uuid", jobID)
 	}
 
 	// Close all metric files
 	for jobID, mf := range lb.metricFiles {
 		mf.gzWriter.Close()
 		mf.file.Close()
-		lb.logger.Debug("Closed metric file", "jobID", jobID)
+		lb.logger.Debug("Closed metric file", "job_uuid", jobID)
 	}
 
 	// Close all exec event files
 	for jobID, ef := range lb.execEventFiles {
 		ef.gzWriter.Close()
 		ef.file.Close()
-		lb.logger.Debug("Closed exec events file", "jobID", jobID)
+		lb.logger.Debug("Closed exec events file", "job_uuid", jobID)
 	}
 
 	// Close all connect event files
 	for jobID, cf := range lb.connectEventFiles {
 		cf.gzWriter.Close()
 		cf.file.Close()
-		lb.logger.Debug("Closed connect events file", "jobID", jobID)
+		lb.logger.Debug("Closed connect events file", "job_uuid", jobID)
 	}
 
 	// Close all file event files
 	for jobID, ef := range lb.fileEventFiles {
 		ef.gzWriter.Close()
 		ef.file.Close()
-		lb.logger.Debug("Closed file events file", "jobID", jobID)
+		lb.logger.Debug("Closed file events file", "job_uuid", jobID)
 	}
 
 	// Close all accept event files
 	for jobID, ef := range lb.acceptEventFiles {
 		ef.gzWriter.Close()
 		ef.file.Close()
-		lb.logger.Debug("Closed accept events file", "jobID", jobID)
+		lb.logger.Debug("Closed accept events file", "job_uuid", jobID)
 	}
 
 	// Close all socket data event files
 	for jobID, ef := range lb.socketDataFiles {
 		ef.gzWriter.Close()
 		ef.file.Close()
-		lb.logger.Debug("Closed socket data events file", "jobID", jobID)
+		lb.logger.Debug("Closed socket data events file", "job_uuid", jobID)
 	}
 
 	// Close all mmap event files
 	for jobID, ef := range lb.mmapEventFiles {
 		ef.gzWriter.Close()
 		ef.file.Close()
-		lb.logger.Debug("Closed mmap events file", "jobID", jobID)
+		lb.logger.Debug("Closed mmap events file", "job_uuid", jobID)
 	}
 
 	// Close all mprotect event files
 	for jobID, ef := range lb.mprotectEventFiles {
 		ef.gzWriter.Close()
 		ef.file.Close()
-		lb.logger.Debug("Closed mprotect events file", "jobID", jobID)
+		lb.logger.Debug("Closed mprotect events file", "job_uuid", jobID)
 	}
 
 	lb.logger.Info("Local storage backend closed")
@@ -906,12 +906,12 @@ func (lb *LocalBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuer
 }
 
 func (lb *LocalBackend) readExecEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ExecEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "exec_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "exec_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("exec events file not found", "jobId", query.JobID)
+			lb.logger.Debug("exec events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open exec events file: %w", err)
@@ -1015,12 +1015,12 @@ func (lb *LocalBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQ
 }
 
 func (lb *LocalBackend) readConnectEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ConnectEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "connect_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "connect_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("connect events file not found", "jobId", query.JobID)
+			lb.logger.Debug("connect events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open connect events file: %w", err)
@@ -1308,7 +1308,7 @@ func (lb *LocalBackend) getOrCreateEventFile(jobID, filename string, fileMap map
 	}
 
 	fileMap[jobID] = ef
-	lb.logger.Debug("Created events file", "jobID", jobID, "file", filename)
+	lb.logger.Debug("Created events file", "job_uuid", jobID, "file", filename)
 
 	return ef, nil
 }
@@ -1335,12 +1335,12 @@ func (lb *LocalBackend) ReadFileEvents(ctx context.Context, query *TelemetryQuer
 }
 
 func (lb *LocalBackend) readFileEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.FileEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "file_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "file_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("file events file not found", "jobId", query.JobID)
+			lb.logger.Debug("file events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open file events file: %w", err)
@@ -1444,12 +1444,12 @@ func (lb *LocalBackend) ReadAcceptEvents(ctx context.Context, query *TelemetryQu
 }
 
 func (lb *LocalBackend) readAcceptEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.AcceptEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "accept_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "accept_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("accept events file not found", "jobId", query.JobID)
+			lb.logger.Debug("accept events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open accept events file: %w", err)
@@ -1548,12 +1548,12 @@ func (lb *LocalBackend) ReadSocketDataEvents(ctx context.Context, query *Telemet
 }
 
 func (lb *LocalBackend) readSocketDataEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.SocketDataEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "socket_data_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "socket_data_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("socket data events file not found", "jobId", query.JobID)
+			lb.logger.Debug("socket data events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open socket data events file: %w", err)
@@ -1652,12 +1652,12 @@ func (lb *LocalBackend) ReadMmapEvents(ctx context.Context, query *TelemetryQuer
 }
 
 func (lb *LocalBackend) readMmapEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MmapEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "mmap_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "mmap_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("mmap events file not found", "jobId", query.JobID)
+			lb.logger.Debug("mmap events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open mmap events file: %w", err)
@@ -1756,12 +1756,12 @@ func (lb *LocalBackend) ReadMprotectEvents(ctx context.Context, query *Telemetry
 }
 
 func (lb *LocalBackend) readMprotectEventsFromFile(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MprotectEvent) error {
-	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobID, "mprotect_events.jsonl.gz")
+	filePath := filepath.Join(lb.config.Local.Events.Directory, query.JobUUID, "mprotect_events.jsonl.gz")
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			lb.logger.Debug("mprotect events file not found", "jobId", query.JobID)
+			lb.logger.Debug("mprotect events file not found", "job_uuid", query.JobUUID)
 			return nil
 		}
 		return fmt.Errorf("failed to open mprotect events file: %w", err)

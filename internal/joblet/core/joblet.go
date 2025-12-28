@@ -187,7 +187,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 // preparing uploads, and queuing the job for future execution. Validates
 // schedule format, pre-processes uploads, and registers with scheduler.
 func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req job.BuildRequest) (*domain.Job, error) {
-	log := j.logger.WithField("jobID", job.Uuid)
+	log := j.logger.WithField("job_uuid", job.Uuid)
 
 	// Parse and set scheduled time
 	scheduledTime, err := time.Parse(time.RFC3339, req.Schedule)
@@ -209,7 +209,7 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req job.Build
 
 	// Register and schedule - Debug the field values before storage
 	log.Debug("storing scheduled job with field values",
-		"jobId", job.Uuid,
+		"job_uuid", job.Uuid,
 		"network", job.Network,
 		"volumes", job.Volumes,
 		"runtime", job.Runtime,
@@ -234,7 +234,7 @@ func (j *Joblet) scheduleJob(ctx context.Context, job *domain.Job, req job.Build
 // coordinating with the execution engine, and starting monitoring.
 // Manages complete lifecycle: resource setup → execution → monitoring.
 func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildRequest) (*domain.Job, error) {
-	log := j.logger.WithField("jobID", job.Uuid)
+	log := j.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("executing job immediately")
 
 	// Setup resources
@@ -244,7 +244,7 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 
 	// Register job - Debug the field values before storage
 	log.Debug("storing job with field values",
-		"jobId", job.Uuid,
+		"job_uuid", job.Uuid,
 		"network", job.Network,
 		"volumes", job.Volumes,
 		"runtime", job.Runtime,
@@ -255,7 +255,7 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 	j.store.CreateNewJob(job)
 
 	// Start execution
-	log.Debug("calling execution engine with job volumes", "jobId", job.Uuid, "volumes", job.Volumes, "volumeCount", len(job.Volumes))
+	log.Debug("calling execution engine with job volumes", "job_uuid", job.Uuid, "volumes", job.Volumes, "volumeCount", len(job.Volumes))
 	cmd, err := j.executionEngine.StartProcessWithUploads(ctx, job, req.Uploads)
 	if err != nil {
 		j.handleExecutionFailure(job)
@@ -350,7 +350,7 @@ func (j *Joblet) ExecuteScheduledJob(ctx context.Context, req interfaces.Execute
 // executeScheduledJob implements the actual scheduled job execution logic.
 // Used by both the interface method and scheduler.JobExecutor interface.
 func (j *Joblet) executeScheduledJob(ctx context.Context, jobObj *domain.Job) error {
-	log := j.logger.WithField("jobID", jobObj.Uuid)
+	log := j.logger.WithField("job_uuid", jobObj.Uuid)
 	log.Info("executing scheduled job")
 
 	// Get fresh job state from store to check for cancellation
@@ -384,22 +384,22 @@ func (j *Joblet) executeScheduledJob(ctx context.Context, jobObj *domain.Job) er
 // Handles both scheduled (removes from scheduler) and running jobs (terminates process).
 // Special handling for runtime builds to preserve filesystem artifacts.
 func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) error {
-	log := j.logger.WithField("jobID", req.JobID)
+	log := j.logger.WithField("job_uuid", req.JobUUID)
 	log.Debug("stopping job", "force", req.Force, "reason", req.Reason)
 
-	jb, exists := j.store.Job(req.JobID)
+	jb, exists := j.store.Job(req.JobUUID)
 	if !exists {
-		return fmt.Errorf("job not found: %s", req.JobID)
+		return fmt.Errorf("job not found: %s", req.JobUUID)
 	}
 
 	// Handle scheduled jobs
 	if jb.IsScheduled() {
-		if j.scheduler.RemoveJob(req.JobID) {
+		if j.scheduler.RemoveJob(req.JobUUID) {
 			jb.Status = domain.StatusCanceled
 			j.store.UpdateJob(jb)
 			// Skip cleanup for runtime build jobs even when stopped
 			if !jb.Type.IsRuntimeBuild() {
-				_ = j.cleanup.CleanupJob(req.JobID)
+				_ = j.cleanup.CleanupJob(req.JobUUID)
 			}
 			log.Info("scheduled job cancelled")
 			return nil
@@ -409,11 +409,11 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 
 	// Handle running jobs
 	if !jb.IsRunning() {
-		return fmt.Errorf("job is not running: %s (status: %s)", req.JobID, jb.Status)
+		return fmt.Errorf("job is not running: %s (status: %s)", req.JobUUID, jb.Status)
 	}
 
 	// Check if cleanup is already in progress (from monitor)
-	if status, exists := j.cleanup.GetCleanupStatus(req.JobID); exists {
+	if status, exists := j.cleanup.GetCleanupStatus(req.JobUUID); exists {
 		log.Debug("cleanup already in progress", "started", status.StartTime)
 		// Just update the job state
 		jb.Status = domain.StatusStopped
@@ -427,10 +427,10 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 		// For runtime builds: system cleanup only (cgroups, process) but preserve filesystem
 		log.Info("stopping runtime build job with partial cleanup - preserving artifacts in /opt/joblet/runtimes")
 		// Use a special cleanup path that preserves filesystem artifacts
-		err = j.cleanup.CleanupJobWithProcessSystemOnly(ctx, req.JobID, jb.Pid)
+		err = j.cleanup.CleanupJobWithProcessSystemOnly(ctx, req.JobUUID, jb.Pid)
 	} else {
 		// For regular jobs: do full cleanup
-		err = j.cleanup.CleanupJobWithProcess(ctx, req.JobID, jb.Pid)
+		err = j.cleanup.CleanupJobWithProcess(ctx, req.JobUUID, jb.Pid)
 	}
 
 	// Update state regardless of cleanup result
@@ -439,7 +439,7 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 
 	if err != nil {
 		// If cleanup is already in progress, that's OK
-		if err.Error() == fmt.Sprintf("cleanup already in progress for job %s", req.JobID) {
+		if err.Error() == fmt.Sprintf("cleanup already in progress for job %s", req.JobUUID) {
 			log.Debug("cleanup initiated by monitor, stop command completed")
 			return nil
 		}
@@ -454,18 +454,18 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 // Prevents deletion of active jobs, delegates to job store for data removal,
 // and performs final resource cleanup (preserves runtime build artifacts).
 func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest) error {
-	log := j.logger.WithField("jobID", req.JobID)
+	log := j.logger.WithField("job_uuid", req.JobUUID)
 	log.Debug("deleting job", "reason", req.Reason)
 
 	// Check if job exists
-	jb, exists := j.store.Job(req.JobID)
+	jb, exists := j.store.Job(req.JobUUID)
 	if !exists {
-		return fmt.Errorf("job not found: %s", req.JobID)
+		return fmt.Errorf("job not found: %s", req.JobUUID)
 	}
 
 	// Prevent deletion of running jobs
 	if jb.IsRunning() || jb.IsScheduled() {
-		return fmt.Errorf("cannot delete job %s (status: %s) - stop the job first", req.JobID, jb.Status)
+		return fmt.Errorf("cannot delete job %s (status: %s) - stop the job first", req.JobUUID, jb.Status)
 	}
 
 	log.Info("deleting job completely", "status", jb.Status, "reason", req.Reason)
@@ -476,7 +476,7 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 	// 3. Log deletion via async system
 	// 4. Job record removal
 	// 5. Event publishing
-	err := j.store.DeleteJob(req.JobID)
+	err := j.store.DeleteJob(req.JobUUID)
 	if err != nil {
 		log.Error("job deletion failed", "error", err)
 		return fmt.Errorf("job deletion failed: %w", err)
@@ -484,7 +484,7 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 
 	// Delete metrics files if metrics system is enabled
 	if j.metricsStore != nil {
-		if err := j.metricsStore.DeleteJobMetrics(req.JobID); err != nil {
+		if err := j.metricsStore.DeleteJobMetrics(req.JobUUID); err != nil {
 			log.Warn("failed to delete job metrics", "error", err)
 			// Continue with deletion even if metrics cleanup fails
 		}
@@ -493,11 +493,11 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 	// Cleanup any remaining resources - handle runtime builds specially
 	if jb.Type.IsRuntimeBuild() {
 		// For runtime builds: only clean system resources, preserve artifacts
-		_ = j.cleanup.CleanupJobSystemResourcesOnly(req.JobID)
+		_ = j.cleanup.CleanupJobSystemResourcesOnly(req.JobUUID)
 		log.Info("runtime build job deleted - system resources cleaned, artifacts preserved")
 	} else {
 		// For regular jobs: full cleanup
-		_ = j.cleanup.CleanupJob(req.JobID)
+		_ = j.cleanup.CleanupJob(req.JobUUID)
 	}
 
 	log.Info("job deleted successfully")
@@ -522,19 +522,19 @@ func (j *Joblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobs
 		// Skip running and scheduled jobs
 		if job.IsRunning() || job.IsScheduled() {
 			skippedCount++
-			log.Debug("skipping job", "jobID", job.Uuid, "status", job.Status)
+			log.Debug("skipping job", "job_uuid", job.Uuid, "status", job.Status)
 			continue
 		}
 
 		// Delete the job using the existing delete logic
 		deleteRequest := interfaces.DeleteJobRequest{
-			JobID:  job.Uuid,
-			Reason: req.Reason,
+			JobUUID: job.Uuid,
+			Reason:  req.Reason,
 		}
 
 		err := j.DeleteJob(ctx, deleteRequest)
 		if err != nil {
-			log.Error("failed to delete job", "jobID", job.Uuid, "error", err)
+			log.Error("failed to delete job", "job_uuid", job.Uuid, "error", err)
 			errors = append(errors, fmt.Sprintf("job %s: %v", job.Uuid, err))
 			continue
 		}
@@ -542,7 +542,7 @@ func (j *Joblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobs
 		// Also delete logs for delete-all operations to match documented behavior
 		err = j.store.DeleteJobLogs(job.Uuid)
 		if err != nil {
-			log.Warn("failed to delete logs for job", "jobID", job.Uuid, "error", err)
+			log.Warn("failed to delete logs for job", "job_uuid", job.Uuid, "error", err)
 			// Continue with deletion even if log cleanup fails
 		}
 
@@ -550,13 +550,13 @@ func (j *Joblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobs
 		if j.metricsStore != nil {
 			err = j.metricsStore.DeleteJobMetrics(job.Uuid)
 			if err != nil {
-				log.Warn("failed to delete metrics for job", "jobID", job.Uuid, "error", err)
+				log.Warn("failed to delete metrics for job", "job_uuid", job.Uuid, "error", err)
 				// Continue with deletion even if metrics cleanup fails
 			}
 		}
 
 		deletedCount++
-		log.Debug("job deleted", "jobID", job.Uuid)
+		log.Debug("job deleted", "job_uuid", job.Uuid)
 	}
 
 	if len(errors) > 0 {
@@ -578,7 +578,7 @@ func (j *Joblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobs
 // Waits for process completion, determines exit code, updates job status,
 // and triggers cleanup (special handling for runtime builds to preserve artifacts).
 func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
-	log := j.logger.WithField("jobID", job.Uuid)
+	log := j.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("starting job monitoring")
 
 	// Wait for completion
@@ -676,12 +676,12 @@ func (j *Joblet) handleExecutionFailure(job *domain.Job) {
 			j.logger.Error("system resource cleanup failed for failed runtime build job", "error", err)
 		} else {
 			j.logger.Info("failed runtime build job - system resources cleaned, partial artifacts preserved",
-				"jobType", job.Type, "jobID", job.Uuid)
+				"jobType", job.Type, "job_uuid", job.Uuid)
 		}
 	} else {
 		if err := j.cleanup.CleanupJob(job.Uuid); err != nil {
 			j.logger.Error("cleanup failed after execution failure",
-				"jobID", job.Uuid, "error", err)
+				"job_uuid", job.Uuid, "error", err)
 		}
 	}
 }

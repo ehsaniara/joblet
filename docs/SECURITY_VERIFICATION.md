@@ -78,13 +78,13 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 - **Network Namespace**: Each job gets its own network namespace
 - **Bridge Networking**: Coordinated network setup with signal files
-- **Network Coordination**: `joblet-network-ready-{jobId}` signal mechanism
+- **Network Coordination**: `joblet-network-ready-{job_uuid}` signal mechanism
 - **Isolated Networking**: Cannot interfere with host network
 
 #### Test Result:
 
 ```
-[DEBUG] [init] waiting for network setup | file=/tmp/joblet-network-ready-{jobId}
+[DEBUG] [init] waiting for network setup | file=/tmp/joblet-network-ready-{job_uuid}
 [DEBUG] [init] network setup signal received, proceeding with initialization
 ```
 
@@ -99,12 +99,12 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 ```
 # Server Stage
-"maxCPU": 25, "maxMemory": 64
+"max_cpu": 25, "max_memory": 64
 
-# Init Stage  
+# Init Stage
 [DEBUG] [init] process assigned to cgroup successfully
 [DEBUG] [init] cgroup assignment verified successfully
-[DEBUG] [init] resource limits applied | limits=map[maxCPU:25 maxMemory:64]
+[DEBUG] [init] resource limits applied | limits=map[max_cpu:25 max_memory:64]
 ```
 
 ### ✅ Mount Isolation

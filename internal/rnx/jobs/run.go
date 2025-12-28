@@ -52,10 +52,10 @@ Examples:
   rnx job run --schedule="2h30m" --max-memory=512 data_processing.py
 
 File Upload Examples:
-  # Uploads work with both immediate and scheduled jobs
+  # Uploads work with both immediate and scheduled jobs (auto-detects files vs directories)
   rnx job run --upload=script.py python3 script.py
-  rnx job run --schedule="1hour" --upload-dir=. python3 main.py
-  rnx job run --schedule="30min" --upload=data.csv --upload=process.py python3 process.py
+  rnx job run --upload=./myproject python3 main.py
+  rnx job run --upload=data.csv --upload=./src python3 process.py
 
 Volume Examples:
   # Use persistent volumes to share data between jobs
@@ -109,11 +109,10 @@ Scheduling Formats:
 Flags:
   --schedule=SPEC     Schedule job for future execution
   --max-cpu=N         Max CPU percentage
-  --max-memory=N      Max Memory in MB  
+  --max-memory=N      Max Memory in MB
   --max-iobps=N       Max IO BPS
   --cpu-cores=SPEC    CPU cores specification
-  --upload=FILE       Upload a file to the job workspace
-  --upload-dir=DIR    Upload entire directory to the job workspace
+  --upload=PATH       Upload file or directory to job workspace (auto-detects)
   --runtime=SPEC      Use pre-built runtime (e.g., openjdk-21, python-3.11-ml)
   --volume=NAME       Mount persistent volume
   --network=NAME      Use network configuration
@@ -144,7 +143,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		maxMemory     int32
 		maxIOBPS      int32
 		uploads       []string
-		uploadDirs    []string
 		schedule      string
 		network       string
 		volumes       []string
@@ -192,9 +190,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		} else if strings.HasPrefix(arg, "--upload=") {
 			uploadPath := strings.TrimPrefix(arg, "--upload=")
 			uploads = append(uploads, uploadPath)
-		} else if strings.HasPrefix(arg, "--upload-dir=") {
-			uploadDir := strings.TrimPrefix(arg, "--upload-dir=")
-			uploadDirs = append(uploadDirs, uploadDir)
 		} else if strings.HasPrefix(arg, "--network=") {
 			network = strings.TrimPrefix(arg, "--network=")
 		} else if strings.HasPrefix(arg, "--volume=") {
@@ -274,7 +269,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	// Process file uploads
-	fileUploads, err := processFileUploads(uploads, uploadDirs)
+	fileUploads, err := processFileUploads(uploads)
 	if err != nil {
 		return fmt.Errorf("file upload processing failed: %w", err)
 	}
@@ -321,7 +316,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		MaxCpu:            maxCPU,
 		CpuCores:          cpuCores,
 		MaxMemory:         maxMemory,
-		MaxIobps:          maxIOBPS,
+		MaxIoBps:          maxIOBPS,
 		Uploads:           fileUploads,
 		Schedule:          scheduledTimeRFC3339,
 		Network:           network,
@@ -341,20 +336,17 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Output JSON if requested
 	if common.JSONOutput {
-		return outputRunJobJSON(response, schedule, len(fileUploads), len(environment), len(secretEnvironment))
+		return outputRunJobJSON(response, command, cmdArgs, schedule, len(fileUploads), len(environment), len(secretEnvironment))
 	}
 
-	fmt.Printf("Job is running:\n")
+	fmt.Printf("Job submitted:\n")
 	fmt.Printf("ID: %s\n", response.JobUuid)
-	fmt.Printf("Command: %s %s\n", response.Command, strings.Join(response.Args, " "))
+	fmt.Printf("Command: %s %s\n", command, strings.Join(cmdArgs, " "))
 	// Display status with color coding
 	statusColor, resetColor := getStatusColor(response.Status)
 	fmt.Printf("Status: %s%s%s\n", statusColor, response.Status, resetColor)
 	if schedule != "" {
-		fmt.Printf("Schedule Input: %s\n", schedule) // Show user's original input
-		fmt.Printf("Scheduled Time: %s\n", response.ScheduledTime)
-	} else {
-		fmt.Printf("StartTime: %s\n", response.StartTime)
+		fmt.Printf("Scheduled: %s\n", schedule)
 	}
 
 	if len(fileUploads) > 0 {
@@ -377,41 +369,36 @@ func parseIntFlag(arg, prefix string) (int, error) {
 	return strconv.Atoi(valueStr)
 }
 
-func processFileUploads(uploads []string, uploadDirs []string) ([]*pb.FileUpload, error) {
+func processFileUploads(uploads []string) ([]*pb.FileUpload, error) {
 	var result []*pb.FileUpload
 
-	// Process individual file uploads
 	for _, uploadPath := range uploads {
 		fileInfo, err := os.Stat(uploadPath)
 		if err != nil {
-			return nil, fmt.Errorf("cannot access upload file %s: %w", uploadPath, err)
+			return nil, fmt.Errorf("cannot access upload path %s: %w", uploadPath, err)
 		}
 
 		if fileInfo.IsDir() {
-			return nil, fmt.Errorf("use --upload-dir for directories: %s", uploadPath)
+			// Auto-handle directories
+			dirUploads, err := processDirectoryUpload(uploadPath)
+			if err != nil {
+				return nil, fmt.Errorf("directory upload failed for %s: %w", uploadPath, err)
+			}
+			result = append(result, dirUploads...)
+		} else {
+			// Handle single file
+			content, err := os.ReadFile(uploadPath)
+			if err != nil {
+				return nil, fmt.Errorf("cannot read upload file %s: %w", uploadPath, err)
+			}
+
+			result = append(result, &pb.FileUpload{
+				Path:        filepath.Base(uploadPath),
+				Content:     content,
+				Mode:        uint32(fileInfo.Mode()),
+				IsDirectory: false,
+			})
 		}
-
-		content, err := os.ReadFile(uploadPath)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read upload file %s: %w", uploadPath, err)
-		}
-
-		result = append(result, &pb.FileUpload{
-			Path:        filepath.Base(uploadPath),
-			Content:     content,
-			Mode:        uint32(fileInfo.Mode()),
-			IsDirectory: false,
-		})
-	}
-
-	// Process directory uploads
-	for _, uploadDir := range uploadDirs {
-		dirUploads, err := processDirectoryUpload(uploadDir)
-		if err != nil {
-			return nil, fmt.Errorf("directory upload failed for %s: %w", uploadDir, err)
-		}
-
-		result = append(result, dirUploads...)
 	}
 
 	return result, nil
@@ -698,27 +685,23 @@ func containsDangerousPatterns(value string) bool {
 }
 
 // outputRunJobJSON outputs the run job response in JSON format
-func outputRunJobJSON(response *pb.RunJobResponse, scheduleInput string, fileCount, envCount, secretEnvCount int) error {
+func outputRunJobJSON(response *pb.RunJobResponse, command string, args []string, scheduleInput string, fileCount, envCount, secretEnvCount int) error {
 	// Create a structured response that includes additional context
 	output := struct {
 		JobUUID       string   `json:"job_uuid"`
 		Command       string   `json:"command"`
 		Args          []string `json:"args"`
 		Status        string   `json:"status"`
-		StartTime     string   `json:"start_time,omitempty"`
-		ScheduleInput string   `json:"schedule_input,omitempty"`
-		ScheduledTime string   `json:"scheduled_time,omitempty"`
+		Schedule      string   `json:"schedule,omitempty"`
 		FilesUploaded int      `json:"files_uploaded,omitempty"`
 		EnvVars       int      `json:"env_vars,omitempty"`
 		SecretEnvVars int      `json:"secret_env_vars,omitempty"`
 	}{
 		JobUUID:       response.JobUuid,
-		Command:       response.Command,
-		Args:          response.Args,
+		Command:       command,
+		Args:          args,
 		Status:        response.Status,
-		StartTime:     response.StartTime,
-		ScheduleInput: scheduleInput,
-		ScheduledTime: response.ScheduledTime,
+		Schedule:      scheduleInput,
 		FilesUploaded: fileCount,
 		EnvVars:       envCount,
 		SecretEnvVars: secretEnvCount,

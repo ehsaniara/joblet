@@ -248,7 +248,7 @@ Implements the unified streaming pattern across all data types.
 
 ```go
 type StreamConfig struct {
-JobID            string
+JobUUID          string
 Logger           *logger.Logger
 SendHistorical   func () (int, error) // Send persist + buffer data
 QueryPersistOnly func () (int, error) // For completed/not-found jobs

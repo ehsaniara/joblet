@@ -8,7 +8,7 @@ import (
 
 type Message struct {
 	Operation string        `json:"op"`
-	JobID     string        `json:"jobId,omitempty"`
+	JobUUID   string        `json:"job_uuid,omitempty"`
 	Job       *domain.Job   `json:"job,omitempty"`
 	Jobs      []*domain.Job `json:"jobs,omitempty"`
 	Filter    *Filter       `json:"filter,omitempty"`

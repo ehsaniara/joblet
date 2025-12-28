@@ -418,8 +418,8 @@ func TestCleanupProcess(t *testing.T) {
 
 	t.Run("invalid request - empty job ID", func(t *testing.T) {
 		req := &CleanupRequest{
-			JobID: "",
-			PID:   1234,
+			JobUUID: "",
+			PID:     1234,
 		}
 		_, err := mgr.CleanupProcess(context.Background(), req)
 		assert.Error(t, err)
@@ -430,7 +430,7 @@ func TestCleanupProcess(t *testing.T) {
 			return syscall.ESRCH
 		}
 		req := &CleanupRequest{
-			JobID:           "test-job",
+			JobUUID:         "test-job",
 			PID:             1234,
 			GracefulTimeout: 100 * time.Millisecond,
 		}
@@ -455,7 +455,7 @@ func TestCleanupProcess(t *testing.T) {
 			return syscall.ESRCH
 		}
 		req := &CleanupRequest{
-			JobID:           "test-job",
+			JobUUID:         "test-job",
 			PID:             1234,
 			GracefulTimeout: 10 * time.Millisecond,
 		}
@@ -477,7 +477,7 @@ func TestCleanupProcess(t *testing.T) {
 			return syscall.ESRCH
 		}
 		req := &CleanupRequest{
-			JobID:     "test-job",
+			JobUUID:   "test-job",
 			PID:       1234,
 			ForceKill: true,
 		}
@@ -489,8 +489,8 @@ func TestCleanupProcess(t *testing.T) {
 
 	t.Run("no PID to cleanup", func(t *testing.T) {
 		req := &CleanupRequest{
-			JobID: "test-job",
-			PID:   0, // No PID
+			JobUUID: "test-job",
+			PID:     0, // No PID
 		}
 		result, err := mgr.CleanupProcess(context.Background(), req)
 		assert.NoError(t, err)
@@ -538,7 +538,7 @@ func TestValidateLaunchConfig(t *testing.T) {
 			name: "valid config",
 			config: &LaunchConfig{
 				InitPath:    initPath,
-				JobID:       "test-job",
+				JobUUID:     "test-job",
 				Command:     "echo",
 				Environment: []string{"KEY=VALUE"},
 			},
@@ -548,7 +548,7 @@ func TestValidateLaunchConfig(t *testing.T) {
 			name: "empty init path",
 			config: &LaunchConfig{
 				InitPath: "",
-				JobID:    "test-job",
+				JobUUID:  "test-job",
 			},
 			expectErr: true,
 			errMsg:    "init path cannot be empty",
@@ -557,7 +557,7 @@ func TestValidateLaunchConfig(t *testing.T) {
 			name: "empty job ID",
 			config: &LaunchConfig{
 				InitPath: initPath,
-				JobID:    "",
+				JobUUID:  "",
 			},
 			expectErr: true,
 			errMsg:    "job ID cannot be empty",
@@ -566,7 +566,7 @@ func TestValidateLaunchConfig(t *testing.T) {
 			name: "invalid environment",
 			config: &LaunchConfig{
 				InitPath:    initPath,
-				JobID:       "test-job",
+				JobUUID:     "test-job",
 				Environment: []string{"INVALID"}, // Missing =
 			},
 			expectErr: true,
@@ -576,7 +576,7 @@ func TestValidateLaunchConfig(t *testing.T) {
 			name: "non-absolute init path",
 			config: &LaunchConfig{
 				InitPath: "relative/path",
-				JobID:    "test-job",
+				JobUUID:  "test-job",
 			},
 			expectErr: true,
 			errMsg:    "must be absolute",
@@ -611,7 +611,7 @@ func TestValidateCleanupRequest(t *testing.T) {
 		{
 			name: "valid request",
 			req: &CleanupRequest{
-				JobID:           "test-job",
+				JobUUID:         "test-job",
 				PID:             1234,
 				GracefulTimeout: 5 * time.Second,
 			},
@@ -620,14 +620,14 @@ func TestValidateCleanupRequest(t *testing.T) {
 		{
 			name: "empty job ID",
 			req: &CleanupRequest{
-				JobID: "",
+				JobUUID: "",
 			},
 			expectErr: true,
 		},
 		{
 			name: "negative timeout",
 			req: &CleanupRequest{
-				JobID:           "test-job",
+				JobUUID:         "test-job",
 				GracefulTimeout: -1 * time.Second,
 			},
 			expectErr: true,
@@ -707,7 +707,7 @@ func TestLaunchProcess_InvalidConfig(t *testing.T) {
 
 	launchCfg := &LaunchConfig{
 		InitPath: "", // Invalid
-		JobID:    "test-job",
+		JobUUID:  "test-job",
 	}
 
 	_, err := mgr.LaunchProcess(context.Background(), launchCfg)
@@ -737,7 +737,7 @@ func TestLaunchProcess_Timeout(t *testing.T) {
 
 	launchCfg := &LaunchConfig{
 		InitPath: initPath,
-		JobID:    "test-job",
+		JobUUID:  "test-job",
 		Command:  "echo",
 	}
 

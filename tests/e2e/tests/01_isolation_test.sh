@@ -41,44 +41,76 @@ wait_for_job() {
     local timeout="${2:-30}"  # Default 30 second timeout
     local elapsed=0
     local interval=1
+    local max_interval=3
 
     while [[ $elapsed -lt $timeout ]]; do
         local status=$("$RNX_BINARY" job status "$job_id" 2>&1 | grep "Status:" | head -1)
 
         # Check if job completed (COMPLETED or FAILED)
         if echo "$status" | grep -qE "COMPLETED|FAILED"; then
-            # Give logs a moment to be fully persisted
-            sleep 1
             return 0
         fi
 
         sleep $interval
         elapsed=$((elapsed + interval))
+
+        # Exponential backoff up to max_interval
+        if [[ $interval -lt $max_interval ]]; then
+            interval=$((interval + 1))
+        fi
     done
 
     # Timeout - job didn't complete in time
     return 1
 }
 
+# Helper function to get job logs with retry
+# Usage: get_job_logs <job_id> [max_retries]
+get_job_logs() {
+    local job_id="$1"
+    local max_retries="${2:-5}"
+    local retry=0
+    local logs=""
+
+    while [[ $retry -lt $max_retries ]]; do
+        logs=$("$RNX_BINARY" job log "$job_id" 2>/dev/null)
+
+        # Check if we got meaningful logs (not empty or just whitespace)
+        if [[ -n "${logs// /}" ]] && [[ "$logs" != *"no logs"* ]]; then
+            echo "$logs"
+            return 0
+        fi
+
+        # Wait before retry with backoff
+        sleep $((retry + 1))
+        retry=$((retry + 1))
+    done
+
+    # Return whatever we have (might be empty)
+    echo "$logs"
+    return 1
+}
+
 # Helper function to run command and get output
 run_remote_job() {
     local cmd="$1"
+    local timeout="${2:-30}"
     local job_output=$("$RNX_BINARY" job run sh -c "$cmd" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
 
     if [[ -z "$job_id" ]]; then
         echo "ERROR: Failed to start job"
         return 1
     fi
 
-    # Poll for job completion (timeout 30s)
-    if ! wait_for_job "$job_id" 30; then
+    # Poll for job completion
+    if ! wait_for_job "$job_id" "$timeout"; then
         echo "ERROR: Job timed out"
         return 1
     fi
 
-    # Get logs
-    "$RNX_BINARY" job log "$job_id" 2>/dev/null | grep -v "^\[" | grep -v "^$"
+    # Get logs with retry to handle log persistence delay
+    get_job_logs "$job_id" 5 | grep -v "^\[" | grep -v "^$"
 }
 
 # Test function wrapper
@@ -111,7 +143,7 @@ test_two_stage_execution() {
     # 2. User command executes correctly (init exec's into command)
     # 3. Process runs as PID 1 in isolated namespace (verified below)
 
-    local job_id=$("$RNX_BINARY" job run sh -c "echo '2STAGE_TEST_OK' && echo PID:\$\$" | grep "ID:" | awk '{print $2}')
+    local job_id=$("$RNX_BINARY" job run sh -c "echo '2STAGE_TEST_OK' && echo PID:\$\$" | grep "^ID:" | awk '{print $2}')
 
     if [[ -z "$job_id" ]]; then
         echo "    Failed to create job"
@@ -124,7 +156,8 @@ test_two_stage_execution() {
         return 1
     fi
 
-    local logs=$("$RNX_BINARY" job log "$job_id" 2>&1)
+    # Get logs with retry to handle log persistence delay
+    local logs=$(get_job_logs "$job_id" 5)
 
     # Verify user command output appears (proves init exec'd successfully)
     if echo "$logs" | grep -q "2STAGE_TEST_OK"; then
@@ -369,15 +402,17 @@ test_cgroup_membership() {
 test_memory_limits() {
     # Test with memory limit
     local job_output=$("$RNX_BINARY" job run --max-memory=100 sh -c "echo 'MEM_TEST_OK'" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
-    
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
+
     if [[ -n "$job_id" ]]; then
-        sleep 2
-        local logs=$("$RNX_BINARY" job log "$job_id" 2>/dev/null)
-        
-        if echo "$logs" | grep -q "MEM_TEST_OK"; then
-            echo "    Memory limits can be applied"
-            return 0
+        # Wait for job completion with proper polling
+        if wait_for_job "$job_id" 30; then
+            local logs=$(get_job_logs "$job_id" 5)
+
+            if echo "$logs" | grep -q "MEM_TEST_OK"; then
+                echo "    Memory limits can be applied"
+                return 0
+            fi
         fi
     fi
     echo "    Memory limit test inconclusive"
@@ -387,15 +422,17 @@ test_memory_limits() {
 test_cpu_limits() {
     # Test with CPU limit
     local job_output=$("$RNX_BINARY" job run --max-cpu=50 sh -c "echo 'CPU_TEST_OK'" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
-    
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
+
     if [[ -n "$job_id" ]]; then
-        sleep 2
-        local logs=$("$RNX_BINARY" job log "$job_id" 2>/dev/null)
-        
-        if echo "$logs" | grep -q "CPU_TEST_OK"; then
-            echo "    CPU limits can be applied"
-            return 0
+        # Wait for job completion with proper polling
+        if wait_for_job "$job_id" 30; then
+            local logs=$(get_job_logs "$job_id" 5)
+
+            if echo "$logs" | grep -q "CPU_TEST_OK"; then
+                echo "    CPU limits can be applied"
+                return 0
+            fi
         fi
     fi
     echo "    CPU limit test inconclusive"

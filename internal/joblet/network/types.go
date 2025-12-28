@@ -4,7 +4,7 @@ import "net"
 
 // JobAllocation represents a job's network allocation
 type JobAllocation struct {
-	JobID    string
+	JobUUID  string
 	Network  string
 	IP       net.IP
 	Hostname string

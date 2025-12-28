@@ -105,7 +105,7 @@ func TestLogQuery_Fields(t *testing.T) {
 	endTime := int64(2000)
 
 	query := &LogQuery{
-		JobID:     "test-job",
+		JobUUID:   "test-job",
 		StartTime: &startTime,
 		EndTime:   &endTime,
 		Limit:     100,
@@ -113,8 +113,8 @@ func TestLogQuery_Fields(t *testing.T) {
 		Filter:    "error",
 	}
 
-	if query.JobID != "test-job" {
-		t.Errorf("Expected JobID 'test-job', got '%s'", query.JobID)
+	if query.JobUUID != "test-job" {
+		t.Errorf("Expected JobID 'test-job', got '%s'", query.JobUUID)
 	}
 
 	if *query.StartTime != 1000 {
@@ -143,7 +143,7 @@ func TestMetricQuery_Fields(t *testing.T) {
 	endTime := int64(2000)
 
 	query := &MetricQuery{
-		JobID:       "test-job",
+		JobUUID:     "test-job",
 		StartTime:   &startTime,
 		EndTime:     &endTime,
 		Aggregation: "avg",
@@ -151,8 +151,8 @@ func TestMetricQuery_Fields(t *testing.T) {
 		Offset:      5,
 	}
 
-	if query.JobID != "test-job" {
-		t.Errorf("Expected JobID 'test-job', got '%s'", query.JobID)
+	if query.JobUUID != "test-job" {
+		t.Errorf("Expected JobID 'test-job', got '%s'", query.JobUUID)
 	}
 
 	if *query.StartTime != 1000 {

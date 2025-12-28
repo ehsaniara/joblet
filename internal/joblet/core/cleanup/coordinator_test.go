@@ -167,7 +167,7 @@ func TestCleanupJob_AlreadyInProgress(t *testing.T) {
 	// Pre-populate the activeCleanups map
 	jobID := "test-job-123"
 	coordinator.activeCleanups.Store(jobID, &CleanupStatus{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		StartTime: time.Now(),
 	})
 
@@ -244,7 +244,7 @@ func TestGetCleanupStatus(t *testing.T) {
 	// Add a status
 	jobID := "test-job"
 	expectedStatus := &CleanupStatus{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		StartTime: time.Now(),
 	}
 	coordinator.activeCleanups.Store(jobID, expectedStatus)
@@ -252,7 +252,7 @@ func TestGetCleanupStatus(t *testing.T) {
 	// Test existing status
 	status, exists = coordinator.GetCleanupStatus(jobID)
 	assert.True(t, exists)
-	assert.Equal(t, jobID, status.JobID)
+	assert.Equal(t, jobID, status.JobUUID)
 }
 
 func TestCleanupOrphanedResources(t *testing.T) {
@@ -376,7 +376,7 @@ func TestSchedulePeriodicCleanup(t *testing.T) {
 
 func TestCleanupStatus_Fields(t *testing.T) {
 	status := &CleanupStatus{
-		JobID:         "test-job",
+		JobUUID:       "test-job",
 		StartTime:     time.Now(),
 		ProcessKilled: true,
 		CgroupCleaned: true,
@@ -385,7 +385,7 @@ func TestCleanupStatus_Fields(t *testing.T) {
 		Completed:     true,
 	}
 
-	assert.Equal(t, "test-job", status.JobID)
+	assert.Equal(t, "test-job", status.JobUUID)
 	assert.True(t, status.ProcessKilled)
 	assert.True(t, status.CgroupCleaned)
 	assert.True(t, status.FilesCleaned)

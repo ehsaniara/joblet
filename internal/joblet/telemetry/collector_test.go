@@ -171,13 +171,13 @@ func TestCollector_Emit(t *testing.T) {
 	})
 
 	t.Run("emit event with empty job ID", func(t *testing.T) {
-		c.Emit(&Event{JobID: ""}) // Should not panic, event ignored
+		c.Emit(&Event{JobUUID: ""}) // Should not panic, event ignored
 	})
 
 	t.Run("emit valid event", func(t *testing.T) {
 		jobID := "test-job-1"
 		c.Emit(&Event{
-			JobID:     jobID,
+			JobUUID:   jobID,
 			Type:      EventTypeMetrics,
 			Timestamp: time.Now(),
 			Data:      &MetricsData{CPUPercent: 50.0},

@@ -83,7 +83,7 @@ func NewWriter(cfg *Config, log *logger.Logger) *Writer {
 func (w *Writer) WriteLog(jobID string, stream ipcpb.StreamType, timestamp int64, sequence uint64, content []byte) error {
 	// Create log line
 	logLine := &ipcpb.LogLine{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Stream:    stream,
 		Timestamp: timestamp,
 		Sequence:  sequence,
@@ -100,7 +100,7 @@ func (w *Writer) WriteLog(jobID string, stream ipcpb.StreamType, timestamp int64
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_LOG,
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Data:      data,
@@ -113,7 +113,7 @@ func (w *Writer) WriteLog(jobID string, stream ipcpb.StreamType, timestamp int64
 func (w *Writer) WriteMetric(jobID string, timestamp int64, sequence uint64, data *ipcpb.MetricData) error {
 	// Create metric
 	metric := &ipcpb.Metric{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Data:      data,
@@ -129,7 +129,7 @@ func (w *Writer) WriteMetric(jobID string, timestamp int64, sequence uint64, dat
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_METRIC,
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Data:      metricData,
@@ -150,7 +150,7 @@ func (w *Writer) WriteExecEvent(event *ipcpb.ExecEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_EXEC_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -171,7 +171,7 @@ func (w *Writer) WriteConnectEvent(event *ipcpb.ConnectEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_CONNECT_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -190,7 +190,7 @@ func (w *Writer) WriteAcceptEvent(event *ipcpb.AcceptEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_ACCEPT_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -209,7 +209,7 @@ func (w *Writer) WriteSocketDataEvent(event *ipcpb.SocketDataEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_SOCKET_DATA_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -228,7 +228,7 @@ func (w *Writer) WriteMmapEvent(event *ipcpb.MmapEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_MMAP_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -247,7 +247,7 @@ func (w *Writer) WriteMprotectEvent(event *ipcpb.MprotectEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_MPROTECT_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -266,7 +266,7 @@ func (w *Writer) WriteFileEvent(event *ipcpb.FileEvent) error {
 	msg := &ipcpb.IPCMessage{
 		Version:   1,
 		Type:      ipcpb.MessageType_MESSAGE_TYPE_FILE_EVENT,
-		JobId:     event.JobId,
+		JobUuid:   event.JobUuid,
 		Timestamp: event.Timestamp,
 		Sequence:  event.Sequence,
 		Data:      data,
@@ -301,7 +301,7 @@ func (w *Writer) write(msg *ipcpb.IPCMessage) error {
 		// Timeout - drop message after waiting
 		w.msgsDropped.Add(1)
 		w.logger.Warn("IPC write timeout (backpressure), dropping message",
-			"jobID", msg.JobId,
+			"job_uuid", msg.JobUuid,
 			"timeout", w.writeTimeout,
 			"queueSize", len(w.writeChan))
 		return fmt.Errorf("write timeout after %v", w.writeTimeout)
@@ -323,7 +323,7 @@ func (w *Writer) writeLoop() {
 		case msg := <-w.writeChan:
 			if err := w.sendMessage(msg, lengthBuf); err != nil {
 				w.writeErrors.Add(1)
-				w.logger.Error("Failed to send IPC message", "error", err, "jobID", msg.JobId)
+				w.logger.Error("Failed to send IPC message", "error", err, "job_uuid", msg.JobUuid)
 
 				// Mark as disconnected on write error
 				w.connected.Store(false)

@@ -679,13 +679,13 @@ rnx network create data-processing-net --cidr=10.80.3.0/24
 # Training job with GPUs
 rnx job run \
   --network=training-net \
-  --upload-dir=./models \
+  --upload=./models \
   python3 train_model.py --epochs=100 --batch-size=128
 
 # Inference/evaluation job
 rnx job run \
   --network=inference-net \
-  --upload-dir=./models \
+  --upload=./models \
   python3 evaluate.py --model-path=/volumes/models/latest
 
 # Data preprocessing
@@ -708,7 +708,7 @@ rnx job run \
 # Run integration tests
 rnx job run \
   --network=test-env \
-  --upload-dir=./tests \
+  --upload=./tests \
   pytest integration_tests/
 ```
 
@@ -720,15 +720,15 @@ rnx network create ml-dev --cidr=10.100.0.0/24
 
 # Start supporting services for ML development
 # Jupyter notebook server for experimentation
-rnx job run --network=ml-dev --name=jupyter python3 -m jupyter notebook --ip=0.0.0.0
+rnx job run --network=ml-dev python3 -m jupyter notebook --ip=0.0.0.0
 # TensorBoard for monitoring training
-rnx job run --network=ml-dev --name=tensorboard tensorboard --logdir=/volumes/logs
+rnx job run --network=ml-dev tensorboard --logdir=/volumes/logs
 
 # Run training experiment with live monitoring
 rnx job run \
   --network=ml-dev \
   --volume=experiments \
-  --upload-dir=./experiments \
+  --upload=./experiments \
   python3 experiment.py --tensorboard-host=tensorboard
 ```
 

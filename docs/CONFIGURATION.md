@@ -369,10 +369,10 @@ persist:
       region: "us-west-2"           # AWS region
       log_group_prefix: "/joblet"   # CloudWatch log group prefix
       # Log streams created per job:
-      # - {job_id}-logs           (stdout/stderr)
-      # - {job_id}-metrics        (resource metrics)
-      # - {job_id}-exec-events    (eBPF process execution)
-      # - {job_id}-connect-events (eBPF network connections)
+      # - {job_uuid}-logs           (stdout/stderr)
+      # - {job_uuid}-metrics        (resource metrics)
+      # - {job_uuid}-exec-events    (eBPF process execution)
+      # - {job_uuid}-connect-events (eBPF network connections)
 ```
 
 ### Telemetry Configuration
@@ -457,15 +457,15 @@ When using CloudWatch storage backend, eBPF events are shipped to dedicated log 
 
 ```
 Log Group: /joblet/{node_id}
-  {job_id}-exec-events     # Process execution events (JSON)
-  {job_id}-connect-events  # Network connection events (JSON)
+  {job_uuid}-exec-events     # Process execution events (JSON)
+  {job_uuid}-connect-events  # Network connection events (JSON)
 ```
 
 Query eBPF events with CloudWatch Insights:
 
 ```sql
 -- Find all network connections to a specific host
-fields @timestamp, job_id, pid, dst_addr, dst_port
+fields @timestamp, job_uuid, pid, dst_addr, dst_port
 | filter dst_addr = "10.0.1.50"
 | sort @timestamp desc
 ```

@@ -164,7 +164,7 @@ func TestServer_DeleteOperation(t *testing.T) {
 
 	msg := Message{
 		Operation: OpDelete,
-		JobID:     "job-to-delete",
+		JobUUID:   "job-to-delete",
 		RequestID: "req-003",
 		Timestamp: time.Now().Unix(),
 	}
@@ -214,7 +214,7 @@ func TestServer_GetOperation(t *testing.T) {
 
 	msg := Message{
 		Operation: OpGet,
-		JobID:     "retrieved-job",
+		JobUUID:   "retrieved-job",
 		RequestID: "req-004",
 		Timestamp: time.Now().Unix(),
 	}

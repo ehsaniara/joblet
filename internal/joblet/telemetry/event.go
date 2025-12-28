@@ -33,7 +33,7 @@ const (
 // either metrics data or activity data (exec, connect, file).
 type Event struct {
 	Timestamp time.Time
-	JobID     string
+	JobUUID   string
 	Type      EventType
 	Data      interface{} // One of: *MetricsData, *ExecData, *ConnectData, *FileData
 }
@@ -119,7 +119,7 @@ type MprotectData struct {
 func NewMetricsEvent(jobID string, data *MetricsData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeMetrics,
 		Data:      data,
 	}
@@ -129,7 +129,7 @@ func NewMetricsEvent(jobID string, data *MetricsData) *Event {
 func NewExecEvent(jobID string, data *ExecData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeExec,
 		Data:      data,
 	}
@@ -139,7 +139,7 @@ func NewExecEvent(jobID string, data *ExecData) *Event {
 func NewConnectEvent(jobID string, data *ConnectData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeConnect,
 		Data:      data,
 	}
@@ -149,7 +149,7 @@ func NewConnectEvent(jobID string, data *ConnectData) *Event {
 func NewFileEvent(jobID string, data *FileData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeFile,
 		Data:      data,
 	}
@@ -159,7 +159,7 @@ func NewFileEvent(jobID string, data *FileData) *Event {
 func NewAcceptEvent(jobID string, data *AcceptData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeAccept,
 		Data:      data,
 	}
@@ -169,7 +169,7 @@ func NewAcceptEvent(jobID string, data *AcceptData) *Event {
 func NewSocketDataEvent(jobID string, data *SocketDataData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeSocketData,
 		Data:      data,
 	}
@@ -179,7 +179,7 @@ func NewSocketDataEvent(jobID string, data *SocketDataData) *Event {
 func NewMmapEvent(jobID string, data *MmapData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeMmap,
 		Data:      data,
 	}
@@ -189,7 +189,7 @@ func NewMmapEvent(jobID string, data *MmapData) *Event {
 func NewMprotectEvent(jobID string, data *MprotectData) *Event {
 	return &Event{
 		Timestamp: time.Now(),
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Type:      EventTypeMprotect,
 		Data:      data,
 	}

@@ -39,18 +39,18 @@ func NewGPUService(gpuManager gpu.GPUManagerInterface, logger *logger.Logger) *G
 func (gs *GPUService) AllocateGPU(ctx context.Context, job *domain.Job) (*gpu.GPUAllocation, error) {
 	if !gs.gpuManager.IsEnabled() {
 		if job.HasGPURequirement() {
-			gs.logger.Warn("GPU requested but GPU support is disabled", "jobID", job.Uuid, "gpuCount", job.GPUCount)
+			gs.logger.Warn("GPU requested but GPU support is disabled", "job_uuid", job.Uuid, "gpuCount", job.GPUCount)
 			return nil, nil // Return nil to indicate no GPU allocation (job will run without GPU)
 		}
 		return nil, nil
 	}
 
 	if !job.HasGPURequirement() {
-		gs.logger.Debug("job does not require GPU", "jobID", job.Uuid)
+		gs.logger.Debug("job does not require GPU", "job_uuid", job.Uuid)
 		return nil, nil
 	}
 
-	log := gs.logger.WithField("jobID", job.Uuid)
+	log := gs.logger.WithField("job_uuid", job.Uuid)
 	log.Info("allocating GPUs for job", "requestedGPUs", job.GPUCount, "memoryRequirement", job.GPUMemoryMB)
 
 	allocation, err := gs.gpuManager.AllocateGPUs(job.Uuid, int(job.GPUCount), job.GPUMemoryMB)
@@ -78,7 +78,7 @@ func (gs *GPUService) ReleaseGPU(ctx context.Context, jobID string) error {
 		return nil
 	}
 
-	log := gs.logger.WithField("jobID", jobID)
+	log := gs.logger.WithField("job_uuid", jobID)
 	log.Debug("releasing GPUs for job")
 
 	err := gs.gpuManager.ReleaseGPUs(jobID)

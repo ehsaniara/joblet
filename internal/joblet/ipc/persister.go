@@ -24,7 +24,7 @@ func (p *Persister) PersistExecEvent(jobID string, timestamp int64, sequence uin
 	}
 
 	event := &ipcpb.ExecEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,
@@ -43,7 +43,7 @@ func (p *Persister) PersistConnectEvent(jobID string, timestamp int64, sequence 
 	}
 
 	event := &ipcpb.ConnectEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,
@@ -87,7 +87,7 @@ func (p *Persister) PersistAcceptEvent(jobID string, timestamp int64, sequence u
 	}
 
 	event := &ipcpb.AcceptEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,
@@ -107,7 +107,7 @@ func (p *Persister) PersistSocketDataEvent(jobID string, timestamp int64, sequen
 	}
 
 	event := &ipcpb.SocketDataEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,
@@ -128,7 +128,7 @@ func (p *Persister) PersistMmapEvent(jobID string, timestamp int64, sequence uin
 	}
 
 	event := &ipcpb.MmapEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,
@@ -148,7 +148,7 @@ func (p *Persister) PersistMprotectEvent(jobID string, timestamp int64, sequence
 	}
 
 	event := &ipcpb.MprotectEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,
@@ -167,7 +167,7 @@ func (p *Persister) PersistFileEvent(jobID string, timestamp int64, sequence uin
 	}
 
 	event := &ipcpb.FileEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Sequence:  sequence,
 		Pid:       data.PID,

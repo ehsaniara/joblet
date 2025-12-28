@@ -134,7 +134,7 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	log := m.logger.WithFields("jobID", jobID, "gpuCount", gpuCount, "gpuMemoryMB", gpuMemoryMB)
+	log := m.logger.WithFields("job_uuid", jobID, "gpuCount", gpuCount, "gpuMemoryMB", gpuMemoryMB)
 	log.Debug("attempting to allocate GPUs")
 
 	// Check if job already has allocation
@@ -171,7 +171,7 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 
 	for i, gpu := range selectedGPUs {
 		gpu.InUse = true
-		gpu.JobID = jobID
+		gpu.JobUUID = jobID
 		gpu.AllocatedAt = &allocatedAt
 		allocatedIndices[i] = gpu.Index
 
@@ -183,7 +183,7 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 
 	// Create allocation record
 	allocation := &GPUAllocation{
-		JobID:       jobID,
+		JobUUID:     jobID,
 		GPUIndices:  allocatedIndices,
 		GPUCount:    gpuCount,
 		GPUMemoryMB: gpuMemoryMB,
@@ -208,7 +208,7 @@ func (m *Manager) ReleaseGPUs(jobID string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	log := m.logger.WithField("jobID", jobID)
+	log := m.logger.WithField("job_uuid", jobID)
 	log.Debug("releasing GPUs for job")
 
 	allocation, exists := m.allocations[jobID]
@@ -221,7 +221,7 @@ func (m *Manager) ReleaseGPUs(jobID string) error {
 	for _, gpuIndex := range allocation.GPUIndices {
 		if gpu, exists := m.gpus[gpuIndex]; exists {
 			gpu.InUse = false
-			gpu.JobID = ""
+			gpu.JobUUID = ""
 			gpu.AllocatedAt = nil
 
 			log.Debug("released GPU",

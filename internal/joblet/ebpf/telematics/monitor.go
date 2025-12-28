@@ -363,7 +363,7 @@ func (m *Monitor) AddJob(jobID string, cgroupID uint64) error {
 	}
 
 	m.jobs[jobID] = cgroupID
-	m.logger.Info("added job to eBPF monitor", "jobId", jobID, "cgroupId", cgroupID)
+	m.logger.Info("added job to eBPF monitor", "job_uuid", jobID, "cgroupId", cgroupID)
 
 	return nil
 }
@@ -381,12 +381,12 @@ func (m *Monitor) RemoveJob(jobID string) error {
 	if m.objs != nil {
 		if err := m.objs.MonitoredCgroups.Delete(cgroupID); err != nil {
 			// Log but don't fail - the job is being removed anyway
-			m.logger.Warn("failed to remove cgroup from monitor", "jobId", jobID, "error", err)
+			m.logger.Warn("failed to remove cgroup from monitor", "job_uuid", jobID, "error", err)
 		}
 	}
 
 	delete(m.jobs, jobID)
-	m.logger.Debug("removed job from eBPF monitor", "jobId", jobID)
+	m.logger.Debug("removed job from eBPF monitor", "job_uuid", jobID)
 
 	return nil
 }

@@ -27,7 +27,7 @@ JOB_OUTPUT=$(mktemp)
 trap "rm -f $JOB_OUTPUT" EXIT
 
 echo "Submitting job..."
-JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..100}; do echo "Line $i"; done' --name log-gap-test 2>&1 | grep -oP 'ID: \K[a-f0-9-]+' | head -1)
+JOB_ID=$($RNX_BINARY job run bash -c 'for i in {1..100}; do echo "Line $i"; done' 2>&1 | grep -oP 'ID: \K[a-f0-9-]+' | head -1)
 
 if [ -z "$JOB_ID" ]; then
     echo "❌ Failed to submit job"

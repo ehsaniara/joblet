@@ -103,7 +103,7 @@ func (a *MetricsStoreAdapter) StartCollector(
 	}
 
 	a.collectors[jobID] = collector
-	a.logger.Info("started metrics collector", "jobId", jobID, "interval", sampleInterval)
+	a.logger.Info("started metrics collector", "job_uuid", jobID, "interval", sampleInterval)
 
 	return nil
 }
@@ -119,11 +119,11 @@ func (a *MetricsStoreAdapter) StopCollector(jobID string) error {
 	}
 
 	if err := collector.Stop(); err != nil {
-		a.logger.Warn("error stopping collector", "jobId", jobID, "error", err)
+		a.logger.Warn("error stopping collector", "job_uuid", jobID, "error", err)
 	}
 
 	delete(a.collectors, jobID)
-	a.logger.Info("stopped metrics collector", "jobId", jobID)
+	a.logger.Info("stopped metrics collector", "job_uuid", jobID)
 
 	return nil
 }
@@ -150,7 +150,7 @@ func (a *MetricsStoreAdapter) PublishMetrics(ctx context.Context, sample *domain
 			telemetryData.GPUPercent = sample.GPU[0].Utilization
 			telemetryData.GPUMemoryBytes = int64(sample.GPU[0].MemoryUsed)
 		}
-		a.telemetryCollector.EmitMetrics(sample.JobID, telemetryData)
+		a.telemetryCollector.EmitMetrics(sample.JobUUID, telemetryData)
 	}
 
 	return nil
@@ -177,24 +177,24 @@ func (a *MetricsStoreAdapter) DeleteJobMetrics(jobID string) error {
 		defer cancel()
 
 		resp, err := a.persistClient.DeleteJob(ctx, &pb.DeleteJobRequest{
-			JobId: jobID,
+			JobUuid: jobID,
 		})
 		if err != nil {
-			a.logger.Warn("failed to delete metrics from persist storage", "jobId", jobID, "error", err)
+			a.logger.Warn("failed to delete metrics from persist storage", "job_uuid", jobID, "error", err)
 			return fmt.Errorf("failed to delete metrics from persist storage: %w", err)
 		}
 
 		if !resp.Success {
-			a.logger.Warn("persist reported metrics deletion failure", "jobId", jobID, "message", resp.Message)
+			a.logger.Warn("persist reported metrics deletion failure", "job_uuid", jobID, "message", resp.Message)
 			return fmt.Errorf("persist metrics deletion failed: %s", resp.Message)
 		}
 
-		a.logger.Info("successfully deleted metrics from persist storage", "jobId", jobID)
+		a.logger.Info("successfully deleted metrics from persist storage", "job_uuid", jobID)
 	} else {
-		a.logger.Warn("persist client not available - cannot delete historical metrics files", "jobId", jobID)
+		a.logger.Warn("persist client not available - cannot delete historical metrics files", "job_uuid", jobID)
 	}
 
-	a.logger.Info("stopped metrics collector and cleared telemetry for job", "jobId", jobID)
+	a.logger.Info("stopped metrics collector and cleared telemetry for job", "job_uuid", jobID)
 	return nil
 }
 
@@ -212,7 +212,7 @@ func (a *MetricsStoreAdapter) Close() error {
 	a.collectorsMutex.Lock()
 	for jobID, collector := range a.collectors {
 		if err := collector.Stop(); err != nil {
-			a.logger.Warn("error stopping collector during shutdown", "jobId", jobID, "error", err)
+			a.logger.Warn("error stopping collector during shutdown", "job_uuid", jobID, "error", err)
 		}
 	}
 	a.collectors = make(map[string]*metrics.Collector)

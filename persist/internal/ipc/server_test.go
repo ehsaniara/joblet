@@ -110,7 +110,7 @@ func TestServerReceiveLogMessage(t *testing.T) {
 
 	// Create a test log message
 	logLine := &ipcpb.LogLine{
-		JobId:     "test-job-123",
+		JobUuid:   "test-job-123",
 		Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 		Timestamp: time.Now().UnixNano(),
 		Sequence:  1,
@@ -123,9 +123,9 @@ func TestServerReceiveLogMessage(t *testing.T) {
 	}
 
 	ipcMsg := &ipcpb.IPCMessage{
-		JobId: "test-job-123",
-		Type:  ipcpb.MessageType_MESSAGE_TYPE_LOG,
-		Data:  logData,
+		JobUuid: "test-job-123",
+		Type:    ipcpb.MessageType_MESSAGE_TYPE_LOG,
+		Data:    logData,
 	}
 
 	msgData, err := proto.Marshal(ipcMsg)
@@ -198,7 +198,7 @@ func TestServerReceiveMetricMessage(t *testing.T) {
 
 	// Create a test metric message
 	metric := &ipcpb.Metric{
-		JobId:     "test-job-456",
+		JobUuid:   "test-job-456",
 		Timestamp: time.Now().UnixNano(),
 		Sequence:  1,
 		Data: &ipcpb.MetricData{
@@ -214,9 +214,9 @@ func TestServerReceiveMetricMessage(t *testing.T) {
 	}
 
 	ipcMsg := &ipcpb.IPCMessage{
-		JobId: "test-job-456",
-		Type:  ipcpb.MessageType_MESSAGE_TYPE_METRIC,
-		Data:  metricData,
+		JobUuid: "test-job-456",
+		Type:    ipcpb.MessageType_MESSAGE_TYPE_METRIC,
+		Data:    metricData,
 	}
 
 	msgData, err := proto.Marshal(ipcMsg)
@@ -336,7 +336,7 @@ func TestServerBatchProcessing(t *testing.T) {
 	// Send multiple messages rapidly
 	for i := 0; i < 10; i++ {
 		logLine := &ipcpb.LogLine{
-			JobId:     "batch-job",
+			JobUuid:   "batch-job",
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  uint64(i),
@@ -345,9 +345,9 @@ func TestServerBatchProcessing(t *testing.T) {
 
 		logData, _ := proto.Marshal(logLine)
 		ipcMsg := &ipcpb.IPCMessage{
-			JobId: "batch-job",
-			Type:  ipcpb.MessageType_MESSAGE_TYPE_LOG,
-			Data:  logData,
+			JobUuid: "batch-job",
+			Type:    ipcpb.MessageType_MESSAGE_TYPE_LOG,
+			Data:    logData,
 		}
 
 		msgData, _ := proto.Marshal(ipcMsg)

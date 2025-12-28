@@ -51,7 +51,7 @@ func TestDynamoDB_Create(t *testing.T) {
 	}
 
 	// Verify job ID in item
-	jobIdAttr, ok := input.Item["jobId"].(*types.AttributeValueMemberS)
+	jobIdAttr, ok := input.Item["job_uuid"].(*types.AttributeValueMemberS)
 	if !ok {
 		t.Fatal("jobId attribute not found or wrong type")
 	}
@@ -86,7 +86,7 @@ func TestDynamoDB_Get(t *testing.T) {
 
 	// Setup mock to return a job
 	mockItem := map[string]types.AttributeValue{
-		"jobId":     &types.AttributeValueMemberS{Value: "job-123"},
+		"job_uuid":  &types.AttributeValueMemberS{Value: "job-123"},
 		"jobStatus": &types.AttributeValueMemberS{Value: "RUNNING"},
 		"command":   &types.AttributeValueMemberS{Value: "echo test"},
 		"nodeId":    &types.AttributeValueMemberS{Value: "node-1"},
@@ -118,7 +118,7 @@ func TestDynamoDB_Get(t *testing.T) {
 	}
 
 	_, input, _ := mockClient.GetItemArgsForCall(0)
-	keyValue, ok := input.Key["jobId"].(*types.AttributeValueMemberS)
+	keyValue, ok := input.Key["job_uuid"].(*types.AttributeValueMemberS)
 	if !ok || keyValue.Value != "job-123" {
 		t.Error("expected key with jobId='job-123'")
 	}
@@ -204,7 +204,7 @@ func TestDynamoDB_Delete(t *testing.T) {
 	}
 
 	_, input, _ := mockClient.DeleteItemArgsForCall(0)
-	keyValue, ok := input.Key["jobId"].(*types.AttributeValueMemberS)
+	keyValue, ok := input.Key["job_uuid"].(*types.AttributeValueMemberS)
 	if !ok || keyValue.Value != "job-to-delete" {
 		t.Error("expected key with jobId='job-to-delete'")
 	}
@@ -217,13 +217,13 @@ func TestDynamoDB_List(t *testing.T) {
 	// Setup mock to return multiple jobs
 	mockItems := []map[string]types.AttributeValue{
 		{
-			"jobId":     &types.AttributeValueMemberS{Value: "job-1"},
+			"job_uuid":  &types.AttributeValueMemberS{Value: "job-1"},
 			"jobStatus": &types.AttributeValueMemberS{Value: "RUNNING"},
 			"command":   &types.AttributeValueMemberS{Value: "echo 1"},
 			"nodeId":    &types.AttributeValueMemberS{Value: "node-1"},
 		},
 		{
-			"jobId":     &types.AttributeValueMemberS{Value: "job-2"},
+			"job_uuid":  &types.AttributeValueMemberS{Value: "job-2"},
 			"jobStatus": &types.AttributeValueMemberS{Value: "RUNNING"},
 			"command":   &types.AttributeValueMemberS{Value: "echo 2"},
 			"nodeId":    &types.AttributeValueMemberS{Value: "node-1"},
@@ -431,7 +431,6 @@ func TestDynamoDB_AllFieldsStored(t *testing.T) {
 
 	testJob := &domain.Job{
 		Uuid:    "full-job-123",
-		Name:    "test-job-name",
 		Command: "python",
 		Args:    []string{"script.py", "--verbose", "--output=/tmp/out"},
 		Type:    domain.JobType("standard"),
@@ -471,8 +470,7 @@ func TestDynamoDB_AllFieldsStored(t *testing.T) {
 		field    string
 		expected interface{}
 	}{
-		{"jobId", "full-job-123"},
-		{"name", "test-job-name"},
+		{"job_uuid", "full-job-123"},
 		{"command", "python"},
 		{"jobStatus", "RUNNING"},
 		{"nodeId", "node-1"},
@@ -564,8 +562,7 @@ func TestDynamoDB_AllFieldsRetrieved(t *testing.T) {
 
 	// Create a mock DynamoDB item with all fields
 	mockItem := map[string]types.AttributeValue{
-		"jobId":            &types.AttributeValueMemberS{Value: "full-job-456"},
-		"name":             &types.AttributeValueMemberS{Value: "retrieved-job"},
+		"job_uuid":         &types.AttributeValueMemberS{Value: "full-job-456"},
 		"command":          &types.AttributeValueMemberS{Value: "node"},
 		"jobStatus":        &types.AttributeValueMemberS{Value: "COMPLETED"},
 		"nodeId":           &types.AttributeValueMemberS{Value: "node-2"},
@@ -609,9 +606,6 @@ func TestDynamoDB_AllFieldsRetrieved(t *testing.T) {
 	// Verify all fields are correctly parsed
 	if job.Uuid != "full-job-456" {
 		t.Errorf("expected UUID 'full-job-456', got %s", job.Uuid)
-	}
-	if job.Name != "retrieved-job" {
-		t.Errorf("expected Name 'retrieved-job', got %s", job.Name)
 	}
 	if job.Command != "node" {
 		t.Errorf("expected Command 'node', got %s", job.Command)

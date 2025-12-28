@@ -22,7 +22,7 @@ type GPUMetrics struct {
 	Utilization  float64   `json:"utilization_percent"`
 	Temperature  float64   `json:"temperature_celsius"`
 	PowerDraw    float64   `json:"power_draw_watts"`
-	JobID        string    `json:"job_id,omitempty"`
+	JobUUID      string    `json:"job_uuid,omitempty"`
 	LastUpdated  time.Time `json:"last_updated"`
 	ProcessCount int       `json:"process_count"`
 }
@@ -201,7 +201,7 @@ func (m *GPUMonitor) collectMetrics() error {
 		if allocation, err := m.manager.GetJobAllocation(""); err == nil && allocation != nil {
 			for _, gpuIndex := range allocation.GPUIndices {
 				if gpuIndex == metrics.Index {
-					metrics.JobID = allocation.JobID
+					metrics.JobUUID = allocation.JobUUID
 					break
 				}
 			}

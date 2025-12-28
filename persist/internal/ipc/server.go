@@ -220,7 +220,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 				timer.Stop()
 			case <-timer.C:
 				s.logger.Warn("Write pipeline backpressure timeout, dropping message",
-					"jobID", msg.JobId,
+					"job_uuid", msg.JobUuid,
 					"timeout", writeBackpressureTimeout,
 					"queueSize", len(s.writePipe))
 				s.writeErrors.Add(1)
@@ -294,9 +294,9 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 	jobBatches := make(map[string]*JobBatch)
 
 	for _, msg := range batch {
-		if _, exists := jobBatches[msg.JobId]; !exists {
-			jobBatches[msg.JobId] = &JobBatch{
-				JobID:            msg.JobId,
+		if _, exists := jobBatches[msg.JobUuid]; !exists {
+			jobBatches[msg.JobUuid] = &JobBatch{
+				JobUUID:          msg.JobUuid,
 				Logs:             make([]*ipcpb.LogLine, 0),
 				Metrics:          make([]*ipcpb.Metric, 0),
 				ExecEvents:       make([]*ipcpb.ExecEvent, 0),
@@ -309,7 +309,7 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 			}
 		}
 
-		batch := jobBatches[msg.JobId]
+		batch := jobBatches[msg.JobUuid]
 
 		switch msg.Type {
 		case ipcpb.MessageType_MESSAGE_TYPE_LOG:
@@ -390,82 +390,82 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 	for jobID, jobBatch := range jobBatches {
 		if len(jobBatch.Logs) > 0 {
 			if err := s.backend.WriteLogs(jobID, jobBatch.Logs); err != nil {
-				log.Error("Failed to write logs", "jobID", jobID, "error", err)
+				log.Error("Failed to write logs", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote logs", "jobID", jobID, "count", len(jobBatch.Logs))
+				log.Info("Wrote logs", "job_uuid", jobID, "count", len(jobBatch.Logs))
 			}
 		}
 
 		if len(jobBatch.Metrics) > 0 {
 			if err := s.backend.WriteMetrics(jobID, jobBatch.Metrics); err != nil {
-				log.Error("Failed to write metrics", "jobID", jobID, "error", err)
+				log.Error("Failed to write metrics", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote metrics", "jobID", jobID, "count", len(jobBatch.Metrics))
+				log.Info("Wrote metrics", "job_uuid", jobID, "count", len(jobBatch.Metrics))
 			}
 		}
 
 		if len(jobBatch.ExecEvents) > 0 {
 			if err := s.backend.WriteExecEvents(jobID, jobBatch.ExecEvents); err != nil {
-				log.Error("Failed to write exec events", "jobID", jobID, "error", err)
+				log.Error("Failed to write exec events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote exec events", "jobID", jobID, "count", len(jobBatch.ExecEvents))
+				log.Info("Wrote exec events", "job_uuid", jobID, "count", len(jobBatch.ExecEvents))
 			}
 		}
 
 		if len(jobBatch.ConnectEvents) > 0 {
 			if err := s.backend.WriteConnectEvents(jobID, jobBatch.ConnectEvents); err != nil {
-				log.Error("Failed to write connect events", "jobID", jobID, "error", err)
+				log.Error("Failed to write connect events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote connect events", "jobID", jobID, "count", len(jobBatch.ConnectEvents))
+				log.Info("Wrote connect events", "job_uuid", jobID, "count", len(jobBatch.ConnectEvents))
 			}
 		}
 
 		if len(jobBatch.FileEvents) > 0 {
 			if err := s.backend.WriteFileEvents(jobID, jobBatch.FileEvents); err != nil {
-				log.Error("Failed to write file events", "jobID", jobID, "error", err)
+				log.Error("Failed to write file events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote file events", "jobID", jobID, "count", len(jobBatch.FileEvents))
+				log.Info("Wrote file events", "job_uuid", jobID, "count", len(jobBatch.FileEvents))
 			}
 		}
 
 		if len(jobBatch.AcceptEvents) > 0 {
 			if err := s.backend.WriteAcceptEvents(jobID, jobBatch.AcceptEvents); err != nil {
-				log.Error("Failed to write accept events", "jobID", jobID, "error", err)
+				log.Error("Failed to write accept events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote accept events", "jobID", jobID, "count", len(jobBatch.AcceptEvents))
+				log.Info("Wrote accept events", "job_uuid", jobID, "count", len(jobBatch.AcceptEvents))
 			}
 		}
 
 		if len(jobBatch.SocketDataEvents) > 0 {
 			if err := s.backend.WriteSocketDataEvents(jobID, jobBatch.SocketDataEvents); err != nil {
-				log.Error("Failed to write socket data events", "jobID", jobID, "error", err)
+				log.Error("Failed to write socket data events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote socket data events", "jobID", jobID, "count", len(jobBatch.SocketDataEvents))
+				log.Info("Wrote socket data events", "job_uuid", jobID, "count", len(jobBatch.SocketDataEvents))
 			}
 		}
 
 		if len(jobBatch.MmapEvents) > 0 {
 			if err := s.backend.WriteMmapEvents(jobID, jobBatch.MmapEvents); err != nil {
-				log.Error("Failed to write mmap events", "jobID", jobID, "error", err)
+				log.Error("Failed to write mmap events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote mmap events", "jobID", jobID, "count", len(jobBatch.MmapEvents))
+				log.Info("Wrote mmap events", "job_uuid", jobID, "count", len(jobBatch.MmapEvents))
 			}
 		}
 
 		if len(jobBatch.MprotectEvents) > 0 {
 			if err := s.backend.WriteMprotectEvents(jobID, jobBatch.MprotectEvents); err != nil {
-				log.Error("Failed to write mprotect events", "jobID", jobID, "error", err)
+				log.Error("Failed to write mprotect events", "job_uuid", jobID, "error", err)
 				s.writeErrors.Add(1)
 			} else {
-				log.Info("Wrote mprotect events", "jobID", jobID, "count", len(jobBatch.MprotectEvents))
+				log.Info("Wrote mprotect events", "job_uuid", jobID, "count", len(jobBatch.MprotectEvents))
 			}
 		}
 	}
@@ -473,7 +473,7 @@ func (s *Server) processBatch(batch []*ipcpb.IPCMessage, log *logger.Logger) {
 
 // JobBatch groups messages by job
 type JobBatch struct {
-	JobID            string
+	JobUUID          string
 	Logs             []*ipcpb.LogLine
 	Metrics          []*ipcpb.Metric
 	ExecEvents       []*ipcpb.ExecEvent

@@ -215,7 +215,7 @@ type AsyncLogSystem struct {
 }
 
 type LogChunk struct {
-    JobID     string
+    JobUUID     string
     Data      []byte
     Timestamp time.Time
     Sequence  int64
@@ -470,7 +470,7 @@ return nil
 
 // 3. Cgroup cleanup
 if err := j.cleanupCgroup(jobID); err != nil {
-log.Warn("cgroup cleanup failed", "jobId", jobID, "error", err)
+log.Warn("cgroup cleanup failed", "job_uuid", jobID, "error", err)
 }
 
 // 4. Resource cleanup

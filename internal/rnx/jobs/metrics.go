@@ -143,7 +143,7 @@ func outputMetricsEventHuman(event *pb.JobMetricsEvent) {
 	timestamp := time.Unix(0, event.Timestamp).Format("15:04:05.000")
 
 	fmt.Printf("\n=== Metrics at %s ===\n", timestamp)
-	fmt.Printf("Job ID: %s\n\n", event.JobId)
+	fmt.Printf("Job ID: %s\n\n", event.JobUuid)
 
 	// CPU
 	fmt.Printf("CPU: %.2f%%\n", event.CpuPercent)

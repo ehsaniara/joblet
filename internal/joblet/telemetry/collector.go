@@ -90,11 +90,11 @@ func (c *Collector) getOrCreateBuffer(jobID string) *eventBuffer {
 // Emit adds a telemetry event to the collector.
 // The event is buffered and sent to all active listeners.
 func (c *Collector) Emit(event *Event) {
-	if event == nil || event.JobID == "" {
+	if event == nil || event.JobUUID == "" {
 		return
 	}
 
-	buf := c.getOrCreateBuffer(event.JobID)
+	buf := c.getOrCreateBuffer(event.JobUUID)
 	buf.mu.Lock()
 	defer buf.mu.Unlock()
 
@@ -129,7 +129,7 @@ func (c *Collector) EmitMetrics(jobID string, data *MetricsData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistMetrics(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist metrics", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist metrics", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -147,7 +147,7 @@ func (c *Collector) EmitExec(jobID string, data *ExecData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistExecEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist exec event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist exec event", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -165,7 +165,7 @@ func (c *Collector) EmitConnect(jobID string, data *ConnectData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistConnectEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist connect event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist connect event", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -183,7 +183,7 @@ func (c *Collector) EmitFile(jobID string, data *FileData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistFileEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist file event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist file event", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -201,7 +201,7 @@ func (c *Collector) EmitAccept(jobID string, data *AcceptData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistAcceptEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist accept event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist accept event", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func (c *Collector) EmitSocketData(jobID string, data *SocketDataData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistSocketDataEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist socket data event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist socket data event", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -237,7 +237,7 @@ func (c *Collector) EmitMmap(jobID string, data *MmapData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistMmapEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist mmap event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist mmap event", "job_uuid", jobID, "error", err)
 		}
 	}
 }
@@ -255,7 +255,7 @@ func (c *Collector) EmitMprotect(jobID string, data *MprotectData) {
 	if persister != nil {
 		seq := atomic.AddUint64(&c.sequence, 1)
 		if err := persister.PersistMprotectEvent(jobID, event.Timestamp.UnixNano(), seq, data); err != nil {
-			c.logger.Warn("failed to persist mprotect event", "jobID", jobID, "error", err)
+			c.logger.Warn("failed to persist mprotect event", "job_uuid", jobID, "error", err)
 		}
 	}
 }

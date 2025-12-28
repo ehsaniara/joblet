@@ -21,7 +21,7 @@ func NewStatusCmd() *cobra.Command {
 		Long: `Get comprehensive status and details of a job by UUID.
 
 The status command shows complete job information including:
-• Job identification (UUID, name, command, arguments)
+• Job identification (UUID, command, arguments)
 • Execution status and timing (created, started, ended, duration)
 • Resource limits (CPU, memory, I/O, core binding, GPU allocation)
 • Runtime environment (Python, Java, Node.js runtimes)
@@ -47,7 +47,7 @@ Examples:
   rnx job status --json f47ac10b
 
 Job Status Information Displayed:
-  • Basic Info: Job UUID, name, command with arguments, current status
+  • Basic Info: Job UUID, command with arguments, current status
   • Timing: Creation time, start time, end time, execution duration
   • Resource Limits: CPU percentage, memory MB, I/O bandwidth, CPU cores, GPUs
   • Runtime Environment: Python, Java, Node.js runtime specifications
@@ -96,9 +96,6 @@ func getJobStatus(jobID string) error {
 
 	// Display basic job information
 	fmt.Printf("Job ID: %s\n", response.Uuid)
-	if response.Name != "" {
-		fmt.Printf("Job Name: %s\n", response.Name)
-	}
 	if response.NodeId != "" {
 		fmt.Printf("Node ID: %s\n", response.NodeId)
 	}
@@ -157,16 +154,16 @@ func getJobStatus(jobID string) error {
 	hasResourceLimits := false
 	resourceLimits := []string{}
 
-	if response.MaxCPU > 0 {
-		resourceLimits = append(resourceLimits, fmt.Sprintf("  Max CPU: %d%%", response.MaxCPU))
+	if response.MaxCpu > 0 {
+		resourceLimits = append(resourceLimits, fmt.Sprintf("  Max CPU: %d%%", response.MaxCpu))
 		hasResourceLimits = true
 	}
 	if response.MaxMemory > 0 {
 		resourceLimits = append(resourceLimits, fmt.Sprintf("  Max Memory: %d MB", response.MaxMemory))
 		hasResourceLimits = true
 	}
-	if response.MaxIOBPS > 0 {
-		resourceLimits = append(resourceLimits, fmt.Sprintf("  Max IO BPS: %d", response.MaxIOBPS))
+	if response.MaxIoBps > 0 {
+		resourceLimits = append(resourceLimits, fmt.Sprintf("  Max IO BPS: %d", response.MaxIoBps))
 		hasResourceLimits = true
 	}
 	if response.CpuCores != "" {
@@ -315,11 +312,10 @@ func formatDuration(d time.Duration) string {
 }
 
 // outputJobStatusJSON outputs the job status in JSON format
-func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
+func outputJobStatusJSON(response *pb.GetJobStatusResponse) error {
 	// Create a structured output that includes all fields, even when empty
 	output := map[string]interface{}{
 		"uuid":              response.Uuid,
-		"name":              response.Name,
 		"nodeId":            response.NodeId,
 		"command":           response.Command,
 		"args":              response.Args,
@@ -338,14 +334,14 @@ func outputJobStatusJSON(response *pb.GetJobStatusRes) error {
 	}
 
 	// Include resource limits if set
-	if response.MaxCPU > 0 {
-		output["maxCPU"] = response.MaxCPU
+	if response.MaxCpu > 0 {
+		output["maxCPU"] = response.MaxCpu
 	}
 	if response.MaxMemory > 0 {
 		output["maxMemory"] = response.MaxMemory
 	}
-	if response.MaxIOBPS > 0 {
-		output["maxIOBPS"] = response.MaxIOBPS
+	if response.MaxIoBps > 0 {
+		output["maxIOBPS"] = response.MaxIoBps
 	}
 	if response.CpuCores != "" {
 		output["cpuCores"] = response.CpuCores

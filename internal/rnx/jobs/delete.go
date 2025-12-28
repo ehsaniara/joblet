@@ -87,7 +87,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 }
 
 // outputDeleteJobJSON outputs the delete job result in JSON format
-func outputDeleteJobJSON(response *pb.DeleteJobRes) error {
+func outputDeleteJobJSON(response *pb.DeleteJobResponse) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(response)

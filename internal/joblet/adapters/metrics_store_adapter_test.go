@@ -21,7 +21,7 @@ func TestPublishMetrics_WithTelemetryCollector(t *testing.T) {
 	// Test: Publish a metrics sample
 	jobID := "test-job-123"
 	sample := &metricsdomain.JobMetricsSample{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Timestamp: time.Now(),
 		CPU: metricsdomain.CPUMetrics{
 			UsagePercent: 50.5,
@@ -58,7 +58,7 @@ func TestPublishMetrics_WithoutTelemetryCollector(t *testing.T) {
 
 	// Test: Publish a metrics sample
 	sample := &metricsdomain.JobMetricsSample{
-		JobID:     "test-job-456",
+		JobUUID:   "test-job-456",
 		Timestamp: time.Now(),
 		CPU: metricsdomain.CPUMetrics{
 			UsagePercent: 75.3,
@@ -82,7 +82,7 @@ func TestPublishMetrics_WithGPUMetrics(t *testing.T) {
 	// Test: Publish a metrics sample with GPU
 	jobID := "test-job-gpu"
 	sample := &metricsdomain.JobMetricsSample{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Timestamp: time.Now(),
 		CPU: metricsdomain.CPUMetrics{
 			UsagePercent: 25.0,
@@ -121,7 +121,7 @@ func TestPublishMetrics_WithNetworkMetrics(t *testing.T) {
 	// Test: Publish a metrics sample with network
 	jobID := "test-job-network"
 	sample := &metricsdomain.JobMetricsSample{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Timestamp: time.Now(),
 		CPU: metricsdomain.CPUMetrics{
 			UsagePercent: 10.0,
@@ -157,7 +157,7 @@ func TestDeleteJobMetrics(t *testing.T) {
 	// Add some metrics
 	jobID := "test-job-delete"
 	sample := &metricsdomain.JobMetricsSample{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Timestamp: time.Now(),
 		CPU:       metricsdomain.CPUMetrics{UsagePercent: 50.0},
 		Memory:    metricsdomain.MemoryMetrics{Current: 1024},

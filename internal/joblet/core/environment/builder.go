@@ -129,7 +129,7 @@ func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileU
 
 // JobConfig represents configuration loaded from environment (used in init mode)
 type JobConfig struct {
-	JobID            string
+	JobUUID          string
 	Command          string
 	Args             []string
 	CgroupPath       string
@@ -180,7 +180,7 @@ func (b *Builder) LoadJobConfigFromEnvironment() (*JobConfig, error) {
 	}
 
 	return &JobConfig{
-		JobID:            jobID,
+		JobUUID:          jobID,
 		Command:          command,
 		Args:             args,
 		CgroupPath:       cgroupPath,

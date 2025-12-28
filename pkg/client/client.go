@@ -71,15 +71,15 @@ func (c *JobClient) RunJob(ctx context.Context, job *pb.RunJobRequest) (*pb.RunJ
 	return c.jobClient.RunJob(ctx, job)
 }
 
-func (c *JobClient) GetJobStatus(ctx context.Context, id string) (*pb.GetJobStatusRes, error) {
-	return c.jobClient.GetJobStatus(ctx, &pb.GetJobStatusReq{Uuid: id})
+func (c *JobClient) GetJobStatus(ctx context.Context, id string) (*pb.GetJobStatusResponse, error) {
+	return c.jobClient.GetJobStatus(ctx, &pb.GetJobStatusRequest{Uuid: id})
 }
 
-func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, error) {
+func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	resp, err := c.jobClient.StopJob(ctx, &pb.StopJobReq{Uuid: id})
+	resp, err := c.jobClient.StopJob(ctx, &pb.StopJobRequest{Uuid: id})
 	if err != nil {
 		if s, ok := status.FromError(err); ok {
 			if s.Code() == codes.DeadlineExceeded {
@@ -91,11 +91,11 @@ func (c *JobClient) StopJob(ctx context.Context, id string) (*pb.StopJobRes, err
 	return resp, nil
 }
 
-func (c *JobClient) DeleteJob(ctx context.Context, id string) (*pb.DeleteJobRes, error) {
+func (c *JobClient) DeleteJob(ctx context.Context, id string) (*pb.DeleteJobResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	resp, err := c.jobClient.DeleteJob(ctx, &pb.DeleteJobReq{Uuid: id})
+	resp, err := c.jobClient.DeleteJob(ctx, &pb.DeleteJobRequest{Uuid: id})
 	if err != nil {
 		if s, ok := status.FromError(err); ok {
 			if s.Code() == codes.DeadlineExceeded {
@@ -107,11 +107,11 @@ func (c *JobClient) DeleteJob(ctx context.Context, id string) (*pb.DeleteJobRes,
 	return resp, nil
 }
 
-func (c *JobClient) DeleteAllJobs(ctx context.Context) (*pb.DeleteAllJobsRes, error) {
+func (c *JobClient) DeleteAllJobs(ctx context.Context) (*pb.DeleteAllJobsResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := c.jobClient.DeleteAllJobs(ctx, &pb.DeleteAllJobsReq{})
+	resp, err := c.jobClient.DeleteAllJobs(ctx, &pb.DeleteAllJobsRequest{})
 	if err != nil {
 		if s, ok := status.FromError(err); ok {
 			if s.Code() == codes.DeadlineExceeded {
@@ -128,7 +128,7 @@ func (c *JobClient) ListJobs(ctx context.Context) (*pb.Jobs, error) {
 }
 
 func (c *JobClient) GetJobLogs(ctx context.Context, id string) (pb.JobService_GetJobLogsClient, error) {
-	stream, err := c.jobClient.GetJobLogs(ctx, &pb.GetJobLogsReq{Uuid: id})
+	stream, err := c.jobClient.GetJobLogs(ctx, &pb.GetJobLogsRequest{Uuid: id})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start log stream: %v", err)
 	}
@@ -187,7 +187,7 @@ func (c *JobClient) GetJobTelematics(ctx context.Context, id string, types []str
 	return stream, nil
 }
 
-func (c *JobClient) CreateNetwork(ctx context.Context, req *pb.CreateNetworkReq) (*pb.CreateNetworkRes, error) {
+func (c *JobClient) CreateNetwork(ctx context.Context, req *pb.CreateNetworkRequest) (*pb.CreateNetworkResponse, error) {
 	return c.networkClient.CreateNetwork(ctx, req)
 }
 
@@ -195,11 +195,11 @@ func (c *JobClient) ListNetworks(ctx context.Context) (*pb.Networks, error) {
 	return c.networkClient.ListNetworks(ctx, &pb.EmptyRequest{})
 }
 
-func (c *JobClient) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkReq) (*pb.RemoveNetworkRes, error) {
+func (c *JobClient) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkRequest) (*pb.RemoveNetworkResponse, error) {
 	return c.networkClient.RemoveNetwork(ctx, req)
 }
 
-func (c *JobClient) CreateVolume(ctx context.Context, req *pb.CreateVolumeReq) (*pb.CreateVolumeRes, error) {
+func (c *JobClient) CreateVolume(ctx context.Context, req *pb.CreateVolumeRequest) (*pb.CreateVolumeResponse, error) {
 	return c.volumeClient.CreateVolume(ctx, req)
 }
 
@@ -207,35 +207,35 @@ func (c *JobClient) ListVolumes(ctx context.Context) (*pb.Volumes, error) {
 	return c.volumeClient.ListVolumes(ctx, &pb.EmptyRequest{})
 }
 
-func (c *JobClient) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeReq) (*pb.RemoveVolumeRes, error) {
+func (c *JobClient) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeRequest) (*pb.RemoveVolumeResponse, error) {
 	return c.volumeClient.RemoveVolume(ctx, req)
 }
 
 // Monitoring service methods
 
-func (c *JobClient) GetSystemStatus(ctx context.Context) (*pb.SystemStatusRes, error) {
+func (c *JobClient) GetSystemStatus(ctx context.Context) (*pb.SystemStatusResponse, error) {
 	return c.monitoringClient.GetSystemStatus(ctx, &pb.EmptyRequest{})
 }
 
-func (c *JobClient) StreamSystemMetrics(ctx context.Context, req *pb.StreamMetricsReq) (pb.MonitoringService_StreamSystemMetricsClient, error) {
+func (c *JobClient) StreamSystemMetrics(ctx context.Context, req *pb.StreamMetricsRequest) (pb.MonitoringService_StreamSystemMetricsClient, error) {
 	return c.monitoringClient.StreamSystemMetrics(ctx, req)
 }
 
 // Runtime service methods
 
-func (c *JobClient) ListRuntimes(ctx context.Context) (*pb.RuntimesRes, error) {
+func (c *JobClient) ListRuntimes(ctx context.Context) (*pb.ListRuntimesResponse, error) {
 	return c.runtimeClient.ListRuntimes(ctx, &pb.EmptyRequest{})
 }
 
-func (c *JobClient) GetRuntimeInfo(ctx context.Context, req *pb.RuntimeInfoReq) (*pb.RuntimeInfoRes, error) {
+func (c *JobClient) GetRuntimeInfo(ctx context.Context, req *pb.GetRuntimeInfoRequest) (*pb.GetRuntimeInfoResponse, error) {
 	return c.runtimeClient.GetRuntimeInfo(ctx, req)
 }
 
-func (c *JobClient) TestRuntime(ctx context.Context, req *pb.RuntimeTestReq) (*pb.RuntimeTestRes, error) {
+func (c *JobClient) TestRuntime(ctx context.Context, req *pb.TestRuntimeRequest) (*pb.TestRuntimeResponse, error) {
 	return c.runtimeClient.TestRuntime(ctx, req)
 }
 
-func (c *JobClient) RemoveRuntime(ctx context.Context, req *pb.RuntimeRemoveReq) (*pb.RuntimeRemoveRes, error) {
+func (c *JobClient) RemoveRuntime(ctx context.Context, req *pb.RemoveRuntimeRequest) (*pb.RemoveRuntimeResponse, error) {
 	return c.runtimeClient.RemoveRuntime(ctx, req)
 }
 

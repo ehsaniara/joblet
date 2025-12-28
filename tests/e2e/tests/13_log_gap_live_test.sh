@@ -33,8 +33,8 @@ test_live_log_streaming_no_gaps() {
     echo -e "${BLUE}Job: 10 seconds, 100 logs/second = 1000 total logs${NC}"
 
     # Start a job that produces 100 logs per second for 10 seconds
-    local job_output=$(run_rnx_command "job run bash -c 'for i in {1..1000}; do echo \"Log \$i\"; sleep 0.01; done' --name log-gap-live-test" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}' | head -1)
+    local job_output=$(run_rnx_command "job run bash -c 'for i in {1..1000}; do echo \"Log \$i\"; sleep 0.01; done'" 2>&1)
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"
@@ -138,8 +138,8 @@ test_live_log_streaming_early_check() {
     echo -e "${BLUE}Testing early log check (check logs immediately after job starts)${NC}"
 
     # Start a job that produces logs continuously
-    local job_output=$(run_rnx_command "job run bash -c 'for i in {1..500}; do echo \"Early \$i\"; sleep 0.02; done' --name early-check-test" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}' | head -1)
+    local job_output=$(run_rnx_command "job run bash -c 'for i in {1..500}; do echo \"Early \$i\"; sleep 0.02; done'" 2>&1)
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"
@@ -183,8 +183,8 @@ test_log_streaming_after_persist() {
     echo -e "${BLUE}Testing log retrieval after persist has written (historical logs)${NC}"
 
     # Start a short job
-    local job_output=$(run_rnx_command "job run bash -c 'for i in {1..100}; do echo \"Historical \$i\"; done' --name persist-test" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}' | head -1)
+    local job_output=$(run_rnx_command "job run bash -c 'for i in {1..100}; do echo \"Historical \$i\"; done'" 2>&1)
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"

@@ -114,7 +114,7 @@ test_directory_upload() {
     # Upload entire directory
     local job_output
     job_output=$("$RNX_BINARY" --config "$RNX_CONFIG" job run \
-        --upload-dir="$test_dir" \
+        --upload="$test_dir" \
         find . -type f -exec basename {} \; | sort 2>&1)
     
     # Extract job ID

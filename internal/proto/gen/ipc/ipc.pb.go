@@ -147,7 +147,7 @@ type IPCMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Version       uint32                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`                       // Protocol version (currently 1)
 	Type          MessageType            `protobuf:"varint,2,opt,name=type,proto3,enum=joblet.ipc.MessageType" json:"type,omitempty"` // Message type
-	JobId         string                 `protobuf:"bytes,3,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`               // Job UUID
+	JobUuid       string                 `protobuf:"bytes,3,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`         // Job UUID
 	Timestamp     int64                  `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                   // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,5,opt,name=sequence,proto3" json:"sequence,omitempty"`                     // Message sequence number
 	Data          []byte                 `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`                              // Serialized payload (LogLine or Metric)
@@ -199,9 +199,9 @@ func (x *IPCMessage) GetType() MessageType {
 	return MessageType_MESSAGE_TYPE_UNSPECIFIED
 }
 
-func (x *IPCMessage) GetJobId() string {
+func (x *IPCMessage) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -230,7 +230,7 @@ func (x *IPCMessage) GetData() []byte {
 // LogLine represents a single log line from a job
 type LogLine struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Stream        StreamType             `protobuf:"varint,2,opt,name=stream,proto3,enum=joblet.ipc.StreamType" json:"stream,omitempty"` // stdout or stderr
 	Timestamp     int64                  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                      // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,4,opt,name=sequence,proto3" json:"sequence,omitempty"`                        // Sequence number
@@ -269,9 +269,9 @@ func (*LogLine) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *LogLine) GetJobId() string {
+func (x *LogLine) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -307,7 +307,7 @@ func (x *LogLine) GetContent() []byte {
 // Metric represents a metrics sample from a job
 type Metric struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Data          *MetricData            `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`            // Metric values
@@ -345,9 +345,9 @@ func (*Metric) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Metric) GetJobId() string {
+func (x *Metric) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -591,7 +591,7 @@ func (x *NetworkIO) GetTxPackets() int64 {
 // ExecEvent represents a process execution event from eBPF telematics
 type ExecEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -635,9 +635,9 @@ func (*ExecEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ExecEvent) GetJobId() string {
+func (x *ExecEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -708,7 +708,7 @@ func (x *ExecEvent) GetArgs() []string {
 // ConnectEvent represents a network connection event from eBPF telematics
 type ConnectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
@@ -752,9 +752,9 @@ func (*ConnectEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ConnectEvent) GetJobId() string {
+func (x *ConnectEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -825,7 +825,7 @@ func (x *ConnectEvent) GetProtocol() string {
 // AcceptEvent represents an incoming connection accept from eBPF telematics
 type AcceptEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
@@ -869,9 +869,9 @@ func (*AcceptEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *AcceptEvent) GetJobId() string {
+func (x *AcceptEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -942,7 +942,7 @@ func (x *AcceptEvent) GetProtocol() string {
 // SocketDataEvent represents sendto/recvfrom events from eBPF telematics
 type SocketDataEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -986,9 +986,9 @@ func (*SocketDataEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *SocketDataEvent) GetJobId() string {
+func (x *SocketDataEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1059,7 +1059,7 @@ func (x *SocketDataEvent) GetBytes() int64 {
 // MmapEvent represents memory mapping events from eBPF telematics
 type MmapEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -1103,9 +1103,9 @@ func (*MmapEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *MmapEvent) GetJobId() string {
+func (x *MmapEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1176,7 +1176,7 @@ func (x *MmapEvent) GetFilename() string {
 // MprotectEvent represents memory protection change events from eBPF telematics
 type MprotectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -1218,9 +1218,9 @@ func (*MprotectEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *MprotectEvent) GetJobId() string {
+func (x *MprotectEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1277,7 +1277,7 @@ func (x *MprotectEvent) GetProt() uint32 {
 // FileEvent represents file access events from eBPF telematics
 type FileEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -1319,9 +1319,9 @@ func (*FileEvent) Descriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *FileEvent) GetJobId() string {
+func (x *FileEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1380,23 +1380,23 @@ var File_ipc_proto protoreflect.FileDescriptor
 const file_ipc_proto_rawDesc = "" +
 	"\n" +
 	"\tipc.proto\x12\n" +
-	"joblet.ipc\"\xb8\x01\n" +
+	"joblet.ipc\"\xbc\x01\n" +
 	"\n" +
 	"IPCMessage\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12+\n" +
-	"\x04type\x18\x02 \x01(\x0e2\x17.joblet.ipc.MessageTypeR\x04type\x12\x15\n" +
-	"\x06job_id\x18\x03 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x17.joblet.ipc.MessageTypeR\x04type\x12\x19\n" +
+	"\bjob_uuid\x18\x03 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x05 \x01(\x04R\bsequence\x12\x12\n" +
-	"\x04data\x18\x06 \x01(\fR\x04data\"\xa4\x01\n" +
-	"\aLogLine\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12.\n" +
+	"\x04data\x18\x06 \x01(\fR\x04data\"\xa8\x01\n" +
+	"\aLogLine\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12.\n" +
 	"\x06stream\x18\x02 \x01(\x0e2\x16.joblet.ipc.StreamTypeR\x06stream\x12\x1c\n" +
 	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x04 \x01(\x04R\bsequence\x12\x18\n" +
-	"\acontent\x18\x05 \x01(\fR\acontent\"\x85\x01\n" +
-	"\x06Metric\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\acontent\x18\x05 \x01(\fR\acontent\"\x89\x01\n" +
+	"\x06Metric\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12*\n" +
 	"\x04data\x18\x04 \x01(\v2\x16.joblet.ipc.MetricDataR\x04data\"\xcc\x01\n" +
@@ -1421,9 +1421,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\n" +
 	"rx_packets\x18\x03 \x01(\x03R\trxPackets\x12\x1d\n" +
 	"\n" +
-	"tx_packets\x18\x04 \x01(\x03R\ttxPackets\"\xea\x01\n" +
-	"\tExecEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"tx_packets\x18\x04 \x01(\x03R\ttxPackets\"\xee\x01\n" +
+	"\tExecEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1433,9 +1433,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04comm\x18\b \x01(\tR\x04comm\x12\x1a\n" +
 	"\bfilename\x18\t \x01(\tR\bfilename\x12\x12\n" +
 	"\x04args\x18\n" +
-	" \x03(\tR\x04args\"\x8d\x02\n" +
-	"\fConnectEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x03(\tR\x04args\"\x91\x02\n" +
+	"\fConnectEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1445,9 +1445,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\bdst_addr\x18\b \x01(\tR\adstAddr\x12\x19\n" +
 	"\bdst_port\x18\t \x01(\rR\adstPort\x12\x1a\n" +
 	"\bprotocol\x18\n" +
-	" \x01(\tR\bprotocol\"\x8c\x02\n" +
-	"\vAcceptEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\tR\bprotocol\"\x90\x02\n" +
+	"\vAcceptEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1457,9 +1457,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\bdst_addr\x18\b \x01(\tR\adstAddr\x12\x19\n" +
 	"\bdst_port\x18\t \x01(\rR\adstPort\x12\x1a\n" +
 	"\bprotocol\x18\n" +
-	" \x01(\tR\bprotocol\"\x80\x02\n" +
-	"\x0fSocketDataEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\tR\bprotocol\"\x84\x02\n" +
+	"\x0fSocketDataEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1469,9 +1469,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04port\x18\b \x01(\rR\x04port\x12\x1a\n" +
 	"\bprotocol\x18\t \x01(\tR\bprotocol\x12\x14\n" +
 	"\x05bytes\x18\n" +
-	" \x01(\x03R\x05bytes\"\xf4\x01\n" +
-	"\tMmapEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\x03R\x05bytes\"\xf8\x01\n" +
+	"\tMmapEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1481,18 +1481,18 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04prot\x18\b \x01(\rR\x04prot\x12\x14\n" +
 	"\x05flags\x18\t \x01(\rR\x05flags\x12\x1a\n" +
 	"\bfilename\x18\n" +
-	" \x01(\tR\bfilename\"\xc6\x01\n" +
-	"\rMprotectEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\tR\bfilename\"\xca\x01\n" +
+	"\rMprotectEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
 	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
 	"\x04addr\x18\x06 \x01(\x04R\x04addr\x12\x16\n" +
 	"\x06length\x18\a \x01(\x04R\x06length\x12\x12\n" +
-	"\x04prot\x18\b \x01(\rR\x04prot\"\xca\x01\n" +
-	"\tFileEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\x04prot\x18\b \x01(\rR\x04prot\"\xce\x01\n" +
+	"\tFileEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +

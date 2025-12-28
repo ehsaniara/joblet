@@ -10,7 +10,7 @@ import (
 func TestJobError(t *testing.T) {
 	originalErr := errors.New("process exited with code 1")
 	jobErr := &JobError{
-		JobID:     "job-123",
+		JobUUID:   "job-123",
 		Operation: "execute",
 		Err:       originalErr,
 	}
@@ -123,8 +123,8 @@ func TestIsJobError(t *testing.T) {
 		err   error
 		isJob bool
 	}{
-		{"JobError", &JobError{JobID: "123", Operation: "start", Err: errors.New("test")}, true},
-		{"Wrapped JobError", fmt.Errorf("wrapped: %w", &JobError{JobID: "123", Operation: "start", Err: errors.New("test")}), true},
+		{"JobError", &JobError{JobUUID: "123", Operation: "start", Err: errors.New("test")}, true},
+		{"Wrapped JobError", fmt.Errorf("wrapped: %w", &JobError{JobUUID: "123", Operation: "start", Err: errors.New("test")}), true},
 		{"Regular error", errors.New("not a job error"), false},
 		{"Nil error", nil, false},
 	}
@@ -275,8 +275,8 @@ func TestWrapJobError(t *testing.T) {
 		t.Fatalf("WrapJobError() returned %T, want *JobError", wrappedErr)
 	}
 
-	if jobErr.JobID != "job-123" {
-		t.Errorf("JobID = %v, want job-123", jobErr.JobID)
+	if jobErr.JobUUID != "job-123" {
+		t.Errorf("JobID = %v, want job-123", jobErr.JobUUID)
 	}
 	if jobErr.Operation != "start" {
 		t.Errorf("Operation = %v, want start", jobErr.Operation)
@@ -316,13 +316,13 @@ func TestGetJobID(t *testing.T) {
 	}{
 		{
 			name:  "Direct JobError",
-			err:   &JobError{JobID: "job-123", Operation: "start", Err: errors.New("test")},
+			err:   &JobError{JobUUID: "job-123", Operation: "start", Err: errors.New("test")},
 			jobID: "job-123",
 			hasID: true,
 		},
 		{
 			name:  "Wrapped JobError",
-			err:   fmt.Errorf("context: %w", &JobError{JobID: "job-456", Operation: "stop", Err: errors.New("test")}),
+			err:   fmt.Errorf("context: %w", &JobError{JobUUID: "job-456", Operation: "stop", Err: errors.New("test")}),
 			jobID: "job-456",
 			hasID: true,
 		},
@@ -369,15 +369,15 @@ func TestErrorChain(t *testing.T) {
 	if !errors.As(wrappedErr, &je) {
 		t.Error("errors.As() should find JobError in chain")
 	}
-	if je.JobID != "job-123" {
-		t.Errorf("Found JobError has JobID = %v, want job-123", je.JobID)
+	if je.JobUUID != "job-123" {
+		t.Errorf("Found JobError has JobID = %v, want job-123", je.JobUUID)
 	}
 }
 
 // Benchmark tests
 func BenchmarkJobError_Error(b *testing.B) {
 	err := &JobError{
-		JobID:     "job-12345678-1234-1234-1234-123456789012",
+		JobUUID:   "job-12345678-1234-1234-1234-123456789012",
 		Operation: "execute_command",
 		Err:       errors.New("process failed with exit code 1"),
 	}
@@ -390,7 +390,7 @@ func BenchmarkJobError_Error(b *testing.B) {
 
 func BenchmarkIsJobError(b *testing.B) {
 	err := fmt.Errorf("wrapped: %w", &JobError{
-		JobID:     "job-123",
+		JobUUID:   "job-123",
 		Operation: "start",
 		Err:       errors.New("test"),
 	})

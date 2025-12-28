@@ -135,10 +135,10 @@ Cloud-native storage using AWS CloudWatch Logs for both logs and metrics.
 ```
 CloudWatch Log Groups (one per node):
 └── {log_group_prefix}/{nodeId}/jobs
-    ├── Log Stream: {jobId}-stdout
-    ├── Log Stream: {jobId}-stderr
-    ├── Log Stream: {anotherJobId}-stdout
-    └── Log Stream: {anotherJobId}-stderr
+    ├── Log Stream: {job_uuid}-stdout
+    ├── Log Stream: {job_uuid}-stderr
+    ├── Log Stream: {another_job_uuid}-stdout
+    └── Log Stream: {another_job_uuid}-stderr
 
 CloudWatch Metrics (namespace per deployment):
 └── {metric_namespace}  (e.g., Joblet/Jobs)
@@ -152,7 +152,7 @@ CloudWatch Metrics (namespace per deployment):
     ├── Metric: NetworkRxBytes (KB)
     └── Metric: NetworkTxBytes (KB)
 
-    Dimensions: JobID, NodeID, [custom dimensions...]
+    Dimensions: JobUUID, NodeID, [custom dimensions...]
 ```
 
 **Multi-Node Architecture:**
@@ -174,12 +174,12 @@ Log Groups (one per node):
 
 CloudWatch Metrics (shared namespace across all nodes):
 └── Joblet/Jobs
-    ├── CPUUsage [JobID=job-abc, NodeID=node-1]
-    ├── MemoryUsage [JobID=job-abc, NodeID=node-1]
-    ├── CPUUsage [JobID=job-abc, NodeID=node-2]
-    ├── MemoryUsage [JobID=job-abc, NodeID=node-2]
-    ├── CPUUsage [JobID=job-xyz, NodeID=node-3]
-    └── MemoryUsage [JobID=job-xyz, NodeID=node-3]
+    ├── CPUUsage [JobUUID=job-abc, NodeID=node-1]
+    ├── MemoryUsage [JobUUID=job-abc, NodeID=node-1]
+    ├── CPUUsage [JobUUID=job-abc, NodeID=node-2]
+    ├── MemoryUsage [JobUUID=job-abc, NodeID=node-2]
+    ├── CPUUsage [JobUUID=job-xyz, NodeID=node-3]
+    └── MemoryUsage [JobUUID=job-xyz, NodeID=node-3]
 ```
 
 This allows:
@@ -258,7 +258,7 @@ persist:
 
       # Log group organization (one per node)
       log_group_prefix: "/joblet"              # Creates: /joblet/{nodeId}/jobs
-      # Note: log_stream_prefix is deprecated - streams are named: {jobId}-{streamType}
+      # Note: log_stream_prefix is deprecated - streams are named: {job_uuid}-{streamType}
 
       # Metrics configuration
       metric_namespace: "Joblet/Production"    # CloudWatch Metrics namespace
@@ -350,7 +350,7 @@ aws logs filter-log-events \
 aws cloudwatch get-metric-statistics \
   --namespace "Joblet/Jobs" \
   --metric-name "CPUUsage" \
-  --dimensions Name=JobID,Value=my-job-id Name=NodeID,Value=node-1 \
+  --dimensions Name=JobUUID,Value=my-job-id Name=NodeID,Value=node-1 \
   --start-time 2024-01-01T00:00:00Z \
   --end-time 2024-01-01T23:59:59Z \
   --period 60 \
@@ -359,13 +359,13 @@ aws cloudwatch get-metric-statistics \
 # List all metrics for a job
 aws cloudwatch list-metrics \
   --namespace "Joblet/Jobs" \
-  --dimensions Name=JobID,Value=my-job-id
+  --dimensions Name=JobUUID,Value=my-job-id
 
 # Get memory usage with custom dimensions
 aws cloudwatch get-metric-statistics \
   --namespace "Joblet/Production" \
   --metric-name "MemoryUsage" \
-  --dimensions Name=JobID,Value=my-job-id Name=NodeID,Value=node-1 Name=Environment,Value=production \
+  --dimensions Name=JobUUID,Value=my-job-id Name=NodeID,Value=node-1 Name=Environment,Value=production \
   --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
   --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
   --period 300 \
@@ -721,10 +721,10 @@ Log Groups:
   └── Streams: job-456-stdout, job-456-stderr
 
 Metrics (namespace: Joblet/Production):
-  ├── CPUUsage [JobID=job-123, NodeID=cluster-node-1, Environment=production, Cluster=main-cluster, Node=node-1]
-  ├── MemoryUsage [JobID=job-123, NodeID=cluster-node-1, Environment=production, Cluster=main-cluster, Node=node-1]
-  ├── CPUUsage [JobID=job-456, NodeID=cluster-node-2, Environment=production, Cluster=main-cluster, Node=node-2]
-  └── MemoryUsage [JobID=job-456, NodeID=cluster-node-2, Environment=production, Cluster=main-cluster, Node=node-2]
+  ├── CPUUsage [JobUUID=job-123, NodeID=cluster-node-1, Environment=production, Cluster=main-cluster, Node=node-1]
+  ├── MemoryUsage [JobUUID=job-123, NodeID=cluster-node-1, Environment=production, Cluster=main-cluster, Node=node-1]
+  ├── CPUUsage [JobUUID=job-456, NodeID=cluster-node-2, Environment=production, Cluster=main-cluster, Node=node-2]
+  └── MemoryUsage [JobUUID=job-456, NodeID=cluster-node-2, Environment=production, Cluster=main-cluster, Node=node-2]
 ```
 
 ## API Reference
@@ -736,7 +736,7 @@ Used by joblet daemon to write logs/metrics to persistence service.
 ```protobuf
 // Log write message
 message LogLine {
-  string job_id = 1;
+  string job_uuid = 1;
   StreamType stream = 2;  // STDOUT or STDERR
   bytes content = 3;
   int64 timestamp = 4;
@@ -745,7 +745,7 @@ message LogLine {
 
 // Metric write message
 message Metric {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;
   double cpu_percent = 3;
   int64 memory_bytes = 4;
@@ -772,7 +772,7 @@ service PersistService {
 }
 
 message LogQueryRequest {
-  string job_id = 1;
+  string job_uuid = 1;
   StreamType stream = 2;  // Optional filter
   int64 start_time = 3;   // Unix timestamp
   int64 end_time = 4;     // Unix timestamp
@@ -782,7 +782,7 @@ message LogQueryRequest {
 }
 
 message MetricQueryRequest {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 start_time = 2;
   int64 end_time = 3;
   string aggregation = 4;  // "avg", "min", "max", "sum"

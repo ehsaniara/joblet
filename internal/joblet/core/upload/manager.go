@@ -31,8 +31,8 @@ func NewManager(platform platform.Platform, logger *logger.Logger) *Manager {
 // to ensure uploads fit within the specified memory limits without system resource exhaustion.
 func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload, memoryLimitMB int32) (*domain.UploadSession, error) {
 	session := &domain.UploadSession{
-		JobID: jobID,
-		Files: make([]domain.FileUpload, 0, len(uploads)),
+		JobUUID: jobID,
+		Files:   make([]domain.FileUpload, 0, len(uploads)),
 	}
 
 	// Optimize for memory constraints
@@ -55,7 +55,7 @@ func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload
 	}
 
 	m.logger.Debug("upload session prepared",
-		"jobID", jobID,
+		"job_uuid", jobID,
 		"totalFiles", session.TotalFiles,
 		"totalSize", totalSize,
 		"chunkSize", session.ChunkSize)

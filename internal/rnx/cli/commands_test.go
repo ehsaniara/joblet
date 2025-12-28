@@ -436,7 +436,7 @@ func TestRunCommandResourceFlags(t *testing.T) {
 }
 
 func TestUploadFlags(t *testing.T) {
-	// Test file upload flags
+	// Test file upload flags (--upload handles both files and directories)
 	uploadTests := []struct {
 		name      string
 		flags     []string
@@ -449,7 +449,7 @@ func TestUploadFlags(t *testing.T) {
 		},
 		{
 			name:      "upload directory",
-			flags:     []string{"--upload-dir=./src"},
+			flags:     []string{"--upload=./src"},
 			expectErr: false,
 		},
 		{
@@ -459,7 +459,7 @@ func TestUploadFlags(t *testing.T) {
 		},
 		{
 			name:      "mixed upload types",
-			flags:     []string{"--upload=script.py", "--upload-dir=./data"},
+			flags:     []string{"--upload=script.py", "--upload=./data"},
 			expectErr: false,
 		},
 	}

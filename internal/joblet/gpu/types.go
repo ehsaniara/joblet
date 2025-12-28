@@ -9,13 +9,13 @@ type GPU struct {
 	Name        string     `json:"name"`                   // GPU model name
 	MemoryMB    int64      `json:"memory_mb"`              // Total GPU memory in MB
 	InUse       bool       `json:"in_use"`                 // Is currently allocated to a job
-	JobID       string     `json:"job_id"`                 // Which job is using this GPU (empty if not in use)
+	JobUUID     string     `json:"job_uuid"`               // Which job is using this GPU (empty if not in use)
 	AllocatedAt *time.Time `json:"allocated_at,omitempty"` // When GPU was allocated
 }
 
 // GPUAllocation represents a GPU allocation for a job
 type GPUAllocation struct {
-	JobID       string    `json:"job_id"`
+	JobUUID     string    `json:"job_uuid"`
 	GPUIndices  []int     `json:"gpu_indices"`   // Which GPUs are allocated
 	GPUCount    int       `json:"gpu_count"`     // Number of GPUs requested
 	GPUMemoryMB int64     `json:"gpu_memory_mb"` // Memory requirement (0 = any)

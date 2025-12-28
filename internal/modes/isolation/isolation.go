@@ -124,7 +124,7 @@ func (i *Isolator) setupFilesystemIsolation() error {
 	isBuilderJob := jobType == "runtime-build"
 
 	if isBuilderJob {
-		i.logger.Info("setting up builder filesystem for runtime build job", "jobID", jobID)
+		i.logger.Info("setting up builder filesystem for runtime build job", "job_uuid", jobID)
 		if err := jobFS.SetupBuilder(); err != nil {
 			return errors.WrapFilesystemError("builder", "setup", err)
 		}

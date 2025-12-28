@@ -98,7 +98,7 @@ func runNetworkCreate(name, cidr string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := &pb.CreateNetworkReq{
+	req := &pb.CreateNetworkRequest{
 		Name: name,
 		Cidr: cidr,
 	}
@@ -222,7 +222,7 @@ func runNetworkRemove(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := &pb.RemoveNetworkReq{
+	req := &pb.RemoveNetworkRequest{
 		Name: name,
 	}
 

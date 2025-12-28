@@ -81,14 +81,14 @@ func TestLocalBackend_WriteLogs(t *testing.T) {
 	jobID := "test-job-123"
 	logs := []*ipcpb.LogLine{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Content:   []byte("First log line"),
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDERR,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
@@ -143,7 +143,7 @@ func TestLocalBackend_WriteMetrics(t *testing.T) {
 	jobID := "test-job-456"
 	metrics := []*ipcpb.Metric{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Data: &ipcpb.MetricData{
@@ -153,7 +153,7 @@ func TestLocalBackend_WriteMetrics(t *testing.T) {
 			},
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Data: &ipcpb.MetricData{
@@ -208,14 +208,14 @@ func TestLocalBackend_ReadLogs(t *testing.T) {
 	// Write some logs first
 	logs := []*ipcpb.LogLine{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Content:   []byte("Log line 1"),
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
@@ -233,9 +233,9 @@ func TestLocalBackend_ReadLogs(t *testing.T) {
 
 	// Read the logs back
 	query := &LogQuery{
-		JobID:  jobID,
-		Stream: ipcpb.StreamType_STREAM_TYPE_STDOUT,
-		Limit:  100,
+		JobUUID: jobID,
+		Stream:  ipcpb.StreamType_STREAM_TYPE_STDOUT,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -302,7 +302,7 @@ func TestLocalBackend_ReadMetrics(t *testing.T) {
 	// Write some metrics first
 	metrics := []*ipcpb.Metric{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Data: &ipcpb.MetricData{
@@ -321,8 +321,8 @@ func TestLocalBackend_ReadMetrics(t *testing.T) {
 
 	// Read the metrics back
 	query := &MetricQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -389,7 +389,7 @@ func TestLocalBackend_DeleteJob(t *testing.T) {
 	// Write some logs and metrics
 	logs := []*ipcpb.LogLine{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
@@ -399,7 +399,7 @@ func TestLocalBackend_DeleteJob(t *testing.T) {
 
 	metrics := []*ipcpb.Metric{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Data: &ipcpb.MetricData{
@@ -499,7 +499,7 @@ func TestLocalBackend_EmptyJobID(t *testing.T) {
 	// This test just verifies the behavior is predictable
 	logs := []*ipcpb.LogLine{
 		{
-			JobId:     "",
+			JobUuid:   "",
 			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
@@ -542,7 +542,7 @@ func TestLocalBackend_WriteExecEvents(t *testing.T) {
 	jobID := "test-job-exec-events"
 	events := []*ipcpb.ExecEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       1234,
@@ -551,7 +551,7 @@ func TestLocalBackend_WriteExecEvents(t *testing.T) {
 			Args:      []string{"-c", "echo hello"},
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       1235,
@@ -635,7 +635,7 @@ func TestLocalBackend_WriteConnectEvents(t *testing.T) {
 	jobID := "test-job-connect-events"
 	events := []*ipcpb.ConnectEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       5678,
@@ -646,7 +646,7 @@ func TestLocalBackend_WriteConnectEvents(t *testing.T) {
 			SrcPort:   54321,
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       5678,
@@ -732,7 +732,7 @@ func TestLocalBackend_WriteExecEvents_AppendMode(t *testing.T) {
 	// Write first batch
 	events1 := []*ipcpb.ExecEvent{
 		{
-			JobId:    jobID,
+			JobUuid:  jobID,
 			Sequence: 1,
 			Pid:      100,
 			Filename: "/bin/first",
@@ -746,7 +746,7 @@ func TestLocalBackend_WriteExecEvents_AppendMode(t *testing.T) {
 	// Write second batch
 	events2 := []*ipcpb.ExecEvent{
 		{
-			JobId:    jobID,
+			JobUuid:  jobID,
 			Sequence: 2,
 			Pid:      200,
 			Filename: "/bin/second",
@@ -802,7 +802,7 @@ func TestLocalBackend_WriteFileEvents(t *testing.T) {
 	jobID := "test-job-file-events"
 	events := []*ipcpb.FileEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       1234,
@@ -812,7 +812,7 @@ func TestLocalBackend_WriteFileEvents(t *testing.T) {
 			Bytes:     0,
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       1234,
@@ -896,7 +896,7 @@ func TestLocalBackend_WriteAcceptEvents(t *testing.T) {
 	jobID := "test-job-accept-events"
 	events := []*ipcpb.AcceptEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       5678,
@@ -907,7 +907,7 @@ func TestLocalBackend_WriteAcceptEvents(t *testing.T) {
 			Protocol:  "tcp",
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       5678,
@@ -992,7 +992,7 @@ func TestLocalBackend_WriteSocketDataEvents(t *testing.T) {
 	jobID := "test-job-socket-data-events"
 	events := []*ipcpb.SocketDataEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       9012,
@@ -1004,7 +1004,7 @@ func TestLocalBackend_WriteSocketDataEvents(t *testing.T) {
 			Bytes:     1024,
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       9012,
@@ -1090,7 +1090,7 @@ func TestLocalBackend_WriteMmapEvents(t *testing.T) {
 	jobID := "test-job-mmap-events"
 	events := []*ipcpb.MmapEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       3456,
@@ -1102,7 +1102,7 @@ func TestLocalBackend_WriteMmapEvents(t *testing.T) {
 			Filename:  "/lib/libc.so.6",
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       3456,
@@ -1188,7 +1188,7 @@ func TestLocalBackend_WriteMprotectEvents(t *testing.T) {
 	jobID := "test-job-mprotect-events"
 	events := []*ipcpb.MprotectEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       7890,
@@ -1198,7 +1198,7 @@ func TestLocalBackend_WriteMprotectEvents(t *testing.T) {
 			Prot:      0x7, // PROT_READ | PROT_WRITE | PROT_EXEC
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       7890,
@@ -1286,7 +1286,7 @@ func TestLocalBackend_ReadFileEvents(t *testing.T) {
 	// Write some events first
 	events := []*ipcpb.FileEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       1111,
@@ -1295,7 +1295,7 @@ func TestLocalBackend_ReadFileEvents(t *testing.T) {
 			Operation: "read",
 		},
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  2,
 			Pid:       1111,
@@ -1314,8 +1314,8 @@ func TestLocalBackend_ReadFileEvents(t *testing.T) {
 
 	// Read the events back
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1380,7 +1380,7 @@ func TestLocalBackend_ReadAcceptEvents(t *testing.T) {
 
 	events := []*ipcpb.AcceptEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       2222,
@@ -1398,8 +1398,8 @@ func TestLocalBackend_ReadAcceptEvents(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1464,7 +1464,7 @@ func TestLocalBackend_ReadSocketDataEvents(t *testing.T) {
 
 	events := []*ipcpb.SocketDataEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       3333,
@@ -1485,8 +1485,8 @@ func TestLocalBackend_ReadSocketDataEvents(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1551,7 +1551,7 @@ func TestLocalBackend_ReadMmapEvents(t *testing.T) {
 
 	events := []*ipcpb.MmapEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       4444,
@@ -1570,8 +1570,8 @@ func TestLocalBackend_ReadMmapEvents(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1636,7 +1636,7 @@ func TestLocalBackend_ReadMprotectEvents(t *testing.T) {
 
 	events := []*ipcpb.MprotectEvent{
 		{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			Timestamp: time.Now().UnixNano(),
 			Sequence:  1,
 			Pid:       5555,
@@ -1655,8 +1655,8 @@ func TestLocalBackend_ReadMprotectEvents(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1720,11 +1720,11 @@ func TestLocalBackend_DeleteJob_IncludesNewEventTypes(t *testing.T) {
 	jobID := "test-job-delete-all-events"
 
 	// Write all event types
-	backend.WriteFileEvents(jobID, []*ipcpb.FileEvent{{JobId: jobID, Sequence: 1, Path: "/test"}})
-	backend.WriteAcceptEvents(jobID, []*ipcpb.AcceptEvent{{JobId: jobID, Sequence: 1, SrcAddr: "1.2.3.4"}})
-	backend.WriteSocketDataEvents(jobID, []*ipcpb.SocketDataEvent{{JobId: jobID, Sequence: 1, Bytes: 100}})
-	backend.WriteMmapEvents(jobID, []*ipcpb.MmapEvent{{JobId: jobID, Sequence: 1, Addr: 0x1000}})
-	backend.WriteMprotectEvents(jobID, []*ipcpb.MprotectEvent{{JobId: jobID, Sequence: 1, Addr: 0x2000}})
+	backend.WriteFileEvents(jobID, []*ipcpb.FileEvent{{JobUuid: jobID, Sequence: 1, Path: "/test"}})
+	backend.WriteAcceptEvents(jobID, []*ipcpb.AcceptEvent{{JobUuid: jobID, Sequence: 1, SrcAddr: "1.2.3.4"}})
+	backend.WriteSocketDataEvents(jobID, []*ipcpb.SocketDataEvent{{JobUuid: jobID, Sequence: 1, Bytes: 100}})
+	backend.WriteMmapEvents(jobID, []*ipcpb.MmapEvent{{JobUuid: jobID, Sequence: 1, Addr: 0x1000}})
+	backend.WriteMprotectEvents(jobID, []*ipcpb.MprotectEvent{{JobUuid: jobID, Sequence: 1, Addr: 0x2000}})
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -1783,8 +1783,8 @@ func TestLocalBackend_ReadFileEvents_NotFound(t *testing.T) {
 	defer backend.Close()
 
 	query := &TelemetryQuery{
-		JobID: "non-existent-job",
-		Limit: 100,
+		JobUUID: "non-existent-job",
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1847,7 +1847,7 @@ func TestLocalBackend_ReadMetrics_MultipleGzipStreams(t *testing.T) {
 	for batch := 0; batch < 5; batch++ {
 		metrics := []*ipcpb.Metric{
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Timestamp: time.Now().UnixNano() + int64(batch*1000),
 				Sequence:  uint64(batch*2 + 1),
 				Data: &ipcpb.MetricData{
@@ -1856,7 +1856,7 @@ func TestLocalBackend_ReadMetrics_MultipleGzipStreams(t *testing.T) {
 				},
 			},
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Timestamp: time.Now().UnixNano() + int64(batch*1000+500),
 				Sequence:  uint64(batch*2 + 2),
 				Data: &ipcpb.MetricData{
@@ -1877,8 +1877,8 @@ func TestLocalBackend_ReadMetrics_MultipleGzipStreams(t *testing.T) {
 
 	// Read all metrics back - should get all 10, not just the first 2
 	query := &MetricQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -1954,7 +1954,7 @@ func TestLocalBackend_ReadExecEvents_MultipleGzipStreams(t *testing.T) {
 	for batch := 0; batch < 3; batch++ {
 		events := []*ipcpb.ExecEvent{
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Timestamp: time.Now().UnixNano() + int64(batch*1000),
 				Sequence:  uint64(batch*2 + 1),
 				Pid:       uint32(1000 + batch*10 + 1),
@@ -1962,7 +1962,7 @@ func TestLocalBackend_ReadExecEvents_MultipleGzipStreams(t *testing.T) {
 				Args:      []string{"-c", "echo", "batch", string(rune('0' + batch))},
 			},
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Timestamp: time.Now().UnixNano() + int64(batch*1000+500),
 				Sequence:  uint64(batch*2 + 2),
 				Pid:       uint32(1000 + batch*10 + 2),
@@ -1982,8 +1982,8 @@ func TestLocalBackend_ReadExecEvents_MultipleGzipStreams(t *testing.T) {
 
 	// Read all events back
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()
@@ -2058,7 +2058,7 @@ func TestLocalBackend_ReadConnectEvents_MultipleGzipStreams(t *testing.T) {
 	for batch := 0; batch < 4; batch++ {
 		events := []*ipcpb.ConnectEvent{
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Timestamp: time.Now().UnixNano() + int64(batch*1000),
 				Sequence:  uint64(batch + 1),
 				Pid:       uint32(2000 + batch),
@@ -2078,8 +2078,8 @@ func TestLocalBackend_ReadConnectEvents_MultipleGzipStreams(t *testing.T) {
 
 	// Read all events back
 	query := &TelemetryQuery{
-		JobID: jobID,
-		Limit: 100,
+		JobUUID: jobID,
+		Limit:   100,
 	}
 
 	ctx := context.Background()

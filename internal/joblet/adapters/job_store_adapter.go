@@ -86,7 +86,7 @@ type subscriptionContext struct {
 // JobEvent represents events published about job state changes.
 type JobEvent struct {
 	Type      string            `json:"type"` // CREATED, UPDATED, DELETED, LOG_CHUNK
-	JobID     string            `json:"JobId"`
+	JobUUID   string            `json:"job_uuid"`
 	Status    string            `json:"status,omitempty"`
 	LogChunk  []byte            `json:"log_chunk,omitempty"`
 	Metadata  map[string]string `json:"metadata,omitempty"`
@@ -127,7 +127,7 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 	a.closeMutex.RLock()
 	if a.closed {
 		a.closeMutex.RUnlock()
-		a.logger.Warn("attempted to create job on closed store", "jobId", job.Uuid)
+		a.logger.Warn("attempted to create job on closed store", "job_uuid", job.Uuid)
 		return
 	}
 	a.closeMutex.RUnlock()
@@ -136,21 +136,21 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 	ctx := context.Background()
 	if err := a.jobStore.Create(ctx, job.Uuid, job); err != nil {
 		if IsConflictError(err) {
-			a.logger.Warn("job already exists, not creating new task", "jobId", job.Uuid)
+			a.logger.Warn("job already exists, not creating new task", "job_uuid", job.Uuid)
 			return
 		}
-		a.logger.Error("failed to create job in store", "jobId", job.Uuid, "error", err)
+		a.logger.Error("failed to create job in store", "job_uuid", job.Uuid, "error", err)
 		return
 	}
 
 	logBuffer := a.logMgr.GetBuffer(job.Uuid)
-	a.logger.Debug("log buffer created successfully for job", "jobId", job.Uuid)
+	a.logger.Debug("log buffer created successfully for job", "job_uuid", job.Uuid)
 
 	task := &taskWrapper{
 		job:         job.DeepCopy(),
 		logBuffer:   logBuffer,
 		subscribers: make(map[string]*subscriptionContext),
-		logger:      a.logger.WithField("jobId", job.Uuid),
+		logger:      a.logger.WithField("job_uuid", job.Uuid),
 		pubsub:      a.pubsub,
 	}
 
@@ -162,11 +162,11 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 	// Publish creation event
 	if err := a.publishEvent(JobEvent{
 		Type:      "CREATED",
-		JobID:     job.Uuid,
+		JobUUID:   job.Uuid,
 		Status:    string(job.Status),
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
-		a.logger.Warn("failed to publish job creation event", "jobId", job.Uuid, "error", err)
+		a.logger.Warn("failed to publish job creation event", "job_uuid", job.Uuid, "error", err)
 	}
 
 	// Persist to state backend (async fire-and-forget)
@@ -177,14 +177,14 @@ func (a *jobStoreAdapter) CreateNewJob(job *domain.Job) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := a.stateClient.Create(ctx, &jobCopy); err != nil {
-				a.logger.Error("failed to persist job state", "jobId", jobCopy.Uuid, "error", err)
+				a.logger.Error("failed to persist job state", "job_uuid", jobCopy.Uuid, "error", err)
 			} else {
-				a.logger.Debug("job state persisted successfully", "jobId", jobCopy.Uuid)
+				a.logger.Debug("job state persisted successfully", "job_uuid", jobCopy.Uuid)
 			}
 		}()
 	}
 
-	a.logger.Debug("job created successfully", "jobId", job.Uuid, "status", string(job.Status))
+	a.logger.Debug("job created successfully", "job_uuid", job.Uuid, "status", string(job.Status))
 }
 
 // UpdateJob updates an existing job's state and publishes changes.
@@ -195,7 +195,7 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	a.closeMutex.RLock()
 	if a.closed {
 		a.closeMutex.RUnlock()
-		a.logger.Warn("attempted to update job on closed store", "jobId", job.Uuid)
+		a.logger.Warn("attempted to update job on closed store", "job_uuid", job.Uuid)
 		return
 	}
 	a.closeMutex.RUnlock()
@@ -204,7 +204,7 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	task, exists := a.tasks[job.Uuid]
 	if !exists {
 		a.tasksMutex.RUnlock()
-		a.logger.Warn("attempted to update non-existent job", "jobId", job.Uuid)
+		a.logger.Warn("attempted to update non-existent job", "job_uuid", job.Uuid)
 		return
 	}
 	oldStatus := string(task.job.Status)
@@ -215,7 +215,7 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	// Update in store
 	ctx := context.Background()
 	if err := a.jobStore.Update(ctx, job.Uuid, job); err != nil {
-		a.logger.Error("failed to update job in store", "jobId", job.Uuid, "error", err)
+		a.logger.Error("failed to update job in store", "job_uuid", job.Uuid, "error", err)
 		return
 	}
 
@@ -230,11 +230,11 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	// Publish update event
 	if err := a.publishEvent(JobEvent{
 		Type:      "UPDATED",
-		JobID:     job.Uuid,
+		JobUUID:   job.Uuid,
 		Status:    newStatus,
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
-		a.logger.Warn("failed to publish job update event", "jobId", job.Uuid, "error", err)
+		a.logger.Warn("failed to publish job update event", "job_uuid", job.Uuid, "error", err)
 	}
 
 	// Persist state update (async fire-and-forget)
@@ -245,9 +245,9 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := a.stateClient.Update(ctx, &jobCopy); err != nil {
-				a.logger.Error("failed to update job state", "jobId", jobCopy.Uuid, "error", err)
+				a.logger.Error("failed to update job state", "job_uuid", jobCopy.Uuid, "error", err)
 			} else {
-				a.logger.Debug("job state updated successfully", "jobId", jobCopy.Uuid)
+				a.logger.Debug("job state updated successfully", "job_uuid", jobCopy.Uuid)
 			}
 		}()
 	}
@@ -255,11 +255,11 @@ func (a *jobStoreAdapter) UpdateJob(job *domain.Job) {
 	// Don't cleanup subscribers immediately - let them drain final log chunks
 	// Subscribers will terminate themselves after receiving UPDATED event and draining
 	if job.IsCompleted() {
-		a.logger.Debug("job completed, subscribers will drain and cleanup", "jobId", job.Uuid, "finalStatus", newStatus)
+		a.logger.Debug("job completed, subscribers will drain and cleanup", "job_uuid", job.Uuid, "finalStatus", newStatus)
 		// Cleanup will happen automatically after drain deadline in subscribeToJobUpdates
 	}
 
-	a.logger.Debug("job updated successfully", "jobId", job.Uuid, "oldStatus", oldStatus, "newStatus", newStatus)
+	a.logger.Debug("job updated successfully", "job_uuid", job.Uuid, "oldStatus", oldStatus, "newStatus", newStatus)
 }
 
 // GetJob retrieves a job by its ID from the store.
@@ -277,16 +277,16 @@ func (a *jobStoreAdapter) Job(id string) (*domain.Job, bool) {
 	ctx := context.Background()
 	job, exists, err := a.jobStore.Get(ctx, id)
 	if err != nil {
-		a.logger.Error("failed to get job from store", "jobId", id, "error", err)
+		a.logger.Error("failed to get job from store", "job_uuid", id, "error", err)
 		return nil, false
 	}
 
 	if exists {
-		a.logger.Debug("job retrieved successfully", "jobId", id, "status", string(job.Status))
+		a.logger.Debug("job retrieved successfully", "job_uuid", id, "status", string(job.Status))
 		return job.DeepCopy(), true
 	}
 
-	a.logger.Debug("job not found", "jobId", id)
+	a.logger.Debug("job not found", "job_uuid", id)
 	return nil, false
 }
 
@@ -323,7 +323,7 @@ func (a *jobStoreAdapter) JobByPrefix(prefix string) (*domain.Job, bool) {
 		}
 
 		if len(matches) == 1 {
-			a.logger.Debug("found unique job by prefix", "prefix", prefix, "jobId", matches[0].Uuid)
+			a.logger.Debug("found unique job by prefix", "prefix", prefix, "job_uuid", matches[0].Uuid)
 			return matches[0].DeepCopy(), true
 		} else if len(matches) > 1 {
 			var matchedUuids []string
@@ -387,7 +387,7 @@ func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 	task, exists := a.tasks[resolvedUuid]
 	if !exists {
 		a.tasksMutex.RUnlock()
-		a.logger.Warn("attempted to write to buffer for non-existent job", "jobId", resolvedUuid, "chunkSize", len(chunk))
+		a.logger.Warn("attempted to write to buffer for non-existent job", "job_uuid", resolvedUuid, "chunkSize", len(chunk))
 		return
 	}
 
@@ -399,25 +399,25 @@ func (a *jobStoreAdapter) WriteToBuffer(jobID string, chunk []byte) {
 	// When persist is disabled, skip buffering to avoid unbounded growth
 	if a.persistEnabled && logBuffer != nil {
 		if err := logBuffer.Write(chunk); err != nil {
-			a.logger.Error("failed to write to job log buffer", "jobId", resolvedUuid, "error", err)
+			a.logger.Error("failed to write to job log buffer", "job_uuid", resolvedUuid, "error", err)
 			return
 		}
-		a.logger.Debug("successfully wrote to buffer", "jobId", resolvedUuid, "chunkSize", len(chunk))
+		a.logger.Debug("successfully wrote to buffer", "job_uuid", resolvedUuid, "chunkSize", len(chunk))
 	} else if !a.persistEnabled {
-		a.logger.Debug("persist disabled - skipping buffer write (live streaming only)", "jobId", resolvedUuid, "chunkSize", len(chunk))
+		a.logger.Debug("persist disabled - skipping buffer write (live streaming only)", "job_uuid", resolvedUuid, "chunkSize", len(chunk))
 	}
 
 	// Always publish to pubsub for live streaming (and IPC forwarding when enabled)
 	if err := a.publishEvent(JobEvent{
 		Type:      "LOG_CHUNK",
-		JobID:     resolvedUuid,
+		JobUUID:   resolvedUuid,
 		LogChunk:  chunk,
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
-		a.logger.Warn("failed to publish log chunk event", "jobId", resolvedUuid, "error", err)
+		a.logger.Warn("failed to publish log chunk event", "job_uuid", resolvedUuid, "error", err)
 	}
 
-	a.logger.Debug("log chunk written", "jobId", resolvedUuid, "chunkSize", len(chunk))
+	a.logger.Debug("log chunk written", "job_uuid", resolvedUuid, "chunkSize", len(chunk))
 }
 
 // GetOutput retrieves the complete output buffer for a job.
@@ -435,7 +435,7 @@ func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 	task, exists := a.tasks[resolvedUuid]
 	if !exists {
 		a.tasksMutex.RUnlock()
-		a.logger.Debug("output requested for non-existent job", "jobId", resolvedUuid)
+		a.logger.Debug("output requested for non-existent job", "job_uuid", resolvedUuid)
 		return nil, false, fmt.Errorf("job not found")
 	}
 
@@ -450,7 +450,7 @@ func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 
 	chunks := logBuffer.ReadAll()
 	if len(chunks) == 0 {
-		a.logger.Debug("no data available in job log buffer", "jobId", id)
+		a.logger.Debug("no data available in job log buffer", "job_uuid", id)
 		return []byte{}, isRunning, nil
 	}
 
@@ -465,7 +465,7 @@ func (a *jobStoreAdapter) Output(id string) ([]byte, bool, error) {
 		data = append(data, chunk...)
 	}
 
-	a.logger.Debug("job output retrieved", "jobId", id, "outputSize", len(data), "isRunning", isRunning)
+	a.logger.Debug("job output retrieved", "job_uuid", id, "outputSize", len(data), "isRunning", isRunning)
 
 	return data, isRunning, nil
 }
@@ -489,7 +489,7 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 	task, exists := a.tasks[resolvedUuid]
 	if !exists {
 		a.tasksMutex.RUnlock()
-		a.logger.Warn("stream requested for non-existent job", "jobId", resolvedUuid)
+		a.logger.Warn("stream requested for non-existent job", "job_uuid", resolvedUuid)
 		return fmt.Errorf("job not found")
 	}
 
@@ -504,7 +504,7 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 		var chunks [][]byte
 		if skipCount > 0 {
 			chunks = logBuffer.ReadAfterSkip(skipCount)
-			a.logger.Debug("reading buffer with skip", "jobId", id, "skipCount", skipCount, "remainingChunks", len(chunks))
+			a.logger.Debug("reading buffer with skip", "job_uuid", id, "skipCount", skipCount, "remainingChunks", len(chunks))
 		} else {
 			chunks = logBuffer.ReadAll()
 		}
@@ -512,19 +512,19 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 		if len(chunks) > 0 {
 			for _, chunk := range chunks {
 				if err := stream.SendData(chunk); err != nil {
-					a.logger.Warn("failed to send existing log chunk", "jobId", id, "error", err)
+					a.logger.Warn("failed to send existing log chunk", "job_uuid", id, "error", err)
 					return err
 				}
 			}
-			a.logger.Debug("sent existing logs", "jobId", id, "chunkCount", len(chunks), "skipped", skipCount)
+			a.logger.Debug("sent existing logs", "job_uuid", id, "chunkCount", len(chunks), "skipped", skipCount)
 		}
 	} else if !a.persistEnabled {
-		a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "jobId", id)
+		a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "job_uuid", id)
 	}
 
 	// If job is completed, we're done
 	if isCompleted {
-		a.logger.Debug("job is completed, finishing stream", "jobId", id)
+		a.logger.Debug("job is completed, finishing stream", "job_uuid", id)
 		return nil
 	}
 
@@ -564,7 +564,7 @@ func (a *jobStoreAdapter) SyncFromPersistentState(ctx context.Context) error {
 	for _, job := range jobs {
 		// Store in in-memory job store
 		if err := a.jobStore.Create(ctx, job.Uuid, job); err != nil {
-			a.logger.Warn("failed to restore job from persistent state", "jobId", job.Uuid, "error", err)
+			a.logger.Warn("failed to restore job from persistent state", "job_uuid", job.Uuid, "error", err)
 			continue
 		}
 
@@ -574,7 +574,7 @@ func (a *jobStoreAdapter) SyncFromPersistentState(ctx context.Context) error {
 			job:         job.DeepCopy(),
 			logBuffer:   logBuffer,
 			subscribers: make(map[string]*subscriptionContext),
-			logger:      a.logger.WithField("jobId", job.Uuid),
+			logger:      a.logger.WithField("job_uuid", job.Uuid),
 			pubsub:      a.pubsub,
 		}
 
@@ -583,7 +583,7 @@ func (a *jobStoreAdapter) SyncFromPersistentState(ctx context.Context) error {
 		a.tasksMutex.Unlock()
 
 		successCount++
-		a.logger.Debug("restored job from persistent state", "jobId", job.Uuid, "status", string(job.Status))
+		a.logger.Debug("restored job from persistent state", "job_uuid", job.Uuid, "status", string(job.Status))
 	}
 
 	a.logger.Info("successfully synced jobs from persistent state",
@@ -724,13 +724,13 @@ func (a *jobStoreAdapter) completeTaskCleanup(jobID string) error {
 func (a *jobStoreAdapter) publishJobEvent(eventType, jobID string, metadata map[string]string) error {
 	event := JobEvent{
 		Type:      eventType,
-		JobID:     jobID,
+		JobUUID:   jobID,
 		Timestamp: time.Now().Unix(),
 		Metadata:  metadata,
 	}
 
 	if err := a.publishEvent(event); err != nil {
-		a.logger.Warn("failed to publish job event", "type", eventType, "jobId", jobID, "error", err)
+		a.logger.Warn("failed to publish job event", "type", eventType, "job_uuid", jobID, "error", err)
 		return err
 	}
 	return nil
@@ -760,21 +760,21 @@ func (a *jobStoreAdapter) DeleteJobLogs(jobID string) error {
 		defer cancel()
 
 		resp, err := a.persistClient.DeleteJob(ctx, &pb.DeleteJobRequest{
-			JobId: resolvedUuid,
+			JobUuid: resolvedUuid,
 		})
 		if err != nil {
-			a.logger.Warn("failed to delete logs from persist storage", "jobId", resolvedUuid, "error", err)
+			a.logger.Warn("failed to delete logs from persist storage", "job_uuid", resolvedUuid, "error", err)
 			return fmt.Errorf("failed to delete logs from persist storage: %w", err)
 		}
 
 		if !resp.Success {
-			a.logger.Warn("persist reported log deletion failure", "jobId", resolvedUuid, "message", resp.Message)
+			a.logger.Warn("persist reported log deletion failure", "job_uuid", resolvedUuid, "message", resp.Message)
 			return fmt.Errorf("persist log deletion failed: %s", resp.Message)
 		}
 
-		a.logger.Info("successfully deleted logs from persist storage", "jobId", resolvedUuid)
+		a.logger.Info("successfully deleted logs from persist storage", "job_uuid", resolvedUuid)
 	} else {
-		a.logger.Warn("persist client not available - cannot delete historical log files", "jobId", resolvedUuid)
+		a.logger.Warn("persist client not available - cannot delete historical log files", "job_uuid", resolvedUuid)
 	}
 
 	return nil
@@ -791,23 +791,23 @@ func (a *jobStoreAdapter) DeleteJob(jobID string) error {
 		return err
 	}
 
-	a.logger.Info("complete job deletion requested", "jobId", resolvedUuid)
+	a.logger.Info("complete job deletion requested", "job_uuid", resolvedUuid)
 
 	if err := a.validateJobNotRunning(job); err != nil {
-		a.logger.Warn("cannot delete running job", "jobId", resolvedUuid, "status", job.Status)
+		a.logger.Warn("cannot delete running job", "job_uuid", resolvedUuid, "status", job.Status)
 		return err
 	}
 
 	// Cleanup operations
 	if err := a.cleanupTaskWrapper(resolvedUuid); err != nil {
-		a.logger.Warn("task cleanup failed", "jobId", resolvedUuid, "error", err)
+		a.logger.Warn("task cleanup failed", "job_uuid", resolvedUuid, "error", err)
 	}
 
 	// Logs are preserved and must be deleted manually if needed
 
 	// Remove from store
 	if err := a.jobStore.Delete(context.Background(), resolvedUuid); err != nil {
-		a.logger.Error("failed to delete job from store", "jobId", resolvedUuid, "error", err)
+		a.logger.Error("failed to delete job from store", "job_uuid", resolvedUuid, "error", err)
 		return fmt.Errorf("failed to delete job from store: %w", err)
 	}
 
@@ -817,9 +817,9 @@ func (a *jobStoreAdapter) DeleteJob(jobID string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := a.stateClient.Delete(ctx, resolvedUuid); err != nil {
-				a.logger.Error("failed to delete job state", "jobId", resolvedUuid, "error", err)
+				a.logger.Error("failed to delete job state", "job_uuid", resolvedUuid, "error", err)
 			} else {
-				a.logger.Debug("job state deleted successfully", "jobId", resolvedUuid)
+				a.logger.Debug("job state deleted successfully", "job_uuid", resolvedUuid)
 			}
 		}()
 	}
@@ -827,7 +827,7 @@ func (a *jobStoreAdapter) DeleteJob(jobID string) error {
 	// Publish event
 	_ = a.publishJobEvent("DELETED", resolvedUuid, map[string]string{"reason": "user_requested"})
 
-	a.logger.Info("job deletion completed successfully", "jobId", resolvedUuid)
+	a.logger.Info("job deletion completed successfully", "job_uuid", resolvedUuid)
 	return nil
 }
 
@@ -870,13 +870,13 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 	ctx := context.Background()
 	// Publish to single "jobs" topic for all jobs
 	topic := "jobs"
-	a.logger.Debug("publishing event", "jobId", event.JobID, "eventType", event.Type, "topic", topic, "chunkSize", len(event.LogChunk))
+	a.logger.Debug("publishing event", "job_uuid", event.JobUUID, "eventType", event.Type, "topic", topic, "chunkSize", len(event.LogChunk))
 
 	err := a.pubsub.Publish(ctx, topic, event)
 	if err != nil {
-		a.logger.Error("failed to publish event", "jobId", event.JobID, "eventType", event.Type, "topic", topic, "error", err)
+		a.logger.Error("failed to publish event", "job_uuid", event.JobUUID, "eventType", event.Type, "topic", topic, "error", err)
 	} else {
-		a.logger.Debug("successfully published event", "jobId", event.JobID, "eventType", event.Type, "topic", topic)
+		a.logger.Debug("successfully published event", "job_uuid", event.JobUUID, "eventType", event.Type, "topic", topic)
 	}
 
 	return err
@@ -888,15 +888,15 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, stream interfaces.DomainStreamer) error {
 	// Subscribe to single "jobs" topic (filter by JobID in loop)
 	topic := "jobs"
-	a.logger.Debug("subscribing to job events for streaming", "jobId", jobID, "topic", topic)
+	a.logger.Debug("subscribing to job events for streaming", "job_uuid", jobID, "topic", topic)
 
 	updates, unsubscribe, err := a.pubsub.Subscribe(ctx, topic)
 	if err != nil {
-		a.logger.Error("failed to subscribe to job events", "jobId", jobID, "topic", topic, "error", err)
+		a.logger.Error("failed to subscribe to job events", "job_uuid", jobID, "topic", topic, "error", err)
 		return fmt.Errorf("failed to subscribe to job events: %w", err)
 	}
 
-	a.logger.Debug("successfully subscribed to job events", "jobId", jobID, "topic", topic)
+	a.logger.Debug("successfully subscribed to job events", "job_uuid", jobID, "topic", topic)
 
 	subCtx, cancel := context.WithCancel(ctx)
 	subID := fmt.Sprintf("stream_%d", time.Now().UnixNano())
@@ -929,9 +929,9 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 
 	// Handle updates in a separate goroutine
 	go func() {
-		a.logger.Debug("started subscription handler goroutine", "jobId", jobID, "subId", subID)
+		a.logger.Debug("started subscription handler goroutine", "job_uuid", jobID, "subId", subID)
 		defer func() {
-			a.logger.Debug("cleaning up subscription", "jobId", jobID, "subId", subID)
+			a.logger.Debug("cleaning up subscription", "job_uuid", jobID, "subId", subID)
 			unsubscribe()
 			cancel()
 
@@ -944,7 +944,7 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 			}
 			a.tasksMutex.RUnlock()
 
-			a.logger.Debug("subscription cleaned up", "jobId", jobID, "subId", subID)
+			a.logger.Debug("subscription cleaned up", "job_uuid", jobID, "subId", subID)
 
 			// Signal that we're done
 			close(done)
@@ -956,7 +956,7 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 		for {
 			// If job completed, check if we've exceeded drain deadline
 			if jobCompleted && time.Now().After(drainDeadline) {
-				a.logger.Debug("drain deadline exceeded, ending stream", "jobId", jobID)
+				a.logger.Debug("drain deadline exceeded, ending stream", "job_uuid", jobID)
 				done <- nil
 				return
 			}
@@ -970,11 +970,11 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 
 			select {
 			case <-subCtx.Done():
-				a.logger.Debug("subscription context cancelled", "jobId", jobID, "subId", subID)
+				a.logger.Debug("subscription context cancelled", "job_uuid", jobID, "subId", subID)
 				done <- nil
 				return
 			case <-stream.Context().Done():
-				a.logger.Debug("stream context cancelled", "jobId", jobID, "subId", subID)
+				a.logger.Debug("stream context cancelled", "job_uuid", jobID, "subId", subID)
 				done <- nil
 				return
 			case <-selectTimeout:
@@ -982,7 +982,7 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 				continue
 			case msg, ok := <-updates:
 				if !ok {
-					a.logger.Debug("updates channel closed", "jobId", jobID, "subId", subID)
+					a.logger.Debug("updates channel closed", "job_uuid", jobID, "subId", subID)
 					done <- nil
 					return
 				}
@@ -990,33 +990,33 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 				event := msg.Payload
 
 				// Filter events for this specific job (all jobs use the same topic)
-				if event.JobID != jobID {
+				if event.JobUUID != jobID {
 					continue
 				}
 
-				a.logger.Debug("received event from pubsub", "jobId", jobID, "eventType", event.Type, "chunkSize", len(event.LogChunk))
+				a.logger.Debug("received event from pubsub", "job_uuid", jobID, "eventType", event.Type, "chunkSize", len(event.LogChunk))
 
 				// Handle different event types
 				switch event.Type {
 				case "LOG_CHUNK":
 					if len(event.LogChunk) > 0 {
-						a.logger.Debug("sending log chunk to client", "jobId", jobID, "chunkSize", len(event.LogChunk))
+						a.logger.Debug("sending log chunk to client", "job_uuid", jobID, "chunkSize", len(event.LogChunk))
 						if err := stream.SendData(event.LogChunk); err != nil {
-							a.logger.Warn("failed to send log chunk to client", "jobId", jobID, "error", err)
+							a.logger.Warn("failed to send log chunk to client", "job_uuid", jobID, "error", err)
 							done <- err
 							return
 						}
-						a.logger.Debug("successfully sent log chunk to client", "jobId", jobID, "chunkSize", len(event.LogChunk))
+						a.logger.Debug("successfully sent log chunk to client", "job_uuid", jobID, "chunkSize", len(event.LogChunk))
 					}
 				case "UPDATED":
-					a.logger.Debug("received job status update", "jobId", jobID, "status", event.Status)
+					a.logger.Debug("received job status update", "job_uuid", jobID, "status", event.Status)
 					// When job reaches final status, enter drain mode instead of immediately terminating
 					if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
 						if !jobCompleted {
 							jobCompleted = true
 							// Set drain deadline to allow final log chunks to arrive
 							drainDeadline = time.Now().Add(500 * time.Millisecond)
-							a.logger.Debug("job completed, entering drain mode", "jobId", jobID, "finalStatus", event.Status, "drainDeadline", drainDeadline)
+							a.logger.Debug("job completed, entering drain mode", "job_uuid", jobID, "finalStatus", event.Status, "drainDeadline", drainDeadline)
 						}
 					}
 				}
@@ -1025,9 +1025,9 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 	}()
 
 	// Wait for the subscription to end
-	a.logger.Debug("waiting for subscription to complete", "jobId", jobID)
+	a.logger.Debug("waiting for subscription to complete", "job_uuid", jobID)
 	err = <-done
-	a.logger.Debug("subscription completed", "jobId", jobID, "error", err)
+	a.logger.Debug("subscription completed", "job_uuid", jobID, "error", err)
 
 	return err
 }
