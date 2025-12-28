@@ -178,7 +178,6 @@ rnx job list [flags]
 **Table Format (default):**
 
 - **ID**: Job UUID (36-character identifier)
-- **NAME**: Job name ("-" if not specified)
 - **NODE ID**: Unique identifier of the Joblet node that executed the job (36-character UUID, "-" if not assigned)
 - **STATUS**: Current job status (RUNNING, COMPLETED, FAILED, STOPPED, SCHEDULED)
 - **START TIME**: When the job started (format: YYYY-MM-DD HH:MM:SS)
@@ -195,12 +194,12 @@ information.
 rnx job list
 
 # Example output:
-# UUID                                 NAME         NODE ID                              STATUS      START TIME           COMMAND
-# ------------------------------------  ------------ ------------------------------------ ----------  -------------------  -------
-# f47ac10b-58cc-4372-a567-0e02b2c3d479  setup-data   8f94c5b2-1234-5678-9abc-def012345678 COMPLETED   2025-08-03 10:15:32  echo "Hello World"
-# a1b2c3d4-e5f6-7890-abcd-ef1234567890  process-data 8f94c5b2-1234-5678-9abc-def012345678 RUNNING     2025-08-03 10:16:45  python3 script.py
-# b2c3d4e5-f6a7-8901-bcde-f23456789012  -            -                                    FAILED      2025-08-03 10:17:20  invalid_command
-# c3d4e5f6-a7b8-9012-cdef-345678901234  -            -                                    SCHEDULED   N/A                  backup.sh
+# UUID                                 NODE ID                              STATUS      START TIME           COMMAND
+# ------------------------------------  ------------------------------------ ----------  -------------------  -------
+# f47ac10b-58cc-4372-a567-0e02b2c3d479  8f94c5b2-1234-5678-9abc-def012345678 COMPLETED   2025-08-03 10:15:32  echo "Hello World"
+# a1b2c3d4-e5f6-7890-abcd-ef1234567890  8f94c5b2-1234-5678-9abc-def012345678 RUNNING     2025-08-03 10:16:45  python3 script.py
+# b2c3d4e5-f6a7-8901-bcde-f23456789012  -                                    FAILED      2025-08-03 10:17:20  invalid_command
+# c3d4e5f6-a7b8-9012-cdef-345678901234  -                                    SCHEDULED   N/A                  backup.sh
 
 # JSON output for scripting
 rnx job list --json
@@ -208,8 +207,7 @@ rnx job list --json
 # Example JSON output:
 # [
 #   {
-#     "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-#     "name": "setup-data",
+#     "uuid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 #     "status": "COMPLETED",
 #     "start_time": "2025-08-03T10:15:32Z",
 #     "end_time": "2025-08-03T10:15:33Z",
@@ -218,8 +216,7 @@ rnx job list --json
 #     "exit_code": 0
 #   },
 #   {
-#     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-#     "name": "process-data",
+#     "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 #     "node_id": "8f94c5b2-1234-5678-9abc-def012345678",
 #     "status": "RUNNING",
 #     "start_time": "2025-08-03T10:16:45Z",
@@ -277,19 +274,18 @@ rnx job status --json f47ac10b-58cc-4372-a567-0e02b2c3d479 | jq .status
 # Example JSON output for individual job:
 # {
 #   "uuid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-#   "name": "process-data",
-#   "nodeId": "8f94c5b2-1234-5678-9abc-def012345678",
+#   "node_id": "8f94c5b2-1234-5678-9abc-def012345678",
 #   "command": "python3",
 #   "args": ["process_data.py"],
-#   "maxCPU": 100,
-#   "cpuCores": "0-3",
-#   "maxMemory": 512,
-#   "maxIOBPS": 0,
+#   "max_cpu": 100,
+#   "cpu_cores": "0-3",
+#   "max_memory": 512,
+#   "max_io_bps": 0,
 #   "status": "COMPLETED",
-#   "startTime": "2025-08-03T10:15:32Z",
-#   "endTime": "2025-08-03T10:18:45Z",
-#   "exitCode": 0,
-#   "scheduledTime": ""
+#   "start_time": "2025-08-03T10:15:32Z",
+#   "end_time": "2025-08-03T10:18:45Z",
+#   "exit_code": 0,
+#   "scheduled_time": ""
 # }
 ```
 

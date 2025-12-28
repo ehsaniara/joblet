@@ -176,7 +176,7 @@ func runRuntimeInfo(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req := &pb.RuntimeInfoReq{Runtime: spec.Name}
+	req := &pb.GetRuntimeInfoRequest{Runtime: spec.Name}
 	resp, err := client.GetRuntimeInfo(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to get runtime info: %w", err)
@@ -345,7 +345,7 @@ func runRuntimeTest(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req := &pb.RuntimeTestReq{Runtime: runtimeSpec}
+	req := &pb.TestRuntimeRequest{Runtime: runtimeSpec}
 	resp, err := client.TestRuntime(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to test runtime: %w", err)
@@ -842,7 +842,7 @@ func runRuntimeRemove(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req := &pb.RuntimeRemoveReq{Runtime: runtimeSpec}
+	req := &pb.RemoveRuntimeRequest{Runtime: runtimeSpec}
 	resp, err := client.RemoveRuntime(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to remove runtime: %w", err)

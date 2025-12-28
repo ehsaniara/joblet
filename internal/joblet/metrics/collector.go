@@ -66,7 +66,7 @@ func NewCollector(
 		ctx:              ctx,
 		cancel:           cancel,
 		metricsPublisher: publisher,
-		logger:           logger.WithField("component", "metrics-collector").WithField("jobID", jobID),
+		logger:           logger.WithField("component", "metrics-collector").WithField("job_uuid", jobID),
 	}
 }
 
@@ -134,7 +134,7 @@ func (c *Collector) CollectSample() (*domain.JobMetricsSample, error) {
 	now := time.Now()
 
 	sample := &domain.JobMetricsSample{
-		JobID:          c.jobID,
+		JobUUID:        c.jobID,
 		Timestamp:      now,
 		SampleInterval: c.sampleInterval,
 		CgroupPath:     c.cgroupPath,

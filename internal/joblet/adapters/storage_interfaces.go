@@ -103,7 +103,7 @@ type NetworkConfig struct {
 
 // JobNetworkAllocation represents a job's network assignment.
 type JobNetworkAllocation struct {
-	JobID       string            `json:"job_id"`
+	JobUUID     string            `json:"job_uuid"`
 	NetworkName string            `json:"network_name"`
 	IPAddress   string            `json:"ip_address,omitempty"`
 	MACAddress  string            `json:"mac_address,omitempty"`

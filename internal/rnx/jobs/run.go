@@ -316,7 +316,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		MaxCpu:            maxCPU,
 		CpuCores:          cpuCores,
 		MaxMemory:         maxMemory,
-		MaxIobps:          maxIOBPS,
+		MaxIoBps:          maxIOBPS,
 		Uploads:           fileUploads,
 		Schedule:          scheduledTimeRFC3339,
 		Network:           network,
@@ -336,20 +336,17 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Output JSON if requested
 	if common.JSONOutput {
-		return outputRunJobJSON(response, schedule, len(fileUploads), len(environment), len(secretEnvironment))
+		return outputRunJobJSON(response, command, cmdArgs, schedule, len(fileUploads), len(environment), len(secretEnvironment))
 	}
 
-	fmt.Printf("Job is running:\n")
+	fmt.Printf("Job submitted:\n")
 	fmt.Printf("ID: %s\n", response.JobUuid)
-	fmt.Printf("Command: %s %s\n", response.Command, strings.Join(response.Args, " "))
+	fmt.Printf("Command: %s %s\n", command, strings.Join(cmdArgs, " "))
 	// Display status with color coding
 	statusColor, resetColor := getStatusColor(response.Status)
 	fmt.Printf("Status: %s%s%s\n", statusColor, response.Status, resetColor)
 	if schedule != "" {
-		fmt.Printf("Schedule Input: %s\n", schedule) // Show user's original input
-		fmt.Printf("Scheduled Time: %s\n", response.ScheduledTime)
-	} else {
-		fmt.Printf("StartTime: %s\n", response.StartTime)
+		fmt.Printf("Scheduled: %s\n", schedule)
 	}
 
 	if len(fileUploads) > 0 {
@@ -688,27 +685,23 @@ func containsDangerousPatterns(value string) bool {
 }
 
 // outputRunJobJSON outputs the run job response in JSON format
-func outputRunJobJSON(response *pb.RunJobResponse, scheduleInput string, fileCount, envCount, secretEnvCount int) error {
+func outputRunJobJSON(response *pb.RunJobResponse, command string, args []string, scheduleInput string, fileCount, envCount, secretEnvCount int) error {
 	// Create a structured response that includes additional context
 	output := struct {
 		JobUUID       string   `json:"job_uuid"`
 		Command       string   `json:"command"`
 		Args          []string `json:"args"`
 		Status        string   `json:"status"`
-		StartTime     string   `json:"start_time,omitempty"`
-		ScheduleInput string   `json:"schedule_input,omitempty"`
-		ScheduledTime string   `json:"scheduled_time,omitempty"`
+		Schedule      string   `json:"schedule,omitempty"`
 		FilesUploaded int      `json:"files_uploaded,omitempty"`
 		EnvVars       int      `json:"env_vars,omitempty"`
 		SecretEnvVars int      `json:"secret_env_vars,omitempty"`
 	}{
 		JobUUID:       response.JobUuid,
-		Command:       response.Command,
-		Args:          response.Args,
+		Command:       command,
+		Args:          args,
 		Status:        response.Status,
-		StartTime:     response.StartTime,
-		ScheduleInput: scheduleInput,
-		ScheduledTime: response.ScheduledTime,
+		Schedule:      scheduleInput,
 		FilesUploaded: fileCount,
 		EnvVars:       envCount,
 		SecretEnvVars: secretEnvCount,

@@ -58,8 +58,8 @@ func TestStreamWithHistory_CompletedJob(t *testing.T) {
 
 	historicalCount := 0
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			historicalCount++
 			return 10, nil
@@ -84,8 +84,8 @@ func TestStreamWithHistory_CompletedJob_HistoricalError(t *testing.T) {
 
 	expectedErr := errors.New("historical data error")
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			return 0, expectedErr
 		},
@@ -100,8 +100,8 @@ func TestStreamWithHistory_NotFoundJob_WithPersistData(t *testing.T) {
 
 	persistCount := 0
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			t.Fatal("SendHistorical should not be called for not found job")
 			return 0, nil
@@ -125,8 +125,8 @@ func TestStreamWithHistory_NotFoundJob_NoPersistData(t *testing.T) {
 	log := logger.WithField("test", "not-found-no-data")
 
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		QueryPersistOnly: func() (int, error) {
 			return 0, nil // No events found
 		},
@@ -146,7 +146,7 @@ func TestStreamWithHistory_NotFoundJob_NoPersistHandler(t *testing.T) {
 	log := logger.WithField("test", "not-found-no-handler")
 
 	cfg := StreamConfig{
-		JobID:            "test-job-123",
+		JobUUID:          "test-job-123",
 		Logger:           log,
 		QueryPersistOnly: nil, // No persist handler configured
 	}
@@ -166,8 +166,8 @@ func TestStreamWithHistory_RunningJob(t *testing.T) {
 	liveCalled := false
 
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			historicalCalled = true
 			return 10, nil
@@ -194,8 +194,8 @@ func TestStreamWithHistory_RunningJob_HistoricalFailsContinuesToLive(t *testing.
 	liveCalled := false
 
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			return 0, errors.New("historical error")
 		},
@@ -215,8 +215,8 @@ func TestStreamWithHistory_RunningJob_NoLiveHandler(t *testing.T) {
 	log := logger.WithField("test", "running-job-no-live")
 
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			return 10, nil
 		},
@@ -233,8 +233,8 @@ func TestStreamWithHistory_RunningJob_LiveError(t *testing.T) {
 
 	expectedErr := errors.New("live stream error")
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			return 10, nil
 		},
@@ -251,8 +251,8 @@ func TestStreamWithHistory_UnknownState(t *testing.T) {
 	log := logger.WithField("test", "unknown-state")
 
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 	}
 
 	// Use an invalid state value
@@ -284,8 +284,8 @@ func TestStreamWithHistory_ContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	cfg := StreamConfig{
-		JobID:  "test-job-123",
-		Logger: log,
+		JobUUID: "test-job-123",
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			return 0, ctx.Err()
 		},

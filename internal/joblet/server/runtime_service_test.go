@@ -50,7 +50,7 @@ func TestRuntimeServiceServer_GetRuntimeInfo_EmptyRuntime(t *testing.T) {
 
 	server := NewRuntimeServiceServer(fakeAuth, "/tmp", testPlatform)
 
-	req := &pb.RuntimeInfoReq{Runtime: ""}
+	req := &pb.GetRuntimeInfoRequest{Runtime: ""}
 	resp, err := server.GetRuntimeInfo(context.Background(), req)
 
 	assert.Error(t, err)

@@ -84,7 +84,7 @@ func TestStatusCommandEnhancedHelp(t *testing.T) {
 
 	expectedSections := []string{
 		"comprehensive status and details",
-		"Job identification (UUID, name, command, arguments)",
+		"Job identification (UUID, command, arguments)",
 		"Resource limits (CPU, memory, I/O, core binding, GPU allocation)",
 		"Runtime environment (Python, Java, Node.js runtimes)",
 		"Network configuration (bridge, isolated, custom networks)",
@@ -136,7 +136,7 @@ func TestStatusCommandInformationCategories(t *testing.T) {
 
 	// Test that all information categories are documented
 	expectedCategories := []string{
-		"Basic Info: Job UUID, name, command with arguments, current status",
+		"Basic Info: Job UUID, command with arguments, current status",
 		"Timing: Creation time, start time, end time, execution duration",
 		"Resource Limits: CPU percentage, memory MB, I/O bandwidth, CPU cores",
 		"Runtime Environment: Python, Java, Node.js runtime specifications",

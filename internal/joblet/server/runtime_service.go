@@ -43,7 +43,7 @@ func NewRuntimeServiceServer(auth auth.GRPCAuthorization, runtimesBasePath strin
 }
 
 // ListRuntimes returns all available runtime environments with their metadata
-func (s *RuntimeServiceServer) ListRuntimes(ctx context.Context, req *pb.EmptyRequest) (*pb.RuntimesRes, error) {
+func (s *RuntimeServiceServer) ListRuntimes(ctx context.Context, req *pb.EmptyRequest) (*pb.ListRuntimesResponse, error) {
 	log := s.logger.WithField("operation", "ListRuntimes")
 
 	// Authorization check
@@ -79,13 +79,13 @@ func (s *RuntimeServiceServer) ListRuntimes(ctx context.Context, req *pb.EmptyRe
 		pbRuntimes = append(pbRuntimes, pbRuntime)
 	}
 
-	return &pb.RuntimesRes{
+	return &pb.ListRuntimesResponse{
 		Runtimes: pbRuntimes,
 	}, nil
 }
 
 // GetRuntimeInfo returns detailed metadata and configuration for a specific runtime
-func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.RuntimeInfoReq) (*pb.RuntimeInfoRes, error) {
+func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.GetRuntimeInfoRequest) (*pb.GetRuntimeInfoResponse, error) {
 	log := s.logger.WithFields("operation", "GetRuntimeInfo", "runtime", req.Runtime)
 
 	// Authorization check
@@ -102,7 +102,7 @@ func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.Runti
 	// Resolve runtime
 	config, err := s.resolver.ResolveRuntime(req.Runtime)
 	if err != nil {
-		return &pb.RuntimeInfoRes{
+		return &pb.GetRuntimeInfoResponse{
 			Found: false,
 		}, nil
 	}
@@ -143,14 +143,14 @@ func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.Runti
 		},
 	}
 
-	return &pb.RuntimeInfoRes{
+	return &pb.GetRuntimeInfoResponse{
 		Runtime: pbRuntime,
 		Found:   true,
 	}, nil
 }
 
 // TestRuntime validates runtime availability and basic functionality
-func (s *RuntimeServiceServer) TestRuntime(ctx context.Context, req *pb.RuntimeTestReq) (*pb.RuntimeTestRes, error) {
+func (s *RuntimeServiceServer) TestRuntime(ctx context.Context, req *pb.TestRuntimeRequest) (*pb.TestRuntimeResponse, error) {
 	log := s.logger.WithFields("operation", "TestRuntime", "runtime", req.Runtime)
 
 	// Authorization check
@@ -167,7 +167,7 @@ func (s *RuntimeServiceServer) TestRuntime(ctx context.Context, req *pb.RuntimeT
 	// Try to resolve runtime
 	_, err := s.resolver.ResolveRuntime(req.Runtime)
 	if err != nil {
-		return &pb.RuntimeTestRes{
+		return &pb.TestRuntimeResponse{
 			Success:  false,
 			Output:   "",
 			Error:    err.Error(),
@@ -176,7 +176,7 @@ func (s *RuntimeServiceServer) TestRuntime(ctx context.Context, req *pb.RuntimeT
 	}
 
 	// Basic test passed
-	return &pb.RuntimeTestRes{
+	return &pb.TestRuntimeResponse{
 		Success:  true,
 		Output:   "Runtime resolution successful",
 		Error:    "",
@@ -201,7 +201,7 @@ func extractLanguageFromName(name string) string {
 }
 
 // RemoveRuntime removes an installed runtime and cleans up its files
-func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.RuntimeRemoveReq) (*pb.RuntimeRemoveRes, error) {
+func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.RemoveRuntimeRequest) (*pb.RemoveRuntimeResponse, error) {
 	log := s.logger.WithFields(
 		"operation", "RemoveRuntime",
 		"runtime", req.Runtime,
@@ -216,7 +216,7 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 	}
 
 	if req.Runtime == "" {
-		return &pb.RuntimeRemoveRes{
+		return &pb.RemoveRuntimeResponse{
 			Success: false,
 			Message: "Runtime name is required",
 		}, nil
@@ -231,7 +231,7 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 		// Use resolver to find the specific version directory
 		resolvedPath, err := s.resolver.FindRuntimeDirectory(req.Runtime)
 		if err != nil {
-			return &pb.RuntimeRemoveRes{
+			return &pb.RemoveRuntimeResponse{
 				Success: false,
 				Message: fmt.Sprintf("Runtime '%s' not found", req.Runtime),
 			}, nil
@@ -248,7 +248,7 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 
 	// Check if runtime path exists
 	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-		return &pb.RuntimeRemoveRes{
+		return &pb.RemoveRuntimeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Runtime '%s' not found", req.Runtime),
 		}, nil
@@ -273,14 +273,14 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Runtim
 	log.Info("removing runtime directory", "path", runtimePath)
 	if err := os.RemoveAll(runtimePath); err != nil {
 		log.Error("failed to remove runtime directory", "error", err)
-		return &pb.RuntimeRemoveRes{
+		return &pb.RemoveRuntimeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to remove runtime: %v", err),
 		}, nil
 	}
 
 	log.Info("runtime removed successfully", "freedBytes", totalSize, "scope", removalScope)
-	return &pb.RuntimeRemoveRes{
+	return &pb.RemoveRuntimeResponse{
 		Success:         true,
 		Message:         fmt.Sprintf("Runtime '%s' removed successfully (%s)", req.Runtime, removalScope),
 		FreedSpaceBytes: totalSize,

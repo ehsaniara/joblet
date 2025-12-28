@@ -31,7 +31,7 @@ func NewVolumeServiceServer(auth auth2.GRPCAuthorization, volumeManager *volume.
 }
 
 // CreateVolume creates a new volume
-func (s *VolumeServiceServer) CreateVolume(ctx context.Context, req *pb.CreateVolumeReq) (*pb.CreateVolumeRes, error) {
+func (s *VolumeServiceServer) CreateVolume(ctx context.Context, req *pb.CreateVolumeRequest) (*pb.CreateVolumeResponse, error) {
 	log := s.logger.WithFields(
 		"operation", "CreateVolume",
 		"name", req.Name,
@@ -54,7 +54,7 @@ func (s *VolumeServiceServer) CreateVolume(ctx context.Context, req *pb.CreateVo
 
 	log.Info("volume created successfully")
 
-	return &pb.CreateVolumeRes{
+	return &pb.CreateVolumeResponse{
 		Name: volume.Name,
 		Size: volume.Size,
 		Type: string(volume.Type),
@@ -92,7 +92,7 @@ func (s *VolumeServiceServer) ListVolumes(ctx context.Context, req *pb.EmptyRequ
 }
 
 // RemoveVolume removes a volume
-func (s *VolumeServiceServer) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeReq) (*pb.RemoveVolumeRes, error) {
+func (s *VolumeServiceServer) RemoveVolume(ctx context.Context, req *pb.RemoveVolumeRequest) (*pb.RemoveVolumeResponse, error) {
 	log := s.logger.WithFields(
 		"operation", "RemoveVolume",
 		"name", req.Name)
@@ -106,7 +106,7 @@ func (s *VolumeServiceServer) RemoveVolume(ctx context.Context, req *pb.RemoveVo
 
 	if err := s.volumeManager.RemoveVolume(req.Name); err != nil {
 		log.Error("failed to remove volume", "error", err)
-		return &pb.RemoveVolumeRes{
+		return &pb.RemoveVolumeResponse{
 			Success: false,
 			Message: err.Error(),
 		}, nil
@@ -114,7 +114,7 @@ func (s *VolumeServiceServer) RemoveVolume(ctx context.Context, req *pb.RemoveVo
 
 	log.Info("volume removed successfully")
 
-	return &pb.RemoveVolumeRes{
+	return &pb.RemoveVolumeResponse{
 		Success: true,
 		Message: "Volume removed successfully",
 	}, nil

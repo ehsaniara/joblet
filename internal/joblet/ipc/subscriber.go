@@ -85,7 +85,7 @@ func (s *Subscriber) processEvents(updates <-chan pubsub.Message[adapters.JobEve
 			}
 
 			// Get or initialize sequence for this job
-			jobID := event.JobID
+			jobID := event.JobUUID
 			seq := sequence[jobID]
 			sequence[jobID] = seq + 1
 
@@ -107,13 +107,13 @@ func (s *Subscriber) processEvents(updates <-chan pubsub.Message[adapters.JobEve
 			if err := s.writer.WriteLog(jobID, streamType, timestamp, seq, event.LogChunk); err != nil {
 				s.errors.Add(1)
 				s.logger.Warn("Failed to write log to IPC",
-					"jobID", jobID,
+					"job_uuid", jobID,
 					"error", err,
 					"chunkSize", len(event.LogChunk))
 			} else {
 				s.logsSent.Add(1)
 				s.logger.Info("Forwarded log chunk to IPC",
-					"jobID", jobID,
+					"job_uuid", jobID,
 					"sequence", seq,
 					"size", len(event.LogChunk))
 			}

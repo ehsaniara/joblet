@@ -261,13 +261,13 @@ func TestCloudWatchBackend_WriteLogs_StreamSeparation(t *testing.T) {
 		// Create test log lines
 		logs := []*ipcpb.LogLine{
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
 				Content:   []byte("stdout log line"),
 				Timestamp: 1000000000,
 			},
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Stream:    ipcpb.StreamType_STREAM_TYPE_STDERR,
 				Content:   []byte("stderr log line"),
 				Timestamp: 2000000000,
@@ -390,7 +390,7 @@ func TestCloudWatchBackend_WriteMetrics_Format(t *testing.T) {
 		// Create test metrics
 		metrics := []*ipcpb.Metric{
 			{
-				JobId:     jobID,
+				JobUuid:   jobID,
 				Timestamp: 1000000000,
 				// Add other metric fields as needed
 			},
@@ -499,8 +499,8 @@ func TestCloudWatchBackend_ReadLogs_QueryFormatting(t *testing.T) {
 	if err == nil && backend != nil {
 		// Create log query
 		query := &LogQuery{
-			JobID:  jobID,
-			Stream: ipcpb.StreamType_STREAM_TYPE_STDOUT,
+			JobUUID: jobID,
+			Stream:  ipcpb.StreamType_STREAM_TYPE_STDOUT,
 		}
 
 		// Attempt to read logs (will fail without AWS credentials)

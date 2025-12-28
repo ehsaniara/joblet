@@ -131,7 +131,7 @@ func (es *EnvironmentService) CleanupWorkspace(jobID string) error {
 	jobDir := filepath.Join(es.config.Filesystem.BaseDir, jobID)
 
 	if err := os.RemoveAll(jobDir); err != nil {
-		es.logger.Warn("failed to remove job directory", "jobID", jobID, "path", jobDir, "error", err)
+		es.logger.Warn("failed to remove job directory", "job_uuid", jobID, "path", jobDir, "error", err)
 		return err
 	}
 
@@ -369,7 +369,7 @@ func (es *EnvironmentService) buildGPUEnvironment(job *domain.Job) []string {
 		gpuEnv = append(gpuEnv, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", cudaVisibleDevices))
 
 		es.logger.Debug("setting GPU environment variables",
-			"jobID", job.Uuid,
+			"job_uuid", job.Uuid,
 			"gpuIndices", job.GPUIndices,
 			"CUDA_VISIBLE_DEVICES", cudaVisibleDevices)
 	}
@@ -410,7 +410,7 @@ func (es *EnvironmentService) buildGPUEnvironment(job *domain.Job) []string {
 	}
 
 	es.logger.Debug("built GPU environment variables",
-		"jobID", job.Uuid,
+		"job_uuid", job.Uuid,
 		"gpuEnvCount", len(gpuEnv))
 
 	return gpuEnv

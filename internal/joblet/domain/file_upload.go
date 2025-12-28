@@ -17,7 +17,7 @@ type FileUpload struct {
 
 // UploadSession represents a file upload session with streaming capabilities
 type UploadSession struct {
-	JobID       string
+	JobUUID     string
 	TotalFiles  int
 	TotalSize   int64
 	Files       []FileUpload // All files

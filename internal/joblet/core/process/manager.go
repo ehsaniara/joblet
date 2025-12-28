@@ -55,7 +55,7 @@ type LaunchConfig struct {
 	SysProcAttr *syscall.SysProcAttr
 	Stdout      io.Writer
 	Stderr      io.Writer
-	JobID       string
+	JobUUID     string
 	JobType     domain.JobType // Job type for isolation configuration
 	Command     string
 	Args        []string
@@ -75,7 +75,7 @@ func (m *Manager) LaunchProcess(ctx context.Context, config *LaunchConfig) (*Lau
 		return nil, fmt.Errorf("launch config cannot be nil")
 	}
 
-	log := m.logger.WithFields("jobID", config.JobID, "command", config.Command)
+	log := m.logger.WithFields("job_uuid", config.JobUUID, "command", config.Command)
 	log.Debug("launching process")
 
 	// Validate configuration
@@ -181,7 +181,7 @@ func (m *Manager) createAndStartCommand(config *LaunchConfig) (platform.Command,
 
 // CleanupRequest contains information needed for cleanup
 type CleanupRequest struct {
-	JobID           string
+	JobUUID         string
 	PID             int32
 	CgroupPath      string
 	NetworkGroupID  string
@@ -192,7 +192,7 @@ type CleanupRequest struct {
 
 // CleanupResult contains the result of a cleanup operation
 type CleanupResult struct {
-	JobID            string
+	JobUUID          string
 	ProcessKilled    bool
 	CgroupCleaned    bool
 	NamespaceRemoved bool
@@ -211,12 +211,12 @@ func (m *Manager) CleanupProcess(ctx context.Context, req *CleanupRequest) (*Cle
 		return nil, fmt.Errorf("invalid cleanup request: %w", err)
 	}
 
-	log := m.logger.WithFields("jobID", req.JobID, "pid", req.PID)
+	log := m.logger.WithFields("job_uuid", req.JobUUID, "pid", req.PID)
 	log.Debug("starting process cleanup", "forceKill", req.ForceKill, "gracefulTimeout", req.GracefulTimeout)
 
 	result := &CleanupResult{
-		JobID:  req.JobID,
-		Errors: make([]error, 0),
+		JobUUID: req.JobUUID,
+		Errors:  make([]error, 0),
 	}
 
 	// Handle process termination
@@ -257,7 +257,7 @@ type processCleanupResult struct {
 
 // cleanupProcessAndGroup handles process and process group cleanup
 func (m *Manager) cleanupProcessAndGroup(ctx context.Context, req *CleanupRequest) *processCleanupResult {
-	log := m.logger.WithFields("jobID", req.JobID, "pid", req.PID)
+	log := m.logger.WithFields("job_uuid", req.JobUUID, "pid", req.PID)
 
 	// Check if process is still alive
 	if !m.isProcessAlive(req.PID) {
@@ -271,23 +271,23 @@ func (m *Manager) cleanupProcessAndGroup(ctx context.Context, req *CleanupReques
 
 	// If force kill is requested, skip graceful shutdown
 	if req.ForceKill {
-		return m.forceKillProcess(req.PID, req.JobID)
+		return m.forceKillProcess(req.PID, req.JobUUID)
 	}
 
 	// Try graceful shutdown first
-	gracefulResult := m.attemptGracefulShutdown(req.PID, req.GracefulTimeout, req.JobID)
+	gracefulResult := m.attemptGracefulShutdown(req.PID, req.GracefulTimeout, req.JobUUID)
 	if gracefulResult.Killed {
 		return gracefulResult
 	}
 
 	// If graceful shutdown failed, force kill
 	log.Warn("graceful shutdown failed, attempting force kill")
-	return m.forceKillProcess(req.PID, req.JobID)
+	return m.forceKillProcess(req.PID, req.JobUUID)
 }
 
 // attemptGracefulShutdown attempts to gracefully shut down a process
 func (m *Manager) attemptGracefulShutdown(pid int32, timeout time.Duration, jobID string) *processCleanupResult {
-	log := m.logger.WithFields("jobID", jobID, "pid", pid)
+	log := m.logger.WithFields("job_uuid", jobID, "pid", pid)
 
 	if timeout <= 0 {
 		timeout = GracefulShutdownTimeout
@@ -333,7 +333,7 @@ func (m *Manager) attemptGracefulShutdown(pid int32, timeout time.Duration, jobI
 
 // forceKillProcess force kills a process and its group
 func (m *Manager) forceKillProcess(pid int32, jobID string) *processCleanupResult {
-	log := m.logger.WithFields("jobID", jobID, "pid", pid)
+	log := m.logger.WithFields("job_uuid", jobID, "pid", pid)
 	log.Warn("force killing process")
 
 	// Send SIGKILL to process group
@@ -684,7 +684,7 @@ func (m *Manager) validateLaunchConfig(config *LaunchConfig) error {
 	if config.InitPath == "" {
 		return fmt.Errorf("init path cannot be empty")
 	}
-	if config.JobID == "" {
+	if config.JobUUID == "" {
 		return fmt.Errorf("job ID cannot be empty")
 	}
 	if err := m.validateInitPath(config.InitPath); err != nil {
@@ -699,7 +699,7 @@ func (m *Manager) validateLaunchConfig(config *LaunchConfig) error {
 }
 
 func (m *Manager) validateCleanupRequest(req *CleanupRequest) error {
-	if req.JobID == "" {
+	if req.JobUUID == "" {
 		return fmt.Errorf("job ID cannot be empty")
 	}
 	if req.GracefulTimeout < 0 {

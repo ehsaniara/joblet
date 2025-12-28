@@ -163,9 +163,9 @@ func (x *PingResponse) GetTimestamp() int64 {
 
 // QueryLogsRequest specifies parameters for log queries
 type QueryLogsRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	JobId  string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	NodeId string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	JobUuid string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
+	NodeId  string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	// Stream filter
 	Stream StreamType `protobuf:"varint,2,opt,name=stream,proto3,enum=joblet.persist.StreamType" json:"stream,omitempty"` // STDOUT, STDERR, or both (UNSPECIFIED)
 	// Time range (optional)
@@ -208,9 +208,9 @@ func (*QueryLogsRequest) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *QueryLogsRequest) GetJobId() string {
+func (x *QueryLogsRequest) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -259,9 +259,9 @@ func (x *QueryLogsRequest) GetOffset() int32 {
 
 // QueryMetricsRequest specifies parameters for metrics queries
 type QueryMetricsRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	JobId  string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	NodeId string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	JobUuid string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
+	NodeId  string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	// Time range (optional)
 	StartTime int64 `protobuf:"varint,2,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"` // Unix nanoseconds
 	EndTime   int64 `protobuf:"varint,3,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`       // Unix nanoseconds
@@ -302,9 +302,9 @@ func (*QueryMetricsRequest) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *QueryMetricsRequest) GetJobId() string {
+func (x *QueryMetricsRequest) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -347,7 +347,7 @@ func (x *QueryMetricsRequest) GetOffset() int32 {
 // LogLine represents a single log line from a job
 type LogLine struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Stream        StreamType             `protobuf:"varint,2,opt,name=stream,proto3,enum=joblet.persist.StreamType" json:"stream,omitempty"` // stdout or stderr
 	Timestamp     int64                  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                          // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,4,opt,name=sequence,proto3" json:"sequence,omitempty"`                            // Sequence number
@@ -386,9 +386,9 @@ func (*LogLine) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *LogLine) GetJobId() string {
+func (x *LogLine) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -424,7 +424,7 @@ func (x *LogLine) GetContent() []byte {
 // Metric represents a metrics sample from a job
 type Metric struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Data          *MetricData            `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`            // Metric values
@@ -462,9 +462,9 @@ func (*Metric) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *Metric) GetJobId() string {
+func (x *Metric) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -708,7 +708,7 @@ func (x *NetworkIO) GetTxPackets() int64 {
 // DeleteJobRequest specifies the job to delete from persist storage
 type DeleteJobRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -744,9 +744,9 @@ func (*DeleteJobRequest) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *DeleteJobRequest) GetJobId() string {
+func (x *DeleteJobRequest) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -813,9 +813,9 @@ func (x *DeleteJobResponse) GetMessage() string {
 
 // QueryTelemetryRequest specifies parameters for telemetry event queries
 type QueryTelemetryRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	JobId  string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	NodeId string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	JobUuid string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
+	NodeId  string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // Node ID where the job ran (for CloudWatch log group lookup)
 	// Time range (optional)
 	StartTime int64 `protobuf:"varint,2,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"` // Unix nanoseconds
 	EndTime   int64 `protobuf:"varint,3,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`       // Unix nanoseconds
@@ -856,9 +856,9 @@ func (*QueryTelemetryRequest) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *QueryTelemetryRequest) GetJobId() string {
+func (x *QueryTelemetryRequest) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -901,7 +901,7 @@ func (x *QueryTelemetryRequest) GetOffset() int32 {
 // ExecEvent represents a process execution event from eBPF telematics
 type ExecEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -945,9 +945,9 @@ func (*ExecEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *ExecEvent) GetJobId() string {
+func (x *ExecEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1018,7 +1018,7 @@ func (x *ExecEvent) GetArgs() []string {
 // ConnectEvent represents a network connection event from eBPF telematics
 type ConnectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
@@ -1062,9 +1062,9 @@ func (*ConnectEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *ConnectEvent) GetJobId() string {
+func (x *ConnectEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1135,7 +1135,7 @@ func (x *ConnectEvent) GetProtocol() string {
 // MmapEvent represents a memory mapping event from eBPF telematics
 type MmapEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -1179,9 +1179,9 @@ func (*MmapEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *MmapEvent) GetJobId() string {
+func (x *MmapEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1252,7 +1252,7 @@ func (x *MmapEvent) GetFilename() string {
 // MprotectEvent represents a memory protection change event from eBPF telematics
 type MprotectEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -1294,9 +1294,9 @@ func (*MprotectEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *MprotectEvent) GetJobId() string {
+func (x *MprotectEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1353,7 +1353,7 @@ func (x *MprotectEvent) GetProt() uint32 {
 // FileEvent represents a file operation event from eBPF telematics
 type FileEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`   // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`             // Process ID
@@ -1395,9 +1395,9 @@ func (*FileEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *FileEvent) GetJobId() string {
+func (x *FileEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1454,7 +1454,7 @@ func (x *FileEvent) GetBytes() int64 {
 // AcceptEvent represents an incoming network connection event from eBPF telematics
 type AcceptEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
@@ -1498,9 +1498,9 @@ func (*AcceptEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *AcceptEvent) GetJobId() string {
+func (x *AcceptEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1571,7 +1571,7 @@ func (x *AcceptEvent) GetProtocol() string {
 // SocketDataEvent represents socket data transfer event from eBPF telematics
 type SocketDataEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	JobUuid       string                 `protobuf:"bytes,1,opt,name=job_uuid,json=jobUuid,proto3" json:"job_uuid,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`            // Unix nanoseconds
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`              // Sequence number
 	Pid           uint32                 `protobuf:"varint,4,opt,name=pid,proto3" json:"pid,omitempty"`                        // Process ID
@@ -1615,9 +1615,9 @@ func (*SocketDataEvent) Descriptor() ([]byte, []int) {
 	return file_persist_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *SocketDataEvent) GetJobId() string {
+func (x *SocketDataEvent) GetJobUuid() string {
 	if x != nil {
-		return x.JobId
+		return x.JobUuid
 	}
 	return ""
 }
@@ -1693,32 +1693,32 @@ const file_persist_proto_rawDesc = "" +
 	"\vPingRequest\"F\n" +
 	"\fPingResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x1c\n" +
-	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\"\xde\x01\n" +
-	"\x10QueryLogsRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\"\xe2\x01\n" +
+	"\x10QueryLogsRequest\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x17\n" +
 	"\anode_id\x18\a \x01(\tR\x06nodeId\x122\n" +
 	"\x06stream\x18\x02 \x01(\x0e2\x1a.joblet.persist.StreamTypeR\x06stream\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x03 \x01(\x03R\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x04 \x01(\x03R\aendTime\x12\x14\n" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x06 \x01(\x05R\x06offset\"\xad\x01\n" +
-	"\x13QueryMetricsRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\x06offset\x18\x06 \x01(\x05R\x06offset\"\xb1\x01\n" +
+	"\x13QueryMetricsRequest\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x17\n" +
 	"\anode_id\x18\x06 \x01(\tR\x06nodeId\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x02 \x01(\x03R\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x03 \x01(\x03R\aendTime\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x05 \x01(\x05R\x06offset\"\xa8\x01\n" +
-	"\aLogLine\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x122\n" +
+	"\x06offset\x18\x05 \x01(\x05R\x06offset\"\xac\x01\n" +
+	"\aLogLine\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x122\n" +
 	"\x06stream\x18\x02 \x01(\x0e2\x1a.joblet.persist.StreamTypeR\x06stream\x12\x1c\n" +
 	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x04 \x01(\x04R\bsequence\x12\x18\n" +
-	"\acontent\x18\x05 \x01(\fR\acontent\"\x89\x01\n" +
-	"\x06Metric\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\acontent\x18\x05 \x01(\fR\acontent\"\x8d\x01\n" +
+	"\x06Metric\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12.\n" +
 	"\x04data\x18\x04 \x01(\v2\x1a.joblet.persist.MetricDataR\x04data\"\xd4\x01\n" +
@@ -1743,23 +1743,23 @@ const file_persist_proto_rawDesc = "" +
 	"\n" +
 	"rx_packets\x18\x03 \x01(\x03R\trxPackets\x12\x1d\n" +
 	"\n" +
-	"tx_packets\x18\x04 \x01(\x03R\ttxPackets\"B\n" +
-	"\x10DeleteJobRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"tx_packets\x18\x04 \x01(\x03R\ttxPackets\"F\n" +
+	"\x10DeleteJobRequest\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\"G\n" +
 	"\x11DeleteJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xaf\x01\n" +
-	"\x15QueryTelemetryRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x17\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xb3\x01\n" +
+	"\x15QueryTelemetryRequest\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x17\n" +
 	"\anode_id\x18\x06 \x01(\tR\x06nodeId\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x02 \x01(\x03R\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x03 \x01(\x03R\aendTime\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x05 \x01(\x05R\x06offset\"\xea\x01\n" +
-	"\tExecEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\x06offset\x18\x05 \x01(\x05R\x06offset\"\xee\x01\n" +
+	"\tExecEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1769,9 +1769,9 @@ const file_persist_proto_rawDesc = "" +
 	"\x04comm\x18\b \x01(\tR\x04comm\x12\x1a\n" +
 	"\bfilename\x18\t \x01(\tR\bfilename\x12\x12\n" +
 	"\x04args\x18\n" +
-	" \x03(\tR\x04args\"\x8d\x02\n" +
-	"\fConnectEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x03(\tR\x04args\"\x91\x02\n" +
+	"\fConnectEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1781,9 +1781,9 @@ const file_persist_proto_rawDesc = "" +
 	"\bdst_addr\x18\b \x01(\tR\adstAddr\x12\x19\n" +
 	"\bdst_port\x18\t \x01(\rR\adstPort\x12\x1a\n" +
 	"\bprotocol\x18\n" +
-	" \x01(\tR\bprotocol\"\xf4\x01\n" +
-	"\tMmapEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\tR\bprotocol\"\xf8\x01\n" +
+	"\tMmapEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1793,27 +1793,27 @@ const file_persist_proto_rawDesc = "" +
 	"\x04prot\x18\b \x01(\rR\x04prot\x12\x14\n" +
 	"\x05flags\x18\t \x01(\rR\x05flags\x12\x1a\n" +
 	"\bfilename\x18\n" +
-	" \x01(\tR\bfilename\"\xc6\x01\n" +
-	"\rMprotectEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\tR\bfilename\"\xca\x01\n" +
+	"\rMprotectEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
 	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
 	"\x04addr\x18\x06 \x01(\x04R\x04addr\x12\x16\n" +
 	"\x06length\x18\a \x01(\x04R\x06length\x12\x12\n" +
-	"\x04prot\x18\b \x01(\rR\x04prot\"\xca\x01\n" +
-	"\tFileEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\x04prot\x18\b \x01(\rR\x04prot\"\xce\x01\n" +
+	"\tFileEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
 	"\x04comm\x18\x05 \x01(\tR\x04comm\x12\x12\n" +
 	"\x04path\x18\x06 \x01(\tR\x04path\x12\x1c\n" +
 	"\toperation\x18\a \x01(\tR\toperation\x12\x14\n" +
-	"\x05bytes\x18\b \x01(\x03R\x05bytes\"\x8c\x02\n" +
-	"\vAcceptEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	"\x05bytes\x18\b \x01(\x03R\x05bytes\"\x90\x02\n" +
+	"\vAcceptEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +
@@ -1823,9 +1823,9 @@ const file_persist_proto_rawDesc = "" +
 	"\bdst_addr\x18\b \x01(\tR\adstAddr\x12\x19\n" +
 	"\bdst_port\x18\t \x01(\rR\adstPort\x12\x1a\n" +
 	"\bprotocol\x18\n" +
-	" \x01(\tR\bprotocol\"\x8e\x02\n" +
-	"\x0fSocketDataEvent\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1c\n" +
+	" \x01(\tR\bprotocol\"\x92\x02\n" +
+	"\x0fSocketDataEvent\x12\x19\n" +
+	"\bjob_uuid\x18\x01 \x01(\tR\ajobUuid\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x10\n" +
 	"\x03pid\x18\x04 \x01(\rR\x03pid\x12\x12\n" +

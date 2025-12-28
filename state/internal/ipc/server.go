@@ -219,11 +219,11 @@ func (s *Server) handleUpdate(ctx context.Context, msg Message) *Response {
 }
 
 func (s *Server) handleDelete(ctx context.Context, msg Message) *Response {
-	if msg.JobID == "" {
+	if msg.JobUUID == "" {
 		return s.makeError(msg.RequestID, "DELETE_ERROR", "jobID is required")
 	}
 
-	if err := s.backend.Delete(ctx, msg.JobID); err != nil {
+	if err := s.backend.Delete(ctx, msg.JobUUID); err != nil {
 		return s.makeError(msg.RequestID, "DELETE_ERROR", err.Error())
 	}
 
@@ -234,11 +234,11 @@ func (s *Server) handleDelete(ctx context.Context, msg Message) *Response {
 }
 
 func (s *Server) handleGet(ctx context.Context, msg Message) *Response {
-	if msg.JobID == "" {
+	if msg.JobUUID == "" {
 		return s.makeError(msg.RequestID, "GET_ERROR", "jobID is required")
 	}
 
-	job, err := s.backend.Get(ctx, msg.JobID)
+	job, err := s.backend.Get(ctx, msg.JobUUID)
 	if err != nil {
 		return s.makeError(msg.RequestID, "GET_ERROR", err.Error())
 	}
@@ -316,7 +316,7 @@ const (
 // Message represents an IPC request message
 type Message struct {
 	Operation Operation       `json:"op"`
-	JobID     string          `json:"jobId,omitempty"`
+	JobUUID   string          `json:"job_uuid,omitempty"`
 	Job       *domain.Job     `json:"job,omitempty"`
 	Jobs      []*domain.Job   `json:"jobs,omitempty"`
 	Filter    *storage.Filter `json:"filter,omitempty"`

@@ -22,7 +22,7 @@ TEST_DATA="test_data_$(date +%s)"
 run_remote_job() {
     local cmd="$1"
     local job_output=$("$RNX_BINARY" job run sh -c "$cmd" 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
     if [[ -z "$job_id" ]]; then
         echo "Failed to get job ID"
@@ -81,7 +81,7 @@ else
 fi
 " 2>&1)
     
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     local logs=$(get_job_logs "$job_id" 5)
     
     # Client-side verification
@@ -105,7 +105,7 @@ test_download_result() {
     local job_output=$("$RNX_BINARY" job run sh -c "
 echo 'DOWNLOAD_TEST_DATA' > /work/output.txt && echo 'FILE_CREATED'
 " 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
     local logs=$(get_job_logs "$job_id")
     assert_contains "$logs" "FILE_CREATED" "Should create output file"
@@ -171,7 +171,7 @@ fi
     fi
     
     if echo "$job_output" | grep -q "ID:"; then
-        local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+        local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
         local logs=$(get_job_logs "$job_id")
         
         # Client-side verification
@@ -207,7 +207,7 @@ echo 'PERSISTENT_DATA' > /work/persist/data.txt
 echo 'DATA_WRITTEN'
 ls -la /work/persist/
 " 2>&1)
-    local job1=$(echo "$job1_output" | grep "ID:" | awk '{print $2}')
+    local job1=$(echo "$job1_output" | grep "^ID:" | awk '{print $2}')
     
     local logs1=$(get_job_logs "$job1")
     if ! assert_contains "$logs1" "DATA_WRITTEN" "First job should write data"; then
@@ -236,7 +236,7 @@ else
 fi
 ls -la /work/ 2>/dev/null || echo 'WORK_DIR_EMPTY'
 " 2>&1)
-    local job2=$(echo "$job2_output" | grep "ID:" | awk '{print $2}')
+    local job2=$(echo "$job2_output" | grep "^ID:" | awk '{print $2}')
     
     local logs2=$(get_job_logs "$job2")
     
@@ -292,7 +292,7 @@ else
     echo 'ERROR:Could not create file'
 fi
 " 2>&1)
-    local job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
     
     local logs=$(get_job_logs "$job_id")
     

@@ -216,7 +216,7 @@ func (b *CloudWatchBackend) writeLogsToStream(jobID, streamType string, logs []*
 	}
 
 	b.logger.Debug("wrote logs to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"stream", streamType,
 		"count", len(logs),
 		"logGroup", logGroup,
@@ -469,7 +469,7 @@ func (b *CloudWatchBackend) writeMetricsToLogs(ctx context.Context, jobID string
 	}
 
 	b.logger.Debug("wrote metrics to CloudWatch Logs",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(metrics),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -615,7 +615,7 @@ func (b *CloudWatchBackend) writeMetricsToMetricsAPI(ctx context.Context, jobID 
 		})
 		if err != nil {
 			b.logger.Warn("failed to put metric data to CloudWatch Metrics API (non-fatal)",
-				"jobId", jobID,
+				"job_uuid", jobID,
 				"error", err)
 		}
 	}
@@ -674,7 +674,7 @@ func (b *CloudWatchBackend) WriteExecEvents(jobID string, events []*ipcpb.ExecEv
 	}
 
 	b.logger.Debug("wrote exec events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -735,7 +735,7 @@ func (b *CloudWatchBackend) WriteConnectEvents(jobID string, events []*ipcpb.Con
 	}
 
 	b.logger.Debug("wrote connect events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -790,7 +790,7 @@ func (b *CloudWatchBackend) WriteFileEvents(jobID string, events []*ipcpb.FileEv
 	}
 
 	b.logger.Debug("wrote file events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -845,7 +845,7 @@ func (b *CloudWatchBackend) WriteAcceptEvents(jobID string, events []*ipcpb.Acce
 	}
 
 	b.logger.Debug("wrote accept events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -900,7 +900,7 @@ func (b *CloudWatchBackend) WriteSocketDataEvents(jobID string, events []*ipcpb.
 	}
 
 	b.logger.Debug("wrote socket data events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -955,7 +955,7 @@ func (b *CloudWatchBackend) WriteMmapEvents(jobID string, events []*ipcpb.MmapEv
 	}
 
 	b.logger.Debug("wrote mmap events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -1010,7 +1010,7 @@ func (b *CloudWatchBackend) WriteMprotectEvents(jobID string, events []*ipcpb.Mp
 	}
 
 	b.logger.Debug("wrote mprotect events to CloudWatch",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"count", len(events),
 		"logGroup", logGroup,
 		"logStream", logStream)
@@ -1049,7 +1049,7 @@ func (b *CloudWatchBackend) readLogsFromStream(ctx context.Context, query *LogQu
 	if query.Stream == ipcpb.StreamType_STREAM_TYPE_STDERR {
 		streamSuffix = "stderr"
 	}
-	logStream := fmt.Sprintf("%s-%s", query.JobID, streamSuffix)
+	logStream := fmt.Sprintf("%s-%s", query.JobUUID, streamSuffix)
 
 	// Build GetLogEvents input
 	input := &cloudwatchlogs.GetLogEventsInput{
@@ -1083,7 +1083,7 @@ func (b *CloudWatchBackend) readLogsFromStream(ctx context.Context, query *LogQu
 		timestampNs := *event.Timestamp * 1_000_000
 
 		logLine := &ipcpb.LogLine{
-			JobId:     query.JobID,
+			JobUuid:   query.JobUUID,
 			Stream:    query.Stream,
 			Content:   []byte(*event.Message),
 			Timestamp: timestampNs,
@@ -1124,7 +1124,7 @@ func (b *CloudWatchBackend) ReadMetrics(ctx context.Context, query *MetricQuery)
 func (b *CloudWatchBackend) readMetricsFromStream(ctx context.Context, query *MetricQuery, ch chan<- *ipcpb.Metric) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-metrics", query.JobID)
+	logStream := fmt.Sprintf("%s-metrics", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1157,7 +1157,7 @@ func (b *CloudWatchBackend) readMetricsFromStream(ctx context.Context, query *Me
 		if err != nil {
 			// Check for stream not found - not an error, just no metrics
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("metrics stream not found", "jobId", query.JobID)
+				b.logger.Debug("metrics stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get metric log events: %w", err)
@@ -1180,7 +1180,7 @@ func (b *CloudWatchBackend) readMetricsFromStream(ctx context.Context, query *Me
 
 	// Parse and send metrics
 	for _, event := range allEvents {
-		metric, err := parseMetricFromJSON(*event.Message, query.JobID)
+		metric, err := parseMetricFromJSON(*event.Message, query.JobUUID)
 		if err != nil {
 			b.logger.Warn("failed to parse metric from log", "error", err)
 			continue
@@ -1217,7 +1217,7 @@ func parseMetricFromJSON(jsonStr string, jobID string) (*ipcpb.Metric, error) {
 	}
 
 	return &ipcpb.Metric{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: data.Timestamp,
 		Data: &ipcpb.MetricData{
 			CpuUsage:    data.CPU,
@@ -1293,7 +1293,7 @@ func (b *CloudWatchBackend) DeleteJob(jobID string) error {
 		return fmt.Errorf("failed to delete some log streams: %v", errs)
 	}
 
-	b.logger.Info("deleted CloudWatch log streams for job", "jobId", jobID, "logGroup", logGroup)
+	b.logger.Info("deleted CloudWatch log streams for job", "job_uuid", jobID, "logGroup", logGroup)
 	return nil
 }
 
@@ -1328,7 +1328,7 @@ func (b *CloudWatchBackend) ReadExecEvents(ctx context.Context, query *Telemetry
 func (b *CloudWatchBackend) readExecEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ExecEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-exec-events", query.JobID)
+	logStream := fmt.Sprintf("%s-exec-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1360,14 +1360,14 @@ func (b *CloudWatchBackend) readExecEventsFromStream(ctx context.Context, query 
 		if err != nil {
 			// Check for stream not found - not an error, just no events
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("exec events stream not found", "jobId", query.JobID)
+				b.logger.Debug("exec events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get exec events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			execEvent, err := parseExecEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			execEvent, err := parseExecEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse exec event", "error", err)
 				continue
@@ -1415,7 +1415,7 @@ func (b *CloudWatchBackend) ReadConnectEvents(ctx context.Context, query *Teleme
 func (b *CloudWatchBackend) readConnectEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.ConnectEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-connect-events", query.JobID)
+	logStream := fmt.Sprintf("%s-connect-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1447,14 +1447,14 @@ func (b *CloudWatchBackend) readConnectEventsFromStream(ctx context.Context, que
 		if err != nil {
 			// Check for stream not found - not an error, just no events
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("connect events stream not found", "jobId", query.JobID)
+				b.logger.Debug("connect events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get connect events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			connectEvent, err := parseConnectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			connectEvent, err := parseConnectEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse connect event", "error", err)
 				continue
@@ -1502,7 +1502,7 @@ func (b *CloudWatchBackend) ReadFileEvents(ctx context.Context, query *Telemetry
 func (b *CloudWatchBackend) readFileEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.FileEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-file-events", query.JobID)
+	logStream := fmt.Sprintf("%s-file-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1533,14 +1533,14 @@ func (b *CloudWatchBackend) readFileEventsFromStream(ctx context.Context, query 
 		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("file events stream not found", "jobId", query.JobID)
+				b.logger.Debug("file events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get file events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			fileEvent, err := parseFileEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			fileEvent, err := parseFileEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse file event", "error", err)
 				continue
@@ -1588,7 +1588,7 @@ func (b *CloudWatchBackend) ReadAcceptEvents(ctx context.Context, query *Telemet
 func (b *CloudWatchBackend) readAcceptEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.AcceptEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-accept-events", query.JobID)
+	logStream := fmt.Sprintf("%s-accept-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1619,14 +1619,14 @@ func (b *CloudWatchBackend) readAcceptEventsFromStream(ctx context.Context, quer
 		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("accept events stream not found", "jobId", query.JobID)
+				b.logger.Debug("accept events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get accept events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			acceptEvent, err := parseAcceptEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			acceptEvent, err := parseAcceptEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse accept event", "error", err)
 				continue
@@ -1674,7 +1674,7 @@ func (b *CloudWatchBackend) ReadSocketDataEvents(ctx context.Context, query *Tel
 func (b *CloudWatchBackend) readSocketDataEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.SocketDataEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-socket-data-events", query.JobID)
+	logStream := fmt.Sprintf("%s-socket-data-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1705,14 +1705,14 @@ func (b *CloudWatchBackend) readSocketDataEventsFromStream(ctx context.Context, 
 		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("socket data events stream not found", "jobId", query.JobID)
+				b.logger.Debug("socket data events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get socket data events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			socketDataEvent, err := parseSocketDataEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			socketDataEvent, err := parseSocketDataEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse socket data event", "error", err)
 				continue
@@ -1760,7 +1760,7 @@ func (b *CloudWatchBackend) ReadMmapEvents(ctx context.Context, query *Telemetry
 func (b *CloudWatchBackend) readMmapEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MmapEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-mmap-events", query.JobID)
+	logStream := fmt.Sprintf("%s-mmap-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1791,14 +1791,14 @@ func (b *CloudWatchBackend) readMmapEventsFromStream(ctx context.Context, query 
 		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("mmap events stream not found", "jobId", query.JobID)
+				b.logger.Debug("mmap events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get mmap events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			mmapEvent, err := parseMmapEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			mmapEvent, err := parseMmapEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse mmap event", "error", err)
 				continue
@@ -1846,7 +1846,7 @@ func (b *CloudWatchBackend) ReadMprotectEvents(ctx context.Context, query *Telem
 func (b *CloudWatchBackend) readMprotectEventsFromStream(ctx context.Context, query *TelemetryQuery, ch chan<- *ipcpb.MprotectEvent) error {
 	// Use passed nodeID for multi-node queries, falls back to local config.NodeID
 	logGroup := b.getLogGroupForRead(query.NodeID)
-	logStream := fmt.Sprintf("%s-mprotect-events", query.JobID)
+	logStream := fmt.Sprintf("%s-mprotect-events", query.JobUUID)
 
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(logGroup),
@@ -1877,14 +1877,14 @@ func (b *CloudWatchBackend) readMprotectEventsFromStream(ctx context.Context, qu
 		resp, err := b.logsClient.GetLogEvents(ctx, input)
 		if err != nil {
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				b.logger.Debug("mprotect events stream not found", "jobId", query.JobID)
+				b.logger.Debug("mprotect events stream not found", "job_uuid", query.JobUUID)
 				return nil
 			}
 			return fmt.Errorf("failed to get mprotect events: %w", err)
 		}
 
 		for _, event := range resp.Events {
-			mprotectEvent, err := parseMprotectEventFromJSON(*event.Message, query.JobID, *event.Timestamp*1_000_000)
+			mprotectEvent, err := parseMprotectEventFromJSON(*event.Message, query.JobUUID, *event.Timestamp*1_000_000)
 			if err != nil {
 				b.logger.Warn("failed to parse mprotect event", "error", err)
 				continue
@@ -1925,7 +1925,7 @@ func parseExecEventFromJSON(jsonStr string, jobID string, timestamp int64) (*ipc
 	}
 
 	return &ipcpb.ExecEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Ppid:      data.Ppid,
@@ -1957,7 +1957,7 @@ func parseConnectEventFromJSON(jsonStr string, jobID string, timestamp int64) (*
 	dstAddr, dstPort := parseAddrPort(data.Dst)
 
 	return &ipcpb.ConnectEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Comm:      data.Comm,
@@ -1995,7 +1995,7 @@ func parseFileEventFromJSON(jsonStr string, jobID string, timestamp int64) (*ipc
 	}
 
 	return &ipcpb.FileEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Comm:      data.Comm,
@@ -2024,7 +2024,7 @@ func parseAcceptEventFromJSON(jsonStr string, jobID string, timestamp int64) (*i
 	dstAddr, dstPort := parseAddrPort(data.Dst)
 
 	return &ipcpb.AcceptEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Comm:      data.Comm,
@@ -2055,7 +2055,7 @@ func parseSocketDataEventFromJSON(jsonStr string, jobID string, timestamp int64)
 	addr, port := parseAddrPort(data.Addr)
 
 	return &ipcpb.SocketDataEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Comm:      data.Comm,
@@ -2085,7 +2085,7 @@ func parseMmapEventFromJSON(jsonStr string, jobID string, timestamp int64) (*ipc
 	}
 
 	return &ipcpb.MmapEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Comm:      data.Comm,
@@ -2113,7 +2113,7 @@ func parseMprotectEventFromJSON(jsonStr string, jobID string, timestamp int64) (
 	}
 
 	return &ipcpb.MprotectEvent{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		Timestamp: timestamp,
 		Pid:       data.Pid,
 		Comm:      data.Comm,

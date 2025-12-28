@@ -302,7 +302,7 @@ func (a *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allo
 	}
 
 	allocation.AssignedAt = time.Now().Unix()
-	allocation.JobID = jobID
+	allocation.JobUUID = jobID
 	allocation.NetworkName = networkName
 
 	// Store the allocation
@@ -311,12 +311,12 @@ func (a *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allo
 		if IsConflictError(err) {
 			return fmt.Errorf("job already assigned to a network: %s", jobID)
 		}
-		a.logger.Error("failed to create job allocation in store", "jobId", jobID, "networkName", networkName, "error", err)
+		a.logger.Error("failed to create job allocation in store", "job_uuid", jobID, "networkName", networkName, "error", err)
 		return fmt.Errorf("failed to assign job to network: %w", err)
 	}
 
 	a.logger.Info("job assigned to network successfully",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"networkName", networkName,
 		"ipAddress", allocation.IPAddress)
 
@@ -342,12 +342,12 @@ func (a *networkStoreAdapter) JobNetworkAllocation(jobID string) (*JobNetworkAll
 	ctx := context.Background()
 	allocation, exists, err := a.allocationStore.Get(ctx, jobID)
 	if err != nil {
-		a.logger.Error("failed to get job allocation from store", "jobId", jobID, "error", err)
+		a.logger.Error("failed to get job allocation from store", "job_uuid", jobID, "error", err)
 		return nil, false
 	}
 
 	if exists {
-		a.logger.Debug("job allocation retrieved successfully", "jobId", jobID, "networkName", allocation.NetworkName)
+		a.logger.Debug("job allocation retrieved successfully", "job_uuid", jobID, "networkName", allocation.NetworkName)
 		allocationCopy := *allocation
 		if allocation.Metadata != nil {
 			allocationCopy.Metadata = make(map[string]string)
@@ -358,7 +358,7 @@ func (a *networkStoreAdapter) JobNetworkAllocation(jobID string) (*JobNetworkAll
 		return &allocationCopy, true
 	}
 
-	a.logger.Debug("job allocation not found", "jobId", jobID)
+	a.logger.Debug("job allocation not found", "job_uuid", jobID)
 	return nil, false
 }
 
@@ -385,7 +385,7 @@ func (a *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
 	// Release IP if allocated
 	if allocation.IPAddress != "" {
 		if err := a.ReleaseIP(allocation.NetworkName, allocation.IPAddress); err != nil {
-			a.logger.Warn("failed to release IP address", "jobId", jobID, "ip", allocation.IPAddress, "error", err)
+			a.logger.Warn("failed to release IP address", "job_uuid", jobID, "ip", allocation.IPAddress, "error", err)
 			// Continue with removal even if IP release fails
 		}
 	}
@@ -396,12 +396,12 @@ func (a *networkStoreAdapter) RemoveJobFromNetwork(jobID string) error {
 		if err.Error() == "key not found" {
 			return fmt.Errorf("job not assigned to any network: %s", jobID)
 		}
-		a.logger.Error("failed to remove job allocation from store", "jobId", jobID, "error", err)
+		a.logger.Error("failed to remove job allocation from store", "job_uuid", jobID, "error", err)
 		return fmt.Errorf("failed to remove job from network: %w", err)
 	}
 
 	a.logger.Info("job removed from network successfully",
-		"jobId", jobID,
+		"job_uuid", jobID,
 		"networkName", allocation.NetworkName)
 
 	return nil

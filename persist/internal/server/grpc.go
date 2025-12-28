@@ -51,7 +51,7 @@ func logLineIPCToGen(ipc *ipcpb.LogLine) *persistpb.LogLine {
 		return nil
 	}
 	return &persistpb.LogLine{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Stream:    streamTypeIPCToGen(ipc.Stream),
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
@@ -65,7 +65,7 @@ func metricIPCToGen(ipc *ipcpb.Metric) *persistpb.Metric {
 	}
 
 	gen := &persistpb.Metric{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 	}
@@ -255,15 +255,15 @@ func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb
 		return err
 	}
 
-	s.logger.Info("QueryLogs request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset, "stream", req.Stream)
+	s.logger.Info("QueryLogs request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset, "stream", req.Stream)
 
 	// Build query
 	query := &storage.LogQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Stream: streamTypeGenToIPC(req.Stream),
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Stream:  streamTypeGenToIPC(req.Stream),
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 
 	// Add time range if specified
@@ -277,7 +277,7 @@ func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb
 	// Read logs from backend
 	reader, err := s.backend.ReadLogs(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read logs", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read logs", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read logs: %v", err)
 	}
 
@@ -286,7 +286,7 @@ func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb
 	for {
 		select {
 		case <-stream.Context().Done():
-			s.logger.Debug("QueryLogs cancelled by client", "jobID", req.JobId, "logCount", logCount)
+			s.logger.Debug("QueryLogs cancelled by client", "job_uuid", req.JobUuid, "logCount", logCount)
 			return stream.Context().Err()
 
 		case logLine, ok := <-reader.Channel:
@@ -295,26 +295,26 @@ func (s *GRPCServer) QueryLogs(req *persistpb.QueryLogsRequest, stream persistpb
 				select {
 				case err := <-reader.Error:
 					if err != nil {
-						s.logger.Error("Error reading logs", "error", err, "jobID", req.JobId)
+						s.logger.Error("Error reading logs", "error", err, "job_uuid", req.JobUuid)
 						return status.Errorf(codes.Internal, "error reading logs: %v", err)
 					}
 				default:
 				}
 				// Successful completion
-				s.logger.Info("QueryLogs completed", "jobID", req.JobId, "logCount", logCount)
+				s.logger.Info("QueryLogs completed", "job_uuid", req.JobUuid, "logCount", logCount)
 				return nil
 			}
 
 			// Send log line to client (convert from ipc to gen)
 			if err := stream.Send(logLineIPCToGen(logLine)); err != nil {
-				s.logger.Error("Failed to send log line", "error", err, "jobID", req.JobId)
+				s.logger.Error("Failed to send log line", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "failed to send log: %v", err)
 			}
 			logCount++
 
 		case err := <-reader.Error:
 			if err != nil {
-				s.logger.Error("Error from log reader", "error", err, "jobID", req.JobId)
+				s.logger.Error("Error from log reader", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "error reading logs: %v", err)
 			}
 		}
@@ -328,14 +328,14 @@ func (s *GRPCServer) QueryMetrics(req *persistpb.QueryMetricsRequest, stream per
 		return err
 	}
 
-	s.logger.Info("QueryMetrics request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryMetrics request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	// Build query
 	query := &storage.MetricQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 
 	// Add time range if specified
@@ -349,7 +349,7 @@ func (s *GRPCServer) QueryMetrics(req *persistpb.QueryMetricsRequest, stream per
 	// Read metrics from backend
 	reader, err := s.backend.ReadMetrics(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read metrics", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read metrics", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read metrics: %v", err)
 	}
 
@@ -358,7 +358,7 @@ func (s *GRPCServer) QueryMetrics(req *persistpb.QueryMetricsRequest, stream per
 	for {
 		select {
 		case <-stream.Context().Done():
-			s.logger.Debug("QueryMetrics cancelled by client", "jobID", req.JobId, "metricCount", metricCount)
+			s.logger.Debug("QueryMetrics cancelled by client", "job_uuid", req.JobUuid, "metricCount", metricCount)
 			return stream.Context().Err()
 
 		case metric, ok := <-reader.Channel:
@@ -367,26 +367,26 @@ func (s *GRPCServer) QueryMetrics(req *persistpb.QueryMetricsRequest, stream per
 				select {
 				case err := <-reader.Error:
 					if err != nil {
-						s.logger.Error("Error reading metrics", "error", err, "jobID", req.JobId)
+						s.logger.Error("Error reading metrics", "error", err, "job_uuid", req.JobUuid)
 						return status.Errorf(codes.Internal, "error reading metrics: %v", err)
 					}
 				default:
 				}
 				// Successful completion
-				s.logger.Info("QueryMetrics completed", "jobID", req.JobId, "metricCount", metricCount)
+				s.logger.Info("QueryMetrics completed", "job_uuid", req.JobUuid, "metricCount", metricCount)
 				return nil
 			}
 
 			// Send metric to client (convert from ipc to gen)
 			if err := stream.Send(metricIPCToGen(metric)); err != nil {
-				s.logger.Error("Failed to send metric", "error", err, "jobID", req.JobId)
+				s.logger.Error("Failed to send metric", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "failed to send metric: %v", err)
 			}
 			metricCount++
 
 		case err := <-reader.Error:
 			if err != nil {
-				s.logger.Error("Error from metric reader", "error", err, "jobID", req.JobId)
+				s.logger.Error("Error from metric reader", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "error reading metrics: %v", err)
 			}
 		}
@@ -403,10 +403,10 @@ func (s *GRPCServer) DeleteJob(ctx context.Context, req *persistpb.DeleteJobRequ
 		}, nil
 	}
 
-	s.logger.Info("DeleteJob request", "jobID", req.JobId)
+	s.logger.Info("DeleteJob request", "job_uuid", req.JobUuid)
 
 	// Validate job ID
-	if req.JobId == "" {
+	if req.JobUuid == "" {
 		return &persistpb.DeleteJobResponse{
 			Success: false,
 			Message: "Job ID cannot be empty",
@@ -414,15 +414,15 @@ func (s *GRPCServer) DeleteJob(ctx context.Context, req *persistpb.DeleteJobRequ
 	}
 
 	// Delete job from backend storage
-	if err := s.backend.DeleteJob(req.JobId); err != nil {
-		s.logger.Error("Failed to delete job", "jobID", req.JobId, "error", err)
+	if err := s.backend.DeleteJob(req.JobUuid); err != nil {
+		s.logger.Error("Failed to delete job", "job_uuid", req.JobUuid, "error", err)
 		return &persistpb.DeleteJobResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to delete job: %v", err),
 		}, nil
 	}
 
-	s.logger.Info("Job deleted successfully", "jobID", req.JobId)
+	s.logger.Info("Job deleted successfully", "job_uuid", req.JobUuid)
 
 	return &persistpb.DeleteJobResponse{
 		Success: true,
@@ -445,7 +445,7 @@ func execEventIPCToGen(ipc *ipcpb.ExecEvent) *persistpb.ExecEvent {
 		return nil
 	}
 	return &persistpb.ExecEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -464,7 +464,7 @@ func connectEventIPCToGen(ipc *ipcpb.ConnectEvent) *persistpb.ConnectEvent {
 		return nil
 	}
 	return &persistpb.ConnectEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -483,7 +483,7 @@ func mmapEventIPCToGen(ipc *ipcpb.MmapEvent) *persistpb.MmapEvent {
 		return nil
 	}
 	return &persistpb.MmapEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -502,7 +502,7 @@ func mprotectEventIPCToGen(ipc *ipcpb.MprotectEvent) *persistpb.MprotectEvent {
 		return nil
 	}
 	return &persistpb.MprotectEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -519,7 +519,7 @@ func fileEventIPCToGen(ipc *ipcpb.FileEvent) *persistpb.FileEvent {
 		return nil
 	}
 	return &persistpb.FileEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -536,7 +536,7 @@ func acceptEventIPCToGen(ipc *ipcpb.AcceptEvent) *persistpb.AcceptEvent {
 		return nil
 	}
 	return &persistpb.AcceptEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -555,7 +555,7 @@ func socketDataEventIPCToGen(ipc *ipcpb.SocketDataEvent) *persistpb.SocketDataEv
 		return nil
 	}
 	return &persistpb.SocketDataEvent{
-		JobId:     ipc.JobId,
+		JobUuid:   ipc.JobUuid,
 		Timestamp: ipc.Timestamp,
 		Sequence:  ipc.Sequence,
 		Pid:       ipc.Pid,
@@ -575,14 +575,14 @@ func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, strea
 		return err
 	}
 
-	s.logger.Info("QueryExecEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryExecEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	// Build query
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 
 	// Add time range if specified
@@ -596,7 +596,7 @@ func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, strea
 	// Read exec events from backend
 	reader, err := s.backend.ReadExecEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read exec events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read exec events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read exec events: %v", err)
 	}
 
@@ -605,7 +605,7 @@ func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, strea
 	for {
 		select {
 		case <-stream.Context().Done():
-			s.logger.Debug("QueryExecEvents cancelled by client", "jobID", req.JobId, "eventCount", eventCount)
+			s.logger.Debug("QueryExecEvents cancelled by client", "job_uuid", req.JobUuid, "eventCount", eventCount)
 			return stream.Context().Err()
 
 		case event, ok := <-reader.Channel:
@@ -614,26 +614,26 @@ func (s *GRPCServer) QueryExecEvents(req *persistpb.QueryTelemetryRequest, strea
 				select {
 				case err := <-reader.Error:
 					if err != nil {
-						s.logger.Error("Error reading exec events", "error", err, "jobID", req.JobId)
+						s.logger.Error("Error reading exec events", "error", err, "job_uuid", req.JobUuid)
 						return status.Errorf(codes.Internal, "error reading exec events: %v", err)
 					}
 				default:
 				}
 				// Successful completion
-				s.logger.Info("QueryExecEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QueryExecEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 
 			// Send event to client (convert from ipc to gen)
 			if err := stream.Send(execEventIPCToGen(event)); err != nil {
-				s.logger.Error("Failed to send exec event", "error", err, "jobID", req.JobId)
+				s.logger.Error("Failed to send exec event", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "failed to send exec event: %v", err)
 			}
 			eventCount++
 
 		case err := <-reader.Error:
 			if err != nil {
-				s.logger.Error("Error from exec event reader", "error", err, "jobID", req.JobId)
+				s.logger.Error("Error from exec event reader", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "error reading exec events: %v", err)
 			}
 		}
@@ -647,14 +647,14 @@ func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, st
 		return err
 	}
 
-	s.logger.Info("QueryConnectEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryConnectEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	// Build query
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 
 	// Add time range if specified
@@ -668,7 +668,7 @@ func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, st
 	// Read connect events from backend
 	reader, err := s.backend.ReadConnectEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read connect events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read connect events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read connect events: %v", err)
 	}
 
@@ -677,7 +677,7 @@ func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, st
 	for {
 		select {
 		case <-stream.Context().Done():
-			s.logger.Debug("QueryConnectEvents cancelled by client", "jobID", req.JobId, "eventCount", eventCount)
+			s.logger.Debug("QueryConnectEvents cancelled by client", "job_uuid", req.JobUuid, "eventCount", eventCount)
 			return stream.Context().Err()
 
 		case event, ok := <-reader.Channel:
@@ -686,26 +686,26 @@ func (s *GRPCServer) QueryConnectEvents(req *persistpb.QueryTelemetryRequest, st
 				select {
 				case err := <-reader.Error:
 					if err != nil {
-						s.logger.Error("Error reading connect events", "error", err, "jobID", req.JobId)
+						s.logger.Error("Error reading connect events", "error", err, "job_uuid", req.JobUuid)
 						return status.Errorf(codes.Internal, "error reading connect events: %v", err)
 					}
 				default:
 				}
 				// Successful completion
-				s.logger.Info("QueryConnectEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QueryConnectEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 
 			// Send event to client (convert from ipc to gen)
 			if err := stream.Send(connectEventIPCToGen(event)); err != nil {
-				s.logger.Error("Failed to send connect event", "error", err, "jobID", req.JobId)
+				s.logger.Error("Failed to send connect event", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "failed to send connect event: %v", err)
 			}
 			eventCount++
 
 		case err := <-reader.Error:
 			if err != nil {
-				s.logger.Error("Error from connect event reader", "error", err, "jobID", req.JobId)
+				s.logger.Error("Error from connect event reader", "error", err, "job_uuid", req.JobUuid)
 				return status.Errorf(codes.Internal, "error reading connect events: %v", err)
 			}
 		}
@@ -718,13 +718,13 @@ func (s *GRPCServer) QueryMmapEvents(req *persistpb.QueryTelemetryRequest, strea
 		return err
 	}
 
-	s.logger.Info("QueryMmapEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryMmapEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 	if req.StartTime > 0 {
 		query.StartTime = &req.StartTime
@@ -735,7 +735,7 @@ func (s *GRPCServer) QueryMmapEvents(req *persistpb.QueryTelemetryRequest, strea
 
 	reader, err := s.backend.ReadMmapEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read mmap events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read mmap events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read mmap events: %v", err)
 	}
 
@@ -753,7 +753,7 @@ func (s *GRPCServer) QueryMmapEvents(req *persistpb.QueryTelemetryRequest, strea
 					}
 				default:
 				}
-				s.logger.Info("QueryMmapEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QueryMmapEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 			if err := stream.Send(mmapEventIPCToGen(event)); err != nil {
@@ -774,13 +774,13 @@ func (s *GRPCServer) QueryMprotectEvents(req *persistpb.QueryTelemetryRequest, s
 		return err
 	}
 
-	s.logger.Info("QueryMprotectEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryMprotectEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 	if req.StartTime > 0 {
 		query.StartTime = &req.StartTime
@@ -791,7 +791,7 @@ func (s *GRPCServer) QueryMprotectEvents(req *persistpb.QueryTelemetryRequest, s
 
 	reader, err := s.backend.ReadMprotectEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read mprotect events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read mprotect events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read mprotect events: %v", err)
 	}
 
@@ -809,7 +809,7 @@ func (s *GRPCServer) QueryMprotectEvents(req *persistpb.QueryTelemetryRequest, s
 					}
 				default:
 				}
-				s.logger.Info("QueryMprotectEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QueryMprotectEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 			if err := stream.Send(mprotectEventIPCToGen(event)); err != nil {
@@ -830,13 +830,13 @@ func (s *GRPCServer) QueryFileEvents(req *persistpb.QueryTelemetryRequest, strea
 		return err
 	}
 
-	s.logger.Info("QueryFileEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryFileEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 	if req.StartTime > 0 {
 		query.StartTime = &req.StartTime
@@ -847,7 +847,7 @@ func (s *GRPCServer) QueryFileEvents(req *persistpb.QueryTelemetryRequest, strea
 
 	reader, err := s.backend.ReadFileEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read file events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read file events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read file events: %v", err)
 	}
 
@@ -865,7 +865,7 @@ func (s *GRPCServer) QueryFileEvents(req *persistpb.QueryTelemetryRequest, strea
 					}
 				default:
 				}
-				s.logger.Info("QueryFileEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QueryFileEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 			if err := stream.Send(fileEventIPCToGen(event)); err != nil {
@@ -886,13 +886,13 @@ func (s *GRPCServer) QueryAcceptEvents(req *persistpb.QueryTelemetryRequest, str
 		return err
 	}
 
-	s.logger.Info("QueryAcceptEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QueryAcceptEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 	if req.StartTime > 0 {
 		query.StartTime = &req.StartTime
@@ -903,7 +903,7 @@ func (s *GRPCServer) QueryAcceptEvents(req *persistpb.QueryTelemetryRequest, str
 
 	reader, err := s.backend.ReadAcceptEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read accept events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read accept events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read accept events: %v", err)
 	}
 
@@ -921,7 +921,7 @@ func (s *GRPCServer) QueryAcceptEvents(req *persistpb.QueryTelemetryRequest, str
 					}
 				default:
 				}
-				s.logger.Info("QueryAcceptEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QueryAcceptEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 			if err := stream.Send(acceptEventIPCToGen(event)); err != nil {
@@ -942,13 +942,13 @@ func (s *GRPCServer) QuerySocketDataEvents(req *persistpb.QueryTelemetryRequest,
 		return err
 	}
 
-	s.logger.Info("QuerySocketDataEvents request", "jobID", req.JobId, "limit", req.Limit, "offset", req.Offset)
+	s.logger.Info("QuerySocketDataEvents request", "job_uuid", req.JobUuid, "limit", req.Limit, "offset", req.Offset)
 
 	query := &storage.TelemetryQuery{
-		JobID:  req.JobId,
-		NodeID: req.NodeId, // For multi-node CloudWatch queries
-		Limit:  int(req.Limit),
-		Offset: int(req.Offset),
+		JobUUID: req.JobUuid,
+		NodeID:  req.NodeId, // For multi-node CloudWatch queries
+		Limit:   int(req.Limit),
+		Offset:  int(req.Offset),
 	}
 	if req.StartTime > 0 {
 		query.StartTime = &req.StartTime
@@ -959,7 +959,7 @@ func (s *GRPCServer) QuerySocketDataEvents(req *persistpb.QueryTelemetryRequest,
 
 	reader, err := s.backend.ReadSocketDataEvents(stream.Context(), query)
 	if err != nil {
-		s.logger.Error("Failed to read socket data events", "error", err, "jobID", req.JobId)
+		s.logger.Error("Failed to read socket data events", "error", err, "job_uuid", req.JobUuid)
 		return status.Errorf(codes.Internal, "failed to read socket data events: %v", err)
 	}
 
@@ -977,7 +977,7 @@ func (s *GRPCServer) QuerySocketDataEvents(req *persistpb.QueryTelemetryRequest,
 					}
 				default:
 				}
-				s.logger.Info("QuerySocketDataEvents completed", "jobID", req.JobId, "eventCount", eventCount)
+				s.logger.Info("QuerySocketDataEvents completed", "job_uuid", req.JobUuid, "eventCount", eventCount)
 				return nil
 			}
 			if err := stream.Send(socketDataEventIPCToGen(event)); err != nil {

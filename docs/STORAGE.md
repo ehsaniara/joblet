@@ -98,7 +98,7 @@ MountPath   string // Path inside container
 CreatedAt   time.Time
 LastUsed    time.Time
 InUse       bool
-JobID       string // Current job using volume
+JobUUID     string // Current job using volume
 }
 ```
 
@@ -228,7 +228,7 @@ message Volume {
   string status = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp last_used = 7;
-  string current_job_id = 8;
+  string current_job_uuid = 8;
 }
 ```
 
@@ -399,8 +399,8 @@ vm.DeleteVolume(ctx, volume.ID)
 }
 
 // Clean up orphaned mounts
-if volume.InUse && volume.JobID != "" {
-if !vm.jobStore.Exists(volume.JobID) {
+if volume.InUse && volume.JobUUID != "" {
+if !vm.jobStore.Exists(volume.JobUUID) {
 vm.DetachVolume(ctx, volume.ID)
 }
 }

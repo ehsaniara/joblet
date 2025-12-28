@@ -11,7 +11,7 @@ package joblet.ipc;
 message IPCMessage {
   uint32 version = 1;        // Protocol version (currently 1)
   MessageType type = 2;      // Message type
-  string job_id = 3;         // Job UUID
+  string job_uuid = 3;         // Job UUID
   int64 timestamp = 4;       // Unix nanoseconds
   uint64 sequence = 5;       // Message sequence number
   bytes data = 6;            // Serialized payload (LogLine or Metric)
@@ -33,7 +33,7 @@ enum MessageType {
 
 // LogLine represents a single log line from a job
 message LogLine {
-  string job_id = 1;
+  string job_uuid = 1;
   StreamType stream = 2;     // stdout or stderr
   int64 timestamp = 3;       // Unix nanoseconds
   uint64 sequence = 4;       // Sequence number
@@ -49,7 +49,7 @@ enum StreamType {
 
 // Metric represents a metrics sample from a job
 message Metric {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   MetricData data = 4;       // Metric values
@@ -82,7 +82,7 @@ message NetworkIO {
 
 // ExecEvent represents a process execution event from eBPF telematics
 message ExecEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -96,7 +96,7 @@ message ExecEvent {
 
 // ConnectEvent represents a network connection event from eBPF telematics
 message ConnectEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -110,7 +110,7 @@ message ConnectEvent {
 
 // AcceptEvent represents an incoming connection accept from eBPF telematics
 message AcceptEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -124,7 +124,7 @@ message AcceptEvent {
 
 // SocketDataEvent represents sendto/recvfrom events from eBPF telematics
 message SocketDataEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -138,7 +138,7 @@ message SocketDataEvent {
 
 // MmapEvent represents memory mapping events from eBPF telematics
 message MmapEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -152,7 +152,7 @@ message MmapEvent {
 
 // MprotectEvent represents memory protection change events from eBPF telematics
 message MprotectEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID
@@ -164,7 +164,7 @@ message MprotectEvent {
 
 // FileEvent represents file access events from eBPF telematics
 message FileEvent {
-  string job_id = 1;
+  string job_uuid = 1;
   int64 timestamp = 2;       // Unix nanoseconds
   uint64 sequence = 3;       // Sequence number
   uint32 pid = 4;            // Process ID

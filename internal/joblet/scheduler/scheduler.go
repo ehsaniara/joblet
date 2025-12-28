@@ -95,7 +95,7 @@ func (s *Scheduler) AddJob(job *domain.Job) error {
 	}
 
 	s.logger.Debug("adding scheduled job",
-		"jobId", job.Uuid,
+		"job_uuid", job.Uuid,
 		"scheduledTime", job.ScheduledTime.Format(time.RFC3339),
 		"command", job.Command)
 
@@ -109,7 +109,7 @@ func (s *Scheduler) AddJob(job *domain.Job) error {
 	}
 
 	s.logger.Debug("scheduled job added successfully",
-		"jobId", job.Uuid,
+		"job_uuid", job.Uuid,
 		"queueSize", s.queue.Size())
 
 	return nil
@@ -119,7 +119,7 @@ func (s *Scheduler) AddJob(job *domain.Job) error {
 func (s *Scheduler) RemoveJob(jobID string) bool {
 	removed := s.queue.Remove(jobID)
 	if removed {
-		s.logger.Debug("job removed from schedule", "jobId", jobID)
+		s.logger.Debug("job removed from schedule", "job_uuid", jobID)
 		// Wake up scheduler in case this was the next job
 		select {
 		case s.newJobSignal <- struct{}{}:
@@ -180,14 +180,14 @@ func (s *Scheduler) run() {
 			// Job is not due yet, sleep until it's time
 			sleepDuration := scheduledTime.Sub(now)
 			s.logger.Debug("sleeping until next job",
-				"jobId", nextJob.Uuid,
+				"job_uuid", nextJob.Uuid,
 				"sleepDuration", sleepDuration,
 				"scheduledTime", scheduledTime.Format(time.RFC3339))
 
 			select {
 			case <-time.After(sleepDuration):
 				// Time to execute the job
-				s.logger.Debug("sleep completed, job is due", "jobId", nextJob.Uuid)
+				s.logger.Debug("sleep completed, job is due", "job_uuid", nextJob.Uuid)
 			case <-s.newJobSignal:
 				// New job added, might be earlier than current job
 				s.logger.Debug("received new job signal during sleep, rechecking queue")
@@ -215,17 +215,17 @@ func (s *Scheduler) run() {
 // executeJob handles the execution of a single scheduled job
 func (s *Scheduler) executeJob(job *domain.Job) {
 	s.logger.Info("executing scheduled job",
-		"jobId", job.Uuid,
+		"job_uuid", job.Uuid,
 		"command", job.Command,
 		"originalScheduledTime", job.ScheduledTime.Format(time.RFC3339))
 
 	// Execute the job using the provided executor
 	if err := s.executor.ExecuteScheduledJob(s.ctx, job); err != nil {
 		s.logger.Error("failed to execute scheduled job",
-			"jobId", job.Uuid,
+			"job_uuid", job.Uuid,
 			"error", err)
 	} else {
-		s.logger.Debug("scheduled job execution initiated successfully", "jobId", job.Uuid)
+		s.logger.Debug("scheduled job execution initiated successfully", "job_uuid", job.Uuid)
 	}
 }
 

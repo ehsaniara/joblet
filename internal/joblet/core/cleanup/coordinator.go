@@ -40,7 +40,7 @@ type Coordinator struct {
 // CleanupStatus tracks the status of a cleanup operation with error collection,
 // timestamps, and completion flags for each cleanup phase.
 type CleanupStatus struct {
-	JobID         string
+	JobUUID       string
 	StartTime     time.Time
 	ProcessKilled bool
 	CgroupCleaned bool
@@ -81,12 +81,12 @@ func NewCoordinator(
 // Main cleanup entry point: handles process termination, cgroup cleanup,
 // filesystem removal, network cleanup with race condition protection.
 func (c *Coordinator) CleanupJob(jobID string) error {
-	log := c.logger.WithField("jobID", jobID)
+	log := c.logger.WithField("job_uuid", jobID)
 	log.Debug("starting job cleanup")
 
 	// Track cleanup status with atomic operation to prevent race condition
 	status := &CleanupStatus{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		StartTime: time.Now(),
 		Errors:    make([]error, 0),
 	}
@@ -122,13 +122,13 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 			if c.networkSetup != nil {
 				// Convert adapter allocation to network allocation for cleanup
 				alloc := &network.JobAllocation{
-					JobID:    adapterAlloc.JobID,
+					JobUUID:  adapterAlloc.JobUUID,
 					Network:  adapterAlloc.NetworkName,
 					Hostname: adapterAlloc.Hostname,
 					// IP will be empty but that's ok for cleanup
 				}
 				if err := c.networkSetup.CleanupJobNetwork(alloc); err != nil {
-					c.logger.Warn("failed to cleanup network", "jobID", jobID, "error", err)
+					c.logger.Warn("failed to cleanup network", "job_uuid", jobID, "error", err)
 				}
 			}
 		}
@@ -136,7 +136,7 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 		// Release network allocation using the adapter method
 		if removeErr := c.networkStore.RemoveJobFromNetwork(jobID); removeErr != nil {
 			c.logger.Warn("failed to remove job from network store",
-				"jobID", jobID,
+				"job_uuid", jobID,
 				"error", removeErr)
 		}
 	}
@@ -160,12 +160,12 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 // CleanupJobSystemResourcesOnly performs system resource cleanup (cgroups, namespaces)
 // but preserves filesystem artifacts. Used for runtime build jobs.
 func (c *Coordinator) CleanupJobSystemResourcesOnly(jobID string) error {
-	log := c.logger.WithField("jobID", jobID)
+	log := c.logger.WithField("job_uuid", jobID)
 	log.Debug("starting system resource cleanup only - preserving filesystem artifacts")
 
 	// Track cleanup status with atomic operation to prevent race condition
 	status := &CleanupStatus{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		StartTime: time.Now(),
 		Errors:    make([]error, 0),
 	}
@@ -205,13 +205,13 @@ func (c *Coordinator) CleanupJobSystemResourcesOnly(jobID string) error {
 // but only cleans system resources (cgroups, namespaces), preserving filesystem artifacts.
 // Used for runtime build jobs.
 func (c *Coordinator) CleanupJobWithProcessSystemOnly(ctx context.Context, jobID string, pid int32) error {
-	log := c.logger.WithField("jobID", jobID)
+	log := c.logger.WithField("job_uuid", jobID)
 	log.Debug("starting job cleanup with process termination (system resources only)", "pid", pid)
 
 	// First, stop the process
 	if pid > 0 {
 		cleanupReq := &process.CleanupRequest{
-			JobID:           jobID,
+			JobUUID:         jobID,
 			PID:             pid,
 			ForceKill:       false,
 			GracefulTimeout: c.config.Cgroup.CleanupTimeout,
@@ -232,13 +232,13 @@ func (c *Coordinator) CleanupJobWithProcessSystemOnly(ctx context.Context, jobID
 
 // CleanupJobWithProcess cleans up a job including its process
 func (c *Coordinator) CleanupJobWithProcess(ctx context.Context, jobID string, pid int32) error {
-	log := c.logger.WithField("jobID", jobID)
+	log := c.logger.WithField("job_uuid", jobID)
 	log.Debug("starting job cleanup with process termination", "pid", pid)
 
 	// First, stop the process
 	if pid > 0 {
 		cleanupReq := &process.CleanupRequest{
-			JobID:           jobID,
+			JobUUID:         jobID,
 			PID:             pid,
 			ForceKill:       false,
 			GracefulTimeout: c.config.Cgroup.CleanupTimeout,
@@ -260,7 +260,7 @@ func (c *Coordinator) CleanupJobWithProcess(ctx context.Context, jobID string, p
 // cleanupCgroup removes cgroup resources
 func (c *Coordinator) cleanupCgroup(jobID string) {
 	log := c.logger.WithField("operation", "cgroup-cleanup")
-	log.Debug("cleaning up cgroup", "jobID", jobID)
+	log.Debug("cleaning up cgroup", "job_uuid", jobID)
 
 	// The cgroup cleanup is handled by the resource manager
 	c.cgroup.CleanupCgroup(jobID)
@@ -269,7 +269,7 @@ func (c *Coordinator) cleanupCgroup(jobID string) {
 // cleanupFilesystem removes all filesystem resources for a job
 func (c *Coordinator) cleanupFilesystem(jobID string) error {
 	log := c.logger.WithField("operation", "filesystem-cleanup")
-	log.Debug("cleaning up filesystem", "jobID", jobID)
+	log.Debug("cleaning up filesystem", "job_uuid", jobID)
 
 	errors := make([]error, 0)
 
@@ -369,11 +369,11 @@ func (c *Coordinator) CleanupOrphanedResources(activeJobIDs map[string]bool) err
 			continue
 		}
 
-		log.Debug("found orphaned job resources", "jobID", jobID)
+		log.Debug("found orphaned job resources", "job_uuid", jobID)
 
 		// Clean up orphaned resources
 		if err := c.CleanupJob(jobID); err != nil {
-			log.Error("failed to clean orphaned job", "jobID", jobID, "error", err)
+			log.Error("failed to clean orphaned job", "job_uuid", jobID, "error", err)
 			errors = append(errors, fmt.Errorf("job %s: %w", jobID, err))
 		} else {
 			cleanedCount++

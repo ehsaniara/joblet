@@ -107,7 +107,7 @@ CONNECTIONS:
 
 type TelemetryEvent struct {
     Timestamp time.Time     `json:"timestamp"`
-    JobID     string        `json:"job_id"`
+    JobUUID     string        `json:"job_uuid"`
     Type      TelemetryType `json:"type"`
     Data      interface{}   `json:"data"`
 }
@@ -212,16 +212,16 @@ type FileData struct {
 
 ```
 /var/lib/joblet/telemetry/
-├── {job_id}/
+├── {job_uuid}/
 │   └── events.jsonl     # All telemetry, line-delimited JSON
 ```
 
 Format:
 
 ```json
-{"timestamp":"2025-12-04T10:30:00Z","job_id":"abc123","type":"metrics","data":{"cpu_percent":45.2,"memory_bytes":2147483648}}
-{"timestamp":"2025-12-04T10:30:01Z","job_id":"abc123","type":"exec","data":{"pid":1234,"binary":"python","args":["train.py"]}}
-{"timestamp":"2025-12-04T10:30:02Z","job_id":"abc123","type":"connect","data":{"pid":1234,"address":"10.0.1.50","port":5432,"protocol":"tcp"}}
+{"timestamp":"2025-12-04T10:30:00Z","job_uuid":"abc123","type":"metrics","data":{"cpu_percent":45.2,"memory_bytes":2147483648}}
+{"timestamp":"2025-12-04T10:30:01Z","job_uuid":"abc123","type":"exec","data":{"pid":1234,"binary":"python","args":["train.py"]}}
+{"timestamp":"2025-12-04T10:30:02Z","job_uuid":"abc123","type":"connect","data":{"pid":1234,"address":"10.0.1.50","port":5432,"protocol":"tcp"}}
 ```
 
 #### AWS CloudWatch
@@ -230,15 +230,15 @@ Format:
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams:
-    - {job_id}-logs         # stdout/stderr logs
-    - {job_id}-metrics      # Resource metrics
-    - {job_id}-exec-events  # Process execution events (eBPF)
-    - {job_id}-connect-events # Network connection events (eBPF)
+    - {job_uuid}-logs         # stdout/stderr logs
+    - {job_uuid}-metrics      # Resource metrics
+    - {job_uuid}-exec-events  # Process execution events (eBPF)
+    - {job_uuid}-connect-events # Network connection events (eBPF)
   Format: JSON
 
 CloudWatch Metrics (for dashboards):
   Namespace: Joblet/Jobs
-  Dimensions: JobID, NodeID
+  Dimensions: JobUUID, NodeID
   Metrics: CPUPercent, MemoryBytes, GPUPercent
 ```
 
@@ -258,7 +258,7 @@ fields @timestamp, pid, dst_addr, dst_port, protocol
 | limit 100
 
 -- Find all processes that connected to a specific host
-fields @timestamp, job_id, pid, comm, dst_addr, dst_port
+fields @timestamp, job_uuid, pid, comm, dst_addr, dst_port
 | filter dst_addr = "10.0.1.50"
 | sort @timestamp desc
 ```
@@ -291,7 +291,7 @@ message GetTelemetryRequest {
 
 message TelemetryEvent {
     int64 timestamp = 1;
-    string job_id = 2;
+    string job_uuid = 2;
     string type = 3;
 
     oneof data {

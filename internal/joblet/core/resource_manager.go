@@ -53,7 +53,7 @@ func NewResourceManager(
 // Creates workspace directory, establishes cgroup with resource limits,
 // and applies CPU core restrictions if specified. Cleans up on failure.
 func (rm *ResourceManager) SetupJobResources(job *domain.Job) error {
-	log := rm.logger.WithField("jobID", job.Uuid)
+	log := rm.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("setting up job resources")
 
 	// Create workspace directory
@@ -95,7 +95,7 @@ func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *
 		return nil
 	}
 
-	log := rm.logger.WithField("jobID", job.Uuid)
+	log := rm.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("preparing uploads for scheduled job", "count", len(uploads))
 
 	// Create workspace
@@ -112,7 +112,7 @@ func (rm *ResourceManager) PrepareScheduledJobUploads(ctx context.Context, job *
 
 	// Process uploads
 	streamConfig := &upload.StreamConfig{
-		JobID:        job.Uuid,
+		JobUUID:      job.Uuid,
 		Uploads:      uploads,
 		MemoryLimit:  job.Limits.Memory.Megabytes(),
 		WorkspaceDir: workspaceDir,
@@ -158,7 +158,7 @@ func (rm *ResourceManager) createCgroup(job *domain.Job) error {
 // It configures CPU core limitations on both the main cgroup and process subgroup,
 // ensuring that the job runs only on the specified CPU cores for performance isolation.
 func (rm *ResourceManager) applyCPUCoreRestrictions(job *domain.Job) error {
-	log := rm.logger.WithFields("jobID", job.Uuid, "cores", job.Limits.CPUCores)
+	log := rm.logger.WithFields("job_uuid", job.Uuid, "cores", job.Limits.CPUCores)
 	log.Debug("applying CPU core restrictions")
 
 	// Apply CPU core restrictions to both the main cgroup and process subgroup
@@ -185,7 +185,7 @@ func (rm *ResourceManager) cleanupWorkspace(jobID string) {
 	baseDir := filepath.Join(rm.config.Filesystem.BaseDir, jobID)
 	if err := rm.platform.RemoveAll(baseDir); err != nil {
 		rm.logger.Error("failed to cleanup workspace",
-			"jobID", jobID, "error", err)
+			"job_uuid", jobID, "error", err)
 	}
 }
 
@@ -196,7 +196,7 @@ func (rm *ResourceManager) cleanupAll(jobID string) {
 
 // setupGPUDevicePermissions configures cgroup device permissions for GPU access
 func (rm *ResourceManager) setupGPUDevicePermissions(job *domain.Job) error {
-	log := rm.logger.WithFields("jobID", job.Uuid, "gpuIndices", job.GPUIndices)
+	log := rm.logger.WithFields("job_uuid", job.Uuid, "gpuIndices", job.GPUIndices)
 	log.Debug("setting up GPU device permissions")
 
 	if !job.IsGPUAllocated() {

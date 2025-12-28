@@ -81,8 +81,8 @@ func TestExecutionCoordinator_StartJob_DefaultRuntime(t *testing.T) {
 	if launchConfig.InitPath != "/opt/joblet/bin/joblet" {
 		t.Errorf("Expected init path '/opt/joblet/bin/joblet', got '%s'", launchConfig.InitPath)
 	}
-	if launchConfig.JobID != "test-job-123" {
-		t.Errorf("Expected job ID 'test-job-123', got '%s'", launchConfig.JobID)
+	if launchConfig.JobUUID != "test-job-123" {
+		t.Errorf("Expected job ID 'test-job-123', got '%s'", launchConfig.JobUUID)
 	}
 }
 
@@ -181,7 +181,7 @@ func TestExecutionCoordinator_StartJob_WithNetworking(t *testing.T) {
 	envManager.BuildEnvironmentReturns([]string{"TEST=1"})
 
 	networkManager.SetupNetworkingReturns(&execution.NetworkAllocation{
-		JobID:   "test-job-123",
+		JobUUID: "test-job-123",
 		Network: "test-network",
 	}, nil)
 

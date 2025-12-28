@@ -332,7 +332,7 @@ func RunJobInit(cfg *config.Config) error {
 	jobID := platformInstance.Getenv("JOB_ID")
 
 	if jobID != "" {
-		initLogger = initLogger.WithField("jobId", jobID)
+		initLogger = initLogger.WithField("job_uuid", jobID)
 	}
 
 	// Log minimal info for normal operation
@@ -757,7 +757,7 @@ func verifyCgroupAssignment(expectedCgroupPath string, logger *logger.Logger, pl
 	jobID := platform.Getenv("JOB_ID")
 	if jobID != "" && !strings.Contains(cgroupContent, jobID) {
 		logger.Warn("cgroup content doesn't contain job ID, but assignment may still be correct",
-			"jobID", jobID, "cgroupContent", cgroupContent)
+			"job_uuid", jobID, "cgroupContent", cgroupContent)
 	}
 
 	// Cgroup assignment verified for pid

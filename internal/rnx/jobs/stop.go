@@ -80,7 +80,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 }
 
 // outputStopJobJSON outputs the stop job result in JSON format
-func outputStopJobJSON(response *pb.StopJobRes) error {
+func outputStopJobJSON(response *pb.StopJobResponse) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(response)

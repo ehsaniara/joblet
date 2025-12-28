@@ -37,7 +37,7 @@ func TestSetupLimitedWorkDir(t *testing.T) {
 
 	platform := platform.NewPlatform()
 	jobFS := &JobFilesystem{
-		JobID:    "test-job",
+		JobUUID:  "test-job",
 		RootDir:  filepath.Join(tempDir, "root"),
 		TmpDir:   filepath.Join(tempDir, "tmp"),
 		WorkDir:  filepath.Join(tempDir, "root", "work"),
@@ -89,7 +89,7 @@ func TestJobFilesystemWithoutVolumes(t *testing.T) {
 
 	platform := platform.NewPlatform()
 	jobFS := &JobFilesystem{
-		JobID:    "test-job-no-volumes",
+		JobUUID:  "test-job-no-volumes",
 		RootDir:  filepath.Join(tempDir, "root"),
 		TmpDir:   filepath.Join(tempDir, "tmp"),
 		WorkDir:  filepath.Join(tempDir, "root", "work"),

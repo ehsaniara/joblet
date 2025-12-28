@@ -142,7 +142,7 @@ sudo systemctl status joblet
 - **Real-time job logs** aggregated from all jobs
 - **Searchable and filterable** via AWS Console or CLI
 - **7-day retention** (default, configurable)
-- **Log format**: `/joblet/{nodeId}/jobs/{jobId}`
+- **Log format**: `/joblet/{nodeId}/jobs/{job_uuid}`
 
 ### DynamoDB (`joblet-jobs` table)
 
@@ -368,8 +368,8 @@ aws iam list-attached-role-policies --role-name JobletEC2Role
 # Manually create table (if needed)
 aws dynamodb create-table \
   --table-name joblet-jobs \
-  --attribute-definitions AttributeName=jobId,AttributeType=S \
-  --key-schema AttributeName=jobId,KeyType=HASH \
+  --attribute-definitions AttributeName=job_uuid,AttributeType=S \
+  --key-schema AttributeName=job_uuid,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
   --region us-east-1
 ```

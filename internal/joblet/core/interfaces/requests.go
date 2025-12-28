@@ -6,9 +6,6 @@ import (
 
 // StartJobRequest encapsulates all parameters needed to start a job
 type StartJobRequest struct {
-	// Job identification
-	Name string // optional readable job name
-
 	// Command and arguments
 	Command string
 	Args    []string
@@ -56,15 +53,15 @@ type ResourceLimits struct {
 
 // StopJobRequest encapsulates parameters for stopping a job
 type StopJobRequest struct {
-	JobID  string
-	Force  bool   // Force kill if graceful stop fails
-	Reason string // Optional reason for audit
+	JobUUID string
+	Force   bool   // Force kill if graceful stop fails
+	Reason  string // Optional reason for audit
 }
 
 // DeleteJobRequest encapsulates parameters for deleting a job
 type DeleteJobRequest struct {
-	JobID  string
-	Reason string // Optional reason for audit/logging
+	JobUUID string
+	Reason  string // Optional reason for audit/logging
 }
 
 // DeleteAllJobsRequest encapsulates parameters for deleting all non-running jobs

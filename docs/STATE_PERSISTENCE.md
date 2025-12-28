@@ -186,7 +186,7 @@ Cloud-native state persistence using AWS DynamoDB. **Only available when Joblet 
 
 ```
 Table: joblet-jobs
-├── Primary Key: jobId (String, HASH)
+├── Primary Key: job_uuid (String, HASH)
 ├── Attributes:
 │   ├── jobStatus (String)
 │   ├── command (String)
@@ -259,8 +259,8 @@ state:
 
 | Operation | DynamoDB API   | Condition                     | TTL Behavior                |
 |-----------|----------------|-------------------------------|-----------------------------|
-| Create    | PutItem        | `attribute_not_exists(jobId)` | No TTL (job running)        |
-| Update    | PutItem        | `attribute_exists(jobId)`     | TTL set if COMPLETED/FAILED |
+| Create    | PutItem        | `attribute_not_exists(job_uuid)` | No TTL (job running)        |
+| Update    | PutItem        | `attribute_exists(job_uuid)`     | TTL set if COMPLETED/FAILED |
 | Delete    | DeleteItem     | None                          | Immediate deletion          |
 | Get       | GetItem        | None                          | N/A                         |
 | List      | Scan           | Optional FilterExpression     | N/A                         |
@@ -313,7 +313,7 @@ TTL Savings:
 ```json
 {
   "op": "create" | "update" | "delete" | "get" | "list" | "sync",
-  "jobId": "abc-123-...",
+  "job_uuid": "abc-123-...",
   "job": {
     "uuid": "abc-123-...",
     "status": "RUNNING",
@@ -378,7 +378,7 @@ item := jobToItem(msg.Job, ttlDays)
 input := &dynamodb.PutItemInput{
 TableName:           aws.String(tableName),
 Item:                item,
-ConditionExpression: aws.String("attribute_exists(jobId)"),
+ConditionExpression: aws.String("attribute_exists(job_uuid)"),
 }
 _, err := client.PutItem(ctx, input)
 ```
@@ -389,7 +389,7 @@ _, err := client.PutItem(ctx, input)
 // Client
 msg := Message{
 Operation: "get",
-JobID:     jobID,
+JobUUID:     jobID,
 RequestID: c.nextRequestID(),
 Timestamp: time.Now().Unix(),
 }
@@ -565,8 +565,8 @@ aws dynamodb describe-table --table-name joblet-jobs
 # 1. Create DynamoDB table
 aws dynamodb create-table \
   --table-name joblet-jobs \
-  --attribute-definitions AttributeName=jobId,AttributeType=S \
-  --key-schema AttributeName=jobId,KeyType=HASH \
+  --attribute-definitions AttributeName=job_uuid,AttributeType=S \
+  --key-schema AttributeName=job_uuid,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
   --region us-east-1
 
@@ -767,8 +767,8 @@ sudo systemctl stop joblet
 # 2. Create DynamoDB table (if not exists)
 aws dynamodb create-table \
   --table-name joblet-jobs \
-  --attribute-definitions AttributeName=jobId,AttributeType=S \
-  --key-schema AttributeName=jobId,KeyType=HASH \
+  --attribute-definitions AttributeName=job_uuid,AttributeType=S \
+  --key-schema AttributeName=job_uuid,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
 
 # 3. Enable TTL

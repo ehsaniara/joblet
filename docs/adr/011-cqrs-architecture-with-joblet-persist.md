@@ -109,7 +109,7 @@ We implement a CQRS (Command Query Responsibility Segregation) architecture by:
 message IPCMessage {
   uint32 version = 1;
   MessageType type = 2;        // LOG or METRIC
-  string job_id = 3;
+  string job_uuid = 3;
   int64 timestamp = 4;
   uint64 sequence = 5;
   bytes data = 6;              // Serialized LogLine or Metric

@@ -22,13 +22,12 @@ func NewJobMapper() *JobMapper {
 func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 	pbJob := &pb.Job{
 		Uuid:              job.Uuid,
-		Name:              job.Name,
 		Command:           job.Command,
 		Args:              job.Args,
-		MaxCPU:            job.Limits.CPU.Value(),
+		MaxCpu:            job.Limits.CPU.Value(),
 		CpuCores:          job.Limits.CPUCores.String(),
 		MaxMemory:         job.Limits.Memory.Megabytes(),
-		MaxIOBPS:          int32(job.Limits.IOBandwidth.BytesPerSecond()),
+		MaxIoBps:          int32(job.Limits.IOBandwidth.BytesPerSecond()),
 		Status:            string(job.Status),
 		StartTime:         job.FormattedStartTime(), // Use job's formatting method
 		ExitCode:          job.ExitCode,
@@ -49,23 +48,10 @@ func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 
 // DomainToRunJobResponse converts domain Job to RunJobResponse
 func (m *JobMapper) DomainToRunJobResponse(job *domain.Job) *pb.RunJobResponse {
-	response := &pb.RunJobResponse{
-		JobUuid:   job.Uuid,
-		Command:   job.Command,
-		Args:      job.Args,
-		MaxCpu:    job.Limits.CPU.Value(),
-		CpuCores:  job.Limits.CPUCores.String(),
-		MaxMemory: job.Limits.Memory.Megabytes(),
-		MaxIobps:  int32(job.Limits.IOBandwidth.BytesPerSecond()),
-		Status:    string(job.Status),
-		StartTime: job.FormattedStartTime(), // Use job's formatting method
-		ExitCode:  job.ExitCode,
+	return &pb.RunJobResponse{
+		JobUuid: job.Uuid,
+		Status:  string(job.Status),
 	}
-
-	response.EndTime = job.FormattedEndTime()             // Use job's formatting method
-	response.ScheduledTime = job.FormattedScheduledTime() // Use job's formatting method
-
-	return response
 }
 
 // RequestToResourceLimits converts request parameters to ResourceLimits
@@ -140,7 +126,7 @@ func (m *JobMapper) ValueObjectsToDisplayStrings(limits *domain.ResourceLimits) 
 // ProtobufToStartJobRequest converts protobuf request to domain request object
 func (m *JobMapper) ProtobufToStartJobRequest(req *pb.RunJobRequest) (*interfaces.StartJobRequest, error) {
 	// Convert resource limits using value objects
-	resourceLimits, err := m.RequestToResourceLimits(req.MaxCpu, req.MaxMemory, req.MaxIobps, req.CpuCores)
+	resourceLimits, err := m.RequestToResourceLimits(req.MaxCpu, req.MaxMemory, req.MaxIoBps, req.CpuCores)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +150,6 @@ func (m *JobMapper) ProtobufToStartJobRequest(req *pb.RunJobRequest) (*interface
 	}
 
 	return &interfaces.StartJobRequest{
-		Name:    req.Name, // Include job name from request
 		Command: req.Command,
 		Args:    req.Args,
 		Resources: interfaces.ResourceLimits{
@@ -198,12 +183,11 @@ func (m *JobMapper) StartJobRequestToProtobuf(req *interfaces.StartJobRequest) *
 	}
 
 	return &pb.RunJobRequest{
-		Name:              req.Name, // Include job name in protobuf request
 		Command:           req.Command,
 		Args:              req.Args,
 		MaxCpu:            req.Resources.MaxCPU,
 		MaxMemory:         req.Resources.MaxMemory,
-		MaxIobps:          req.Resources.MaxIOBPS,
+		MaxIoBps:          req.Resources.MaxIOBPS,
 		CpuCores:          req.Resources.CPUCores,
 		Uploads:           pbUploads,
 		Schedule:          req.Schedule,

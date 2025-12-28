@@ -488,8 +488,8 @@ rnx job run --network=host curl https://google.com
 rnx job run --network=mynet ip addr show
 
 # 2. Test connectivity
-rnx job run --network=mynet --name=server nc -l 8080 &
-rnx job run --network=mynet nc server 8080
+rnx job run --network=mynet nc -l 8080 &
+rnx job run --network=mynet nc localhost 8080
 
 # 3. Check firewall/iptables
 rnx job run --network=mynet iptables -L

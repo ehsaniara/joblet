@@ -447,7 +447,7 @@ func (c *cgroup) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
 
 // CleanupCgroup deletes a cgroup after removing job processes
 func (c *cgroup) CleanupCgroup(jobID string) {
-	cleanupLogger := c.logger.WithField("jobId", jobID)
+	cleanupLogger := c.logger.WithField("job_uuid", jobID)
 	cleanupLogger.Debug("starting cgroup cleanup with configured timeout",
 		"timeout", c.config.CleanupTimeout)
 

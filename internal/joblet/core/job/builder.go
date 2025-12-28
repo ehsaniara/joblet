@@ -56,7 +56,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	// Generate UUID
 	jobUuid := b.idGenerator.Next()
 
-	b.logger.Debug("building job", "jobUuid", jobUuid, "command", req.Command)
+	b.logger.Debug("building job", "job_uuid", jobUuid, "command", req.Command)
 
 	// Create job - debug all field values
 	volumes := b.copyStrings(req.Volumes)
@@ -64,7 +64,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	runtime := req.Runtime
 
 	b.logger.Debug("building job with all fields",
-		"jobUuid", jobUuid,
+		"job_uuid", jobUuid,
 		"network", network,
 		"volumes", volumes,
 		"runtime", runtime,
@@ -105,7 +105,7 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	}
 
 	b.logger.Debug("job built successfully",
-		"jobUuid", jobUuid,
+		"job_uuid", jobUuid,
 		"cpu", job.Limits.CPU.Value(),
 		"memory", job.Limits.Memory.Megabytes(),
 		"io", job.Limits.IOBandwidth.BytesPerSecond())

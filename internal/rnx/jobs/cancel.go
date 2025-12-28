@@ -94,7 +94,7 @@ func runCancel(cmd *cobra.Command, args []string) error {
 }
 
 // outputCancelJobJSON outputs the cancel job result in JSON format
-func outputCancelJobJSON(stopResponse *pb.StopJobRes) error {
+func outputCancelJobJSON(stopResponse *pb.StopJobResponse) error {
 	result := map[string]interface{}{
 		"canceled": true,
 		"job_id":   stopResponse.Uuid,

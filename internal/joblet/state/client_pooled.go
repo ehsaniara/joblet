@@ -86,7 +86,7 @@ func (c *PooledClient) Update(ctx context.Context, job *domain.Job) error {
 func (c *PooledClient) Delete(ctx context.Context, jobID string) error {
 	msg := Message{
 		Operation: "delete",
-		JobID:     jobID,
+		JobUUID:   jobID,
 		RequestID: c.nextRequestID(),
 		Timestamp: time.Now().Unix(),
 	}
@@ -98,7 +98,7 @@ func (c *PooledClient) Delete(ctx context.Context, jobID string) error {
 func (c *PooledClient) Get(ctx context.Context, jobID string) (*domain.Job, error) {
 	msg := Message{
 		Operation: "get",
-		JobID:     jobID,
+		JobUUID:   jobID,
 		RequestID: c.nextRequestID(),
 		Timestamp: time.Now().Unix(),
 	}

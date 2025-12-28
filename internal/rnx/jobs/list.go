@@ -73,7 +73,6 @@ func runList(cmd *cobra.Command, args []string) error {
 
 func formatJobList(jobs []*pb.Job) {
 	maxIDWidth := len("ID")
-	maxNameWidth := len("NAME")
 	maxNodeIDWidth := len("NODE ID")
 	maxStatusWidth := len("STATUS")
 
@@ -81,13 +80,6 @@ func formatJobList(jobs []*pb.Job) {
 	for _, job := range jobs {
 		if len(job.Uuid) > maxIDWidth {
 			maxIDWidth = len(job.Uuid)
-		}
-		jobName := job.Name
-		if jobName == "" {
-			jobName = "-"
-		}
-		if len(jobName) > maxNameWidth {
-			maxNameWidth = len(jobName)
 		}
 		nodeId := job.NodeId
 		if nodeId == "" {
@@ -103,24 +95,21 @@ func formatJobList(jobs []*pb.Job) {
 
 	// some padding and limit max widths for readability
 	// UUID width should accommodate full UUIDs (36 chars) plus padding
-	maxIDWidth = min(maxIDWidth+2, 38) // Full UUID width
-	maxNameWidth = min(maxNameWidth+2, 25)
+	maxIDWidth = min(maxIDWidth+2, 38)         // Full UUID width
 	maxNodeIDWidth = min(maxNodeIDWidth+2, 38) // Node ID width (also UUID)
 	maxStatusWidth += 2
 
 	// header
-	fmt.Printf("%-*s %-*s %-*s %-*s %-19s %s\n",
+	fmt.Printf("%-*s %-*s %-*s %-19s %s\n",
 		maxIDWidth, "ID",
-		maxNameWidth, "NAME",
 		maxNodeIDWidth, "NODE ID",
 		maxStatusWidth, "STATUS",
 		"START TIME",
 		"COMMAND")
 
 	// separator line
-	fmt.Printf("%s %s %s %s %s %s\n",
+	fmt.Printf("%s %s %s %s %s\n",
 		strings.Repeat("-", maxIDWidth),
-		strings.Repeat("-", maxNameWidth),
 		strings.Repeat("-", maxNodeIDWidth),
 		strings.Repeat("-", maxStatusWidth),
 		strings.Repeat("-", 19), // length of "START TIME"
@@ -140,15 +129,6 @@ func formatJobList(jobs []*pb.Job) {
 		// truncate long commands
 		command := formatCommand(job.Command, job.Args)
 
-		// Format job name
-		jobName := job.Name
-		if jobName == "" {
-			jobName = "-"
-		}
-		if len(jobName) > maxNameWidth-2 {
-			jobName = jobName[:maxNameWidth-5] + "..."
-		}
-
 		// Format node ID
 		nodeId := job.NodeId
 		if nodeId == "" {
@@ -161,9 +141,8 @@ func formatJobList(jobs []*pb.Job) {
 		// Get status color
 		statusColor, resetColor := getStatusColor(job.Status)
 
-		fmt.Printf("%-*s %-*s %-*s %s%-*s%s %-19s %s\n",
+		fmt.Printf("%-*s %-*s %s%-*s%s %-19s %s\n",
 			maxIDWidth, job.Uuid,
-			maxNameWidth, jobName,
 			maxNodeIDWidth, nodeId,
 			statusColor, maxStatusWidth, job.Status, resetColor,
 			displayTime,
@@ -226,7 +205,6 @@ func outputJobsJSON(jobs []*pb.Job) error {
 	// Convert protobuf jobs to a simpler structure for JSON output
 	type jsonJob struct {
 		ID            string   `json:"id"`
-		Name          string   `json:"name,omitempty"`
 		NodeID        string   `json:"node_id,omitempty"`
 		Status        string   `json:"status"`
 		StartTime     string   `json:"start_time"`
@@ -245,7 +223,6 @@ func outputJobsJSON(jobs []*pb.Job) error {
 	for i, job := range jobs {
 		jsonJobs[i] = jsonJob{
 			ID:            job.Uuid,
-			Name:          job.Name,
 			NodeID:        job.NodeId,
 			Status:        job.Status,
 			StartTime:     job.StartTime,
@@ -253,9 +230,9 @@ func outputJobsJSON(jobs []*pb.Job) error {
 			Command:       job.Command,
 			Args:          job.Args,
 			ExitCode:      job.ExitCode,
-			MaxCPU:        job.MaxCPU,
+			MaxCPU:        job.MaxCpu,
 			MaxMemory:     job.MaxMemory,
-			MaxIOBPS:      job.MaxIOBPS,
+			MaxIOBPS:      job.MaxIoBps,
 			CPUCores:      job.CpuCores,
 			ScheduledTime: job.ScheduledTime,
 		}

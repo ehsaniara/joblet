@@ -163,7 +163,7 @@ run_job() {
         job_output=$("$RNX_BINARY" job run "$command" 2>&1)
     fi
     
-    echo "$job_output" | grep "ID:" | awk '{print $2}'
+    echo "$job_output" | grep "^ID:" | awk '{print $2}'
 }
 
 # Run a job with Python runtime
@@ -176,7 +176,7 @@ run_python_job() {
     else
         job_output=$("$RNX_BINARY" job run python3 -c "$python_code" 2>&1)
     fi
-    echo "$job_output" | grep "ID:" | awk '{print $2}'
+    echo "$job_output" | grep "^ID:" | awk '{print $2}'
 }
 
 # Wait for job and get logs

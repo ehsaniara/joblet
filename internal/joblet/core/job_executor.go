@@ -118,7 +118,7 @@ func NewExecutionEngineV2(
 
 // StartProcess initiates job execution with proper isolation and coordination
 func (ee *ExecutionEngineV2) StartProcess(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
-	log := ee.logger.WithField("jobID", opts.Job.Uuid)
+	log := ee.logger.WithField("job_uuid", opts.Job.Uuid)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
 
 	// Check if we're in CI mode - if so, use lightweight isolation
@@ -151,7 +151,7 @@ func (ee *ExecutionEngineV2) StartProcessWithUploads(ctx context.Context, job *d
 
 // executeCICommand executes a job in CI mode with minimal isolation
 func (ee *ExecutionEngineV2) executeCICommand(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
-	log := ee.logger.WithField("jobID", opts.Job.Uuid).WithField("mode", "ci-isolated")
+	log := ee.logger.WithField("job_uuid", opts.Job.Uuid).WithField("mode", "ci-isolated")
 
 	// Create job directory for workspace
 	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Uuid)
@@ -244,7 +244,7 @@ func (nsa *networkStoreAdapter) ReleaseIP(networkName, ipAddress string) error {
 func (nsa *networkStoreAdapter) AssignJobToNetwork(jobID, networkName string, allocation *execution.JobNetworkAllocation) error {
 	// Convert execution.JobNetworkAllocation to adapters.JobNetworkAllocation
 	adapterAlloc := &adapters.JobNetworkAllocation{
-		JobID:       allocation.JobID,
+		JobUUID:     allocation.JobUUID,
 		NetworkName: allocation.NetworkName,
 		IPAddress:   allocation.IPAddress,
 		Hostname:    allocation.Hostname,
@@ -266,7 +266,7 @@ func (nsa *networkStoreAdapter) GetJobAllocation(jobID string) (*execution.JobNe
 
 	// Convert to execution package format
 	return &execution.JobNetworkAllocation{
-		JobID:       alloc.JobID,
+		JobUUID:     alloc.JobUUID,
 		NetworkName: alloc.NetworkName,
 		IPAddress:   alloc.IPAddress,
 		Hostname:    alloc.Hostname,
@@ -285,7 +285,7 @@ type processManagerAdapter struct {
 
 func (pma *processManagerAdapter) LaunchProcess(ctx context.Context, config *execution.LaunchConfig) (*execution.ProcessResult, error) {
 	// Convert to process.LaunchConfig
-	outputWriter := NewWrite(pma.store, config.JobID)
+	outputWriter := NewWrite(pma.store, config.JobUUID)
 
 	// Use the job isolation's proper namespace isolation setup based on job type
 	// Runtime build jobs disable network isolation for internet access
@@ -295,7 +295,7 @@ func (pma *processManagerAdapter) LaunchProcess(ctx context.Context, config *exe
 
 	// Debug: Log namespace isolation configuration
 	pma.logger.Info("configuring namespace isolation for job",
-		"jobID", config.JobID,
+		"job_uuid", config.JobUUID,
 		"cloneflags", fmt.Sprintf("0x%x", sysProcAttr.Cloneflags),
 		"component", "process-manager-adapter")
 
@@ -304,7 +304,7 @@ func (pma *processManagerAdapter) LaunchProcess(ctx context.Context, config *exe
 		Environment: config.Environment,
 		Stdout:      outputWriter,
 		Stderr:      outputWriter,
-		JobID:       config.JobID,
+		JobUUID:     config.JobUUID,
 		JobType:     config.JobType, // Pass job type for logging and validation
 		Command:     config.Command,
 		Args:        config.Args,
@@ -314,14 +314,14 @@ func (pma *processManagerAdapter) LaunchProcess(ctx context.Context, config *exe
 	result, err := pma.manager.LaunchProcess(ctx, procConfig)
 	if err != nil {
 		pma.logger.Error("failed to launch process with namespace isolation",
-			"jobID", config.JobID,
+			"job_uuid", config.JobUUID,
 			"error", err,
 			"component", "process-manager-adapter")
 		return nil, err
 	}
 
 	pma.logger.Info("process launched successfully with namespace isolation",
-		"jobID", config.JobID,
+		"job_uuid", config.JobUUID,
 		"pid", result.PID,
 		"component", "process-manager-adapter")
 
@@ -348,7 +348,7 @@ func (ima *isolationManagerAdapter) CreateIsolatedEnvironment(jobID string) (*ex
 	// Create job directory and other isolation setup
 	// This is a simplified implementation
 	return &execution.IsolationContext{
-		JobID:        jobID,
+		JobUUID:      jobID,
 		Namespace:    "job-" + jobID,
 		CgroupPath:   "/sys/fs/cgroup/joblet/" + jobID,
 		WorkspaceDir: ima.config.Filesystem.BaseDir + "/" + jobID,
@@ -358,10 +358,10 @@ func (ima *isolationManagerAdapter) CreateIsolatedEnvironment(jobID string) (*ex
 func (ima *isolationManagerAdapter) CreateBuilderEnvironment(jobID string) (*execution.IsolationContext, error) {
 	// Create builder environment for runtime builds
 	// Similar to regular isolated environment but with builder flag
-	ima.logger.Debug("creating builder environment", "jobID", jobID)
+	ima.logger.Debug("creating builder environment", "job_uuid", jobID)
 
 	return &execution.IsolationContext{
-		JobID:        jobID,
+		JobUUID:      jobID,
 		Namespace:    "builder-" + jobID,
 		CgroupPath:   "/sys/fs/cgroup/joblet/" + jobID,
 		WorkspaceDir: ima.config.Filesystem.BaseDir + "/" + jobID,
@@ -384,7 +384,7 @@ func (ima *isolationManagerAdapter) CreateGPUDeviceNodes(jobID string, gpuIndice
 	// when the filesystem isolator creates the job environment.
 	// This is a placeholder that stores the requirement for later use.
 
-	ima.logger.Debug("GPU device nodes will be created during job execution", "jobID", jobID, "gpuIndices", gpuIndices)
+	ima.logger.Debug("GPU device nodes will be created during job execution", "job_uuid", jobID, "gpuIndices", gpuIndices)
 	return nil
 }
 
@@ -398,6 +398,6 @@ func (ima *isolationManagerAdapter) MountCUDALibraries(jobID string, cudaPath st
 	// when the filesystem isolator sets up the job environment.
 	// This is a placeholder that stores the requirement for later use.
 
-	ima.logger.Debug("CUDA libraries will be mounted during job execution", "jobID", jobID, "cudaPath", cudaPath)
+	ima.logger.Debug("CUDA libraries will be mounted during job execution", "job_uuid", jobID, "cudaPath", cudaPath)
 	return nil
 }

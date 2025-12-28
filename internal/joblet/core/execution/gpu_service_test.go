@@ -51,7 +51,7 @@ func TestGPUService_AllocateGPU_Success(t *testing.T) {
 
 	// Setup successful allocation
 	expectedAllocation := &gpu.GPUAllocation{
-		JobID:       "test-job",
+		JobUUID:     "test-job",
 		GPUIndices:  []int{0, 1},
 		GPUMemoryMB: 8192,
 	}
@@ -77,8 +77,8 @@ func TestGPUService_AllocateGPU_Success(t *testing.T) {
 	if allocation == nil {
 		t.Fatal("Expected allocation, got nil")
 	}
-	if allocation.JobID != "test-job" {
-		t.Errorf("Expected job ID 'test-job', got '%s'", allocation.JobID)
+	if allocation.JobUUID != "test-job" {
+		t.Errorf("Expected job ID 'test-job', got '%s'", allocation.JobUUID)
 	}
 	if len(allocation.GPUIndices) != 2 {
 		t.Errorf("Expected 2 GPU indices, got %d", len(allocation.GPUIndices))

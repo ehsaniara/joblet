@@ -190,8 +190,8 @@ func runMonitorTop(metricTypes []string, jsonOutput bool) error {
 		return fmt.Errorf("failed to get system status: %v", err)
 	}
 
-	// Convert to SystemMetricsRes format for display
-	metrics := &pb.SystemMetricsRes{
+	// Convert to SystemMetricsResponse format for display
+	metrics := &pb.SystemMetricsResponse{
 		Timestamp: resp.Timestamp,
 		Host:      resp.Host,
 		Cpu:       resp.Cpu,
@@ -228,7 +228,7 @@ func runMonitorWatch(interval int, metricTypes []string, compact bool, jsonOutpu
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	req := &pb.StreamMetricsReq{
+	req := &pb.StreamMetricsRequest{
 		IntervalSeconds: int32(interval),
 		MetricTypes:     metricTypes,
 	}
@@ -249,8 +249,8 @@ func runMonitorWatch(interval int, metricTypes []string, compact bool, jsonOutpu
 		}
 
 		if jsonOutput {
-			// Convert to SystemStatusRes format for UI transformation
-			statusResp := &pb.SystemStatusRes{
+			// Convert to SystemStatusResponse format for UI transformation
+			statusResp := &pb.SystemStatusResponse{
 				Timestamp: resp.Timestamp,
 				Available: true,
 				Host:      resp.Host,
@@ -281,7 +281,7 @@ func runMonitorWatch(interval int, metricTypes []string, compact bool, jsonOutpu
 
 // Display functions
 
-func displaySystemStatus(status *pb.SystemStatusRes) {
+func displaySystemStatus(status *pb.SystemStatusResponse) {
 	fmt.Printf("System Status - %s\n", status.Timestamp)
 	fmt.Printf("Available: %v\n\n", status.Available)
 
@@ -301,8 +301,8 @@ func displaySystemStatus(status *pb.SystemStatusRes) {
 		}
 
 		// Display Server IPs if available
-		if len(status.Host.ServerIPs) > 0 {
-			fmt.Printf("  Server IPs:   %s\n", strings.Join(status.Host.ServerIPs, ", "))
+		if len(status.Host.ServerIps) > 0 {
+			fmt.Printf("  Server IPs:   %s\n", strings.Join(status.Host.ServerIps, ", "))
 		}
 
 		// Display MAC Addresses if available
@@ -432,14 +432,14 @@ func displaySystemStatus(status *pb.SystemStatusRes) {
 		fmt.Printf("  Provider:     %s\n", status.Cloud.Provider)
 		fmt.Printf("  Region:       %s\n", status.Cloud.Region)
 		fmt.Printf("  Zone:         %s\n", status.Cloud.Zone)
-		fmt.Printf("  Instance ID:  %s\n", status.Cloud.InstanceID)
+		fmt.Printf("  Instance ID:  %s\n", status.Cloud.InstanceId)
 		fmt.Printf("  Instance Type: %s\n", status.Cloud.InstanceType)
 		fmt.Println()
 	}
 
 }
 
-func displaySystemMetrics(metrics *pb.SystemMetricsRes) {
+func displaySystemMetrics(metrics *pb.SystemMetricsResponse) {
 	fmt.Printf("System Metrics - %s\n\n", metrics.Timestamp)
 
 	// CPU
@@ -458,14 +458,14 @@ func displaySystemMetrics(metrics *pb.SystemMetricsRes) {
 			metrics.Processes.TotalThreads)
 
 		// Show top processes table if data is available
-		if len(metrics.Processes.TopByCPU) > 0 {
+		if len(metrics.Processes.TopByCpu) > 0 {
 			fmt.Printf("Top Processes by CPU:\n")
 			fmt.Printf("  %-6s │ %-16s │ %6s │ %6s │ %8s │ %s\n",
 				"PID", "Name", "CPU%", "Mem%", "Memory", "Command")
 			fmt.Printf("  ───────┼──────────────────┼────────┼────────┼──────────┼──────────\n")
 
 			count := 0
-			for _, proc := range metrics.Processes.TopByCPU {
+			for _, proc := range metrics.Processes.TopByCpu {
 				if count >= 10 {
 					break
 				}
@@ -584,7 +584,7 @@ func displaySystemMetrics(metrics *pb.SystemMetricsRes) {
 	fmt.Println()
 }
 
-func displaySystemMetricsWithOptions(metrics *pb.SystemMetricsRes, compact bool) {
+func displaySystemMetricsWithOptions(metrics *pb.SystemMetricsResponse, compact bool) {
 	fmt.Printf("System Metrics - %s\n\n", metrics.Timestamp)
 
 	// CPU
@@ -726,14 +726,14 @@ func displaySystemMetricsWithOptions(metrics *pb.SystemMetricsRes, compact bool)
 	}
 
 	// Top Processes by CPU
-	if metrics.Processes != nil && len(metrics.Processes.TopByCPU) > 0 {
+	if metrics.Processes != nil && len(metrics.Processes.TopByCpu) > 0 {
 		fmt.Printf("Top Processes by CPU:\n")
 		fmt.Printf("  %-6s │ %-16s │ %6s │ %6s │ %8s │ %s\n",
 			"PID", "Name", "CPU%", "Mem%", "Memory", "Command")
 		fmt.Printf("  ───────┼──────────────────┼────────┼────────┼──────────┼──────────\n")
 
 		count := 0
-		for _, proc := range metrics.Processes.TopByCPU {
+		for _, proc := range metrics.Processes.TopByCpu {
 			if count >= 10 {
 				break
 			}
@@ -905,7 +905,7 @@ type UIProcessInfo struct {
 }
 
 // transformToUIFormat converts the protobuf response to UI-expected format
-func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
+func transformToUIFormat(resp *pb.SystemStatusResponse) *UIFormat {
 	// Calculate total space for disks (excluding duplicates and snaps)
 	var totalSpace, usedSpace int64
 	seenDevices := make(map[string]bool)
@@ -975,17 +975,17 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 
 			// Assign the first IP and MAC to the first physical interface
 			if isPhysicalInterface && !primaryInterfaceAssigned && resp.Host != nil {
-				if len(resp.Host.ServerIPs) > 0 {
+				if len(resp.Host.ServerIps) > 0 {
 					// Filter out bridge/docker IPs (usually 172.x.x.x or 10.x.x.x)
-					for _, ip := range resp.Host.ServerIPs {
+					for _, ip := range resp.Host.ServerIps {
 						if !strings.HasPrefix(ip, "172.") && !strings.HasPrefix(ip, "10.") {
 							ipAddresses = append(ipAddresses, ip)
 							break // Take first non-docker IP
 						}
 					}
 					// If no non-docker IP found, take the first one
-					if len(ipAddresses) == 0 && len(resp.Host.ServerIPs) > 0 {
-						ipAddresses = []string{resp.Host.ServerIPs[0]}
+					if len(ipAddresses) == 0 && len(resp.Host.ServerIps) > 0 {
+						ipAddresses = []string{resp.Host.ServerIps[0]}
 					}
 				}
 				if len(resp.Host.MacAddresses) > 0 {
@@ -995,7 +995,7 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 			} else if strings.HasPrefix(net.Interface, "joblet") || strings.HasPrefix(net.Interface, "docker") {
 				// For virtual interfaces, try to find matching docker/bridge IPs
 				if resp.Host != nil {
-					for _, ip := range resp.Host.ServerIPs {
+					for _, ip := range resp.Host.ServerIps {
 						if strings.HasPrefix(ip, "172.") || strings.HasPrefix(ip, "10.") {
 							ipAddresses = []string{ip}
 							break
@@ -1027,7 +1027,7 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 
 	// Get top processes (limit to match UI expectation)
 	uiProcesses := []UIProcessInfo{}
-	for i, proc := range resp.Processes.TopByCPU {
+	for i, proc := range resp.Processes.TopByCpu {
 		if i >= 10 { // Limit to top 10
 			break
 		}
@@ -1071,7 +1071,7 @@ func transformToUIFormat(resp *pb.SystemStatusRes) *UIFormat {
 			InstanceType:  resp.Cloud.InstanceType,
 			Region:        resp.Cloud.Region,
 			NodeId:        resp.Host.NodeId,
-			ServerIPs:     resp.Host.ServerIPs,
+			ServerIPs:     resp.Host.ServerIps,
 			MacAddresses:  resp.Host.MacAddresses,
 		},
 		CPUInfo: UICPUInfo{

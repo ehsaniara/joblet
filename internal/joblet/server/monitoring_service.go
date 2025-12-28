@@ -35,7 +35,7 @@ func NewMonitoringServiceServer(monitor *monitoring.Service, cfg *config.Config)
 }
 
 // GetSystemStatus returns the current system status
-func (s *MonitoringServiceServer) GetSystemStatus(ctx context.Context, req *pb.EmptyRequest) (*pb.SystemStatusRes, error) {
+func (s *MonitoringServiceServer) GetSystemStatus(ctx context.Context, req *pb.EmptyRequest) (*pb.SystemStatusResponse, error) {
 
 	systemStatus := s.monitor.GetSystemStatus()
 	if systemStatus == nil {
@@ -46,7 +46,7 @@ func (s *MonitoringServiceServer) GetSystemStatus(ctx context.Context, req *pb.E
 }
 
 // StreamSystemMetrics streams system metrics at the specified interval
-func (s *MonitoringServiceServer) StreamSystemMetrics(req *pb.StreamMetricsReq, stream pb.MonitoringService_StreamSystemMetricsServer) error {
+func (s *MonitoringServiceServer) StreamSystemMetrics(req *pb.StreamMetricsRequest, stream pb.MonitoringService_StreamSystemMetricsServer) error {
 	s.logger.Debug("StreamSystemMetrics called", "interval", req.IntervalSeconds, "filters", req.MetricTypes)
 
 	// Default to 5 seconds if not specified
@@ -137,8 +137,8 @@ func (s *MonitoringServiceServer) filterMetrics(metrics *domain.SystemMetrics, t
 
 // Conversion methods from domain to protobuf
 
-func (s *MonitoringServiceServer) systemStatusToProto(status *monitoring.SystemStatus) *pb.SystemStatusRes {
-	return &pb.SystemStatusRes{
+func (s *MonitoringServiceServer) systemStatusToProto(status *monitoring.SystemStatus) *pb.SystemStatusResponse {
+	return &pb.SystemStatusResponse{
 		Timestamp:     status.Timestamp.Format(time.RFC3339),
 		Available:     status.Available,
 		Host:          s.hostInfoToProto(status.Host),
@@ -153,8 +153,8 @@ func (s *MonitoringServiceServer) systemStatusToProto(status *monitoring.SystemS
 	}
 }
 
-func (s *MonitoringServiceServer) systemMetricsToProto(metrics *domain.SystemMetrics) *pb.SystemMetricsRes {
-	return &pb.SystemMetricsRes{
+func (s *MonitoringServiceServer) systemMetricsToProto(metrics *domain.SystemMetrics) *pb.SystemMetricsResponse {
+	return &pb.SystemMetricsResponse{
 		Timestamp: metrics.Timestamp.Format(time.RFC3339),
 		Host:      s.hostInfoToProto(metrics.Host),
 		Cpu:       s.cpuMetricsToProto(metrics.CPU),
@@ -175,21 +175,15 @@ func (s *MonitoringServiceServer) hostInfoToProto(h domain.HostInfo) *pb.HostInf
 	macAddresses := s.collectMACAddresses()
 
 	return &pb.HostInfo{
-		Hostname:        h.Hostname,
-		Os:              h.OS,
-		Platform:        "", // Not available in domain model
-		PlatformFamily:  "", // Not available in domain model
-		PlatformVersion: "", // Not available in domain model
-		KernelVersion:   h.Kernel,
-		KernelArch:      "", // Not available in domain model
-		Architecture:    h.Architecture,
-		CpuCount:        0, // Not available in domain model
-		TotalMemory:     0, // Not available in domain model
-		BootTime:        h.BootTime.Format(time.RFC3339),
-		Uptime:          int64(h.Uptime.Seconds()),
-		NodeId:          s.config.Server.NodeId,
-		ServerIPs:       serverIPs,
-		MacAddresses:    macAddresses,
+		Hostname:      h.Hostname,
+		Os:            h.OS,
+		KernelVersion: h.Kernel,
+		Architecture:  h.Architecture,
+		BootTime:      h.BootTime.Format(time.RFC3339),
+		Uptime:        int64(h.Uptime.Seconds()),
+		NodeId:        s.config.Server.NodeId,
+		ServerIps:     serverIPs,
+		MacAddresses:  macAddresses,
 	}
 }
 
@@ -239,7 +233,7 @@ func (s *MonitoringServiceServer) diskMetricsToProto(disks []domain.DiskMetrics)
 			InodesTotal:        int64(d.InodesTotal),
 			InodesUsed:         int64(d.InodesUsed),
 			InodesFree:         int64(d.InodesFree),
-			InodesUsagePercent: 0, // Not available in domain model
+			InodesUsagePercent: 0, // TODO: implement
 		}
 	}
 	return result
@@ -268,18 +262,14 @@ func (s *MonitoringServiceServer) networkMetricsToProto(networks []domain.Networ
 }
 
 func (s *MonitoringServiceServer) ioMetricsToProto(io domain.IOMetrics) *pb.IOMetrics {
-	// Domain IOMetrics doesn't have per-device breakdown like DiskIO
-	// Return empty DiskIO array for now
-	diskIO := make([]*pb.DiskIOMetrics, 0)
-
 	return &pb.IOMetrics{
 		TotalReads:  int64(io.ReadsCompleted),
 		TotalWrites: int64(io.WritesCompleted),
 		ReadBytes:   int64(io.ReadBytes),
 		WriteBytes:  int64(io.WriteBytes),
-		ReadRate:    0, // Not available in domain model
-		WriteRate:   0, // Not available in domain model
-		DiskIO:      diskIO,
+		ReadRate:    0,   // TODO: implement
+		WriteRate:   0,   // TODO: implement
+		DiskIo:      nil, // TODO: implement per-device breakdown
 	}
 }
 
@@ -301,7 +291,7 @@ func (s *MonitoringServiceServer) processMetricsToProto(p domain.ProcessMetrics)
 		StoppedProcesses:  int32(p.StoppedProcesses),
 		ZombieProcesses:   int32(p.ZombieProcesses),
 		TotalThreads:      int32(p.TotalThreads),
-		TopByCPU:          topCPU,
+		TopByCpu:          topCPU,
 		TopByMemory:       topMem,
 	}
 }
@@ -317,7 +307,6 @@ func (s *MonitoringServiceServer) processInfoToProto(p domain.ProcessInfo) *pb.P
 		MemoryBytes:   int64(p.MemoryBytes),
 		Status:        p.Status,
 		StartTime:     p.StartTime.Format(time.RFC3339),
-		User:          "", // Not available in domain model
 	}
 }
 
@@ -330,7 +319,7 @@ func (s *MonitoringServiceServer) cloudInfoToProto(c *domain.CloudInfo) *pb.Clou
 		Provider:       c.Provider,
 		Region:         c.Region,
 		Zone:           c.Zone,
-		InstanceID:     c.InstanceID,
+		InstanceId:     c.InstanceID,
 		InstanceType:   c.InstanceType,
 		HypervisorType: c.HypervisorType,
 		Metadata:       c.Metadata,

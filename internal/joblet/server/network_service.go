@@ -31,7 +31,7 @@ func NewNetworkServiceServer(auth auth2.GRPCAuthorization, networkStore adapters
 }
 
 // CreateNetwork creates a new custom network
-func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.CreateNetworkReq) (*pb.CreateNetworkRes, error) {
+func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.CreateNetworkRequest) (*pb.CreateNetworkResponse, error) {
 	log := s.logger.WithFields(
 		"operation", "CreateNetwork",
 		"name", req.Name,
@@ -70,7 +70,7 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 
 	log.Info("network created successfully")
 
-	return &pb.CreateNetworkRes{
+	return &pb.CreateNetworkResponse{
 		Name:   network.Name,
 		Cidr:   network.CIDR,
 		Bridge: network.BridgeName,
@@ -109,7 +109,7 @@ func (s *NetworkServiceServer) ListNetworks(ctx context.Context, req *pb.EmptyRe
 }
 
 // RemoveNetwork removes a custom network
-func (s *NetworkServiceServer) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkReq) (*pb.RemoveNetworkRes, error) {
+func (s *NetworkServiceServer) RemoveNetwork(ctx context.Context, req *pb.RemoveNetworkRequest) (*pb.RemoveNetworkResponse, error) {
 	log := s.logger.WithFields(
 		"operation", "RemoveNetwork",
 		"name", req.Name)
@@ -123,7 +123,7 @@ func (s *NetworkServiceServer) RemoveNetwork(ctx context.Context, req *pb.Remove
 
 	if err := s.networkStore.RemoveNetwork(req.Name); err != nil {
 		log.Error("failed to remove network", "error", err)
-		return &pb.RemoveNetworkRes{
+		return &pb.RemoveNetworkResponse{
 			Success: false,
 			Message: err.Error(),
 		}, nil
@@ -131,7 +131,7 @@ func (s *NetworkServiceServer) RemoveNetwork(ctx context.Context, req *pb.Remove
 
 	log.Info("network removed successfully")
 
-	return &pb.RemoveNetworkRes{
+	return &pb.RemoveNetworkResponse{
 		Success: true,
 		Message: "Network removed successfully",
 	}, nil

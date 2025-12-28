@@ -720,9 +720,9 @@ rnx network create ml-dev --cidr=10.100.0.0/24
 
 # Start supporting services for ML development
 # Jupyter notebook server for experimentation
-rnx job run --network=ml-dev --name=jupyter python3 -m jupyter notebook --ip=0.0.0.0
+rnx job run --network=ml-dev python3 -m jupyter notebook --ip=0.0.0.0
 # TensorBoard for monitoring training
-rnx job run --network=ml-dev --name=tensorboard tensorboard --logdir=/volumes/logs
+rnx job run --network=ml-dev tensorboard --logdir=/volumes/logs
 
 # Run training experiment with live monitoring
 rnx job run \

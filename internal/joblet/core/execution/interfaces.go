@@ -73,7 +73,7 @@ type LaunchConfig struct {
 	SysProcAttr interface{}
 	Stdout      interface{}
 	Stderr      interface{}
-	JobID       string
+	JobUUID     string
 	JobType     domain.JobType // Job type for isolation configuration
 	Command     string
 	Args        []string
@@ -88,7 +88,7 @@ type ProcessResult struct {
 
 // NetworkAllocation represents network allocation details
 type NetworkAllocation struct {
-	JobID    string
+	JobUUID  string
 	Network  string
 	IP       string
 	Hostname string
@@ -96,7 +96,7 @@ type NetworkAllocation struct {
 
 // IsolationContext contains isolation environment details
 type IsolationContext struct {
-	JobID        string
+	JobUUID      string
 	Namespace    string
 	CgroupPath   string
 	WorkspaceDir string

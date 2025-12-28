@@ -26,7 +26,7 @@ test_telematics_live_streaming_no_gaps() {
 
     # Start a job that spawns 200 processes (one every 0.1s for 20s)
     local job_output=$($RNX_BINARY job run bash -c 'for i in $(seq 1 200); do echo "Iteration $i"; sleep 0.1; done' 2>&1)
-    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "ID:" | awk '{print $2}' | head -1)
+    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"
@@ -94,7 +94,7 @@ test_telematics_early_check() {
 
     # Start a job that spawns processes
     local job_output=$($RNX_BINARY job run bash -c 'for i in $(seq 1 50); do echo "Check $i"; sleep 0.1; done' 2>&1)
-    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "ID:" | awk '{print $2}' | head -1)
+    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"
@@ -138,7 +138,7 @@ test_telematics_for_completed_job() {
 
     # Start a short job with known number of process spawns
     local job_output=$($RNX_BINARY job run bash -c 'for i in $(seq 1 10); do echo "Done $i"; sleep 0.05; done' 2>&1)
-    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "ID:" | awk '{print $2}' | head -1)
+    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"
@@ -181,7 +181,7 @@ test_telematics_gap_detection() {
 
     # Start a longer job to ensure persist has written some events before we stream
     local job_output=$($RNX_BINARY job run bash -c 'for i in $(seq 1 100); do echo "Gap test $i"; sleep 0.15; done' 2>&1)
-    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "ID:" | awk '{print $2}' | head -1)
+    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"
@@ -226,7 +226,7 @@ test_telematics_deduplication() {
 
     # Start a 15-second job
     local job_output=$($RNX_BINARY job run bash -c 'for i in $(seq 1 50); do echo "Dedup $i"; sleep 0.3; done' 2>&1)
-    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "ID:" | awk '{print $2}' | head -1)
+    local job_id=$(echo "$job_output" | sed 's/\x1b\[[0-9;]*m//g' | grep "^ID:" | awk '{print $2}' | head -1)
 
     if [ -z "$job_id" ]; then
         echo -e "${RED}✗ Failed to start job${NC}"

@@ -77,7 +77,7 @@ test_rapid_job_creation() {
     for i in $(seq 1 $NUM_JOBS); do
         (
             job_output=$("$RNX_BINARY" job run echo "load-test-$i" 2>&1)
-            job_id=$(echo "$job_output" | grep "ID:" | awk '{print $2}')
+            job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
             if [[ -n "$job_id" ]]; then
                 echo "$job_id"
             fi

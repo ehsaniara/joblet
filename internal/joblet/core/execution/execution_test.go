@@ -35,7 +35,7 @@ func TestExecutionCoordinator_RuntimeInitPathResolution(t *testing.T) {
 
 	// Setup mocks for success path
 	fakeIsolationManager.CreateIsolatedEnvironmentReturns(&execution.IsolationContext{
-		JobID:        "test-job-123",
+		JobUUID:      "test-job-123",
 		WorkspaceDir: "/tmp/test-workspace",
 	}, nil)
 	fakeEnvManager.PrepareWorkspaceReturns("/tmp/test-workspace", nil)

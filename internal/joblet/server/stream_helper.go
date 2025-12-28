@@ -15,7 +15,7 @@ import (
 // 3. For running jobs: send historical data first, then stream live updates
 type StreamConfig struct {
 	// JobID is the resolved job UUID
-	JobID string
+	JobUUID string
 
 	// Logger for this stream operation
 	Logger *logger.Logger
@@ -64,14 +64,14 @@ func StreamWithHistory(ctx context.Context, cfg StreamConfig, state JobState) er
 		// Job not found locally - query persist for historical data
 		log.Debug("job not found locally, querying persist for historical data")
 		if cfg.QueryPersistOnly == nil {
-			return status.Errorf(codes.NotFound, "job not found: %s", cfg.JobID)
+			return status.Errorf(codes.NotFound, "job not found: %s", cfg.JobUUID)
 		}
 		count, err := cfg.QueryPersistOnly()
 		if err != nil {
 			return err
 		}
 		if count == 0 {
-			return status.Errorf(codes.NotFound, "job not found: %s", cfg.JobID)
+			return status.Errorf(codes.NotFound, "job not found: %s", cfg.JobUUID)
 		}
 		return nil
 

@@ -25,7 +25,7 @@ func TestJobToItem_BasicFields(t *testing.T) {
 	item := jobToItem(job, 30)
 
 	// Verify required fields
-	if v, ok := item["jobId"].(*types.AttributeValueMemberS); !ok || v.Value != "test-uuid" {
+	if v, ok := item["job_uuid"].(*types.AttributeValueMemberS); !ok || v.Value != "test-uuid" {
 		t.Error("expected jobId to be set correctly")
 	}
 	if v, ok := item["jobStatus"].(*types.AttributeValueMemberS); !ok || v.Value != "RUNNING" {
@@ -106,7 +106,7 @@ func TestJobToItem_TTL(t *testing.T) {
 func TestItemToJob(t *testing.T) {
 	now := time.Now()
 	item := map[string]types.AttributeValue{
-		"jobId":         &types.AttributeValueMemberS{Value: "test-job"},
+		"job_uuid":      &types.AttributeValueMemberS{Value: "test-job"},
 		"jobStatus":     &types.AttributeValueMemberS{Value: "COMPLETED"},
 		"command":       &types.AttributeValueMemberS{Value: "echo test"},
 		"nodeId":        &types.AttributeValueMemberS{Value: "node-1"},
@@ -166,7 +166,7 @@ func TestItemToJob(t *testing.T) {
 func TestItemToJob_MinimalFields(t *testing.T) {
 	// Test with only required fields
 	item := map[string]types.AttributeValue{
-		"jobId":     &types.AttributeValueMemberS{Value: "minimal-job"},
+		"job_uuid":  &types.AttributeValueMemberS{Value: "minimal-job"},
 		"jobStatus": &types.AttributeValueMemberS{Value: "PENDING"},
 		"command":   &types.AttributeValueMemberS{Value: "echo minimal"},
 		"nodeId":    &types.AttributeValueMemberS{Value: "node-1"},

@@ -121,11 +121,11 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 
 	if req.Schedule != "" {
 		log.Info("job scheduled successfully",
-			"jobUuid", newJob.Uuid,
+			"job_uuid", newJob.Uuid,
 			"scheduledTime", req.Schedule)
 	} else {
 		log.Info("job started successfully",
-			"jobUuid", newJob.Uuid,
+			"job_uuid", newJob.Uuid,
 			"status", newJob.Status)
 	}
 
@@ -177,13 +177,12 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 	}
 
 	jobRequest := &interfaces.StartJobRequest{
-		Name:    req.Name,
 		Command: req.Command,
 		Args:    req.Args,
 		Resources: interfaces.ResourceLimits{
 			MaxCPU:    req.MaxCpu,
 			MaxMemory: req.MaxMemory,
-			MaxIOBPS:  req.MaxIobps,
+			MaxIOBPS:  req.MaxIoBps,
 			CPUCores:  req.CpuCores,
 		},
 		Uploads:           domainUploads,
@@ -288,8 +287,8 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, req *pb.EmptyRequest) (
 }
 
 // GetJobStatus returns the status of a specific job
-func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatusReq) (*pb.GetJobStatusRes, error) {
-	log := s.logger.WithFields("operation", "GetJobStatus", "jobId", req.GetUuid())
+func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatusRequest) (*pb.GetJobStatusResponse, error) {
+	log := s.logger.WithFields("operation", "GetJobStatus", "job_uuid", req.GetUuid())
 	log.Debug("get job status request received")
 
 	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
@@ -299,7 +298,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 
 	job, exists := s.jobStore.JobByPrefix(req.GetUuid())
 	if !exists {
-		log.Error("job not found", "jobId", req.GetUuid())
+		log.Error("job not found", "job_uuid", req.GetUuid())
 		return nil, status.Errorf(codes.NotFound, "job %s not found", req.GetUuid())
 	}
 
@@ -313,15 +312,14 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		maskedSecretEnv[key] = "***"
 	}
 
-	return &pb.GetJobStatusRes{
+	return &pb.GetJobStatusResponse{
 		Uuid:              pbJob.Uuid,
-		Name:              pbJob.Name,
 		Command:           pbJob.Command,
 		Args:              pbJob.Args,
-		MaxCPU:            pbJob.MaxCPU,
+		MaxCpu:            pbJob.MaxCpu,
 		CpuCores:          pbJob.CpuCores,
 		MaxMemory:         pbJob.MaxMemory,
-		MaxIOBPS:          pbJob.MaxIOBPS,
+		MaxIoBps:          pbJob.MaxIoBps,
 		Status:            pbJob.Status,
 		StartTime:         pbJob.StartTime,
 		EndTime:           pbJob.EndTime,
@@ -339,8 +337,8 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 }
 
 // StopJob stops a running job
-func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb.StopJobRes, error) {
-	log := s.logger.WithFields("operation", "StopJob", "jobId", req.GetUuid())
+func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobRequest) (*pb.StopJobResponse, error) {
+	log := s.logger.WithFields("operation", "StopJob", "job_uuid", req.GetUuid())
 	log.Debug("stop job request received")
 
 	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
@@ -349,10 +347,10 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 	}
 
 	stopRequest := interfaces.StopJobRequest{
-		JobID: req.GetUuid(),
+		JobUUID: req.GetUuid(),
 	}
 
-	log.Info("stopping job", "jobId", stopRequest.JobID)
+	log.Info("stopping job", "job_uuid", stopRequest.JobUUID)
 
 	err := s.joblet.StopJob(ctx, stopRequest)
 	if err != nil {
@@ -360,16 +358,16 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobReq) (*pb
 		return nil, status.Errorf(codes.Internal, "job stop failed: %v", err)
 	}
 
-	log.Info("job stopped successfully", "jobId", stopRequest.JobID)
+	log.Info("job stopped successfully", "job_uuid", stopRequest.JobUUID)
 
-	return &pb.StopJobRes{
-		Uuid: stopRequest.JobID,
+	return &pb.StopJobResponse{
+		Uuid: stopRequest.JobUUID,
 	}, nil
 }
 
 // DeleteJob deletes a job
-func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReq) (*pb.DeleteJobRes, error) {
-	log := s.logger.WithFields("operation", "DeleteJob", "jobId", req.GetUuid())
+func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobRequest) (*pb.DeleteJobResponse, error) {
+	log := s.logger.WithFields("operation", "DeleteJob", "job_uuid", req.GetUuid())
 	log.Debug("delete job request received")
 
 	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
@@ -378,32 +376,32 @@ func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReq) 
 	}
 
 	deleteRequest := interfaces.DeleteJobRequest{
-		JobID:  req.GetUuid(),
-		Reason: "user_requested",
+		JobUUID: req.GetUuid(),
+		Reason:  "user_requested",
 	}
 
-	log.Debug("processing job deletion", "jobId", deleteRequest.JobID)
+	log.Debug("processing job deletion", "job_uuid", deleteRequest.JobUUID)
 
 	err := s.joblet.DeleteJob(ctx, deleteRequest)
 	if err != nil {
 		log.Error("job deletion failed", "error", err)
-		return &pb.DeleteJobRes{
-			Uuid:    deleteRequest.JobID,
+		return &pb.DeleteJobResponse{
+			Uuid:    deleteRequest.JobUUID,
 			Success: false,
 			Message: err.Error(),
 		}, status.Errorf(codes.Internal, "job deletion failed: %v", err)
 	}
 
-	log.Info("job deletion completed successfully", "jobId", deleteRequest.JobID)
-	return &pb.DeleteJobRes{
-		Uuid:    deleteRequest.JobID,
+	log.Info("job deletion completed successfully", "job_uuid", deleteRequest.JobUUID)
+	return &pb.DeleteJobResponse{
+		Uuid:    deleteRequest.JobUUID,
 		Success: true,
 		Message: "Job deleted successfully",
 	}, nil
 }
 
 // DeleteAllJobs deletes all non-running jobs
-func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJobsReq) (*pb.DeleteAllJobsRes, error) {
+func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJobsRequest) (*pb.DeleteAllJobsResponse, error) {
 	log := s.logger.WithField("operation", "DeleteAllJobs")
 	log.Debug("delete all jobs request received")
 
@@ -421,7 +419,7 @@ func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJ
 	result, err := s.joblet.DeleteAllJobs(ctx, deleteRequest)
 	if err != nil {
 		log.Error("bulk job deletion failed", "error", err)
-		return &pb.DeleteAllJobsRes{
+		return &pb.DeleteAllJobsResponse{
 			Success:      false,
 			Message:      err.Error(),
 			DeletedCount: 0,
@@ -433,7 +431,7 @@ func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJ
 		"deletedCount", result.DeletedCount,
 		"skippedCount", result.SkippedCount)
 
-	return &pb.DeleteAllJobsRes{
+	return &pb.DeleteAllJobsResponse{
 		Success:      true,
 		Message:      fmt.Sprintf("Successfully deleted %d jobs, skipped %d running/scheduled jobs", result.DeletedCount, result.SkippedCount),
 		DeletedCount: int32(result.DeletedCount),
@@ -445,8 +443,8 @@ func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJ
 // For running jobs: sends historical logs from buffer/persist, then streams live.
 // For completed jobs: sends all historical logs only.
 // For jobs not found locally: queries persist for historical logs.
-func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobService_GetJobLogsServer) error {
-	log := s.logger.WithFields("operation", "GetJobLogs", "jobId", req.GetUuid())
+func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsRequest, stream pb.JobService_GetJobLogsServer) error {
+	log := s.logger.WithFields("operation", "GetJobLogs", "job_uuid", req.GetUuid())
 	log.Debug("get job logs request received")
 
 	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
@@ -477,8 +475,8 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsReq, stream pb.JobServic
 
 	// Use unified streaming helper
 	cfg := StreamConfig{
-		JobID:  resolvedUUID,
-		Logger: log,
+		JobUUID: resolvedUUID,
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			return s.sendHistoricalLogs(stream, resolvedUUID, log)
 		},
@@ -503,9 +501,9 @@ func (s *JobServiceServer) sendHistoricalLogs(stream pb.JobService_GetJobLogsSer
 	// First, query persist for historical logs
 	if s.persistClient != nil {
 		persistReq := &persistpb.QueryLogsRequest{
-			JobId:  jobUUID,
-			NodeId: s.getJobNodeId(jobUUID), // For multi-node CloudWatch queries
-			Stream: persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
+			JobUuid: jobUUID,
+			NodeId:  s.getJobNodeId(jobUUID), // For multi-node CloudWatch queries
+			Stream:  persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
 		}
 
 		persistStream, err := s.persistClient.QueryLogs(stream.Context(), persistReq)
@@ -538,9 +536,9 @@ func (s *JobServiceServer) sendHistoricalLogs(stream pb.JobService_GetJobLogsSer
 // queryPersistLogs queries persist for logs when job is not found locally
 func (s *JobServiceServer) queryPersistLogs(stream pb.JobService_GetJobLogsServer, jobUUID string, log *logger.Logger) (int, error) {
 	persistReq := &persistpb.QueryLogsRequest{
-		JobId:  jobUUID,
-		NodeId: s.getJobNodeId(jobUUID), // For multi-node CloudWatch queries
-		Stream: persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
+		JobUuid: jobUUID,
+		NodeId:  s.getJobNodeId(jobUUID), // For multi-node CloudWatch queries
+		Stream:  persistpb.StreamType_STREAM_TYPE_UNSPECIFIED,
 	}
 
 	persistStream, err := s.persistClient.QueryLogs(stream.Context(), persistReq)
@@ -673,8 +671,8 @@ func (s *JobServiceServer) StreamJobMetrics(req *pb.StreamJobMetricsRequest, str
 
 	// Use unified streaming helper
 	cfg := StreamConfig{
-		JobID:  resolvedUUID,
-		Logger: log,
+		JobUUID: resolvedUUID,
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			err := s.sendHistoricalMetrics(stream, resolvedUUID, filter, 0, 0, 0, log)
 			return 0, err // sendHistoricalMetrics doesn't return count
@@ -760,8 +758,8 @@ func (s *JobServiceServer) StreamJobTelematics(req *pb.StreamJobTelematicsReques
 
 	// Use unified streaming helper
 	cfg := StreamConfig{
-		JobID:  resolvedUUID,
-		Logger: log,
+		JobUUID: resolvedUUID,
+		Logger:  log,
 		SendHistorical: func() (int, error) {
 			err := s.sendHistoricalTelematics(stream, resolvedUUID, filter, 0, 0, 0, log)
 			return 0, err // sendHistoricalTelematics doesn't return count
@@ -874,7 +872,7 @@ func (s *JobServiceServer) queryPersistMetrics(stream grpc.ServerStreamingServer
 	eventCount := 0
 
 	metricsReq := &persistpb.QueryMetricsRequest{
-		JobId:     jobID,
+		JobUuid:   jobID,
 		NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -893,7 +891,7 @@ func (s *JobServiceServer) queryPersistMetrics(stream grpc.ServerStreamingServer
 		}
 		pbEvent := &pb.JobMetricsEvent{
 			Timestamp:      metric.Timestamp,
-			JobId:          metric.JobId,
+			JobUuid:        metric.JobUuid,
 			CpuPercent:     metric.Data.CpuUsage * 100,
 			MemoryBytes:    metric.Data.MemoryUsage,
 			GpuPercent:     metric.Data.GpuUsage * 100,
@@ -980,7 +978,7 @@ func (s *JobServiceServer) streamLiveMetrics(stream grpc.ServerStreamingServer[p
 			}
 
 			event := msg.Payload
-			if event.JobID != jobID {
+			if event.JobUUID != jobID {
 				continue
 			}
 
@@ -1075,7 +1073,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query exec events if requested
 	if wantsExec {
 		execReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1092,7 +1090,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: execEvent.Timestamp,
-					JobId:     execEvent.JobId,
+					JobUuid:   execEvent.JobUuid,
 					Type:      "exec",
 					Data: &pb.TelematicsEvent_Exec{
 						Exec: &pb.TelematicsExecData{
@@ -1110,7 +1108,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query connect events if requested
 	if wantsConnect {
 		connectReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1127,7 +1125,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: connectEvent.Timestamp,
-					JobId:     connectEvent.JobId,
+					JobUuid:   connectEvent.JobUuid,
 					Type:      "connect",
 					Data: &pb.TelematicsEvent_Connect{
 						Connect: &pb.TelematicsConnectData{
@@ -1147,7 +1145,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query mmap events if requested
 	if wantsMmap {
 		mmapReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1164,7 +1162,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: mmapEvent.Timestamp,
-					JobId:     mmapEvent.JobId,
+					JobUuid:   mmapEvent.JobUuid,
 					Type:      "mmap",
 					Data: &pb.TelematicsEvent_Mmap{
 						Mmap: &pb.TelematicsMmapData{
@@ -1182,7 +1180,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query mprotect events if requested
 	if wantsMprotect {
 		mprotectReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1199,7 +1197,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: mprotectEvent.Timestamp,
-					JobId:     mprotectEvent.JobId,
+					JobUuid:   mprotectEvent.JobUuid,
 					Type:      "mprotect",
 					Data: &pb.TelematicsEvent_Mprotect{
 						Mprotect: &pb.TelematicsMprotectData{
@@ -1217,7 +1215,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query file events if requested
 	if wantsFile {
 		fileReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1234,7 +1232,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: fileEvent.Timestamp,
-					JobId:     fileEvent.JobId,
+					JobUuid:   fileEvent.JobUuid,
 					Type:      "file",
 					Data: &pb.TelematicsEvent_File{
 						File: &pb.TelematicsFileData{
@@ -1252,7 +1250,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query accept events if requested
 	if wantsAccept {
 		acceptReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1269,7 +1267,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: acceptEvent.Timestamp,
-					JobId:     acceptEvent.JobId,
+					JobUuid:   acceptEvent.JobUuid,
 					Type:      "accept",
 					Data: &pb.TelematicsEvent_Accept{
 						Accept: &pb.TelematicsAcceptData{
@@ -1289,7 +1287,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 	// Query socket data events if requested
 	if wantsSocketData {
 		socketDataReq := &persistpb.QueryTelemetryRequest{
-			JobId:     jobID,
+			JobUuid:   jobID,
 			NodeId:    s.getJobNodeId(jobID), // For multi-node CloudWatch queries
 			StartTime: startTime,
 			EndTime:   endTime,
@@ -1306,7 +1304,7 @@ func (s *JobServiceServer) queryPersistTelematics(stream grpc.ServerStreamingSer
 				}
 				allEvents = append(allEvents, &pb.TelematicsEvent{
 					Timestamp: socketDataEvent.Timestamp,
-					JobId:     socketDataEvent.JobId,
+					JobUuid:   socketDataEvent.JobUuid,
 					Type:      "socket_data",
 					Data: &pb.TelematicsEvent_SocketData{
 						SocketData: &pb.TelematicsSocketDataData{
@@ -1410,7 +1408,7 @@ func (s *JobServiceServer) streamLiveTelematics(stream grpc.ServerStreamingServe
 			}
 
 			event := msg.Payload
-			if event.JobID != jobID {
+			if event.JobUUID != jobID {
 				continue
 			}
 
@@ -1437,7 +1435,7 @@ func (s *JobServiceServer) telemetryEventToMetricsEvent(event *telemetry.Event) 
 	}
 	return &pb.JobMetricsEvent{
 		Timestamp:      event.Timestamp.UnixNano(),
-		JobId:          event.JobID,
+		JobUuid:        event.JobUUID,
 		CpuPercent:     data.CPUPercent,
 		MemoryBytes:    data.MemoryBytes,
 		MemoryLimit:    data.MemoryLimit,
@@ -1454,7 +1452,7 @@ func (s *JobServiceServer) telemetryEventToMetricsEvent(event *telemetry.Event) 
 func (s *JobServiceServer) telemetryEventToTelematicsEvent(event *telemetry.Event) *pb.TelematicsEvent {
 	pbEvent := &pb.TelematicsEvent{
 		Timestamp: event.Timestamp.UnixNano(),
-		JobId:     event.JobID,
+		JobUuid:   event.JobUUID,
 		Type:      string(event.Type),
 	}
 

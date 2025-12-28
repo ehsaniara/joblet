@@ -92,7 +92,7 @@ func (d *dynamoDBBackend) Get(ctx context.Context, jobID string) (*domain.Job, e
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(d.tableName),
 		Key: map[string]types.AttributeValue{
-			"jobId": &types.AttributeValueMemberS{Value: jobID},
+			"job_uuid": &types.AttributeValueMemberS{Value: jobID},
 		},
 	}
 
@@ -139,7 +139,7 @@ func (d *dynamoDBBackend) Delete(ctx context.Context, jobID string) error {
 	input := &dynamodb.DeleteItemInput{
 		TableName: aws.String(d.tableName),
 		Key: map[string]types.AttributeValue{
-			"jobId": &types.AttributeValueMemberS{Value: jobID},
+			"job_uuid": &types.AttributeValueMemberS{Value: jobID},
 		},
 	}
 
@@ -281,7 +281,7 @@ func loadAWSConfig(ctx context.Context, region string) (aws.Config, error) {
 
 func jobToItem(job *domain.Job, ttlDays int) map[string]types.AttributeValue {
 	item := map[string]types.AttributeValue{
-		"jobId":     &types.AttributeValueMemberS{Value: job.Uuid},
+		"job_uuid":  &types.AttributeValueMemberS{Value: job.Uuid},
 		"jobStatus": &types.AttributeValueMemberS{Value: string(job.Status)},
 		"command":   &types.AttributeValueMemberS{Value: job.Command},
 		"nodeId":    &types.AttributeValueMemberS{Value: job.NodeId},
@@ -323,10 +323,7 @@ func jobToItem(job *domain.Job, ttlDays int) map[string]types.AttributeValue {
 		item["runtime"] = &types.AttributeValueMemberS{Value: job.Runtime}
 	}
 
-	// Job name and type
-	if job.Name != "" {
-		item["name"] = &types.AttributeValueMemberS{Value: job.Name}
-	}
+	// Job type
 	if job.Type != "" {
 		item["jobType"] = &types.AttributeValueMemberS{Value: string(job.Type)}
 	}
@@ -400,7 +397,7 @@ func itemToJob(item map[string]types.AttributeValue) (*domain.Job, error) {
 	job := &domain.Job{}
 
 	// Parse required fields
-	if v, ok := item["jobId"].(*types.AttributeValueMemberS); ok {
+	if v, ok := item["job_uuid"].(*types.AttributeValueMemberS); ok {
 		job.Uuid = v.Value
 	}
 	if v, ok := item["jobStatus"].(*types.AttributeValueMemberS); ok {
@@ -462,10 +459,7 @@ func itemToJob(item map[string]types.AttributeValue) (*domain.Job, error) {
 		}
 	}
 
-	// Parse job name and type
-	if v, ok := item["name"].(*types.AttributeValueMemberS); ok {
-		job.Name = v.Value
-	}
+	// Parse job type
 	if v, ok := item["jobType"].(*types.AttributeValueMemberS); ok {
 		job.Type = domain.JobType(v.Value)
 	}

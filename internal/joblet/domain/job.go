@@ -32,7 +32,6 @@ var (
 type Job struct {
 	// Core identifiers
 	Uuid string // Unique identifier for job tracking
-	Name string // Optional readable job name
 
 	// Execution details
 	Command string   // Executable command path
@@ -355,7 +354,6 @@ func (j *Job) DeepCopy() *Job {
 	jobCopy := &Job{
 		// Core identifiers
 		Uuid: j.Uuid,
-		Name: j.Name,
 
 		// Execution details
 		Command: j.Command,

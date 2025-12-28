@@ -26,7 +26,7 @@ var _ domain.UploadStreamer = (*StreamContext)(nil)
 type StreamContext struct {
 	Session  *domain.UploadSession
 	PipePath string
-	JobID    string
+	JobUUID  string
 	manager  domain.UploadManager
 	platform platform.Platform
 	logger   *logger.Logger
@@ -46,7 +46,7 @@ func NewStreamContext(session *domain.UploadSession, pipePath string, jobID stri
 	return &StreamContext{
 		Session:  session,
 		PipePath: pipePath,
-		JobID:    jobID,
+		JobUUID:  jobID,
 		platform: platform,
 		logger:   logger.WithField("component", "streamContext"),
 	}
@@ -59,7 +59,7 @@ func (sc *StreamContext) GetPipePath() string {
 
 // GetJobID returns the job ID
 func (sc *StreamContext) GetJobID() string {
-	return sc.JobID
+	return sc.JobUUID
 }
 
 // SetManager sets the upload manager for the stream context
@@ -150,7 +150,7 @@ func (sc *StreamContext) streamingGoroutine() {
 
 	// Cleanup pipe after streaming (if not cancelled)
 	if ctx.Err() != context.Canceled {
-		if transport, err := sc.manager.CreateTransport(sc.JobID); err == nil {
+		if transport, err := sc.manager.CreateTransport(sc.JobUUID); err == nil {
 			if err := sc.manager.CleanupTransport(transport); err != nil {
 				log.Warn("failed to cleanup transport", "error", err)
 			}
@@ -266,7 +266,7 @@ func (sc *StreamContext) streamFilesToPipe(ctx context.Context, pipe *os.File) e
 
 // StreamConfig contains configuration for streaming uploads
 type StreamConfig struct {
-	JobID        string
+	JobUUID      string
 	Uploads      []domain.FileUpload
 	MemoryLimit  int32
 	WorkspaceDir string
@@ -275,7 +275,7 @@ type StreamConfig struct {
 // GetTransport returns the transport mechanism (required by UploadStreamer interface)
 func (sc *StreamContext) GetTransport() domain.UploadTransport {
 	if sc.manager != nil {
-		if transport, err := sc.manager.CreateTransport(sc.JobID); err == nil {
+		if transport, err := sc.manager.CreateTransport(sc.JobUUID); err == nil {
 			return transport
 		}
 	}
@@ -319,11 +319,11 @@ func (m *Manager) ProcessDirectUploads(ctx context.Context, config *StreamConfig
 	}
 
 	log := m.logger.WithField("operation", "process-direct-uploads")
-	log.Debug("processing direct uploads", "jobID", config.JobID,
+	log.Debug("processing direct uploads", "job_uuid", config.JobUUID,
 		"uploadCount", len(config.Uploads), "workspace", config.WorkspaceDir)
 
 	// Prepare session
-	session, err := m.PrepareUploadSession(config.JobID, config.Uploads, config.MemoryLimit)
+	session, err := m.PrepareUploadSession(config.JobUUID, config.Uploads, config.MemoryLimit)
 	if err != nil {
 		return fmt.Errorf("failed to prepare upload session: %w", err)
 	}

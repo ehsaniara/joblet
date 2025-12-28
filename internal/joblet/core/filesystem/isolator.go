@@ -38,7 +38,7 @@ func NewIsolator(cfg *config.Config, platform platform.Platform) *Isolator {
 
 // JobFilesystem represents an isolated filesystem for a job
 type JobFilesystem struct {
-	JobID         string
+	JobUUID       string
 	RootDir       string
 	TmpDir        string
 	WorkDir       string
@@ -79,7 +79,7 @@ func (f *JobFilesystem) PrepareInitBinary(hostBinaryPath string) error {
 
 // CreateJobFilesystem creates directory structure for a job's isolated environment.
 func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
-	log := i.logger.WithField("jobID", jobID)
+	log := i.logger.WithField("job_uuid", jobID)
 
 	jobRootDir := filepath.Join(i.config.Filesystem.BaseDir, jobID)
 	jobTmpDir := strings.Replace(i.config.Filesystem.TmpDir, "{JOB_ID}", jobID, -1)
@@ -97,7 +97,7 @@ func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 	}
 
 	return &JobFilesystem{
-		JobID:    jobID,
+		JobUUID:  jobID,
 		RootDir:  jobRootDir,
 		TmpDir:   jobTmpDir,
 		WorkDir:  jobWorkDir,
@@ -110,7 +110,7 @@ func (i *Isolator) CreateJobFilesystem(jobID string) (*JobFilesystem, error) {
 // CreateBuilderFilesystem creates directory structure for runtime build jobs.
 // Same structure as regular jobs, but marked as builder for full host access.
 func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error) {
-	log := i.logger.WithField("jobID", jobID)
+	log := i.logger.WithField("job_uuid", jobID)
 	log.Debug("creating builder filesystem for runtime build job")
 
 	// Create job-specific directories (same structure as regular jobs)
@@ -132,7 +132,7 @@ func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error)
 	}
 
 	filesystem := &JobFilesystem{
-		JobID:     jobID,
+		JobUUID:   jobID,
 		RootDir:   jobRootDir,
 		TmpDir:    jobTmpDir,
 		WorkDir:   jobWorkDir,
@@ -816,8 +816,8 @@ func (f *JobFilesystem) validateInJobContext() error {
 		return fmt.Errorf("JOB_ID not set - refusing chroot")
 	}
 
-	if jobID != f.JobID {
-		return fmt.Errorf("JOB_ID mismatch - expected %s, got %s", f.JobID, jobID)
+	if jobID != f.JobUUID {
+		return fmt.Errorf("JOB_ID mismatch - expected %s, got %s", f.JobUUID, jobID)
 	}
 
 	// Ensure we're PID 1 in a namespace
@@ -996,9 +996,9 @@ func (f *JobFilesystem) SetVolumes(volumes []string) {
 // Environment variables are set by the job execution system.
 func (f *JobFilesystem) loadVolumesFromEnvironment() {
 	volumeCountStr := f.platform.Getenv("JOB_VOLUMES_COUNT")
-	f.logger.Debug("checking for volume environment variables", "JOB_VOLUMES_COUNT", volumeCountStr, "jobID", f.JobID)
+	f.logger.Debug("checking for volume environment variables", "JOB_VOLUMES_COUNT", volumeCountStr, "job_uuid", f.JobUUID)
 	if volumeCountStr == "" {
-		f.logger.Debug("no volume environment variables found - volumes will not be mounted", "jobID", f.JobID)
+		f.logger.Debug("no volume environment variables found - volumes will not be mounted", "job_uuid", f.JobUUID)
 		return
 	}
 
@@ -1015,14 +1015,14 @@ func (f *JobFilesystem) loadVolumesFromEnvironment() {
 	for i := 0; i < volumeCount; i++ {
 		envVar := fmt.Sprintf("JOB_VOLUME_%d", i)
 		volumeName := f.platform.Getenv(envVar)
-		f.logger.Debug("checking volume environment variable", "envVar", envVar, "volumeName", volumeName, "jobID", f.JobID)
+		f.logger.Debug("checking volume environment variable", "envVar", envVar, "volumeName", volumeName, "job_uuid", f.JobUUID)
 		if volumeName != "" {
 			volumes = append(volumes, volumeName)
 		}
 	}
 
 	f.Volumes = volumes
-	f.logger.Debug("loaded volumes from environment", "volumes", volumes, "volumeCount", len(volumes), "jobID", f.JobID)
+	f.logger.Debug("loaded volumes from environment", "volumes", volumes, "volumeCount", len(volumes), "job_uuid", f.JobUUID)
 }
 
 // setupLimitedWorkDir creates a size-limited work directory for jobs without volumes.
@@ -1127,7 +1127,7 @@ func (f *JobFilesystem) mountRuntime() error {
 		return fmt.Errorf("failed to mount runtime %s: %w", f.Runtime, err)
 	}
 
-	log.Debug("runtime mounted", "runtime", f.Runtime, "jobID", f.JobID)
+	log.Debug("runtime mounted", "runtime", f.Runtime, "job_uuid", f.JobUUID)
 	return nil
 }
 
