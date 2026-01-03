@@ -441,15 +441,3 @@ func TestDomainToProtobuf_EmptyEnvironmentVariables(t *testing.T) {
 		t.Errorf("Expected empty secret environment variables, got %v", pbJob.SecretEnvironment)
 	}
 }
-
-// TestProtobufToDomain_WithEnvironmentVariables is skipped because ProtobufToDomain is not implemented
-// This test documents expected behavior for future implementation of protobuf-to-domain conversion
-// Note: Currently only domain-to-protobuf mapping is needed for gRPC responses
-func TestProtobufToDomain_WithEnvironmentVariables(t *testing.T) {
-	t.Skip("ProtobufToDomain not implemented - protobuf-to-domain conversion not currently needed")
-
-	// Future implementation would test:
-	// - Round-trip: Domain -> Protobuf -> Domain
-	// - Environment variables preservation
-	// - Secret environment variables preservation
-}

@@ -184,7 +184,6 @@ persist/
 │   │   ├── backend.go    # Interface
 │   │   ├── local.go      # Local filesystem
 │   │   └── index.go      # Job index
-│   ├── query/            # Query engine (TODO)
 │   └── server/           # gRPC server
 └── pkg/
     └── logger/           # Logging

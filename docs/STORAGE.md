@@ -428,7 +428,6 @@ vm.DetachVolume(ctx, volume.ID)
 
 - Each volume mounted in isolated namespace
 - No direct host filesystem access
-- Encrypted volume support (future enhancement)
 
 ## Performance Optimization
 
@@ -449,35 +448,6 @@ vm.DetachVolume(ctx, volume.ID)
 - Volume usage metrics
 - Mount/unmount latency tracking
 - I/O throughput monitoring
-
-## Future Enhancements
-
-### Planned Features
-
-1. **Network Storage Support**
-    - NFS volume driver
-    - S3-compatible object storage
-    - Distributed storage backends
-
-2. **Advanced Quota Management**
-    - Project quotas
-    - User quotas
-    - Soft/hard limit support
-
-3. **Snapshot and Backup**
-    - Volume snapshots
-    - Incremental backups
-    - Point-in-time recovery
-
-4. **Encryption**
-    - At-rest encryption for filesystem volumes
-    - Encrypted memory volumes
-    - Key management integration
-
-5. **Volume Sharing**
-    - Read-only volume sharing between jobs
-    - Copy-on-write volumes
-    - Volume cloning
 
 ## Testing Strategy
 

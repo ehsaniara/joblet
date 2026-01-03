@@ -49,7 +49,6 @@ Examples:
 	cmd.AddCommand(NewRuntimeInfoCmd())
 	cmd.AddCommand(NewRuntimeTestCmd())
 	cmd.AddCommand(NewRuntimeBuildCmd())
-	cmd.AddCommand(NewRuntimeInstallCmd())
 	cmd.AddCommand(NewRuntimeValidateCmd())
 	cmd.AddCommand(NewRuntimeRemoveCmd())
 
@@ -616,31 +615,6 @@ func outputBuildResultFromProto(result *pb.BuildResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)
-}
-
-func NewRuntimeInstallCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:        "install <runtime-spec>",
-		Short:      "DEPRECATED: Use 'rnx runtime build' instead",
-		Deprecated: "GitHub-based installation is deprecated. Use 'rnx runtime build <path>' with a runtime.yaml file instead.",
-		Long: `DEPRECATED: This command is no longer supported.
-
-Use 'rnx runtime build' to build runtimes from YAML specifications:
-
-  # Build a runtime from a YAML file
-  rnx runtime build ./my-runtime/runtime.yaml
-
-  # Validate a runtime specification before building
-  rnx runtime validate ./my-runtime/runtime.yaml
-
-See docs/design/RUNTIME_YAML_QUICKREF.md for the runtime.yaml format.`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("GitHub-based installation is deprecated. Use 'rnx runtime build <path>' with a runtime.yaml file instead")
-		},
-	}
-
-	return cmd
 }
 
 func NewRuntimeValidateCmd() *cobra.Command {

@@ -751,8 +751,7 @@ sudo netstat -anp | grep state-ipc.sock
 # Check for IPC errors
 journalctl -u joblet -f | grep "state client"
 
-# Manually trigger sync (not implemented, future feature)
-# For now, restart triggers sync:
+# Restart triggers state sync:
 sudo systemctl restart joblet
 ```
 
@@ -926,21 +925,6 @@ ls -la /opt/joblet/run/
   ]
 }
 ```
-
-## Future Enhancements
-
-### Planned
-
-- **State Reconciliation**: Automatic sync after network partitions
-- **Query Optimization**: GSI for status-based queries in DynamoDB
-- **Backup & Restore**: Point-in-time state snapshots
-
-### Under Consideration
-
-- **Multi-Region**: Cross-region DynamoDB replication
-- **Compression**: Gzip job metadata to reduce storage costs
-- **Encryption**: Client-side encryption for sensitive job data
-- **Audit Trail**: Immutable state change history
 
 ## References
 

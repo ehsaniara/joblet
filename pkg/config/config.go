@@ -46,11 +46,6 @@ type NetworkDefinition struct {
 	BridgeName string `yaml:"bridge_name"`
 }
 
-type IPAllocationConfig struct {
-	StartOffset int `yaml:"start_offset"`
-	EndReserve  int `yaml:"end_reserve"`
-}
-
 type NetworkStorageConfig struct {
 	Path string `yaml:"path" json:"path"`
 }

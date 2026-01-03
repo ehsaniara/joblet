@@ -13,8 +13,6 @@
 - ✅ **Streaming Completeness**: Drain mode ensures final metrics samples are captured (v5.0.0)
 - ✅ **Short UUID Support**: Commands work with both full and short (8-char) UUIDs
 - ✅ **CLI Commands**: `rnx job metrics` streams historical + live metrics (no flags needed)
-- ⏳ **Retention Cleanup**: Automatic cleanup based on retention period (TODO)
-- ⏳ **Aggregations/Rollups**: Historical data aggregation for long-term storage (TODO)
 
 ### Key Design Decisions Made
 

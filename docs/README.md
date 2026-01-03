@@ -60,7 +60,7 @@ seamless integration with existing infrastructure through a unified gRPC API and
 - **Log/Metric Persistence**: Dedicated persistence service (`persist`) with multiple storage backends including local
   filesystem and AWS CloudWatch Logs for cloud-native deployments, featuring multi-node support, high-performance log
   and metric storage with gzip compression, Unix socket IPC, and historical query capabilities
-- **Job State Persistence**: Separate state service with pluggable backends (Memory, DynamoDB, Redis) ensuring job
+- **Job State Persistence**: Separate state service with pluggable backends (Memory, DynamoDB) ensuring job
   metadata survives restarts, supporting auto-scaling deployments with async fire-and-forget operations for maximum
   performance
 

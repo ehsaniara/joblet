@@ -213,20 +213,6 @@ test_job_queue_ordering() {
     fi
 }
 
-test_recurring_schedule() {
-    # Test recurring schedules (if supported)
-    echo -e "    ${YELLOW}Testing recurring schedules (future feature)${NC}"
-    
-    # This would test schedules like:
-    # - Every 5 minutes
-    # - Every hour at :30
-    # - Daily at 2 AM
-    # - Weekly on Mondays
-    
-    # For now, just pass as this is likely a future feature
-    return 0
-}
-
 test_schedule_cancellation() {
     # Test cancelling a scheduled job
     local job_output=$("$RNX_BINARY" job run sh -c "sleep 10; echo 'SHOULD_NOT_COMPLETE'" 2>&1)
@@ -250,19 +236,6 @@ test_schedule_cancellation() {
         echo -e "    ${YELLOW}Job cancellation may not be fully implemented${NC}"
         return 0
     fi
-}
-
-test_schedule_with_dependencies() {
-    # Test scheduling with job dependencies
-    echo -e "    ${YELLOW}Testing job dependencies (workflow feature)${NC}"
-    
-    # This would test:
-    # - Job B starts after Job A completes
-    # - Job C starts after both A and B complete
-    # - Failure handling in dependency chains
-    
-    # For now, mark as future feature
-    return 0
 }
 
 test_schedule_timezone_handling() {
@@ -369,9 +342,7 @@ main() {
     run_test "Job queue ordering" test_job_queue_ordering
     
     test_section "Advanced Scheduling"
-    run_test "Recurring schedules" test_recurring_schedule
     run_test "Schedule cancellation" test_schedule_cancellation
-    run_test "Schedule with dependencies" test_schedule_with_dependencies
     
     test_section "Time Handling"
     run_test "Timezone handling" test_schedule_timezone_handling
