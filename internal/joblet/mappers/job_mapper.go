@@ -166,6 +166,9 @@ func (m *JobMapper) ProtobufToStartJobRequest(req *pb.RunJobRequest) (*interface
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           domain.JobTypeStandard, // JobService jobs use standard (production) isolation
+		GPUCount:          req.GpuCount,
+		GPUMemoryMB:       int64(req.GpuMemoryMb),
+		WorkingDirectory:  req.WorkDir,
 	}, nil
 }
 
@@ -193,7 +196,11 @@ func (m *JobMapper) StartJobRequestToProtobuf(req *interfaces.StartJobRequest) *
 		Schedule:          req.Schedule,
 		Network:           req.Network,
 		Volumes:           req.Volumes,
+		Runtime:           req.Runtime,
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
+		GpuCount:          req.GPUCount,
+		GpuMemoryMb:       int32(req.GPUMemoryMB),
+		WorkDir:           req.WorkingDirectory,
 	}
 }

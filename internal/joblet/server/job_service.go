@@ -332,6 +332,9 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		Runtime:           job.Runtime,
 		WorkDir:           job.WorkingDirectory,
 		Uploads:           s.convertUploadsToStringArray(job.Uploads),
+		GpuIndices:        pbJob.GpuIndices,
+		GpuCount:          pbJob.GpuCount,
+		GpuMemoryMb:       pbJob.GpuMemoryMb,
 		NodeId:            job.NodeId,
 	}, nil
 }
