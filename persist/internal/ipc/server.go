@@ -20,9 +20,8 @@ import (
 )
 
 const (
-	// writeBackpressureTimeout is how long to wait when the write pipeline is full
-	// before dropping the message. This provides backpressure to senders.
-	writeBackpressureTimeout = 5 * time.Second
+	// defaultFlushInterval is the periodic flush interval for batched writes
+	defaultFlushInterval = 5 * time.Second
 )
 
 // Server is the IPC server that receives messages from joblet-core
@@ -39,9 +38,16 @@ type Server struct {
 	connections sync.Map // conn_id -> net.Conn
 
 	// Metrics
-	msgsReceived  atomic.Uint64
-	bytesReceived atomic.Uint64
-	writeErrors   atomic.Uint64
+	msgsReceived       atomic.Uint64
+	bytesReceived      atomic.Uint64
+	writeErrors        atomic.Uint64
+	backpressureEvents atomic.Uint64 // Count of backpressure events (block or drop)
+	msgsDropped        atomic.Uint64 // Count of dropped messages (only in drop mode)
+
+	// Computed config values
+	backpressureTimeout time.Duration
+	backpressureMode    string // "block" or "drop"
+	batchSize           int
 
 	// Lifecycle
 	ctx    context.Context
@@ -53,13 +59,37 @@ type Server struct {
 func NewServer(cfg *config.IPCConfig, backend storage.Backend, log *logger.Logger) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Apply defaults if not configured
+	bufferSize := cfg.BufferSize
+	if bufferSize <= 0 {
+		bufferSize = 100000
+	}
+
+	backpressureTimeout := time.Duration(cfg.BackpressureTimeout) * time.Second
+	if backpressureTimeout <= 0 {
+		backpressureTimeout = 5 * time.Second
+	}
+
+	backpressureMode := cfg.BackpressureMode
+	if backpressureMode == "" {
+		backpressureMode = "block" // Default to block mode (prevents data loss)
+	}
+
+	batchSize := cfg.BatchSize
+	if batchSize <= 0 {
+		batchSize = 100
+	}
+
 	return &Server{
-		config:    cfg,
-		backend:   backend,
-		logger:    log.WithField("component", "ipc-server"),
-		writePipe: make(chan *ipcpb.IPCMessage, 100000), // 100k message buffer for high-frequency eBPF events
-		ctx:       ctx,
-		cancel:    cancel,
+		config:              cfg,
+		backend:             backend,
+		logger:              log.WithField("component", "ipc-server"),
+		writePipe:           make(chan *ipcpb.IPCMessage, bufferSize),
+		backpressureTimeout: backpressureTimeout,
+		backpressureMode:    backpressureMode,
+		batchSize:           batchSize,
+		ctx:                 ctx,
+		cancel:              cancel,
 	}
 }
 
@@ -86,7 +116,11 @@ func (s *Server) Start(ctx context.Context) error {
 	s.logger.Info("IPC server listening", "socket", s.config.Socket)
 
 	// Start write pipeline workers
-	for i := 0; i < 4; i++ { // 4 workers
+	workerCount := s.config.WorkerCount
+	if workerCount <= 0 {
+		workerCount = 4
+	}
+	for i := 0; i < workerCount; i++ {
 		s.wg.Add(1)
 		go s.writeWorker(i)
 	}
@@ -115,7 +149,10 @@ func (s *Server) Stop() error {
 
 	s.logger.Info("IPC server stopped",
 		"msgsReceived", s.msgsReceived.Load(),
-		"bytesReceived", s.bytesReceived.Load())
+		"bytesReceived", s.bytesReceived.Load(),
+		"backpressureEvents", s.backpressureEvents.Load(),
+		"msgsDropped", s.msgsDropped.Load(),
+		"writeErrors", s.writeErrors.Load())
 
 	return nil
 }
@@ -213,20 +250,40 @@ func (s *Server) handleConnection(conn net.Conn) {
 		case s.writePipe <- &msg:
 			// Queued successfully
 		default:
-			// Pipeline full - apply backpressure with timeout
-			timer := time.NewTimer(writeBackpressureTimeout)
-			select {
-			case s.writePipe <- &msg:
-				timer.Stop()
-			case <-timer.C:
-				s.logger.Warn("Write pipeline backpressure timeout, dropping message",
+			// Pipeline full - apply backpressure based on configured mode
+			s.backpressureEvents.Add(1)
+
+			if s.backpressureMode == "drop" {
+				// Drop mode: wait with timeout, then drop if still full
+				timer := time.NewTimer(s.backpressureTimeout)
+				select {
+				case s.writePipe <- &msg:
+					timer.Stop()
+				case <-timer.C:
+					s.msgsDropped.Add(1)
+					s.logger.Warn("Write pipeline backpressure timeout, dropping message",
+						"job_uuid", msg.JobUuid,
+						"timeout", s.backpressureTimeout,
+						"queueSize", len(s.writePipe),
+						"totalDropped", s.msgsDropped.Load())
+				case <-s.ctx.Done():
+					timer.Stop()
+					return
+				}
+			} else {
+				// Block mode (default): block until space available (prevents data loss)
+				// Log periodically to indicate backpressure is occurring
+				s.logger.Debug("Write pipeline full, blocking sender",
 					"job_uuid", msg.JobUuid,
-					"timeout", writeBackpressureTimeout,
-					"queueSize", len(s.writePipe))
-				s.writeErrors.Add(1)
-			case <-s.ctx.Done():
-				timer.Stop()
-				return
+					"queueSize", len(s.writePipe),
+					"mode", "block")
+
+				select {
+				case s.writePipe <- &msg:
+					// Successfully queued after blocking
+				case <-s.ctx.Done():
+					return
+				}
 			}
 		}
 	}
@@ -237,13 +294,13 @@ func (s *Server) writeWorker(id int) {
 	defer s.wg.Done()
 
 	workerLog := s.logger.WithField("worker", id)
-	workerLog.Debug("Write worker started")
+	workerLog.Debug("Write worker started", "batchSize", s.batchSize)
 
-	batch := make([]*ipcpb.IPCMessage, 0, 100)
+	batch := make([]*ipcpb.IPCMessage, 0, s.batchSize)
 
 	// Add time-based flush to ensure metrics are written periodically
-	// even if batch size threshold (100) isn't reached
-	flushTicker := time.NewTicker(5 * time.Second)
+	// even if batch size threshold isn't reached
+	flushTicker := time.NewTicker(defaultFlushInterval)
 	defer flushTicker.Stop()
 
 	for {
@@ -269,7 +326,7 @@ func (s *Server) writeWorker(id int) {
 			batch = append(batch, msg)
 
 			// Flush batch when full or channel empty
-			if len(batch) >= 100 {
+			if len(batch) >= s.batchSize {
 				s.processBatch(batch, workerLog)
 				batch = batch[:0]
 			} else if len(s.writePipe) == 0 && len(batch) > 0 {

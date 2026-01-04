@@ -144,11 +144,15 @@ persist:
 
   ipc:
     # socket: inherited from top-level ipc.socket (single source of truth)
-    # Server-specific settings only:
-    max_connections: 10
     max_message_size: 134217728  # 128MB - handle large batches
     read_buffer: 8388608         # 8MB
-    write_buffer: 8388608        # 8MB
+
+    # Write pipeline settings (for high-throughput eBPF events)
+    buffer_size: 100000          # Pipeline buffer size (default: 100k messages)
+    worker_count: 4              # Parallel write workers (default: 4)
+    batch_size: 100              # Max messages per batch before flush (default: 100)
+    backpressure_timeout: 5      # Seconds to wait when pipeline full (default: 5)
+    backpressure_mode: "block"   # "block" (default, no data loss) or "drop" (lossy but faster)
 
   storage:
     # Storage backend type: "local", "cloudwatch", or "s3"
@@ -156,18 +160,20 @@ persist:
     type: "local"
 
     # LOCAL storage configuration (filesystem-based)
+    # Format: JSONL (logs) or gzipped JSONL (metrics/events)
     local:
       logs:
         directory: "/opt/joblet/logs"      # Inherited from parent's log dir
-        format: "jsonl"                     # Gzip compressed JSON lines
 
       metrics:
         directory: "/opt/joblet/metrics"   # Inherited from parent's metrics dir
-        format: "jsonl.gz"                  # Gzip compressed JSON lines
 
       events:
         directory: "/opt/joblet/events"    # eBPF telematics events storage
-        format: "jsonl.gz"                  # Gzip compressed JSON lines
+
+      # File handle cache settings (prevents unbounded resource growth)
+      max_open_files: 1000           # Max file handles per type (default: 1000)
+      file_handle_ttl: 300           # TTL in seconds for idle handles (default: 300)
 
     # AWS CLOUDWATCH storage configuration (cloud-native)
     # Automatically configured when running on EC2 instances
@@ -181,7 +187,6 @@ persist:
     cloudwatch:
       region: ""                              # AWS region (empty = auto-detect from EC2 metadata)
       log_group_prefix: "/joblet"             # CloudWatch Logs group prefix (nodeId automatically inserted)
-      log_stream_prefix: "job-"               # CloudWatch Logs stream prefix
       metric_namespace: "Joblet/Jobs"         # CloudWatch Metrics namespace
       metric_dimensions:                      # Additional metric dimensions (optional)
       # Environment: "production"
@@ -203,6 +208,56 @@ persist:
       #   log_retention_days: 30   # Production (standard)
       #   log_retention_days: 365  # Compliance (1 year)
       #   log_retention_days: -1   # Never expire (not recommended)
+
+    # AWS S3 storage configuration (object storage)
+    # Best for: Long-term archival, cross-region replication, cost-effective storage
+    #
+    # AUTHENTICATION: Uses AWS default credential chain (secure, no credentials in config)
+    #   1. IAM Role / Instance Profile (recommended for EC2)
+    #   2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    #   3. Shared credentials file (~/.aws/credentials)
+    #
+    s3:
+      region: ""                              # AWS region (empty = auto-detect from EC2 metadata)
+      bucket: ""                              # S3 bucket name (required when type: "s3")
+      key_prefix: "jobs/"                     # Key prefix for all objects (default: "jobs/")
+      # Object paths: {key_prefix}{nodeId}/{jobId}/{streamType}/{timestamp}.jsonl.gz
+
+      # Buffering settings (data is buffered locally before upload)
+      flush_interval: 30                      # Seconds between flushes (default: 30)
+      flush_threshold: 5242880                # Flush when buffer reaches this size in bytes (default: 5MB)
+      max_buffer_size: 52428800               # Max buffer size before blocking (default: 50MB)
+
+      # Storage class for cost optimization
+      storage_class: "STANDARD"               # Options: STANDARD, STANDARD_IA, ONEZONE_IA, GLACIER, DEEP_ARCHIVE
+      # Cost optimization examples:
+      #   STANDARD       - Frequently accessed data (highest cost, lowest latency)
+      #   STANDARD_IA    - Infrequently accessed (lower cost, retrieval fee)
+      #   ONEZONE_IA     - Single AZ, infrequent access (cheapest for non-critical data)
+      #   GLACIER        - Archive storage (very low cost, minutes to hours retrieval)
+      #   DEEP_ARCHIVE   - Long-term archive (lowest cost, 12+ hours retrieval)
+
+      # Server-side encryption
+      sse: ""                                 # Server-side encryption: "" (none), "AES256", or "aws:kms"
+      kms_key_id: ""                          # KMS key ID if sse="aws:kms"
+
+      # IMPORTANT: Lifecycle rules must be configured MANUALLY on the S3 bucket
+      # The code does NOT configure these - they are reference values for your bucket policy
+      #
+      # Example AWS CLI command to set lifecycle rules:
+      #   aws s3api put-bucket-lifecycle-configuration --bucket YOUR_BUCKET \
+      #     --lifecycle-configuration file://lifecycle.json
+      #
+      # Example lifecycle.json:
+      # {
+      #   "Rules": [{
+      #     "ID": "JobletArchiveRule",
+      #     "Status": "Enabled",
+      #     "Filter": {"Prefix": "jobs/"},
+      #     "Transitions": [{"Days": 30, "StorageClass": "GLACIER"}],
+      #     "Expiration": {"Days": 365}
+      #   }]
+      # }
 
 # Job State Persistence Configuration (Optional - for EC2/Cloud deployments)
 # When enabled, job states survive joblet restarts

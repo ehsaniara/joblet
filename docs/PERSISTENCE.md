@@ -7,8 +7,7 @@
 
 The Joblet Persistence Service (`persist`) is a dedicated microservice that handles historical storage and
 querying of job **logs and metrics**. It runs as a subprocess of the main joblet daemon and provides durable storage
-with
-support for multiple storage backends including local filesystem and AWS CloudWatch.
+with support for multiple storage backends including local filesystem, AWS CloudWatch, and AWS S3.
 
 ## Architecture
 
@@ -109,10 +108,8 @@ persist:
     local:
       logs:
         directory: "/opt/joblet/logs"
-        format: "jsonl.gz"
       metrics:
         directory: "/opt/joblet/metrics"
-        format: "jsonl.gz"
 ```
 
 ### CloudWatch Backend (AWS)
@@ -258,7 +255,7 @@ persist:
 
       # Log group organization (one per node)
       log_group_prefix: "/joblet"              # Creates: /joblet/{nodeId}/jobs
-      # Note: log_stream_prefix is deprecated - streams are named: {job_uuid}-{streamType}
+      # Streams are named: {job_uuid}-{streamType} (e.g., job-123-logs, job-123-metrics)
 
       # Metrics configuration
       metric_namespace: "Joblet/Production"    # CloudWatch Metrics namespace
@@ -372,9 +369,102 @@ aws cloudwatch get-metric-statistics \
   --statistics Average,Maximum,Minimum
 ```
 
-### S3 Backend (Planned)
+### S3 Backend
 
-Object storage for long-term archival (v2.1+).
+Cost-effective object storage using AWS S3 with time-partitioned keys for efficient append-only writes.
+
+**Features:**
+
+- ✅ ~20x cheaper than CloudWatch for storage
+- ✅ 11 9's durability
+- ✅ Time-partitioned keys (no read-modify-write)
+- ✅ Server-side encryption (AES256, KMS)
+- ✅ Configurable storage classes
+- ✅ Multi-node support via key prefixes
+- ⚠️ Higher latency than CloudWatch
+- ⚠️ Application-level querying (no CloudWatch Insights)
+
+**Storage Layout (Time-Partitioned):**
+
+```
+s3://{bucket}/{key_prefix}{node_id}/{job_id}/
+  stdout/
+    1704345600000000000.jsonl.gz    # First flush
+    1704345630000000000.jsonl.gz    # Second flush (30s later)
+  stderr/
+    1704345615000000000.jsonl.gz
+  metrics/
+    1704345600000000000.jsonl.gz
+  exec-events/
+    1704345600000000000.jsonl.gz
+  connect-events/
+    ...
+```
+
+Each flush creates a new object with a nanosecond timestamp, eliminating expensive read-modify-write operations.
+
+**Configuration:**
+
+```yaml
+server:
+  nodeId: "node-1"  # REQUIRED: Unique identifier for this node
+
+persist:
+  storage:
+    type: "s3"
+    s3:
+      region: "us-east-1"              # Required: AWS region
+      bucket: "my-joblet-data"         # Required: S3 bucket name
+      key_prefix: "jobs/"              # Optional: Object key prefix (default: "jobs/")
+
+      # Buffering settings
+      flush_interval: 30               # Seconds between flushes (default: 30)
+      flush_threshold: 5242880         # Bytes before flush (default: 5MB)
+      max_buffer_size: 52428800        # Max buffer before blocking (default: 50MB)
+
+      # S3-specific options
+      storage_class: "STANDARD"        # S3 storage class (default: STANDARD)
+      sse: "AES256"                    # Server-side encryption: "", "AES256", or "aws:kms"
+      kms_key_id: ""                   # KMS key ID if sse="aws:kms"
+```
+
+**Required IAM Permissions:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::my-joblet-data",
+        "arn:aws:s3:::my-joblet-data/*"
+      ]
+    }
+  ]
+}
+```
+
+**Cost Comparison:**
+
+| Backend    | Ingestion Cost | Storage Cost  | Best For                    |
+|------------|----------------|---------------|-----------------------------|
+| Local      | Free           | Disk space    | Development, single-node    |
+| CloudWatch | ~$0.50/GB      | ~$0.03/GB/mo  | AWS monitoring integration  |
+| S3         | Free           | ~$0.023/GB/mo | Long-term archival, cost    |
+
+**When to use S3:**
+- Long-term log archival (cheaper than CloudWatch)
+- High-volume telemetry data
+- Custom query requirements (Athena, Spark)
+- Cross-region data access
+- Budget-conscious deployments
 
 ## Configuration
 
@@ -413,8 +503,6 @@ persist:
 
   ipc:
     # socket: inherited from top-level ipc.socket (single source of truth)
-    # Server-specific settings only:
-    max_connections: 10
     max_message_size: 134217728  # 128MB
 
   storage:
@@ -727,6 +815,71 @@ Metrics (namespace: Joblet/Production):
   └── MemoryUsage [JobUUID=job-456, NodeID=cluster-node-2, Environment=production, Cluster=main-cluster, Node=node-2]
 ```
 
+### Cost-Optimized Deployment (S3 Backend)
+
+Best for:
+
+- Long-term log archival
+- Budget-conscious deployments
+- High-volume telemetry data
+- Custom analytics (Athena, Spark)
+
+```yaml
+server:
+  nodeId: "prod-node-1"
+
+persist:
+  storage:
+    type: "s3"
+    s3:
+      region: "us-east-1"
+      bucket: "my-company-joblet-logs"
+      key_prefix: "production/"
+      storage_class: "STANDARD_IA"      # Infrequent Access for cost savings
+      sse: "AES256"                     # Server-side encryption
+      flush_interval: 60                # Flush every 60 seconds
+      flush_threshold: 10485760         # Or when buffer reaches 10MB
+```
+
+**Result in S3:**
+
+```
+s3://my-company-joblet-logs/production/prod-node-1/
+  job-123/
+    stdout/
+      1704345600000000000.jsonl.gz
+      1704345660000000000.jsonl.gz
+    stderr/
+      1704345630000000000.jsonl.gz
+    metrics/
+      1704345600000000000.jsonl.gz
+    exec-events/
+      1704345600000000000.jsonl.gz
+  job-456/
+    stdout/
+      1704345700000000000.jsonl.gz
+    ...
+```
+
+**Query with Athena (optional):**
+
+```sql
+-- Create external table for logs
+CREATE EXTERNAL TABLE joblet_logs (
+  job_uuid STRING,
+  stream STRING,
+  timestamp BIGINT,
+  content STRING
+)
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+LOCATION 's3://my-company-joblet-logs/production/';
+
+-- Query logs
+SELECT * FROM joblet_logs
+WHERE job_uuid = 'job-123'
+ORDER BY timestamp;
+```
+
 ## API Reference
 
 ### IPC Protocol (Internal)
@@ -1034,6 +1187,49 @@ sudo chown joblet:joblet /opt/joblet/logs /opt/joblet/metrics
 sudo systemctl start joblet
 ```
 
+### Local/CloudWatch to S3
+
+```bash
+# 1. Create S3 bucket (if not exists)
+aws s3 mb s3://my-joblet-logs --region us-east-1
+
+# 2. Stop joblet
+sudo systemctl stop joblet
+
+# 3. Update configuration
+sudo vi /opt/joblet/joblet-config.yml
+# Change: type: "local" or "cloudwatch" → type: "s3"
+# Add s3 configuration section
+
+# 4. Ensure IAM role has S3 permissions
+# Add s3:PutObject, s3:GetObject, s3:DeleteObject, s3:ListBucket
+
+# 5. Start joblet
+sudo systemctl start joblet
+
+# 6. Verify logs are being written to S3
+aws s3 ls s3://my-joblet-logs/jobs/ --recursive
+```
+
+### S3 to CloudWatch (for better querying)
+
+```bash
+# 1. Stop joblet
+sudo systemctl stop joblet
+
+# 2. Update configuration
+sudo vi /opt/joblet/joblet-config.yml
+# Change: type: "s3" → type: "cloudwatch"
+
+# 3. Ensure IAM role has CloudWatch permissions
+
+# 4. Start joblet
+sudo systemctl start joblet
+
+# Note: Historical data in S3 remains accessible
+# New data will be written to CloudWatch
+```
+
 ## Security Best Practices
 
 ### Local Backend
@@ -1113,10 +1309,9 @@ Custom metrics (via CloudWatch Metrics API):
 
 ### Planned for v2.1
 
-- **S3 Backend**: Long-term archival storage
 - **Elasticsearch Backend**: Full-text search and analytics
 - **Compression Options**: Configurable compression levels
-- **Retention Policies**: Automatic data lifecycle management
+- **S3 Lifecycle Policies**: Integration with S3 lifecycle rules
 
 ### Under Consideration
 
@@ -1124,6 +1319,7 @@ Custom metrics (via CloudWatch Metrics API):
 - **Log Streaming**: Real-time log tailing via WebSocket
 - **Query DSL**: Advanced query language for log filtering
 - **Multi-Region**: Cross-region log replication
+- **Athena Integration**: SQL queries over S3-stored logs
 
 ## References
 

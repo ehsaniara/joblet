@@ -10,7 +10,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
+	"time"
 
 	ipcpb "github.com/ehsaniara/joblet/internal/proto/gen/ipc"
 	"github.com/ehsaniara/joblet/persist/internal/config"
@@ -22,7 +24,7 @@ type LocalBackend struct {
 	config *config.StorageConfig
 	logger *logger.Logger
 
-	// File handles cache
+	// File handles cache with LRU eviction
 	logFiles           map[string]*logFile
 	metricFiles        map[string]*metricFile
 	execEventFiles     map[string]*execEventFile
@@ -33,43 +35,70 @@ type LocalBackend struct {
 	mmapEventFiles     map[string]*eventFile
 	mprotectEventFiles map[string]*eventFile
 	filesMu            sync.RWMutex
+
+	// Cache settings
+	maxOpenFiles  int
+	fileHandleTTL time.Duration
+
+	// Eviction goroutine control
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 type logFile struct {
-	jobID    string
-	stdout   *os.File
-	stderr   *os.File
-	gzStdout *gzip.Writer
-	gzStderr *gzip.Writer
+	jobID      string
+	stdout     *os.File
+	stderr     *os.File
+	gzStdout   *gzip.Writer
+	gzStderr   *gzip.Writer
+	lastAccess time.Time
 }
 
 type metricFile struct {
-	jobID    string
-	file     *os.File
-	gzWriter *gzip.Writer
+	jobID      string
+	file       *os.File
+	gzWriter   *gzip.Writer
+	lastAccess time.Time
 }
 
 type execEventFile struct {
-	jobID    string
-	file     *os.File
-	gzWriter *gzip.Writer
+	jobID      string
+	file       *os.File
+	gzWriter   *gzip.Writer
+	lastAccess time.Time
 }
 
 type connectEventFile struct {
-	jobID    string
-	file     *os.File
-	gzWriter *gzip.Writer
+	jobID      string
+	file       *os.File
+	gzWriter   *gzip.Writer
+	lastAccess time.Time
 }
 
 // eventFile is a generic event file handle for file, accept, socket_data, mmap, mprotect events
 type eventFile struct {
-	jobID    string
-	file     *os.File
-	gzWriter *gzip.Writer
+	jobID      string
+	file       *os.File
+	gzWriter   *gzip.Writer
+	lastAccess time.Time
 }
 
 // NewLocalBackend creates a new local storage backend
 func NewLocalBackend(cfg *config.StorageConfig, log *logger.Logger) (*LocalBackend, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Apply defaults for cache settings
+	maxOpenFiles := cfg.Local.MaxOpenFiles
+	if maxOpenFiles <= 0 {
+		maxOpenFiles = 1000
+	}
+
+	fileHandleTTL := time.Duration(cfg.Local.FileHandleTTL) * time.Second
+	if fileHandleTTL <= 0 {
+		fileHandleTTL = 300 * time.Second // 5 minutes default
+	}
+
 	backend := &LocalBackend{
 		config:             cfg,
 		logger:             log.WithField("backend", "local"),
@@ -82,25 +111,38 @@ func NewLocalBackend(cfg *config.StorageConfig, log *logger.Logger) (*LocalBacke
 		socketDataFiles:    make(map[string]*eventFile),
 		mmapEventFiles:     make(map[string]*eventFile),
 		mprotectEventFiles: make(map[string]*eventFile),
+		maxOpenFiles:       maxOpenFiles,
+		fileHandleTTL:      fileHandleTTL,
+		ctx:                ctx,
+		cancel:             cancel,
 	}
 
 	// Create base directories
 	if err := os.MkdirAll(cfg.Local.Logs.Directory, 0755); err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	if err := os.MkdirAll(cfg.Local.Metrics.Directory, 0755); err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create metrics directory: %w", err)
 	}
 
 	if err := os.MkdirAll(cfg.Local.Events.Directory, 0755); err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create events directory: %w", err)
 	}
+
+	// Start background eviction goroutine
+	backend.wg.Add(1)
+	go backend.evictionLoop()
 
 	log.Info("Local storage backend initialized",
 		"logsDir", cfg.Local.Logs.Directory,
 		"metricsDir", cfg.Local.Metrics.Directory,
-		"eventsDir", cfg.Local.Events.Directory)
+		"eventsDir", cfg.Local.Events.Directory,
+		"maxOpenFiles", maxOpenFiles,
+		"fileHandleTTL", fileHandleTTL)
 
 	return backend, nil
 }
@@ -137,27 +179,43 @@ func (lb *LocalBackend) WriteLogs(jobID string, logs []*ipcpb.LogLine) error {
 		}
 	}
 
+	// Flush gzip streams safely - always recreate to ensure valid state
+	if err := lb.flushLogFile(lf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// flushLogFile safely closes and recreates gzip writers, ensuring valid state even on partial failure
+func (lb *LocalBackend) flushLogFile(lf *logFile) error {
+	var stdoutErr, stderrErr, syncErr error
+
 	// Close gzip writers to write trailer (CRC32 + size)
 	// This makes logs immediately readable while allowing future appends
-	if err := lf.gzStdout.Close(); err != nil {
-		return fmt.Errorf("failed to close stdout gzip writer: %w", err)
-	}
-	if err := lf.gzStderr.Close(); err != nil {
-		return fmt.Errorf("failed to close stderr gzip writer: %w", err)
-	}
+	stdoutErr = lf.gzStdout.Close()
+	stderrErr = lf.gzStderr.Close()
 
-	// Sync file handles to disk
-	if err := lf.stdout.Sync(); err != nil {
-		return err
-	}
-	if err := lf.stderr.Sync(); err != nil {
-		return err
-	}
-
-	// Recreate gzip writers for next write (creates new gzip stream in file)
+	// Always recreate gzip writers to ensure valid state for next write
 	// Multiple gzip streams in one file is valid and gzip.NewReader handles it
 	lf.gzStdout = gzip.NewWriter(lf.stdout)
 	lf.gzStderr = gzip.NewWriter(lf.stderr)
+
+	// Check for close errors
+	if stdoutErr != nil {
+		return fmt.Errorf("failed to close stdout gzip writer: %w", stdoutErr)
+	}
+	if stderrErr != nil {
+		return fmt.Errorf("failed to close stderr gzip writer: %w", stderrErr)
+	}
+
+	// Sync file handles to disk
+	if syncErr = lf.stdout.Sync(); syncErr != nil {
+		return fmt.Errorf("failed to sync stdout: %w", syncErr)
+	}
+	if syncErr = lf.stderr.Sync(); syncErr != nil {
+		return fmt.Errorf("failed to sync stderr: %w", syncErr)
+	}
 
 	return nil
 }
@@ -186,19 +244,31 @@ func (lb *LocalBackend) WriteMetrics(jobID string, metrics []*ipcpb.Metric) erro
 		}
 	}
 
+	// Flush gzip stream safely - always recreate to ensure valid state
+	if err := lb.flushMetricFile(mf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// flushMetricFile safely closes and recreates gzip writer, ensuring valid state even on failure
+func (lb *LocalBackend) flushMetricFile(mf *metricFile) error {
 	// Close gzip writer to write trailer (CRC32 + size)
-	// This makes metrics immediately readable while allowing future appends
-	if err := mf.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close metric gzip writer: %w", err)
+	closeErr := mf.gzWriter.Close()
+
+	// Always recreate gzip writer to ensure valid state for next write
+	mf.gzWriter = gzip.NewWriter(mf.file)
+
+	// Check for close error
+	if closeErr != nil {
+		return fmt.Errorf("failed to close metric gzip writer: %w", closeErr)
 	}
 
 	// Sync file handle to disk
 	if err := mf.file.Sync(); err != nil {
-		return err
+		return fmt.Errorf("failed to sync metrics file: %w", err)
 	}
-
-	// Recreate gzip writer for next write (creates new gzip stream in file)
-	mf.gzWriter = gzip.NewWriter(mf.file)
 
 	return nil
 }
@@ -228,19 +298,25 @@ func (lb *LocalBackend) WriteExecEvents(jobID string, events []*ipcpb.ExecEvent)
 		}
 	}
 
-	// Close gzip writer to write trailer (makes data readable immediately)
-	if err := ef.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close exec events gzip writer: %w", err)
-	}
-
-	// Sync to disk
-	if err := ef.file.Sync(); err != nil {
+	// Flush gzip stream safely
+	if err := lb.flushExecEventFile(ef); err != nil {
 		return err
 	}
 
-	// Recreate gzip writer for next write (creates new gzip stream)
+	return nil
+}
+
+// flushExecEventFile safely closes and recreates gzip writer
+func (lb *LocalBackend) flushExecEventFile(ef *execEventFile) error {
+	closeErr := ef.gzWriter.Close()
 	ef.gzWriter = gzip.NewWriter(ef.file)
 
+	if closeErr != nil {
+		return fmt.Errorf("failed to close exec events gzip writer: %w", closeErr)
+	}
+	if err := ef.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync exec events file: %w", err)
+	}
 	return nil
 }
 
@@ -269,25 +345,32 @@ func (lb *LocalBackend) WriteConnectEvents(jobID string, events []*ipcpb.Connect
 		}
 	}
 
-	// Close gzip writer to write trailer (makes data readable immediately)
-	if err := cf.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close connect events gzip writer: %w", err)
-	}
-
-	// Sync to disk
-	if err := cf.file.Sync(); err != nil {
+	// Flush gzip stream safely
+	if err := lb.flushConnectEventFile(cf); err != nil {
 		return err
 	}
 
-	// Recreate gzip writer for next write (creates new gzip stream)
+	return nil
+}
+
+// flushConnectEventFile safely closes and recreates gzip writer
+func (lb *LocalBackend) flushConnectEventFile(cf *connectEventFile) error {
+	closeErr := cf.gzWriter.Close()
 	cf.gzWriter = gzip.NewWriter(cf.file)
 
+	if closeErr != nil {
+		return fmt.Errorf("failed to close connect events gzip writer: %w", closeErr)
+	}
+	if err := cf.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync connect events file: %w", err)
+	}
 	return nil
 }
 
 // getOrCreateLogFile gets or creates log file handles for a job
 func (lb *LocalBackend) getOrCreateLogFile(jobID string) (*logFile, error) {
 	if lf, exists := lb.logFiles[jobID]; exists {
+		lf.lastAccess = time.Now()
 		return lf, nil
 	}
 
@@ -313,11 +396,12 @@ func (lb *LocalBackend) getOrCreateLogFile(jobID string) (*logFile, error) {
 	}
 
 	lf := &logFile{
-		jobID:    jobID,
-		stdout:   stdout,
-		stderr:   stderr,
-		gzStdout: gzip.NewWriter(stdout),
-		gzStderr: gzip.NewWriter(stderr),
+		jobID:      jobID,
+		stdout:     stdout,
+		stderr:     stderr,
+		gzStdout:   gzip.NewWriter(stdout),
+		gzStderr:   gzip.NewWriter(stderr),
+		lastAccess: time.Now(),
 	}
 
 	lb.logFiles[jobID] = lf
@@ -329,6 +413,7 @@ func (lb *LocalBackend) getOrCreateLogFile(jobID string) (*logFile, error) {
 // getOrCreateMetricFile gets or creates metric file handle for a job
 func (lb *LocalBackend) getOrCreateMetricFile(jobID string) (*metricFile, error) {
 	if mf, exists := lb.metricFiles[jobID]; exists {
+		mf.lastAccess = time.Now()
 		return mf, nil
 	}
 
@@ -346,9 +431,10 @@ func (lb *LocalBackend) getOrCreateMetricFile(jobID string) (*metricFile, error)
 	}
 
 	mf := &metricFile{
-		jobID:    jobID,
-		file:     file,
-		gzWriter: gzip.NewWriter(file),
+		jobID:      jobID,
+		file:       file,
+		gzWriter:   gzip.NewWriter(file),
+		lastAccess: time.Now(),
 	}
 
 	lb.metricFiles[jobID] = mf
@@ -360,6 +446,7 @@ func (lb *LocalBackend) getOrCreateMetricFile(jobID string) (*metricFile, error)
 // getOrCreateExecEventFile gets or creates exec event file handle for a job
 func (lb *LocalBackend) getOrCreateExecEventFile(jobID string) (*execEventFile, error) {
 	if ef, exists := lb.execEventFiles[jobID]; exists {
+		ef.lastAccess = time.Now()
 		return ef, nil
 	}
 
@@ -377,9 +464,10 @@ func (lb *LocalBackend) getOrCreateExecEventFile(jobID string) (*execEventFile, 
 	}
 
 	ef := &execEventFile{
-		jobID:    jobID,
-		file:     file,
-		gzWriter: gzip.NewWriter(file),
+		jobID:      jobID,
+		file:       file,
+		gzWriter:   gzip.NewWriter(file),
+		lastAccess: time.Now(),
 	}
 
 	lb.execEventFiles[jobID] = ef
@@ -391,6 +479,7 @@ func (lb *LocalBackend) getOrCreateExecEventFile(jobID string) (*execEventFile, 
 // getOrCreateConnectEventFile gets or creates connect event file handle for a job
 func (lb *LocalBackend) getOrCreateConnectEventFile(jobID string) (*connectEventFile, error) {
 	if cf, exists := lb.connectEventFiles[jobID]; exists {
+		cf.lastAccess = time.Now()
 		return cf, nil
 	}
 
@@ -408,9 +497,10 @@ func (lb *LocalBackend) getOrCreateConnectEventFile(jobID string) (*connectEvent
 	}
 
 	cf := &connectEventFile{
-		jobID:    jobID,
-		file:     file,
-		gzWriter: gzip.NewWriter(file),
+		jobID:      jobID,
+		file:       file,
+		gzWriter:   gzip.NewWriter(file),
+		lastAccess: time.Now(),
 	}
 
 	lb.connectEventFiles[jobID] = cf
@@ -420,7 +510,7 @@ func (lb *LocalBackend) getOrCreateConnectEventFile(jobID string) (*connectEvent
 }
 
 // ReadLogs returns a log reader for streaming logs
-func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error) {
+func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*EventReader[*ipcpb.LogLine], error) {
 	lb.logger.Debug("ReadLogs called", "job_uuid", query.JobUUID, "stream", query.Stream, "limit", query.Limit, "offset", query.Offset)
 
 	// Build log directory path
@@ -432,18 +522,12 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 		return nil, fmt.Errorf("no logs found for job %s", query.JobUUID)
 	}
 
-	// Create reader
-	reader := &LogReader{
-		Channel: make(chan *ipcpb.LogLine, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+	// Create reader using generic helper
+	reader := NewEventReader[*ipcpb.LogLine](100)
 
 	// Start reading in background
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
+		defer reader.Close()
 
 		// Determine which files to read based on stream filter
 		var files []struct {
@@ -483,7 +567,7 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 
 			file, err := os.Open(fileInfo.path)
 			if err != nil {
-				reader.Error <- fmt.Errorf("failed to open log file %s: %w", fileInfo.path, err)
+				reader.SendError(fmt.Errorf("failed to open log file %s: %w", fileInfo.path, err))
 				return
 			}
 
@@ -495,7 +579,7 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 					lb.logger.Warn("Empty or corrupted gzip file", "path", fileInfo.path)
 					continue
 				}
-				reader.Error <- fmt.Errorf("failed to create gzip reader for %s: %w", fileInfo.path, err)
+				reader.SendError(fmt.Errorf("failed to create gzip reader for %s: %w", fileInfo.path, err))
 				return
 			}
 
@@ -563,7 +647,7 @@ func (lb *LocalBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogRead
 			if err := scanner.Err(); err != nil {
 				gzReader.Close()
 				file.Close()
-				reader.Error <- fmt.Errorf("error reading log file %s: %w", fileInfo.path, err)
+				reader.SendError(fmt.Errorf("error reading log file %s: %w", fileInfo.path, err))
 				return
 			}
 
@@ -596,7 +680,7 @@ func indexSubstring(s, substr string) int {
 }
 
 // ReadMetrics returns a metric reader for streaming metrics
-func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*MetricReader, error) {
+func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*EventReader[*ipcpb.Metric], error) {
 	lb.logger.Debug("ReadMetrics called", "job_uuid", query.JobUUID, "limit", query.Limit, "offset", query.Offset)
 
 	// Build metrics file path
@@ -608,22 +692,16 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 		return nil, fmt.Errorf("no metrics found for job %s", query.JobUUID)
 	}
 
-	// Create reader
-	reader := &MetricReader{
-		Channel: make(chan *ipcpb.Metric, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+	// Create reader using generic helper
+	reader := NewEventReader[*ipcpb.Metric](100)
 
 	// Start reading in background
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
+		defer reader.Close()
 
 		file, err := os.Open(metricsPath)
 		if err != nil {
-			reader.Error <- fmt.Errorf("failed to open metrics file: %w", err)
+			reader.SendError(fmt.Errorf("failed to open metrics file: %w", err))
 			return
 		}
 		defer file.Close()
@@ -644,7 +722,7 @@ func (lb *LocalBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*M
 					lb.logger.Debug("Incomplete gzip metrics stream", "path", metricsPath, "job_uuid", query.JobUUID, "count", count)
 					break
 				}
-				reader.Error <- fmt.Errorf("failed to create gzip reader: %w", err)
+				reader.SendError(fmt.Errorf("failed to create gzip reader: %w", err))
 				return
 			}
 
@@ -809,8 +887,255 @@ func (lb *LocalBackend) DeleteJob(jobID string) error {
 	return nil
 }
 
+// evictionLoop runs periodically to evict idle file handles
+func (lb *LocalBackend) evictionLoop() {
+	defer lb.wg.Done()
+
+	ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-lb.ctx.Done():
+			lb.logger.Debug("Eviction loop stopped")
+			return
+		case <-ticker.C:
+			lb.evictIdleHandles()
+		}
+	}
+}
+
+// evictIdleHandles evicts file handles that have exceeded TTL or when over max limit
+func (lb *LocalBackend) evictIdleHandles() {
+	lb.filesMu.Lock()
+	defer lb.filesMu.Unlock()
+
+	now := time.Now()
+	evicted := 0
+
+	// Evict log files past TTL
+	for jobID, lf := range lb.logFiles {
+		if now.Sub(lf.lastAccess) > lb.fileHandleTTL {
+			lb.closeLogFile(lf)
+			delete(lb.logFiles, jobID)
+			evicted++
+		}
+	}
+
+	// Evict metric files past TTL
+	for jobID, mf := range lb.metricFiles {
+		if now.Sub(mf.lastAccess) > lb.fileHandleTTL {
+			lb.closeMetricFile(mf)
+			delete(lb.metricFiles, jobID)
+			evicted++
+		}
+	}
+
+	// Evict exec event files past TTL
+	for jobID, ef := range lb.execEventFiles {
+		if now.Sub(ef.lastAccess) > lb.fileHandleTTL {
+			lb.closeExecEventFile(ef)
+			delete(lb.execEventFiles, jobID)
+			evicted++
+		}
+	}
+
+	// Evict connect event files past TTL
+	for jobID, cf := range lb.connectEventFiles {
+		if now.Sub(cf.lastAccess) > lb.fileHandleTTL {
+			lb.closeConnectEventFile(cf)
+			delete(lb.connectEventFiles, jobID)
+			evicted++
+		}
+	}
+
+	// Evict generic event files past TTL
+	evicted += lb.evictEventFiles(lb.fileEventFiles, now)
+	evicted += lb.evictEventFiles(lb.acceptEventFiles, now)
+	evicted += lb.evictEventFiles(lb.socketDataFiles, now)
+	evicted += lb.evictEventFiles(lb.mmapEventFiles, now)
+	evicted += lb.evictEventFiles(lb.mprotectEventFiles, now)
+
+	// If still over max, evict oldest handles using LRU
+	totalHandles := lb.countOpenHandles()
+	if totalHandles > lb.maxOpenFiles {
+		lb.evictLRU(totalHandles - lb.maxOpenFiles)
+	}
+
+	if evicted > 0 {
+		lb.logger.Debug("Evicted idle file handles", "count", evicted, "remaining", lb.countOpenHandles())
+	}
+}
+
+// evictEventFiles evicts generic event files past TTL
+func (lb *LocalBackend) evictEventFiles(files map[string]*eventFile, now time.Time) int {
+	evicted := 0
+	for jobID, ef := range files {
+		if now.Sub(ef.lastAccess) > lb.fileHandleTTL {
+			lb.closeEventFile(ef)
+			delete(files, jobID)
+			evicted++
+		}
+	}
+	return evicted
+}
+
+// countOpenHandles returns total open file handle count
+func (lb *LocalBackend) countOpenHandles() int {
+	return len(lb.logFiles) + len(lb.metricFiles) + len(lb.execEventFiles) +
+		len(lb.connectEventFiles) + len(lb.fileEventFiles) + len(lb.acceptEventFiles) +
+		len(lb.socketDataFiles) + len(lb.mmapEventFiles) + len(lb.mprotectEventFiles)
+}
+
+// evictLRU evicts the oldest n file handles (LRU policy)
+func (lb *LocalBackend) evictLRU(n int) {
+	if n <= 0 {
+		return
+	}
+
+	// Collect all handles with their last access times
+	type handleInfo struct {
+		fileType   string
+		jobID      string
+		lastAccess time.Time
+	}
+
+	var handles []handleInfo
+
+	for jobID, lf := range lb.logFiles {
+		handles = append(handles, handleInfo{"log", jobID, lf.lastAccess})
+	}
+	for jobID, mf := range lb.metricFiles {
+		handles = append(handles, handleInfo{"metric", jobID, mf.lastAccess})
+	}
+	for jobID, ef := range lb.execEventFiles {
+		handles = append(handles, handleInfo{"exec", jobID, ef.lastAccess})
+	}
+	for jobID, cf := range lb.connectEventFiles {
+		handles = append(handles, handleInfo{"connect", jobID, cf.lastAccess})
+	}
+	for jobID, ef := range lb.fileEventFiles {
+		handles = append(handles, handleInfo{"file", jobID, ef.lastAccess})
+	}
+	for jobID, ef := range lb.acceptEventFiles {
+		handles = append(handles, handleInfo{"accept", jobID, ef.lastAccess})
+	}
+	for jobID, ef := range lb.socketDataFiles {
+		handles = append(handles, handleInfo{"socket_data", jobID, ef.lastAccess})
+	}
+	for jobID, ef := range lb.mmapEventFiles {
+		handles = append(handles, handleInfo{"mmap", jobID, ef.lastAccess})
+	}
+	for jobID, ef := range lb.mprotectEventFiles {
+		handles = append(handles, handleInfo{"mprotect", jobID, ef.lastAccess})
+	}
+
+	// Sort by last access (oldest first)
+	sort.Slice(handles, func(i, j int) bool {
+		return handles[i].lastAccess.Before(handles[j].lastAccess)
+	})
+
+	// Evict oldest n handles
+	evicted := 0
+	for i := 0; i < len(handles) && evicted < n; i++ {
+		h := handles[i]
+		switch h.fileType {
+		case "log":
+			if lf, exists := lb.logFiles[h.jobID]; exists {
+				lb.closeLogFile(lf)
+				delete(lb.logFiles, h.jobID)
+				evicted++
+			}
+		case "metric":
+			if mf, exists := lb.metricFiles[h.jobID]; exists {
+				lb.closeMetricFile(mf)
+				delete(lb.metricFiles, h.jobID)
+				evicted++
+			}
+		case "exec":
+			if ef, exists := lb.execEventFiles[h.jobID]; exists {
+				lb.closeExecEventFile(ef)
+				delete(lb.execEventFiles, h.jobID)
+				evicted++
+			}
+		case "connect":
+			if cf, exists := lb.connectEventFiles[h.jobID]; exists {
+				lb.closeConnectEventFile(cf)
+				delete(lb.connectEventFiles, h.jobID)
+				evicted++
+			}
+		case "file":
+			if ef, exists := lb.fileEventFiles[h.jobID]; exists {
+				lb.closeEventFile(ef)
+				delete(lb.fileEventFiles, h.jobID)
+				evicted++
+			}
+		case "accept":
+			if ef, exists := lb.acceptEventFiles[h.jobID]; exists {
+				lb.closeEventFile(ef)
+				delete(lb.acceptEventFiles, h.jobID)
+				evicted++
+			}
+		case "socket_data":
+			if ef, exists := lb.socketDataFiles[h.jobID]; exists {
+				lb.closeEventFile(ef)
+				delete(lb.socketDataFiles, h.jobID)
+				evicted++
+			}
+		case "mmap":
+			if ef, exists := lb.mmapEventFiles[h.jobID]; exists {
+				lb.closeEventFile(ef)
+				delete(lb.mmapEventFiles, h.jobID)
+				evicted++
+			}
+		case "mprotect":
+			if ef, exists := lb.mprotectEventFiles[h.jobID]; exists {
+				lb.closeEventFile(ef)
+				delete(lb.mprotectEventFiles, h.jobID)
+				evicted++
+			}
+		}
+	}
+
+	if evicted > 0 {
+		lb.logger.Info("LRU evicted file handles", "count", evicted, "target", n)
+	}
+}
+
+// Helper functions to close file handles properly
+func (lb *LocalBackend) closeLogFile(lf *logFile) {
+	lf.gzStdout.Close()
+	lf.gzStderr.Close()
+	lf.stdout.Close()
+	lf.stderr.Close()
+}
+
+func (lb *LocalBackend) closeMetricFile(mf *metricFile) {
+	mf.gzWriter.Close()
+	mf.file.Close()
+}
+
+func (lb *LocalBackend) closeExecEventFile(ef *execEventFile) {
+	ef.gzWriter.Close()
+	ef.file.Close()
+}
+
+func (lb *LocalBackend) closeConnectEventFile(cf *connectEventFile) {
+	cf.gzWriter.Close()
+	cf.file.Close()
+}
+
+func (lb *LocalBackend) closeEventFile(ef *eventFile) {
+	ef.gzWriter.Close()
+	ef.file.Close()
+}
+
 // Close closes the backend and all open files
 func (lb *LocalBackend) Close() error {
+	// Stop eviction goroutine
+	lb.cancel()
+	lb.wg.Wait()
+
 	lb.filesMu.Lock()
 	defer lb.filesMu.Unlock()
 
@@ -885,21 +1210,12 @@ func (lb *LocalBackend) Close() error {
 }
 
 // ReadExecEvents reads exec events from local storage
-func (lb *LocalBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*ExecEventReader, error) {
-	reader := &ExecEventReader{
-		Channel: make(chan *ipcpb.ExecEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.ExecEvent], error) {
+	reader := NewEventReader[*ipcpb.ExecEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readExecEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readExecEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -994,21 +1310,12 @@ func (lb *LocalBackend) readExecEventsFromFile(ctx context.Context, query *Telem
 }
 
 // ReadConnectEvents reads connect events from local storage
-func (lb *LocalBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*ConnectEventReader, error) {
-	reader := &ConnectEventReader{
-		Channel: make(chan *ipcpb.ConnectEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.ConnectEvent], error) {
+	reader := NewEventReader[*ipcpb.ConnectEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readConnectEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readConnectEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1102,6 +1409,20 @@ func (lb *LocalBackend) readConnectEventsFromFile(ctx context.Context, query *Te
 	return nil
 }
 
+// flushGenericEventFile safely closes and recreates gzip writer for generic event files
+func (lb *LocalBackend) flushGenericEventFile(ef *eventFile, eventType string) error {
+	closeErr := ef.gzWriter.Close()
+	ef.gzWriter = gzip.NewWriter(ef.file)
+
+	if closeErr != nil {
+		return fmt.Errorf("failed to close %s events gzip writer: %w", eventType, closeErr)
+	}
+	if err := ef.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync %s events file: %w", eventType, err)
+	}
+	return nil
+}
+
 // WriteFileEvents writes file events to disk
 func (lb *LocalBackend) WriteFileEvents(jobID string, events []*ipcpb.FileEvent) error {
 	if len(events) == 0 {
@@ -1127,15 +1448,7 @@ func (lb *LocalBackend) WriteFileEvents(jobID string, events []*ipcpb.FileEvent)
 		}
 	}
 
-	if err := ef.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close file events gzip writer: %w", err)
-	}
-	if err := ef.file.Sync(); err != nil {
-		return err
-	}
-	ef.gzWriter = gzip.NewWriter(ef.file)
-
-	return nil
+	return lb.flushGenericEventFile(ef, "file")
 }
 
 // WriteAcceptEvents writes accept events to disk
@@ -1163,15 +1476,7 @@ func (lb *LocalBackend) WriteAcceptEvents(jobID string, events []*ipcpb.AcceptEv
 		}
 	}
 
-	if err := ef.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close accept events gzip writer: %w", err)
-	}
-	if err := ef.file.Sync(); err != nil {
-		return err
-	}
-	ef.gzWriter = gzip.NewWriter(ef.file)
-
-	return nil
+	return lb.flushGenericEventFile(ef, "accept")
 }
 
 // WriteSocketDataEvents writes socket data events to disk
@@ -1199,15 +1504,7 @@ func (lb *LocalBackend) WriteSocketDataEvents(jobID string, events []*ipcpb.Sock
 		}
 	}
 
-	if err := ef.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close socket data events gzip writer: %w", err)
-	}
-	if err := ef.file.Sync(); err != nil {
-		return err
-	}
-	ef.gzWriter = gzip.NewWriter(ef.file)
-
-	return nil
+	return lb.flushGenericEventFile(ef, "socket_data")
 }
 
 // WriteMmapEvents writes mmap events to disk
@@ -1235,15 +1532,7 @@ func (lb *LocalBackend) WriteMmapEvents(jobID string, events []*ipcpb.MmapEvent)
 		}
 	}
 
-	if err := ef.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close mmap events gzip writer: %w", err)
-	}
-	if err := ef.file.Sync(); err != nil {
-		return err
-	}
-	ef.gzWriter = gzip.NewWriter(ef.file)
-
-	return nil
+	return lb.flushGenericEventFile(ef, "mmap")
 }
 
 // WriteMprotectEvents writes mprotect events to disk
@@ -1271,20 +1560,13 @@ func (lb *LocalBackend) WriteMprotectEvents(jobID string, events []*ipcpb.Mprote
 		}
 	}
 
-	if err := ef.gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close mprotect events gzip writer: %w", err)
-	}
-	if err := ef.file.Sync(); err != nil {
-		return err
-	}
-	ef.gzWriter = gzip.NewWriter(ef.file)
-
-	return nil
+	return lb.flushGenericEventFile(ef, "mprotect")
 }
 
 // getOrCreateEventFile gets or creates a generic event file handle for a job
 func (lb *LocalBackend) getOrCreateEventFile(jobID, filename string, fileMap map[string]*eventFile) (*eventFile, error) {
 	if ef, exists := fileMap[jobID]; exists {
+		ef.lastAccess = time.Now()
 		return ef, nil
 	}
 
@@ -1302,9 +1584,10 @@ func (lb *LocalBackend) getOrCreateEventFile(jobID, filename string, fileMap map
 	}
 
 	ef := &eventFile{
-		jobID:    jobID,
-		file:     file,
-		gzWriter: gzip.NewWriter(file),
+		jobID:      jobID,
+		file:       file,
+		gzWriter:   gzip.NewWriter(file),
+		lastAccess: time.Now(),
 	}
 
 	fileMap[jobID] = ef
@@ -1314,21 +1597,12 @@ func (lb *LocalBackend) getOrCreateEventFile(jobID, filename string, fileMap map
 }
 
 // ReadFileEvents reads file events from local storage
-func (lb *LocalBackend) ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*FileEventReader, error) {
-	reader := &FileEventReader{
-		Channel: make(chan *ipcpb.FileEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.FileEvent], error) {
+	reader := NewEventReader[*ipcpb.FileEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readFileEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readFileEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1423,21 +1697,12 @@ func (lb *LocalBackend) readFileEventsFromFile(ctx context.Context, query *Telem
 }
 
 // ReadAcceptEvents reads accept events from local storage
-func (lb *LocalBackend) ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*AcceptEventReader, error) {
-	reader := &AcceptEventReader{
-		Channel: make(chan *ipcpb.AcceptEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.AcceptEvent], error) {
+	reader := NewEventReader[*ipcpb.AcceptEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readAcceptEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readAcceptEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1527,21 +1792,12 @@ func (lb *LocalBackend) readAcceptEventsFromFile(ctx context.Context, query *Tel
 }
 
 // ReadSocketDataEvents reads socket data events from local storage
-func (lb *LocalBackend) ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*SocketDataEventReader, error) {
-	reader := &SocketDataEventReader{
-		Channel: make(chan *ipcpb.SocketDataEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.SocketDataEvent], error) {
+	reader := NewEventReader[*ipcpb.SocketDataEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readSocketDataEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readSocketDataEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1631,21 +1887,12 @@ func (lb *LocalBackend) readSocketDataEventsFromFile(ctx context.Context, query 
 }
 
 // ReadMmapEvents reads mmap events from local storage
-func (lb *LocalBackend) ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*MmapEventReader, error) {
-	reader := &MmapEventReader{
-		Channel: make(chan *ipcpb.MmapEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.MmapEvent], error) {
+	reader := NewEventReader[*ipcpb.MmapEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readMmapEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readMmapEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1735,21 +1982,12 @@ func (lb *LocalBackend) readMmapEventsFromFile(ctx context.Context, query *Telem
 }
 
 // ReadMprotectEvents reads mprotect events from local storage
-func (lb *LocalBackend) ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*MprotectEventReader, error) {
-	reader := &MprotectEventReader{
-		Channel: make(chan *ipcpb.MprotectEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (lb *LocalBackend) ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.MprotectEvent], error) {
+	reader := NewEventReader[*ipcpb.MprotectEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := lb.readMprotectEventsFromFile(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(lb.readMprotectEventsFromFile(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil

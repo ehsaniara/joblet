@@ -77,11 +77,9 @@ func main() {
 			Local: config.LocalConfig{
 				Logs: config.LogStorageConfig{
 					Directory: "/opt/joblet/logs",
-					Format:    "jsonl",
 				},
 				Metrics: config.MetricStorageConfig{
 					Directory: "/opt/joblet/metrics",
-					Format:    "jsonl.gz",
 				},
 			},
 		}

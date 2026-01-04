@@ -28,8 +28,20 @@ export JOBLET_HOME
 # Joblet version to install (default: latest)
 JOBLET_VERSION="${JOBLET_VERSION:-latest}"
 
-# CloudWatch Logs configuration (set to "true" to enable)
+# Storage backend configuration
+# PERSIST_BACKEND: "local", "cloudwatch", or "s3" (takes precedence over ENABLE_CLOUDWATCH)
+# ENABLE_CLOUDWATCH: Legacy variable - "true" maps to cloudwatch, "false" maps to local
+#
+# For S3 backend, also set:
+#   S3_BUCKET: Required - S3 bucket name for storing logs/metrics/events
+#   S3_PREFIX: Optional - Key prefix (default: "joblet")
+#   S3_STORAGE_CLASS: Optional - STANDARD, STANDARD_IA, ONEZONE_IA, GLACIER, DEEP_ARCHIVE
+#
+PERSIST_BACKEND="${PERSIST_BACKEND:-}"
 ENABLE_CLOUDWATCH="${ENABLE_CLOUDWATCH:-true}"
+S3_BUCKET="${S3_BUCKET:-}"
+S3_PREFIX="${S3_PREFIX:-joblet}"
+S3_STORAGE_CLASS="${S3_STORAGE_CLASS:-STANDARD}"
 
 # Joblet server configuration
 JOBLET_SERVER_PORT="${JOBLET_SERVER_PORT:-443}"
@@ -272,12 +284,7 @@ install_redhat_amazon() {
 # Post-Installation Configuration
 # ============================================================================
 
-configure_cloudwatch() {
-    if [ "$ENABLE_CLOUDWATCH" != "true" ]; then
-        log "CloudWatch backend not enabled (set ENABLE_CLOUDWATCH=true to enable)"
-        return 0
-    fi
-
+configure_storage_backend() {
     CONFIG_FILE="${JOBLET_HOME}/config/joblet-config.yml"
 
     if [ ! -f "$CONFIG_FILE" ]; then
@@ -285,18 +292,94 @@ configure_cloudwatch() {
         return 1
     fi
 
-    log "Configuring AWS storage backends..."
+    # Determine effective backend (PERSIST_BACKEND takes precedence over ENABLE_CLOUDWATCH)
+    local effective_backend=""
+    if [ -n "$PERSIST_BACKEND" ]; then
+        effective_backend="$PERSIST_BACKEND"
+        log "Using PERSIST_BACKEND=$effective_backend"
+    elif [ "$ENABLE_CLOUDWATCH" = "true" ]; then
+        effective_backend="cloudwatch"
+        log "Using ENABLE_CLOUDWATCH=true (legacy) -> cloudwatch backend"
+    else
+        effective_backend="local"
+        log "Using local storage backend"
+    fi
 
-    # Update persist storage to CloudWatch
-    sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
+    case "$effective_backend" in
+        cloudwatch)
+            log "Configuring CloudWatch storage backend..."
 
-    # Set CloudWatch region (required by persist)
-    sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+            # Update persist storage to CloudWatch
+            sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
 
-    # Update state backend to DynamoDB
-    sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
+            # Set CloudWatch region (required by persist)
+            if [ -n "$EC2_REGION" ]; then
+                sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+                log_success "Set CloudWatch region: $EC2_REGION"
+            fi
 
-    log_success "Set persist=cloudwatch (region=$EC2_REGION), state=dynamodb"
+            # Update state backend to DynamoDB
+            sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
+
+            log_success "Set persist=cloudwatch, state=dynamodb"
+            ;;
+
+        s3)
+            log "Configuring S3 storage backend..."
+
+            # Validate S3_BUCKET is set
+            if [ -z "$S3_BUCKET" ]; then
+                log_error "S3_BUCKET is required when PERSIST_BACKEND=s3"
+                log_error "Set S3_BUCKET environment variable to your S3 bucket name"
+                return 1
+            fi
+
+            # Update persist storage to S3
+            sed -i 's/type: "local"/type: "s3"/' "$CONFIG_FILE"
+
+            # Set S3 region
+            if [ -n "$EC2_REGION" ]; then
+                sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+                log_success "Set S3 region: $EC2_REGION"
+            fi
+
+            # Set S3 bucket
+            sed -i "s/bucket: \"\"/bucket: \"$S3_BUCKET\"/" "$CONFIG_FILE"
+            log_success "Set S3 bucket: $S3_BUCKET"
+
+            # Set S3 key prefix
+            if [ -n "$S3_PREFIX" ]; then
+                sed -i "s|key_prefix: \"jobs/\"|key_prefix: \"$S3_PREFIX\"|" "$CONFIG_FILE"
+                log_success "Set S3 key_prefix: $S3_PREFIX"
+            fi
+
+            # Set S3 storage class
+            if [ -n "$S3_STORAGE_CLASS" ]; then
+                sed -i "s/storage_class: \"STANDARD\"/storage_class: \"$S3_STORAGE_CLASS\"/" "$CONFIG_FILE"
+                log_success "Set S3 storage class: $S3_STORAGE_CLASS"
+            fi
+
+            # Update state backend to DynamoDB (S3 also uses DynamoDB for state)
+            sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
+
+            log_success "Set persist=s3 (bucket=$S3_BUCKET), state=dynamodb"
+            ;;
+
+        local)
+            log "Using local storage backend (no AWS services for persistence)"
+            log "  Logs stored in: ${JOBLET_HOME}/logs/"
+            log "  State: in-memory (not persistent across restarts)"
+            # Config already defaults to local, no changes needed
+            ;;
+
+        *)
+            log_error "Unknown PERSIST_BACKEND: $effective_backend"
+            log_error "Valid options: local, cloudwatch, s3"
+            return 1
+            ;;
+    esac
+
+    return 0
 }
 
 start_joblet_service() {
@@ -397,14 +480,40 @@ display_summary() {
         log "    - Custom Domain: $JOBLET_CERT_DOMAIN"
     fi
     log ""
-    if [ "$ENABLE_CLOUDWATCH" = "true" ]; then
-        log "CloudWatch Logs:"
-        log "  Enabled: Yes"
-        log "  Log Group Prefix: /joblet"
-        log "  Region: $EC2_REGION (auto-detected)"
-        log "  View logs: CloudWatch Console → Logs → /joblet"
-        log ""
+    # Determine effective backend for display
+    local effective_backend=""
+    if [ -n "$PERSIST_BACKEND" ]; then
+        effective_backend="$PERSIST_BACKEND"
+    elif [ "$ENABLE_CLOUDWATCH" = "true" ]; then
+        effective_backend="cloudwatch"
+    else
+        effective_backend="local"
     fi
+
+    log "Storage Backend: $effective_backend"
+    case "$effective_backend" in
+        cloudwatch)
+            log "  Log Storage: AWS CloudWatch Logs"
+            log "  Log Group Prefix: /joblet"
+            log "  Region: $EC2_REGION"
+            log "  State Storage: AWS DynamoDB (joblet-jobs table)"
+            log "  View logs: CloudWatch Console → Logs → /joblet"
+            ;;
+        s3)
+            log "  Log Storage: AWS S3"
+            log "  Bucket: $S3_BUCKET"
+            log "  Key Prefix: ${S3_PREFIX:-jobs/}"
+            log "  Storage Class: ${S3_STORAGE_CLASS:-STANDARD}"
+            log "  Region: $EC2_REGION"
+            log "  State Storage: AWS DynamoDB (joblet-jobs table)"
+            log "  View logs: S3 Console → $S3_BUCKET → ${S3_PREFIX:-jobs/}"
+            ;;
+        local)
+            log "  Log Storage: Local filesystem (${JOBLET_HOME}/logs/)"
+            log "  State Storage: In-memory (not persistent)"
+            ;;
+    esac
+    log ""
     log "Quick Start:"
     log "  Test connection: rnx job list"
     log "  Run a job: rnx job run echo 'Hello from EC2!'"
@@ -464,8 +573,8 @@ main() {
             ;;
     esac
 
-    # Configure CloudWatch if enabled
-    configure_cloudwatch
+    # Configure storage backend (cloudwatch, s3, or local)
+    configure_storage_backend
 
     # Start Joblet service
     start_joblet_service

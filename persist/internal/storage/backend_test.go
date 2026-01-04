@@ -65,21 +65,24 @@ func TestNewBackend_CloudWatch_RequiresConfig(t *testing.T) {
 	// Note: We don't fail on other errors as they may be due to missing AWS credentials in test environment
 }
 
-func TestNewBackend_S3_NotImplemented(t *testing.T) {
+func TestNewBackend_S3_RequiresConfig(t *testing.T) {
+	// S3 backend is now implemented but requires proper configuration
 	cfg := &config.StorageConfig{
 		Type: "s3",
+		S3: config.S3Config{
+			Region: "us-east-1",
+			Bucket: "test-bucket",
+		},
 	}
 
 	log := logger.New()
 
+	// Backend may fail due to missing AWS credentials, but should not return "not implemented"
 	_, err := NewBackend(cfg, "test-node", log)
-	if err == nil {
-		t.Error("Expected error for S3 backend (not implemented)")
+	if err != nil && err.Error() == "S3 backend not implemented yet (v2.0)" {
+		t.Error("S3 backend should be implemented")
 	}
-
-	if err.Error() != "S3 backend not implemented yet (v2.0)" {
-		t.Errorf("Expected S3 not implemented error, got: %v", err)
-	}
+	// Note: We don't fail on other errors as they may be due to missing AWS credentials in test environment
 }
 
 func TestNewBackend_Unknown(t *testing.T) {
@@ -176,12 +179,8 @@ func TestMetricQuery_Fields(t *testing.T) {
 	}
 }
 
-func TestLogReader_Channels(t *testing.T) {
-	reader := &LogReader{
-		Channel: make(chan *ipcpb.LogLine, 10),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func TestEventReader_LogLine_Channels(t *testing.T) {
+	reader := NewEventReader[*ipcpb.LogLine](10)
 
 	if reader.Channel == nil {
 		t.Error("Expected Channel to be initialized")
@@ -196,12 +195,8 @@ func TestLogReader_Channels(t *testing.T) {
 	}
 }
 
-func TestMetricReader_Channels(t *testing.T) {
-	reader := &MetricReader{
-		Channel: make(chan *ipcpb.Metric, 10),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func TestEventReader_Metric_Channels(t *testing.T) {
+	reader := NewEventReader[*ipcpb.Metric](10)
 
 	if reader.Channel == nil {
 		t.Error("Expected Channel to be initialized")

@@ -2120,3 +2120,543 @@ done:
 		t.Errorf("Expected %d unique ports, got %d - suggests some batches weren't read", totalEvents, len(seenPorts))
 	}
 }
+
+// Tests for LRU eviction and file handle cache
+
+func TestLocalBackend_FileHandleCacheSettings(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+			MaxOpenFiles:  100,
+			FileHandleTTL: 60, // 60 seconds
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	// Verify settings are applied
+	if backend.maxOpenFiles != 100 {
+		t.Errorf("Expected maxOpenFiles 100, got %d", backend.maxOpenFiles)
+	}
+
+	if backend.fileHandleTTL != 60*time.Second {
+		t.Errorf("Expected fileHandleTTL 60s, got %v", backend.fileHandleTTL)
+	}
+}
+
+func TestLocalBackend_FileHandleCacheDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+			// MaxOpenFiles and FileHandleTTL not set - should use defaults
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	// Verify defaults are applied
+	if backend.maxOpenFiles != 1000 {
+		t.Errorf("Expected default maxOpenFiles 1000, got %d", backend.maxOpenFiles)
+	}
+
+	if backend.fileHandleTTL != 300*time.Second {
+		t.Errorf("Expected default fileHandleTTL 300s, got %v", backend.fileHandleTTL)
+	}
+}
+
+func TestLocalBackend_FileHandleLastAccessUpdated(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-access-time"
+
+	// First write - creates file handle
+	logs1 := []*ipcpb.LogLine{
+		{
+			JobUuid:   jobID,
+			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Content:   []byte("First log"),
+		},
+	}
+
+	err = backend.WriteLogs(jobID, logs1)
+	if err != nil {
+		t.Fatalf("Failed to write first log: %v", err)
+	}
+
+	// Get the first access time
+	backend.filesMu.RLock()
+	lf := backend.logFiles[jobID]
+	firstAccess := lf.lastAccess
+	backend.filesMu.RUnlock()
+
+	// Wait a bit
+	time.Sleep(100 * time.Millisecond)
+
+	// Second write - should update access time
+	logs2 := []*ipcpb.LogLine{
+		{
+			JobUuid:   jobID,
+			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Content:   []byte("Second log"),
+		},
+	}
+
+	err = backend.WriteLogs(jobID, logs2)
+	if err != nil {
+		t.Fatalf("Failed to write second log: %v", err)
+	}
+
+	// Verify access time was updated
+	backend.filesMu.RLock()
+	secondAccess := backend.logFiles[jobID].lastAccess
+	backend.filesMu.RUnlock()
+
+	if !secondAccess.After(firstAccess) {
+		t.Error("Expected lastAccess to be updated after second write")
+	}
+}
+
+func TestLocalBackend_CountOpenHandles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	// Initially no handles
+	backend.filesMu.RLock()
+	initialCount := backend.countOpenHandles()
+	backend.filesMu.RUnlock()
+
+	if initialCount != 0 {
+		t.Errorf("Expected 0 initial handles, got %d", initialCount)
+	}
+
+	// Create log files for 3 different jobs
+	for i := 0; i < 3; i++ {
+		jobID := "test-job-" + string(rune('A'+i))
+		logs := []*ipcpb.LogLine{
+			{
+				JobUuid:   jobID,
+				Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+				Timestamp: time.Now().UnixNano(),
+				Sequence:  1,
+				Content:   []byte("Test"),
+			},
+		}
+		backend.WriteLogs(jobID, logs)
+	}
+
+	// Create metric files for 2 different jobs
+	for i := 0; i < 2; i++ {
+		jobID := "test-job-metric-" + string(rune('A'+i))
+		metrics := []*ipcpb.Metric{
+			{
+				JobUuid:   jobID,
+				Timestamp: time.Now().UnixNano(),
+				Sequence:  1,
+				Data:      &ipcpb.MetricData{CpuUsage: 50.0},
+			},
+		}
+		backend.WriteMetrics(jobID, metrics)
+	}
+
+	// Count handles
+	backend.filesMu.RLock()
+	count := backend.countOpenHandles()
+	backend.filesMu.RUnlock()
+
+	// Should have 3 log file handles + 2 metric file handles = 5
+	if count != 5 {
+		t.Errorf("Expected 5 handles (3 logs + 2 metrics), got %d", count)
+	}
+}
+
+func TestLocalBackend_EvictionLoopStopsOnClose(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+
+	// Close should stop the eviction loop cleanly
+	err = backend.Close()
+	if err != nil {
+		t.Errorf("Failed to close backend: %v", err)
+	}
+
+	// If we reach here, the eviction goroutine stopped correctly
+}
+
+// Tests for safe gzip flush
+
+func TestLocalBackend_MultipleWritesWithFlush(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-multi-flush"
+
+	// Write multiple batches - each write closes and recreates gzip writer
+	for batch := 0; batch < 10; batch++ {
+		logs := []*ipcpb.LogLine{
+			{
+				JobUuid:   jobID,
+				Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+				Timestamp: time.Now().UnixNano(),
+				Sequence:  uint64(batch + 1),
+				Content:   []byte("Batch log " + string(rune('0'+batch))),
+			},
+		}
+
+		err = backend.WriteLogs(jobID, logs)
+		if err != nil {
+			t.Fatalf("Failed to write batch %d: %v", batch, err)
+		}
+	}
+
+	// Verify all writes succeeded (gzip writer was properly recreated each time)
+	time.Sleep(100 * time.Millisecond)
+
+	query := &LogQuery{
+		JobUUID: jobID,
+		Stream:  ipcpb.StreamType_STREAM_TYPE_STDOUT,
+		Limit:   100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadLogs(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read logs: %v", err)
+	}
+
+	var readLogs []*ipcpb.LogLine
+	for {
+		select {
+		case log, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readLogs = append(readLogs, log)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading logs: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for logs")
+		}
+	}
+
+done:
+	if len(readLogs) != 10 {
+		t.Errorf("Expected 10 logs from 10 batches, got %d", len(readLogs))
+	}
+}
+
+func TestLocalBackend_GzipWriterStateAfterError(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-error-recovery"
+
+	// First write should succeed
+	logs1 := []*ipcpb.LogLine{
+		{
+			JobUuid:   jobID,
+			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  1,
+			Content:   []byte("First log"),
+		},
+	}
+
+	err = backend.WriteLogs(jobID, logs1)
+	if err != nil {
+		t.Fatalf("First write failed: %v", err)
+	}
+
+	// Second write should also succeed (gzip writer properly recreated)
+	logs2 := []*ipcpb.LogLine{
+		{
+			JobUuid:   jobID,
+			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  2,
+			Content:   []byte("Second log"),
+		},
+	}
+
+	err = backend.WriteLogs(jobID, logs2)
+	if err != nil {
+		t.Fatalf("Second write failed: %v", err)
+	}
+
+	// Verify both writes are readable
+	time.Sleep(100 * time.Millisecond)
+
+	query := &LogQuery{
+		JobUUID: jobID,
+		Stream:  ipcpb.StreamType_STREAM_TYPE_STDOUT,
+		Limit:   100,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadLogs(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read logs: %v", err)
+	}
+
+	var readLogs []*ipcpb.LogLine
+	for {
+		select {
+		case log, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readLogs = append(readLogs, log)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading logs: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for logs")
+		}
+	}
+
+done:
+	if len(readLogs) != 2 {
+		t.Errorf("Expected 2 logs, got %d", len(readLogs))
+	}
+}
+
+func TestLocalBackend_ConcurrentWritesToSameJob(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.StorageConfig{
+		Type: "local",
+		Local: config.LocalConfig{
+			Logs: config.LogStorageConfig{
+				Directory: filepath.Join(tmpDir, "logs"),
+			},
+			Metrics: config.MetricStorageConfig{
+				Directory: filepath.Join(tmpDir, "metrics"),
+			},
+			Events: config.EventStorageConfig{
+				Directory: filepath.Join(tmpDir, "events"),
+			},
+		},
+	}
+
+	log := logger.New()
+	backend, err := NewLocalBackend(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+	defer backend.Close()
+
+	jobID := "test-job-concurrent"
+	numWriters := 5
+	numWrites := 10
+
+	// Launch concurrent writers
+	done := make(chan error, numWriters)
+	for w := 0; w < numWriters; w++ {
+		go func(writerID int) {
+			for i := 0; i < numWrites; i++ {
+				logs := []*ipcpb.LogLine{
+					{
+						JobUuid:   jobID,
+						Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+						Timestamp: time.Now().UnixNano(),
+						Sequence:  uint64(writerID*1000 + i),
+						Content:   []byte("Log from writer"),
+					},
+				}
+				if err := backend.WriteLogs(jobID, logs); err != nil {
+					done <- err
+					return
+				}
+			}
+			done <- nil
+		}(w)
+	}
+
+	// Wait for all writers
+	for i := 0; i < numWriters; i++ {
+		if err := <-done; err != nil {
+			t.Errorf("Writer failed: %v", err)
+		}
+	}
+
+	// All concurrent writes should succeed with proper gzip state management
+	time.Sleep(100 * time.Millisecond)
+
+	query := &LogQuery{
+		JobUUID: jobID,
+		Stream:  ipcpb.StreamType_STREAM_TYPE_STDOUT,
+		Limit:   1000,
+	}
+
+	ctx := context.Background()
+	reader, err := backend.ReadLogs(ctx, query)
+	if err != nil {
+		t.Fatalf("Failed to read logs: %v", err)
+	}
+
+	var readLogs []*ipcpb.LogLine
+	for {
+		select {
+		case log, ok := <-reader.Channel:
+			if !ok {
+				goto done
+			}
+			readLogs = append(readLogs, log)
+		case err := <-reader.Error:
+			if err != nil {
+				t.Fatalf("Error reading logs: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for logs")
+		}
+	}
+
+done:
+	expectedTotal := numWriters * numWrites
+	if len(readLogs) != expectedTotal {
+		t.Errorf("Expected %d total logs, got %d", expectedTotal, len(readLogs))
+	}
+}

@@ -34,10 +34,15 @@ type TLSConfig struct {
 // IPCConfig contains Unix socket IPC settings
 type IPCConfig struct {
 	Socket         string `yaml:"socket"`
-	MaxConnections int    `yaml:"max_connections"`
 	MaxMessageSize int    `yaml:"max_message_size"`
 	ReadBuffer     int    `yaml:"read_buffer"`
-	WriteBuffer    int    `yaml:"write_buffer"`
+
+	// Pipeline settings
+	BufferSize          int    `yaml:"buffer_size"`          // Write pipeline buffer size (default: 100000)
+	WorkerCount         int    `yaml:"worker_count"`         // Number of write workers (default: 4)
+	BatchSize           int    `yaml:"batch_size"`           // Max messages per batch (default: 100)
+	BackpressureTimeout int    `yaml:"backpressure_timeout"` // Timeout in seconds before action (default: 5)
+	BackpressureMode    string `yaml:"backpressure_mode"`    // "drop" or "block" (default: "block")
 }
 
 // StorageConfig contains storage backend settings
@@ -45,6 +50,26 @@ type StorageConfig struct {
 	Type       string           `yaml:"type"` // "local", "cloudwatch", "s3"
 	Local      LocalConfig      `yaml:"local"`
 	CloudWatch CloudWatchConfig `yaml:"cloudwatch"`
+	S3         S3Config         `yaml:"s3"`
+}
+
+// S3Config contains AWS S3 storage settings
+// Authentication: Uses AWS default credential chain (IAM roles, environment variables, etc.)
+type S3Config struct {
+	Region    string `yaml:"region"`     // AWS region (REQUIRED)
+	Bucket    string `yaml:"bucket"`     // S3 bucket name (REQUIRED)
+	KeyPrefix string `yaml:"key_prefix"` // Object key prefix (default: "jobs/")
+	NodeID    string `yaml:"-"`          // Node ID (inherited from server.nodeId, not from YAML)
+
+	// Buffering settings
+	FlushInterval  int `yaml:"flush_interval"`  // Flush buffer interval in seconds (default: 30)
+	FlushThreshold int `yaml:"flush_threshold"` // Flush when buffer reaches this size in bytes (default: 5MB)
+	MaxBufferSize  int `yaml:"max_buffer_size"` // Maximum buffer size before blocking (default: 50MB)
+
+	// S3-specific options
+	StorageClass         string `yaml:"storage_class"` // S3 storage class (default: "STANDARD")
+	ServerSideEncryption string `yaml:"sse"`           // Server-side encryption: "" (none), "AES256", "aws:kms"
+	KMSKeyID             string `yaml:"kms_key_id"`    // KMS key ID if sse="aws:kms"
 }
 
 // LocalConfig contains local filesystem storage settings
@@ -52,21 +77,23 @@ type LocalConfig struct {
 	Logs    LogStorageConfig    `yaml:"logs"`
 	Metrics MetricStorageConfig `yaml:"metrics"`
 	Events  EventStorageConfig  `yaml:"events"`
+
+	// File handle cache settings
+	MaxOpenFiles  int `yaml:"max_open_files"`  // Max open file handles per type (default: 1000)
+	FileHandleTTL int `yaml:"file_handle_ttl"` // TTL in seconds for idle file handles (default: 300)
 }
 
 // EventStorageConfig contains telematics event storage settings
 type EventStorageConfig struct {
 	Directory string `yaml:"directory"`
-	Format    string `yaml:"format"` // "jsonl.gz"
 }
 
 // CloudWatchConfig contains AWS CloudWatch storage settings
 // Authentication: Uses AWS default credential chain (IAM roles, environment variables, etc.)
 type CloudWatchConfig struct {
-	Region          string `yaml:"region"`            // AWS region (REQUIRED - must be set by installation script)
-	NodeID          string `yaml:"-"`                 // Node ID (inherited from server.nodeId, not from YAML)
-	LogGroupPrefix  string `yaml:"log_group_prefix"`  // Prefix for CloudWatch Logs groups (default: /joblet/jobs)
-	LogStreamPrefix string `yaml:"log_stream_prefix"` // Prefix for log streams (default: job-)
+	Region         string `yaml:"region"`           // AWS region (REQUIRED - must be set by installation script)
+	NodeID         string `yaml:"-"`                // Node ID (inherited from server.nodeId, not from YAML)
+	LogGroupPrefix string `yaml:"log_group_prefix"` // Prefix for CloudWatch Logs groups (default: /joblet/jobs)
 
 	// Metrics configuration
 	MetricNamespace  string            `yaml:"metric_namespace"`  // CloudWatch Metrics namespace (default: Joblet/Jobs)
@@ -85,29 +112,16 @@ type CloudWatchConfig struct {
 // LogStorageConfig contains log storage settings
 type LogStorageConfig struct {
 	Directory string `yaml:"directory"`
-	Format    string `yaml:"format"` // "jsonl"
 }
 
 // MetricStorageConfig contains metric storage settings
 type MetricStorageConfig struct {
 	Directory string `yaml:"directory"`
-	Format    string `yaml:"format"` // "jsonl.gz"
 }
 
 // LoggingConfig contains logging settings
 type LoggingConfig struct {
-	Level  string        `yaml:"level"`  // debug, info, warn, error
-	Format string        `yaml:"format"` // json, text
-	Output string        `yaml:"output"` // stdout, file, syslog
-	File   LogFileConfig `yaml:"file"`
-}
-
-// LogFileConfig contains log file settings
-type LogFileConfig struct {
-	Path       string `yaml:"path"`
-	MaxSize    string `yaml:"max_size"`
-	MaxBackups int    `yaml:"max_backups"`
-	Compress   bool   `yaml:"compress"`
+	Level string `yaml:"level"` // debug, info, warn, error
 }
 
 // SecurityConfig contains embedded TLS certificates (inherited from parent)
@@ -205,9 +219,7 @@ func Load(path string) (*LoadResult, error) {
 	return &LoadResult{
 		Config: cfg,
 		Logging: LoggingConfig{
-			Level:  "info",
-			Format: "text",
-			Output: "stdout",
+			Level: "info",
 		},
 		Security: SecurityConfig{
 			// Standalone mode requires external cert files
@@ -228,27 +240,29 @@ func DefaultConfig() *Config {
 			TLS:            nil, // nil = fully inherited from parent's security section
 		},
 		IPC: IPCConfig{
-			Socket:         "/opt/joblet/run/persist-ipc.sock", // Unix socket for log/metric writes
-			MaxConnections: 10,
-			MaxMessageSize: 134217728, // 128MB - handle large historical data streams
-			ReadBuffer:     8388608,   // 8MB
-			WriteBuffer:    8388608,   // 8MB
+			Socket:              "/opt/joblet/run/persist-ipc.sock", // Unix socket for log/metric writes
+			MaxMessageSize:      134217728,                          // 128MB - handle large historical data streams
+			ReadBuffer:          8388608,                            // 8MB
+			BufferSize:          100000,                             // 100k message buffer for high-frequency eBPF events
+			WorkerCount:         4,                                  // 4 parallel write workers
+			BatchSize:           100,                                // Flush after 100 messages
+			BackpressureTimeout: 5,                                  // 5 seconds before backpressure action
+			BackpressureMode:    "block",                            // Block instead of drop (prevents data loss)
 		},
 		Storage: StorageConfig{
 			Type: "local",
 			Local: LocalConfig{
 				Logs: LogStorageConfig{
 					Directory: "/opt/joblet/logs",
-					Format:    "jsonl",
 				},
 				Metrics: MetricStorageConfig{
 					Directory: "/opt/joblet/metrics",
-					Format:    "jsonl.gz",
 				},
 				Events: EventStorageConfig{
 					Directory: "/opt/joblet/events",
-					Format:    "jsonl.gz",
 				},
+				MaxOpenFiles:  1000, // Max 1000 file handles per type
+				FileHandleTTL: 300,  // 5 minutes TTL for idle handles
 			},
 		},
 		// Note: Logging config now comes from root level (shared with main joblet)

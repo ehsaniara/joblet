@@ -237,11 +237,7 @@ func TestQueryLogsSuccess(t *testing.T) {
 	authorization.AuthorizedReturns(nil)
 
 	// Configure backend to return test logs
-	reader := &storage.LogReader{
-		Channel: make(chan *ipcpb.LogLine, 10),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+	reader := storage.NewEventReader[*ipcpb.LogLine](10)
 
 	backend.ReadLogsReturns(reader, nil)
 
@@ -318,11 +314,7 @@ func TestQueryMetricsSuccess(t *testing.T) {
 
 	authorization.AuthorizedReturns(nil)
 
-	reader := &storage.MetricReader{
-		Channel: make(chan *ipcpb.Metric, 10),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+	reader := storage.NewEventReader[*ipcpb.Metric](10)
 
 	backend.ReadMetricsReturns(reader, nil)
 

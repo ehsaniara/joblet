@@ -346,8 +346,6 @@ persist:
 
   ipc:
     # socket: inherited from top-level ipc.socket (single source of truth)
-    # Server-specific settings only:
-    max_connections: 10
     max_message_size: 134217728  # 128MB
 
   storage:
@@ -356,13 +354,10 @@ persist:
     local:
       logs:
         directory: "/opt/joblet/logs"
-        format: "jsonl"
       metrics:
         directory: "/opt/joblet/metrics"
-        format: "jsonl.gz"
       events:
         directory: "/opt/joblet/events"  # eBPF events storage
-        format: "jsonl.gz"
 
     # CloudWatch configuration (when type: "cloudwatch")
     cloudwatch:
