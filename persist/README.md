@@ -153,15 +153,15 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams per job:
-    - {job_id}-logs                 # stdout/stderr logs
-    - {job_id}-metrics              # Resource metrics (JSON)
-    - {job_id}-exec-events          # Process execution events (JSON)
-    - {job_id}-connect-events       # Network connection events (JSON)
-    - {job_id}-file-events          # File access events (JSON)
-    - {job_id}-accept-events        # Socket accept events (JSON)
-    - {job_id}-socket-data-events   # Socket data events (JSON)
-    - {job_id}-mmap-events          # Memory mapping events (JSON)
-    - {job_id}-mprotect-events      # Memory protection events (JSON)
+    - {job_uuid}-logs                 # stdout/stderr logs
+    - {job_uuid}-metrics              # Resource metrics (JSON)
+    - {job_uuid}-exec-events          # Process execution events (JSON)
+    - {job_uuid}-connect-events       # Network connection events (JSON)
+    - {job_uuid}-file-events          # File access events (JSON)
+    - {job_uuid}-accept-events        # Socket accept events (JSON)
+    - {job_uuid}-socket-data-events   # Socket data events (JSON)
+    - {job_uuid}-mmap-events          # Memory mapping events (JSON)
+    - {job_uuid}-mprotect-events      # Memory protection events (JSON)
 ```
 
 ### S3 Backend
@@ -171,7 +171,7 @@ The S3 backend uses **time-partitioned keys** to avoid expensive read-modify-wri
 **Storage Layout:**
 
 ```
-s3://{bucket}/{key_prefix}{node_id}/{job_id}/
+s3://{bucket}/{key_prefix}{node_id}/{job_uuid}/
   stdout/
     1704345600000000000.jsonl.gz    # First flush
     1704345630000000000.jsonl.gz    # Second flush (30s later)

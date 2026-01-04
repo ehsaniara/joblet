@@ -387,7 +387,7 @@ Cost-effective object storage using AWS S3 with time-partitioned keys for effici
 **Storage Layout (Time-Partitioned):**
 
 ```
-s3://{bucket}/{key_prefix}{node_id}/{job_id}/
+s3://{bucket}/{key_prefix}{node_id}/{job_uuid}/
   stdout/
     1704345600000000000.jsonl.gz    # First flush
     1704345630000000000.jsonl.gz    # Second flush (30s later)
