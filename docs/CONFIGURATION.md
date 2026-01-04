@@ -346,23 +346,18 @@ persist:
 
   ipc:
     # socket: inherited from top-level ipc.socket (single source of truth)
-    # Server-specific settings only:
-    max_connections: 10
     max_message_size: 134217728  # 128MB
 
   storage:
-    type: "local"  # Options: "local", "cloudwatch"
+    type: "local"  # Options: "local", "cloudwatch", "s3"
 
     local:
       logs:
         directory: "/opt/joblet/logs"
-        format: "jsonl"
       metrics:
         directory: "/opt/joblet/metrics"
-        format: "jsonl.gz"
       events:
         directory: "/opt/joblet/events"  # eBPF events storage
-        format: "jsonl.gz"
 
     # CloudWatch configuration (when type: "cloudwatch")
     cloudwatch:
@@ -373,6 +368,18 @@ persist:
       # - {job_uuid}-metrics        (resource metrics)
       # - {job_uuid}-exec-events    (eBPF process execution)
       # - {job_uuid}-connect-events (eBPF network connections)
+
+    # S3 configuration (when type: "s3")
+    s3:
+      region: "us-east-1"              # Required: AWS region
+      bucket: "my-joblet-data"         # Required: S3 bucket name
+      key_prefix: "jobs/"              # Optional: Object key prefix (default: "jobs/")
+      flush_interval: 30               # Seconds between flushes (default: 30)
+      flush_threshold: 5242880         # Bytes before flush (default: 5MB)
+      max_buffer_size: 52428800        # Max buffer before blocking (default: 50MB)
+      storage_class: "STANDARD"        # S3 storage class (default: STANDARD)
+      sse: "AES256"                    # Server-side encryption: "", "AES256", or "aws:kms"
+      kms_key_id: ""                   # KMS key ID if sse="aws:kms"
 ```
 
 ### Telemetry Configuration

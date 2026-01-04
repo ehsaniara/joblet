@@ -378,3 +378,255 @@ func TestServerBatchProcessing(t *testing.T) {
 		t.Errorf("Expected 10 total logs, got %d", totalLogs)
 	}
 }
+
+func TestServerConfigurablePipeline(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	cfg := &config.IPCConfig{
+		Socket:              socketPath,
+		ReadBuffer:          262144,
+		MaxMessageSize:      10485760,
+		BufferSize:          50,      // Small buffer for testing
+		WorkerCount:         2,       // 2 workers
+		BatchSize:           5,       // Small batch size
+		BackpressureTimeout: 1,       // 1 second timeout
+		BackpressureMode:    "block", // Block mode
+	}
+	backend := &storagefakes.FakeBackend{}
+	log := logger.New()
+
+	server := NewServer(cfg, backend, log)
+
+	// Verify server was created with custom settings
+	if server.batchSize != 5 {
+		t.Errorf("Expected batchSize 5, got %d", server.batchSize)
+	}
+
+	if server.backpressureMode != "block" {
+		t.Errorf("Expected backpressureMode 'block', got '%s'", server.backpressureMode)
+	}
+
+	if server.backpressureTimeout != time.Second {
+		t.Errorf("Expected backpressureTimeout 1s, got %v", server.backpressureTimeout)
+	}
+
+	// Verify write pipe capacity
+	if cap(server.writePipe) != 50 {
+		t.Errorf("Expected writePipe capacity 50, got %d", cap(server.writePipe))
+	}
+}
+
+func TestServerDefaultPipelineSettings(t *testing.T) {
+	cfg := &config.IPCConfig{
+		Socket:         "/tmp/test.sock",
+		ReadBuffer:     262144,
+		MaxMessageSize: 10485760,
+		// Pipeline settings not specified - should use defaults
+	}
+	backend := &storagefakes.FakeBackend{}
+	log := logger.New()
+
+	server := NewServer(cfg, backend, log)
+
+	// Verify defaults are applied
+	if server.batchSize != 100 {
+		t.Errorf("Expected default batchSize 100, got %d", server.batchSize)
+	}
+
+	if server.backpressureMode != "block" {
+		t.Errorf("Expected default backpressureMode 'block', got '%s'", server.backpressureMode)
+	}
+
+	if server.backpressureTimeout != 5*time.Second {
+		t.Errorf("Expected default backpressureTimeout 5s, got %v", server.backpressureTimeout)
+	}
+
+	if cap(server.writePipe) != 100000 {
+		t.Errorf("Expected default writePipe capacity 100000, got %d", cap(server.writePipe))
+	}
+}
+
+func TestServerBackpressureBlockMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	cfg := &config.IPCConfig{
+		Socket:              socketPath,
+		ReadBuffer:          262144,
+		MaxMessageSize:      10485760,
+		BufferSize:          5,   // Very small buffer to trigger backpressure
+		WorkerCount:         1,   // Single worker
+		BatchSize:           100, // Large batch size so messages accumulate
+		BackpressureTimeout: 1,
+		BackpressureMode:    "block",
+	}
+
+	// Create a slow backend that takes time to process
+	backend := &storagefakes.FakeBackend{}
+	backend.WriteLogsStub = func(jobID string, logs []*ipcpb.LogLine) error {
+		time.Sleep(50 * time.Millisecond) // Simulate slow write
+		return nil
+	}
+	log := logger.New()
+
+	server := NewServer(cfg, backend, log)
+
+	ctx := context.Background()
+	err := server.Start(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	time.Sleep(100 * time.Millisecond)
+
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		t.Fatalf("Failed to connect to server: %v", err)
+	}
+	defer conn.Close()
+
+	// Send messages - in block mode, they should all eventually be processed
+	messageCount := 10
+	for i := 0; i < messageCount; i++ {
+		logLine := &ipcpb.LogLine{
+			JobUuid:   "block-test-job",
+			Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+			Timestamp: time.Now().UnixNano(),
+			Sequence:  uint64(i),
+			Content:   []byte("Block mode test"),
+		}
+
+		logData, _ := proto.Marshal(logLine)
+		ipcMsg := &ipcpb.IPCMessage{
+			JobUuid: "block-test-job",
+			Type:    ipcpb.MessageType_MESSAGE_TYPE_LOG,
+			Data:    logData,
+		}
+
+		msgData, _ := proto.Marshal(ipcMsg)
+		lengthBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(lengthBuf, uint32(len(msgData)))
+
+		conn.Write(lengthBuf)
+		conn.Write(msgData)
+	}
+
+	// Wait for processing
+	time.Sleep(1 * time.Second)
+
+	// In block mode, no messages should be dropped
+	if server.msgsDropped.Load() != 0 {
+		t.Errorf("Expected 0 dropped messages in block mode, got %d", server.msgsDropped.Load())
+	}
+
+	// All messages should be received
+	if server.msgsReceived.Load() != uint64(messageCount) {
+		t.Errorf("Expected %d messages received, got %d", messageCount, server.msgsReceived.Load())
+	}
+}
+
+func TestServerBackpressureDropMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	cfg := &config.IPCConfig{
+		Socket:              socketPath,
+		ReadBuffer:          262144,
+		MaxMessageSize:      10485760,
+		BufferSize:          2, // Very small buffer
+		WorkerCount:         1,
+		BatchSize:           100,    // Large batch so messages accumulate
+		BackpressureTimeout: 1,      // 1 second timeout before drop
+		BackpressureMode:    "drop", // Drop mode
+	}
+
+	// Create a very slow backend
+	backend := &storagefakes.FakeBackend{}
+	backend.WriteLogsStub = func(jobID string, logs []*ipcpb.LogLine) error {
+		time.Sleep(2 * time.Second) // Very slow - will cause backpressure
+		return nil
+	}
+	log := logger.New()
+
+	server := NewServer(cfg, backend, log)
+
+	// Verify drop mode is set
+	if server.backpressureMode != "drop" {
+		t.Errorf("Expected backpressureMode 'drop', got '%s'", server.backpressureMode)
+	}
+}
+
+func TestServerMetricsTracking(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	cfg := &config.IPCConfig{
+		Socket:         socketPath,
+		ReadBuffer:     262144,
+		MaxMessageSize: 10485760,
+	}
+	backend := &storagefakes.FakeBackend{}
+	log := logger.New()
+
+	server := NewServer(cfg, backend, log)
+
+	ctx := context.Background()
+	err := server.Start(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	time.Sleep(100 * time.Millisecond)
+
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		t.Fatalf("Failed to connect to server: %v", err)
+	}
+	defer conn.Close()
+
+	// Send a test message
+	logLine := &ipcpb.LogLine{
+		JobUuid:   "metrics-test-job",
+		Stream:    ipcpb.StreamType_STREAM_TYPE_STDOUT,
+		Timestamp: time.Now().UnixNano(),
+		Sequence:  1,
+		Content:   []byte("Metrics test message"),
+	}
+
+	logData, _ := proto.Marshal(logLine)
+	ipcMsg := &ipcpb.IPCMessage{
+		JobUuid: "metrics-test-job",
+		Type:    ipcpb.MessageType_MESSAGE_TYPE_LOG,
+		Data:    logData,
+	}
+
+	msgData, _ := proto.Marshal(ipcMsg)
+	lengthBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(lengthBuf, uint32(len(msgData)))
+
+	conn.Write(lengthBuf)
+	conn.Write(msgData)
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify metrics are tracked
+	if server.msgsReceived.Load() != 1 {
+		t.Errorf("Expected 1 message received, got %d", server.msgsReceived.Load())
+	}
+
+	if server.bytesReceived.Load() == 0 {
+		t.Error("Expected bytes received to be tracked")
+	}
+
+	// No backpressure should have occurred with default buffer
+	if server.backpressureEvents.Load() != 0 {
+		t.Errorf("Expected 0 backpressure events, got %d", server.backpressureEvents.Load())
+	}
+
+	if server.msgsDropped.Load() != 0 {
+		t.Errorf("Expected 0 dropped messages, got %d", server.msgsDropped.Load())
+	}
+}

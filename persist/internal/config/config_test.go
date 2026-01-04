@@ -345,11 +345,6 @@ security:
 		t.Errorf("Expected log group prefix '/joblet', got '%s'", cwConfig.LogGroupPrefix)
 	}
 
-	// Verify log stream prefix
-	if cwConfig.LogStreamPrefix != "job-" {
-		t.Errorf("Expected log stream prefix 'job-', got '%s'", cwConfig.LogStreamPrefix)
-	}
-
 	// Verify metric namespace
 	if cwConfig.MetricNamespace != "Joblet/Production" {
 		t.Errorf("Expected metric namespace 'Joblet/Production', got '%s'", cwConfig.MetricNamespace)
@@ -540,11 +535,6 @@ security:
 		t.Errorf("Expected IPC socket '%s' (inherited), got '%s'", expectedSocket, result.Config.IPC.Socket)
 	}
 
-	// Verify server-specific settings are still loaded
-	if result.Config.IPC.MaxConnections != 10 {
-		t.Errorf("Expected max_connections 10, got %d", result.Config.IPC.MaxConnections)
-	}
-
 	if result.Config.IPC.MaxMessageSize != 1048576 {
 		t.Errorf("Expected max_message_size 1048576, got %d", result.Config.IPC.MaxMessageSize)
 	}
@@ -603,5 +593,121 @@ security:
 	expectedSocket := "/opt/joblet/run/explicit-socket.sock"
 	if result.Config.IPC.Socket != expectedSocket {
 		t.Errorf("Expected explicit IPC socket '%s', got '%s'", expectedSocket, result.Config.IPC.Socket)
+	}
+}
+
+func TestDefaultConfig_PipelineSettings(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Verify pipeline defaults
+	if cfg.IPC.BufferSize != 100000 {
+		t.Errorf("Expected default BufferSize 100000, got %d", cfg.IPC.BufferSize)
+	}
+
+	if cfg.IPC.WorkerCount != 4 {
+		t.Errorf("Expected default WorkerCount 4, got %d", cfg.IPC.WorkerCount)
+	}
+
+	if cfg.IPC.BatchSize != 100 {
+		t.Errorf("Expected default BatchSize 100, got %d", cfg.IPC.BatchSize)
+	}
+
+	if cfg.IPC.BackpressureTimeout != 5 {
+		t.Errorf("Expected default BackpressureTimeout 5, got %d", cfg.IPC.BackpressureTimeout)
+	}
+
+	if cfg.IPC.BackpressureMode != "block" {
+		t.Errorf("Expected default BackpressureMode 'block', got '%s'", cfg.IPC.BackpressureMode)
+	}
+}
+
+func TestDefaultConfig_FileHandleCacheSettings(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Verify file handle cache defaults
+	if cfg.Storage.Local.MaxOpenFiles != 1000 {
+		t.Errorf("Expected default MaxOpenFiles 1000, got %d", cfg.Storage.Local.MaxOpenFiles)
+	}
+
+	if cfg.Storage.Local.FileHandleTTL != 300 {
+		t.Errorf("Expected default FileHandleTTL 300, got %d", cfg.Storage.Local.FileHandleTTL)
+	}
+}
+
+func TestLoad_PipelineConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "pipeline-config.yml")
+
+	configContent := `
+version: "3.0"
+
+server:
+  nodeId: "test-node"
+
+persist:
+  ipc:
+    socket: "/tmp/test.sock"
+    buffer_size: 50000
+    worker_count: 8
+    batch_size: 200
+    backpressure_timeout: 10
+    backpressure_mode: "drop"
+  storage:
+    type: "local"
+    local:
+      logs:
+        directory: "/tmp/logs"
+      metrics:
+        directory: "/tmp/metrics"
+      max_open_files: 500
+      file_handle_ttl: 600
+
+logging:
+  level: "info"
+
+security:
+  serverCert: ""
+  serverKey: ""
+  caCert: ""
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	result, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify pipeline settings
+	if result.Config.IPC.BufferSize != 50000 {
+		t.Errorf("Expected BufferSize 50000, got %d", result.Config.IPC.BufferSize)
+	}
+
+	if result.Config.IPC.WorkerCount != 8 {
+		t.Errorf("Expected WorkerCount 8, got %d", result.Config.IPC.WorkerCount)
+	}
+
+	if result.Config.IPC.BatchSize != 200 {
+		t.Errorf("Expected BatchSize 200, got %d", result.Config.IPC.BatchSize)
+	}
+
+	if result.Config.IPC.BackpressureTimeout != 10 {
+		t.Errorf("Expected BackpressureTimeout 10, got %d", result.Config.IPC.BackpressureTimeout)
+	}
+
+	if result.Config.IPC.BackpressureMode != "drop" {
+		t.Errorf("Expected BackpressureMode 'drop', got '%s'", result.Config.IPC.BackpressureMode)
+	}
+
+	// Verify file handle cache settings
+	if result.Config.Storage.Local.MaxOpenFiles != 500 {
+		t.Errorf("Expected MaxOpenFiles 500, got %d", result.Config.Storage.Local.MaxOpenFiles)
+	}
+
+	if result.Config.Storage.Local.FileHandleTTL != 600 {
+		t.Errorf("Expected FileHandleTTL 600, got %d", result.Config.Storage.Local.FileHandleTTL)
 	}
 }

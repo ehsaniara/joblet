@@ -23,15 +23,15 @@ type Backend interface {
 	WriteMprotectEvents(jobID string, events []*ipcpb.MprotectEvent) error
 
 	// Read operations
-	ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error)
-	ReadMetrics(ctx context.Context, query *MetricQuery) (*MetricReader, error)
-	ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*ExecEventReader, error)
-	ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*ConnectEventReader, error)
-	ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*FileEventReader, error)
-	ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*AcceptEventReader, error)
-	ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*SocketDataEventReader, error)
-	ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*MmapEventReader, error)
-	ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*MprotectEventReader, error)
+	ReadLogs(ctx context.Context, query *LogQuery) (*EventReader[*ipcpb.LogLine], error)
+	ReadMetrics(ctx context.Context, query *MetricQuery) (*EventReader[*ipcpb.Metric], error)
+	ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.ExecEvent], error)
+	ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.ConnectEvent], error)
+	ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.FileEvent], error)
+	ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.AcceptEvent], error)
+	ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.SocketDataEvent], error)
+	ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.MmapEvent], error)
+	ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.MprotectEvent], error)
 
 	// Management operations
 	DeleteJob(jobID string) error
@@ -63,18 +63,43 @@ type MetricQuery struct {
 	Offset      int
 }
 
-// LogReader provides streaming access to logs
-type LogReader struct {
-	Channel chan *ipcpb.LogLine
+// EventReader provides generic streaming access to events of type T.
+// This replaces the previous type-specific readers (LogReader, MetricReader, etc.)
+// reducing ~70 lines of duplicated struct definitions.
+type EventReader[T any] struct {
+	Channel chan T
 	Error   chan error
 	Done    chan struct{}
 }
 
-// MetricReader provides streaming access to metrics
-type MetricReader struct {
-	Channel chan *ipcpb.Metric
-	Error   chan error
-	Done    chan struct{}
+// NewEventReader creates a new EventReader with standard buffer sizes
+func NewEventReader[T any](bufferSize int) *EventReader[T] {
+	if bufferSize <= 0 {
+		bufferSize = 100
+	}
+	return &EventReader[T]{
+		Channel: make(chan T, bufferSize),
+		Error:   make(chan error, 1),
+		Done:    make(chan struct{}),
+	}
+}
+
+// Close closes all channels. Should be called by the producer goroutine.
+func (r *EventReader[T]) Close() {
+	close(r.Channel)
+	close(r.Error)
+	close(r.Done)
+}
+
+// SendError sends an error to the error channel if not nil
+func (r *EventReader[T]) SendError(err error) {
+	if err != nil {
+		select {
+		case r.Error <- err:
+		default:
+			// Error channel full, skip
+		}
+	}
 }
 
 // TelemetryQuery parameters for exec and connect events
@@ -87,55 +112,6 @@ type TelemetryQuery struct {
 	Offset    int
 }
 
-// ExecEventReader provides streaming access to exec events
-type ExecEventReader struct {
-	Channel chan *ipcpb.ExecEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
-// ConnectEventReader provides streaming access to connect events
-type ConnectEventReader struct {
-	Channel chan *ipcpb.ConnectEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
-// FileEventReader provides streaming access to file events
-type FileEventReader struct {
-	Channel chan *ipcpb.FileEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
-// AcceptEventReader provides streaming access to accept events
-type AcceptEventReader struct {
-	Channel chan *ipcpb.AcceptEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
-// SocketDataEventReader provides streaming access to socket data events
-type SocketDataEventReader struct {
-	Channel chan *ipcpb.SocketDataEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
-// MmapEventReader provides streaming access to mmap events
-type MmapEventReader struct {
-	Channel chan *ipcpb.MmapEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
-// MprotectEventReader provides streaming access to mprotect events
-type MprotectEventReader struct {
-	Channel chan *ipcpb.MprotectEvent
-	Error   chan error
-	Done    chan struct{}
-}
-
 // NewBackend creates a new storage backend based on configuration
 func NewBackend(cfg *config.StorageConfig, nodeID string, log *logger.Logger) (Backend, error) {
 	switch cfg.Type {
@@ -144,7 +120,7 @@ func NewBackend(cfg *config.StorageConfig, nodeID string, log *logger.Logger) (B
 	case "cloudwatch":
 		return NewCloudWatchBackend(cfg, nodeID, log)
 	case "s3":
-		return nil, fmt.Errorf("S3 backend not implemented yet (v2.0)")
+		return NewS3Backend(cfg, nodeID, log)
 	default:
 		return nil, fmt.Errorf("unknown storage backend type: %s", cfg.Type)
 	}

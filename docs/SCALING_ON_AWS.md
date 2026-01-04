@@ -46,7 +46,17 @@ set -e
 
 export JOBLET_VERSION="latest"
 export JOBLET_SERVER_PORT="443"
-export ENABLE_CLOUDWATCH="true"
+
+# Storage backend: "cloudwatch" (default), "s3", or "local"
+# CloudWatch is recommended for real-time monitoring
+# S3 is recommended for cost-effective long-term storage
+export PERSIST_BACKEND="cloudwatch"
+
+# For S3 backend, also set:
+# export PERSIST_BACKEND="s3"
+# export S3_BUCKET="my-joblet-logs"
+# export S3_PREFIX="joblet"
+# export S3_STORAGE_CLASS="STANDARD"
 
 # Enable Secrets Manager for scaling
 export USE_SECRETS_MANAGER="true"
@@ -56,6 +66,8 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-u
 chmod +x /tmp/joblet-install.sh
 /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
+
+> **Note**: `ENABLE_CLOUDWATCH=true` is still supported for backward compatibility but `PERSIST_BACKEND` is preferred.
 
 ### 3. Create Auto Scaling Group
 

@@ -50,8 +50,10 @@ The script will:
 #!/bin/bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
 chmod +x /tmp/joblet-install.sh
-ENABLE_CLOUDWATCH=true /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+/tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
+
+   > **Note**: By default, this uses CloudWatch Logs for storage. See [Storage Backend Options](#storage-backend-options) for alternatives including S3.
 
 4. Click **Launch instance**
 
@@ -137,12 +139,20 @@ sudo systemctl status joblet
 - **Auto-starts on boot** (systemd service)
 - **30GB gp3 EBS** volume
 
-### CloudWatch Logs (`/joblet` log group)
+### CloudWatch Logs (`/joblet` log group) - Default Backend
 
 - **Real-time job logs** aggregated from all jobs
 - **Searchable and filterable** via AWS Console or CLI
 - **7-day retention** (default, configurable)
 - **Log format**: `/joblet/{nodeId}/jobs/{job_uuid}`
+
+### S3 Storage (Alternative Backend)
+
+- **Cost-effective** long-term storage for high-volume logs
+- **Configurable storage classes** (STANDARD, GLACIER, DEEP_ARCHIVE)
+- **Lifecycle policies** for automatic archival and deletion
+- **Object format**: `{prefix}/{nodeId}/{jobId}/{type}/{timestamp}.jsonl.gz`
+- **Enable with**: `PERSIST_BACKEND=s3 S3_BUCKET=your-bucket`
 
 ### DynamoDB (`joblet-jobs` table)
 
@@ -171,10 +181,10 @@ sudo systemctl status joblet
 
 Joblet is designed to **always start**, even if AWS services are unavailable:
 
-| Service     | Primary    | Fallback   | Behavior                             |
-|-------------|------------|------------|--------------------------------------|
-| **State**   | DynamoDB   | In-memory  | Jobs work, but state lost on restart |
-| **Persist** | CloudWatch | Local disk | Logs stored at `/opt/joblet/logs`    |
+| Service     | Primary         | Fallback   | Behavior                             |
+|-------------|-----------------|------------|--------------------------------------|
+| **State**   | DynamoDB        | In-memory  | Jobs work, but state lost on restart |
+| **Persist** | CloudWatch / S3 | Local disk | Logs stored at `/opt/joblet/logs`    |
 
 When running in fallback mode, Joblet logs **prominent warnings** so you know AWS integration is not working. This
 ensures Joblet remains functional for development/testing even without proper AWS setup.
@@ -182,6 +192,119 @@ ensures Joblet remains functional for development/testing even without proper AW
 ---
 
 ## Advanced
+
+### Storage Backend Options
+
+Joblet supports three storage backends for logs and metrics. Choose based on your requirements:
+
+| Backend | Best For | Pros | Cons |
+|---------|----------|------|------|
+| **CloudWatch** (default) | Real-time monitoring, AWS integration | Native AWS integration, real-time queries, CloudWatch Insights | Higher cost for high-volume logs |
+| **S3** | Long-term archival, cost optimization | Very low cost, unlimited storage, lifecycle policies | Not real-time, requires S3 bucket setup |
+| **Local** | Development, testing, VMs | No AWS dependencies, zero cost | Lost on instance termination, no aggregation |
+
+#### Option 1: CloudWatch Logs (Default)
+
+CloudWatch is the default when deploying on EC2. No additional configuration needed:
+
+```bash
+#!/bin/bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
+chmod +x /tmp/joblet-install.sh
+/tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+```
+
+Or explicitly set the backend:
+
+```bash
+PERSIST_BACKEND=cloudwatch /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+```
+
+#### Option 2: S3 Storage
+
+For cost-effective long-term storage, use S3. **Requires an S3 bucket** (create one before deployment):
+
+```bash
+#!/bin/bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
+chmod +x /tmp/joblet-install.sh
+PERSIST_BACKEND=s3 \
+S3_BUCKET=my-joblet-logs \
+S3_PREFIX=joblet \
+S3_STORAGE_CLASS=STANDARD \
+/tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+```
+
+**S3 Environment Variables:**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `PERSIST_BACKEND` | Yes | - | Must be `s3` |
+| `S3_BUCKET` | Yes | - | Your S3 bucket name |
+| `S3_PREFIX` | No | `joblet` | Key prefix for all objects |
+| `S3_STORAGE_CLASS` | No | `STANDARD` | Storage class (see below) |
+
+**S3 Storage Classes:**
+
+- `STANDARD` - Frequently accessed (default)
+- `STANDARD_IA` - Infrequent access, lower cost
+- `ONEZONE_IA` - Single AZ, cheapest for non-critical data
+- `GLACIER` - Archive, minutes to hours retrieval
+- `DEEP_ARCHIVE` - Long-term archive, 12+ hours retrieval
+
+**S3 IAM Permissions Required:**
+
+Add these permissions to `JobletEC2Role` when using S3:
+
+```json
+{
+    "Effect": "Allow",
+    "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:DeleteObject"
+    ],
+    "Resource": [
+        "arn:aws:s3:::my-joblet-logs",
+        "arn:aws:s3:::my-joblet-logs/*"
+    ]
+}
+```
+
+**S3 Lifecycle Rules (Recommended):**
+
+Configure lifecycle rules on your S3 bucket for automatic cost optimization:
+
+```bash
+aws s3api put-bucket-lifecycle-configuration --bucket my-joblet-logs \
+  --lifecycle-configuration '{
+    "Rules": [{
+      "ID": "JobletArchiveRule",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "joblet/"},
+      "Transitions": [{"Days": 30, "StorageClass": "GLACIER"}],
+      "Expiration": {"Days": 365}
+    }]
+  }'
+```
+
+#### Option 3: Local Storage (No AWS Services)
+
+For development, testing, or VM deployments without AWS:
+
+```bash
+#!/bin/bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
+chmod +x /tmp/joblet-install.sh
+PERSIST_BACKEND=local /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+```
+
+**Local Storage Behavior:**
+- Logs stored in `/opt/joblet/logs/`
+- Metrics stored in `/opt/joblet/metrics/`
+- Job state is in-memory (lost on restart)
+- No AWS permissions required
 
 ### Alternative: Fully Automated CLI Deployment
 
@@ -205,23 +328,26 @@ The `launch-instance.sh` script will:
 
 ### Disable CloudWatch/DynamoDB (Local-Only Mode)
 
-If you don't want AWS CloudWatch or DynamoDB integration:
+If you don't want AWS CloudWatch or DynamoDB integration, use the local storage backend:
 
-1. **Skip Step 1** (don't create IAM role)
-2. In Step 2, use this user data instead:
+1. **Skip Step 1** (don't create IAM role - optional, but saves setup time)
+2. In Step 2, use this user data:
 
 ```bash
 #!/bin/bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
 chmod +x /tmp/joblet-install.sh
-ENABLE_CLOUDWATCH=false /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+PERSIST_BACKEND=local /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
 ```
+
+> **Note**: `ENABLE_CLOUDWATCH=false` is still supported for backward compatibility, but `PERSIST_BACKEND=local` is preferred.
 
 This deploys Joblet with:
 
 - ❌ No CloudWatch Logs (logs stored in `/opt/joblet/logs/` on instance)
 - ❌ No DynamoDB (job state stored in memory, lost on restart)
 - ✅ Still fully functional for job execution
+- ✅ No AWS permissions required
 
 ### Monitor Installation Progress
 
@@ -460,7 +586,7 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 │            ▼                           ▼                          │
 │  ┌─────────────────┐         ┌──────────────────────┐            │
 │  │ CloudWatch Logs │         │ DynamoDB             │            │
-│  │                 │         │                      │            │
+│  │  OR S3 Bucket   │         │                      │            │
 │  │ /joblet/...     │         │ Table: joblet-jobs   │            │
 │  │ (job logs)      │         │ (job state)          │            │
 │  └─────────────────┘         └──────────────────────┘            │
@@ -479,8 +605,10 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 
 1. **Client → Joblet Server**: gRPC requests over TLS (port 443)
 2. **Joblet → VPC Endpoint → DynamoDB**: Job state persistence (private, no internet)
-3. **Joblet → CloudWatch**: Real-time log streaming (PutLogEvents)
-4. **Client ← CloudWatch**: Historical log queries via `rnx job log` (GetLogEvents)
+3. **Joblet → CloudWatch OR S3**: Log/metrics storage
+   - CloudWatch: Real-time log streaming (PutLogEvents)
+   - S3: Batch uploads as gzipped JSONL files (PutObject)
+4. **Client ← CloudWatch/S3**: Historical log queries via `rnx job log`
 
 ---
 

@@ -579,13 +579,10 @@ persist:
     local:
       logs:
         directory: /opt/joblet/logs
-        format: jsonl
       metrics:
         directory: /opt/joblet/metrics
-        format: jsonl.gz
       events:
         directory: /opt/joblet/events
-        format: jsonl.gz
 ```
 
 ### Pub/Sub Configuration

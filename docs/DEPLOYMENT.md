@@ -182,7 +182,6 @@ persist:
     cloudwatch:
       region: ""  # Auto-detect from EC2 metadata
       log_group_prefix: "/joblet"  # Logs at: /joblet/{nodeId}/jobs/{job_uuid}
-      log_stream_prefix: "job-"
       metric_namespace: "Joblet/Production"
 
       # Optional: Add custom dimensions for filtering

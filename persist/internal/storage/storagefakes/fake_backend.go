@@ -31,130 +31,130 @@ type FakeBackend struct {
 	deleteJobReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ReadAcceptEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.AcceptEventReader, error)
+	ReadAcceptEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.AcceptEvent], error)
 	readAcceptEventsMutex       sync.RWMutex
 	readAcceptEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readAcceptEventsReturns struct {
-		result1 *storage.AcceptEventReader
+		result1 *storage.EventReader[*ipc.AcceptEvent]
 		result2 error
 	}
 	readAcceptEventsReturnsOnCall map[int]struct {
-		result1 *storage.AcceptEventReader
+		result1 *storage.EventReader[*ipc.AcceptEvent]
 		result2 error
 	}
-	ReadConnectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.ConnectEventReader, error)
+	ReadConnectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.ConnectEvent], error)
 	readConnectEventsMutex       sync.RWMutex
 	readConnectEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readConnectEventsReturns struct {
-		result1 *storage.ConnectEventReader
+		result1 *storage.EventReader[*ipc.ConnectEvent]
 		result2 error
 	}
 	readConnectEventsReturnsOnCall map[int]struct {
-		result1 *storage.ConnectEventReader
+		result1 *storage.EventReader[*ipc.ConnectEvent]
 		result2 error
 	}
-	ReadExecEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.ExecEventReader, error)
+	ReadExecEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.ExecEvent], error)
 	readExecEventsMutex       sync.RWMutex
 	readExecEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readExecEventsReturns struct {
-		result1 *storage.ExecEventReader
+		result1 *storage.EventReader[*ipc.ExecEvent]
 		result2 error
 	}
 	readExecEventsReturnsOnCall map[int]struct {
-		result1 *storage.ExecEventReader
+		result1 *storage.EventReader[*ipc.ExecEvent]
 		result2 error
 	}
-	ReadFileEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.FileEventReader, error)
+	ReadFileEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.FileEvent], error)
 	readFileEventsMutex       sync.RWMutex
 	readFileEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readFileEventsReturns struct {
-		result1 *storage.FileEventReader
+		result1 *storage.EventReader[*ipc.FileEvent]
 		result2 error
 	}
 	readFileEventsReturnsOnCall map[int]struct {
-		result1 *storage.FileEventReader
+		result1 *storage.EventReader[*ipc.FileEvent]
 		result2 error
 	}
-	ReadLogsStub        func(context.Context, *storage.LogQuery) (*storage.LogReader, error)
+	ReadLogsStub        func(context.Context, *storage.LogQuery) (*storage.EventReader[*ipc.LogLine], error)
 	readLogsMutex       sync.RWMutex
 	readLogsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.LogQuery
 	}
 	readLogsReturns struct {
-		result1 *storage.LogReader
+		result1 *storage.EventReader[*ipc.LogLine]
 		result2 error
 	}
 	readLogsReturnsOnCall map[int]struct {
-		result1 *storage.LogReader
+		result1 *storage.EventReader[*ipc.LogLine]
 		result2 error
 	}
-	ReadMetricsStub        func(context.Context, *storage.MetricQuery) (*storage.MetricReader, error)
+	ReadMetricsStub        func(context.Context, *storage.MetricQuery) (*storage.EventReader[*ipc.Metric], error)
 	readMetricsMutex       sync.RWMutex
 	readMetricsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.MetricQuery
 	}
 	readMetricsReturns struct {
-		result1 *storage.MetricReader
+		result1 *storage.EventReader[*ipc.Metric]
 		result2 error
 	}
 	readMetricsReturnsOnCall map[int]struct {
-		result1 *storage.MetricReader
+		result1 *storage.EventReader[*ipc.Metric]
 		result2 error
 	}
-	ReadMmapEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.MmapEventReader, error)
+	ReadMmapEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.MmapEvent], error)
 	readMmapEventsMutex       sync.RWMutex
 	readMmapEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readMmapEventsReturns struct {
-		result1 *storage.MmapEventReader
+		result1 *storage.EventReader[*ipc.MmapEvent]
 		result2 error
 	}
 	readMmapEventsReturnsOnCall map[int]struct {
-		result1 *storage.MmapEventReader
+		result1 *storage.EventReader[*ipc.MmapEvent]
 		result2 error
 	}
-	ReadMprotectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.MprotectEventReader, error)
+	ReadMprotectEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.MprotectEvent], error)
 	readMprotectEventsMutex       sync.RWMutex
 	readMprotectEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readMprotectEventsReturns struct {
-		result1 *storage.MprotectEventReader
+		result1 *storage.EventReader[*ipc.MprotectEvent]
 		result2 error
 	}
 	readMprotectEventsReturnsOnCall map[int]struct {
-		result1 *storage.MprotectEventReader
+		result1 *storage.EventReader[*ipc.MprotectEvent]
 		result2 error
 	}
-	ReadSocketDataEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.SocketDataEventReader, error)
+	ReadSocketDataEventsStub        func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.SocketDataEvent], error)
 	readSocketDataEventsMutex       sync.RWMutex
 	readSocketDataEventsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *storage.TelemetryQuery
 	}
 	readSocketDataEventsReturns struct {
-		result1 *storage.SocketDataEventReader
+		result1 *storage.EventReader[*ipc.SocketDataEvent]
 		result2 error
 	}
 	readSocketDataEventsReturnsOnCall map[int]struct {
-		result1 *storage.SocketDataEventReader
+		result1 *storage.EventReader[*ipc.SocketDataEvent]
 		result2 error
 	}
 	WriteAcceptEventsStub        func(string, []*ipc.AcceptEvent) error
@@ -383,7 +383,7 @@ func (fake *FakeBackend) DeleteJobReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeBackend) ReadAcceptEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.AcceptEventReader, error) {
+func (fake *FakeBackend) ReadAcceptEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.AcceptEvent], error) {
 	fake.readAcceptEventsMutex.Lock()
 	ret, specificReturn := fake.readAcceptEventsReturnsOnCall[len(fake.readAcceptEventsArgsForCall)]
 	fake.readAcceptEventsArgsForCall = append(fake.readAcceptEventsArgsForCall, struct {
@@ -409,7 +409,7 @@ func (fake *FakeBackend) ReadAcceptEventsCallCount() int {
 	return len(fake.readAcceptEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadAcceptEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.AcceptEventReader, error)) {
+func (fake *FakeBackend) ReadAcceptEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.AcceptEvent], error)) {
 	fake.readAcceptEventsMutex.Lock()
 	defer fake.readAcceptEventsMutex.Unlock()
 	fake.ReadAcceptEventsStub = stub
@@ -422,33 +422,33 @@ func (fake *FakeBackend) ReadAcceptEventsArgsForCall(i int) (context.Context, *s
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadAcceptEventsReturns(result1 *storage.AcceptEventReader, result2 error) {
+func (fake *FakeBackend) ReadAcceptEventsReturns(result1 *storage.EventReader[*ipc.AcceptEvent], result2 error) {
 	fake.readAcceptEventsMutex.Lock()
 	defer fake.readAcceptEventsMutex.Unlock()
 	fake.ReadAcceptEventsStub = nil
 	fake.readAcceptEventsReturns = struct {
-		result1 *storage.AcceptEventReader
+		result1 *storage.EventReader[*ipc.AcceptEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadAcceptEventsReturnsOnCall(i int, result1 *storage.AcceptEventReader, result2 error) {
+func (fake *FakeBackend) ReadAcceptEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.AcceptEvent], result2 error) {
 	fake.readAcceptEventsMutex.Lock()
 	defer fake.readAcceptEventsMutex.Unlock()
 	fake.ReadAcceptEventsStub = nil
 	if fake.readAcceptEventsReturnsOnCall == nil {
 		fake.readAcceptEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.AcceptEventReader
+			result1 *storage.EventReader[*ipc.AcceptEvent]
 			result2 error
 		})
 	}
 	fake.readAcceptEventsReturnsOnCall[i] = struct {
-		result1 *storage.AcceptEventReader
+		result1 *storage.EventReader[*ipc.AcceptEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadConnectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.ConnectEventReader, error) {
+func (fake *FakeBackend) ReadConnectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.ConnectEvent], error) {
 	fake.readConnectEventsMutex.Lock()
 	ret, specificReturn := fake.readConnectEventsReturnsOnCall[len(fake.readConnectEventsArgsForCall)]
 	fake.readConnectEventsArgsForCall = append(fake.readConnectEventsArgsForCall, struct {
@@ -474,7 +474,7 @@ func (fake *FakeBackend) ReadConnectEventsCallCount() int {
 	return len(fake.readConnectEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadConnectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.ConnectEventReader, error)) {
+func (fake *FakeBackend) ReadConnectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.ConnectEvent], error)) {
 	fake.readConnectEventsMutex.Lock()
 	defer fake.readConnectEventsMutex.Unlock()
 	fake.ReadConnectEventsStub = stub
@@ -487,33 +487,33 @@ func (fake *FakeBackend) ReadConnectEventsArgsForCall(i int) (context.Context, *
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadConnectEventsReturns(result1 *storage.ConnectEventReader, result2 error) {
+func (fake *FakeBackend) ReadConnectEventsReturns(result1 *storage.EventReader[*ipc.ConnectEvent], result2 error) {
 	fake.readConnectEventsMutex.Lock()
 	defer fake.readConnectEventsMutex.Unlock()
 	fake.ReadConnectEventsStub = nil
 	fake.readConnectEventsReturns = struct {
-		result1 *storage.ConnectEventReader
+		result1 *storage.EventReader[*ipc.ConnectEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadConnectEventsReturnsOnCall(i int, result1 *storage.ConnectEventReader, result2 error) {
+func (fake *FakeBackend) ReadConnectEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.ConnectEvent], result2 error) {
 	fake.readConnectEventsMutex.Lock()
 	defer fake.readConnectEventsMutex.Unlock()
 	fake.ReadConnectEventsStub = nil
 	if fake.readConnectEventsReturnsOnCall == nil {
 		fake.readConnectEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.ConnectEventReader
+			result1 *storage.EventReader[*ipc.ConnectEvent]
 			result2 error
 		})
 	}
 	fake.readConnectEventsReturnsOnCall[i] = struct {
-		result1 *storage.ConnectEventReader
+		result1 *storage.EventReader[*ipc.ConnectEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadExecEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.ExecEventReader, error) {
+func (fake *FakeBackend) ReadExecEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.ExecEvent], error) {
 	fake.readExecEventsMutex.Lock()
 	ret, specificReturn := fake.readExecEventsReturnsOnCall[len(fake.readExecEventsArgsForCall)]
 	fake.readExecEventsArgsForCall = append(fake.readExecEventsArgsForCall, struct {
@@ -539,7 +539,7 @@ func (fake *FakeBackend) ReadExecEventsCallCount() int {
 	return len(fake.readExecEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadExecEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.ExecEventReader, error)) {
+func (fake *FakeBackend) ReadExecEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.ExecEvent], error)) {
 	fake.readExecEventsMutex.Lock()
 	defer fake.readExecEventsMutex.Unlock()
 	fake.ReadExecEventsStub = stub
@@ -552,33 +552,33 @@ func (fake *FakeBackend) ReadExecEventsArgsForCall(i int) (context.Context, *sto
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadExecEventsReturns(result1 *storage.ExecEventReader, result2 error) {
+func (fake *FakeBackend) ReadExecEventsReturns(result1 *storage.EventReader[*ipc.ExecEvent], result2 error) {
 	fake.readExecEventsMutex.Lock()
 	defer fake.readExecEventsMutex.Unlock()
 	fake.ReadExecEventsStub = nil
 	fake.readExecEventsReturns = struct {
-		result1 *storage.ExecEventReader
+		result1 *storage.EventReader[*ipc.ExecEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadExecEventsReturnsOnCall(i int, result1 *storage.ExecEventReader, result2 error) {
+func (fake *FakeBackend) ReadExecEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.ExecEvent], result2 error) {
 	fake.readExecEventsMutex.Lock()
 	defer fake.readExecEventsMutex.Unlock()
 	fake.ReadExecEventsStub = nil
 	if fake.readExecEventsReturnsOnCall == nil {
 		fake.readExecEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.ExecEventReader
+			result1 *storage.EventReader[*ipc.ExecEvent]
 			result2 error
 		})
 	}
 	fake.readExecEventsReturnsOnCall[i] = struct {
-		result1 *storage.ExecEventReader
+		result1 *storage.EventReader[*ipc.ExecEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadFileEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.FileEventReader, error) {
+func (fake *FakeBackend) ReadFileEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.FileEvent], error) {
 	fake.readFileEventsMutex.Lock()
 	ret, specificReturn := fake.readFileEventsReturnsOnCall[len(fake.readFileEventsArgsForCall)]
 	fake.readFileEventsArgsForCall = append(fake.readFileEventsArgsForCall, struct {
@@ -604,7 +604,7 @@ func (fake *FakeBackend) ReadFileEventsCallCount() int {
 	return len(fake.readFileEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadFileEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.FileEventReader, error)) {
+func (fake *FakeBackend) ReadFileEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.FileEvent], error)) {
 	fake.readFileEventsMutex.Lock()
 	defer fake.readFileEventsMutex.Unlock()
 	fake.ReadFileEventsStub = stub
@@ -617,33 +617,33 @@ func (fake *FakeBackend) ReadFileEventsArgsForCall(i int) (context.Context, *sto
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadFileEventsReturns(result1 *storage.FileEventReader, result2 error) {
+func (fake *FakeBackend) ReadFileEventsReturns(result1 *storage.EventReader[*ipc.FileEvent], result2 error) {
 	fake.readFileEventsMutex.Lock()
 	defer fake.readFileEventsMutex.Unlock()
 	fake.ReadFileEventsStub = nil
 	fake.readFileEventsReturns = struct {
-		result1 *storage.FileEventReader
+		result1 *storage.EventReader[*ipc.FileEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadFileEventsReturnsOnCall(i int, result1 *storage.FileEventReader, result2 error) {
+func (fake *FakeBackend) ReadFileEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.FileEvent], result2 error) {
 	fake.readFileEventsMutex.Lock()
 	defer fake.readFileEventsMutex.Unlock()
 	fake.ReadFileEventsStub = nil
 	if fake.readFileEventsReturnsOnCall == nil {
 		fake.readFileEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.FileEventReader
+			result1 *storage.EventReader[*ipc.FileEvent]
 			result2 error
 		})
 	}
 	fake.readFileEventsReturnsOnCall[i] = struct {
-		result1 *storage.FileEventReader
+		result1 *storage.EventReader[*ipc.FileEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadLogs(arg1 context.Context, arg2 *storage.LogQuery) (*storage.LogReader, error) {
+func (fake *FakeBackend) ReadLogs(arg1 context.Context, arg2 *storage.LogQuery) (*storage.EventReader[*ipc.LogLine], error) {
 	fake.readLogsMutex.Lock()
 	ret, specificReturn := fake.readLogsReturnsOnCall[len(fake.readLogsArgsForCall)]
 	fake.readLogsArgsForCall = append(fake.readLogsArgsForCall, struct {
@@ -669,7 +669,7 @@ func (fake *FakeBackend) ReadLogsCallCount() int {
 	return len(fake.readLogsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadLogsCalls(stub func(context.Context, *storage.LogQuery) (*storage.LogReader, error)) {
+func (fake *FakeBackend) ReadLogsCalls(stub func(context.Context, *storage.LogQuery) (*storage.EventReader[*ipc.LogLine], error)) {
 	fake.readLogsMutex.Lock()
 	defer fake.readLogsMutex.Unlock()
 	fake.ReadLogsStub = stub
@@ -682,33 +682,33 @@ func (fake *FakeBackend) ReadLogsArgsForCall(i int) (context.Context, *storage.L
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadLogsReturns(result1 *storage.LogReader, result2 error) {
+func (fake *FakeBackend) ReadLogsReturns(result1 *storage.EventReader[*ipc.LogLine], result2 error) {
 	fake.readLogsMutex.Lock()
 	defer fake.readLogsMutex.Unlock()
 	fake.ReadLogsStub = nil
 	fake.readLogsReturns = struct {
-		result1 *storage.LogReader
+		result1 *storage.EventReader[*ipc.LogLine]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadLogsReturnsOnCall(i int, result1 *storage.LogReader, result2 error) {
+func (fake *FakeBackend) ReadLogsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.LogLine], result2 error) {
 	fake.readLogsMutex.Lock()
 	defer fake.readLogsMutex.Unlock()
 	fake.ReadLogsStub = nil
 	if fake.readLogsReturnsOnCall == nil {
 		fake.readLogsReturnsOnCall = make(map[int]struct {
-			result1 *storage.LogReader
+			result1 *storage.EventReader[*ipc.LogLine]
 			result2 error
 		})
 	}
 	fake.readLogsReturnsOnCall[i] = struct {
-		result1 *storage.LogReader
+		result1 *storage.EventReader[*ipc.LogLine]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadMetrics(arg1 context.Context, arg2 *storage.MetricQuery) (*storage.MetricReader, error) {
+func (fake *FakeBackend) ReadMetrics(arg1 context.Context, arg2 *storage.MetricQuery) (*storage.EventReader[*ipc.Metric], error) {
 	fake.readMetricsMutex.Lock()
 	ret, specificReturn := fake.readMetricsReturnsOnCall[len(fake.readMetricsArgsForCall)]
 	fake.readMetricsArgsForCall = append(fake.readMetricsArgsForCall, struct {
@@ -734,7 +734,7 @@ func (fake *FakeBackend) ReadMetricsCallCount() int {
 	return len(fake.readMetricsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadMetricsCalls(stub func(context.Context, *storage.MetricQuery) (*storage.MetricReader, error)) {
+func (fake *FakeBackend) ReadMetricsCalls(stub func(context.Context, *storage.MetricQuery) (*storage.EventReader[*ipc.Metric], error)) {
 	fake.readMetricsMutex.Lock()
 	defer fake.readMetricsMutex.Unlock()
 	fake.ReadMetricsStub = stub
@@ -747,33 +747,33 @@ func (fake *FakeBackend) ReadMetricsArgsForCall(i int) (context.Context, *storag
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadMetricsReturns(result1 *storage.MetricReader, result2 error) {
+func (fake *FakeBackend) ReadMetricsReturns(result1 *storage.EventReader[*ipc.Metric], result2 error) {
 	fake.readMetricsMutex.Lock()
 	defer fake.readMetricsMutex.Unlock()
 	fake.ReadMetricsStub = nil
 	fake.readMetricsReturns = struct {
-		result1 *storage.MetricReader
+		result1 *storage.EventReader[*ipc.Metric]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadMetricsReturnsOnCall(i int, result1 *storage.MetricReader, result2 error) {
+func (fake *FakeBackend) ReadMetricsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.Metric], result2 error) {
 	fake.readMetricsMutex.Lock()
 	defer fake.readMetricsMutex.Unlock()
 	fake.ReadMetricsStub = nil
 	if fake.readMetricsReturnsOnCall == nil {
 		fake.readMetricsReturnsOnCall = make(map[int]struct {
-			result1 *storage.MetricReader
+			result1 *storage.EventReader[*ipc.Metric]
 			result2 error
 		})
 	}
 	fake.readMetricsReturnsOnCall[i] = struct {
-		result1 *storage.MetricReader
+		result1 *storage.EventReader[*ipc.Metric]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadMmapEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.MmapEventReader, error) {
+func (fake *FakeBackend) ReadMmapEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.MmapEvent], error) {
 	fake.readMmapEventsMutex.Lock()
 	ret, specificReturn := fake.readMmapEventsReturnsOnCall[len(fake.readMmapEventsArgsForCall)]
 	fake.readMmapEventsArgsForCall = append(fake.readMmapEventsArgsForCall, struct {
@@ -799,7 +799,7 @@ func (fake *FakeBackend) ReadMmapEventsCallCount() int {
 	return len(fake.readMmapEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadMmapEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.MmapEventReader, error)) {
+func (fake *FakeBackend) ReadMmapEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.MmapEvent], error)) {
 	fake.readMmapEventsMutex.Lock()
 	defer fake.readMmapEventsMutex.Unlock()
 	fake.ReadMmapEventsStub = stub
@@ -812,33 +812,33 @@ func (fake *FakeBackend) ReadMmapEventsArgsForCall(i int) (context.Context, *sto
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadMmapEventsReturns(result1 *storage.MmapEventReader, result2 error) {
+func (fake *FakeBackend) ReadMmapEventsReturns(result1 *storage.EventReader[*ipc.MmapEvent], result2 error) {
 	fake.readMmapEventsMutex.Lock()
 	defer fake.readMmapEventsMutex.Unlock()
 	fake.ReadMmapEventsStub = nil
 	fake.readMmapEventsReturns = struct {
-		result1 *storage.MmapEventReader
+		result1 *storage.EventReader[*ipc.MmapEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadMmapEventsReturnsOnCall(i int, result1 *storage.MmapEventReader, result2 error) {
+func (fake *FakeBackend) ReadMmapEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.MmapEvent], result2 error) {
 	fake.readMmapEventsMutex.Lock()
 	defer fake.readMmapEventsMutex.Unlock()
 	fake.ReadMmapEventsStub = nil
 	if fake.readMmapEventsReturnsOnCall == nil {
 		fake.readMmapEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.MmapEventReader
+			result1 *storage.EventReader[*ipc.MmapEvent]
 			result2 error
 		})
 	}
 	fake.readMmapEventsReturnsOnCall[i] = struct {
-		result1 *storage.MmapEventReader
+		result1 *storage.EventReader[*ipc.MmapEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadMprotectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.MprotectEventReader, error) {
+func (fake *FakeBackend) ReadMprotectEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.MprotectEvent], error) {
 	fake.readMprotectEventsMutex.Lock()
 	ret, specificReturn := fake.readMprotectEventsReturnsOnCall[len(fake.readMprotectEventsArgsForCall)]
 	fake.readMprotectEventsArgsForCall = append(fake.readMprotectEventsArgsForCall, struct {
@@ -864,7 +864,7 @@ func (fake *FakeBackend) ReadMprotectEventsCallCount() int {
 	return len(fake.readMprotectEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadMprotectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.MprotectEventReader, error)) {
+func (fake *FakeBackend) ReadMprotectEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.MprotectEvent], error)) {
 	fake.readMprotectEventsMutex.Lock()
 	defer fake.readMprotectEventsMutex.Unlock()
 	fake.ReadMprotectEventsStub = stub
@@ -877,33 +877,33 @@ func (fake *FakeBackend) ReadMprotectEventsArgsForCall(i int) (context.Context, 
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadMprotectEventsReturns(result1 *storage.MprotectEventReader, result2 error) {
+func (fake *FakeBackend) ReadMprotectEventsReturns(result1 *storage.EventReader[*ipc.MprotectEvent], result2 error) {
 	fake.readMprotectEventsMutex.Lock()
 	defer fake.readMprotectEventsMutex.Unlock()
 	fake.ReadMprotectEventsStub = nil
 	fake.readMprotectEventsReturns = struct {
-		result1 *storage.MprotectEventReader
+		result1 *storage.EventReader[*ipc.MprotectEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadMprotectEventsReturnsOnCall(i int, result1 *storage.MprotectEventReader, result2 error) {
+func (fake *FakeBackend) ReadMprotectEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.MprotectEvent], result2 error) {
 	fake.readMprotectEventsMutex.Lock()
 	defer fake.readMprotectEventsMutex.Unlock()
 	fake.ReadMprotectEventsStub = nil
 	if fake.readMprotectEventsReturnsOnCall == nil {
 		fake.readMprotectEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.MprotectEventReader
+			result1 *storage.EventReader[*ipc.MprotectEvent]
 			result2 error
 		})
 	}
 	fake.readMprotectEventsReturnsOnCall[i] = struct {
-		result1 *storage.MprotectEventReader
+		result1 *storage.EventReader[*ipc.MprotectEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadSocketDataEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.SocketDataEventReader, error) {
+func (fake *FakeBackend) ReadSocketDataEvents(arg1 context.Context, arg2 *storage.TelemetryQuery) (*storage.EventReader[*ipc.SocketDataEvent], error) {
 	fake.readSocketDataEventsMutex.Lock()
 	ret, specificReturn := fake.readSocketDataEventsReturnsOnCall[len(fake.readSocketDataEventsArgsForCall)]
 	fake.readSocketDataEventsArgsForCall = append(fake.readSocketDataEventsArgsForCall, struct {
@@ -929,7 +929,7 @@ func (fake *FakeBackend) ReadSocketDataEventsCallCount() int {
 	return len(fake.readSocketDataEventsArgsForCall)
 }
 
-func (fake *FakeBackend) ReadSocketDataEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.SocketDataEventReader, error)) {
+func (fake *FakeBackend) ReadSocketDataEventsCalls(stub func(context.Context, *storage.TelemetryQuery) (*storage.EventReader[*ipc.SocketDataEvent], error)) {
 	fake.readSocketDataEventsMutex.Lock()
 	defer fake.readSocketDataEventsMutex.Unlock()
 	fake.ReadSocketDataEventsStub = stub
@@ -942,28 +942,28 @@ func (fake *FakeBackend) ReadSocketDataEventsArgsForCall(i int) (context.Context
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeBackend) ReadSocketDataEventsReturns(result1 *storage.SocketDataEventReader, result2 error) {
+func (fake *FakeBackend) ReadSocketDataEventsReturns(result1 *storage.EventReader[*ipc.SocketDataEvent], result2 error) {
 	fake.readSocketDataEventsMutex.Lock()
 	defer fake.readSocketDataEventsMutex.Unlock()
 	fake.ReadSocketDataEventsStub = nil
 	fake.readSocketDataEventsReturns = struct {
-		result1 *storage.SocketDataEventReader
+		result1 *storage.EventReader[*ipc.SocketDataEvent]
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBackend) ReadSocketDataEventsReturnsOnCall(i int, result1 *storage.SocketDataEventReader, result2 error) {
+func (fake *FakeBackend) ReadSocketDataEventsReturnsOnCall(i int, result1 *storage.EventReader[*ipc.SocketDataEvent], result2 error) {
 	fake.readSocketDataEventsMutex.Lock()
 	defer fake.readSocketDataEventsMutex.Unlock()
 	fake.ReadSocketDataEventsStub = nil
 	if fake.readSocketDataEventsReturnsOnCall == nil {
 		fake.readSocketDataEventsReturnsOnCall = make(map[int]struct {
-			result1 *storage.SocketDataEventReader
+			result1 *storage.EventReader[*ipc.SocketDataEvent]
 			result2 error
 		})
 	}
 	fake.readSocketDataEventsReturnsOnCall[i] = struct {
-		result1 *storage.SocketDataEventReader
+		result1 *storage.EventReader[*ipc.SocketDataEvent]
 		result2 error
 	}{result1, result2}
 }

@@ -8,11 +8,11 @@ storage, queries, and lifecycle management.
 `persist` is a separate service that receives logs, metrics, and eBPF events from `joblet-core` via Unix domain
 sockets (IPC) and provides:
 
-- **Persistent storage** - Local filesystem storage and CloudWatch Logs integration
-- **eBPF Event Storage** - Process execution (exec) and network connection events
+- **Persistent storage** - Local filesystem, CloudWatch Logs, and S3 backends
+- **eBPF Event Storage** - All eBPF telemetry events (exec, connect, file, accept, socket_data, mmap, mprotect)
 - **Historical queries** - gRPC API for querying stored logs, metrics, and events
 - **Data lifecycle** - Retention policies, cleanup, compression, and rotation
-- **Multiple backends** - Pluggable storage architecture (local, CloudWatch, S3)
+- **Multiple backends** - Pluggable storage architecture with consistent interface
 
 ## Architecture
 
@@ -23,9 +23,9 @@ joblet-core (execution)
      ▼
 persist (storage)
      │
-     ├─► Local Filesystem
-     ├─► CloudWatch (v2.0)
-     └─► S3 (v2.0)
+     ├─► Local Filesystem (default)
+     ├─► CloudWatch Logs + Metrics API
+     └─► S3 (time-partitioned objects)
 ```
 
 ## Features
@@ -45,10 +45,17 @@ persist (storage)
 - ✅ **eBPF event storage** - All eBPF telemetry events (exec, connect, file, accept, socket_data, mmap, mprotect)
 - ✅ Multi-backend support (local + CloudWatch)
 
-### v2.0 (Planned)
+### v2.0 (Current)
 
-- [ ] S3 archival
+- ✅ **S3 storage backend** - Cost-effective storage with time-partitioned keys
+- ✅ Configurable flush intervals and buffer thresholds
+- ✅ Server-side encryption support (AES256, KMS)
+
+### v3.0 (Planned)
+
 - [ ] Advanced querying (full-text search, time-range aggregation)
+- [ ] Cross-region replication
+- [ ] Real-time streaming to external systems
 
 ## Building
 
@@ -146,16 +153,84 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams per job:
-    - {job_id}-logs                 # stdout/stderr logs
-    - {job_id}-metrics              # Resource metrics (JSON)
-    - {job_id}-exec-events          # Process execution events (JSON)
-    - {job_id}-connect-events       # Network connection events (JSON)
-    - {job_id}-file-events          # File access events (JSON)
-    - {job_id}-accept-events        # Socket accept events (JSON)
-    - {job_id}-socket-data-events   # Socket data events (JSON)
-    - {job_id}-mmap-events          # Memory mapping events (JSON)
-    - {job_id}-mprotect-events      # Memory protection events (JSON)
+    - {job_uuid}-logs                 # stdout/stderr logs
+    - {job_uuid}-metrics              # Resource metrics (JSON)
+    - {job_uuid}-exec-events          # Process execution events (JSON)
+    - {job_uuid}-connect-events       # Network connection events (JSON)
+    - {job_uuid}-file-events          # File access events (JSON)
+    - {job_uuid}-accept-events        # Socket accept events (JSON)
+    - {job_uuid}-socket-data-events   # Socket data events (JSON)
+    - {job_uuid}-mmap-events          # Memory mapping events (JSON)
+    - {job_uuid}-mprotect-events      # Memory protection events (JSON)
 ```
+
+### S3 Backend
+
+The S3 backend uses **time-partitioned keys** to avoid expensive read-modify-write operations. Each flush creates a new object with a nanosecond timestamp, enabling efficient append-only writes.
+
+**Storage Layout:**
+
+```
+s3://{bucket}/{key_prefix}{node_id}/{job_uuid}/
+  stdout/
+    1704345600000000000.jsonl.gz    # First flush
+    1704345630000000000.jsonl.gz    # Second flush (30s later)
+    1704345660000000000.jsonl.gz    # Third flush
+  stderr/
+    1704345615000000000.jsonl.gz
+  metrics/
+    1704345600000000000.jsonl.gz
+  exec-events/
+    1704345600000000000.jsonl.gz
+  connect-events/
+    1704345600000000000.jsonl.gz
+  file-events/
+    1704345600000000000.jsonl.gz
+  accept-events/
+    1704345600000000000.jsonl.gz
+  socket-data-events/
+    1704345600000000000.jsonl.gz
+  mmap-events/
+    1704345600000000000.jsonl.gz
+  mprotect-events/
+    1704345600000000000.jsonl.gz
+```
+
+**Configuration:**
+
+```yaml
+storage:
+  type: s3
+  s3:
+    region: us-east-1              # Required: AWS region
+    bucket: my-joblet-data         # Required: S3 bucket name
+    key_prefix: jobs/              # Optional: Object key prefix (default: "jobs/")
+
+    # Buffering settings
+    flush_interval: 30             # Seconds between flushes (default: 30)
+    flush_threshold: 5242880       # Bytes before flush (default: 5MB)
+    max_buffer_size: 52428800      # Max buffer before blocking (default: 50MB)
+
+    # S3-specific options
+    storage_class: STANDARD        # S3 storage class (default: STANDARD)
+    sse: AES256                    # Server-side encryption: "", "AES256", or "aws:kms"
+    kms_key_id: ""                 # KMS key ID if sse="aws:kms"
+```
+
+**Authentication:** Uses AWS default credential chain (IAM roles, instance profiles, environment variables).
+
+**Cost Comparison:**
+
+| Backend    | Ingestion Cost | Storage Cost | Query Cost       |
+|------------|----------------|--------------|------------------|
+| CloudWatch | ~$0.50/GB      | ~$0.03/GB/mo | CloudWatch Logs  |
+| S3         | Free           | ~$0.023/GB/mo| Application-side |
+
+**When to use S3:**
+- Long-term archival (cheaper than CloudWatch)
+- High-volume telemetry data
+- Custom query requirements (Athena, Spark)
+- Cross-region data access
 
 ## Monitoring
 
@@ -179,14 +254,16 @@ persist/
 │   └── persist/           # Main entry point
 ├── internal/
 │   ├── config/            # Configuration
-│   ├── ipc/              # IPC server
-│   ├── storage/          # Storage backends
-│   │   ├── backend.go    # Interface
-│   │   ├── local.go      # Local filesystem
-│   │   └── index.go      # Job index
-│   └── server/           # gRPC server
+│   ├── ipc/               # IPC server
+│   ├── storage/           # Storage backends
+│   │   ├── backend.go     # Interface & factory
+│   │   ├── local.go       # Local filesystem backend
+│   │   ├── cloudwatch.go  # AWS CloudWatch backend
+│   │   ├── s3.go          # AWS S3 backend
+│   │   └── index.go       # Job index
+│   └── server/            # gRPC server
 └── pkg/
-    └── logger/           # Logging
+    └── logger/            # Logging
 ```
 
 ### Adding a New Storage Backend

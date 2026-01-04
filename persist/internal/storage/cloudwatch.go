@@ -1019,21 +1019,12 @@ func (b *CloudWatchBackend) WriteMprotectEvents(jobID string, events []*ipcpb.Mp
 }
 
 // ReadLogs reads log lines from CloudWatch Logs
-func (b *CloudWatchBackend) ReadLogs(ctx context.Context, query *LogQuery) (*LogReader, error) {
-	reader := &LogReader{
-		Channel: make(chan *ipcpb.LogLine, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadLogs(ctx context.Context, query *LogQuery) (*EventReader[*ipcpb.LogLine], error) {
+	reader := NewEventReader[*ipcpb.LogLine](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readLogsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readLogsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1100,21 +1091,12 @@ func (b *CloudWatchBackend) readLogsFromStream(ctx context.Context, query *LogQu
 }
 
 // ReadMetrics reads metrics from CloudWatch Logs (stored as JSON)
-func (b *CloudWatchBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*MetricReader, error) {
-	reader := &MetricReader{
-		Channel: make(chan *ipcpb.Metric, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadMetrics(ctx context.Context, query *MetricQuery) (*EventReader[*ipcpb.Metric], error) {
+	reader := NewEventReader[*ipcpb.Metric](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readMetricsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readMetricsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1304,21 +1286,12 @@ func (b *CloudWatchBackend) Close() error {
 }
 
 // ReadExecEvents reads process execution events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*ExecEventReader, error) {
-	reader := &ExecEventReader{
-		Channel: make(chan *ipcpb.ExecEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadExecEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.ExecEvent], error) {
+	reader := NewEventReader[*ipcpb.ExecEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readExecEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readExecEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1391,21 +1364,12 @@ func (b *CloudWatchBackend) readExecEventsFromStream(ctx context.Context, query 
 }
 
 // ReadConnectEvents reads network connection events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*ConnectEventReader, error) {
-	reader := &ConnectEventReader{
-		Channel: make(chan *ipcpb.ConnectEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadConnectEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.ConnectEvent], error) {
+	reader := NewEventReader[*ipcpb.ConnectEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readConnectEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readConnectEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1478,21 +1442,12 @@ func (b *CloudWatchBackend) readConnectEventsFromStream(ctx context.Context, que
 }
 
 // ReadFileEvents reads file access events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*FileEventReader, error) {
-	reader := &FileEventReader{
-		Channel: make(chan *ipcpb.FileEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadFileEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.FileEvent], error) {
+	reader := NewEventReader[*ipcpb.FileEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readFileEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readFileEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1564,21 +1519,12 @@ func (b *CloudWatchBackend) readFileEventsFromStream(ctx context.Context, query 
 }
 
 // ReadAcceptEvents reads incoming connection accept events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*AcceptEventReader, error) {
-	reader := &AcceptEventReader{
-		Channel: make(chan *ipcpb.AcceptEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadAcceptEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.AcceptEvent], error) {
+	reader := NewEventReader[*ipcpb.AcceptEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readAcceptEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readAcceptEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1650,21 +1596,12 @@ func (b *CloudWatchBackend) readAcceptEventsFromStream(ctx context.Context, quer
 }
 
 // ReadSocketDataEvents reads sendto/recvfrom events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*SocketDataEventReader, error) {
-	reader := &SocketDataEventReader{
-		Channel: make(chan *ipcpb.SocketDataEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadSocketDataEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.SocketDataEvent], error) {
+	reader := NewEventReader[*ipcpb.SocketDataEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readSocketDataEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readSocketDataEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1736,21 +1673,12 @@ func (b *CloudWatchBackend) readSocketDataEventsFromStream(ctx context.Context, 
 }
 
 // ReadMmapEvents reads memory mapping events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*MmapEventReader, error) {
-	reader := &MmapEventReader{
-		Channel: make(chan *ipcpb.MmapEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadMmapEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.MmapEvent], error) {
+	reader := NewEventReader[*ipcpb.MmapEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readMmapEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readMmapEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil
@@ -1822,21 +1750,12 @@ func (b *CloudWatchBackend) readMmapEventsFromStream(ctx context.Context, query 
 }
 
 // ReadMprotectEvents reads memory protection change events from CloudWatch Logs
-func (b *CloudWatchBackend) ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*MprotectEventReader, error) {
-	reader := &MprotectEventReader{
-		Channel: make(chan *ipcpb.MprotectEvent, 100),
-		Error:   make(chan error, 1),
-		Done:    make(chan struct{}),
-	}
+func (b *CloudWatchBackend) ReadMprotectEvents(ctx context.Context, query *TelemetryQuery) (*EventReader[*ipcpb.MprotectEvent], error) {
+	reader := NewEventReader[*ipcpb.MprotectEvent](100)
 
 	go func() {
-		defer close(reader.Channel)
-		defer close(reader.Error)
-		defer close(reader.Done)
-
-		if err := b.readMprotectEventsFromStream(ctx, query, reader.Channel); err != nil {
-			reader.Error <- err
-		}
+		defer reader.Close()
+		reader.SendError(b.readMprotectEventsFromStream(ctx, query, reader.Channel))
 	}()
 
 	return reader, nil

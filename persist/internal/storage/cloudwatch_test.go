@@ -67,7 +67,6 @@ func TestCloudWatchBackend_NodeIDIntegration(t *testing.T) {
 				CloudWatch: config.CloudWatchConfig{
 					Region:          "us-east-1", // Use fixed region to avoid metadata calls
 					LogGroupPrefix:  tt.logGroupPrefix,
-					LogStreamPrefix: "job-",
 					MetricNamespace: "Joblet/Test",
 					LogBatchSize:    100,
 					MetricBatchSize: 20,
@@ -199,9 +198,8 @@ func TestCloudWatchBackend_DeleteJob_LogGroupFormat(t *testing.T) {
 	cfg := &config.StorageConfig{
 		Type: "cloudwatch",
 		CloudWatch: config.CloudWatchConfig{
-			Region:          "us-east-1",
-			LogGroupPrefix:  "/test",
-			LogStreamPrefix: "job-",
+			Region:         "us-east-1",
+			LogGroupPrefix: "/test",
 		},
 	}
 
@@ -243,9 +241,8 @@ func TestCloudWatchBackend_WriteLogs_StreamSeparation(t *testing.T) {
 	cfg := &config.StorageConfig{
 		Type: "cloudwatch",
 		CloudWatch: config.CloudWatchConfig{
-			Region:          "us-west-2",
-			LogGroupPrefix:  "/streams",
-			LogStreamPrefix: "stream-",
+			Region:         "us-west-2",
+			LogGroupPrefix: "/streams",
 		},
 	}
 
@@ -373,9 +370,8 @@ func TestCloudWatchBackend_WriteMetrics_Format(t *testing.T) {
 	cfg := &config.StorageConfig{
 		Type: "cloudwatch",
 		CloudWatch: config.CloudWatchConfig{
-			Region:          "eu-central-1",
-			LogGroupPrefix:  "/metrics-test",
-			LogStreamPrefix: "stream-",
+			Region:         "eu-central-1",
+			LogGroupPrefix: "/metrics-test",
 		},
 	}
 
@@ -483,9 +479,8 @@ func TestCloudWatchBackend_ReadLogs_QueryFormatting(t *testing.T) {
 	cfg := &config.StorageConfig{
 		Type: "cloudwatch",
 		CloudWatch: config.CloudWatchConfig{
-			Region:          "us-east-1",
-			LogGroupPrefix:  "/query-test",
-			LogStreamPrefix: "q-",
+			Region:         "us-east-1",
+			LogGroupPrefix: "/query-test",
 		},
 	}
 

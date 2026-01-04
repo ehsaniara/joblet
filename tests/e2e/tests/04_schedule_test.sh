@@ -258,9 +258,12 @@ test_scheduled_time_display() {
 
     # Get current time for comparison
     local current_time=$(date +"%Y-%m-%d %H:%M")
+    local current_date=$(date +"%Y-%m-%d")
 
-    # Schedule a job far in the future (end of year)
-    local future_time="2025-12-31T23:59:59Z"
+    # Schedule a job 1 year in the future (dynamic, always in future)
+    local future_year=$(($(date +%Y) + 1))
+    local future_date="${future_year}-12-31"
+    local future_time="${future_date}T23:59:59Z"
     local job_output=$("$RNX_BINARY" job run --schedule="$future_time" echo "FAR_FUTURE_JOB" 2>&1)
 
     if ! echo "$job_output" | grep -q "ID:"; then
@@ -293,15 +296,15 @@ test_scheduled_time_display() {
 
     echo -e "    Current time:   $current_time"
     echo -e "    Displayed time: $displayed_time"
-    echo -e "    Expected time:  2025-12-31 (or similar future date)"
+    echo -e "    Expected time:  $future_date (scheduled future date)"
 
-    # Check if the displayed time shows the scheduled time (December 2025)
+    # Check if the displayed time shows the scheduled time (future year)
     # not the creation time (current time)
-    if echo "$displayed_time" | grep -q "2025-12-31"; then
+    if echo "$displayed_time" | grep -q "$future_date"; then
         echo -e "    ${GREEN}✓ List correctly shows scheduled time (future)${NC}"
         "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
         return 0
-    elif echo "$displayed_time" | grep -q "$(date +%Y-%m-%d)"; then
+    elif echo "$displayed_time" | grep -q "$current_date"; then
         echo -e "    ${RED}✗ List incorrectly shows creation time (today) instead of scheduled time${NC}"
         echo -e "    ${RED}This is a bug: SCHEDULED jobs should show their scheduled execution time${NC}"
         "$RNX_BINARY" job delete "$job_id" 2>/dev/null || true
