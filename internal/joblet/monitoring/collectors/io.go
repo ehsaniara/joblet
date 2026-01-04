@@ -29,6 +29,18 @@ type ioSystemStats struct {
 	ioTime          uint64
 	weightedIOTime  uint64
 	devicesInIO     uint64
+	perDevice       []deviceStats
+}
+
+type deviceStats struct {
+	device          string
+	readsCompleted  uint64
+	writesCompleted uint64
+	readBytes       uint64
+	writeBytes      uint64
+	readTime        uint64
+	writeTime       uint64
+	ioTime          uint64
 }
 
 // NewIOCollector creates a new I/O metrics collector
@@ -80,6 +92,31 @@ func (c *IOCollector) Collect() (*domain.IOMetrics, error) {
 					metrics.Utilization = 100.0
 				}
 			}
+
+			// Calculate read/write rates (bytes/sec)
+			readBytesDelta := currentStats.readBytes - c.lastStats.readBytes
+			writeBytesDelta := currentStats.writeBytes - c.lastStats.writeBytes
+			metrics.ReadRate = float64(readBytesDelta) / timeDelta
+			metrics.WriteRate = float64(writeBytesDelta) / timeDelta
+
+			// Calculate per-device metrics with utilization
+			metrics.PerDevice = c.calculatePerDeviceMetrics(currentStats, timeDeltaMs)
+		}
+	} else {
+		// First collection - populate per-device stats without utilization
+		metrics.PerDevice = make([]domain.DeviceIOMetrics, len(currentStats.perDevice))
+		for i, dev := range currentStats.perDevice {
+			metrics.PerDevice[i] = domain.DeviceIOMetrics{
+				Device:          dev.device,
+				ReadsCompleted:  dev.readsCompleted,
+				WritesCompleted: dev.writesCompleted,
+				ReadBytes:       dev.readBytes,
+				WriteBytes:      dev.writeBytes,
+				ReadTime:        dev.readTime,
+				WriteTime:       dev.writeTime,
+				IOTime:          dev.ioTime,
+				Utilization:     0, // Can't calculate without previous sample
+			}
 		}
 	}
 
@@ -90,6 +127,46 @@ func (c *IOCollector) Collect() (*domain.IOMetrics, error) {
 	return metrics, nil
 }
 
+// calculatePerDeviceMetrics computes per-device I/O metrics with utilization
+func (c *IOCollector) calculatePerDeviceMetrics(currentStats *ioSystemStats, timeDeltaMs float64) []domain.DeviceIOMetrics {
+	result := make([]domain.DeviceIOMetrics, 0, len(currentStats.perDevice))
+
+	// Build a map of previous device stats for quick lookup
+	prevDeviceMap := make(map[string]*deviceStats)
+	if c.lastStats != nil {
+		for i := range c.lastStats.perDevice {
+			dev := &c.lastStats.perDevice[i]
+			prevDeviceMap[dev.device] = dev
+		}
+	}
+
+	for _, dev := range currentStats.perDevice {
+		dm := domain.DeviceIOMetrics{
+			Device:          dev.device,
+			ReadsCompleted:  dev.readsCompleted,
+			WritesCompleted: dev.writesCompleted,
+			ReadBytes:       dev.readBytes,
+			WriteBytes:      dev.writeBytes,
+			ReadTime:        dev.readTime,
+			WriteTime:       dev.writeTime,
+			IOTime:          dev.ioTime,
+		}
+
+		// Calculate utilization if we have previous stats for this device
+		if prevDev, ok := prevDeviceMap[dev.device]; ok && timeDeltaMs > 0 {
+			ioDelta := float64(dev.ioTime - prevDev.ioTime)
+			dm.Utilization = (ioDelta / timeDeltaMs) * 100.0
+			if dm.Utilization > 100.0 {
+				dm.Utilization = 100.0
+			}
+		}
+
+		result = append(result, dm)
+	}
+
+	return result
+}
+
 // readSystemIOStats aggregates I/O statistics across all block devices
 func (c *IOCollector) readSystemIOStats() (*ioSystemStats, error) {
 	file, err := os.Open("/proc/diskstats")
@@ -98,7 +175,9 @@ func (c *IOCollector) readSystemIOStats() (*ioSystemStats, error) {
 	}
 	defer file.Close()
 
-	stats := &ioSystemStats{}
+	stats := &ioSystemStats{
+		perDevice: make([]deviceStats, 0),
+	}
 	scanner := bufio.NewScanner(file)
 	devicesWithIO := make(map[string]bool)
 
@@ -139,6 +218,18 @@ func (c *IOCollector) readSystemIOStats() (*ioSystemStats, error) {
 		stats.writeTime += writeTime
 		stats.ioTime += ioTime
 		stats.weightedIOTime += weightedIOTime
+
+		// Track per-device stats
+		stats.perDevice = append(stats.perDevice, deviceStats{
+			device:          deviceName,
+			readsCompleted:  readCompleted,
+			writesCompleted: writeCompleted,
+			readBytes:       readBytes,
+			writeBytes:      writeBytes,
+			readTime:        readTime,
+			writeTime:       writeTime,
+			ioTime:          ioTime,
+		})
 
 		// Track devices that have any I/O activity
 		if readCompleted > 0 || writeCompleted > 0 {

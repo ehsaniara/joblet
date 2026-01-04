@@ -35,11 +35,14 @@ cgroup:
 
 # GPU support configuration
 gpu:
-  cuda_paths: # CUDA installation paths to search
+  enabled: false                    # Enable GPU support (default: false, opt-in only)
+  allocation_strategy: "first-fit"  # GPU allocation strategy: first-fit, pack, spread, best-fit
+  cuda_paths:                       # CUDA installation paths to search
     - "/usr/local/cuda"
     - "/opt/cuda"
 
 network:
+  enabled: true                     # Enable network isolation (default: true)
   state_dir: "/opt/joblet/network"
   default_network: "bridge"
   allow_custom_networks: true
@@ -160,6 +163,10 @@ persist:
 
       metrics:
         directory: "/opt/joblet/metrics"   # Inherited from parent's metrics dir
+        format: "jsonl.gz"                  # Gzip compressed JSON lines
+
+      events:
+        directory: "/opt/joblet/events"    # eBPF telematics events storage
         format: "jsonl.gz"                  # Gzip compressed JSON lines
 
     # AWS CLOUDWATCH storage configuration (cloud-native)

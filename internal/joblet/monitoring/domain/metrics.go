@@ -93,6 +93,24 @@ type NetworkMetrics struct {
 
 // IOMetrics contains block device I/O statistics
 type IOMetrics struct {
+	ReadsCompleted  uint64            `json:"reads_completed"`
+	WritesCompleted uint64            `json:"writes_completed"`
+	ReadBytes       uint64            `json:"read_bytes"`
+	WriteBytes      uint64            `json:"write_bytes"`
+	ReadTime        uint64            `json:"read_time_ms"`
+	WriteTime       uint64            `json:"write_time_ms"`
+	IOTime          uint64            `json:"io_time_ms"`
+	WeightedIOTime  uint64            `json:"weighted_io_time_ms"`
+	QueueDepth      float64           `json:"queue_depth"`
+	Utilization     float64           `json:"utilization_percent"`
+	ReadRate        float64           `json:"read_rate_bps"`  // bytes/sec
+	WriteRate       float64           `json:"write_rate_bps"` // bytes/sec
+	PerDevice       []DeviceIOMetrics `json:"per_device,omitempty"`
+}
+
+// DeviceIOMetrics contains I/O statistics for a single block device
+type DeviceIOMetrics struct {
+	Device          string  `json:"device"`
 	ReadsCompleted  uint64  `json:"reads_completed"`
 	WritesCompleted uint64  `json:"writes_completed"`
 	ReadBytes       uint64  `json:"read_bytes"`
@@ -100,8 +118,6 @@ type IOMetrics struct {
 	ReadTime        uint64  `json:"read_time_ms"`
 	WriteTime       uint64  `json:"write_time_ms"`
 	IOTime          uint64  `json:"io_time_ms"`
-	WeightedIOTime  uint64  `json:"weighted_io_time_ms"`
-	QueueDepth      float64 `json:"queue_depth"`
 	Utilization     float64 `json:"utilization_percent"`
 }
 

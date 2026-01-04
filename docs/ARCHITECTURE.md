@@ -22,7 +22,7 @@ joblet/
 ├── state/               # State persistence service (sub-module)
 │   ├── cmd/state/       # State service binary
 │   ├── internal/
-│   │   ├── storage/     # Backend interface (Memory, DynamoDB, Redis)
+│   │   ├── storage/     # Backend interface (Memory, DynamoDB)
 │   │   └── ipc/         # IPC server
 │   └── go.mod           # Separate Go module (AWS SDK dependencies)
 ├── api/
@@ -69,14 +69,13 @@ joblet/
 - **Purpose**: Job metadata persistence across restarts
 - **Responsibilities**:
     - Persist job state (status, exit code, timestamps) via async IPC
-    - Store to pluggable backends (Memory, DynamoDB, Redis)
+    - Store to pluggable backends (Memory, DynamoDB)
     - Sync jobs on joblet startup
     - Auto-reconnection and graceful degradation
     - TTL-based cleanup (DynamoDB)
 - **Backend Support**:
     - **Memory**: RAM-only (testing, lost on restart)
     - **DynamoDB**: AWS cloud persistence (production, survives restarts)
-    - **Redis**: Planned for future releases
 
 ### 4. RNX (CLI Client)
 
@@ -413,7 +412,7 @@ make deploy
 - **AWS Isolation**: Keeps AWS SDK dependencies (DynamoDB) out of main joblet binary
 - **Fault isolation**: State service crashes don't kill joblet
 - **Independent scaling**: Can upgrade state service independently
-- **Multiple backends**: Easy to add Redis, PostgreSQL, or other backends
+- **Multiple backends**: Easy to add S3, PostgreSQL, or other backends
 - **Performance**: Async fire-and-forget operations for maximum throughput
 - **Separation of concerns**: Job state distinct from logs/metrics (persist)
 
@@ -449,18 +448,3 @@ make deploy
 - **Persist**: ~100MB RAM / +storage for history
 - **RNX**: <10MB RAM
 
-## Future Enhancements
-
-### Planned (v2.0)
-
-- [ ] Cloud storage backends (S3, CloudWatch)
-- [ ] Distributed job scheduling (multi-node)
-- [ ] Job priority and preemption
-- [ ] Web UI dashboard
-
-### Considered
-
-- [ ] Kubernetes integration
-- [ ] Job checkpointing
-- [ ] Spot instance support
-- [ ] Cost optimization

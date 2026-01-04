@@ -26,10 +26,6 @@ runtime:
     - "/usr/local/node"
     - "/usr/local/go"
 
-  # Package manager for this distribution (used by OverlayFS isolation)
-  # Note: apk support is not yet implemented in the builder
-  package_manager: "apk"
-
   # Paths mounted read-only into job sandbox
   # These provide essential binaries and libraries for job execution
   allowed_mounts:

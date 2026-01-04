@@ -49,7 +49,7 @@ func TestNewRuntimeCmd(t *testing.T) {
 		foundSubcommands[subcmd.Use] = true
 	}
 
-	coreCommands := []string{"list", "info <runtime>", "test <runtime>", "install <runtime-spec>"}
+	coreCommands := []string{"list", "info <runtime>", "test <runtime>"}
 	for _, expected := range coreCommands {
 		if !foundSubcommands[expected] {
 			t.Errorf("Expected core subcommand '%s' not found", expected)
@@ -128,31 +128,6 @@ func TestNewRuntimeTestCmd(t *testing.T) {
 	}
 }
 
-func TestNewRuntimeInstallCmd(t *testing.T) {
-	cmd := NewRuntimeInstallCmd()
-
-	if cmd == nil {
-		t.Fatal("NewRuntimeInstallCmd() returned nil")
-	}
-
-	if cmd.Use != "install <runtime-spec>" {
-		t.Errorf("Expected Use 'install <runtime-spec>', got %s", cmd.Use)
-	}
-
-	if cmd.Short == "" {
-		t.Error("Short description is empty")
-	}
-
-	if cmd.RunE == nil {
-		t.Error("RunE function is nil")
-	}
-
-	// The install command is now deprecated and has no flags
-	if cmd.Deprecated == "" {
-		t.Error("Expected install command to be deprecated")
-	}
-}
-
 func TestRuntimeCommandHelp(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -178,11 +153,6 @@ func TestRuntimeCommandHelp(t *testing.T) {
 			name:        "runtime test help",
 			cmdFunc:     NewRuntimeTestCmd,
 			expectedUse: "test <runtime>",
-		},
-		{
-			name:        "runtime install help",
-			cmdFunc:     NewRuntimeInstallCmd,
-			expectedUse: "install <runtime-spec>",
 		},
 	}
 
@@ -384,7 +354,6 @@ func BenchmarkRuntimeSubcommandCreation(b *testing.B) {
 		NewRuntimeListCmd,
 		NewRuntimeInfoCmd,
 		NewRuntimeTestCmd,
-		NewRuntimeInstallCmd,
 	}
 
 	b.ResetTimer()

@@ -336,15 +336,8 @@ get_configuration() {
 
     # === Priority 1: Environment Variables ===
     # Check for environment variables first (highest priority)
-    if [ -n "$JOBLET_SERVER_ADDRESS" ] || [ -n "$JOBLET_CERT_INTERNAL_IP" ] || [ -n "$JOBLET_SERVER_IP" ]; then
+    if [ -n "$JOBLET_SERVER_ADDRESS" ] || [ -n "$JOBLET_CERT_INTERNAL_IP" ]; then
         print_info "Configuration source: Environment variables"
-
-        # Legacy support: JOBLET_SERVER_IP sets the certificate primary IP
-        if [ -n "$JOBLET_SERVER_IP" ]; then
-            JOBLET_CERT_PRIMARY="${JOBLET_CERT_PRIMARY:-$JOBLET_SERVER_IP}"
-            JOBLET_CERT_INTERNAL_IP="${JOBLET_CERT_INTERNAL_IP:-$JOBLET_SERVER_IP}"
-            print_info "Using JOBLET_SERVER_IP (legacy): $JOBLET_SERVER_IP"
-        fi
 
         # Standard environment variables
         JOBLET_SERVER_ADDRESS="${JOBLET_SERVER_ADDRESS:-0.0.0.0}"

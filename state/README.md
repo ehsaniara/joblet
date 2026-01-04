@@ -17,7 +17,7 @@ By default, Joblet stores job states in memory. When the service or host restart
 
 - **Memory** (default, no persistence)
 - **DynamoDB** (AWS cloud persistence)
-- **Redis** (future: distributed caching)
+- **S3** (planned for v2.0)
 
 ## 🏗️ Architecture
 
@@ -38,8 +38,8 @@ By default, Joblet stores job states in memory. When the service or host restart
 │  ┌──────────────────────▼───────────────────────────────┐   │
 │  │  Storage Backend Interface                           │   │
 │  │  ┌──────────┐  ┌───────────┐  ┌───────────┐          │   │
-│  │  │  Memory  │  │ DynamoDB  │  │   Redis   │          │   │
-│  │  │(fallback)│  │(AWS prod) │  │ (future)  │          │   │
+│  │  │  Memory  │  │ DynamoDB  │  │    S3     │          │   │
+│  │  │(fallback)│  │(AWS prod) │  │ (planned) │          │   │
 │  │  └──────────┘  └───────────┘  └───────────┘          │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -153,15 +153,6 @@ nodeId: String        # Node identifier
 expiresAt: Number     # Unix timestamp for TTL (auto-cleanup)
 ```
 
-### Global Secondary Index (Future)
-
-```
-status-createdAt-index
-  - Partition: status
-  - Sort: createdAt
-  - Purpose: Efficient queries like "list all RUNNING jobs"
-```
-
 ## ⚙️ Configuration Reference
 
 ### Performance
@@ -195,19 +186,6 @@ state:
       region: "us-east-1"  # or "" for auto-detect
       table_name: "joblet-jobs"
       ttl_enabled: true
-      ttl_days: 30
-```
-
-#### Redis (Future)
-
-```yaml
-state:
-  backend: "redis"
-  storage:
-    redis:
-      endpoint: "localhost:6379"
-      password: ""
-      db: 0
       ttl_days: 30
 ```
 
@@ -376,15 +354,6 @@ go test ./internal/ipc/...
 ### EC2 Instance Profile
 
 Attach the IAM role with the above policy to your EC2 instance.
-
-## 🎯 Future Enhancements
-
-- [ ] Redis backend for distributed caching
-- [ ] PostgreSQL backend for self-hosted
-- [ ] Global Secondary Indexes for efficient queries
-- [ ] Compression for large job metadata
-- [ ] Encryption at rest
-- [ ] Cross-region replication (DynamoDB Global Tables)
 
 ## 📄 License
 

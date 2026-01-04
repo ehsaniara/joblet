@@ -222,6 +222,12 @@ func (s *MonitoringServiceServer) memoryMetricsToProto(m domain.MemoryMetrics) *
 func (s *MonitoringServiceServer) diskMetricsToProto(disks []domain.DiskMetrics) []*pb.DiskMetrics {
 	result := make([]*pb.DiskMetrics, len(disks))
 	for i, d := range disks {
+		// Calculate inodes usage percentage
+		var inodesUsagePercent float64
+		if d.InodesTotal > 0 {
+			inodesUsagePercent = float64(d.InodesUsed) / float64(d.InodesTotal) * 100.0
+		}
+
 		result[i] = &pb.DiskMetrics{
 			Device:             d.Device,
 			MountPoint:         d.MountPoint,
@@ -233,7 +239,7 @@ func (s *MonitoringServiceServer) diskMetricsToProto(disks []domain.DiskMetrics)
 			InodesTotal:        int64(d.InodesTotal),
 			InodesUsed:         int64(d.InodesUsed),
 			InodesFree:         int64(d.InodesFree),
-			InodesUsagePercent: 0, // TODO: implement
+			InodesUsagePercent: inodesUsagePercent,
 		}
 	}
 	return result
@@ -262,14 +268,33 @@ func (s *MonitoringServiceServer) networkMetricsToProto(networks []domain.Networ
 }
 
 func (s *MonitoringServiceServer) ioMetricsToProto(io domain.IOMetrics) *pb.IOMetrics {
+	// Convert per-device metrics to protobuf
+	var diskIO []*pb.DiskIOMetrics
+	if len(io.PerDevice) > 0 {
+		diskIO = make([]*pb.DiskIOMetrics, len(io.PerDevice))
+		for i, dev := range io.PerDevice {
+			diskIO[i] = &pb.DiskIOMetrics{
+				Device:          dev.Device,
+				ReadsCompleted:  int64(dev.ReadsCompleted),
+				WritesCompleted: int64(dev.WritesCompleted),
+				ReadBytes:       int64(dev.ReadBytes),
+				WriteBytes:      int64(dev.WriteBytes),
+				ReadTime:        int64(dev.ReadTime),
+				WriteTime:       int64(dev.WriteTime),
+				IoTime:          int64(dev.IOTime),
+				Utilization:     dev.Utilization,
+			}
+		}
+	}
+
 	return &pb.IOMetrics{
 		TotalReads:  int64(io.ReadsCompleted),
 		TotalWrites: int64(io.WritesCompleted),
 		ReadBytes:   int64(io.ReadBytes),
 		WriteBytes:  int64(io.WriteBytes),
-		ReadRate:    0,   // TODO: implement
-		WriteRate:   0,   // TODO: implement
-		DiskIo:      nil, // TODO: implement per-device breakdown
+		ReadRate:    io.ReadRate,
+		WriteRate:   io.WriteRate,
+		DiskIo:      diskIO,
 	}
 }
 

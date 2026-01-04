@@ -347,6 +347,17 @@ func outputJobStatusJSON(response *pb.GetJobStatusResponse) error {
 		output["cpuCores"] = response.CpuCores
 	}
 
+	// Include GPU fields if set
+	if response.GpuCount > 0 {
+		output["gpuCount"] = response.GpuCount
+	}
+	if response.GpuMemoryMb > 0 {
+		output["gpuMemoryMb"] = response.GpuMemoryMb
+	}
+	if len(response.GpuIndices) > 0 {
+		output["gpuIndices"] = response.GpuIndices
+	}
+
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)

@@ -27,9 +27,6 @@ runtime:
     - "/usr/local/node"
     - "/usr/local/go"
 
-  # Package manager for this distribution (used by OverlayFS isolation)
-  package_manager: "dnf"
-
   # Paths mounted read-only into job sandbox
   # These provide essential binaries and libraries for job execution
   allowed_mounts:
