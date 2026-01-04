@@ -117,19 +117,6 @@ with JobletClient(host="your-joblet-server") as client:
 
 ## 🚀 Usage Examples
 
-### YAML Workflows (Recommended for Complex Jobs)
-
-```bash
-# Execute pre-configured workflows
-rnx workflow run jobs.yaml:ml-analysis      # Python ML analysis
-rnx workflow run jobs.yaml:hello-joblet     # Java application
-rnx workflow run ml-pipeline.yaml           # ML pipeline with GPU support
-
-# Monitor execution status
-rnx job status <job-uuid>
-rnx workflow status <workflow-uuid>
-```
-
 ### Command Line Interface
 
 ```bash
@@ -222,7 +209,7 @@ npm run dev
 - **[Job Execution Guide](docs/JOB_EXECUTION.md)** - Detailed job management and execution patterns
 - **[RNX CLI Reference](docs/RNX_CLI_REFERENCE.md)** - Complete command reference with examples
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
-- **[Working Examples](examples/)** - Production-ready workflow templates and runtime configurations
+- **[Working Examples](examples/)** - Production-ready runtime configurations and job examples
 
 ## Related Projects
 

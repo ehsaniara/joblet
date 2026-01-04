@@ -332,6 +332,6 @@ rnx job run --gpu=2 --max-memory=16384 --runtime=python-3.11-ml python train.py
 ## Additional Resources
 
 - See [RNX CLI Reference](./RNX_CLI_REFERENCE.md) for complete command options
-- Check out [Workflows Guide](./WORKFLOWS.md) for complex GPU pipelines
 - Review [Runtime System](./RUNTIME_SYSTEM.md) for pre-built ML environments
 - Explore [API Reference](./API.md) for programmatic GPU job submission
+- Check [Job Execution Guide](./JOB_EXECUTION.md) for complex GPU job patterns
