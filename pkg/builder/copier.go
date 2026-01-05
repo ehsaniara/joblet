@@ -545,7 +545,7 @@ func CopyPythonRuntimeFromPath(rootPath string, profile *LanguageProfile, isolat
 	}
 
 	if stdlibSrc == "" {
-		return fmt.Errorf("Python stdlib not found in isolated environment for Python %s", profile.Version)
+		return fmt.Errorf("python stdlib not found in isolated environment for Python %s", profile.Version)
 	}
 
 	// Create destination directory

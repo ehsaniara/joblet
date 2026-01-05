@@ -11,14 +11,27 @@
 # - Optionally enables CloudWatch Logs backend
 # - Starts the Joblet service
 #
-# Usage: Paste this script into EC2 User Data field when launching an instance
-#        Or reference it in Terraform/CloudFormation templates
+# Usage:
+#   Paste into EC2 User Data field when launching an instance
+#   Or reference in Terraform/CloudFormation templates
+#
+# Command-line options (preferred):
+#   --storage=TYPE        Storage backend: cloudwatch (default), s3, local
+#   --s3-bucket=NAME      S3 bucket name (required for --storage=s3)
+#   --s3-prefix=PREFIX    S3 key prefix (default: joblet)
+#   --s3-class=CLASS      S3 storage class (default: STANDARD)
+#   --version=VERSION     Joblet version (default: latest)
+#   --port=PORT           Server port (default: 443)
+#   --help                Show this help
+#
+# Environment variables (alternative, for backward compatibility):
+#   PERSIST_BACKEND, S3_BUCKET, S3_PREFIX, S3_STORAGE_CLASS, JOBLET_VERSION, etc.
 #
 
 set -e
 
 # ============================================================================
-# Configuration Variables (can be customized via environment variables)
+# Default Configuration Values
 # ============================================================================
 
 # JOBLET_HOME defines the installation directory (default: /opt/joblet)
@@ -31,12 +44,6 @@ JOBLET_VERSION="${JOBLET_VERSION:-latest}"
 # Storage backend configuration
 # PERSIST_BACKEND: "local", "cloudwatch", or "s3" (takes precedence over ENABLE_CLOUDWATCH)
 # ENABLE_CLOUDWATCH: Legacy variable - "true" maps to cloudwatch, "false" maps to local
-#
-# For S3 backend, also set:
-#   S3_BUCKET: Required - S3 bucket name for storing logs/metrics/events
-#   S3_PREFIX: Optional - Key prefix (default: "joblet")
-#   S3_STORAGE_CLASS: Optional - STANDARD, STANDARD_IA, ONEZONE_IA, GLACIER, DEEP_ARCHIVE
-#
 PERSIST_BACKEND="${PERSIST_BACKEND:-}"
 ENABLE_CLOUDWATCH="${ENABLE_CLOUDWATCH:-true}"
 S3_BUCKET="${S3_BUCKET:-}"
@@ -51,6 +58,102 @@ JOBLET_CERT_DOMAIN="${JOBLET_CERT_DOMAIN:-}"
 
 # Log file for installation
 LOG_FILE="/var/log/joblet-install.log"
+
+# ============================================================================
+# Command-line Argument Parsing
+# ============================================================================
+
+show_help() {
+    cat << 'EOF'
+Joblet EC2 Installation Script
+
+USAGE:
+    ./joblet-install.sh [OPTIONS]
+
+OPTIONS:
+    --storage=TYPE        Storage backend type
+                          cloudwatch  - AWS CloudWatch Logs (default, recommended)
+                          s3          - AWS S3 bucket storage
+                          local       - Local filesystem (no AWS)
+
+    --s3-bucket=NAME      S3 bucket name (required when --storage=s3)
+
+    --s3-prefix=PREFIX    S3 key prefix for objects (default: joblet)
+
+    --s3-class=CLASS      S3 storage class (default: STANDARD)
+                          Options: STANDARD, STANDARD_IA, ONEZONE_IA, GLACIER, DEEP_ARCHIVE
+
+    --version=VERSION     Joblet version to install (default: latest)
+
+    --port=PORT           Server port (default: 443)
+
+    --help                Show this help message
+
+EXAMPLES:
+    # CloudWatch (default)
+    ./joblet-install.sh
+
+    # Explicit CloudWatch
+    ./joblet-install.sh --storage=cloudwatch
+
+    # S3 storage
+    ./joblet-install.sh --storage=s3 --s3-bucket=my-joblet-logs
+
+    # S3 with custom prefix and storage class
+    ./joblet-install.sh --storage=s3 --s3-bucket=my-logs --s3-prefix=prod --s3-class=STANDARD_IA
+
+    # Local storage (no AWS)
+    ./joblet-install.sh --storage=local
+
+ENVIRONMENT VARIABLES (alternative to command-line):
+    PERSIST_BACKEND      Same as --storage
+    S3_BUCKET            Same as --s3-bucket
+    S3_PREFIX            Same as --s3-prefix
+    S3_STORAGE_CLASS     Same as --s3-class
+    JOBLET_VERSION       Same as --version
+    JOBLET_SERVER_PORT   Same as --port
+
+Note: Command-line options take precedence over environment variables.
+EOF
+    exit 0
+}
+
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --storage=*)
+                PERSIST_BACKEND="${1#*=}"
+                ;;
+            --s3-bucket=*)
+                S3_BUCKET="${1#*=}"
+                ;;
+            --s3-prefix=*)
+                S3_PREFIX="${1#*=}"
+                ;;
+            --s3-class=*)
+                S3_STORAGE_CLASS="${1#*=}"
+                ;;
+            --version=*)
+                JOBLET_VERSION="${1#*=}"
+                ;;
+            --port=*)
+                JOBLET_SERVER_PORT="${1#*=}"
+                ;;
+            --help|-h)
+                show_help
+                ;;
+            *)
+                echo "Unknown option: $1" >&2
+                echo "Use --help for usage information" >&2
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+
+# Parse command-line arguments (they override environment variables)
+parse_args "$@"
 
 # ============================================================================
 # Logging Functions
