@@ -76,7 +76,7 @@ type Job struct {
 	NodeId string // Unique identifier of the Joblet node that executed this job
 
 	// Value object accessors (for new code to use value objects)
-	jobID       *values.JobID       // Cached value object for UUID
+	jobUUID     *values.JobUUID     // Cached value object for UUID
 	cgroupPath  *values.CgroupPath  // Cached value object for CgroupPath
 	processID   *values.ProcessID   // Cached value object for PID
 	networkName *values.NetworkName // Cached value object for Network
@@ -186,24 +186,24 @@ func (j *Job) Validate() error {
 
 // Value object accessors (for new code to use value objects)
 
-// JobIDValue returns the job ID as a value object, creating it if needed
-func (j *Job) JobIDValue() values.JobID {
-	if j.jobID == nil {
+// JobUUIDValue returns the job UUID as a value object, creating it if needed
+func (j *Job) JobUUIDValue() values.JobUUID {
+	if j.jobUUID == nil {
 		// Create and cache the value object
-		if jobID, err := values.NewJobID(j.Uuid); err == nil {
-			j.jobID = &jobID
+		if jobUUID, err := values.NewJobUUID(j.Uuid); err == nil {
+			j.jobUUID = &jobUUID
 		} else {
-			// Return empty JobID if invalid
-			j.jobID = &values.JobID{}
+			// Return empty JobUUID if invalid
+			j.jobUUID = &values.JobUUID{}
 		}
 	}
-	return *j.jobID
+	return *j.jobUUID
 }
 
-// SetJobIDValue sets the job ID from a value object and updates the string field
-func (j *Job) SetJobIDValue(jobID values.JobID) {
-	j.Uuid = jobID.String()
-	j.jobID = &jobID
+// SetJobUUIDValue sets the job UUID from a value object and updates the string field
+func (j *Job) SetJobUUIDValue(jobUUID values.JobUUID) {
+	j.Uuid = jobUUID.String()
+	j.jobUUID = &jobUUID
 }
 
 // CgroupPathValue returns the cgroup path as a value object, creating it if needed

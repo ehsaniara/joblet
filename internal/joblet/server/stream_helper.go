@@ -14,7 +14,7 @@ import (
 // 2. For jobs not found locally: query persist for historical data
 // 3. For running jobs: send historical data first, then stream live updates
 type StreamConfig struct {
-	// JobID is the resolved job UUID
+	// JobUUID is the resolved job UUID
 	JobUUID string
 
 	// Logger for this stream operation

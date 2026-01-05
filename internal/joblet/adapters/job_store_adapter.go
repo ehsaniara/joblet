@@ -864,7 +864,7 @@ func (a *jobStoreAdapter) resolveUuidByPrefix(prefix string) (string, error) {
 }
 
 // publishEvent publishes a job event to the pub-sub system.
-// Uses a single "jobs" topic for all jobs. Subscribers filter by JobID.
+// Uses a single "jobs" topic for all jobs. Subscribers filter by JobUUID.
 // Logs success/failure for debugging and monitoring.
 func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 	ctx := context.Background()
@@ -885,18 +885,18 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 // subscribeToJobUpdates creates a real-time subscription for job events.
 // Handles LOG_CHUNK events by streaming data to client, and UPDATED events by checking
 // for job completion. Manages subscription lifecycle and cleanup automatically.
-func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID string, stream interfaces.DomainStreamer) error {
-	// Subscribe to single "jobs" topic (filter by JobID in loop)
+func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID string, stream interfaces.DomainStreamer) error {
+	// Subscribe to single "jobs" topic (filter by JobUUID in loop)
 	topic := "jobs"
-	a.logger.Debug("subscribing to job events for streaming", "job_uuid", jobID, "topic", topic)
+	a.logger.Debug("subscribing to job events for streaming", "job_uuid", jobUUID, "topic", topic)
 
 	updates, unsubscribe, err := a.pubsub.Subscribe(ctx, topic)
 	if err != nil {
-		a.logger.Error("failed to subscribe to job events", "job_uuid", jobID, "topic", topic, "error", err)
+		a.logger.Error("failed to subscribe to job events", "job_uuid", jobUUID, "topic", topic, "error", err)
 		return fmt.Errorf("failed to subscribe to job events: %w", err)
 	}
 
-	a.logger.Debug("successfully subscribed to job events", "job_uuid", jobID, "topic", topic)
+	a.logger.Debug("successfully subscribed to job events", "job_uuid", jobUUID, "topic", topic)
 
 	subCtx, cancel := context.WithCancel(ctx)
 	subID := fmt.Sprintf("stream_%d", time.Now().UnixNano())
@@ -912,7 +912,7 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 
 	// Register subscriber with proper locking to avoid race with task deletion
 	a.tasksMutex.RLock()
-	task, exists := a.tasks[jobID]
+	task, exists := a.tasks[jobUUID]
 	if !exists {
 		a.tasksMutex.RUnlock()
 		unsubscribe()
@@ -929,22 +929,22 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 
 	// Handle updates in a separate goroutine
 	go func() {
-		a.logger.Debug("started subscription handler goroutine", "job_uuid", jobID, "subId", subID)
+		a.logger.Debug("started subscription handler goroutine", "job_uuid", jobUUID, "subId", subID)
 		defer func() {
-			a.logger.Debug("cleaning up subscription", "job_uuid", jobID, "subId", subID)
+			a.logger.Debug("cleaning up subscription", "job_uuid", jobUUID, "subId", subID)
 			unsubscribe()
 			cancel()
 
 			// Clean up subscriber with proper locking to avoid race with task deletion
 			a.tasksMutex.RLock()
-			if task, exists := a.tasks[jobID]; exists {
+			if task, exists := a.tasks[jobUUID]; exists {
 				task.subMutex.Lock()
 				delete(task.subscribers, subID)
 				task.subMutex.Unlock()
 			}
 			a.tasksMutex.RUnlock()
 
-			a.logger.Debug("subscription cleaned up", "job_uuid", jobID, "subId", subID)
+			a.logger.Debug("subscription cleaned up", "job_uuid", jobUUID, "subId", subID)
 
 			// Signal that we're done
 			close(done)
@@ -956,7 +956,7 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 		for {
 			// If job completed, check if we've exceeded drain deadline
 			if jobCompleted && time.Now().After(drainDeadline) {
-				a.logger.Debug("drain deadline exceeded, ending stream", "job_uuid", jobID)
+				a.logger.Debug("drain deadline exceeded, ending stream", "job_uuid", jobUUID)
 				done <- nil
 				return
 			}
@@ -970,11 +970,11 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 
 			select {
 			case <-subCtx.Done():
-				a.logger.Debug("subscription context cancelled", "job_uuid", jobID, "subId", subID)
+				a.logger.Debug("subscription context cancelled", "job_uuid", jobUUID, "subId", subID)
 				done <- nil
 				return
 			case <-stream.Context().Done():
-				a.logger.Debug("stream context cancelled", "job_uuid", jobID, "subId", subID)
+				a.logger.Debug("stream context cancelled", "job_uuid", jobUUID, "subId", subID)
 				done <- nil
 				return
 			case <-selectTimeout:
@@ -982,7 +982,7 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 				continue
 			case msg, ok := <-updates:
 				if !ok {
-					a.logger.Debug("updates channel closed", "job_uuid", jobID, "subId", subID)
+					a.logger.Debug("updates channel closed", "job_uuid", jobUUID, "subId", subID)
 					done <- nil
 					return
 				}
@@ -990,33 +990,33 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 				event := msg.Payload
 
 				// Filter events for this specific job (all jobs use the same topic)
-				if event.JobUUID != jobID {
+				if event.JobUUID != jobUUID {
 					continue
 				}
 
-				a.logger.Debug("received event from pubsub", "job_uuid", jobID, "eventType", event.Type, "chunkSize", len(event.LogChunk))
+				a.logger.Debug("received event from pubsub", "job_uuid", jobUUID, "eventType", event.Type, "chunkSize", len(event.LogChunk))
 
 				// Handle different event types
 				switch event.Type {
 				case "LOG_CHUNK":
 					if len(event.LogChunk) > 0 {
-						a.logger.Debug("sending log chunk to client", "job_uuid", jobID, "chunkSize", len(event.LogChunk))
+						a.logger.Debug("sending log chunk to client", "job_uuid", jobUUID, "chunkSize", len(event.LogChunk))
 						if err := stream.SendData(event.LogChunk); err != nil {
-							a.logger.Warn("failed to send log chunk to client", "job_uuid", jobID, "error", err)
+							a.logger.Warn("failed to send log chunk to client", "job_uuid", jobUUID, "error", err)
 							done <- err
 							return
 						}
-						a.logger.Debug("successfully sent log chunk to client", "job_uuid", jobID, "chunkSize", len(event.LogChunk))
+						a.logger.Debug("successfully sent log chunk to client", "job_uuid", jobUUID, "chunkSize", len(event.LogChunk))
 					}
 				case "UPDATED":
-					a.logger.Debug("received job status update", "job_uuid", jobID, "status", event.Status)
+					a.logger.Debug("received job status update", "job_uuid", jobUUID, "status", event.Status)
 					// When job reaches final status, enter drain mode instead of immediately terminating
 					if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
 						if !jobCompleted {
 							jobCompleted = true
 							// Set drain deadline to allow final log chunks to arrive
 							drainDeadline = time.Now().Add(500 * time.Millisecond)
-							a.logger.Debug("job completed, entering drain mode", "job_uuid", jobID, "finalStatus", event.Status, "drainDeadline", drainDeadline)
+							a.logger.Debug("job completed, entering drain mode", "job_uuid", jobUUID, "finalStatus", event.Status, "drainDeadline", drainDeadline)
 						}
 					}
 				}
@@ -1025,9 +1025,9 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobID strin
 	}()
 
 	// Wait for the subscription to end
-	a.logger.Debug("waiting for subscription to complete", "job_uuid", jobID)
+	a.logger.Debug("waiting for subscription to complete", "job_uuid", jobUUID)
 	err = <-done
-	a.logger.Debug("subscription completed", "job_uuid", jobID, "error", err)
+	a.logger.Debug("subscription completed", "job_uuid", jobUUID, "error", err)
 
 	return err
 }

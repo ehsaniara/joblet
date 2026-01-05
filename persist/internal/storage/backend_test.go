@@ -117,7 +117,7 @@ func TestLogQuery_Fields(t *testing.T) {
 	}
 
 	if query.JobUUID != "test-job" {
-		t.Errorf("Expected JobID 'test-job', got '%s'", query.JobUUID)
+		t.Errorf("Expected JobUUID 'test-job', got '%s'", query.JobUUID)
 	}
 
 	if *query.StartTime != 1000 {
@@ -155,7 +155,7 @@ func TestMetricQuery_Fields(t *testing.T) {
 	}
 
 	if query.JobUUID != "test-job" {
-		t.Errorf("Expected JobID 'test-job', got '%s'", query.JobUUID)
+		t.Errorf("Expected JobUUID 'test-job', got '%s'", query.JobUUID)
 	}
 
 	if *query.StartTime != 1000 {

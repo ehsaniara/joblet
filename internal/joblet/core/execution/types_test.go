@@ -63,7 +63,7 @@ func TestLaunchConfig(t *testing.T) {
 		t.Errorf("Expected InitPath '/usr/bin/python3', got: %s", config.InitPath)
 	}
 	if config.JobUUID != "test-job-123" {
-		t.Errorf("Expected JobID 'test-job-123', got: %s", config.JobUUID)
+		t.Errorf("Expected JobUUID 'test-job-123', got: %s", config.JobUUID)
 	}
 	if config.Command != "python3" {
 		t.Errorf("Expected Command 'python3', got: %s", config.Command)
@@ -103,7 +103,7 @@ func TestNetworkAllocation(t *testing.T) {
 
 	// Verify struct fields
 	if allocation.JobUUID != "job-123" {
-		t.Errorf("Expected JobID 'job-123', got: %s", allocation.JobUUID)
+		t.Errorf("Expected JobUUID 'job-123', got: %s", allocation.JobUUID)
 	}
 	if allocation.Network != "test-network" {
 		t.Errorf("Expected Network 'test-network', got: %s", allocation.Network)
@@ -126,7 +126,7 @@ func TestIsolationContext(t *testing.T) {
 
 	// Verify struct fields
 	if context.JobUUID != "job-123" {
-		t.Errorf("Expected JobID 'job-123', got: %s", context.JobUUID)
+		t.Errorf("Expected JobUUID 'job-123', got: %s", context.JobUUID)
 	}
 	if context.Namespace != "job-ns-123" {
 		t.Errorf("Expected Namespace 'job-ns-123', got: %s", context.Namespace)

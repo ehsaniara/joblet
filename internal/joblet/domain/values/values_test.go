@@ -138,10 +138,10 @@ func TestBandwidth_Validate(t *testing.T) {
 }
 
 // ============================================================================
-// JobID Tests
+// JobUUID Tests
 // ============================================================================
 
-func TestNewJobID(t *testing.T) {
+func TestNewJobUUID(t *testing.T) {
 	tests := []struct {
 		name    string
 		id      string
@@ -156,9 +156,9 @@ func TestNewJobID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jid, err := NewJobID(tt.id)
+			jid, err := NewJobUUID(tt.id)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewJobID() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewJobUUID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && jid.String() != tt.id {
@@ -168,22 +168,22 @@ func TestNewJobID(t *testing.T) {
 	}
 }
 
-func TestMustJobID(t *testing.T) {
-	jid := MustJobID("test-job-id")
+func TestMustJobUUID(t *testing.T) {
+	jid := MustJobUUID("test-job-id")
 	if jid.Value() != "test-job-id" {
-		t.Errorf("MustJobID() Value() = %v, want test-job-id", jid.Value())
+		t.Errorf("MustJobUUID() Value() = %v, want test-job-id", jid.Value())
 	}
 }
 
-func TestJobID_IsEmpty(t *testing.T) {
-	jid := MustJobID("")
+func TestJobUUID_IsEmpty(t *testing.T) {
+	jid := MustJobUUID("")
 	if !jid.IsEmpty() {
-		t.Error("empty JobID should return true for IsEmpty()")
+		t.Error("empty JobUUID should return true for IsEmpty()")
 	}
 
-	jid = MustJobID("test-id")
+	jid = MustJobUUID("test-id")
 	if jid.IsEmpty() {
-		t.Error("non-empty JobID should return false for IsEmpty()")
+		t.Error("non-empty JobUUID should return false for IsEmpty()")
 	}
 }
 

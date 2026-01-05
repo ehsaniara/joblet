@@ -276,7 +276,7 @@ func TestWrapJobError(t *testing.T) {
 	}
 
 	if jobErr.JobUUID != "job-123" {
-		t.Errorf("JobID = %v, want job-123", jobErr.JobUUID)
+		t.Errorf("JobUUID = %v, want job-123", jobErr.JobUUID)
 	}
 	if jobErr.Operation != "start" {
 		t.Errorf("Operation = %v, want start", jobErr.Operation)
@@ -307,47 +307,47 @@ func TestWrapRuntimeError(t *testing.T) {
 }
 
 // Test error cause extraction
-func TestGetJobID(t *testing.T) {
+func TestGetJobUUID(t *testing.T) {
 	tests := []struct {
-		name  string
-		err   error
-		jobID string
-		hasID bool
+		name    string
+		err     error
+		jobUUID string
+		hasUUID bool
 	}{
 		{
-			name:  "Direct JobError",
-			err:   &JobError{JobUUID: "job-123", Operation: "start", Err: errors.New("test")},
-			jobID: "job-123",
-			hasID: true,
+			name:    "Direct JobError",
+			err:     &JobError{JobUUID: "job-123", Operation: "start", Err: errors.New("test")},
+			jobUUID: "job-123",
+			hasUUID: true,
 		},
 		{
-			name:  "Wrapped JobError",
-			err:   fmt.Errorf("context: %w", &JobError{JobUUID: "job-456", Operation: "stop", Err: errors.New("test")}),
-			jobID: "job-456",
-			hasID: true,
+			name:    "Wrapped JobError",
+			err:     fmt.Errorf("context: %w", &JobError{JobUUID: "job-456", Operation: "stop", Err: errors.New("test")}),
+			jobUUID: "job-456",
+			hasUUID: true,
 		},
 		{
-			name:  "Non-JobError",
-			err:   errors.New("regular error"),
-			jobID: "",
-			hasID: false,
+			name:    "Non-JobError",
+			err:     errors.New("regular error"),
+			jobUUID: "",
+			hasUUID: false,
 		},
 		{
-			name:  "Nil error",
-			err:   nil,
-			jobID: "",
-			hasID: false,
+			name:    "Nil error",
+			err:     nil,
+			jobUUID: "",
+			hasUUID: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jobID, hasID := GetJobID(tt.err)
-			if jobID != tt.jobID {
-				t.Errorf("GetJobID() jobID = %v, want %v", jobID, tt.jobID)
+			jobUUID, hasUUID := GetJobUUID(tt.err)
+			if jobUUID != tt.jobUUID {
+				t.Errorf("GetJobUUID() jobUUID = %v, want %v", jobUUID, tt.jobUUID)
 			}
-			if hasID != tt.hasID {
-				t.Errorf("GetJobID() hasID = %v, want %v", hasID, tt.hasID)
+			if hasUUID != tt.hasUUID {
+				t.Errorf("GetJobUUID() hasUUID = %v, want %v", hasUUID, tt.hasUUID)
 			}
 		})
 	}
@@ -370,7 +370,7 @@ func TestErrorChain(t *testing.T) {
 		t.Error("errors.As() should find JobError in chain")
 	}
 	if je.JobUUID != "job-123" {
-		t.Errorf("Found JobError has JobID = %v, want job-123", je.JobUUID)
+		t.Errorf("Found JobError has JobUUID = %v, want job-123", je.JobUUID)
 	}
 }
 

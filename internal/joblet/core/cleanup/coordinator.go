@@ -339,7 +339,7 @@ func (c *Coordinator) GetCleanupStatus(jobID string) (*CleanupStatus, bool) {
 }
 
 // CleanupOrphanedResources cleans up resources for jobs that no longer exist
-func (c *Coordinator) CleanupOrphanedResources(activeJobIDs map[string]bool) error {
+func (c *Coordinator) CleanupOrphanedResources(activeJobUUIDs map[string]bool) error {
 	log := c.logger.WithField("operation", "orphaned-cleanup")
 	log.Debug("starting orphaned resource cleanup")
 
@@ -357,24 +357,24 @@ func (c *Coordinator) CleanupOrphanedResources(activeJobIDs map[string]bool) err
 			continue
 		}
 
-		jobID := entry.Name()
+		jobUUID := entry.Name()
 
 		// Skip if job is active
-		if activeJobIDs[jobID] {
+		if activeJobUUIDs[jobUUID] {
 			continue
 		}
 
 		// Skip if cleanup is in progress
-		if _, cleaning := c.activeCleanups.Load(jobID); cleaning {
+		if _, cleaning := c.activeCleanups.Load(jobUUID); cleaning {
 			continue
 		}
 
-		log.Debug("found orphaned job resources", "job_uuid", jobID)
+		log.Debug("found orphaned job resources", "job_uuid", jobUUID)
 
 		// Clean up orphaned resources
-		if err := c.CleanupJob(jobID); err != nil {
-			log.Error("failed to clean orphaned job", "job_uuid", jobID, "error", err)
-			errors = append(errors, fmt.Errorf("job %s: %w", jobID, err))
+		if err := c.CleanupJob(jobUUID); err != nil {
+			log.Error("failed to clean orphaned job", "job_uuid", jobUUID, "error", err)
+			errors = append(errors, fmt.Errorf("job %s: %w", jobUUID, err))
 		} else {
 			cleanedCount++
 		}

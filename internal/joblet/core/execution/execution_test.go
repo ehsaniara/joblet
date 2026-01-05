@@ -239,14 +239,14 @@ func TestExecutionCoordinator_StopJob(t *testing.T) {
 		t.Errorf("Expected jobID 'test-job-123' for network cleanup, got: %s", jobID)
 	}
 
-	envJobID := fakeEnvManager.CleanupWorkspaceArgsForCall(0)
-	if envJobID != "test-job-123" {
-		t.Errorf("Expected jobID 'test-job-123' for workspace cleanup, got: %s", envJobID)
+	envJobUUID := fakeEnvManager.CleanupWorkspaceArgsForCall(0)
+	if envJobUUID != "test-job-123" {
+		t.Errorf("Expected jobUUID 'test-job-123' for workspace cleanup, got: %s", envJobUUID)
 	}
 
-	isoJobID := fakeIsolationManager.DestroyIsolatedEnvironmentArgsForCall(0)
-	if isoJobID != "test-job-123" {
-		t.Errorf("Expected jobID 'test-job-123' for isolation cleanup, got: %s", isoJobID)
+	isoJobUUID := fakeIsolationManager.DestroyIsolatedEnvironmentArgsForCall(0)
+	if isoJobUUID != "test-job-123" {
+		t.Errorf("Expected jobUUID 'test-job-123' for isolation cleanup, got: %s", isoJobUUID)
 	}
 }
 

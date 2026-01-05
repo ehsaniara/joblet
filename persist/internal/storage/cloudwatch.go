@@ -486,7 +486,7 @@ func (b *CloudWatchBackend) writeMetricsToMetricsAPI(ctx context.Context, jobID 
 	// Base dimensions for all metrics
 	baseDimensions := []cloudwatchtypes.Dimension{
 		{
-			Name:  aws.String("JobID"),
+			Name:  aws.String("JobUUID"),
 			Value: aws.String(jobID),
 		},
 		{

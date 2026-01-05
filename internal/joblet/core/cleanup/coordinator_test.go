@@ -262,14 +262,14 @@ func TestCleanupOrphanedResources(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create orphaned job directory
-	orphanedJobID := "orphaned-job"
-	orphanedDir := filepath.Join(tmpDir, orphanedJobID)
+	orphanedJobUUID := "orphaned-job"
+	orphanedDir := filepath.Join(tmpDir, orphanedJobUUID)
 	err = os.MkdirAll(orphanedDir, 0755)
 	require.NoError(t, err)
 
 	// Create active job directory
-	activeJobID := "active-job"
-	activeDir := filepath.Join(tmpDir, activeJobID)
+	activeJobUUID := "active-job"
+	activeDir := filepath.Join(tmpDir, activeJobUUID)
 	err = os.MkdirAll(activeDir, 0755)
 	require.NoError(t, err)
 
@@ -295,9 +295,9 @@ func TestCleanupOrphanedResources(t *testing.T) {
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
 
-	// Define active jobs (only activeJobID is active)
+	// Define active jobs (only activeJobUUID is active)
 	activeJobs := map[string]bool{
-		activeJobID: true,
+		activeJobUUID: true,
 	}
 
 	// Execute orphaned cleanup

@@ -6,42 +6,42 @@ import (
 	"strings"
 )
 
-// JobID represents a unique job identifier
-type JobID struct {
+// JobUUID represents a unique job identifier
+type JobUUID struct {
 	value string
 }
 
-// NewJobID creates a new JobID with validation
-func NewJobID(id string) (JobID, error) {
+// NewJobUUID creates a new JobUUID with validation
+func NewJobUUID(id string) (JobUUID, error) {
 	if strings.TrimSpace(id) == "" {
-		return JobID{}, fmt.Errorf("job ID cannot be empty")
+		return JobUUID{}, fmt.Errorf("job UUID cannot be empty")
 	}
 
 	// Validate UUID format (basic check)
 	if len(id) < 8 {
-		return JobID{}, fmt.Errorf("job ID too short: %s", id)
+		return JobUUID{}, fmt.Errorf("job UUID too short: %s", id)
 	}
 
-	return JobID{value: id}, nil
+	return JobUUID{value: id}, nil
 }
 
-// MustJobID creates a JobID without validation (for constants)
-func MustJobID(id string) JobID {
-	return JobID{value: id}
+// MustJobUUID creates a JobUUID without validation (for constants)
+func MustJobUUID(id string) JobUUID {
+	return JobUUID{value: id}
 }
 
 // String returns the string representation
-func (j JobID) String() string {
+func (j JobUUID) String() string {
 	return j.value
 }
 
 // Value returns the underlying string value
-func (j JobID) Value() string {
+func (j JobUUID) Value() string {
 	return j.value
 }
 
-// IsEmpty returns true if the ID is empty
-func (j JobID) IsEmpty() bool {
+// IsEmpty returns true if the UUID is empty
+func (j JobUUID) IsEmpty() bool {
 	return j.value == ""
 }
 
