@@ -10,28 +10,88 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
+// Default client configuration values
+const (
+	DefaultMaxRetries     = 3
+	DefaultRetryBaseDelay = 100 * time.Millisecond
+	DefaultRetryMaxDelay  = 2 * time.Second
+	DefaultConnectTimeout = 5 * time.Second
+)
+
+// ClientConfig contains configuration options for the pooled client
+type ClientConfig struct {
+	// PoolConfig contains connection pool configuration
+	PoolConfig PoolConfig
+	// MaxRetries is the maximum number of retry attempts for transient failures
+	MaxRetries int
+	// RetryBaseDelay is the initial delay between retries (doubles with each attempt)
+	RetryBaseDelay time.Duration
+	// RetryMaxDelay is the maximum delay between retries
+	RetryMaxDelay time.Duration
+	// ConnectTimeout is the timeout for initial connection test
+	ConnectTimeout time.Duration
+}
+
+// DefaultClientConfig returns the default client configuration
+func DefaultClientConfig() ClientConfig {
+	return ClientConfig{
+		PoolConfig:     DefaultPoolConfig(),
+		MaxRetries:     DefaultMaxRetries,
+		RetryBaseDelay: DefaultRetryBaseDelay,
+		RetryMaxDelay:  DefaultRetryMaxDelay,
+		ConnectTimeout: DefaultConnectTimeout,
+	}
+}
+
+// withDefaults fills in zero values with defaults
+func (c ClientConfig) withDefaults() ClientConfig {
+	c.PoolConfig = c.PoolConfig.withDefaults()
+	if c.MaxRetries <= 0 {
+		c.MaxRetries = DefaultMaxRetries
+	}
+	if c.RetryBaseDelay <= 0 {
+		c.RetryBaseDelay = DefaultRetryBaseDelay
+	}
+	if c.RetryMaxDelay <= 0 {
+		c.RetryMaxDelay = DefaultRetryMaxDelay
+	}
+	if c.ConnectTimeout <= 0 {
+		c.ConnectTimeout = DefaultConnectTimeout
+	}
+	return c
+}
+
 // PooledClient provides high-performance IPC communication with state subprocess
 // using a connection pool to eliminate global mutex bottleneck
 type PooledClient struct {
 	pool      *ConnectionPool
+	config    ClientConfig
 	logger    *logger.Logger
 	requestID uint64 // Accessed atomically
 }
 
-// NewPooledClient creates a new pooled state IPC client
+// NewPooledClient creates a new pooled state IPC client with default configuration
 func NewPooledClient(socketPath string, poolSize int, logger *logger.Logger) *PooledClient {
+	cfg := DefaultClientConfig()
+	if poolSize > 0 {
+		cfg.PoolConfig.PoolSize = poolSize
+	}
+	return NewPooledClientWithConfig(socketPath, cfg, logger)
+}
+
+// NewPooledClientWithConfig creates a new pooled state IPC client with custom configuration
+func NewPooledClientWithConfig(socketPath string, config ClientConfig, logger *logger.Logger) *PooledClient {
+	config = config.withDefaults()
+
 	if logger == nil {
 		logger = logger.WithField("component", "state-client-pooled")
 	}
 
-	if poolSize <= 0 {
-		poolSize = defaultPoolSize
-	}
-
-	pool := NewConnectionPool(socketPath, poolSize, logger)
+	pool := NewConnectionPoolWithConfig(socketPath, config.PoolConfig, logger)
 
 	return &PooledClient{
 		pool:   pool,
+		config: config,
 		logger: logger,
 	}
 }
@@ -39,7 +99,7 @@ func NewPooledClient(socketPath string, poolSize int, logger *logger.Logger) *Po
 // Connect performs initial connection test (optional for pooled client)
 func (c *PooledClient) Connect() error {
 	// For pooled client, we just test that we can get a connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.config.ConnectTimeout)
 	defer cancel()
 
 	conn, err := c.pool.Get(ctx)
@@ -49,7 +109,7 @@ func (c *PooledClient) Connect() error {
 
 	// Return immediately
 	c.pool.Put(conn)
-	c.logger.Info("pooled client connected", "pool_size", c.pool.poolSize)
+	c.logger.Info("pooled client connected", "pool_size", c.config.PoolConfig.PoolSize)
 	return nil
 }
 
@@ -173,9 +233,53 @@ func (c *PooledClient) Stats() map[string]interface{} {
 	return c.pool.Stats()
 }
 
-// sendMessageFireAndForget sends a message and waits for acknowledgment
+// sendMessageFireAndForget sends a message and waits for acknowledgment with retry support
 // This ensures the message was received, but doesn't wait for full processing
 func (c *PooledClient) sendMessageFireAndForget(ctx context.Context, msg Message) error {
+	var lastErr error
+	delay := c.config.RetryBaseDelay
+
+	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retry with exponential backoff
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("context cancelled during retry: %w (last error: %v)", ctx.Err(), lastErr)
+			case <-time.After(delay):
+				// Double delay for next attempt, cap at max
+				delay *= 2
+				if delay > c.config.RetryMaxDelay {
+					delay = c.config.RetryMaxDelay
+				}
+			}
+			c.logger.Debug("retrying fire-and-forget operation",
+				"attempt", attempt+1,
+				"max_retries", c.config.MaxRetries,
+				"operation", msg.Operation)
+		}
+
+		err := c.trySendMessage(ctx, msg)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		// Only retry on connection errors, not on logical failures
+		if !isRetryableError(err) {
+			return err
+		}
+	}
+
+	c.logger.Error("fire-and-forget operation failed after retries",
+		"operation", msg.Operation,
+		"max_retries", c.config.MaxRetries,
+		"error", lastErr)
+
+	return fmt.Errorf("operation failed after %d retries: %w", c.config.MaxRetries, lastErr)
+}
+
+// trySendMessage attempts to send a message once
+func (c *PooledClient) trySendMessage(ctx context.Context, msg Message) error {
 	// Get connection from pool
 	conn, err := c.pool.Get(ctx)
 	if err != nil {
@@ -200,6 +304,35 @@ func (c *PooledClient) sendMessageFireAndForget(ctx context.Context, msg Message
 	}
 
 	return nil
+}
+
+// isRetryableError checks if an error is transient and worth retrying
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Retry on connection/network errors, not on logical errors
+	return contains(errStr, "connection") ||
+		contains(errStr, "timeout") ||
+		contains(errStr, "dial") ||
+		contains(errStr, "EOF") ||
+		contains(errStr, "reset") ||
+		contains(errStr, "broken pipe")
+}
+
+// contains checks if s contains substr (simple helper to avoid strings import)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // sendMessageWithResponse sends a message and waits for full response

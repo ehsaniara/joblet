@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // LocalConfig holds local filesystem storage configuration
@@ -30,11 +31,13 @@ type localBackend struct {
 	jobs     map[string]*domain.Job
 	config   *LocalConfig
 	filePath string
+	logger   *logger.Logger
 
 	// Background sync
 	dirty      bool
 	syncTicker *time.Ticker
 	done       chan struct{}
+	wg         sync.WaitGroup // Ensures backgroundSync exits before Close completes
 	closed     bool
 }
 
@@ -66,13 +69,14 @@ func NewLocalBackend(cfg *LocalConfig) (Backend, error) {
 		jobs:     make(map[string]*domain.Job),
 		config:   cfg,
 		filePath: filePath,
+		logger:   logger.WithField("component", "local-storage"),
 		done:     make(chan struct{}),
 	}
 
 	// Load existing jobs from disk
 	if err := lb.loadFromDisk(); err != nil {
 		// Log warning but don't fail - start fresh if file doesn't exist or is corrupted
-		fmt.Printf("Warning: could not load existing state: %v\n", err)
+		lb.logger.Warn("could not load existing state, starting fresh", "error", err)
 	}
 
 	// Parse sync interval
@@ -83,6 +87,7 @@ func NewLocalBackend(cfg *LocalConfig) (Backend, error) {
 
 	// Start background sync goroutine
 	lb.syncTicker = time.NewTicker(syncInterval)
+	lb.wg.Add(1)
 	go lb.backgroundSync()
 
 	return lb, nil
@@ -124,7 +129,7 @@ func (lb *localBackend) loadFromDisk() error {
 			var job domain.Job
 			if err := json.Unmarshal(line, &job); err != nil {
 				// Log warning but continue loading other jobs
-				fmt.Printf("Warning: failed to unmarshal job: %v\n", err)
+				lb.logger.Warn("failed to unmarshal job, skipping", "error", err)
 				continue
 			}
 
@@ -140,7 +145,7 @@ func (lb *localBackend) loadFromDisk() error {
 		gzReader.Close()
 	}
 
-	fmt.Printf("Loaded %d jobs from local state\n", len(lb.jobs))
+	lb.logger.Info("loaded jobs from local state", "count", len(lb.jobs))
 	return nil
 }
 
@@ -205,13 +210,15 @@ func (lb *localBackend) saveToDisk() error {
 
 // backgroundSync periodically syncs dirty state to disk
 func (lb *localBackend) backgroundSync() {
+	defer lb.wg.Done()
+
 	for {
 		select {
 		case <-lb.syncTicker.C:
 			lb.mu.Lock()
 			if lb.dirty {
 				if err := lb.saveToDisk(); err != nil {
-					fmt.Printf("Error saving state to disk: %v\n", err)
+					lb.logger.Error("failed to save state to disk", "error", err)
 				} else {
 					lb.dirty = false
 				}
@@ -344,11 +351,15 @@ func (lb *localBackend) Close() error {
 	lb.closed = true
 	lb.mu.Unlock()
 
-	// Stop background sync
+	// Stop background sync ticker and signal goroutine to exit
 	lb.syncTicker.Stop()
 	close(lb.done)
 
-	// Final save
+	// Wait for backgroundSync goroutine to fully exit before final save
+	// This prevents race between backgroundSync's saveToDisk and our final save
+	lb.wg.Wait()
+
+	// Final save - now safe since backgroundSync has exited
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
@@ -378,13 +389,9 @@ func (lb *localBackend) matchesFilter(job *domain.Job, filter *Filter) bool {
 		return true
 	}
 
-	// Filter by status
-	if filter.Status != "" && string(job.Status) != filter.Status {
-		return false
-	}
-
-	// Filter by multiple statuses (OR condition)
+	// Filter by status - Statuses takes precedence over Status if both are provided
 	if len(filter.Statuses) > 0 {
+		// Filter by multiple statuses (OR condition)
 		found := false
 		for _, status := range filter.Statuses {
 			if string(job.Status) == status {
@@ -393,6 +400,11 @@ func (lb *localBackend) matchesFilter(job *domain.Job, filter *Filter) bool {
 			}
 		}
 		if !found {
+			return false
+		}
+	} else if filter.Status != "" {
+		// Single status filter (only if Statuses is not provided)
+		if string(job.Status) != filter.Status {
 			return false
 		}
 	}

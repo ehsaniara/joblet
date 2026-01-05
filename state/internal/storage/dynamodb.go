@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/domain/values"
+	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
 // dynamoDBBackend implements Backend using AWS DynamoDB
@@ -19,6 +20,7 @@ type dynamoDBBackend struct {
 	client    DynamoDBAPI
 	tableName string
 	ttlDays   int
+	logger    *logger.Logger
 }
 
 // NewDynamoDBBackend creates a new DynamoDB storage backend
@@ -42,6 +44,7 @@ func NewDynamoDBBackend(cfg *DynamoDBConfig) (Backend, error) {
 		client:    client,
 		tableName: cfg.TableName,
 		ttlDays:   cfg.TTLDays,
+		logger:    logger.WithField("component", "dynamodb-storage"),
 	}
 
 	// Verify table exists
@@ -58,6 +61,7 @@ func NewDynamoDBBackendWithClient(client DynamoDBAPI, tableName string, ttlDays 
 		client:    client,
 		tableName: tableName,
 		ttlDays:   ttlDays,
+		logger:    logger.WithField("component", "dynamodb-storage"),
 	}
 }
 
@@ -70,11 +74,11 @@ func (d *dynamoDBBackend) Create(ctx context.Context, job *domain.Job) error {
 	// Calculate TTL if enabled
 	item := jobToItem(job, d.ttlDays)
 
-	// PutItem with condition: jobId must not exist
+	// PutItem with condition: job_uuid must not exist (prevents duplicates)
 	input := &dynamodb.PutItemInput{
 		TableName:           aws.String(d.tableName),
 		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(jobId)"),
+		ConditionExpression: aws.String("attribute_not_exists(job_uuid)"),
 	}
 
 	_, err := d.client.PutItem(ctx, input)
@@ -117,11 +121,11 @@ func (d *dynamoDBBackend) Update(ctx context.Context, job *domain.Job) error {
 	// Calculate TTL
 	item := jobToItem(job, d.ttlDays)
 
-	// PutItem with condition: jobId must exist
+	// PutItem with condition: job_uuid must exist (prevents creating new items)
 	input := &dynamodb.PutItemInput{
 		TableName:           aws.String(d.tableName),
 		Item:                item,
-		ConditionExpression: aws.String("attribute_exists(jobId)"),
+		ConditionExpression: aws.String("attribute_exists(job_uuid)"),
 	}
 
 	_, err := d.client.PutItem(ctx, input)
@@ -180,13 +184,28 @@ func (d *dynamoDBBackend) List(ctx context.Context, filter *Filter) ([]*domain.J
 	}
 
 	// Convert items to jobs
+	skippedCount := 0
 	for _, item := range result.Items {
 		job, err := itemToJob(item)
 		if err != nil {
 			// Log error but continue with other items
+			skippedCount++
+			jobUUID := ""
+			if v, ok := item["job_uuid"].(*types.AttributeValueMemberS); ok {
+				jobUUID = v.Value
+			}
+			d.logger.Warn("failed to parse DynamoDB item, skipping",
+				"error", err,
+				"job_uuid", jobUUID)
 			continue
 		}
 		jobs = append(jobs, job)
+	}
+
+	if skippedCount > 0 {
+		d.logger.Warn("some items could not be parsed during list operation",
+			"skipped_count", skippedCount,
+			"returned_count", len(jobs))
 	}
 
 	return jobs, nil

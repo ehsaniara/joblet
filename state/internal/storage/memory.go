@@ -141,13 +141,9 @@ func matchesFilter(job *domain.Job, filter *Filter) bool {
 		return true
 	}
 
-	// Filter by status
-	if filter.Status != "" && string(job.Status) != filter.Status {
-		return false
-	}
-
-	// Filter by multiple statuses (OR condition)
+	// Filter by status - Statuses takes precedence over Status if both are provided
 	if len(filter.Statuses) > 0 {
+		// Filter by multiple statuses (OR condition)
 		found := false
 		for _, status := range filter.Statuses {
 			if string(job.Status) == status {
@@ -156,6 +152,11 @@ func matchesFilter(job *domain.Job, filter *Filter) bool {
 			}
 		}
 		if !found {
+			return false
+		}
+	} else if filter.Status != "" {
+		// Single status filter (only if Statuses is not provided)
+		if string(job.Status) != filter.Status {
 			return false
 		}
 	}

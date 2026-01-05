@@ -198,12 +198,38 @@ func (c *TelemetryConfig) IsEventTypeEnabled(eventType string) bool {
 // State is mandatory - it's the backbone of joblet that ensures jobs survive restarts
 // All state operations are async fire-and-forget for maximum performance
 type StateConfig struct {
-	Backend        string             `yaml:"backend" json:"backend"`                 // "memory", "dynamodb"
+	Backend        string             `yaml:"backend" json:"backend"`                 // "memory", "dynamodb", "local"
 	Socket         string             `yaml:"socket" json:"socket"`                   // Unix socket path
 	BufferSize     int                `yaml:"buffer_size" json:"buffer_size"`         // Message buffer size
 	ReconnectDelay time.Duration      `yaml:"reconnect_delay" json:"reconnect_delay"` // Reconnection delay
-	PoolSize       int                `yaml:"pool_size" json:"pool_size"`             // Connection pool size (0 = use default 20)
+	Pool           StatePoolConfig    `yaml:"pool" json:"pool"`                       // Connection pool configuration
+	Client         StateClientConfig  `yaml:"client" json:"client"`                   // Client retry configuration
+	Local          LocalStateConfig   `yaml:"local" json:"local"`                     // Local storage configuration
 	Storage        StateStorageConfig `yaml:"storage" json:"storage"`                 // Backend-specific configuration
+}
+
+// StatePoolConfig holds connection pool configuration
+type StatePoolConfig struct {
+	Size               int           `yaml:"size" json:"size"`                                 // Max connections in pool (default: 20)
+	ReadTimeout        time.Duration `yaml:"read_timeout" json:"read_timeout"`                 // Timeout for read operations (default: 10s)
+	DialTimeout        time.Duration `yaml:"dial_timeout" json:"dial_timeout"`                 // Timeout for establishing connections (default: 5s)
+	MaxIdleTime        time.Duration `yaml:"max_idle_time" json:"max_idle_time"`               // Max idle time before health check (default: 30s)
+	HealthCheckTimeout time.Duration `yaml:"health_check_timeout" json:"health_check_timeout"` // Health check timeout (default: 500ms)
+	ShutdownTimeout    time.Duration `yaml:"shutdown_timeout" json:"shutdown_timeout"`         // Graceful shutdown timeout (default: 5s)
+}
+
+// StateClientConfig holds client retry configuration
+type StateClientConfig struct {
+	MaxRetries     int           `yaml:"max_retries" json:"max_retries"`           // Max retry attempts (default: 3)
+	RetryBaseDelay time.Duration `yaml:"retry_base_delay" json:"retry_base_delay"` // Initial retry delay (default: 100ms)
+	RetryMaxDelay  time.Duration `yaml:"retry_max_delay" json:"retry_max_delay"`   // Max retry delay (default: 2s)
+	ConnectTimeout time.Duration `yaml:"connect_timeout" json:"connect_timeout"`   // Connection test timeout (default: 5s)
+}
+
+// LocalStateConfig holds local filesystem state storage configuration
+type LocalStateConfig struct {
+	Directory    string `yaml:"directory" json:"directory"`         // Directory for state storage
+	SyncInterval string `yaml:"sync_interval" json:"sync_interval"` // How often to sync to disk
 }
 
 // StateStorageConfig holds backend-specific storage configuration
