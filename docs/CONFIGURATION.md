@@ -505,11 +505,31 @@ state service stores job status, exit codes, and metadata.
 
 ```yaml
 state:
-  backend: "memory"  # Options: "memory", "dynamodb" (EC2 only)
+  backend: "memory"  # Options: "memory", "dynamodb", "local"
   socket: "/opt/joblet/run/state-ipc.sock"      # Unix socket for state operations
   buffer_size: 10000                             # Message buffer size
   reconnect_delay: "5s"                          # Reconnection retry delay
-  pool_size: 20                                  # Connection pool size for high concurrency (default: 20)
+
+  # Connection pool configuration (for high-concurrency scenarios with 1000+ jobs)
+  pool:
+    size: 20                      # Max connections in pool (default: 20)
+    read_timeout: "10s"           # Timeout for read operations (default: 10s)
+    dial_timeout: "5s"            # Timeout for establishing new connections (default: 5s)
+    max_idle_time: "30s"          # Max idle time before health check (default: 30s)
+    health_check_timeout: "500ms" # Timeout for connection health checks (default: 500ms)
+    shutdown_timeout: "5s"        # Max time to wait for graceful shutdown (default: 5s)
+
+  # Client retry configuration (for transient failures)
+  client:
+    max_retries: 3                # Max retry attempts for transient failures (default: 3)
+    retry_base_delay: "100ms"     # Initial delay between retries, doubles each attempt (default: 100ms)
+    retry_max_delay: "2s"         # Maximum delay between retries (default: 2s)
+    connect_timeout: "5s"         # Timeout for initial connection test (default: 5s)
+
+  # Local storage configuration (when backend: "local")
+  local:
+    directory: "/opt/joblet/state"  # Directory for local state storage
+    sync_interval: "5s"             # How often to sync to disk (default: 5s)
 
   storage:
     # DynamoDB configuration (when backend: "dynamodb")
@@ -528,6 +548,7 @@ state:
 **Backend Options:**
 
 - **memory**: Jobs persist in RAM only (default, lost on restart)
+- **local**: Jobs persist to local filesystem (survives restarts, single-node)
 - **dynamodb**: Jobs persist in AWS DynamoDB (EC2 only, production, survives restarts)
 
 **When to use DynamoDB state persistence:**
@@ -546,17 +567,17 @@ state:
 All state operations use async fire-and-forget pattern with connection pooling:
 
 - Non-blocking create/update/delete operations
-- 10-second timeout per operation (configurable)
+- Configurable timeout per operation (default: 10s via `pool.read_timeout`)
 - Connection pool handles 1000+ concurrent jobs efficiently
 - Automatic reconnection if state service restarts
 - High-throughput regardless of job count (200x faster than previous implementation)
-- Pool size configurable via `pool_size` (default: 20 connections)
+- Automatic retry with exponential backoff for transient failures
 
 **Pool Size Recommendations:**
 
 - < 100 jobs: Default (20) is sufficient
 - 100-1000 jobs: Default (20) handles well
-- 1000-2500 jobs: Consider 30-50 for headroom
+- 1000-2500 jobs: Consider 30-50 via `pool.size`
 - > 2500 jobs: 50-100+ depending on workload
 
 See [STATE_PERSISTENCE.md](./STATE_PERSISTENCE.md) for detailed state persistence documentation including performance

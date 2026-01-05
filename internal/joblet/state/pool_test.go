@@ -166,7 +166,7 @@ func TestConnectionPool_ConcurrentAccess(t *testing.T) {
 	// Report statistics
 	stats := pool.Stats()
 	t.Logf("Pool stats: %+v", stats)
-	t.Logf("Pool size: %d", pool.poolSize)
+	t.Logf("Pool size: %v", stats["pool_size"])
 	t.Logf("Total connections created: %d", stats["creations"])
 	t.Logf("Active connections: %d", stats["active_conns"])
 	t.Logf("Available connections: %d", stats["available_conns"])
@@ -222,5 +222,246 @@ func TestConnectionPool_Lifecycle(t *testing.T) {
 	_, err = pool.Get(ctx)
 	if err == nil {
 		t.Error("Expected error when getting connection from closed pool")
+	}
+}
+
+// TestPoolConfig_Defaults tests that PoolConfig fills in defaults for zero values
+func TestPoolConfig_Defaults(t *testing.T) {
+	// Empty config should get all defaults
+	cfg := PoolConfig{}
+	cfg = cfg.withDefaults()
+
+	if cfg.PoolSize != DefaultPoolSize {
+		t.Errorf("Expected default pool size %d, got %d", DefaultPoolSize, cfg.PoolSize)
+	}
+	if cfg.ReadTimeout != DefaultReadTimeout {
+		t.Errorf("Expected default read timeout %v, got %v", DefaultReadTimeout, cfg.ReadTimeout)
+	}
+	if cfg.DialTimeout != DefaultDialTimeout {
+		t.Errorf("Expected default dial timeout %v, got %v", DefaultDialTimeout, cfg.DialTimeout)
+	}
+	if cfg.MaxIdleTime != DefaultMaxIdleTime {
+		t.Errorf("Expected default max idle time %v, got %v", DefaultMaxIdleTime, cfg.MaxIdleTime)
+	}
+	if cfg.HealthCheckTimeout != DefaultHealthCheckTimeout {
+		t.Errorf("Expected default health check timeout %v, got %v", DefaultHealthCheckTimeout, cfg.HealthCheckTimeout)
+	}
+	if cfg.ShutdownTimeout != DefaultShutdownTimeout {
+		t.Errorf("Expected default shutdown timeout %v, got %v", DefaultShutdownTimeout, cfg.ShutdownTimeout)
+	}
+}
+
+// TestPoolConfig_PartialOverride tests that PoolConfig preserves non-zero values
+func TestPoolConfig_PartialOverride(t *testing.T) {
+	cfg := PoolConfig{
+		PoolSize:    50,
+		ReadTimeout: 30 * time.Second,
+		// Leave others as zero
+	}
+	cfg = cfg.withDefaults()
+
+	if cfg.PoolSize != 50 {
+		t.Errorf("Expected pool size 50, got %d", cfg.PoolSize)
+	}
+	if cfg.ReadTimeout != 30*time.Second {
+		t.Errorf("Expected read timeout 30s, got %v", cfg.ReadTimeout)
+	}
+	// Others should be defaults
+	if cfg.DialTimeout != DefaultDialTimeout {
+		t.Errorf("Expected default dial timeout, got %v", cfg.DialTimeout)
+	}
+}
+
+// TestNewConnectionPoolWithConfig tests creating pool with custom config
+func TestNewConnectionPoolWithConfig(t *testing.T) {
+	log := logger.WithField("test", "config")
+	socketPath := "/tmp/state-config.sock"
+
+	cfg := PoolConfig{
+		PoolSize:    25,
+		ReadTimeout: 15 * time.Second,
+	}
+
+	pool := NewConnectionPoolWithConfig(socketPath, cfg, log)
+	defer pool.Close()
+
+	stats := pool.Stats()
+	if stats["pool_size"].(int) != 25 {
+		t.Errorf("Expected pool size 25, got %v", stats["pool_size"])
+	}
+}
+
+// TestDefaultPoolConfig tests DefaultPoolConfig returns expected values
+func TestDefaultPoolConfig(t *testing.T) {
+	cfg := DefaultPoolConfig()
+
+	if cfg.PoolSize != DefaultPoolSize {
+		t.Errorf("Expected pool size %d, got %d", DefaultPoolSize, cfg.PoolSize)
+	}
+	if cfg.ReadTimeout != DefaultReadTimeout {
+		t.Errorf("Expected read timeout %v, got %v", DefaultReadTimeout, cfg.ReadTimeout)
+	}
+}
+
+// TestConnectionPool_PoolSizeLimit tests that the pool respects the configured size limit
+func TestConnectionPool_PoolSizeLimit(t *testing.T) {
+	log := logger.WithField("test", "pool-size-limit")
+	socketPath := "/tmp/state-pool-limit.sock"
+
+	const poolSize = 3
+	pool := NewConnectionPool(socketPath, poolSize, log)
+	defer pool.Close()
+
+	// Verify initial state
+	stats := pool.Stats()
+	if stats["pool_size"].(int) != poolSize {
+		t.Errorf("Expected pool size %d, got %v", poolSize, stats["pool_size"])
+	}
+
+	if stats["total_conns"].(int32) != 0 {
+		t.Errorf("Expected 0 total connections initially, got %v", stats["total_conns"])
+	}
+}
+
+// TestConnectionPool_CloseIdempotent tests that Close can be called multiple times safely
+func TestConnectionPool_CloseIdempotent(t *testing.T) {
+	log := logger.WithField("test", "close-idempotent")
+	socketPath := "/tmp/state-close-idempotent.sock"
+
+	pool := NewConnectionPool(socketPath, 5, log)
+
+	// First close should succeed
+	err := pool.Close()
+	if err != nil {
+		t.Errorf("First close failed: %v", err)
+	}
+
+	// Second close should also succeed (idempotent)
+	err = pool.Close()
+	if err != nil {
+		t.Errorf("Second close failed: %v", err)
+	}
+
+	// Pool should be marked as closed
+	if !pool.closed.Load() {
+		t.Error("Pool should be marked as closed")
+	}
+}
+
+// TestConnectionPool_GetFromClosedPool tests that Get returns error for closed pool
+func TestConnectionPool_GetFromClosedPool(t *testing.T) {
+	log := logger.WithField("test", "get-closed")
+	socketPath := "/tmp/state-get-closed.sock"
+
+	pool := NewConnectionPool(socketPath, 5, log)
+	pool.Close()
+
+	ctx := context.Background()
+	_, err := pool.Get(ctx)
+	if err == nil {
+		t.Error("Expected error when getting from closed pool")
+	}
+	if err.Error() != "connection pool is closed" {
+		t.Errorf("Expected 'connection pool is closed' error, got: %v", err)
+	}
+}
+
+// TestConnectionPool_StatsTracking tests that pool statistics are tracked correctly
+func TestConnectionPool_StatsTracking(t *testing.T) {
+	log := logger.WithField("test", "stats-tracking")
+	socketPath := "/tmp/state-stats-tracking.sock"
+
+	pool := NewConnectionPool(socketPath, 10, log)
+	defer pool.Close()
+
+	// Initial stats should be zero
+	stats := pool.Stats()
+
+	if stats["acquisitions"].(uint64) != 0 {
+		t.Errorf("Expected 0 acquisitions initially, got %v", stats["acquisitions"])
+	}
+	if stats["creations"].(uint64) != 0 {
+		t.Errorf("Expected 0 creations initially, got %v", stats["creations"])
+	}
+	if stats["errors"].(uint64) != 0 {
+		t.Errorf("Expected 0 errors initially, got %v", stats["errors"])
+	}
+	if stats["timeouts"].(uint64) != 0 {
+		t.Errorf("Expected 0 timeouts initially, got %v", stats["timeouts"])
+	}
+	if stats["health_checks"].(uint64) != 0 {
+		t.Errorf("Expected 0 health_checks initially, got %v", stats["health_checks"])
+	}
+	if stats["active_conns"].(int32) != 0 {
+		t.Errorf("Expected 0 active_conns initially, got %v", stats["active_conns"])
+	}
+	if stats["available_conns"].(int) != 0 {
+		t.Errorf("Expected 0 available_conns initially, got %v", stats["available_conns"])
+	}
+}
+
+// TestPoolConfig_AllDefaults tests that all config fields get defaults when zero
+func TestPoolConfig_AllDefaults(t *testing.T) {
+	cfg := PoolConfig{}
+	cfg = cfg.withDefaults()
+
+	// Verify all defaults are set
+	if cfg.PoolSize != DefaultPoolSize {
+		t.Errorf("PoolSize: expected %d, got %d", DefaultPoolSize, cfg.PoolSize)
+	}
+	if cfg.ReadTimeout != DefaultReadTimeout {
+		t.Errorf("ReadTimeout: expected %v, got %v", DefaultReadTimeout, cfg.ReadTimeout)
+	}
+	if cfg.DialTimeout != DefaultDialTimeout {
+		t.Errorf("DialTimeout: expected %v, got %v", DefaultDialTimeout, cfg.DialTimeout)
+	}
+	if cfg.MaxIdleTime != DefaultMaxIdleTime {
+		t.Errorf("MaxIdleTime: expected %v, got %v", DefaultMaxIdleTime, cfg.MaxIdleTime)
+	}
+	if cfg.HealthCheckTimeout != DefaultHealthCheckTimeout {
+		t.Errorf("HealthCheckTimeout: expected %v, got %v", DefaultHealthCheckTimeout, cfg.HealthCheckTimeout)
+	}
+	if cfg.ShutdownTimeout != DefaultShutdownTimeout {
+		t.Errorf("ShutdownTimeout: expected %v, got %v", DefaultShutdownTimeout, cfg.ShutdownTimeout)
+	}
+	if cfg.ShutdownPollInterval != DefaultShutdownPollInterval {
+		t.Errorf("ShutdownPollInterval: expected %v, got %v", DefaultShutdownPollInterval, cfg.ShutdownPollInterval)
+	}
+}
+
+// TestPoolConfig_CustomValues tests that custom config values are preserved
+func TestPoolConfig_CustomValues(t *testing.T) {
+	cfg := PoolConfig{
+		PoolSize:             100,
+		ReadTimeout:          30 * time.Second,
+		DialTimeout:          10 * time.Second,
+		MaxIdleTime:          60 * time.Second,
+		HealthCheckTimeout:   1 * time.Second,
+		ShutdownTimeout:      15 * time.Second,
+		ShutdownPollInterval: 200 * time.Millisecond,
+	}
+	cfg = cfg.withDefaults()
+
+	// All custom values should be preserved
+	if cfg.PoolSize != 100 {
+		t.Errorf("PoolSize: expected 100, got %d", cfg.PoolSize)
+	}
+	if cfg.ReadTimeout != 30*time.Second {
+		t.Errorf("ReadTimeout: expected 30s, got %v", cfg.ReadTimeout)
+	}
+	if cfg.DialTimeout != 10*time.Second {
+		t.Errorf("DialTimeout: expected 10s, got %v", cfg.DialTimeout)
+	}
+	if cfg.MaxIdleTime != 60*time.Second {
+		t.Errorf("MaxIdleTime: expected 60s, got %v", cfg.MaxIdleTime)
+	}
+	if cfg.HealthCheckTimeout != 1*time.Second {
+		t.Errorf("HealthCheckTimeout: expected 1s, got %v", cfg.HealthCheckTimeout)
+	}
+	if cfg.ShutdownTimeout != 15*time.Second {
+		t.Errorf("ShutdownTimeout: expected 15s, got %v", cfg.ShutdownTimeout)
+	}
+	if cfg.ShutdownPollInterval != 200*time.Millisecond {
+		t.Errorf("ShutdownPollInterval: expected 200ms, got %v", cfg.ShutdownPollInterval)
 	}
 }

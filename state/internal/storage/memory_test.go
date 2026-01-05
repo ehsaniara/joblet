@@ -255,3 +255,145 @@ func TestMemoryBackend_Close(t *testing.T) {
 		t.Errorf("Close failed: %v", err)
 	}
 }
+
+// TestMemoryBackend_ListFilterStatusesPrecedence tests that Statuses takes precedence over Status
+func TestMemoryBackend_ListFilterStatusesPrecedence(t *testing.T) {
+	backend := NewMemoryBackend()
+	ctx := context.Background()
+
+	// Create jobs with different statuses
+	jobs := []*domain.Job{
+		{Uuid: "job-running-1", Status: "RUNNING", Command: "cmd1", StartTime: time.Now()},
+		{Uuid: "job-running-2", Status: "RUNNING", Command: "cmd2", StartTime: time.Now()},
+		{Uuid: "job-completed-1", Status: "COMPLETED", Command: "cmd3", StartTime: time.Now()},
+		{Uuid: "job-failed-1", Status: "FAILED", Command: "cmd4", StartTime: time.Now()},
+		{Uuid: "job-pending-1", Status: "PENDING", Command: "cmd5", StartTime: time.Now()},
+	}
+
+	for _, job := range jobs {
+		if err := backend.Create(ctx, job); err != nil {
+			t.Fatalf("Failed to create job %s: %v", job.Uuid, err)
+		}
+	}
+
+	// Test with only Status filter (single status)
+	singleStatusJobs, err := backend.List(ctx, &Filter{Status: "RUNNING"})
+	if err != nil {
+		t.Fatalf("List with Status filter failed: %v", err)
+	}
+	if len(singleStatusJobs) != 2 {
+		t.Errorf("Expected 2 RUNNING jobs with Status filter, got %d", len(singleStatusJobs))
+	}
+
+	// Test with only Statuses filter (multiple statuses)
+	multiStatusJobs, err := backend.List(ctx, &Filter{Statuses: []string{"RUNNING", "COMPLETED"}})
+	if err != nil {
+		t.Fatalf("List with Statuses filter failed: %v", err)
+	}
+	if len(multiStatusJobs) != 3 {
+		t.Errorf("Expected 3 jobs (RUNNING + COMPLETED) with Statuses filter, got %d", len(multiStatusJobs))
+	}
+
+	// Test that Statuses takes precedence over Status when both are provided
+	// When both are set, Statuses should be used and Status should be ignored
+	precedenceJobs, err := backend.List(ctx, &Filter{
+		Status:   "PENDING",          // This should be ignored
+		Statuses: []string{"FAILED"}, // This should take precedence
+	})
+	if err != nil {
+		t.Fatalf("List with both Status and Statuses failed: %v", err)
+	}
+	if len(precedenceJobs) != 1 {
+		t.Errorf("Expected 1 FAILED job (Statuses takes precedence), got %d", len(precedenceJobs))
+	}
+	if len(precedenceJobs) > 0 && precedenceJobs[0].Status != "FAILED" {
+		t.Errorf("Expected FAILED job, got %s", precedenceJobs[0].Status)
+	}
+}
+
+// TestMemoryBackend_ListFilterByNodeID tests filtering by NodeID
+func TestMemoryBackend_ListFilterByNodeID(t *testing.T) {
+	backend := NewMemoryBackend()
+	ctx := context.Background()
+
+	// Create jobs on different nodes
+	jobs := []*domain.Job{
+		{Uuid: "job-1", Status: "RUNNING", Command: "cmd1", NodeId: "node-1"},
+		{Uuid: "job-2", Status: "RUNNING", Command: "cmd2", NodeId: "node-1"},
+		{Uuid: "job-3", Status: "RUNNING", Command: "cmd3", NodeId: "node-2"},
+	}
+
+	for _, job := range jobs {
+		if err := backend.Create(ctx, job); err != nil {
+			t.Fatalf("Failed to create job %s: %v", job.Uuid, err)
+		}
+	}
+
+	// Filter by NodeID
+	node1Jobs, err := backend.List(ctx, &Filter{NodeID: "node-1"})
+	if err != nil {
+		t.Fatalf("List with NodeID filter failed: %v", err)
+	}
+	if len(node1Jobs) != 2 {
+		t.Errorf("Expected 2 jobs on node-1, got %d", len(node1Jobs))
+	}
+
+	// Combine NodeID and Status filter
+	node1RunningJobs, err := backend.List(ctx, &Filter{
+		NodeID: "node-1",
+		Status: "RUNNING",
+	})
+	if err != nil {
+		t.Fatalf("List with NodeID and Status filter failed: %v", err)
+	}
+	if len(node1RunningJobs) != 2 {
+		t.Errorf("Expected 2 RUNNING jobs on node-1, got %d", len(node1RunningJobs))
+	}
+}
+
+// TestMemoryBackend_ListSorting tests sorting functionality
+func TestMemoryBackend_ListSorting(t *testing.T) {
+	backend := NewMemoryBackend()
+	ctx := context.Background()
+
+	// Create jobs with different start times
+	baseTime := time.Now()
+	jobs := []*domain.Job{
+		{Uuid: "job-3", Status: "RUNNING", Command: "cmd3", StartTime: baseTime.Add(2 * time.Hour)},
+		{Uuid: "job-1", Status: "RUNNING", Command: "cmd1", StartTime: baseTime},
+		{Uuid: "job-2", Status: "RUNNING", Command: "cmd2", StartTime: baseTime.Add(1 * time.Hour)},
+	}
+
+	for _, job := range jobs {
+		if err := backend.Create(ctx, job); err != nil {
+			t.Fatalf("Failed to create job %s: %v", job.Uuid, err)
+		}
+	}
+
+	// Test ascending sort by startTime
+	ascJobs, err := backend.List(ctx, &Filter{SortBy: "startTime", SortDesc: false})
+	if err != nil {
+		t.Fatalf("List with ascending sort failed: %v", err)
+	}
+	if len(ascJobs) != 3 {
+		t.Fatalf("Expected 3 jobs, got %d", len(ascJobs))
+	}
+	if ascJobs[0].Uuid != "job-1" {
+		t.Errorf("Expected job-1 first in ascending order, got %s", ascJobs[0].Uuid)
+	}
+	if ascJobs[2].Uuid != "job-3" {
+		t.Errorf("Expected job-3 last in ascending order, got %s", ascJobs[2].Uuid)
+	}
+
+	// Test descending sort by startTime
+	descJobs, err := backend.List(ctx, &Filter{SortBy: "startTime", SortDesc: true})
+	if err != nil {
+		t.Fatalf("List with descending sort failed: %v", err)
+	}
+	if descJobs[0].Uuid != "job-3" {
+		t.Errorf("Expected job-3 first in descending order, got %s", descJobs[0].Uuid)
+	}
+	if descJobs[2].Uuid != "job-1" {
+		t.Errorf("Expected job-1 last in descending order, got %s", descJobs[2].Uuid)
+	}
+}

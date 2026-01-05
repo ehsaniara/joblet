@@ -311,3 +311,123 @@ func handleMockConnection(conn net.Conn) {
 		_ = encoder.Encode(response)
 	}
 }
+
+// TestClientConfig_Defaults tests that ClientConfig fills in defaults for zero values
+func TestClientConfig_Defaults(t *testing.T) {
+	cfg := ClientConfig{}
+	cfg = cfg.withDefaults()
+
+	if cfg.MaxRetries != DefaultMaxRetries {
+		t.Errorf("Expected max retries %d, got %d", DefaultMaxRetries, cfg.MaxRetries)
+	}
+	if cfg.RetryBaseDelay != DefaultRetryBaseDelay {
+		t.Errorf("Expected retry base delay %v, got %v", DefaultRetryBaseDelay, cfg.RetryBaseDelay)
+	}
+	if cfg.RetryMaxDelay != DefaultRetryMaxDelay {
+		t.Errorf("Expected retry max delay %v, got %v", DefaultRetryMaxDelay, cfg.RetryMaxDelay)
+	}
+	if cfg.ConnectTimeout != DefaultConnectTimeout {
+		t.Errorf("Expected connect timeout %v, got %v", DefaultConnectTimeout, cfg.ConnectTimeout)
+	}
+	// PoolConfig should also get defaults
+	if cfg.PoolConfig.PoolSize != DefaultPoolSize {
+		t.Errorf("Expected pool size %d, got %d", DefaultPoolSize, cfg.PoolConfig.PoolSize)
+	}
+}
+
+// TestClientConfig_PartialOverride tests that ClientConfig preserves non-zero values
+func TestClientConfig_PartialOverride(t *testing.T) {
+	cfg := ClientConfig{
+		MaxRetries:     5,
+		RetryBaseDelay: 200 * time.Millisecond,
+		// Leave others as zero
+	}
+	cfg = cfg.withDefaults()
+
+	if cfg.MaxRetries != 5 {
+		t.Errorf("Expected max retries 5, got %d", cfg.MaxRetries)
+	}
+	if cfg.RetryBaseDelay != 200*time.Millisecond {
+		t.Errorf("Expected retry base delay 200ms, got %v", cfg.RetryBaseDelay)
+	}
+	// Others should be defaults
+	if cfg.RetryMaxDelay != DefaultRetryMaxDelay {
+		t.Errorf("Expected default retry max delay, got %v", cfg.RetryMaxDelay)
+	}
+	if cfg.ConnectTimeout != DefaultConnectTimeout {
+		t.Errorf("Expected default connect timeout, got %v", cfg.ConnectTimeout)
+	}
+}
+
+// TestDefaultClientConfig tests that DefaultClientConfig returns expected values
+func TestDefaultClientConfig(t *testing.T) {
+	cfg := DefaultClientConfig()
+
+	if cfg.MaxRetries != DefaultMaxRetries {
+		t.Errorf("Expected max retries %d, got %d", DefaultMaxRetries, cfg.MaxRetries)
+	}
+	if cfg.RetryBaseDelay != DefaultRetryBaseDelay {
+		t.Errorf("Expected retry base delay %v, got %v", DefaultRetryBaseDelay, cfg.RetryBaseDelay)
+	}
+	if cfg.RetryMaxDelay != DefaultRetryMaxDelay {
+		t.Errorf("Expected retry max delay %v, got %v", DefaultRetryMaxDelay, cfg.RetryMaxDelay)
+	}
+	if cfg.ConnectTimeout != DefaultConnectTimeout {
+		t.Errorf("Expected connect timeout %v, got %v", DefaultConnectTimeout, cfg.ConnectTimeout)
+	}
+	if cfg.PoolConfig.PoolSize != DefaultPoolSize {
+		t.Errorf("Expected pool size %d, got %d", DefaultPoolSize, cfg.PoolConfig.PoolSize)
+	}
+}
+
+// TestPooledClient_WithCustomConfig tests creating client with custom configuration
+func TestPooledClient_WithCustomConfig(t *testing.T) {
+	socketPath := "/tmp/test-custom-config.sock"
+	cleanup := startMockServer(t, socketPath)
+	defer cleanup()
+
+	log := logger.WithField("test", "custom-config")
+	cfg := ClientConfig{
+		MaxRetries:     5,
+		RetryBaseDelay: 50 * time.Millisecond,
+		PoolConfig: PoolConfig{
+			PoolSize: 15,
+		},
+	}
+
+	client := NewPooledClientWithConfig(socketPath, cfg, log)
+	defer client.Close()
+
+	stats := client.Stats()
+	if stats["pool_size"].(int) != 15 {
+		t.Errorf("Expected pool_size 15, got %v", stats["pool_size"])
+	}
+}
+
+// TestIsRetryableError tests the isRetryableError function
+func TestIsRetryableError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"nil error", nil, false},
+		{"connection error", fmt.Errorf("connection refused"), true},
+		{"timeout error", fmt.Errorf("operation timeout"), true},
+		{"dial error", fmt.Errorf("dial failed"), true},
+		{"EOF error", fmt.Errorf("unexpected EOF"), true},
+		{"reset error", fmt.Errorf("connection reset by peer"), true},
+		{"broken pipe", fmt.Errorf("broken pipe"), true},
+		{"logical error", fmt.Errorf("job not found"), false},
+		{"validation error", fmt.Errorf("invalid job UUID"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isRetryableError(tt.err)
+			if result != tt.expected {
+				t.Errorf("isRetryableError(%v) = %v, expected %v", tt.err, result, tt.expected)
+			}
+		})
+	}
+}

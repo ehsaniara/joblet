@@ -61,8 +61,9 @@ func (s *Server) Start() error {
 
 	s.listener = listener
 
-	// Set socket permissions
-	if err := os.Chmod(s.socketPath, 0666); err != nil {
+	// Set socket permissions - restricted to owner only for security
+	// Use 0700 to prevent other users from connecting to the state service
+	if err := os.Chmod(s.socketPath, 0700); err != nil {
 		return fmt.Errorf("failed to set socket permissions: %w", err)
 	}
 
@@ -145,14 +146,29 @@ func (s *Server) handleConnection(netConn net.Conn) {
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024) // 1MB initial, 10MB max
 
 	for scanner.Scan() {
+		// Check if server is shutting down before processing
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
 		var msg Message
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
 			s.sendError(conn, "", "INVALID_JSON", err.Error())
 			continue
 		}
 
-		// Process message
+		// Process message with server context
 		response := s.processMessage(msg)
+
+		// Check again before sending response
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
 		if err := conn.enc.Encode(response); err != nil {
 			break
 		}
@@ -160,7 +176,8 @@ func (s *Server) handleConnection(netConn net.Conn) {
 }
 
 func (s *Server) processMessage(msg Message) *Response {
-	ctx := context.Background()
+	// Use server context so operations can be cancelled during shutdown
+	ctx := s.ctx
 
 	switch msg.Operation {
 	case OpCreate:

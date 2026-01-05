@@ -137,6 +137,11 @@ state:
   socket: "/opt/joblet/run/state-ipc.sock"
   buffer_size: 10000
   reconnect_delay: "5s"
+
+  # Pool configuration (optional, defaults shown)
+  pool:
+    size: 20
+    read_timeout: "10s"
 ```
 
 **Implementation:**
@@ -158,6 +163,37 @@ return ErrJobNotFound
 m.jobs[job.Uuid] = job
 return nil
 }
+```
+
+### Local Backend
+
+File-based state persistence for single-node deployments where state must survive restarts.
+
+**Features:**
+
+- ✅ State survives restarts
+- ✅ No external dependencies
+- ✅ Simple deployment
+- ✅ Fast operations (~1-5ms)
+- ⚠️ Single-node only
+- ⚠️ Requires filesystem durability
+
+**Use Cases:**
+
+- Single-node production deployments
+- VM deployments requiring persistence
+- On-premise deployments without cloud services
+- Development with persistence testing
+
+**Configuration:**
+
+```yaml
+state:
+  backend: "local"
+  socket: "/opt/joblet/run/state-ipc.sock"
+  local:
+    directory: "/opt/joblet/state"  # Directory for state files
+    sync_interval: "5s"             # How often to sync to disk
 ```
 
 ### DynamoDB Backend (EC2 Only)
@@ -213,6 +249,11 @@ state:
   socket: "/opt/joblet/run/state-ipc.sock"
   buffer_size: 10000
   reconnect_delay: "5s"
+
+  # Pool configuration (optional, defaults shown)
+  pool:
+    size: 20
+    read_timeout: "10s"
 
   storage:
     dynamodb:
@@ -448,7 +489,7 @@ server:
 
 # State persistence configuration
 state:
-  # Backend type: "memory" or "dynamodb"
+  # Backend type: "memory", "local", or "dynamodb"
   backend: "dynamodb"
 
   # IPC socket for communication
@@ -460,9 +501,30 @@ state:
   # Reconnect delay if state subprocess crashes
   reconnect_delay: "5s"
 
+  # Connection pool configuration (for high-concurrency scenarios)
+  pool:
+    size: 20                      # Max connections in pool (default: 20)
+    read_timeout: "10s"           # Timeout for read operations (default: 10s)
+    dial_timeout: "5s"            # Timeout for establishing new connections (default: 5s)
+    max_idle_time: "30s"          # Max idle time before health check (default: 30s)
+    health_check_timeout: "500ms" # Timeout for connection health checks (default: 500ms)
+    shutdown_timeout: "5s"        # Max time to wait for graceful shutdown (default: 5s)
+
+  # Client retry configuration (for transient failures)
+  client:
+    max_retries: 3                # Max retry attempts for transient failures (default: 3)
+    retry_base_delay: "100ms"     # Initial delay between retries (default: 100ms)
+    retry_max_delay: "2s"         # Maximum delay between retries (default: 2s)
+    connect_timeout: "5s"         # Timeout for initial connection test (default: 5s)
+
+  # Local storage configuration (when backend: "local")
+  local:
+    directory: "/opt/joblet/state"  # Directory for local state storage
+    sync_interval: "5s"             # How often to sync to disk (default: 5s)
+
   # Backend-specific configuration
   storage:
-    # DynamoDB configuration (ignored if backend: "memory")
+    # DynamoDB configuration (ignored if backend: "memory" or "local")
     dynamodb:
       # AWS region (empty = auto-detect from EC2 metadata)
       region: ""
@@ -483,6 +545,17 @@ state:
 state:
   backend: "memory"
   socket: "/opt/joblet/run/state-ipc.sock"
+```
+
+#### Production - Single Node (Local Backend)
+
+```yaml
+state:
+  backend: "local"
+  socket: "/opt/joblet/run/state-ipc.sock"
+  local:
+    directory: "/opt/joblet/state"
+    sync_interval: "5s"
 ```
 
 #### AWS EC2 (DynamoDB Backend)
@@ -836,7 +909,9 @@ The state client uses connection pooling for high-concurrency workloads (1000+ c
 - Each connection reused for multiple operations
 - Thread-safe acquisition and release
 - Automatic connection creation up to pool size
-- 10-second read timeout per operation
+- Configurable read timeout per operation (default: 10s)
+- Automatic retry with exponential backoff for transient failures
+- Connection health checks with configurable timeout
 
 **Performance Improvements:**
 
@@ -849,7 +924,21 @@ The state client uses connection pooling for high-concurrency workloads (1000+ c
 
 ```yaml
 state:
-  pool_size: 20  # Default: 20 connections
+  # Connection pool configuration
+  pool:
+    size: 20                      # Max connections in pool (default: 20)
+    read_timeout: "10s"           # Timeout for read operations (default: 10s)
+    dial_timeout: "5s"            # Timeout for establishing new connections (default: 5s)
+    max_idle_time: "30s"          # Max idle time before health check (default: 30s)
+    health_check_timeout: "500ms" # Timeout for connection health checks (default: 500ms)
+    shutdown_timeout: "5s"        # Max time to wait for graceful shutdown (default: 5s)
+
+  # Client retry configuration
+  client:
+    max_retries: 3                # Max retry attempts for transient failures (default: 3)
+    retry_base_delay: "100ms"     # Initial delay between retries (default: 100ms)
+    retry_max_delay: "2s"         # Maximum delay between retries (default: 2s)
+    connect_timeout: "5s"         # Timeout for initial connection test (default: 5s)
 ```
 
 **Pool Size Recommendations:**
@@ -867,7 +956,7 @@ state:
 ```go
 stats := stateClient.Stats()
 // Returns: pool_size, active_conns, available_conns,
-//          acquisitions, errors, timeouts
+//          acquisitions, creations, errors, timeouts, health_checks
 ```
 
 Performance characteristics show significant improvements with connection pooling at high concurrency levels.

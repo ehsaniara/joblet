@@ -113,16 +113,47 @@ func NewJobStore(cfg *config.Config, persistEnabled bool, logger *logger.Logger)
 	// Health check is deferred - happens after subprocess startup in server.go
 	stateSocketPath := "/opt/joblet/run/state-ipc.sock"
 
-	// Use pooled client for high-performance concurrent access (1000+ jobs)
-	// Pool size defaults to 20 connections, tuned for high concurrency
-	poolSize := 20
-	if cfg != nil && cfg.State.PoolSize > 0 {
-		poolSize = cfg.State.PoolSize
+	// Build client config from yaml config, with defaults for unset values
+	clientConfig := state.DefaultClientConfig()
+	if cfg != nil {
+		// Pool configuration
+		if cfg.State.Pool.Size > 0 {
+			clientConfig.PoolConfig.PoolSize = cfg.State.Pool.Size
+		}
+		if cfg.State.Pool.ReadTimeout > 0 {
+			clientConfig.PoolConfig.ReadTimeout = cfg.State.Pool.ReadTimeout
+		}
+		if cfg.State.Pool.DialTimeout > 0 {
+			clientConfig.PoolConfig.DialTimeout = cfg.State.Pool.DialTimeout
+		}
+		if cfg.State.Pool.MaxIdleTime > 0 {
+			clientConfig.PoolConfig.MaxIdleTime = cfg.State.Pool.MaxIdleTime
+		}
+		if cfg.State.Pool.HealthCheckTimeout > 0 {
+			clientConfig.PoolConfig.HealthCheckTimeout = cfg.State.Pool.HealthCheckTimeout
+		}
+		if cfg.State.Pool.ShutdownTimeout > 0 {
+			clientConfig.PoolConfig.ShutdownTimeout = cfg.State.Pool.ShutdownTimeout
+		}
+
+		// Client retry configuration
+		if cfg.State.Client.MaxRetries > 0 {
+			clientConfig.MaxRetries = cfg.State.Client.MaxRetries
+		}
+		if cfg.State.Client.RetryBaseDelay > 0 {
+			clientConfig.RetryBaseDelay = cfg.State.Client.RetryBaseDelay
+		}
+		if cfg.State.Client.RetryMaxDelay > 0 {
+			clientConfig.RetryMaxDelay = cfg.State.Client.RetryMaxDelay
+		}
+		if cfg.State.Client.ConnectTimeout > 0 {
+			clientConfig.ConnectTimeout = cfg.State.Client.ConnectTimeout
+		}
 	}
 
-	stateClient := state.NewPooledClient(stateSocketPath, poolSize, logger)
+	stateClient := state.NewPooledClientWithConfig(stateSocketPath, clientConfig, logger)
 	logger.Info("pooled state client created - will connect after subprocess starts",
-		"socket", stateSocketPath, "pool_size", poolSize)
+		"socket", stateSocketPath, "pool_size", clientConfig.PoolConfig.PoolSize)
 
 	// Logs are buffered in-memory for real-time streaming and forwarded to persist via IPC
 	return NewJobStorer(store, logMgr, pubsubSystem, persistClient, stateClient, persistEnabled, logger)

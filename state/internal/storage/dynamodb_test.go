@@ -46,7 +46,7 @@ func TestDynamoDB_Create(t *testing.T) {
 	}
 
 	// Verify condition expression (must not exist)
-	if *input.ConditionExpression != "attribute_not_exists(jobId)" {
+	if *input.ConditionExpression != "attribute_not_exists(job_uuid)" {
 		t.Errorf("expected condition expression for create, got %s", *input.ConditionExpression)
 	}
 
@@ -162,7 +162,7 @@ func TestDynamoDB_Update(t *testing.T) {
 	}
 
 	_, input, _ := mockClient.PutItemArgsForCall(0)
-	if *input.ConditionExpression != "attribute_exists(jobId)" {
+	if *input.ConditionExpression != "attribute_exists(job_uuid)" {
 		t.Errorf("expected condition expression for update, got %s", *input.ConditionExpression)
 	}
 }
