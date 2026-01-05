@@ -355,7 +355,7 @@ func (e *IsolatedEnvironment) InstallPipPackagesIsolated(packages []string, pipO
 	// First, verify Python is available in the isolated environment
 	e.logger.Debug("Verifying Python is available in isolated environment")
 	if output, err := e.RunInChroot(pythonBinary, "--version"); err != nil {
-		return fmt.Errorf("Python %s not found in isolated environment: %w\nOutput: %s\n\nMake sure the base Python package was installed in phase 7", pythonVersion, err, string(output))
+		return fmt.Errorf("python %s not found in isolated environment: %w\nOutput: %s\n\nMake sure the base Python package was installed in phase 7", pythonVersion, err, string(output))
 	}
 
 	// Ensure pip is available
@@ -367,7 +367,7 @@ func (e *IsolatedEnvironment) InstallPipPackagesIsolated(packages []string, pipO
 
 	// Verify pip is actually available
 	if output, err := e.RunInChroot(pythonBinary, "-m", "pip", "--version"); err != nil {
-		return fmt.Errorf("pip not available in isolated environment: %w\nOutput: %s\n\nTried ensurepip but pip is still not working. Check if python3-pip package is installed.", err, string(output))
+		return fmt.Errorf("pip not available in isolated environment: %w\nOutput: %s\n\nTried ensurepip but pip is still not working, check if python3-pip package is installed", err, string(output))
 	}
 
 	// Build pip install arguments

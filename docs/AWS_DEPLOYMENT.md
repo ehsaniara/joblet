@@ -6,15 +6,43 @@ Deploy Joblet on AWS EC2 in **2 simple steps** (~10 minutes total).
 
 ### Step 1: AWS Pre-Setup (CloudShell - 1 minute)
 
-Open **AWS Console → CloudShell** (top-right toolbar icon) and run:
+Open **AWS Console → CloudShell** (top-right toolbar icon) and run ONE of the following based on your storage preference:
+
+<details>
+<summary><b>CloudWatch (Recommended)</b></summary>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=cloudwatch
 ```
+</details>
+
+<details>
+<summary><b>S3 Storage</b></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=s3
+```
+
+The script will prompt you to enter your S3 bucket name. Create the bucket first if it doesn't exist:
+```bash
+aws s3 mb s3://your-bucket-name
+```
+</details>
+
+<details>
+<summary><b>Local Storage</b></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=local
+```
+</details>
 
 This interactive script creates:
 
-- `JobletEC2Role` IAM role with permissions for CloudWatch Logs, DynamoDB, and Secrets Manager
+- `JobletEC2Role` IAM role with permissions based on your storage selection:
+  - CloudWatch: CloudWatch Logs + DynamoDB + Secrets Manager
+  - S3: S3 bucket access + DynamoDB + Secrets Manager
+  - Local: DynamoDB + Secrets Manager only
 - `joblet-jobs` DynamoDB table for job state persistence
 - **DynamoDB VPC Endpoint** (required) for secure access to DynamoDB
 - **CA and client certificates** in AWS Secrets Manager (for horizontal scaling)
@@ -44,16 +72,56 @@ The script will:
     - **IAM Instance Profile**: Select `JobletEC2Role` ⬅️ Created in Step 1
     - **Storage**: 30 GB gp3 (default)
 
-3. **Expand "Advanced Details" → Scroll to "User data"** and paste:
+3. **Expand "Advanced Details" → Scroll to "User data"** and paste ONE of the following scripts based on your storage preference:
 
-```bash
-#!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-chmod +x /tmp/joblet-install.sh
-/tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
-```
+   #### Choose Your Storage Backend:
 
-   > **Note**: By default, this uses CloudWatch Logs for storage. See [Storage Backend Options](#storage-backend-options) for alternatives including S3.
+   <details>
+   <summary><b>CloudWatch Logs (Recommended)</b> - Real-time monitoring, AWS-native integration</summary>
+
+   ```bash
+   #!/bin/bash
+   curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
+   chmod +x /tmp/joblet-install.sh
+   /tmp/joblet-install.sh --storage=cloudwatch 2>&1 | tee /var/log/joblet-install.log
+   ```
+
+   **Features**: Real-time log streaming, CloudWatch Insights queries, 7-day default retention
+   </details>
+
+   <details>
+   <summary><b>S3 Storage</b> - Cost-effective long-term archival</summary>
+
+   ```bash
+   #!/bin/bash
+   curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
+   chmod +x /tmp/joblet-install.sh
+   /tmp/joblet-install.sh --storage=s3 --s3-bucket=your-bucket-name 2>&1 | tee /var/log/joblet-install.log
+   ```
+
+   **Prerequisites**: Create an S3 bucket first. Run `pre-setup.sh --storage=s3 --s3-bucket=your-bucket-name` in Step 1 to configure IAM permissions.
+
+   **Features**: Low cost, unlimited storage, lifecycle policies for archival
+
+   **Additional options**: `--s3-prefix=PREFIX` (default: joblet), `--s3-class=CLASS` (default: STANDARD)
+   </details>
+
+   <details>
+   <summary><b>Local Storage</b> - Development/testing, no AWS dependencies</summary>
+
+   ```bash
+   #!/bin/bash
+   curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
+   chmod +x /tmp/joblet-install.sh
+   /tmp/joblet-install.sh --storage=local 2>&1 | tee /var/log/joblet-install.log
+   ```
+
+   **Features**: No AWS permissions needed, logs stored at `/opt/joblet/logs/`
+
+   **Note**: Logs are lost if instance is terminated. Best for development/testing only.
+   </details>
+
+   > See [Storage Backend Options](#storage-backend-options) for detailed configuration options.
 
 4. Click **Launch instance**
 
@@ -63,7 +131,10 @@ When the instance boots, the user data script automatically:
 
 - **Detects EC2 environment** (region, instance ID, metadata)
 - **Installs Joblet** via Debian/RPM package
-- **Configures CloudWatch Logs** `/joblet` log group (for log aggregation)
+- **Configures storage backend** based on your selection:
+  - CloudWatch: Creates `/joblet` log group for real-time aggregation
+  - S3: Configures bucket and prefix for batch uploads
+  - Local: Uses `/opt/joblet/logs/` on disk
 - **Fetches CA/client certificates** from Secrets Manager (shared across instances)
 - **Generates server TLS certificate** (instance-specific, embedded in config)
 - **Starts Joblet server** on port 443 (systemd service)
@@ -98,7 +169,7 @@ rnx job list
 # Run first job
 rnx job run echo "Hello from Joblet on AWS!"
 
-# View job logs (stored in CloudWatch)
+# View job logs (fetched from configured storage backend)
 rnx job log <job-id>
 
 # Check job status
@@ -108,17 +179,27 @@ rnx job status <job-id>
 ### 3. Verify AWS Integration
 
 ```bash
-# View CloudWatch Logs
-aws logs describe-log-streams --log-group-name /joblet
-
-# View DynamoDB table
-aws dynamodb describe-table --table-name joblet-jobs
-
 # SSH to instance
 ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}
 
 # Check Joblet service status
 sudo systemctl status joblet
+
+# View DynamoDB table (job state)
+aws dynamodb describe-table --table-name joblet-jobs
+```
+
+**Verify storage backend (based on your selection):**
+
+```bash
+# If using CloudWatch:
+aws logs describe-log-streams --log-group-name /joblet
+
+# If using S3:
+aws s3 ls s3://your-bucket-name/joblet/
+
+# If using Local:
+ssh ubuntu@${PUBLIC_IP} "ls -la /opt/joblet/logs/"
 ```
 
 ---
@@ -195,7 +276,7 @@ ensures Joblet remains functional for development/testing even without proper AW
 
 ### Storage Backend Options
 
-Joblet supports three storage backends for logs and metrics. Choose based on your requirements:
+Joblet supports three storage backends for logs and metrics. Select your preferred backend in [Step 2](#step-2-launch-ec2-instance-console---5-minutes) when configuring User Data.
 
 | Backend | Best For | Pros | Cons |
 |---------|----------|------|------|
@@ -203,39 +284,46 @@ Joblet supports three storage backends for logs and metrics. Choose based on you
 | **S3** | Long-term archival, cost optimization | Very low cost, unlimited storage, lifecycle policies | Not real-time, requires S3 bucket setup |
 | **Local** | Development, testing, VMs | No AWS dependencies, zero cost | Lost on instance termination, no aggregation |
 
+#### Command-Line Options (Preferred)
+
+The install script supports command-line options for cleaner User Data:
+
+```bash
+/tmp/joblet-install.sh [OPTIONS]
+
+Options:
+  --storage=TYPE      cloudwatch (default), s3, or local
+  --s3-bucket=NAME    S3 bucket name (required for s3)
+  --s3-prefix=PREFIX  S3 key prefix (default: joblet)
+  --s3-class=CLASS    STANDARD, STANDARD_IA, GLACIER, etc.
+  --version=VERSION   Joblet version (default: latest)
+  --port=PORT         Server port (default: 443)
+  --help              Show all options
+```
+
 #### Option 1: CloudWatch Logs (Default)
 
-CloudWatch is the default when deploying on EC2. No additional configuration needed:
+No additional configuration needed. CloudWatch log group `/joblet` is created automatically.
 
 ```bash
-#!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-chmod +x /tmp/joblet-install.sh
-/tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+/tmp/joblet-install.sh --storage=cloudwatch
 ```
 
-Or explicitly set the backend:
+**Environment variables (alternative):**
 
-```bash
-PERSIST_BACKEND=cloudwatch /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PERSIST_BACKEND` | `cloudwatch` | Explicitly set backend |
+| `CLOUDWATCH_LOG_GROUP` | `/joblet` | Custom log group name |
+| `CLOUDWATCH_RETENTION_DAYS` | `7` | Log retention period |
 
 #### Option 2: S3 Storage
 
-For cost-effective long-term storage, use S3. **Requires an S3 bucket** (create one before deployment):
-
 ```bash
-#!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-chmod +x /tmp/joblet-install.sh
-PERSIST_BACKEND=s3 \
-S3_BUCKET=my-joblet-logs \
-S3_PREFIX=joblet \
-S3_STORAGE_CLASS=STANDARD \
-/tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+/tmp/joblet-install.sh --storage=s3 --s3-bucket=my-bucket --s3-prefix=joblet --s3-class=STANDARD
 ```
 
-**S3 Environment Variables:**
+**Environment variables (alternative):**
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -252,9 +340,9 @@ S3_STORAGE_CLASS=STANDARD \
 - `GLACIER` - Archive, minutes to hours retrieval
 - `DEEP_ARCHIVE` - Long-term archive, 12+ hours retrieval
 
-**S3 IAM Permissions Required:**
+**S3 IAM Permissions:**
 
-Add these permissions to `JobletEC2Role` when using S3:
+When you run `pre-setup.sh --storage=s3 --s3-bucket=YOUR_BUCKET`, the IAM policy is automatically configured with these permissions scoped to your bucket:
 
 ```json
 {
@@ -266,11 +354,13 @@ Add these permissions to `JobletEC2Role` when using S3:
         "s3:DeleteObject"
     ],
     "Resource": [
-        "arn:aws:s3:::my-joblet-logs",
-        "arn:aws:s3:::my-joblet-logs/*"
+        "arn:aws:s3:::YOUR_BUCKET",
+        "arn:aws:s3:::YOUR_BUCKET/*"
     ]
 }
 ```
+
+> **Note**: If you ran `pre-setup.sh` without `--storage=s3`, you'll need to manually add S3 permissions to `JobletEC2Role` or re-run the pre-setup with the correct storage option.
 
 **S3 Lifecycle Rules (Recommended):**
 
@@ -291,13 +381,10 @@ aws s3api put-bucket-lifecycle-configuration --bucket my-joblet-logs \
 
 #### Option 3: Local Storage (No AWS Services)
 
-For development, testing, or VM deployments without AWS:
+For development, testing, or VM deployments without AWS. No S3 bucket or CloudWatch permissions needed.
 
 ```bash
-#!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-chmod +x /tmp/joblet-install.sh
-PERSIST_BACKEND=local /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
+/tmp/joblet-install.sh --storage=local
 ```
 
 **Local Storage Behavior:**
@@ -306,13 +393,28 @@ PERSIST_BACKEND=local /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.
 - Job state is in-memory (lost on restart)
 - No AWS permissions required
 
+**Environment variables (alternative):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PERSIST_BACKEND` | - | Must be `local` |
+| `LOCAL_LOG_DIR` | `/opt/joblet/logs` | Custom log directory |
+| `LOCAL_METRICS_DIR` | `/opt/joblet/metrics` | Custom metrics directory |
+
 ### Alternative: Fully Automated CLI Deployment
 
 If you prefer command-line automation instead of the Console:
 
 ```bash
 # Step 1: AWS Pre-Setup (IAM + DynamoDB)
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
+# For CloudWatch (default):
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=cloudwatch
+
+# For S3 (interactive - will prompt for bucket name):
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=s3
+
+# For S3 (non-interactive - for scripts/automation):
+curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=s3 --s3-bucket=my-bucket
 
 # Step 2: Launch instance (will prompt for security group)
 export KEY_NAME="your-ssh-key-name"
@@ -326,28 +428,20 @@ The `launch-instance.sh` script will:
 - Launch EC2 instance with user data
 - Output instance details (IP, DNS, etc.)
 
-### Disable CloudWatch/DynamoDB (Local-Only Mode)
+### Local-Only Mode (No AWS Services)
 
-If you don't want AWS CloudWatch or DynamoDB integration, use the local storage backend:
+To deploy without CloudWatch or DynamoDB:
 
-1. **Skip Step 1** (don't create IAM role - optional, but saves setup time)
-2. In Step 2, use this user data:
-
-```bash
-#!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh
-chmod +x /tmp/joblet-install.sh
-PERSIST_BACKEND=local /tmp/joblet-install.sh 2>&1 | tee /var/log/joblet-install.log
-```
+1. **Skip Step 1** (IAM role not needed)
+2. In Step 2, select the **💾 Local Storage** option
 
 > **Note**: `ENABLE_CLOUDWATCH=false` is still supported for backward compatibility, but `PERSIST_BACKEND=local` is preferred.
 
-This deploys Joblet with:
-
-- ❌ No CloudWatch Logs (logs stored in `/opt/joblet/logs/` on instance)
-- ❌ No DynamoDB (job state stored in memory, lost on restart)
-- ✅ Still fully functional for job execution
-- ✅ No AWS permissions required
+This results in:
+- Logs stored locally at `/opt/joblet/logs/`
+- Job state in-memory (lost on restart)
+- No AWS permissions required
+- Fully functional for job execution
 
 ### Monitor Installation Progress
 

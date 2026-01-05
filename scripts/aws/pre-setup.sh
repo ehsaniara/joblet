@@ -6,15 +6,112 @@
 #   - Creates DynamoDB table for job state persistence
 #   - Configures VPC Endpoint for secure DynamoDB access (no internet required)
 #
-# Usage: ./pre-setup.sh
+# Usage: ./pre-setup.sh [OPTIONS]
 # Or: curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash
+#
+# Options:
+#   --storage=TYPE        Storage backend: cloudwatch (default), s3, local
+#   --s3-bucket=NAME      S3 bucket name (required when --storage=s3)
+#   --help                Show this help
 #
 
 set -e
 
+# ============================================================================
+# Command-line Argument Parsing
+# ============================================================================
+
+STORAGE_BACKEND="cloudwatch"
+S3_BUCKET=""
+
+show_help() {
+    cat << 'EOF'
+Joblet AWS Pre-Setup Script
+
+USAGE:
+    ./pre-setup.sh [OPTIONS]
+
+OPTIONS:
+    --storage=TYPE        Storage backend type (default: cloudwatch)
+                          cloudwatch  - AWS CloudWatch Logs (includes CloudWatch permissions)
+                          s3          - AWS S3 bucket (includes S3 permissions)
+                          local       - Local filesystem (no storage permissions)
+
+    --s3-bucket=NAME      S3 bucket name (optional for --storage=s3)
+                          If not provided, the script will prompt you interactively.
+                          The IAM policy will be scoped to this specific bucket.
+
+    --help                Show this help message
+
+EXAMPLES:
+    # Default: CloudWatch storage
+    ./pre-setup.sh
+
+    # S3 storage (interactive - will prompt for bucket name)
+    ./pre-setup.sh --storage=s3
+
+    # S3 storage (non-interactive - for automation)
+    ./pre-setup.sh --storage=s3 --s3-bucket=my-joblet-logs
+
+    # Local storage (minimal permissions)
+    ./pre-setup.sh --storage=local
+
+Note: DynamoDB permissions for job state are always included regardless of storage backend.
+EOF
+    exit 0
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --storage=*)
+            STORAGE_BACKEND="${1#*=}"
+            ;;
+        --s3-bucket=*)
+            S3_BUCKET="${1#*=}"
+            ;;
+        --help|-h)
+            show_help
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Prompt for S3 bucket if using S3 storage and bucket not provided
+if [ "$STORAGE_BACKEND" = "s3" ] && [ -z "$S3_BUCKET" ]; then
+    echo "=========================================================================="
+    echo "S3 Storage Configuration"
+    echo "=========================================================================="
+    echo ""
+    echo "You selected S3 storage backend. Please provide your S3 bucket name."
+    echo ""
+    echo "Note: The bucket must already exist. Create it first if needed:"
+    echo "  aws s3 mb s3://your-bucket-name"
+    echo ""
+    read -p "Enter S3 bucket name: " S3_BUCKET </dev/tty
+
+    if [ -z "$S3_BUCKET" ]; then
+        echo "❌ Error: S3 bucket name is required"
+        exit 1
+    fi
+
+    echo ""
+    echo "✅ Using S3 bucket: $S3_BUCKET"
+    echo ""
+fi
+
 echo "=========================================================================="
 echo "Joblet AWS Pre-Setup"
 echo "=========================================================================="
+echo ""
+echo "Storage backend: $STORAGE_BACKEND"
+if [ "$STORAGE_BACKEND" = "s3" ]; then
+    echo "S3 bucket: $S3_BUCKET"
+fi
 echo ""
 echo "This script will create:"
 echo "  • IAM Policy: JobletAWSPolicy"
@@ -25,7 +122,13 @@ echo "  • VPC Endpoint for DynamoDB (required)"
 echo "  • Secrets Manager: CA and client certificates (for horizontal scaling)"
 echo ""
 echo "Permissions granted:"
-echo "  ✅ CloudWatch Logs - Automatic log aggregation"
+if [ "$STORAGE_BACKEND" = "cloudwatch" ]; then
+    echo "  ✅ CloudWatch Logs - Automatic log aggregation"
+elif [ "$STORAGE_BACKEND" = "s3" ]; then
+    echo "  ✅ S3 - Log storage in bucket: $S3_BUCKET"
+else
+    echo "  ⚪ Local storage - No cloud storage permissions"
+fi
 echo "  ✅ DynamoDB - Persistent job state (via private VPC endpoint)"
 echo "  ✅ Secrets Manager - Shared CA/client certificates"
 echo "  ✅ EC2 Metadata - Region detection"
@@ -63,10 +166,17 @@ echo ""
 echo "Checking for existing IAM resources..."
 
 # Define the policy document (used for both create and update)
-cat > /tmp/joblet-aws-policy.json << 'EOF'
+# Build policy based on storage backend
+generate_policy() {
+    cat << 'POLICY_START'
 {
   "Version": "2012-10-17",
   "Statement": [
+POLICY_START
+
+    # Storage-specific permissions
+    if [ "$STORAGE_BACKEND" = "cloudwatch" ]; then
+        cat << 'CLOUDWATCH_POLICY'
     {
       "Sid": "CloudWatchLogsAccess",
       "Effect": "Allow",
@@ -94,6 +204,29 @@ cat > /tmp/joblet-aws-policy.json << 'EOF'
       ],
       "Resource": "*"
     },
+CLOUDWATCH_POLICY
+    elif [ "$STORAGE_BACKEND" = "s3" ]; then
+        cat << S3_POLICY
+    {
+      "Sid": "S3LogStorageAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::${S3_BUCKET}",
+        "arn:aws:s3:::${S3_BUCKET}/*"
+      ]
+    },
+S3_POLICY
+    fi
+    # Note: local storage doesn't need any storage permissions
+
+    # Common permissions (always included)
+    cat << 'COMMON_POLICY'
     {
       "Sid": "DynamoDBStateAccess",
       "Effect": "Allow",
@@ -135,7 +268,10 @@ cat > /tmp/joblet-aws-policy.json << 'EOF'
     }
   ]
 }
-EOF
+COMMON_POLICY
+}
+
+generate_policy > /tmp/joblet-aws-policy.json
 
 # Check if policy already exists
 EXISTING_POLICY=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='JobletAWSPolicy'].Arn" --output text)
@@ -738,6 +874,11 @@ if [ -n "$VPC_ID" ]; then
     fi
 fi
 echo ""
+echo "Storage backend: $STORAGE_BACKEND"
+if [ "$STORAGE_BACKEND" = "s3" ]; then
+    echo "  S3 bucket: $S3_BUCKET (IAM permissions configured)"
+fi
+echo ""
 echo "=========================================================================="
 echo "Next Step: Launch EC2 Instance"
 echo "=========================================================================="
@@ -749,7 +890,7 @@ if [ -n "$VPC_ID" ]; then
     echo "  VPC:              $VPC_ID"
 fi
 echo "  IAM Role:         JobletEC2Role"
-echo "  AMI:              Ubuntu Server 22.04 LTS"
+echo "  AMI:              Ubuntu Server 24.04 LTS"
 echo "  Instance Type:    t3.medium (or larger)"
 echo ""
 echo "From AWS Console: EC2 → Launch Instance"
@@ -758,4 +899,18 @@ if [ -n "$VPC_ID" ]; then
     echo "  2. Network settings → Select VPC: $VPC_ID"
 fi
 echo "  3. Advanced details → IAM instance profile: JobletEC2Role"
+echo "  4. Advanced details → User data (paste below):"
+echo ""
+echo "┌──────────────────────────────────────────────────────────────────────┐"
+echo "│ #!/bin/bash                                                          │"
+echo "│ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/ec2-user-data.sh -o /tmp/joblet-install.sh"
+echo "│ chmod +x /tmp/joblet-install.sh                                      │"
+if [ "$STORAGE_BACKEND" = "cloudwatch" ]; then
+    echo "│ /tmp/joblet-install.sh --storage=cloudwatch 2>&1 | tee /var/log/joblet-install.log"
+elif [ "$STORAGE_BACKEND" = "s3" ]; then
+    echo "│ /tmp/joblet-install.sh --storage=s3 --s3-bucket=$S3_BUCKET 2>&1 | tee /var/log/joblet-install.log"
+else
+    echo "│ /tmp/joblet-install.sh --storage=local 2>&1 | tee /var/log/joblet-install.log"
+fi
+echo "└──────────────────────────────────────────────────────────────────────┘"
 echo ""

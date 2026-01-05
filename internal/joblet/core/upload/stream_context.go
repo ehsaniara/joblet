@@ -57,8 +57,8 @@ func (sc *StreamContext) GetPipePath() string {
 	return sc.PipePath
 }
 
-// GetJobID returns the job ID
-func (sc *StreamContext) GetJobID() string {
+// GetJobUUID returns the job UUID
+func (sc *StreamContext) GetJobUUID() string {
 	return sc.JobUUID
 }
 

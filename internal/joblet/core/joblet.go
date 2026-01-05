@@ -107,7 +107,7 @@ func NewPlatformJoblet(store adapters.JobStorer, metricsStore *adapters.MetricsS
 	go j.cleanup.SchedulePeriodicCleanup(
 		context.Background(),
 		PeriodicCleanupInterval,
-		j.getActiveJobIDs,
+		j.getActiveJobUUIDs,
 	)
 
 	return j
@@ -686,16 +686,16 @@ func (j *Joblet) handleExecutionFailure(job *domain.Job) {
 	}
 }
 
-// getActiveJobIDs returns a map of all active job IDs for cleanup coordination.
+// getActiveJobUUIDs returns a map of all active job UUIDs for cleanup coordination.
 // Used by periodic cleanup to avoid cleaning up jobs that are still active.
-func (j *Joblet) getActiveJobIDs() map[string]bool {
+func (j *Joblet) getActiveJobUUIDs() map[string]bool {
 	jobs := j.store.ListJobs()
 
-	activeIDs := make(map[string]bool)
+	activeUUIDs := make(map[string]bool)
 	for _, jb := range jobs {
-		activeIDs[jb.Uuid] = true
+		activeUUIDs[jb.Uuid] = true
 	}
-	return activeIDs
+	return activeUUIDs
 }
 
 // initializeComponents creates all specialized components for job execution.

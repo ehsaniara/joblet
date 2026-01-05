@@ -34,8 +34,8 @@ type UploadStreamer interface {
 	// SetManager sets the upload manager
 	SetManager(manager UploadManager)
 
-	// GetJobID returns the job ID this streamer is associated with
-	GetJobID() string
+	// GetJobUUID returns the job UUID this streamer is associated with
+	GetJobUUID() string
 
 	// GetTransport returns the transport mechanism
 	GetTransport() UploadTransport

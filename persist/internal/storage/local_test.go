@@ -469,7 +469,7 @@ func TestLocalBackend_Close(t *testing.T) {
 	}
 }
 
-func TestLocalBackend_EmptyJobID(t *testing.T) {
+func TestLocalBackend_EmptyJobUUID(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfg := &config.StorageConfig{

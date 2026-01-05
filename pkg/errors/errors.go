@@ -237,7 +237,7 @@ func IsPermissionError(err error) bool {
 }
 
 // Error extraction helpers
-func GetJobID(err error) (string, bool) {
+func GetJobUUID(err error) (string, bool) {
 	var je *JobError
 	if errors.As(err, &je) {
 		return je.JobUUID, true

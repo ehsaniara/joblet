@@ -401,7 +401,7 @@ func TestCloudWatchBackend_WriteMetrics_Format(t *testing.T) {
 
 		// Metrics are now sent to CloudWatch Metrics API
 		// Expected namespace: Joblet/Jobs
-		// Expected dimensions: JobID=metrics-job, NodeID=metrics-write-node
+		// Expected dimensions: JobUUID=metrics-job, NodeID=metrics-write-node
 
 		_ = backend.Close()
 	}
