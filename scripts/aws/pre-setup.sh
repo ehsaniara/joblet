@@ -81,6 +81,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+# Get region early (needed for S3 bucket validation/creation)
+REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
+
 # Prompt for S3 bucket if using S3 storage and bucket not provided
 if [ "$STORAGE_BACKEND" = "s3" ] && [ -z "$S3_BUCKET" ]; then
     echo "=========================================================================="
@@ -98,9 +101,52 @@ if [ "$STORAGE_BACKEND" = "s3" ] && [ -z "$S3_BUCKET" ]; then
         echo "❌ Error: S3 bucket name is required"
         exit 1
     fi
+fi
 
+# Validate S3 bucket exists (when using S3 storage)
+if [ "$STORAGE_BACKEND" = "s3" ] && [ -n "$S3_BUCKET" ]; then
     echo ""
-    echo "✅ Using S3 bucket: $S3_BUCKET"
+    echo "Checking if S3 bucket exists: $S3_BUCKET"
+
+    if aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then
+        echo "✅ S3 bucket exists and is accessible: $S3_BUCKET"
+    else
+        # Check if it's a permissions issue vs bucket doesn't exist
+        ERROR_MSG=$(aws s3api head-bucket --bucket "$S3_BUCKET" 2>&1)
+
+        if echo "$ERROR_MSG" | grep -q "404\|NoSuchBucket"; then
+            echo ""
+            echo "❌ Error: S3 bucket '$S3_BUCKET' does not exist"
+            echo ""
+            echo "Create the bucket first:"
+            echo "  aws s3 mb s3://$S3_BUCKET --region $REGION"
+            echo ""
+            read -p "Would you like to create it now? (y/N): " CREATE_BUCKET </dev/tty
+            if [ "$CREATE_BUCKET" = "y" ] || [ "$CREATE_BUCKET" = "Y" ]; then
+                if aws s3 mb "s3://$S3_BUCKET" --region "$REGION" 2>&1; then
+                    echo "✅ S3 bucket created: $S3_BUCKET"
+                else
+                    echo "❌ Failed to create bucket. Please create it manually and re-run."
+                    exit 1
+                fi
+            else
+                echo "Please create the bucket and re-run the script."
+                exit 1
+            fi
+        elif echo "$ERROR_MSG" | grep -q "403\|AccessDenied"; then
+            echo ""
+            echo "⚠️  Warning: Cannot verify bucket '$S3_BUCKET' - access denied"
+            echo "   The bucket may exist but you don't have permission to check."
+            echo "   Proceeding with setup - EC2 instance will need proper IAM permissions."
+            echo ""
+        else
+            echo ""
+            echo "⚠️  Warning: Could not verify bucket '$S3_BUCKET'"
+            echo "   Error: $ERROR_MSG"
+            echo "   Proceeding with setup anyway..."
+            echo ""
+        fi
+    fi
     echo ""
 fi
 
@@ -398,8 +444,8 @@ else
     echo "Creating DynamoDB table: joblet-jobs in region: $REGION"
     if aws dynamodb create-table \
         --table-name joblet-jobs \
-        --attribute-definitions AttributeName=jobId,AttributeType=S \
-        --key-schema AttributeName=jobId,KeyType=HASH \
+        --attribute-definitions AttributeName=job_uuid,AttributeType=S \
+        --key-schema AttributeName=job_uuid,KeyType=HASH \
         --billing-mode PAY_PER_REQUEST \
         --region "$REGION" \
         --tags Key=ManagedBy,Value=Joblet Key=Purpose,Value=JobStatePersistence \

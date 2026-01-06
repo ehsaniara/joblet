@@ -413,8 +413,10 @@ configure_storage_backend() {
             log "Configuring CloudWatch storage backend..."
 
             # Update persist storage to CloudWatch (handle both quoted and unquoted values)
-            sed -i 's/type: "local"/type: cloudwatch/' "$CONFIG_FILE"
-            sed -i 's/type: local/type: cloudwatch/' "$CONFIG_FILE"
+            sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
+            sed -i 's/type: local/type: "cloudwatch"/' "$CONFIG_FILE"
+            sed -i 's/type: "s3"/type: "cloudwatch"/' "$CONFIG_FILE"
+            sed -i 's/type: s3/type: "cloudwatch"/' "$CONFIG_FILE"
 
             # Set CloudWatch region (required by persist)
             if [ -n "$EC2_REGION" ]; then
@@ -441,9 +443,10 @@ configure_storage_backend() {
             fi
 
             # Update persist storage to S3 (handle both quoted and unquoted values)
-            sed -i 's/type: "local"/type: s3/' "$CONFIG_FILE"
-            sed -i 's/type: local/type: s3/' "$CONFIG_FILE"
-            sed -i 's/type: cloudwatch/type: s3/' "$CONFIG_FILE"
+            sed -i 's/type: "local"/type: "s3"/' "$CONFIG_FILE"
+            sed -i 's/type: local/type: "s3"/' "$CONFIG_FILE"
+            sed -i 's/type: "cloudwatch"/type: "s3"/' "$CONFIG_FILE"
+            sed -i 's/type: cloudwatch/type: "s3"/' "$CONFIG_FILE"
 
             # Set S3 region
             if [ -n "$EC2_REGION" ]; then
@@ -481,10 +484,17 @@ configure_storage_backend() {
             ;;
 
         local)
-            log "Using local storage backend (no AWS services for persistence)"
+            log "Configuring local storage backend..."
+
+            # Update persist storage to local (handle both quoted and unquoted values)
+            sed -i 's/type: "cloudwatch"/type: "local"/' "$CONFIG_FILE"
+            sed -i 's/type: cloudwatch/type: "local"/' "$CONFIG_FILE"
+            sed -i 's/type: "s3"/type: "local"/' "$CONFIG_FILE"
+            sed -i 's/type: s3/type: "local"/' "$CONFIG_FILE"
+
             log "  Logs stored in: ${JOBLET_HOME}/logs/"
             log "  State: in-memory (not persistent across restarts)"
-            # Config already defaults to local, no changes needed
+            log_success "Set persist=local, state=memory"
             ;;
 
         *)
