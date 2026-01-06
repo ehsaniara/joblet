@@ -101,6 +101,8 @@ The script will:
    /tmp/joblet-install.sh --storage=s3 --s3-bucket=your-bucket-name 2>&1 | tee /var/log/joblet-install.log
    ```
 
+   > ⚠️ **Important**: Replace `your-bucket-name` with your actual S3 bucket name (the same one you used in Step 1).
+
    **Prerequisites**: Create an S3 bucket first. Run `pre-setup.sh --storage=s3 --s3-bucket=your-bucket-name` in Step 1 to configure IAM permissions.
 
    **Features**: Low cost, unlimited storage, lifecycle policies for archival
