@@ -88,7 +88,7 @@ func (a *MetricsStoreAdapter) StartCollector(
 	}
 
 	// Create collector with this adapter as the publisher
-	collector := metrics.NewCollector(
+	collector, err := metrics.NewCollector(
 		jobID,
 		cgroupPath,
 		sampleInterval,
@@ -96,6 +96,9 @@ func (a *MetricsStoreAdapter) StartCollector(
 		gpuIndices,
 		a, // MetricsStoreAdapter implements MetricsPublisher
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create collector: %w", err)
+	}
 
 	// Start the collector
 	if err := collector.Start(); err != nil {
