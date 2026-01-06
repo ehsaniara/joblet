@@ -78,7 +78,7 @@ OPTIONS:
 
     --s3-bucket=NAME      S3 bucket name (required when --storage=s3)
 
-    --s3-prefix=PREFIX    S3 key prefix for objects (default: joblet)
+    --s3-prefix=PREFIX    S3 key prefix for objects (default: jobs/)
 
     --s3-class=CLASS      S3 storage class (default: STANDARD)
                           Options: STANDARD, STANDARD_IA, ONEZONE_IA, GLACIER, DEEP_ARCHIVE
@@ -412,17 +412,20 @@ configure_storage_backend() {
         cloudwatch)
             log "Configuring CloudWatch storage backend..."
 
-            # Update persist storage to CloudWatch
-            sed -i 's/type: "local"/type: "cloudwatch"/' "$CONFIG_FILE"
+            # Update persist storage to CloudWatch (handle both quoted and unquoted values)
+            sed -i 's/type: "local"/type: cloudwatch/' "$CONFIG_FILE"
+            sed -i 's/type: local/type: cloudwatch/' "$CONFIG_FILE"
 
             # Set CloudWatch region (required by persist)
             if [ -n "$EC2_REGION" ]; then
-                sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+                sed -i "s/region: ''/region: '$EC2_REGION'/" "$CONFIG_FILE"
+                sed -i "s/region: \"\"/region: '$EC2_REGION'/" "$CONFIG_FILE"
                 log_success "Set CloudWatch region: $EC2_REGION"
             fi
 
             # Update state backend to DynamoDB
-            sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
+            sed -i 's/backend: "memory"/backend: dynamodb/' "$CONFIG_FILE"
+            sed -i 's/backend: memory/backend: dynamodb/' "$CONFIG_FILE"
 
             log_success "Set persist=cloudwatch, state=dynamodb"
             ;;
@@ -437,33 +440,42 @@ configure_storage_backend() {
                 return 1
             fi
 
-            # Update persist storage to S3
-            sed -i 's/type: "local"/type: "s3"/' "$CONFIG_FILE"
+            # Update persist storage to S3 (handle both quoted and unquoted values)
+            sed -i 's/type: "local"/type: s3/' "$CONFIG_FILE"
+            sed -i 's/type: local/type: s3/' "$CONFIG_FILE"
+            sed -i 's/type: cloudwatch/type: s3/' "$CONFIG_FILE"
 
             # Set S3 region
             if [ -n "$EC2_REGION" ]; then
-                sed -i "s/region: \"\"/region: \"$EC2_REGION\"/" "$CONFIG_FILE"
+                sed -i "s/region: ''/region: '$EC2_REGION'/" "$CONFIG_FILE"
+                sed -i "s/region: \"\"/region: '$EC2_REGION'/" "$CONFIG_FILE"
                 log_success "Set S3 region: $EC2_REGION"
             fi
 
-            # Set S3 bucket
-            sed -i "s/bucket: \"\"/bucket: \"$S3_BUCKET\"/" "$CONFIG_FILE"
-            log_success "Set S3 bucket: $S3_BUCKET"
+            # Set S3 configuration
+            # Update bucket (handle both quoted and unquoted empty values)
+            sed -i "s/bucket: ''/bucket: '$S3_BUCKET'/" "$CONFIG_FILE"
+            sed -i "s/bucket: \"\"/bucket: '$S3_BUCKET'/" "$CONFIG_FILE"
 
-            # Set S3 key prefix
+            # Update key_prefix if specified (default in template is "jobs/")
             if [ -n "$S3_PREFIX" ]; then
-                sed -i "s|key_prefix: \"jobs/\"|key_prefix: \"$S3_PREFIX\"|" "$CONFIG_FILE"
+                sed -i "s|key_prefix: \"jobs/\"|key_prefix: '$S3_PREFIX'|" "$CONFIG_FILE"
+                sed -i "s|key_prefix: 'jobs/'|key_prefix: '$S3_PREFIX'|" "$CONFIG_FILE"
                 log_success "Set S3 key_prefix: $S3_PREFIX"
             fi
 
-            # Set S3 storage class
-            if [ -n "$S3_STORAGE_CLASS" ]; then
-                sed -i "s/storage_class: \"STANDARD\"/storage_class: \"$S3_STORAGE_CLASS\"/" "$CONFIG_FILE"
-                log_success "Set S3 storage class: $S3_STORAGE_CLASS"
+            # Update storage_class if specified (default in template is "STANDARD")
+            if [ -n "$S3_STORAGE_CLASS" ] && [ "$S3_STORAGE_CLASS" != "STANDARD" ]; then
+                sed -i "s/storage_class: \"STANDARD\"/storage_class: '$S3_STORAGE_CLASS'/" "$CONFIG_FILE"
+                sed -i "s/storage_class: 'STANDARD'/storage_class: '$S3_STORAGE_CLASS'/" "$CONFIG_FILE"
+                log_success "Set S3 storage_class: $S3_STORAGE_CLASS"
             fi
 
+            log_success "Set S3 bucket: $S3_BUCKET"
+
             # Update state backend to DynamoDB (S3 also uses DynamoDB for state)
-            sed -i 's/backend: "memory"/backend: "dynamodb"/' "$CONFIG_FILE"
+            sed -i 's/backend: "memory"/backend: dynamodb/' "$CONFIG_FILE"
+            sed -i 's/backend: memory/backend: dynamodb/' "$CONFIG_FILE"
 
             log_success "Set persist=s3 (bucket=$S3_BUCKET), state=dynamodb"
             ;;
@@ -609,7 +621,7 @@ display_summary() {
             log "  Storage Class: ${S3_STORAGE_CLASS:-STANDARD}"
             log "  Region: $EC2_REGION"
             log "  State Storage: AWS DynamoDB (joblet-jobs table)"
-            log "  View logs: S3 Console → $S3_BUCKET → ${S3_PREFIX:-jobs/}"
+            log "  View logs: aws s3 ls s3://$S3_BUCKET/${S3_PREFIX:-jobs/}"
             ;;
         local)
             log "  Log Storage: Local filesystem (${JOBLET_HOME}/logs/)"

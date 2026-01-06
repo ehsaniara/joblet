@@ -119,6 +119,9 @@ echo "  • IAM Role: JobletEC2Role"
 echo "  • Instance Profile: JobletEC2Role"
 echo "  • DynamoDB Table: joblet-jobs"
 echo "  • VPC Endpoint for DynamoDB (required)"
+if [ "$STORAGE_BACKEND" = "s3" ]; then
+    echo "  • VPC Endpoint for S3 (with bucket policy)"
+fi
 echo "  • Secrets Manager: CA and client certificates (for horizontal scaling)"
 echo ""
 echo "Permissions granted:"
@@ -852,6 +855,141 @@ POLICY_EOF
 
         rm -f /tmp/dynamodb-endpoint-policy.json
     fi
+
+    # ============================================================================
+    # S3 VPC Endpoint Configuration (when using S3 storage)
+    # ============================================================================
+    if [ "$STORAGE_BACKEND" = "s3" ]; then
+        echo ""
+        echo "=========================================================================="
+        echo "S3 VPC Endpoint Configuration"
+        echo "=========================================================================="
+        echo ""
+        echo "Checking for S3 VPC Endpoint in $VPC_ID..."
+        echo "(Required for EC2 instances to access S3 without internet gateway)"
+        echo ""
+
+        # Check if S3 endpoint already exists in this VPC
+        S3_ENDPOINT_ID=$(aws ec2 describe-vpc-endpoints --region "$REGION" \
+            --filters "Name=vpc-id,Values=$VPC_ID" "Name=service-name,Values=com.amazonaws.$REGION.s3" \
+            --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>/dev/null || echo "")
+
+        if [ -n "$S3_ENDPOINT_ID" ] && [ "$S3_ENDPOINT_ID" != "None" ]; then
+            echo "✅ Found existing S3 VPC Endpoint: $S3_ENDPOINT_ID"
+            S3_ENDPOINT_STATUS="existing"
+        else
+            echo "No S3 VPC Endpoint found. Creating one..."
+
+            # Get route tables for Gateway endpoint
+            if [ -z "$ROUTE_TABLE_IDS" ]; then
+                ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "$REGION" \
+                    --filters "Name=vpc-id,Values=$VPC_ID" \
+                    --query 'RouteTables[*].RouteTableId' --output text 2>/dev/null | tr '\t' ' ')
+            fi
+
+            if [ -z "$ROUTE_TABLE_IDS" ] || [ "$ROUTE_TABLE_IDS" = "None" ]; then
+                echo "❌ No route tables found for VPC $VPC_ID"
+                echo "   Cannot create S3 VPC Endpoint."
+            else
+                echo "   Route tables: $ROUTE_TABLE_IDS"
+
+                if S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint --region "$REGION" \
+                    --vpc-id "$VPC_ID" \
+                    --service-name "com.amazonaws.$REGION.s3" \
+                    --route-table-ids $ROUTE_TABLE_IDS \
+                    --vpc-endpoint-type Gateway \
+                    --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=joblet-s3-endpoint},{Key=ManagedBy,Value=Joblet}]" \
+                    --query 'VpcEndpoint.VpcEndpointId' --output text 2>&1); then
+                    echo "✅ S3 VPC Endpoint created: $S3_ENDPOINT_ID"
+                    S3_ENDPOINT_STATUS="created"
+                elif echo "$S3_ENDPOINT_ID" | grep -q "RouteAlreadyExists"; then
+                    echo "⚠️  S3 route already exists - endpoint may exist in different state"
+                    S3_ENDPOINT_ID=$(aws ec2 describe-vpc-endpoints --region "$REGION" \
+                        --filters "Name=vpc-id,Values=$VPC_ID" "Name=service-name,Values=com.amazonaws.$REGION.s3" \
+                        --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>/dev/null || echo "")
+                    S3_ENDPOINT_STATUS="existing"
+                else
+                    echo "❌ Failed to create S3 VPC Endpoint: $S3_ENDPOINT_ID"
+                    S3_ENDPOINT_ID=""
+                fi
+            fi
+        fi
+
+        # Update S3 VPC Endpoint policy to allow access to the bucket
+        if [ -n "$S3_ENDPOINT_ID" ] && [ "$S3_ENDPOINT_ID" != "None" ]; then
+            echo ""
+            echo "Updating S3 VPC Endpoint policy for bucket: $S3_BUCKET..."
+
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/null || echo "*")
+
+            # Create S3 endpoint policy that allows access to the joblet bucket
+            cat > /tmp/s3-endpoint-policy.json << S3_POLICY_EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowJobletS3Access",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+                "s3:GetBucketLocation"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${S3_BUCKET}",
+                "arn:aws:s3:::${S3_BUCKET}/*"
+            ]
+        },
+        {
+            "Sid": "AllowAllS3ForPackages",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:PrincipalAccount": "${AWS_ACCOUNT_ID}"
+                }
+            }
+        }
+    ]
+}
+S3_POLICY_EOF
+
+            if aws ec2 modify-vpc-endpoint --region "$REGION" \
+                --vpc-endpoint-id "$S3_ENDPOINT_ID" \
+                --policy-document file:///tmp/s3-endpoint-policy.json 2>/dev/null; then
+                echo "✅ S3 VPC Endpoint policy updated"
+                echo "   - Bucket access: s3://$S3_BUCKET"
+                echo "   - Actions allowed: PutObject, GetObject, DeleteObject, ListBucket"
+            else
+                echo "⚠️  Could not update S3 VPC Endpoint policy"
+                echo ""
+                echo "   You may need to manually update the policy to allow S3 access."
+                echo "   Run this command:"
+                echo ""
+                echo "   aws ec2 modify-vpc-endpoint --region $REGION \\"
+                echo "       --vpc-endpoint-id $S3_ENDPOINT_ID \\"
+                echo "       --policy-document '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::$S3_BUCKET\",\"arn:aws:s3:::$S3_BUCKET/*\"]}]}'"
+                echo ""
+                echo "   Or via AWS Console: VPC → Endpoints → $S3_ENDPOINT_ID → Policy → Edit"
+            fi
+
+            rm -f /tmp/s3-endpoint-policy.json
+        else
+            echo ""
+            echo "⚠️  S3 VPC Endpoint not configured"
+            echo "   EC2 instances may need internet access to reach S3."
+            echo "   Alternatively, create an S3 Gateway endpoint manually."
+        fi
+    fi
 fi
 
 echo ""
@@ -872,11 +1010,22 @@ if [ -n "$VPC_ID" ]; then
     else
         echo "  • VPC Endpoint: Configured (DynamoDB Gateway)"
     fi
+    if [ "$STORAGE_BACKEND" = "s3" ]; then
+        if [ "$S3_ENDPOINT_STATUS" = "created" ]; then
+            echo "  • VPC Endpoint: Created (S3 Gateway)"
+        elif [ -n "$S3_ENDPOINT_ID" ] && [ "$S3_ENDPOINT_ID" != "None" ]; then
+            echo "  • VPC Endpoint: Configured (S3 Gateway)"
+        fi
+    fi
 fi
 echo ""
 echo "Storage backend: $STORAGE_BACKEND"
 if [ "$STORAGE_BACKEND" = "s3" ]; then
-    echo "  S3 bucket: $S3_BUCKET (IAM permissions configured)"
+    echo "  S3 bucket: $S3_BUCKET"
+    echo "  IAM permissions: Configured"
+    if [ -n "$S3_ENDPOINT_ID" ] && [ "$S3_ENDPOINT_ID" != "None" ]; then
+        echo "  VPC endpoint policy: Updated for bucket access"
+    fi
 fi
 echo ""
 echo "=========================================================================="

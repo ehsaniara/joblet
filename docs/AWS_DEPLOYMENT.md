@@ -45,6 +45,7 @@ This interactive script creates:
   - Local: DynamoDB + Secrets Manager only
 - `joblet-jobs` DynamoDB table for job state persistence
 - **DynamoDB VPC Endpoint** (required) for secure access to DynamoDB
+- **S3 VPC Endpoint** (when using S3 storage) with bucket-specific policy
 - **CA and client certificates** in AWS Secrets Manager (for horizontal scaling)
 
 The script will:
@@ -52,7 +53,8 @@ The script will:
 1. Ask you to select a VPC for the EC2 instance
 2. Check if a DynamoDB VPC Endpoint exists in that VPC
 3. Let you select an existing endpoint or create a new one
-4. Generate and store shared CA/client certificates in Secrets Manager
+4. If using S3 storage: Configure S3 VPC Endpoint with bucket-specific policy
+5. Generate and store shared CA/client certificates in Secrets Manager
 
 **Note the VPC ID** shown at the end - you'll need it in Step 2.
 
@@ -103,7 +105,7 @@ The script will:
 
    **Features**: Low cost, unlimited storage, lifecycle policies for archival
 
-   **Additional options**: `--s3-prefix=PREFIX` (default: joblet), `--s3-class=CLASS` (default: STANDARD)
+   **Additional options**: `--s3-prefix=PREFIX` (default: jobs/), `--s3-class=CLASS` (default: STANDARD)
    </details>
 
    <details>
@@ -250,6 +252,17 @@ ssh ubuntu@${PUBLIC_IP} "ls -la /opt/joblet/logs/"
 - **No NAT Gateway required** for DynamoDB access
 - **Created automatically** by the pre-setup script if not exists
 
+### VPC Endpoint (S3 Gateway) - For S3 Storage
+
+When using S3 storage backend, the pre-setup script also configures:
+
+- **S3 VPC Endpoint** for EC2 instances without internet access
+- **Bucket-specific policy** allowing only your Joblet S3 bucket
+- **Actions allowed**: PutObject, GetObject, DeleteObject, ListBucket
+- **Created/updated automatically** by `pre-setup.sh --storage=s3`
+
+**Note**: If the S3 VPC Endpoint policy doesn't allow access to your bucket, you'll see `AccessDenied` errors in the persist service logs. The pre-setup script updates the endpoint policy automatically to allow access to the specified bucket.
+
 ### Secrets Manager (TLS Certificates)
 
 - **Shared CA certificate** (`joblet/ca-cert`, `joblet/ca-key`) - Same across all instances
@@ -294,7 +307,7 @@ The install script supports command-line options for cleaner User Data:
 Options:
   --storage=TYPE      cloudwatch (default), s3, or local
   --s3-bucket=NAME    S3 bucket name (required for s3)
-  --s3-prefix=PREFIX  S3 key prefix (default: joblet)
+  --s3-prefix=PREFIX  S3 key prefix (default: jobs/)
   --s3-class=CLASS    STANDARD, STANDARD_IA, GLACIER, etc.
   --version=VERSION   Joblet version (default: latest)
   --port=PORT         Server port (default: 443)
@@ -607,6 +620,46 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 5 "persist:"
 aws logs describe-log-groups --log-group-name-prefix /joblet
 ```
 
+### S3 Storage Access Denied
+
+If you see errors like:
+```
+AccessDenied: User is not authorized to perform: s3:PutObject on resource
+because no VPC endpoint policy allows the s3:PutObject action
+```
+
+**Cause**: The S3 VPC Endpoint policy doesn't allow access to your bucket.
+
+**Fix 1**: Re-run pre-setup with your bucket name:
+```bash
+./pre-setup.sh --storage=s3 --s3-bucket=your-bucket-name
+```
+
+**Fix 2**: Manually update the S3 VPC Endpoint policy:
+```bash
+# Find the S3 VPC Endpoint ID
+aws ec2 describe-vpc-endpoints --filters "Name=service-name,Values=com.amazonaws.REGION.s3" \
+  --query 'VpcEndpoints[*].[VpcEndpointId,VpcId]' --output table
+
+# Update the policy
+aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-xxxx \
+  --policy-document '{
+    "Version":"2012-10-17",
+    "Statement":[{
+      "Effect":"Allow",
+      "Principal":"*",
+      "Action":"s3:*",
+      "Resource":["arn:aws:s3:::your-bucket","arn:aws:s3:::your-bucket/*"]
+    }]
+  }'
+```
+
+**Fix 3**: Via AWS Console:
+1. Go to **VPC → Endpoints**
+2. Find the S3 Gateway endpoint for your VPC
+3. Click **Actions → Manage policy**
+4. Update the policy to allow access to your bucket
+
 ### Client Cannot Connect
 
 **Check security group:**
@@ -668,22 +721,25 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 │  │  │                    │                               │     │  │
 │  │  └────────────────────┼───────────────────────────────┘     │  │
 │  │                       │                                      │  │
-│  │                       ▼                                      │  │
-│  │           ┌───────────────────────┐                         │  │
-│  │           │ VPC Endpoint          │                         │  │
-│  │           │ (DynamoDB Gateway)    │                         │  │
-│  │           └───────────┬───────────┘                         │  │
 │  │                       │                                      │  │
-│  └───────────────────────┼──────────────────────────────────────┘  │
-│                          │                                         │
-│            ┌─────────────┴─────────────┐                          │
-│            ▼                           ▼                          │
-│  ┌─────────────────┐         ┌──────────────────────┐            │
-│  │ CloudWatch Logs │         │ DynamoDB             │            │
-│  │  OR S3 Bucket   │         │                      │            │
-│  │ /joblet/...     │         │ Table: joblet-jobs   │            │
-│  │ (job logs)      │         │ (job state)          │            │
-│  └─────────────────┘         └──────────────────────┘            │
+│  │           ┌───────────┴───────────┐                         │  │
+│  │           ▼                       ▼                         │  │
+│  │  ┌───────────────────┐  ┌───────────────────┐              │  │
+│  │  │ VPC Endpoint      │  │ VPC Endpoint      │              │  │
+│  │  │ (DynamoDB Gateway)│  │ (S3 Gateway)*     │              │  │
+│  │  └─────────┬─────────┘  └─────────┬─────────┘              │  │
+│  │            │                      │                         │  │
+│  └────────────┼──────────────────────┼─────────────────────────┘  │
+│               │                      │                            │
+│               ▼                      ▼                            │
+│  ┌──────────────────────┐  ┌─────────────────┐                   │
+│  │ DynamoDB             │  │ CloudWatch Logs │                   │
+│  │                      │  │  OR S3 Bucket   │                   │
+│  │ Table: joblet-jobs   │  │ /joblet/...     │                   │
+│  │ (job state)          │  │ (job logs)      │                   │
+│  └──────────────────────┘  └─────────────────┘                   │
+│                                                                   │
+│  * S3 VPC Endpoint created when using --storage=s3               │
 │                                                                    │
 └───────────────────────────────────────────────────────────────────┘
                               ↑
@@ -701,7 +757,7 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 2. **Joblet → VPC Endpoint → DynamoDB**: Job state persistence (private, no internet)
 3. **Joblet → CloudWatch OR S3**: Log/metrics storage
    - CloudWatch: Real-time log streaming (PutLogEvents)
-   - S3: Batch uploads as gzipped JSONL files (PutObject)
+   - S3: Batch uploads via VPC Endpoint as gzipped JSONL files (PutObject)
 4. **Client ← CloudWatch/S3**: Historical log queries via `rnx job log`
 
 ---
