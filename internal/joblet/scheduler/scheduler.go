@@ -11,6 +11,8 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
+//counterfeiter:generate . JobExecutor
+
 // JobExecutor defines the interface for executing jobs
 type JobExecutor interface {
 	ExecuteScheduledJob(ctx context.Context, job *domain.Job) error

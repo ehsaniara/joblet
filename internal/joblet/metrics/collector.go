@@ -46,7 +46,8 @@ type MetricsPublisher interface {
 	PublishMetrics(ctx context.Context, sample *domain.JobMetricsSample) error
 }
 
-// NewCollector creates a new metrics collector for a job
+// NewCollector creates a new metrics collector for a job.
+// Returns an error if the cgroup path does not exist or is not a directory.
 func NewCollector(
 	jobID string,
 	cgroupPath string,
@@ -54,7 +55,19 @@ func NewCollector(
 	limits *domain.ResourceLimits,
 	gpuIndices []int,
 	publisher MetricsPublisher,
-) *Collector {
+) (*Collector, error) {
+	// Validate cgroup path exists and is a directory
+	info, err := os.Stat(cgroupPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("cgroup path does not exist: %s", cgroupPath)
+		}
+		return nil, fmt.Errorf("failed to stat cgroup path: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("cgroup path is not a directory: %s", cgroupPath)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Collector{
@@ -67,7 +80,7 @@ func NewCollector(
 		cancel:           cancel,
 		metricsPublisher: publisher,
 		logger:           logger.WithField("component", "metrics-collector").WithField("job_uuid", jobID),
-	}
+	}, nil
 }
 
 // Start begins collecting metrics at the configured interval
@@ -624,12 +637,14 @@ func (c *Collector) collectGPUProcessInfo(gpuIndex int) (count int, memory uint6
 
 	output, err := cmd.Output()
 	if err != nil {
+		c.logger.Debug("failed to query GPU process info", "gpu_index", gpuIndex, "error", err)
 		return 0, 0
 	}
 
 	reader := csv.NewReader(strings.NewReader(string(output)))
 	records, err := reader.ReadAll()
 	if err != nil {
+		c.logger.Debug("failed to parse GPU process info CSV", "gpu_index", gpuIndex, "error", err)
 		return 0, 0
 	}
 

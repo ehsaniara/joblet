@@ -39,6 +39,11 @@ type Joblet interface {
 
 	// SetTelematicsMonitor sets the eBPF telematics monitor for job activity tracking
 	SetTelematicsMonitor(monitor TelematicsMonitor)
+
+	// RecoverScheduledJobs re-registers scheduled jobs with the scheduler after restart.
+	// This should be called after loading jobs from persistent storage to ensure
+	// scheduled jobs are properly queued for execution.
+	RecoverScheduledJobs(jobs []*domain.Job) (recovered int, skipped int)
 }
 
 // Import the adapters interfaces and use them directly

@@ -265,6 +265,16 @@ func RunServer(cfg *config.Config) error {
 		log.Warn("failed to sync from persistent state - continuing with empty job list",
 			"error", syncErr)
 		// Don't fail server startup, just log the warning
+	} else {
+		// Recover scheduled jobs from persistent state into the scheduler queue
+		// This ensures scheduled jobs survive restarts and are properly executed
+		allJobs := jobStoreAdapter.ListJobs()
+		recovered, skipped := jobletInstance.RecoverScheduledJobs(allJobs)
+		if recovered > 0 || skipped > 0 {
+			log.Info("scheduled job recovery from persistent state",
+				"recovered", recovered,
+				"skipped", skipped)
+		}
 	}
 
 	// Start gRPC server with configuration using new adapters
