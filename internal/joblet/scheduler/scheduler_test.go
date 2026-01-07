@@ -1,40 +1,28 @@
-package scheduler
+package scheduler_test
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/scheduler"
+	"github.com/ehsaniara/joblet/internal/joblet/scheduler/schedulerfakes"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mockExecutor implements JobExecutor for testing
-type mockExecutor struct {
-	mu            sync.Mutex
-	executedJobs  []string
-	executionErr  error
-	executionWait time.Duration
-}
-
-func (m *mockExecutor) ExecuteScheduledJob(ctx context.Context, job *domain.Job) error {
-	if m.executionWait > 0 {
-		time.Sleep(m.executionWait)
+// getExecutedJobUUIDs extracts job UUIDs from the fake executor's call history
+func getExecutedJobUUIDs(fake *schedulerfakes.FakeJobExecutor) []string {
+	count := fake.ExecuteScheduledJobCallCount()
+	uuids := make([]string, count)
+	for i := 0; i < count; i++ {
+		_, job := fake.ExecuteScheduledJobArgsForCall(i)
+		uuids[i] = job.Uuid
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.executedJobs = append(m.executedJobs, job.Uuid)
-	return m.executionErr
-}
-
-func (m *mockExecutor) GetExecutedJobs() []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([]string{}, m.executedJobs...)
+	return uuids
 }
 
 func createTestJob(uuid string, scheduledTime time.Time) *domain.Job {
@@ -47,21 +35,17 @@ func createTestJob(uuid string, scheduledTime time.Time) *domain.Job {
 }
 
 func TestNew(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	assert.NotNil(t, s)
-	assert.NotNil(t, s.queue)
-	assert.NotNil(t, s.executor)
-	assert.NotNil(t, s.logger)
-	assert.NotNil(t, s.newJobSignal)
-	assert.NotNil(t, s.stopSignal)
-	assert.False(t, s.running)
+	assert.False(t, s.IsRunning())
+	assert.Equal(t, 0, s.GetQueueSize())
 }
 
 func TestScheduler_StartStop(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Start scheduler
 	err := s.Start()
@@ -83,8 +67,8 @@ func TestScheduler_StartStop(t *testing.T) {
 }
 
 func TestScheduler_AddJob(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Add a scheduled job
 	scheduledTime := time.Now().Add(1 * time.Hour)
@@ -102,8 +86,8 @@ func TestScheduler_AddJob(t *testing.T) {
 }
 
 func TestScheduler_AddJob_NotScheduled(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Add a job without scheduled time
 	job := &domain.Job{
@@ -118,8 +102,8 @@ func TestScheduler_AddJob_NotScheduled(t *testing.T) {
 }
 
 func TestScheduler_RemoveJob(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Add jobs
 	scheduledTime := time.Now().Add(1 * time.Hour)
@@ -148,8 +132,8 @@ func TestScheduler_RemoveJob(t *testing.T) {
 }
 
 func TestScheduler_GetScheduledJobs(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Add jobs
 	now := time.Now()
@@ -178,8 +162,8 @@ func TestScheduler_GetScheduledJobs(t *testing.T) {
 }
 
 func TestScheduler_ExecutesJobAtScheduledTime(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Start scheduler
 	err := s.Start()
@@ -197,14 +181,14 @@ func TestScheduler_ExecutesJobAtScheduledTime(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify job was executed
-	executedJobs := executor.GetExecutedJobs()
+	executedJobs := getExecutedJobUUIDs(executor)
 	assert.Contains(t, executedJobs, "immediate-job")
 	assert.Equal(t, 0, s.GetQueueSize(), "Job should be removed from queue after execution")
 }
 
 func TestScheduler_ExecutesJobsInOrder(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Start scheduler
 	err := s.Start()
@@ -229,7 +213,7 @@ func TestScheduler_ExecutesJobsInOrder(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Verify all jobs executed
-	executedJobs := executor.GetExecutedJobs()
+	executedJobs := getExecutedJobUUIDs(executor)
 	assert.Len(t, executedJobs, 3)
 
 	// First job executed should be job-3 (earliest)
@@ -237,10 +221,9 @@ func TestScheduler_ExecutesJobsInOrder(t *testing.T) {
 }
 
 func TestScheduler_HandleExecutionError(t *testing.T) {
-	executor := &mockExecutor{
-		executionErr: errors.New("execution failed"),
-	}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	executor.ExecuteScheduledJobReturns(errors.New("execution failed"))
+	s := scheduler.New(executor)
 
 	// Start scheduler
 	err := s.Start()
@@ -258,13 +241,13 @@ func TestScheduler_HandleExecutionError(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify job was attempted (even though it failed)
-	executedJobs := executor.GetExecutedJobs()
+	executedJobs := getExecutedJobUUIDs(executor)
 	assert.Contains(t, executedJobs, "failing-job")
 }
 
 func TestScheduler_NewJobWakesUpScheduler(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Start scheduler
 	err := s.Start()
@@ -285,13 +268,13 @@ func TestScheduler_NewJobWakesUpScheduler(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify job was executed
-	executedJobs := executor.GetExecutedJobs()
+	executedJobs := getExecutedJobUUIDs(executor)
 	assert.Contains(t, executedJobs, "wake-up-job")
 }
 
 func TestScheduler_StopDuringExecution(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	// Start scheduler
 	err := s.Start()
@@ -311,13 +294,13 @@ func TestScheduler_StopDuringExecution(t *testing.T) {
 	assert.False(t, s.IsRunning())
 
 	// Job should not have been executed
-	executedJobs := executor.GetExecutedJobs()
+	executedJobs := getExecutedJobUUIDs(executor)
 	assert.Empty(t, executedJobs)
 }
 
 func TestScheduler_IsRunning(t *testing.T) {
-	executor := &mockExecutor{}
-	s := New(executor)
+	executor := &schedulerfakes.FakeJobExecutor{}
+	s := scheduler.New(executor)
 
 	assert.False(t, s.IsRunning())
 
@@ -333,7 +316,7 @@ func TestScheduler_IsRunning(t *testing.T) {
 // Priority Queue Tests
 
 func TestPriorityQueue_New(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	assert.NotNil(t, pq)
 	assert.True(t, pq.IsEmpty())
@@ -341,7 +324,7 @@ func TestPriorityQueue_New(t *testing.T) {
 }
 
 func TestPriorityQueue_AddAndPeek(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	now := time.Now()
 	job1 := createTestJob("job-1", now.Add(2*time.Hour))
@@ -357,7 +340,7 @@ func TestPriorityQueue_AddAndPeek(t *testing.T) {
 }
 
 func TestPriorityQueue_Next(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	now := time.Now()
 	job1 := createTestJob("job-1", now.Add(2*time.Hour))
@@ -387,7 +370,7 @@ func TestPriorityQueue_Next(t *testing.T) {
 }
 
 func TestPriorityQueue_Remove(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	now := time.Now()
 	job1 := createTestJob("job-1", now.Add(1*time.Hour))
@@ -411,7 +394,7 @@ func TestPriorityQueue_Remove(t *testing.T) {
 }
 
 func TestPriorityQueue_Update(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	now := time.Now()
 	job1 := createTestJob("job-1", now.Add(2*time.Hour))
@@ -437,7 +420,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 }
 
 func TestPriorityQueue_GetAll(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	now := time.Now()
 	job1 := createTestJob("job-1", now.Add(1*time.Hour))
@@ -455,7 +438,7 @@ func TestPriorityQueue_GetAll(t *testing.T) {
 }
 
 func TestPriorityQueue_GetNextExecutionTime(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	// Empty queue
 	nextTime := pq.GetNextExecutionTime()
@@ -476,7 +459,7 @@ func TestPriorityQueue_GetNextExecutionTime(t *testing.T) {
 }
 
 func TestPriorityQueue_ThreadSafety(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 	now := time.Now()
 
 	var wg sync.WaitGroup
@@ -503,7 +486,7 @@ func TestPriorityQueue_ThreadSafety(t *testing.T) {
 }
 
 func TestPriorityQueue_AddNilScheduledTime(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	job := &domain.Job{
 		Uuid:    "job-no-schedule",
@@ -516,7 +499,7 @@ func TestPriorityQueue_AddNilScheduledTime(t *testing.T) {
 }
 
 func TestPriorityQueue_PeekEmpty(t *testing.T) {
-	pq := NewPriorityQueue()
+	pq := scheduler.NewPriorityQueue()
 
 	result := pq.Peek()
 	assert.Nil(t, result)

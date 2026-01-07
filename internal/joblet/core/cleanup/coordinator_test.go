@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
+	"github.com/ehsaniara/joblet/internal/joblet/core/resource/resourcefakes"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform/platformfakes"
@@ -19,54 +20,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockResource implements resource.Resource for testing
-type mockResource struct {
-	cleanupCalls []string
-	mu           sync.Mutex
-}
-
-func (m *mockResource) Create(cgroupJobDir string, maxCPU int32, maxMemory int32, maxIOBPS int32) error {
-	return nil
-}
-
-func (m *mockResource) SetIOLimit(cgroupPath string, ioBPS int) error {
-	return nil
-}
-
-func (m *mockResource) SetCPULimit(cgroupPath string, cpuLimit int) error {
-	return nil
-}
-
-func (m *mockResource) SetCPUCores(cgroupPath string, cores string) error {
-	return nil
-}
-
-func (m *mockResource) SetMemoryLimit(cgroupPath string, memoryLimitMB int) error {
-	return nil
-}
-
-func (m *mockResource) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
-	return nil
-}
-
-func (m *mockResource) CleanupCgroup(jobID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.cleanupCalls = append(m.cleanupCalls, jobID)
-}
-
-func (m *mockResource) EnsureControllers() error {
-	return nil
-}
-
-func (m *mockResource) AddProcessToCgroup(cgroupPath string, pid int) error {
-	return nil
-}
-
-func (m *mockResource) GetCleanupCalls() []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([]string{}, m.cleanupCalls...)
+// getCleanupCalls extracts job IDs from CleanupCgroup calls
+func getCleanupCalls(fake *resourcefakes.FakeResource) []string {
+	count := fake.CleanupCgroupCallCount()
+	calls := make([]string, count)
+	for i := 0; i < count; i++ {
+		calls[i] = fake.CleanupCgroupArgsForCall(i)
+	}
+	return calls
 }
 
 func TestNewCoordinator(t *testing.T) {
@@ -81,7 +42,7 @@ func TestNewCoordinator(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -130,7 +91,7 @@ func TestCleanupJob_Success(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -140,7 +101,7 @@ func TestCleanupJob_Success(t *testing.T) {
 
 	// Verify
 	assert.NoError(t, err)
-	assert.Contains(t, mockRes.GetCleanupCalls(), jobID)
+	assert.Contains(t, getCleanupCalls(mockRes), jobID)
 
 	// Verify directory was removed
 	_, err = os.Stat(jobDir)
@@ -159,7 +120,7 @@ func TestCleanupJob_AlreadyInProgress(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -202,7 +163,7 @@ func TestCleanupJobSystemResourcesOnly(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -212,7 +173,7 @@ func TestCleanupJobSystemResourcesOnly(t *testing.T) {
 
 	// Verify
 	assert.NoError(t, err)
-	assert.Contains(t, mockRes.GetCleanupCalls(), jobID)
+	assert.Contains(t, getCleanupCalls(mockRes), jobID)
 
 	// Verify directory was NOT removed (preserved for runtime builds)
 	_, err = os.Stat(jobDir)
@@ -231,7 +192,7 @@ func TestGetCleanupStatus(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -290,7 +251,7 @@ func TestCleanupOrphanedResources(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -337,7 +298,7 @@ func TestSchedulePeriodicCleanup(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -427,7 +388,7 @@ func TestCleanupJob_FilesystemError(t *testing.T) {
 	require.NoError(t, err)
 
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)
@@ -463,7 +424,7 @@ func TestCleanupJob_NonExistentDirectory(t *testing.T) {
 		},
 	}
 	log := logger.New().WithField("component", "test")
-	mockRes := &mockResource{}
+	mockRes := &resourcefakes.FakeResource{}
 	procMgr := process.NewProcessManager(fakePlatform, cfg)
 
 	coordinator := NewCoordinator(procMgr, mockRes, fakePlatform, cfg, log, nil)

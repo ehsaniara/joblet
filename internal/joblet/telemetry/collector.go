@@ -1,5 +1,7 @@
 package telemetry
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 import (
 	"context"
 	"sync"
@@ -8,6 +10,8 @@ import (
 
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
+
+//counterfeiter:generate . EventPersister
 
 // EventPersister is an interface for persisting telemetry events to storage.
 // This is typically implemented by the IPC writer to send events to persist.
