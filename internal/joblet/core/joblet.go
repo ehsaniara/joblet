@@ -815,3 +815,74 @@ func (j *Joblet) SetTelematicsMonitor(monitor interfaces.TelematicsMonitor) {
 		j.logger.Info("eBPF telematics monitor enabled for job activity tracking")
 	}
 }
+
+// RecoverScheduledJobs re-registers scheduled jobs with the scheduler after restart.
+// This ensures scheduled jobs loaded from persistent storage (e.g., DynamoDB) are
+// properly queued for execution. Jobs that have passed their scheduled time are
+// executed immediately. Jobs with invalid states are skipped.
+//
+// IMPORTANT: Only jobs belonging to this node (matching NodeId) are recovered.
+// This prevents duplicate execution in multi-node deployments where all nodes
+// share the same DynamoDB table.
+func (j *Joblet) RecoverScheduledJobs(jobs []*domain.Job) (recovered int, skipped int) {
+	currentNodeId := j.config.Server.NodeId
+	j.logger.Info("recovering scheduled jobs from persistent storage",
+		"totalJobs", len(jobs),
+		"nodeId", currentNodeId)
+
+	now := time.Now()
+
+	for _, job := range jobs {
+		// Only recover jobs that are still in SCHEDULED status
+		if job.Status != domain.StatusScheduled {
+			continue
+		}
+
+		// CRITICAL: Only recover jobs that belong to THIS node
+		// This prevents duplicate execution in multi-node deployments
+		if job.NodeId != currentNodeId {
+			j.logger.Debug("skipping scheduled job from different node",
+				"job_uuid", job.Uuid,
+				"jobNodeId", job.NodeId,
+				"currentNodeId", currentNodeId)
+			continue
+		}
+
+		// Validate job has a scheduled time
+		if job.ScheduledTime == nil {
+			j.logger.Warn("skipping scheduled job without scheduled time",
+				"job_uuid", job.Uuid)
+			skipped++
+			continue
+		}
+
+		// Check if scheduled time has already passed
+		if job.ScheduledTime.Before(now) {
+			j.logger.Info("scheduled job is overdue, will execute immediately",
+				"job_uuid", job.Uuid,
+				"scheduledTime", job.ScheduledTime.Format(time.RFC3339),
+				"overdueBy", now.Sub(*job.ScheduledTime))
+		}
+
+		// Add to scheduler queue
+		if err := j.scheduler.AddJob(job); err != nil {
+			j.logger.Error("failed to recover scheduled job",
+				"job_uuid", job.Uuid,
+				"error", err)
+			skipped++
+			continue
+		}
+
+		recovered++
+		j.logger.Debug("recovered scheduled job",
+			"job_uuid", job.Uuid,
+			"scheduledTime", job.ScheduledTime.Format(time.RFC3339))
+	}
+
+	j.logger.Info("scheduled job recovery completed",
+		"recovered", recovered,
+		"skipped", skipped,
+		"nodeId", currentNodeId)
+
+	return recovered, skipped
+}

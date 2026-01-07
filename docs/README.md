@@ -22,6 +22,8 @@ environments without the overhead of containerization.
 
 ### Features
 
+- **[JOB_EXECUTION.md](JOB_EXECUTION.md)** - Job execution guide
+- **[SCHEDULING.md](SCHEDULING.md)** - Job scheduling for future execution
 - **[GPU_SUPPORT.md](GPU_SUPPORT.md)** - GPU acceleration
 - **[NETWORK_MANAGEMENT.md](NETWORK_MANAGEMENT.md)** - Network isolation
 - **[VOLUME_MANAGEMENT.md](VOLUME_MANAGEMENT.md)** - Storage management

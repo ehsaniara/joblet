@@ -48,6 +48,19 @@ type FakeJoblet struct {
 	executeScheduledJobReturnsOnCall map[int]struct {
 		result1 error
 	}
+	RecoverScheduledJobsStub        func([]*domain.Job) (int, int)
+	recoverScheduledJobsMutex       sync.RWMutex
+	recoverScheduledJobsArgsForCall []struct {
+		arg1 []*domain.Job
+	}
+	recoverScheduledJobsReturns struct {
+		result1 int
+		result2 int
+	}
+	recoverScheduledJobsReturnsOnCall map[int]struct {
+		result1 int
+		result2 int
+	}
 	SetTelematicsMonitorStub        func(interfaces.TelematicsMonitor)
 	setTelematicsMonitorMutex       sync.RWMutex
 	setTelematicsMonitorArgsForCall []struct {
@@ -270,6 +283,75 @@ func (fake *FakeJoblet) ExecuteScheduledJobReturnsOnCall(i int, result1 error) {
 	fake.executeScheduledJobReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakeJoblet) RecoverScheduledJobs(arg1 []*domain.Job) (int, int) {
+	var arg1Copy []*domain.Job
+	if arg1 != nil {
+		arg1Copy = make([]*domain.Job, len(arg1))
+		copy(arg1Copy, arg1)
+	}
+	fake.recoverScheduledJobsMutex.Lock()
+	ret, specificReturn := fake.recoverScheduledJobsReturnsOnCall[len(fake.recoverScheduledJobsArgsForCall)]
+	fake.recoverScheduledJobsArgsForCall = append(fake.recoverScheduledJobsArgsForCall, struct {
+		arg1 []*domain.Job
+	}{arg1Copy})
+	stub := fake.RecoverScheduledJobsStub
+	fakeReturns := fake.recoverScheduledJobsReturns
+	fake.recordInvocation("RecoverScheduledJobs", []interface{}{arg1Copy})
+	fake.recoverScheduledJobsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeJoblet) RecoverScheduledJobsCallCount() int {
+	fake.recoverScheduledJobsMutex.RLock()
+	defer fake.recoverScheduledJobsMutex.RUnlock()
+	return len(fake.recoverScheduledJobsArgsForCall)
+}
+
+func (fake *FakeJoblet) RecoverScheduledJobsCalls(stub func([]*domain.Job) (int, int)) {
+	fake.recoverScheduledJobsMutex.Lock()
+	defer fake.recoverScheduledJobsMutex.Unlock()
+	fake.RecoverScheduledJobsStub = stub
+}
+
+func (fake *FakeJoblet) RecoverScheduledJobsArgsForCall(i int) []*domain.Job {
+	fake.recoverScheduledJobsMutex.RLock()
+	defer fake.recoverScheduledJobsMutex.RUnlock()
+	argsForCall := fake.recoverScheduledJobsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeJoblet) RecoverScheduledJobsReturns(result1 int, result2 int) {
+	fake.recoverScheduledJobsMutex.Lock()
+	defer fake.recoverScheduledJobsMutex.Unlock()
+	fake.RecoverScheduledJobsStub = nil
+	fake.recoverScheduledJobsReturns = struct {
+		result1 int
+		result2 int
+	}{result1, result2}
+}
+
+func (fake *FakeJoblet) RecoverScheduledJobsReturnsOnCall(i int, result1 int, result2 int) {
+	fake.recoverScheduledJobsMutex.Lock()
+	defer fake.recoverScheduledJobsMutex.Unlock()
+	fake.RecoverScheduledJobsStub = nil
+	if fake.recoverScheduledJobsReturnsOnCall == nil {
+		fake.recoverScheduledJobsReturnsOnCall = make(map[int]struct {
+			result1 int
+			result2 int
+		})
+	}
+	fake.recoverScheduledJobsReturnsOnCall[i] = struct {
+		result1 int
+		result2 int
+	}{result1, result2}
 }
 
 func (fake *FakeJoblet) SetTelematicsMonitor(arg1 interfaces.TelematicsMonitor) {
