@@ -5,6 +5,7 @@ Complete guide to managing persistent and temporary storage volumes in Joblet.
 ## Table of Contents
 
 - [Volume Overview](#volume-overview)
+- [Volume Isolation and Sharing](#volume-isolation-and-sharing)
 - [Volume Types](#volume-types)
 - [Creating Volumes](#creating-volumes)
 - [Using Volumes in Jobs](#using-volumes-in-jobs)
@@ -30,6 +31,150 @@ Joblet volumes provide persistent and temporary storage for jobs, enabling:
 - **Isolation**: Each job sees only its assigned volumes
 - **Mount location**: Volumes mounted at `/volumes/<name>`
 - **Performance**: Memory volumes for high-speed I/O
+
+## Volume Isolation and Sharing
+
+Understanding how volumes are isolated between jobs and how sharing works is important for designing secure and correct workflows.
+
+### Volume Isolation
+
+Each job runs in an isolated filesystem environment (chroot) and can **only see volumes explicitly assigned to it**. A job cannot access volumes belonging to other jobs.
+
+```
+Job A (assigned: volume-a)          Job B (assigned: volume-b)
+├── /volumes/                       ├── /volumes/
+│   └── volume-a/  ✓ accessible     │   └── volume-b/  ✓ accessible
+│                                   │
+│   volume-b/      ✗ not visible    │   volume-a/      ✗ not visible
+```
+
+**Example:**
+
+```bash
+# Create two separate volumes
+rnx volume create data-for-job-a --size=1GB
+rnx volume create data-for-job-b --size=1GB
+
+# Job A can only see volume-a
+rnx job run --volume=data-for-job-a ls /volumes/
+# Output: data-for-job-a
+
+# Job B can only see volume-b
+rnx job run --volume=data-for-job-b ls /volumes/
+# Output: data-for-job-b
+
+# Job A cannot access Job B's volume - it simply doesn't exist in Job A's filesystem
+```
+
+This isolation is enforced at the kernel level using bind mounts and chroot, not application-level checks.
+
+### Shared Volume Access
+
+When **multiple jobs are assigned the same volume**, they share access to the same underlying storage. Both jobs see the same files and can read/write simultaneously.
+
+```
+Host Storage:
+/opt/joblet/volumes/shared-data/data/   ← actual files on disk
+                    │
+                    ├── bind mount ──→ Job A: /volumes/shared-data/
+                    │
+                    └── bind mount ──→ Job B: /volumes/shared-data/
+```
+
+**Both jobs see identical content because they point to the same host directory.**
+
+**Example:**
+
+```bash
+# Create a shared volume
+rnx volume create shared-data --size=1GB
+
+# Job A writes a file
+rnx job run --volume=shared-data bash -c '
+  echo "written by job A" > /volumes/shared-data/message.txt
+'
+
+# Job B can immediately read the file
+rnx job run --volume=shared-data cat /volumes/shared-data/message.txt
+# Output: written by job A
+
+# Job B modifies the file
+rnx job run --volume=shared-data bash -c '
+  echo "modified by job B" >> /volumes/shared-data/message.txt
+'
+
+# Job A sees the modification
+rnx job run --volume=shared-data cat /volumes/shared-data/message.txt
+# Output:
+# written by job A
+# modified by job B
+```
+
+### Concurrent Access Considerations
+
+Joblet does **not** provide automatic file locking or coordination between jobs accessing the same volume. This is intentional and consistent with how shared storage works in other systems (Docker volumes, Kubernetes PVCs, NFS).
+
+**Your responsibility when sharing volumes:**
+
+| Concern | Joblet's Role | Your Responsibility |
+|---------|---------------|---------------------|
+| Volume mounting | Handled automatically | Assign correct volumes to jobs |
+| File visibility | Enforced via isolation | Design which jobs share which volumes |
+| Concurrent writes | Not managed | Coordinate access patterns |
+| File locking | Not provided | Implement if needed (flock, advisory locks) |
+| Data consistency | Not enforced | Use separate files or implement synchronization |
+
+**Safe patterns for concurrent access:**
+
+```bash
+# Pattern 1: Sequential jobs (no conflict)
+# Job A runs first, Job B runs after A completes
+rnx job run --volume=pipeline-data producer.py
+# Wait for completion...
+rnx job run --volume=pipeline-data consumer.py
+
+# Pattern 2: Separate directories per job
+rnx job run --volume=shared-data --env=JOB_NAME=worker-1 bash -c '
+  mkdir -p /volumes/shared-data/$JOB_NAME
+  # Write only to own directory
+  echo "output" > /volumes/shared-data/$JOB_NAME/result.txt
+'
+
+# Pattern 3: Append-only logs (generally safe)
+rnx job run --volume=logs bash -c '
+  echo "$(date) - Job started" >> /volumes/logs/activity.log
+'
+
+# Pattern 4: File-based locking (when needed)
+rnx job run --volume=shared-data bash -c '
+  (
+    flock -x 200  # Acquire exclusive lock
+    # Critical section - safe to modify shared file
+    echo "update" >> /volumes/shared-data/shared-file.txt
+  ) 200>/volumes/shared-data/.lock
+'
+```
+
+**Patterns to avoid:**
+
+```bash
+# DANGEROUS: Multiple jobs writing to same file simultaneously
+# Job A and Job B both running:
+echo "data" > /volumes/shared/output.txt  # Race condition!
+
+# DANGEROUS: Read-modify-write without locking
+count=$(cat /volumes/shared/counter.txt)
+echo $((count + 1)) > /volumes/shared/counter.txt  # Lost updates!
+```
+
+### Summary
+
+| Scenario | Behavior |
+|----------|----------|
+| Job A has volume X, Job B has volume Y | Fully isolated - neither can see the other's volume |
+| Job A and Job B both have volume X | Shared access - both see same files in real-time |
+| Concurrent writes to same file | No automatic coordination - user must handle |
+| Volume not assigned to job | Not visible in job's `/volumes/` directory |
 
 ## Volume Types
 
