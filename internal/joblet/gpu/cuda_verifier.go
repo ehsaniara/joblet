@@ -112,11 +112,7 @@ func (v *CUDAVerifier) getVersionInfo(ctx context.Context, result *CUDAVerificat
 		result.DriverVersion = strings.TrimSpace(lines[0])
 	}
 
-	// Get CUDA version from nvidia-smi header
-	cmd = exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=name", "--format=csv,noheader")
-	output, _ = cmd.Output()
-
-	// Try to get CUDA version from nvidia-smi output
+	// Get CUDA version from nvidia-smi output
 	cmd = exec.CommandContext(ctx, "nvidia-smi")
 	output, err = cmd.Output()
 	if err == nil {
