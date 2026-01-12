@@ -1,6 +1,7 @@
 package gpu
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -46,6 +47,7 @@ type CUDAInstallation struct {
 // CUDADetector implements CUDA installation detection
 type CUDADetector struct {
 	platform platform.Platform
+	verifier CUDAVerifierInterface
 	logger   *logger.Logger
 }
 
@@ -53,6 +55,7 @@ type CUDADetector struct {
 func NewCUDADetector(platform platform.Platform) *CUDADetector {
 	return &CUDADetector{
 		platform: platform,
+		verifier: NewCUDAVerifier(),
 		logger:   logger.New().WithField("component", "cuda-detector"),
 	}
 }
@@ -563,4 +566,109 @@ func (c *CUDADetector) GetBestCUDA(requiredVersion CUDAVersion) (CUDAInstallatio
 	}
 
 	return best, nil
+}
+
+// VerifyCUDARuntime performs CUDA runtime verification using nvidia-smi
+func (c *CUDADetector) VerifyCUDARuntime(ctx context.Context) (*CUDAVerificationResult, error) {
+	if c.verifier != nil && c.verifier.IsAvailable() {
+		return c.verifier.Verify(ctx)
+	}
+
+	// Fallback if verifier not initialized
+	return c.fallbackVerification()
+}
+
+// VerifyGPUsForJob verifies that specific GPUs are usable for a job
+func (c *CUDADetector) VerifyGPUsForJob(ctx context.Context, gpuIndices []int, minComputeCapability string) error {
+	result, err := c.VerifyCUDARuntime(ctx)
+	if err != nil {
+		return err
+	}
+	if !result.Success {
+		return fmt.Errorf("CUDA verification failed: %s", result.Error)
+	}
+
+	deviceMap := make(map[int]*CUDADeviceInfo)
+	for i := range result.Devices {
+		deviceMap[result.Devices[i].Index] = &result.Devices[i]
+	}
+
+	for _, idx := range gpuIndices {
+		dev, ok := deviceMap[idx]
+		if !ok {
+			return fmt.Errorf("GPU %d not found (available: %d)", idx, result.DeviceCount)
+		}
+		if !dev.Usable {
+			return fmt.Errorf("GPU %d (%s) not usable: %s", idx, dev.Name, dev.UsableError)
+		}
+		if minComputeCapability != "" && !IsComputeCapabilityCompatible(dev.ComputeCapability, minComputeCapability) {
+			return fmt.Errorf("GPU %d compute capability %s < required %s", idx, dev.ComputeCapability, minComputeCapability)
+		}
+	}
+
+	return nil
+}
+
+// fallbackVerification uses nvidia-smi when the verifier is not available
+func (c *CUDADetector) fallbackVerification() (*CUDAVerificationResult, error) {
+	result := &CUDAVerificationResult{Devices: []CUDADeviceInfo{}}
+
+	// Get driver version
+	driverVersion := c.detectDriverVersion()
+	if driverVersion == "" || driverVersion == "unknown" {
+		result.Error = "NVIDIA driver not detected"
+		return result, nil
+	}
+	result.DriverVersion = driverVersion
+
+	// Get CUDA version from installation
+	if installations, err := c.DetectCUDAInstallations(); err == nil && len(installations) > 0 {
+		result.CUDAVersion = installations[0].Version.String()
+	}
+
+	// Query GPUs via nvidia-smi
+	cmd := c.platform.CreateCommand("nvidia-smi", "--query-gpu=index,name,memory.total,memory.free",
+		"--format=csv,noheader,nounits")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		result.Error = fmt.Sprintf("nvidia-smi failed: %v", err)
+		return result, nil
+	}
+
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, ",")
+		if len(parts) < 4 {
+			continue
+		}
+
+		index, _ := strconv.Atoi(strings.TrimSpace(parts[0]))
+		totalMem, _ := strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64)
+		freeMem, _ := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64)
+
+		result.Devices = append(result.Devices, CUDADeviceInfo{
+			Index:         index,
+			Name:          strings.TrimSpace(parts[1]),
+			TotalMemoryMB: totalMem,
+			FreeMemoryMB:  freeMem,
+			Usable:        true,
+		})
+	}
+
+	result.DeviceCount = len(result.Devices)
+	result.UsableDeviceCount = len(result.Devices)
+	result.Success = result.DeviceCount > 0
+
+	if !result.Success {
+		result.Error = "No CUDA devices found"
+	}
+
+	return result, nil
+}
+
+// IsVerifierAvailable checks if nvidia-smi is available for GPU verification
+func (c *CUDADetector) IsVerifierAvailable() bool {
+	return c.verifier != nil && c.verifier.IsAvailable()
 }

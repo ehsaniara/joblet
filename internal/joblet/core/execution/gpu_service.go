@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
@@ -23,8 +24,9 @@ type GPUManager interface {
 
 // GPUService implements GPU management for job execution
 type GPUService struct {
-	gpuManager gpu.GPUManagerInterface
-	logger     *logger.Logger
+	gpuManager   gpu.GPUManagerInterface
+	cudaVerifier gpu.CUDAVerifierInterface
+	logger       *logger.Logger
 }
 
 // NewGPUService creates a new GPU service
@@ -35,12 +37,21 @@ func NewGPUService(gpuManager gpu.GPUManagerInterface, logger *logger.Logger) *G
 	}
 }
 
-// AllocateGPU allocates GPUs for a job and updates the job with allocation details
+// NewGPUServiceWithVerifier creates a GPU service with CUDA verification
+func NewGPUServiceWithVerifier(gpuManager gpu.GPUManagerInterface, verifier gpu.CUDAVerifierInterface, logger *logger.Logger) *GPUService {
+	return &GPUService{
+		gpuManager:   gpuManager,
+		cudaVerifier: verifier,
+		logger:       logger.WithField("component", "gpu-service"),
+	}
+}
+
+// AllocateGPU allocates GPUs for a job, verifies CUDA runtime, and updates the job with allocation details
 func (gs *GPUService) AllocateGPU(ctx context.Context, job *domain.Job) (*gpu.GPUAllocation, error) {
 	if !gs.gpuManager.IsEnabled() {
 		if job.HasGPURequirement() {
-			gs.logger.Warn("GPU requested but GPU support is disabled", "job_uuid", job.Uuid, "gpuCount", job.GPUCount)
-			return nil, nil // Return nil to indicate no GPU allocation (job will run without GPU)
+			gs.logger.Error("GPU requested but GPU support is disabled", "job_uuid", job.Uuid, "gpuCount", job.GPUCount)
+			return nil, fmt.Errorf("job requires %d GPU(s) but GPU support is disabled", job.GPUCount)
 		}
 		return nil, nil
 	}
@@ -59,14 +70,33 @@ func (gs *GPUService) AllocateGPU(ctx context.Context, job *domain.Job) (*gpu.GP
 		return nil, err
 	}
 
-	if allocation != nil {
-		// Update job with allocated GPU information
-		job.GPUIndices = make([]int32, len(allocation.GPUIndices))
-		for i, gpuIndex := range allocation.GPUIndices {
-			job.GPUIndices[i] = int32(gpuIndex)
+	if allocation == nil {
+		log.Warn("GPU allocation returned nil, no GPUs allocated")
+		return nil, nil
+	}
+
+	// Update job with allocated GPU information
+	job.GPUIndices = make([]int32, len(allocation.GPUIndices))
+	for i, gpuIndex := range allocation.GPUIndices {
+		job.GPUIndices[i] = int32(gpuIndex)
+	}
+
+	log.Info("GPUs allocated", "allocatedGPUs", allocation.GPUIndices)
+
+	// Verify CUDA runtime if verifier is available
+	if gs.cudaVerifier != nil && gs.cudaVerifier.IsAvailable() {
+		log.Debug("verifying CUDA runtime for allocated GPUs")
+
+		if err := gs.cudaVerifier.CheckGPUsUsable(ctx, allocation.GPUIndices); err != nil {
+			// CUDA verification failed - release GPUs and return error
+			log.Error("CUDA runtime verification failed", "error", err)
+			if releaseErr := gs.gpuManager.ReleaseGPUs(job.Uuid); releaseErr != nil {
+				log.Warn("failed to release GPUs after verification failure", "error", releaseErr)
+			}
+			return nil, fmt.Errorf("CUDA verification failed: %w", err)
 		}
 
-		log.Info("GPUs allocated successfully", "allocatedGPUs", allocation.GPUIndices)
+		log.Info("CUDA runtime verified successfully")
 	}
 
 	return allocation, nil
