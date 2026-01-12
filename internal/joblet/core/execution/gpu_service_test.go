@@ -30,9 +30,9 @@ func TestGPUService_AllocateGPU_DisabledGPU(t *testing.T) {
 	// Try to allocate GPU
 	allocation, err := service.AllocateGPU(context.Background(), job)
 
-	// Should return nil (no allocation) when GPU disabled
-	if err != nil {
-		t.Errorf("Expected no error for disabled GPU, got: %v", err)
+	// Should return error when GPU required but disabled
+	if err == nil {
+		t.Error("Expected error when GPU required but disabled")
 	}
 	if allocation != nil {
 		t.Error("Expected nil allocation when GPU disabled")
@@ -41,6 +41,32 @@ func TestGPUService_AllocateGPU_DisabledGPU(t *testing.T) {
 	// Verify IsEnabled was called
 	if fakeGPUManager.IsEnabledCallCount() != 1 {
 		t.Error("Expected IsEnabled to be called once")
+	}
+}
+
+func TestGPUService_AllocateGPU_DisabledGPU_NoRequirement(t *testing.T) {
+	// Setup fake GPU manager
+	fakeGPUManager := &gpufakes.FakeGPUManagerInterface{}
+	fakeGPUManager.IsEnabledReturns(false)
+
+	// Create GPU service
+	service := execution.NewGPUService(fakeGPUManager, logger.New())
+
+	// Create job WITHOUT GPU requirement
+	job := &domain.Job{
+		Uuid:     "test-job",
+		GPUCount: 0,
+	}
+
+	// Try to allocate GPU
+	allocation, err := service.AllocateGPU(context.Background(), job)
+
+	// Should succeed (no GPU needed, none requested)
+	if err != nil {
+		t.Errorf("Expected no error for job without GPU requirement, got: %v", err)
+	}
+	if allocation != nil {
+		t.Error("Expected nil allocation when no GPU required")
 	}
 }
 
