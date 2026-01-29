@@ -986,7 +986,7 @@ func (s *JobServiceServer) streamLiveMetrics(stream grpc.ServerStreamingServer[p
 			}
 
 			if event.Type == "UPDATED" {
-				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
+				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" || event.Status == "TIMEOUT" {
 					if !jobCompleted {
 						jobCompleted = true
 						drainDeadline = time.Now().Add(500 * time.Millisecond)
@@ -1416,7 +1416,7 @@ func (s *JobServiceServer) streamLiveTelematics(stream grpc.ServerStreamingServe
 			}
 
 			if event.Type == "UPDATED" {
-				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
+				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" || event.Status == "TIMEOUT" {
 					if !jobCompleted {
 						jobCompleted = true
 						drainDeadline = time.Now().Add(500 * time.Millisecond)

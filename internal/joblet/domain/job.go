@@ -21,6 +21,7 @@ const (
 	StatusInitializing JobStatus = "INITIALIZING"
 	StatusCanceled     JobStatus = "CANCELED"
 	StatusStopping     JobStatus = "STOPPING"
+	StatusTimeout      JobStatus = "TIMEOUT"
 )
 
 var (
@@ -93,7 +94,8 @@ func (j *Job) IsRunning() bool {
 
 // IsCompleted returns true if the job has completed execution
 func (j *Job) IsCompleted() bool {
-	return j.Status == StatusCompleted || j.Status == StatusFailed || j.Status == StatusStopped
+	return j.Status == StatusCompleted || j.Status == StatusFailed ||
+		j.Status == StatusStopped || j.Status == StatusTimeout
 }
 
 // IsScheduled returns true if the job is scheduled for future execution
