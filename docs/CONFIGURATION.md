@@ -129,7 +129,7 @@ joblet:
 
   # Job execution settings
   maxConcurrentJobs: 100          # Maximum concurrent jobs
-  jobTimeout: "24h"               # Maximum job runtime
+  jobTimeout: "24h"               # Maximum job runtime (0 = unlimited). Can be overridden per-job with --timeout flag
 
   # Command validation
   validateCommands: true          # Validate commands before execution

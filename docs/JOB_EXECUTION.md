@@ -311,6 +311,7 @@ Use job UUIDs to:
 4. **COMPLETED** - Job finished successfully (exit code 0)
 5. **FAILED** - Job finished with error (non-zero exit code)
 6. **STOPPED** - Job manually stopped
+7. **TIMEOUT** - Job exceeded its execution timeout (exit code 124)
 
 ### Monitoring Job Progress
 
@@ -641,7 +642,8 @@ Common issues and solutions:
 3. **Job Hangs**
     - Check CPU limits
     - Monitor with `rnx job log <job-uuid>`
-    - Set appropriate timeout
+   - Set a per-job timeout: `rnx job run --timeout=5m long_task.sh`
+   - Or configure global timeout in `joblet-config.yml` via `jobTimeout`
 
 4. **File Not Found**
     - Verify upload succeeded
