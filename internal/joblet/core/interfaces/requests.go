@@ -41,6 +41,9 @@ type StartJobRequest struct {
 
 	// Working directory
 	WorkingDirectory string // Execution directory path
+
+	// Execution timeout (e.g., "30s", "5m", "1h"). Empty = use global config
+	Timeout string
 }
 
 // ResourceLimits encapsulates resource constraints for a job

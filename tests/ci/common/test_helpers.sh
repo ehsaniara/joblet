@@ -174,7 +174,7 @@ wait_for_job_completion() {
     while [[ $elapsed -lt $timeout ]]; do
         local status
         if status=$("$RNX_BINARY" --config "$RNX_CONFIG" job status "$job_id" 2>/dev/null | jq -r '.status' 2>/dev/null); then
-            if [[ "$status" == "COMPLETED" || "$status" == "STOPPED" || "$status" == "FAILED" ]]; then
+            if [[ "$status" == "COMPLETED" || "$status" == "STOPPED" || "$status" == "FAILED" || "$status" == "TIMEOUT" ]]; then
                 return 0
             fi
         fi

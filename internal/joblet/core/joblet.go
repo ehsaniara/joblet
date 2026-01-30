@@ -148,6 +148,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 		WorkingDirectory:  req.WorkingDirectory,
 		GPUCount:          req.GPUCount,    // GPU requirements
 		GPUMemoryMB:       req.GPUMemoryMB, // GPU memory requirement
+		Timeout:           req.Timeout,     // Per-job timeout
 	}
 
 	log := j.logger.WithFields(
@@ -589,8 +590,12 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		waitDone <- cmd.Wait()
 	}()
 
-	// Setup timeout if configured (0 or negative = no timeout)
+	// Setup timeout: per-job timeout takes precedence over global config
+	// (0 or negative = no timeout)
 	timeout := j.config.Joblet.JobTimeout
+	if job.Timeout > 0 {
+		timeout = job.Timeout
+	}
 	var timeoutChan <-chan time.Time
 	if timeout > 0 {
 		timeoutChan = time.After(timeout)
@@ -611,9 +616,13 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), j.config.Joblet.CleanupTimeout)
 		if job.Type.IsRuntimeBuild() {
-			j.cleanup.CleanupJobWithProcessSystemOnly(cleanupCtx, job.Uuid, job.Pid)
+			if err := j.cleanup.CleanupJobWithProcessSystemOnly(cleanupCtx, job.Uuid, job.Pid); err != nil {
+				log.Error("timeout cleanup failed for runtime build job", "error", err)
+			}
 		} else {
-			j.cleanup.CleanupJobWithProcess(cleanupCtx, job.Uuid, job.Pid)
+			if err := j.cleanup.CleanupJobWithProcess(cleanupCtx, job.Uuid, job.Pid); err != nil {
+				log.Error("timeout cleanup failed", "error", err)
+			}
 		}
 		cancel()
 

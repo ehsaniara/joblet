@@ -40,6 +40,10 @@ func (m *JobMapper) DomainToProtobuf(job *domain.Job) *pb.Job {
 		NodeId:            job.NodeId,             // Unique identifier of the Joblet node
 	}
 
+	if job.Timeout > 0 {
+		pbJob.Timeout = job.Timeout.String()
+	}
+
 	pbJob.EndTime = job.FormattedEndTime()             // Use job's formatting method
 	pbJob.ScheduledTime = job.FormattedScheduledTime() // Use job's formatting method
 
@@ -169,6 +173,7 @@ func (m *JobMapper) ProtobufToStartJobRequest(req *pb.RunJobRequest) (*interface
 		GPUCount:          req.GpuCount,
 		GPUMemoryMB:       int64(req.GpuMemoryMb),
 		WorkingDirectory:  req.WorkDir,
+		Timeout:           req.Timeout,
 	}, nil
 }
 
@@ -202,5 +207,6 @@ func (m *JobMapper) StartJobRequestToProtobuf(req *interfaces.StartJobRequest) *
 		GpuCount:          req.GPUCount,
 		GpuMemoryMb:       int32(req.GPUMemoryMB),
 		WorkDir:           req.WorkingDirectory,
+		Timeout:           req.Timeout,
 	}
 }

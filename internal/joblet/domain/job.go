@@ -76,6 +76,9 @@ type Job struct {
 	// Node identification
 	NodeId string // Unique identifier of the Joblet node that executed this job
 
+	// Execution timeout (per-job override; 0 = use global config)
+	Timeout time.Duration
+
 	// Value object accessors (for new code to use value objects)
 	jobUUID     *values.JobUUID     // Cached value object for UUID
 	cgroupPath  *values.CgroupPath  // Cached value object for CgroupPath
@@ -389,6 +392,9 @@ func (j *Job) DeepCopy() *Job {
 
 		// Node identification
 		NodeId: j.NodeId,
+
+		// Timeout
+		Timeout: j.Timeout,
 	}
 
 	// Copy slices

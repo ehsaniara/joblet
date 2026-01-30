@@ -193,6 +193,7 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           jobType,
+		Timeout:           req.Timeout,
 	}
 
 	if err := s.validateJobRequest(jobRequest); err != nil {
@@ -336,6 +337,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		GpuCount:          pbJob.GpuCount,
 		GpuMemoryMb:       pbJob.GpuMemoryMb,
 		NodeId:            job.NodeId,
+		Timeout:           pbJob.Timeout,
 	}, nil
 }
 
