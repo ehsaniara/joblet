@@ -45,8 +45,9 @@ type BuildRequest struct {
 	JobType           domain.JobType
 	WorkingDirectory  string
 	Uploads           []domain.FileUpload
-	GPUCount          int32 // Number of GPUs requested
-	GPUMemoryMB       int64 // GPU memory requirement in MB
+	GPUCount          int32  // Number of GPUs requested
+	GPUMemoryMB       int64  // GPU memory requirement in MB
+	Timeout           string // Execution timeout (e.g., "30s", "5m", "1h"). Empty = use global config
 }
 
 // Build creates a new job from the request.
@@ -91,6 +92,18 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 		GPUMemoryMB:       req.GPUMemoryMB,        // GPU memory requirement
 		GPUIndices:        []int32{},              // Will be populated during allocation
 		NodeId:            b.config.Server.NodeId, // Unique identifier of the Joblet node
+	}
+
+	// Parse per-job timeout if specified
+	if req.Timeout != "" {
+		timeout, err := time.ParseDuration(req.Timeout)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timeout: %w", err)
+		}
+		if timeout < 0 {
+			return nil, fmt.Errorf("invalid timeout: must be non-negative")
+		}
+		job.Timeout = timeout
 	}
 
 	// Apply resource limits with defaults

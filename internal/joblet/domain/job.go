@@ -21,6 +21,7 @@ const (
 	StatusInitializing JobStatus = "INITIALIZING"
 	StatusCanceled     JobStatus = "CANCELED"
 	StatusStopping     JobStatus = "STOPPING"
+	StatusTimeout      JobStatus = "TIMEOUT"
 )
 
 var (
@@ -75,6 +76,9 @@ type Job struct {
 	// Node identification
 	NodeId string // Unique identifier of the Joblet node that executed this job
 
+	// Execution timeout (per-job override; 0 = use global config)
+	Timeout time.Duration
+
 	// Value object accessors (for new code to use value objects)
 	jobUUID     *values.JobUUID     // Cached value object for UUID
 	cgroupPath  *values.CgroupPath  // Cached value object for CgroupPath
@@ -93,7 +97,8 @@ func (j *Job) IsRunning() bool {
 
 // IsCompleted returns true if the job has completed execution
 func (j *Job) IsCompleted() bool {
-	return j.Status == StatusCompleted || j.Status == StatusFailed || j.Status == StatusStopped
+	return j.Status == StatusCompleted || j.Status == StatusFailed ||
+		j.Status == StatusStopped || j.Status == StatusTimeout
 }
 
 // IsScheduled returns true if the job is scheduled for future execution
@@ -387,6 +392,9 @@ func (j *Job) DeepCopy() *Job {
 
 		// Node identification
 		NodeId: j.NodeId,
+
+		// Timeout
+		Timeout: j.Timeout,
 	}
 
 	// Copy slices

@@ -121,7 +121,8 @@ Flags:
   --secret-env=KEY=VALUE  Set secret environment variable (hidden from logs)
   -s KEY=VALUE            Short form of --secret-env
   --gpu=N             Request N GPUs for the job (requires GPU support enabled)
-  --gpu-memory=SIZE   Minimum GPU memory required (e.g., 8GB, 1024MB, 2048)`,
+  --gpu-memory=SIZE   Minimum GPU memory required (e.g., 8GB, 1024MB, 2048)
+  --timeout=DURATION  Job execution timeout (e.g., 30s, 5m, 1h). Overrides global config`,
 		Args:               cobra.MinimumNArgs(1),
 		RunE:               runRun,
 		DisableFlagParsing: true,
@@ -151,6 +152,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		secretEnvVars []string
 		gpuCount      int32
 		gpuMemoryMB   int32
+		timeout       string
 	)
 
 	commandStartIndex := -1
@@ -223,6 +225,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 			if val, err := parseIntFlag(arg, "--gpu="); err == nil {
 				gpuCount = int32(val)
 			}
+		} else if strings.HasPrefix(arg, "--timeout=") {
+			timeout = strings.TrimPrefix(arg, "--timeout=")
 		} else if strings.HasPrefix(arg, "--gpu-memory=") {
 			gpuMemoryStr := strings.TrimPrefix(arg, "--gpu-memory=")
 			// Parse GPU memory - support formats like "8GB", "1024MB", or just "1024"
@@ -326,6 +330,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		SecretEnvironment: secretEnvironment,
 		GpuCount:          gpuCount,
 		GpuMemoryMb:       gpuMemoryMB,
+		Timeout:           timeout,
 	}
 
 	// Submit job

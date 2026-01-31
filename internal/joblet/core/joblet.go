@@ -148,6 +148,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 		WorkingDirectory:  req.WorkingDirectory,
 		GPUCount:          req.GPUCount,    // GPU requirements
 		GPUMemoryMB:       req.GPUMemoryMB, // GPU memory requirement
+		Timeout:           req.Timeout,     // Per-job timeout
 	}
 
 	log := j.logger.WithFields(
@@ -577,12 +578,64 @@ func (j *Joblet) DeleteAllJobs(ctx context.Context, req interfaces.DeleteAllJobs
 // monitorJob monitors a running job until completion asynchronously.
 // Waits for process completion, determines exit code, updates job status,
 // and triggers cleanup (special handling for runtime builds to preserve artifacts).
+// If JobTimeout is configured and positive, the job will be terminated if it exceeds
+// the timeout duration.
 func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *domain.Job) {
 	log := j.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("starting job monitoring")
 
-	// Wait for completion
-	err := cmd.Wait()
+	// Channel to receive Wait() result
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- cmd.Wait()
+	}()
+
+	// Setup timeout: per-job timeout takes precedence over global config
+	// (0 or negative = no timeout)
+	timeout := j.config.Joblet.JobTimeout
+	if job.Timeout > 0 {
+		timeout = job.Timeout
+	}
+	var timeoutChan <-chan time.Time
+	if timeout > 0 {
+		timeoutChan = time.After(timeout)
+		log.Debug("job timeout configured", "timeout", timeout)
+	}
+
+	// Race between completion and timeout
+	var waitErr error
+	var timedOut bool
+
+	select {
+	case waitErr = <-waitDone:
+		// Process completed normally
+	case <-timeoutChan:
+		// Timeout exceeded - terminate job
+		timedOut = true
+		log.Warn("job execution timeout exceeded", "timeout", timeout)
+
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), j.config.Joblet.CleanupTimeout)
+		if job.Type.IsRuntimeBuild() {
+			if err := j.cleanup.CleanupJobWithProcessSystemOnly(cleanupCtx, job.Uuid, job.Pid); err != nil {
+				log.Error("timeout cleanup failed for runtime build job", "error", err)
+			}
+		} else {
+			if err := j.cleanup.CleanupJobWithProcess(cleanupCtx, job.Uuid, job.Pid); err != nil {
+				log.Error("timeout cleanup failed", "error", err)
+			}
+		}
+		cancel()
+
+		// Wait for process to terminate after cleanup
+		select {
+		case waitErr = <-waitDone:
+		case <-time.After(5 * time.Second):
+			log.Error("process did not terminate after cleanup")
+		}
+	case <-ctx.Done():
+		log.Info("context canceled during job monitoring")
+		return
+	}
 
 	// Give a brief moment for final log chunks to be written and published
 	// cmd.Wait() ensures pipes are closed, but async pubsub publishes might still be in flight
@@ -591,9 +644,14 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 	// Determine final status
 	var exitCode int32
 	now := time.Now()
-	if err != nil {
+
+	if timedOut {
+		job.Status = domain.StatusTimeout
+		job.ExitCode = 124 // Unix timeout convention
+		job.EndTime = &now
+	} else if waitErr != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if errors.As(waitErr, &exitErr) {
 			exitCode = int32(exitErr.ExitCode())
 		} else {
 			exitCode = -1
@@ -602,9 +660,8 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 		job.ExitCode = exitCode
 		job.EndTime = &now
 	} else {
-		exitCode = 0
 		job.Status = domain.StatusCompleted
-		job.ExitCode = exitCode
+		job.ExitCode = 0
 		job.EndTime = &now
 	}
 
@@ -630,22 +687,25 @@ func (j *Joblet) monitorJob(ctx context.Context, cmd platform.Command, job *doma
 	}
 
 	// Cleanup resources - but handle runtime build jobs specially
-	if job.Type.IsRuntimeBuild() {
-		// For runtime builds: clean system resources but preserve filesystem artifacts
-		if err := j.cleanup.CleanupJobSystemResourcesOnly(job.Uuid); err != nil {
-			log.Error("system resource cleanup failed for runtime build job", "error", err)
+	// Skip cleanup if already done during timeout handling
+	if !timedOut {
+		if job.Type.IsRuntimeBuild() {
+			// For runtime builds: clean system resources but preserve filesystem artifacts
+			if err := j.cleanup.CleanupJobSystemResourcesOnly(job.Uuid); err != nil {
+				log.Error("system resource cleanup failed for runtime build job", "error", err)
+			} else {
+				log.Info("runtime build job completed - system resources cleaned, artifacts preserved",
+					"jobType", job.Type, "runtimesPath", "/opt/joblet/runtimes")
+			}
 		} else {
-			log.Info("runtime build job completed - system resources cleaned, artifacts preserved",
-				"jobType", job.Type, "runtimesPath", "/opt/joblet/runtimes")
-		}
-	} else {
-		// For regular jobs: full cleanup
-		if err := j.cleanup.CleanupJob(job.Uuid); err != nil {
-			log.Error("cleanup failed during monitoring", "error", err)
+			// For regular jobs: full cleanup
+			if err := j.cleanup.CleanupJob(job.Uuid); err != nil {
+				log.Error("cleanup failed during monitoring", "error", err)
+			}
 		}
 	}
 
-	log.Info("job completed", "exitCode", exitCode)
+	log.Info("job monitoring complete", "status", job.Status, "exitCode", job.ExitCode)
 }
 
 // Helper methods

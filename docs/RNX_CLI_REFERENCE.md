@@ -74,21 +74,22 @@ rnx job run [parameters] <command> [arguments...]
 
 #### Command Parameters
 
-| Parameter          | Description                                                | Default Value  |
-|--------------------|------------------------------------------------------------|----------------|
-| `--max-cpu`        | Maximum CPU usage percentage (0-10000)                     | 0 (unlimited)  |
-| `--max-memory`     | Maximum memory in MB                                       | 0 (unlimited)  |
-| `--max-iobps`      | Maximum I/O bytes per second                               | 0 (unlimited)  |
-| `--cpu-cores`      | CPU cores to use (e.g., "0-3" or "1,3,5")                  | "" (all cores) |
-| `--gpu`            | Number of GPUs to allocate to the job                      | 0 (none)       |
-| `--gpu-memory`     | Minimum GPU memory required (e.g., "8GB", "4096MB")        | none           |
-| `--network`        | Network mode: bridge, isolated, none, or custom            | "bridge"       |
-| `--volume`         | Volume to mount (can be specified multiple times)          | none           |
+| Parameter          | Description                                                                           | Default Value  |
+|--------------------|---------------------------------------------------------------------------------------|----------------|
+| `--max-cpu`        | Maximum CPU usage percentage (0-10000)                                                | 0 (unlimited)  |
+| `--max-memory`     | Maximum memory in MB                                                                  | 0 (unlimited)  |
+| `--max-iobps`      | Maximum I/O bytes per second                                                          | 0 (unlimited)  |
+| `--cpu-cores`      | CPU cores to use (e.g., "0-3" or "1,3,5")                                             | "" (all cores) |
+| `--gpu`            | Number of GPUs to allocate to the job                                                 | 0 (none)       |
+| `--gpu-memory`     | Minimum GPU memory required (e.g., "8GB", "4096MB")                                   | none           |
+| `--network`        | Network mode: bridge, isolated, none, or custom                                       | "bridge"       |
+| `--volume`         | Volume to mount (can be specified multiple times)                                     | none           |
 | `--upload`         | Upload file or directory to workspace (auto-detects, can be specified multiple times) | none           |
-| `--runtime`        | Use pre-built runtime (e.g., openjdk-21, python-3.11-ml)   | none           |
-| `--env, -e`        | Environment variable (KEY=VALUE, visible in logs)          | none           |
-| `--secret-env, -s` | Secret environment variable (KEY=VALUE, hidden from logs)  | none           |
-| `--schedule`       | Schedule job execution (duration or RFC3339 time)          | immediate      |
+| `--runtime`        | Use pre-built runtime (e.g., openjdk-21, python-3.11-ml)                              | none           |
+| `--env, -e`        | Environment variable (KEY=VALUE, visible in logs)                                     | none           |
+| `--secret-env, -s` | Secret environment variable (KEY=VALUE, hidden from logs)                             | none           |
+| `--schedule`       | Schedule job execution (duration or RFC3339 time)                                     | immediate      |
+| `--timeout`        | Job execution timeout (e.g., "30s", "5m", "1h"). Overrides global config              | global config  |
 
 #### Examples
 
@@ -138,6 +139,10 @@ rnx job run --network=isolated ping google.com
 # Using runtime
 rnx job run --runtime=python-3.11-ml python -c "import torch; print(torch.__version__)"
 rnx job run --runtime=openjdk-21 java -version
+
+# Per-job execution timeout
+rnx job run --timeout=5m long_task.sh
+rnx job run --timeout=30s --max-memory=256 quick_check.sh
 
 # GPU acceleration
 rnx job run --gpu=1 python gpu_script.py

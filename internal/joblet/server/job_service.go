@@ -193,6 +193,7 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           jobType,
+		Timeout:           req.Timeout,
 	}
 
 	if err := s.validateJobRequest(jobRequest); err != nil {
@@ -336,6 +337,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 		GpuCount:          pbJob.GpuCount,
 		GpuMemoryMb:       pbJob.GpuMemoryMb,
 		NodeId:            job.NodeId,
+		Timeout:           pbJob.Timeout,
 	}, nil
 }
 
@@ -986,7 +988,7 @@ func (s *JobServiceServer) streamLiveMetrics(stream grpc.ServerStreamingServer[p
 			}
 
 			if event.Type == "UPDATED" {
-				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
+				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" || event.Status == "TIMEOUT" {
 					if !jobCompleted {
 						jobCompleted = true
 						drainDeadline = time.Now().Add(500 * time.Millisecond)
@@ -1416,7 +1418,7 @@ func (s *JobServiceServer) streamLiveTelematics(stream grpc.ServerStreamingServe
 			}
 
 			if event.Type == "UPDATED" {
-				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
+				if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" || event.Status == "TIMEOUT" {
 					if !jobCompleted {
 						jobCompleted = true
 						drainDeadline = time.Now().Add(500 * time.Millisecond)

@@ -188,7 +188,7 @@ get_job_logs() {
     # Wait for job to complete with exponential backoff
     for i in $(seq 1 $max_attempts); do
         local status=$(check_job_status "$job_id")
-        if [[ "$status" == "COMPLETED" || "$status" == "FAILED" ]]; then
+        if [[ "$status" == "COMPLETED" || "$status" == "FAILED" || "$status" == "TIMEOUT" ]]; then
             break
         fi
         # Start with shorter waits, increase gradually

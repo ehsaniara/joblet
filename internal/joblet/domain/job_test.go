@@ -184,6 +184,7 @@ func TestJobIsRunning(t *testing.T) {
 		{StatusCompleted, false},
 		{StatusFailed, false},
 		{StatusStopped, false},
+		{StatusTimeout, false},
 	}
 
 	for _, tt := range tests {
@@ -205,6 +206,7 @@ func TestJobIsCompleted(t *testing.T) {
 		{StatusCompleted, true},
 		{StatusFailed, true},
 		{StatusStopped, true},
+		{StatusTimeout, true},
 	}
 
 	for _, tt := range tests {
@@ -213,5 +215,32 @@ func TestJobIsCompleted(t *testing.T) {
 			t.Errorf("IsCompleted() for status %v: expected %v, got %v",
 				tt.status, tt.expected, job.IsCompleted())
 		}
+	}
+}
+
+func TestJobTimeoutTransition(t *testing.T) {
+	job := &Job{
+		Uuid:   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		Status: StatusRunning,
+		Pid:    1234,
+	}
+
+	// Simulate timeout
+	job.Status = StatusTimeout
+	job.ExitCode = 124 // Unix timeout convention
+	endTime := time.Now()
+	job.EndTime = &endTime
+
+	if job.Status != StatusTimeout {
+		t.Errorf("Expected status TIMEOUT, got %v", job.Status)
+	}
+	if job.ExitCode != 124 {
+		t.Errorf("Expected exit code 124, got %v", job.ExitCode)
+	}
+	if job.EndTime == nil {
+		t.Error("Expected end time to be set")
+	}
+	if !job.IsCompleted() {
+		t.Error("Expected job with TIMEOUT status to be completed")
 	}
 }

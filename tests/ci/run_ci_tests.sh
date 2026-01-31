@@ -65,6 +65,9 @@ run_test_suite "mTLS Authentication Tests" "$SCRIPT_DIR/test_mtls_auth.sh"
 run_test_suite "Volume Operations Tests" "$SCRIPT_DIR/test_volume_operations.sh"
 run_test_suite "Default Disk Quota Tests" "$SCRIPT_DIR/test_default_disk_quota.sh"
 
+# Timeout tests
+run_test_suite "Job Timeout Tests" "$SCRIPT_DIR/test_job_timeout.sh"
+
 # Print final summary and handle CI environment limitations
 if print_suite_summary; then
     echo "CI-compatible E2E tests completed successfully!"

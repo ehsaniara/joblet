@@ -153,6 +153,10 @@ rnx job run --volume=mydata python3 process_data.py
 # Job scheduling options
 rnx job run --schedule="1hour" backup.sh
 rnx job run --schedule="2025-12-25T00:00:00" maintenance.py
+
+# Execution timeout (terminates job if exceeded)
+rnx job run --timeout=5m long_running_task.sh
+rnx job run --timeout=30s --max-memory=256 quick_check.sh
 ```
 
 ## 🎨 Web Administration Interface
