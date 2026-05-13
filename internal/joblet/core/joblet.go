@@ -335,8 +335,11 @@ func (j *Joblet) executeJob(ctx context.Context, job *domain.Job, req job.BuildR
 		log.Debug("eBPF telematics monitoring skipped", "hasMonitor", j.telematicsMonitor != nil, "hasCgroupPath", job.CgroupPath != "")
 	}
 
-	// Monitor asynchronously
-	go j.monitorJob(ctx, cmd, job)
+	// Monitor asynchronously using background context.
+	// We don't use the request context here because job monitoring must continue
+	// after the RunJob RPC returns to the client. The request context gets canceled
+	// when the RPC completes, which would incorrectly abort job monitoring.
+	go j.monitorJob(context.Background(), cmd, job)
 
 	log.Info("job started", "pid", job.Pid)
 	return job, nil
