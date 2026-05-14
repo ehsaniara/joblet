@@ -433,7 +433,8 @@ detect_aws_environment() {
         fi
     fi
 
-    return 1
+    # Not running on EC2 - this is not an error, just detection
+    return 0
 }
 
 display_aws_quickstart() {
