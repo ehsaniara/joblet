@@ -18,7 +18,7 @@ func TestGPUService_AllocateGPU_DisabledGPU(t *testing.T) {
 	fakeGPUManager.IsEnabledReturns(false)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Create job with GPU requirement
 	job := &domain.Job{
@@ -50,7 +50,7 @@ func TestGPUService_AllocateGPU_DisabledGPU_NoRequirement(t *testing.T) {
 	fakeGPUManager.IsEnabledReturns(false)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Create job WITHOUT GPU requirement
 	job := &domain.Job{
@@ -84,7 +84,7 @@ func TestGPUService_AllocateGPU_Success(t *testing.T) {
 	fakeGPUManager.AllocateGPUsReturns(expectedAllocation, nil)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Create job with GPU requirement
 	job := &domain.Job{
@@ -140,7 +140,7 @@ func TestGPUService_AllocateGPU_NoGPURequired(t *testing.T) {
 	fakeGPUManager.IsEnabledReturns(true)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Create job without GPU requirement
 	job := &domain.Job{
@@ -175,7 +175,7 @@ func TestGPUService_AllocateGPU_AllocationFailure(t *testing.T) {
 	fakeGPUManager.AllocateGPUsReturns(nil, expectedError)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Create job with GPU requirement
 	job := &domain.Job{
@@ -206,7 +206,7 @@ func TestGPUService_ReleaseGPU_Success(t *testing.T) {
 	fakeGPUManager.ReleaseGPUsReturns(nil)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Release GPU
 	err := service.ReleaseGPU(context.Background(), "test-job")
@@ -232,7 +232,7 @@ func TestGPUService_ReleaseGPU_Disabled(t *testing.T) {
 	fakeGPUManager.IsEnabledReturns(false)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Release GPU
 	err := service.ReleaseGPU(context.Background(), "test-job")
@@ -258,7 +258,7 @@ func TestGPUService_ReleaseGPU_Failure(t *testing.T) {
 	fakeGPUManager.ReleaseGPUsReturns(expectedError)
 
 	// Create GPU service
-	service := execution.NewGPUService(fakeGPUManager, logger.New())
+	service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 	// Release GPU
 	err := service.ReleaseGPU(context.Background(), "test-job")
@@ -277,7 +277,7 @@ func TestGPUService_IsGPUEnabled(t *testing.T) {
 		fakeGPUManager := &gpufakes.FakeGPUManagerInterface{}
 		fakeGPUManager.IsEnabledReturns(true)
 
-		service := execution.NewGPUService(fakeGPUManager, logger.New())
+		service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 		if !service.IsGPUEnabled() {
 			t.Error("Expected GPU to be enabled")
@@ -288,7 +288,7 @@ func TestGPUService_IsGPUEnabled(t *testing.T) {
 		fakeGPUManager := &gpufakes.FakeGPUManagerInterface{}
 		fakeGPUManager.IsEnabledReturns(false)
 
-		service := execution.NewGPUService(fakeGPUManager, logger.New())
+		service := execution.NewGPUService(fakeGPUManager, nil, logger.New())
 
 		if service.IsGPUEnabled() {
 			t.Error("Expected GPU to be disabled")

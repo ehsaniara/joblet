@@ -29,16 +29,9 @@ type GPUService struct {
 	logger       *logger.Logger
 }
 
-// NewGPUService creates a new GPU service
-func NewGPUService(gpuManager gpu.GPUManagerInterface, logger *logger.Logger) *GPUService {
-	return &GPUService{
-		gpuManager: gpuManager,
-		logger:     logger.WithField("component", "gpu-service"),
-	}
-}
-
-// NewGPUServiceWithVerifier creates a GPU service with CUDA verification
-func NewGPUServiceWithVerifier(gpuManager gpu.GPUManagerInterface, verifier gpu.CUDAVerifierInterface, logger *logger.Logger) *GPUService {
+// NewGPUService creates a new GPU service. Pass a nil verifier to skip
+// CUDA runtime verification (tests).
+func NewGPUService(gpuManager gpu.GPUManagerInterface, verifier gpu.CUDAVerifierInterface, logger *logger.Logger) *GPUService {
 	return &GPUService{
 		gpuManager:   gpuManager,
 		cudaVerifier: verifier,
