@@ -26,6 +26,7 @@ import (
 	metricsdomain "github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/scheduler"
 	"github.com/ehsaniara/joblet/pkg/config"
+	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
@@ -168,7 +169,7 @@ func (j *Joblet) StartJob(ctx context.Context, req interfaces.StartJobRequest) (
 
 	// 1. Basic request validation (simplified)
 	if internalReq.Command == "" {
-		return nil, fmt.Errorf("command cannot be empty")
+		return nil, fmt.Errorf("%w: command cannot be empty", pkgerrors.ErrInvalidJobSpec)
 	}
 
 	// 2. Build the job
@@ -360,7 +361,7 @@ func (j *Joblet) executeScheduledJob(ctx context.Context, jobObj *domain.Job) er
 	// Get fresh job state from store to check for cancellation
 	freshJob, exists := j.store.Job(jobObj.Uuid)
 	if !exists {
-		return fmt.Errorf("job not found: %s", jobObj.Uuid)
+		return fmt.Errorf("%w: %s", pkgerrors.ErrJobNotFound, jobObj.Uuid)
 	}
 
 	// Prevent execution of canceled jobs (defensive check against race conditions)
@@ -393,7 +394,7 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 
 	jb, exists := j.store.Job(req.JobUUID)
 	if !exists {
-		return fmt.Errorf("job not found: %s", req.JobUUID)
+		return fmt.Errorf("%w: %s", pkgerrors.ErrJobNotFound, req.JobUUID)
 	}
 
 	// Handle scheduled jobs
@@ -413,7 +414,7 @@ func (j *Joblet) StopJob(ctx context.Context, req interfaces.StopJobRequest) err
 
 	// Handle running jobs
 	if !jb.IsRunning() {
-		return fmt.Errorf("job is not running: %s (status: %s)", req.JobUUID, jb.Status)
+		return fmt.Errorf("%w: %s (status: %s)", pkgerrors.ErrJobNotRunning, req.JobUUID, jb.Status)
 	}
 
 	// Check if cleanup is already in progress (from monitor)
@@ -464,12 +465,12 @@ func (j *Joblet) DeleteJob(ctx context.Context, req interfaces.DeleteJobRequest)
 	// Check if job exists
 	jb, exists := j.store.Job(req.JobUUID)
 	if !exists {
-		return fmt.Errorf("job not found: %s", req.JobUUID)
+		return fmt.Errorf("%w: %s", pkgerrors.ErrJobNotFound, req.JobUUID)
 	}
 
 	// Prevent deletion of running jobs
 	if jb.IsRunning() || jb.IsScheduled() {
-		return fmt.Errorf("cannot delete job %s (status: %s) - stop the job first", req.JobUUID, jb.Status)
+		return fmt.Errorf("%w: cannot delete job %s (status: %s) - stop the job first", pkgerrors.ErrJobAlreadyRunning, req.JobUUID, jb.Status)
 	}
 
 	log.Info("deleting job completely", "status", jb.Status, "reason", req.Reason)

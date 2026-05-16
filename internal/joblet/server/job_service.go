@@ -15,6 +15,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/mappers"
 	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
 	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
+	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 
 	"google.golang.org/grpc"
@@ -91,7 +92,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 	jobRequest, err := s.convertToJobRequest(req)
 	if err != nil {
 		log.Error("failed to convert request", "error", err)
-		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+		return nil, statusFromError(err, "invalid request")
 	}
 
 	// Log the request (excluding sensitive environment variables)
@@ -116,7 +117,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 	newJob, err := s.joblet.StartJob(ctx, *jobRequest)
 	if err != nil {
 		log.Error("job creation failed", "error", err)
-		return nil, status.Errorf(codes.Internal, "job run failed: %v", err)
+		return nil, statusFromError(err, "job run failed")
 	}
 
 	if req.Schedule != "" {
@@ -138,7 +139,7 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 // convertToJobRequest converts protobuf request to domain request object
 func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfaces.StartJobRequest, error) {
 	if req.Command == "" {
-		return nil, fmt.Errorf("command is required")
+		return nil, fmt.Errorf("%w: command is required", pkgerrors.ErrInvalidJobSpec)
 	}
 
 	network := req.Network
@@ -360,7 +361,7 @@ func (s *JobServiceServer) StopJob(ctx context.Context, req *pb.StopJobRequest) 
 	err := s.joblet.StopJob(ctx, stopRequest)
 	if err != nil {
 		log.Error("job stop failed", "error", err)
-		return nil, status.Errorf(codes.Internal, "job stop failed: %v", err)
+		return nil, statusFromError(err, "job stop failed")
 	}
 
 	log.Info("job stopped successfully", "job_uuid", stopRequest.JobUUID)
@@ -394,7 +395,7 @@ func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReque
 			Uuid:    deleteRequest.JobUUID,
 			Success: false,
 			Message: err.Error(),
-		}, status.Errorf(codes.Internal, "job deletion failed: %v", err)
+		}, statusFromError(err, "job deletion failed")
 	}
 
 	log.Info("job deletion completed successfully", "job_uuid", deleteRequest.JobUUID)
@@ -429,7 +430,7 @@ func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJ
 			Message:      err.Error(),
 			DeletedCount: 0,
 			SkippedCount: 0,
-		}, status.Errorf(codes.Internal, "bulk job deletion failed: %v", err)
+		}, statusFromError(err, "bulk job deletion failed")
 	}
 
 	log.Info("bulk job deletion completed successfully",
