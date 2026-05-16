@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
@@ -193,7 +194,7 @@ func (a *volumeStoreAdapter) RemoveVolume(name string) error {
 	a.countsMutex.RUnlock()
 
 	if jobCount > 0 {
-		return fmt.Errorf("volume is currently in use by %d job(s)", jobCount)
+		return fmt.Errorf("%w: volume is currently in use by %d job(s)", pkgerrors.ErrVolumeInUse, jobCount)
 	}
 
 	// Get volume for statistics before deletion
@@ -205,13 +206,13 @@ func (a *volumeStoreAdapter) RemoveVolume(name string) error {
 	}
 
 	if !exists {
-		return fmt.Errorf("volume not found: %s", name)
+		return fmt.Errorf("%w: %s", pkgerrors.ErrVolumeNotFound, name)
 	}
 
 	// Remove from store
 	if err := a.volumeStore.Delete(ctx, name); err != nil {
 		if err.Error() == "key not found" {
-			return fmt.Errorf("volume not found: %s", name)
+			return fmt.Errorf("%w: %s", pkgerrors.ErrVolumeNotFound, name)
 		}
 		a.logger.Error("failed to remove volume from store", "volumeName", name, "error", err)
 		return fmt.Errorf("failed to remove volume: %w", err)
@@ -247,7 +248,7 @@ func (a *volumeStoreAdapter) IncrementJobCount(name string) error {
 	// Check if volume exists
 	_, exists := a.GetVolume(name)
 	if !exists {
-		return fmt.Errorf("volume not found: %s", name)
+		return fmt.Errorf("%w: %s", pkgerrors.ErrVolumeNotFound, name)
 	}
 
 	a.countsMutex.Lock()
@@ -282,7 +283,7 @@ func (a *volumeStoreAdapter) DecrementJobCount(name string) error {
 
 	count, exists := a.jobCounts[name]
 	if !exists {
-		return fmt.Errorf("volume not found: %s", name)
+		return fmt.Errorf("%w: %s", pkgerrors.ErrVolumeNotFound, name)
 	}
 
 	if count <= 0 {

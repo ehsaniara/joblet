@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 	"github.com/ehsaniara/joblet/pkg/semver"
@@ -190,7 +191,7 @@ func (r *Resolver) ResolveRuntime(runtimeSpec string) (*RuntimeConfig, error) {
 	// Find the runtime directory
 	runtimeDir, err := r.FindRuntimeDirectory(runtimeSpec)
 	if err != nil {
-		return nil, fmt.Errorf("runtime not found: %w", err)
+		return nil, fmt.Errorf("%w: %v", pkgerrors.ErrRuntimeNotFound, err)
 	}
 
 	// Load runtime configuration
@@ -350,7 +351,7 @@ func (r *Resolver) FindRuntimeDirectory(spec string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("runtime not found for spec %s", spec)
+	return "", fmt.Errorf("%w: spec %s", pkgerrors.ErrRuntimeNotFound, spec)
 }
 
 // runtimeMatches checks if a runtime config matches a runtime specification
@@ -582,7 +583,7 @@ func (r *Resolver) getRuntimeConfig(runtimeName string) (*RuntimeConfig, error) 
 		}
 	}
 
-	return nil, fmt.Errorf("runtime config not found for %s", runtimeName)
+	return nil, fmt.Errorf("%w: config not found for %s", pkgerrors.ErrRuntimeNotFound, runtimeName)
 }
 
 // inferCUDAVersion attempts to infer CUDA version from runtime name

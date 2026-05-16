@@ -7,6 +7,7 @@ import (
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/config"
+	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
@@ -98,10 +99,10 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 	if req.Timeout != "" {
 		timeout, err := time.ParseDuration(req.Timeout)
 		if err != nil {
-			return nil, fmt.Errorf("invalid timeout: %w", err)
+			return nil, fmt.Errorf("%w: invalid timeout: %v", pkgerrors.ErrInvalidJobSpec, err)
 		}
 		if timeout < 0 {
-			return nil, fmt.Errorf("invalid timeout: must be non-negative")
+			return nil, fmt.Errorf("%w: invalid timeout: must be non-negative", pkgerrors.ErrInvalidJobSpec)
 		}
 		job.Timeout = timeout
 	}
@@ -111,10 +112,10 @@ func (b *Builder) Build(req BuildRequest) (*domain.Job, error) {
 
 	// Basic resource limit validation (simplified)
 	if job.Limits.CPU.Value() < 0 || job.Limits.CPU.Value() > 100 {
-		return nil, fmt.Errorf("invalid CPU limit: must be between 0-100")
+		return nil, fmt.Errorf("%w: invalid CPU limit: must be between 0-100", pkgerrors.ErrInvalidResourceSpec)
 	}
 	if job.Limits.Memory.Bytes() < 0 {
-		return nil, fmt.Errorf("invalid memory limit: must be positive")
+		return nil, fmt.Errorf("%w: invalid memory limit: must be positive", pkgerrors.ErrInvalidResourceSpec)
 	}
 
 	b.logger.Debug("job built successfully",
