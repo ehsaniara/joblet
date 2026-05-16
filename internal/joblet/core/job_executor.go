@@ -95,7 +95,7 @@ func NewExecutionEngineV2(
 
 	// Create GPU service with CUDA verification
 	cudaVerifier := gpu.NewCUDAVerifier()
-	gpuService := execution.NewGPUServiceWithVerifier(gpuManager, cudaVerifier, logger)
+	gpuService := execution.NewGPUService(gpuManager, cudaVerifier, logger)
 
 	// Create execution coordinator
 	coordinator := execution.NewExecutionCoordinator(
