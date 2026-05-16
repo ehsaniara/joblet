@@ -54,7 +54,6 @@ state:
 proto:
 	@echo "Generating proto files..."
 	@./scripts/generate-proto.sh
-	@go generate ./internal/proto
 	@echo "Proto generation complete"
 
 version:
