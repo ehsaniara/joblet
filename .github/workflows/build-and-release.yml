@@ -39,6 +39,14 @@ jobs:
           echo "version=$CLEAN" >> $GITHUB_OUTPUT
           echo "Building version: $CLEAN"
 
+      - name: Install BPF toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+
+      - name: Compile BPF objects
+        # bpf2go -target amd64,arm64 produces both .o files from one invocation,
+        # so this runs once per matrix arch but produces identical bytes.
+        run: go generate ./internal/joblet/ebpf/telematics
+
       - name: Build all binaries
         run: |
           LDFLAGS="-X main.version=${{ steps.version.outputs.version }} -w -s"

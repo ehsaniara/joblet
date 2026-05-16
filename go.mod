@@ -25,9 +25,14 @@ require (
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/tools v0.38.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.0 // indirect
 )
 
-tool github.com/maxbrunsfeld/counterfeiter/v6
+tool (
+	github.com/maxbrunsfeld/counterfeiter/v6
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	google.golang.org/protobuf/cmd/protoc-gen-go
+)
 
 // Workaround for counterfeiter issue #344: VendorlessPath removed in x/tools v0.38.0
 // Remove this when counterfeiter releases a fix

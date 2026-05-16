@@ -178,6 +178,19 @@ use (
 
 ## Building
 
+### One-time setup: compile the BPF objects
+
+The joblet daemon embeds compiled BPF programs (`internal/joblet/ebpf/telematics/telematics_*_bpfel.o`). These are not tracked in git — bytes depend on local `clang`/`llvm`/`libbpf-dev` versions and are rebuilt from `bpf/telematics.c`. Run once after clone, and whenever you edit a `.c` file:
+
+```bash
+sudo apt-get install -y clang llvm libbpf-dev   # Ubuntu/Debian
+make bpf
+```
+
+`make bpf` runs `go generate ./internal/joblet/ebpf/telematics`, which produces both the amd64 and arm64 `.o` files in a single invocation. Without it, building `joblet` will fail with `pattern telematics_*.o: no matching files found`.
+
+> CLI-only contributors (only touching `rnx`) can skip this — `rnx` uses a stub on non-Linux targets and doesn't import the BPF package on Linux either.
+
 ### Build All Binaries
 
 ```bash

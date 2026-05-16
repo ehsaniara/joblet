@@ -65,3 +65,7 @@ VERSION
 error.log
 *SUMMARY.md
 *CHECKLIST.md
+
+# Generated BPF objects (rebuilt by `make bpf` / `go generate ./internal/joblet/ebpf/telematics`)
+# Bytes depend on local clang/llvm/libbpf-dev versions and are not portable.
+internal/joblet/ebpf/telematics/telematics_*_bpfel.o

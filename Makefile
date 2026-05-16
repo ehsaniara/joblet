@@ -26,7 +26,7 @@ LDFLAGS := -s -w \
 	-X github.com/ehsaniara/joblet/pkg/version.GitTag=$(GIT_TAG) \
 	-X github.com/ehsaniara/joblet/pkg/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all clean deploy test proto help joblet rnx persist state version
+.PHONY: all clean deploy test proto bpf help joblet rnx persist state version
 
 all: joblet rnx persist state
 	@echo "✅ Build complete - all binaries ready"
@@ -54,8 +54,12 @@ state:
 proto:
 	@echo "Generating proto files..."
 	@./scripts/generate-proto.sh
-	@go generate ./internal/proto
 	@echo "Proto generation complete"
+
+bpf:
+	@echo "Compiling BPF objects (requires clang, llvm, libbpf-dev)..."
+	@go generate ./internal/joblet/ebpf/telematics
+	@echo "BPF compilation complete"
 
 version:
 	@echo "Version: $(VERSION)"
@@ -65,6 +69,7 @@ version:
 
 clean:
 	rm -rf bin/ dist/ api/gen/ internal/proto/gen/
+	rm -f internal/joblet/ebpf/telematics/telematics_*_bpfel.o
 
 deploy: all
 	@echo "Deploying to $(REMOTE_USER)@$(REMOTE_HOST)..."
@@ -99,6 +104,7 @@ help:
 	@echo "  make persist        - Build persist only"
 	@echo "  make state          - Build state only"
 	@echo "  make proto          - Generate proto files"
+	@echo "  make bpf            - Compile BPF objects (needs clang, llvm, libbpf-dev)"
 	@echo "  make version        - Show version information"
 	@echo "  make clean          - Remove build artifacts"
 	@echo "  make test           - Run all tests (all modules)"

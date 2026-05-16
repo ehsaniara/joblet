@@ -6,14 +6,12 @@
 //
 // To regenerate proto files:
 //
-//	go generate ./internal/proto
-//	make proto
+//	go generate ./internal/proto    # or: make proto
+//
+// Generation uses protoc-gen-go and protoc-gen-go-grpc at the versions pinned
+// in go.mod (tool directives), so output is identical across developers
+// regardless of which plugins they have installed globally. `protoc` itself
+// must still be on PATH.
 package proto
 
-// Generate IPC protobuf (used for joblet-core <-> persist communication)
-//go:generate mkdir -p gen/ipc
-//go:generate protoc --proto_path=. --go_out=gen/ipc --go_opt=paths=source_relative ipc.proto
-
-// Generate Persist protobuf (used for persist gRPC service API)
-//go:generate mkdir -p gen/persist
-//go:generate protoc --proto_path=. --go_out=gen/persist --go-grpc_out=gen/persist --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative persist.proto
+//go:generate ../../scripts/generate-proto.sh

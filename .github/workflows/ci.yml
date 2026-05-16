@@ -26,6 +26,12 @@ jobs:
 
       - run: go mod download
 
+      - name: Install BPF toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+
+      - name: Compile BPF objects
+        run: go generate ./internal/joblet/ebpf/telematics
+
       - run: go vet ./...
 
       - name: Run tests
@@ -81,6 +87,14 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "commit=$COMMIT" >> $GITHUB_OUTPUT
           echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+
+      - name: Install BPF toolchain
+        if: matrix.component == 'joblet'
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+
+      - name: Compile BPF objects
+        if: matrix.component == 'joblet'
+        run: go generate ./internal/joblet/ebpf/telematics
 
       - name: Build ${{ matrix.component }}
         run: |
