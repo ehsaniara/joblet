@@ -85,4 +85,4 @@ The `scripts/` directory contains helper scripts:
 ## Related
 
 - [Java 21 Examples](../java-21/README.md) - Virtual Threads and newer features
-- [Runtime YAML Reference](../../docs/design/RUNTIME_YAML_QUICKREF.md)
+- [Runtime System Guide](../../docs/RUNTIME_SYSTEM.md)

@@ -15,19 +15,33 @@ letting you focus on your applications rather than infrastructure complexity.
 > Provides sandboxed code execution with GPU support, resource controls, and complete process
 > isolation for AI workloads.
 
+**How it works:** Joblet runs each job as a native Linux process inside its own kernel-enforced sandbox
+(namespaces + cgroups v2), with optional eBPF-based runtime monitoring, all driven through a single
+mTLS-secured gRPC API. There are no container images to build and no registry to manage.
+
+**Common use cases:** running untrusted or LLM-generated code in a sandbox, giving AI agents a secure
+execution backend (via MCP), isolating tests and builds in CI/CD, and running GPU-accelerated ML/AI
+workloads.
+
 ## Key Capabilities
 
 - **🔒 Isolation**: Run in secure sandboxes, separate namespaces, preventing interference between
   workloads
+- **🔬 eBPF Observability**: Kernel-level, per-job behavioral telemetry - process execution, network
+  connections, file access, and memory-mapping events - for security auditing and runtime monitoring of
+  untrusted code
 - **⚡ GPU Acceleration**: Native NVIDIA GPU support with automatic CUDA env. setup for AI/ML workloads
 - **🎛️ Resource Management**: CPU, memory, I/O, and GPU resource limits with fine-grained control
 - **🌐 Network Isolation**: Networking options from full isolation to custom networks for secure
   communication
 - **💾 Storage Solutions**: Persistent volumes for data retention and temporary storage with automatic cleanup
 - **⏰ Job Scheduling**: Execute jobs immediately, schedule for specific times, or set delayed execution
+- **⏱️ Execution Timeouts**: Per-job wall-clock limits that terminate runaway or hung jobs automatically
 - **🛡️ Enterprise Security**: mTLS encryption with certificate-based authentication and role-based
   access control
 - **🐍 Runtime Environments**: Build Python ML, Java, and custom runtime environments from declarative YAML specifications
+- **🤖 AI-Native Integration**: Drive Joblet from AI assistants and agent frameworks through the
+  [Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server) and [Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)
 
 ## Getting Started
 
@@ -159,6 +173,78 @@ rnx job run --timeout=5m long_running_task.sh
 rnx job run --timeout=30s --max-memory=256 quick_check.sh
 ```
 
+## 💡 Use Cases
+
+### 🤖 Sandboxed code execution for AI agents
+
+Run untrusted or LLM-generated code inside a kernel-enforced sandbox instead of on the host. Each job
+gets its own PID, mount, network, IPC, and UTS namespaces with cgroup resource caps, so a misbehaving
+script cannot touch the host or other jobs. eBPF telemetry records exactly what the code did - every
+process it spawned, every network connection it opened, and every file it touched - giving you an audit
+trail for code you did not write.
+
+```bash
+# Run model-generated code with no network, tight limits, and a hard timeout
+rnx job run --network=none --max-cpu=50 --max-memory=512 --timeout=30s \
+        --runtime=python-3.11-ml --upload=generated.py python3 generated.py
+```
+
+### 🧠 Agentic AI execution backend (MCP)
+
+The [Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server) exposes Joblet to AI assistants
+and agent frameworks over the Model Context Protocol, so an agent can launch jobs, stream logs, manage
+volumes and networks, and read GPU/metrics - all against isolated sandboxes rather than your shell.
+Combined with the [Python SDK](https://github.com/ehsaniara/joblet-sdk-python/), this makes Joblet a
+secure tool-use / code-execution layer for multi-agent systems.
+
+```python
+from joblet import JobletClient
+
+with JobletClient(host="your-joblet-server") as client:
+    job = client.jobs.run_job(
+        command="python3", args=["agent_task.py"],
+        runtime="python-3.11-ml", network="none", max_memory=1024,
+    )
+    print(f"Agent job started in sandbox: {job['job_uuid']}")
+```
+
+### 🔁 CI/CD test & build isolation
+
+Replace heavyweight container builds in your pipeline with instant, reproducible runtime environments.
+Each test or build runs isolated, with resource limits and timeouts, and no image registry to maintain.
+
+```bash
+# Isolated test run with a pre-built runtime
+rnx job run --runtime=python-3.11-ml --upload=. pytest tests/
+rnx job run --runtime=openjdk-21 --upload=pom.xml --upload=src/ mvn clean install
+
+# Network-isolated integration testing across jobs
+rnx network create test-env --cidr=10.10.0.0/24
+rnx job run --network=test-env --runtime=openjdk-21 ./service-a
+rnx job run --network=test-env --runtime=python-3.11-ml ./service-b
+```
+
+### ⚡ GPU-accelerated ML/AI workloads
+
+Native NVIDIA GPU allocation with automatic CUDA setup and per-job GPU memory limits - no container GPU
+plumbing required. See the [GPU Support Guide](docs/GPU_SUPPORT.md).
+
+```bash
+rnx job run --gpu=1 --gpu-memory=8GB --runtime=python-3.11-ml python train_model.py
+```
+
+## 🆚 Why Joblet instead of containers?
+
+- **No images, no registry**: Jobs run as native Linux processes - skip `Dockerfile` builds, image
+  versioning, and registry management entirely.
+- **Lower overhead**: Direct process execution avoids container-runtime layers while keeping
+  kernel-enforced isolation (namespaces + cgroups v2).
+- **Built-in runtime visibility**: eBPF gives per-job syscall-level telemetry out of the box, instead of
+  bolting on a separate runtime-security agent.
+- **Secure by default**: mTLS + RBAC on the API, default-deny networking, and resource quotas to prevent
+  noisy-neighbor and denial-of-service conditions.
+- **Fast iteration**: Pre-built YAML runtimes start instantly - no rebuild cycle between runs.
+
 ## 🎨 Web Administration Interface
 
 The Joblet Admin UI is available as a standalone package
@@ -213,6 +299,7 @@ npm run dev
 - **[Job Execution Guide](docs/JOB_EXECUTION.md)** - Detailed job management and execution patterns
 - **[RNX CLI Reference](docs/RNX_CLI_REFERENCE.md)** - Complete command reference with examples
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
+- **[Monitoring Guide](docs/MONITORING.md)** - eBPF telemetry, metrics, and observability
 - **[Working Examples](examples/)** - Production-ready runtime configurations and job examples
 
 ## Related Projects

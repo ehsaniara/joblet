@@ -60,5 +60,5 @@ operational simplicity has been worth any minor trade-offs in binary size.
 ## Learn More
 
 See [DESIGN.md](/docs/DESIGN.md) for the complete system architecture
-and [builder-runtime-final.md](/docs/design/builder-runtime-final.md) for how this pattern extends to runtime
+and [RUNTIME_DESIGN.md](/docs/RUNTIME_DESIGN.md) for how this pattern extends to runtime
 management.

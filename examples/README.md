@@ -195,7 +195,7 @@ This demonstrates:
 
 ## Creating Custom Runtimes
 
-See `docs/design/RUNTIME_YAML_QUICKREF.md` for the complete runtime.yaml specification.
+See `docs/RUNTIME_SYSTEM.md` for the complete runtime.yaml specification.
 
 Basic template:
 

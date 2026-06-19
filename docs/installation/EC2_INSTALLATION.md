@@ -36,8 +36,8 @@ This guide walks you through setting up Joblet on AWS EC2, including:
 ## Architecture Overview
 
 ```
-┌─────────────┐         SSH Tunnel          ┌─────────────────┐
-│   MacBook   │◄────────(localhost:443)───┤   EC2 Instance  │
+┌─────────────┐            SSH Tunnel        ┌─────────────────┐
+│   MacBook   │◄────────(localhost:443)──────┤   EC2 Instance  │
 │   (Local)   │                              │  (Joblet Server)│
 │             │                              │                 │
 │  rnx CLI    │                              │  joblet daemon  │
