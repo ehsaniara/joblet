@@ -154,4 +154,4 @@ collector stops.
 ## Learn More
 
 See [DESIGN.md](/docs/DESIGN.md#51-async-log-persistence-system) for implementation details
-and [persistence-log.md](/docs/design/persistence-log.md) for performance characteristics.
+and [PERSISTENCE.md](/docs/PERSISTENCE.md) for performance characteristics.

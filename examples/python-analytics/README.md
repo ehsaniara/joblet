@@ -85,4 +85,4 @@ Directory containing additional analysis scripts:
 
 - [Python ML Runtime](../python-3.11-ml/README.md) - Full ML stack
 - [Python Basic Runtime](../python/README.md) - Lightweight Python
-- [Runtime YAML Reference](../../docs/design/RUNTIME_YAML_QUICKREF.md)
+- [Runtime System Guide](../../docs/RUNTIME_SYSTEM.md)

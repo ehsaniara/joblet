@@ -104,4 +104,4 @@ rnx job run --runtime=python-3.11 --volume=workflow \
 
 - [Python ML Runtime](../python-3.11-ml/README.md) - NumPy, Pandas, scikit-learn
 - [Python Analytics Runtime](../python-analytics/README.md) - Pandas and visualization
-- [Runtime YAML Reference](../../docs/design/RUNTIME_YAML_QUICKREF.md)
+- [Runtime System Guide](../../docs/RUNTIME_SYSTEM.md)

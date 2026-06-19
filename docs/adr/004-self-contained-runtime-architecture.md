@@ -96,5 +96,5 @@ No conflicts, no environment variables to juggle, no system package conflicts. I
 
 ## Learn More
 
-See [builder-runtime-final.md](/docs/design/builder-runtime-final.md) for implementation details
+See [RUNTIME_DESIGN.md](/docs/RUNTIME_DESIGN.md) for implementation details
 and [runtime_design_doc.md](/docs/runtime_design_doc.md) for the complete runtime system design.

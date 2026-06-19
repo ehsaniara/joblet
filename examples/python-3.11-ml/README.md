@@ -94,4 +94,4 @@ Helper script for local development setup.
 
 - [Python Basic Runtime](../python/README.md) - Lightweight Python without ML packages
 - [Python Analytics](../python-analytics/README.md) - Analytics-focused examples
-- [Runtime YAML Reference](../../docs/design/RUNTIME_YAML_QUICKREF.md)
+- [Runtime System Guide](../../docs/RUNTIME_SYSTEM.md)

@@ -115,4 +115,4 @@ public class VirtualThreadExample {
 ## Related
 
 - [Java 17 Examples](../java-17/README.md)
-- [Runtime YAML Reference](../../docs/design/RUNTIME_YAML_QUICKREF.md)
+- [Runtime System Guide](../../docs/RUNTIME_SYSTEM.md)
