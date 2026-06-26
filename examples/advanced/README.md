@@ -66,7 +66,7 @@ The script will:
 
 ### Expected Output
 
-```
+```text
 🔗 Simple Job Coordination Demo
 ===============================
 

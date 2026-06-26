@@ -230,7 +230,7 @@ If you're using the Medium article guide for your blog:
 
 ## Files in This Directory
 
-```
+```text
 installation/
 ├── README.md                    # This file
 ├── EC2_INSTALLATION.md          # Technical reference guide

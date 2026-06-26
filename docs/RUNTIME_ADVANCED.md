@@ -42,7 +42,7 @@ The Joblet runtime system provides a sophisticated isolation and mounting archit
 
 Runtime configurations are stored in `/opt/joblet/runtimes/`:
 
-```
+```text
 /opt/joblet/runtimes/
 ├── openjdk-21/
 │   ├── isolated/          # Self-contained runtime files
@@ -164,7 +164,7 @@ mounts:
 
 The cleanup system transforms runtime installations into isolated, self-contained packages:
 
-```
+```text
 1. Runtime Built in Builder Chroot
 2. Cleanup Phase Initiated
 3. Parse runtime.yml
@@ -179,7 +179,7 @@ The cleanup system transforms runtime installations into isolated, self-containe
 
 The runtime builder automatically creates this structure:
 
-```
+```text
 /opt/joblet/runtimes/openjdk-21/1.0.0/
 ├── runtime.yml               # Runtime configuration with isolated paths
 └── isolated/                 # Self-contained runtime files

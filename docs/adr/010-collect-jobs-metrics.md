@@ -524,7 +524,7 @@ Additional context included with each metric sample:
 
 For counter metrics, rates are calculated using:
 
-```
+```text
 rate = (current_value - previous_value) / time_delta
 ```
 

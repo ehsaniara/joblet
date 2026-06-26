@@ -32,7 +32,7 @@ rnx job run --runtime=python-3.11-ml bash -c "sleep 30 & sleep 40 & ps aux"
 
 **Output:**
 
-```
+```text
 USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
 0              1  1.0  0.1   4364  2916 ?        S    05:40   0:00 /usr/bin/bash -c sleep 30 & sleep 40 & ps aux
 0              7  0.0  0.0   2792   280 ?        S    05:40   0:00 sleep 30

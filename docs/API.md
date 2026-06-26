@@ -572,7 +572,7 @@ message Job {
 
 ### Job Status Values
 
-```
+```text
 PENDING       - Job queued, waiting to be processed
 INITIALIZING  - Job created, setting up isolation and resources
 SCHEDULED     - Job scheduled for future execution
@@ -1018,7 +1018,7 @@ message LogEntry {
 
 **Storage Location**:
 
-```
+```text
 /opt/joblet/logs/{job_uuid}/
 ├── stdout.log.gz    # Compressed stdout
 └── stderr.log.gz    # Compressed stderr
@@ -1065,7 +1065,7 @@ message MetricSample {
 
 **Storage Location**:
 
-```
+```text
 /opt/joblet/metrics/{job_uuid}/
 └── metrics.jsonl.gz    # Compressed JSON Lines metrics
 ```

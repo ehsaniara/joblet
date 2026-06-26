@@ -10,7 +10,7 @@ establishing clearer architectural boundaries.
 
 ### 1.1 Existing Structure
 
-```
+```text
 joblet/
 ├── cmd/rnx/              # Go CLI including admin command
 ├── admin/
@@ -46,7 +46,7 @@ joblet/
 
 ### 2.1 Target Structure
 
-```
+```text
 Separate Repositories/Packages:
 
 joblet/                   # Main repository
@@ -232,7 +232,7 @@ flowchart LR
 
 **Environment Variables:**
 
-```
+```ini
 JOBLET_ADMIN_PORT=5173
 JOBLET_ADMIN_HOST=localhost
 JOBLET_CONFIG_PATH=~/.rnx/rnx-config.yml

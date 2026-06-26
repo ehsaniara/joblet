@@ -336,7 +336,7 @@ rnx job run --runtime=java:21 find /usr -type f | head -5
 
 **Runtime Directory Structure:**
 
-```
+```text
 /opt/joblet/runtimes/openjdk-21/1.0.0/
 ├── isolated/                    # Self-contained runtime files
 │   ├── usr/lib/jvm/            # Copied from host during build

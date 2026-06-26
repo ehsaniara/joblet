@@ -821,7 +821,7 @@ The command displays comprehensive runtime information:
 
 #### Example Output
 
-```
+```text
 Runtime: python-3.11-ml
 Version: 1.0.0
 Description: Python 3.11 with machine learning and data science packages

@@ -87,7 +87,7 @@ flowchart TD
 
 **Shared secrets (generated once):**
 
-```
+```text
 joblet/ca-cert          # Root CA certificate
 joblet/ca-key           # Root CA private key
 joblet/client-cert      # Admin client certificate
@@ -284,7 +284,7 @@ USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
 
 Store each instance's certificates separately:
 
-```
+```text
 joblet/instances/i-xxx/ca-cert
 joblet/instances/i-xxx/client-cert
 ```

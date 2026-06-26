@@ -4,7 +4,7 @@ This directory contains example code and runtime definitions for testing Joblet.
 
 ## Directory Structure
 
-```
+```text
 examples/
 ├── python/             # Basic Python 3.11 runtime
 │   └── runtime.yaml    # Lightweight Python runtime

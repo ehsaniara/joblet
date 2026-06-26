@@ -178,7 +178,7 @@ Cloud-native state persistence using AWS DynamoDB. **Only available when Joblet 
 
 **Table Schema:**
 
-```
+```text
 Table: joblet-jobs
 ├── Primary Key: job_uuid (String, HASH)
 ├── Attributes:
@@ -277,7 +277,7 @@ item["expiresAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", expire
 
 **Cost Considerations:**
 
-```
+```text
 DynamoDB Pricing (PAY_PER_REQUEST mode):
 
 Write Requests:
@@ -673,7 +673,7 @@ aws dynamodb scan \
 
 **Symptom:**
 
-```
+```text
 FATAL: state service is not available - joblet cannot start
 ensure joblet-state subprocess is running and healthy
 panic: state service required but not available

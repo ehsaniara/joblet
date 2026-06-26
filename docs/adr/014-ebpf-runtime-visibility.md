@@ -51,7 +51,7 @@ through the same pipeline to the same storage backends.
 
 ### Unified View
 
-```
+```text
 $ rnx job watch ml-training-7a3f
 
 ╭─ JOB: ml-training-7a3f ─────────────────────────────────────────╮
@@ -181,7 +181,7 @@ flowchart TD
 
 #### Local (Standalone VM)
 
-```
+```text
 /var/lib/joblet/telemetry/
 ├── {job_uuid}/
 │   └── events.jsonl     # All telemetry, line-delimited JSON
@@ -197,7 +197,7 @@ Format:
 
 #### AWS CloudWatch
 
-```
+```text
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams:
@@ -368,7 +368,7 @@ storage:
 
 ### eBPF Component
 
-```
+```text
 internal/joblet/ebpf/
 ├── telematics/
 │   ├── monitor.go           # Go monitor, emits TelemetryEvents
@@ -383,7 +383,7 @@ The eBPF monitor emits the same `TelemetryEvent` type as metrics, just with diff
 
 ### File Structure
 
-```
+```text
 # Joblet core (no AWS deps)
 internal/joblet/
 ├── telemetry/

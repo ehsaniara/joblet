@@ -59,7 +59,7 @@ rnx job run --schedule="2025-01-15T14:00:00Z" \
 
 The schedule parameter must be in RFC3339 format:
 
-```
+```text
 YYYY-MM-DDTHH:MM:SSZ          # UTC time
 YYYY-MM-DDTHH:MM:SS+HH:MM     # With positive offset
 YYYY-MM-DDTHH:MM:SS-HH:MM     # With negative offset
@@ -135,12 +135,17 @@ The scheduler uses a **sleep-until-next** strategy for efficient CPU usage:
 
 ```mermaid
 stateDiagram-v2
+    [*] --> SCHEDULED
     SCHEDULED --> INITIALIZING
+    SCHEDULED --> CANCELED
     INITIALIZING --> RUNNING
     RUNNING --> COMPLETED
-    SCHEDULED --> CANCELED
+    RUNNING --> FAILED
     RUNNING --> STOPPED
-    COMPLETED --> FAILED
+    COMPLETED --> [*]
+    FAILED --> [*]
+    STOPPED --> [*]
+    CANCELED --> [*]
 ```
 
 | Status | Description |
@@ -210,7 +215,7 @@ This is a deliberate design choice. Future orchestration layers may add:
 
 When a Joblet node restarts:
 
-```
+```text
 1. Start Joblet
 2. SyncFromPersistentState() → Load ALL jobs from DynamoDB
 3. RecoverScheduledJobs() → Filter for:
@@ -222,7 +227,7 @@ When a Joblet node restarts:
 
 **Log output during recovery:**
 
-```
+```text
 [INFO] recovering scheduled jobs from persistent storage totalJobs=15 nodeId=node-prod-1
 [INFO] scheduled job is overdue, will execute immediately job_uuid=job-abc123 overdueBy=5m30s
 [DEBUG] recovered scheduled job job_uuid=job-def456 scheduledTime=2025-01-15T10:30:00Z

@@ -140,7 +140,7 @@ features.
 
 **Real-World Performance Numbers**:
 
-```
+```text
 Workload Type        | No Filter | Level 1 | Level 2 | Level 3 | eBPF Custom
 ---------------------|-----------|---------|---------|---------|-------------
 CPU-bound (compute)  | 100%      | 99.9%   | 99.5%   | 99%     | 98%

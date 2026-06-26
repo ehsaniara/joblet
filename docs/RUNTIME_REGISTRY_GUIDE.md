@@ -184,7 +184,7 @@ The runtime builder executes a 14-phase pipeline:
 Runtimes are installed to: `/opt/joblet/runtimes/{name}/{version}/`
 
 Directory structure:
-```
+```text
 /opt/joblet/runtimes/python-3.11-ml/1.0.0/
 ├── runtime.yml           # Generated runtime configuration
 └── isolated/             # Isolated filesystem
@@ -421,7 +421,7 @@ Hooks execute with:
 
 ### Build Fails at Package Validation
 
-```
+```text
 Error: package not found: python3.11-dev
 ```
 
@@ -432,7 +432,7 @@ apt-cache search python3.11
 
 ### Pip Installation Fails
 
-```
+```text
 Error: pip install failed: Could not find a version that satisfies the requirement
 ```
 
@@ -444,7 +444,7 @@ Error: pip install failed: Could not find a version that satisfies the requireme
 
 ### Permission Denied
 
-```
+```text
 Error: failed to create directory: permission denied
 ```
 
@@ -452,7 +452,7 @@ Error: failed to create directory: permission denied
 
 ### Disk Space Error
 
-```
+```text
 Error: insufficient disk space: 500 MB available, need at least 1024 MB
 ```
 
@@ -460,7 +460,7 @@ Error: insufficient disk space: 500 MB available, need at least 1024 MB
 
 ### Hook Timeout
 
-```
+```text
 Error: pre-install hook timed out after 20m
 ```
 

@@ -36,7 +36,7 @@ flowchart TD
 
 **Security Boundaries:**
 
-```
+```text
 Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 ├── bin/          # Minimal binaries (read-only bind mount from host)
 ├── lib/          # Required libraries (read-only bind mount from host) 
@@ -63,7 +63,7 @@ Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 
 **Security Boundaries:**
 
-```
+```text
 Builder Chroot: /opt/joblet/jobs/{BUILD_ID}/
 ├── bin/          # Full /bin from host (read-only bind mount)
 ├── lib/          # Full /lib from host (read-only bind mount)

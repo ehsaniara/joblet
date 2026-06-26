@@ -313,7 +313,7 @@ aws cloudtrail lookup-events \
 
 **Symptom:**
 
-```
+```text
 ERROR: Failed to retrieve secret joblet/ca-cert
 ERROR: Permission denied
 ```
@@ -338,7 +338,7 @@ aws ec2 terminate-instances --instance-ids i-xxx
 
 **Symptom:**
 
-```
+```text
 ERROR: Certificate expired
 ERROR: Certificate verification failed
 ```

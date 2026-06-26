@@ -20,7 +20,7 @@ This structure allows different dependencies for each module while keeping them 
 
 ## Directory Structure
 
-```
+```text
 joblet/ (repo root)
 ├── go.work                    # Go workspace file
 ├── go.mod                     # Main module: github.com/ehsaniara/joblet
@@ -412,7 +412,7 @@ Both binaries are included in the same `.deb` and `.rpm` packages:
 
 **Debian (.deb):**
 
-```
+```text
 /opt/joblet/bin/
 ├── joblet           # From cmd/joblet
 ├── rnx              # From cmd/rnx
@@ -421,7 +421,7 @@ Both binaries are included in the same `.deb` and `.rpm` packages:
 
 **RPM (.rpm):**
 
-```
+```text
 /opt/joblet/bin/
 ├── joblet
 ├── rnx
@@ -463,7 +463,7 @@ Both binaries are included in the same `.deb` and `.rpm` packages:
 
 **Before:**
 
-```
+```text
 joblet/              # One module
 ├── go.mod
 ├── cmd/
@@ -482,7 +482,7 @@ persist/      # Separate repo
 
 **After:**
 
-```
+```text
 joblet/              # Monorepo with 2 modules
 ├── go.work          # NEW
 ├── go.mod           # Main module
@@ -532,7 +532,7 @@ require (
 
 ### v2.1: Shared Utilities Module
 
-```
+```text
 joblet/
 ├── shared/          # Optional third module
 │   ├── go.mod       # github.com/ehsaniara/joblet/shared

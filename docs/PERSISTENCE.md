@@ -63,7 +63,7 @@ File-based storage using gzipped JSON lines format.
 
 **Storage Format:**
 
-```
+```text
 /opt/joblet/logs/
 ├── {job-id-1}/
 │   ├── stdout.log.gz  # Gzipped JSONL
@@ -112,7 +112,7 @@ Cloud-native storage using AWS CloudWatch Logs for both logs and metrics.
 
 **Log Organization:**
 
-```
+```text
 CloudWatch Log Groups (one per node):
 └── {log_group_prefix}/{nodeId}/jobs
     ├── Log Stream: {job_uuid}-stdout
@@ -140,7 +140,7 @@ CloudWatch Metrics (namespace per deployment):
 CloudWatch backend supports distributed deployments with multiple joblet nodes. Each node is identified by a unique
 `nodeId`, ensuring logs from different nodes are properly isolated:
 
-```
+```text
 Log Groups (one per node):
 ├── /joblet/node-1/jobs              # All jobs from node-1
 │   ├── job-abc-stdout
@@ -299,13 +299,13 @@ log_retention_days: -1
 
 **View logs in AWS Console:**
 
-```
+```text
 CloudWatch → Log Groups → /joblet/{nodeId}/jobs
 ```
 
 **View metrics in AWS Console:**
 
-```
+```text
 CloudWatch → Metrics → Custom Namespaces → Joblet/Jobs
 ```
 
@@ -369,7 +369,7 @@ Cost-effective object storage using AWS S3 with time-partitioned keys for effici
 
 **Storage Layout (Time-Partitioned):**
 
-```
+```text
 s3://{bucket}/{key_prefix}{node_id}/{job_uuid}/
   stdout/
     1704345600000000000.jsonl.gz    # First flush
@@ -784,7 +784,7 @@ persist:
 
 **Result in CloudWatch:**
 
-```
+```text
 Log Groups:
 /joblet-cluster/cluster-node-1/jobs
   └── Streams: job-123-stdout, job-123-stderr
@@ -826,7 +826,7 @@ persist:
 
 **Result in S3:**
 
-```
+```text
 s3://my-company-joblet-logs/production/prod-node-1/
   job-123/
     stdout/
@@ -976,7 +976,7 @@ rnx job metrics <job-id> --since="1h" --until="now"
 
 **Disk Usage:**
 
-```
+```text
 Typical job with 10,000 log lines:
 - Raw JSON: ~5 MB
 - Gzipped: ~1 MB
@@ -1001,7 +1001,7 @@ Typical job with 10,000 log lines:
 
 **Cost Considerations:**
 
-```
+```text
 CloudWatch Logs Pricing (prices vary by region):
 - Ingestion: Per GB ingested
 - Storage: Per GB/month stored

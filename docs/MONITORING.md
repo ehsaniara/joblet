@@ -160,7 +160,7 @@ rnx --node=production monitor status # Specific server node
 
 **Example Output:**
 
-```
+```text
 System Status - 2025-10-08T18:45:14Z
 Available: true
 
@@ -748,7 +748,7 @@ flowchart LR
 
 **CloudWatch Log Streams (per job):**
 
-```
+```text
 Log Group: /joblet/{node_id}
   - {job_uuid}-logs           # stdout/stderr logs
   - {job_uuid}-metrics        # Resource metrics
@@ -786,7 +786,7 @@ fields @timestamp, @logStream
 
 eBPF events are stored locally in compressed JSONL format:
 
-```
+```text
 /opt/joblet/events/{job-uuid}/
 ├── exec_events.jsonl.gz     # Process execution events
 └── connect_events.jsonl.gz  # Network connection events

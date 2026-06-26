@@ -140,7 +140,7 @@ The command returns a job UUID and displays the execution output. This confirms 
 
 Expected output format:
 
-```
+```text
 Job Initiated:
   UUID: 550e8400-e29b-41d4-a716-446655440000
   Command: echo Hello, Joblet!

@@ -83,7 +83,7 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 #### Test Result:
 
-```
+```text
 [DEBUG] [init] waiting for network setup | file=/tmp/joblet-network-ready-{job_uuid}
 [DEBUG] [init] network setup signal received, proceeding with initialization
 ```
@@ -97,7 +97,7 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 #### Test Result:
 
-```
+```text
 # Server Stage
 "max_cpu": 25, "max_memory": 64
 
@@ -116,7 +116,7 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 #### Test Result:
 
-```
+```text
 [DEBUG] [init] making mounts private using platform abstraction
 [DEBUG] [init] /proc successfully remounted within chrooted environment
 [DEBUG] [init] isolation verification | visibleProcesses=5

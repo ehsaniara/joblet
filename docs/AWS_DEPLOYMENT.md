@@ -508,7 +508,7 @@ ssh -i ~/.ssh/your-key.pem -L 50051:<PRIVATE_IP>:443 ubuntu@<BASTION_IP>
 
 If you see warnings like these in the logs (`sudo journalctl -u joblet`):
 
-```
+```text
 ========================================================================
 [STATE] WARNING: Running with IN-MEMORY backend (fallback mode)
 [STATE] Job state will NOT persist across restarts!
@@ -519,7 +519,7 @@ If you see warnings like these in the logs (`sudo journalctl -u joblet`):
 
 Or:
 
-```
+```text
 ========================================================================
 [PERSIST] WARNING: Running with LOCAL storage backend (fallback mode)
 [PERSIST] Logs will be stored on disk at /opt/joblet/logs
@@ -625,7 +625,7 @@ aws logs describe-log-groups --log-group-name-prefix /joblet
 ### S3 Storage Access Denied
 
 If you see errors like:
-```
+```text
 AccessDenied: User is not authorized to perform: s3:PutObject on resource
 because no VPC endpoint policy allows the s3:PutObject action
 ```

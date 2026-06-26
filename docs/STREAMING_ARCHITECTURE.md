@@ -202,7 +202,7 @@ func (b *SimpleLogBuffer) ReadAfterSkip(skipCount int) [][]byte
 
 Long-term storage service with gzip-compressed JSONL files.
 
-```
+```text
 /opt/joblet/
 ├── logs/
 │   └── <job-uuid>/
@@ -291,7 +291,7 @@ flowchart TD
 
 When a client connects mid-execution, there's a potential gap:
 
-```
+```text
 Time:     T0────T1────T2────T3────T4────T5────T6────T7────T8
 Events:   E1    E2    E3    E4    E5    E6    E7    E8    E9
                             │
@@ -335,7 +335,7 @@ Some overlap may occur at the transition boundary. The system handles this by:
 
 ### Directory Structure
 
-```
+```text
 /opt/joblet/
 ├── logs/                          # Job log output
 │   └── <job-uuid>/

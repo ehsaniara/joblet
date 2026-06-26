@@ -122,7 +122,7 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 
 ### Local Backend
 
-```
+```text
 /opt/joblet/
 ├── logs/
 │   └── <job-uuid>/
@@ -145,7 +145,7 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 
 ### CloudWatch Backend
 
-```
+```text
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams per job:
@@ -166,7 +166,7 @@ The S3 backend uses **time-partitioned keys** to avoid expensive read-modify-wri
 
 **Storage Layout:**
 
-```
+```text
 s3://{bucket}/{key_prefix}{node_id}/{job_uuid}/
   stdout/
     1704345600000000000.jsonl.gz    # First flush
@@ -244,7 +244,7 @@ Key metrics:
 
 ### Project Structure
 
-```
+```text
 persist/
 ├── cmd/
 │   └── persist/           # Main entry point

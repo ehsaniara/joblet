@@ -186,7 +186,7 @@ aws secretsmanager list-secrets \
 
 Expected output:
 
-```
+```text
 ----------------------------------------
 |            ListSecrets                |
 +----------------------+----------------+

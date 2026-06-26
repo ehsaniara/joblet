@@ -6,7 +6,7 @@ Joblet is a high-performance job execution system with a monorepo structure cont
 
 ## Repository Structure
 
-```
+```text
 joblet/
 ├── cmd/
 │   ├── joblet/          # Main service daemon
@@ -274,7 +274,7 @@ flowchart TD
 
 ## Storage Layout
 
-```
+```text
 /opt/joblet/
 ├── bin/                    # Binaries
 │   ├── joblet

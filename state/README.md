@@ -135,7 +135,7 @@ rnx job status <job-id>
 
 ### Attributes
 
-```
+```text
 jobId: String         # UUID (e.g., "abc123...")
 jobStatus: String     # PENDING, RUNNING, COMPLETED, FAILED
 command: String       # Job command

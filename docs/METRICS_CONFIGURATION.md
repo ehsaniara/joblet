@@ -157,7 +157,7 @@ rnx job metrics a1b2c3d4
 
 ### Example Output
 
-```
+```text
 ═══ Metrics Sample at 15:23:45 ═══
 Job ID: abc123-def456
 Sample Interval: 5s
@@ -245,7 +245,7 @@ Metrics are stored as gzipped JSON Lines files:
 
 ### File Structure Example
 
-```
+```text
 /opt/joblet/metrics/
 ├── f47ac10b-58cc-4372-a567-0e02b2c3d479/
 │   └── 20251004-153045.jsonl.gz  # Gzipped JSON Lines

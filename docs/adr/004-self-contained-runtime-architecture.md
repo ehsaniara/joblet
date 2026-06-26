@@ -30,7 +30,7 @@ consistent, predictable environment regardless of what's installed on the host.
 
 The structure is beautifully simple:
 
-```
+```text
 /opt/joblet/runtimes/python-3.11-ml/
 ├── isolated/          # Complete root filesystem
 │   ├── bin/          # bash, sh, ls, etc.

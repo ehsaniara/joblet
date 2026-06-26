@@ -55,7 +55,7 @@ environments without contaminating the host system.
 
 ### Directory Structure
 
-```
+```text
 /opt/joblet/runtimes/
 ├── python-3.11-ml/
 │   └── 1.0.0/                   # Version directory
@@ -244,7 +244,7 @@ for _, mount := range config.Mounts {
 
 **Example Mount from Python 3.11:**
 
-```
+```text
 Source: /opt/joblet/runtimes/python-3.11/1.3.1/bin
 Target: /usr/local/bin (in chroot)
 Flags:  MS_BIND (read-write for runtime)
@@ -290,7 +290,7 @@ environment:
 
 **Result in job process:**
 
-```
+```text
 PATH=/usr/local/bin:$ORIGINAL_PATH
 PYTHONPATH=/usr/local/lib/python3.11/site-packages
 PYTHON_VERSION=3.11

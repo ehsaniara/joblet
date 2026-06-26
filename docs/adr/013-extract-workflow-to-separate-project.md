@@ -95,7 +95,7 @@ flowchart TD
 
 ### What Gets Removed from Joblet
 
-```
+```text
 internal/joblet/workflow/              # Orchestration engine
 ├── manager.go
 ├── dependency_resolver.go
@@ -117,7 +117,7 @@ docs/WORKFLOWS.md                      # Moves to new project
 
 ### What Stays in Joblet
 
-```
+```text
 internal/joblet/server/job_service.go        # Core job API
 internal/joblet/server/runtime_service.go    # Runtime management
 internal/joblet/server/volume_service.go     # Volume management
@@ -136,7 +136,7 @@ internal/rnx/jobs/                           # Job CLI commands
 
 ### New Project Structure
 
-```
+```text
 joblet-orchestrator/
 ├── cmd/
 │   └── orchestrator/main.go

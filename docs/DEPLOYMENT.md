@@ -234,7 +234,7 @@ server:
 
 **CloudWatch Log Organization:**
 
-```
+```text
 /joblet/cluster-node-1/jobs/job-abc
 /joblet/cluster-node-1/jobs/job-def
 /joblet/cluster-node-2/jobs/job-ghi
@@ -245,7 +245,7 @@ server:
 
 **AWS Console:**
 
-```
+```text
 CloudWatch → Logs → Log Groups → /joblet
 ```
 
