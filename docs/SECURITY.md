@@ -19,23 +19,14 @@ practices.
 
 Joblet implements multi-layered security:
 
-```
-┌─────────────────────────────────────────┐
-│           Transport Layer               │
-│         mTLS + Certificate Auth         │
-├─────────────────────────────────────────┤
-│         Authorization Layer             │
-│         RBAC (admin/viewer)             │
-├─────────────────────────────────────────┤
-│         Process Isolation               │
-│    Namespaces + cgroups + chroot        │
-├─────────────────────────────────────────┤
-│         Network Isolation               │
-│       Custom networks + traffic         │
-├─────────────────────────────────────────┤
-│         Filesystem Isolation            │
-│      Per-job workspaces + volumes       │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    N1["Transport Layer<br/>mTLS + Certificate Auth"]
+    N2["Authorization Layer<br/>RBAC (admin/viewer)"]
+    N3["Process Isolation<br/>Namespaces + cgroups + chroot"]
+    N4["Network Isolation<br/>Custom networks + traffic"]
+    N5["Filesystem Isolation<br/>Per-job workspaces + volumes"]
+    N1 --- N2 --- N3 --- N4 --- N5
 ```
 
 ### Key Security Features
@@ -71,18 +62,18 @@ This creates:
 
 ### Certificate Structure
 
-```
-Certificate Authority (CA)
-├── Server Certificate (CN=joblet)
-│   ├── Used by Joblet daemon
-│   └── Validates server identity
-└── Client Certificates
-    ├── Admin Certificate (OU=admin)
-    │   ├── Full access to all operations
-    │   └── Can run, stop, manage jobs
-    └── Viewer Certificate (OU=viewer)
-        ├── Read-only access
-        └── Can list, view status, logs
+```mermaid
+flowchart TD
+    N1["Certificate Authority (CA)"] --> N2["Server Certificate (CN=joblet)"]
+    N1 --> N3["Client Certificates"]
+    N2 --> N4["Used by Joblet daemon"]
+    N2 --> N5["Validates server identity"]
+    N3 --> N6["Admin Certificate (OU=admin)"]
+    N3 --> N7["Viewer Certificate (OU=viewer)"]
+    N6 --> N8["Full access to all operations"]
+    N6 --> N9["Can run, stop, manage jobs"]
+    N7 --> N10["Read-only access"]
+    N7 --> N11["Can list, view status, logs"]
 ```
 
 ### Manual Certificate Generation
@@ -272,17 +263,12 @@ rnx runtime build ./examples/java-21/runtime.yaml  # Uses builder chroot with ho
 
 **Isolation Routing:**
 
-```
-JobService API          RuntimeService API
-     │                       │
-     ▼                       ▼
-JobType: "standard"     JobType: "runtime-build"
-     │                       │
-     ▼                       ▼
-Minimal Chroot          Builder Chroot
-- Production isolation  - Controlled host access
-- Secure runtime mounts - Runtime building tools
-- No package managers   - Temporary modifications
+```mermaid
+flowchart TD
+    N1["JobService API"] --> N2["JobType: standard"]
+    N2 --> N3["Minimal Chroot<br/>- Production isolation<br/>- Secure runtime mounts<br/>- No package managers"]
+    N4["RuntimeService API"] --> N5["JobType: runtime-build"]
+    N5 --> N6["Builder Chroot<br/>- Controlled host access<br/>- Runtime building tools<br/>- Temporary modifications"]
 ```
 
 ### Dual Chroot System

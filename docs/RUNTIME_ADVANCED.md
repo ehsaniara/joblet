@@ -237,9 +237,11 @@ mounts:
 
 ## Build-Once, Deploy-Many Architecture
 
-```
-Dev Host → Runtime Built → Runtime.tar.gz → Multiple Production Hosts
-          (Auto Package)                   (Direct Extract)
+```mermaid
+flowchart LR
+    N1["Dev Host"] -->|Auto Package| N2["Runtime Built"]
+    N2 --> N3["Runtime.tar.gz"]
+    N3 -->|Direct Extract| N4["Multiple Production Hosts"]
 ```
 
 ## Standard Deployment Method

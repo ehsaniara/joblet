@@ -13,40 +13,23 @@ with support for multiple storage backends including local filesystem, AWS Cloud
 
 ### Components
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   Joblet Main Service               │
-│                                                     │
-│  ┌─────────────┐         ┌─────────────────────┐    │
-│  │ Job Executor│────────▶│  IPC Client         │    │
-│  │             │  logs   │  (Unix Socket)      │    │
-│  └─────────────┘  metrics└─────────────────────┘    │
-│                                    │                │
-└────────────────────────────────────┼────────────────┘
-                                     │
-                    Unix Socket: /opt/joblet/run/persist-ipc.sock
-                                     │
-┌────────────────────────────────────▼─────────────────┐
-│            Joblet Persistence Service                │
-│                                                      │
-│  ┌──────────────┐        ┌──────────────────────┐    │
-│  │ IPC Server   │───────▶│  Storage Backend     │    │
-│  │ (writes)     │        │  Manager             │    │
-│  └──────────────┘        └──────────────────────┘    │
-│                                   │                  │
-│  ┌──────────────┐                 │                  │
-│  │ gRPC Server  │◀────────────────┘                  │
-│  │ (queries)    │                                    │
-│  └──────────────┘                                    │
-│         │                                            │
-└─────────┼────────────────────────────────────────────┘
-          │
-          │ Unix Socket: /opt/joblet/run/persist-grpc.sock
-          │
-┌─────────▼─────────────┐
-│  RNX CLI / API Client │
-│  (Historical Queries) │
-└───────────────────────┘
+```mermaid
+flowchart TD
+    subgraph G1["Joblet Main Service"]
+        N1["Job Executor"]
+        N2["IPC Client (Unix Socket)"]
+        N1 -->|"logs metrics"| N2
+    end
+    subgraph G2["Joblet Persistence Service"]
+        N3["IPC Server (writes)"]
+        N4["Storage Backend Manager"]
+        N5["gRPC Server (queries)"]
+        N3 --> N4
+        N4 --> N5
+    end
+    N6["RNX CLI / API Client (Historical Queries)"]
+    N2 -->|"Unix Socket: /opt/joblet/run/persist-ipc.sock"| N3
+    N5 -->|"Unix Socket: /opt/joblet/run/persist-grpc.sock"| N6
 ```
 
 ### Communication Channels

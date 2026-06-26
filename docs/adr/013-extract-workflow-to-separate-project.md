@@ -82,35 +82,15 @@ through the existing gRPC Job API.
 
 ### New Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│           joblet-orchestrator (new project)                 │
-├─────────────────────────────────────────────────────────────┤
-│  CLI: rnx-workflow (or integrated into rnx)                 │
-│  - YAML workflow parsing & validation                       │
-│  - DAG dependency resolution (Kahn's algorithm)             │
-│  - Circular dependency detection (DFS)                      │
-│  - Job scheduling & state machine                           │
-│  - Multi-node job distribution                              │
-│  - Retry policies, timeouts, conditional execution          │
-│  - Workflow status API                                      │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                           │ gRPC (existing Job API only)
-                           │ - StartJob, StopJob, KillJob
-                           │ - GetJobStatus, StreamLogs
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  joblet (simplified)                        │
-├─────────────────────────────────────────────────────────────┤
-│  - Job execution (single job focus)                         │
-│  - Process isolation (namespaces, cgroups, seccomp)         │
-│  - Resource management (CPU, memory, GPU)                   │
-│  - Network isolation (bridge, isolated, custom)             │
-│  - Runtime management                                       │
-│  - Volume management                                        │
-│  - Log/metrics persistence                                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph N1["joblet-orchestrator (new project)"]
+        N1a["CLI: rnx-workflow (or integrated into rnx)<br/>- YAML workflow parsing & validation<br/>- DAG dependency resolution (Kahn's algorithm)<br/>- Circular dependency detection (DFS)<br/>- Job scheduling & state machine<br/>- Multi-node job distribution<br/>- Retry policies, timeouts, conditional execution<br/>- Workflow status API"]
+    end
+    subgraph N2["joblet (simplified)"]
+        N2a["- Job execution (single job focus)<br/>- Process isolation (namespaces, cgroups, seccomp)<br/>- Resource management (CPU, memory, GPU)<br/>- Network isolation (bridge, isolated, custom)<br/>- Runtime management<br/>- Volume management<br/>- Log/metrics persistence"]
+    end
+    N1a -->|"gRPC (existing Job API only)<br/>- StartJob, StopJob, KillJob<br/>- GetJobStatus, StreamLogs"| N2a
 ```
 
 ### What Gets Removed from Joblet

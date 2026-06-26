@@ -38,29 +38,21 @@ unique Server certificates per instance.
 
 ### Architecture
 
-```
-┌─────────────────────────────────────┐
-│    AWS Secrets Manager              │
-│  ┌────────────────────────────┐    │
-│  │ joblet/ca-cert    (Shared) │    │  Generated ONCE by first instance
-│  │ joblet/ca-key     (Shared) │    │  Reused by ALL instances
-│  │ joblet/client-cert(Shared) │    │
-│  │ joblet/client-key (Shared) │    │
-│  └────────────────────────────┘    │
-└────────────┬────────────────────────┘
-             │
-    ┌────────┼────────┐
-    ↓        ↓        ↓
-┌─────┐  ┌─────┐  ┌─────┐
-│EC2#1│  │EC2#2│  │EC2#3│  Each generates unique server cert
-│Srv-A│  │Srv-B│  │Srv-C│  All signed by shared CA
-└──┬──┘  └──┬──┘  └──┬──┘
-   └────────┼────────┘
-            ↓
-    ┌───────────────┐
-    │   Clients     │  One config works with all servers
-    │ (One Config)  │
-    └───────────────┘
+```mermaid
+flowchart TD
+    subgraph N1["AWS Secrets Manager"]
+        N2["joblet/ca-cert (Shared)<br/>joblet/ca-key (Shared)<br/>joblet/client-cert (Shared)<br/>joblet/client-key (Shared)<br/>Generated ONCE by first instance, reused by ALL instances"]
+    end
+    N3["EC2#1<br/>Srv-A"]
+    N4["EC2#2<br/>Srv-B"]
+    N5["EC2#3<br/>Srv-C"]
+    N6["Clients (One Config)<br/>One config works with all servers"]
+    N1 -->|"Each generates unique server cert, all signed by shared CA"| N3
+    N1 --> N4
+    N1 --> N5
+    N3 --> N6
+    N4 --> N6
+    N5 --> N6
 ```
 
 ### Certificate Flow

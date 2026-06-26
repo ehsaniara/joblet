@@ -61,11 +61,11 @@ joblet-admin/            # New repository
 
 ### 2.2 Component Interaction
 
-```
-[Browser] ←HTTP/WS→ [joblet-admin server] ←gRPC/mTLS→ [joblet server]
-                            ↓
-                    [Direct protobuf calls]
-                    (No CLI subprocess spawning)
+```mermaid
+flowchart LR
+    N1["Browser"] <-->|"HTTP/WS"| N2["joblet-admin server"]
+    N2 <-->|"gRPC/mTLS"| N3["joblet server"]
+    N2 --> N4["Direct protobuf calls<br/>(No CLI subprocess spawning)"]
 ```
 
 ### 2.3 Design Decisions

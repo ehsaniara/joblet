@@ -191,26 +191,18 @@ aws secretsmanager delete-secret --secret-id joblet/ca-cert
 
 ## Decision Tree
 
-```
-Are you deploying on AWS EC2?
-├─ No → Use Embedded Certs
-│       (On-premises, laptop, air-gapped)
-│
-└─ Yes → How many instances?
-    ├─ 1 instance
-    │  └─ Will you scale in next 6 months?
-    │     ├─ No → Use Embedded Certs
-    │     └─ Yes → Use Secrets Manager
-    │              (Easier to start with scaling support)
-    │
-    ├─ 2-3 instances
-    │  └─ Need auto-scaling or load balancer?
-    │     ├─ No → Use Embedded Certs
-    │     └─ Yes → Use Secrets Manager (required)
-    │
-    └─ 4+ instances
-       └─ Use Secrets Manager (required)
-          (Manual cert management too complex)
+```mermaid
+flowchart TD
+    Q1{"Are you deploying on AWS EC2?"}
+    Q1 -->|"No (On-premises, laptop, air-gapped)"| E1["Use Embedded Certs"]
+    Q1 -->|Yes| Q2{"How many instances?"}
+    Q2 -->|1 instance| Q3{"Will you scale in next 6 months?"}
+    Q3 -->|No| E2["Use Embedded Certs"]
+    Q3 -->|Yes| S1["Use Secrets Manager<br/>(Easier to start with scaling support)"]
+    Q2 -->|2-3 instances| Q4{"Need auto-scaling or load balancer?"}
+    Q4 -->|No| E3["Use Embedded Certs"]
+    Q4 -->|Yes| S2["Use Secrets Manager (required)"]
+    Q2 -->|4+ instances| S3["Use Secrets Manager (required)<br/>(Manual cert management too complex)"]
 ```
 
 ### ❌ Using Embedded Certs for ASG

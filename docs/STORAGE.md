@@ -10,24 +10,34 @@ while maintaining performance and security.
 
 ### Core Components
 
-```
-Storage Layer
-├── Volume Management
-│   ├── Volume Types (filesystem, memory)
-│   ├── Volume Lifecycle (create, mount, unmount, delete)
-│   └── Volume Store (state management)
-├── Filesystem Isolation
-│   ├── Chroot Environments
-│   ├── Mount Namespaces
-│   └── Bind Mount Management
-├── Disk Quota Management
-│   ├── Default Work Directory (1MB tmpfs)
-│   ├── Volume Size Limits
-│   └── I/O Bandwidth Throttling
-└── Storage APIs
-    ├── gRPC Volume Service
-    ├── CLI Commands
-    └── Internal Interfaces
+```mermaid
+flowchart TD
+    SL["Storage Layer"]
+    VM["Volume Management"]
+    FI["Filesystem Isolation"]
+    DQ["Disk Quota Management"]
+    SA["Storage APIs"]
+
+    SL --> VM
+    SL --> FI
+    SL --> DQ
+    SL --> SA
+
+    VM --> VM1["Volume Types (filesystem, memory)"]
+    VM --> VM2["Volume Lifecycle (create, mount, unmount, delete)"]
+    VM --> VM3["Volume Store (state management)"]
+
+    FI --> FI1["Chroot Environments"]
+    FI --> FI2["Mount Namespaces"]
+    FI --> FI3["Bind Mount Management"]
+
+    DQ --> DQ1["Default Work Directory (1MB tmpfs)"]
+    DQ --> DQ2["Volume Size Limits"]
+    DQ --> DQ3["I/O Bandwidth Throttling"]
+
+    SA --> SA1["gRPC Volume Service"]
+    SA --> SA2["CLI Commands"]
+    SA --> SA3["Internal Interfaces"]
 ```
 
 ## Volume Management

@@ -10,25 +10,25 @@ cgroups v2.
 
 ### 1.1 High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Joblet Server                       │
-├─────────────────────────────────────────────────────────┤
-│                    gRPC API Layer                       │
-│         (Extended with GPU requirements)                │
-├─────────────────────────────────────────────────────────┤
-│                  Job Scheduler                          │
-│            (GPU-aware scheduling)                       │
-├──────────────────┬──────────────────┬───────────────────┤
-│   GPU Manager    │  State Manager   │ Resource Manager  │
-│  (GPU allocation)│  (GPU tracking)  │ (Cgroups + GPU)   │
-├──────────────────┴──────────────────┴───────────────────┤
-│              Process Isolation Layer                    │
-│        (Namespace + GPU device passthrough)             │
-├─────────────────────────────────────────────────────────┤
-│                 GPU Device Layer                        │
-│        (NVIDIA Driver + CUDA Runtime)                   │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph N0["Joblet Server"]
+        N1["gRPC API Layer<br/>(Extended with GPU requirements)"]
+        N2["Job Scheduler<br/>(GPU-aware scheduling)"]
+        N3["GPU Manager<br/>(GPU allocation)"]
+        N4["State Manager<br/>(GPU tracking)"]
+        N5["Resource Manager<br/>(Cgroups + GPU)"]
+        N6["Process Isolation Layer<br/>(Namespace + GPU device passthrough)"]
+        N7["GPU Device Layer<br/>(NVIDIA Driver + CUDA Runtime)"]
+        N1 --> N2
+        N2 --> N3
+        N2 --> N4
+        N2 --> N5
+        N3 --> N6
+        N4 --> N6
+        N5 --> N6
+        N6 --> N7
+    end
 ```
 
 ### 1.2 Component Responsibilities

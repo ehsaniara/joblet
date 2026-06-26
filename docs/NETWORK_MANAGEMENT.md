@@ -26,23 +26,16 @@ Joblet provides comprehensive network management capabilities:
 
 ### Network Architecture
 
-```
-┌─────────────────────────────────────────────┐
-│                Joblet Host                  │
-│                                             │
-│  ┌──────────────┐  ┌─────────────┐          │
-│  │   Bridge     │  │   Custom    │          │
-│  │   Network    │  │   Network   │          │
-│  │ 172.20.0.0/16│  │ 10.10.0.0/24│          │
-│  └──────┬───────┘  └──────┬──────┘          │
-│         │                 │                 │
-│    ┌────┴───┐         ┌───┴────┐            │
-│    │ Job A  │         │ Job C  │            │
-│    └────────┘         └────────┘            │
-│    ┌────────┐         ┌────────┐            │
-│    │ Job B  │         │ Job D  │            │
-│    └────────┘         └────────┘            │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Host["Joblet Host"]
+        B["Bridge Network<br/>172.20.0.0/16"]
+        C["Custom Network<br/>10.10.0.0/24"]
+        B --> JA["Job A"]
+        B --> JB["Job B"]
+        C --> JC["Job C"]
+        C --> JD["Job D"]
+    end
 ```
 
 ## Network Implementation: 2-Phase Setup
@@ -131,25 +124,22 @@ panic("timeout waiting for network setup")
 
 ### Sequence Diagram
 
-```
-Server (Coordinator)          Job Process              NetworkService
-        |                          |                         |
-        |-- Phase 1: Allocate IP --|------------------------>|
-        |<-------------------------|-- IP: 172.20.0.19 ------|
-        |                          |                         |
-        |-- Launch Process ------->|                         |
-        |                          |-- Start (PID: 12345) -->|
-        |                          |                         |
-        |-- Phase 2: Setup NS -----|------------------------>|
-        |                          |                         |
-        |                          |<- Create veth pairs ----|
-        |                          |<- Configure namespace --|
-        |                          |                         |
-        |-- Write Ready File ------|------------------------>|
-        |                          |                         |
-        |                          |-- Check Ready File ---->|
-        |                          |-- Network Ready! ------>|
-        |                          |-- Continue Execution -->|
+```mermaid
+sequenceDiagram
+    participant S as Server (Coordinator)
+    participant J as Job Process
+    participant N as NetworkService
+    S->>N: Phase 1: Allocate IP
+    N->>S: IP: 172.20.0.19
+    S->>J: Launch Process
+    J->>N: Start (PID: 12345)
+    S->>N: Phase 2: Setup NS
+    N->>J: Create veth pairs
+    N->>J: Configure namespace
+    S->>N: Write Ready File
+    J->>N: Check Ready File
+    J->>N: Network Ready!
+    J->>N: Continue Execution
 ```
 
 ### Benefits

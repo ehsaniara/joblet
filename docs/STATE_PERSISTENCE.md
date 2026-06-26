@@ -14,98 +14,56 @@ storage backends: in-memory (default) and AWS DynamoDB (for EC2 deployments only
 > sequence includes a 30-second health check with retries to ensure state service is ready before accepting job
 > requests.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                 Joblet Main Process                  │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐   │
-│  │     STARTUP: Wait for State Service          │   │
-│  │  • Retry connection: 30 attempts × 1 second   │   │
-│  │  • Health check: List operation with timeout │   │
-│  │  • PANIC if not available (prevents startup) │   │
-│  └──────────────────────────────────────────────┘   │
-│                           │                        │
-│  ┌──────────────────────────────────────────────┐   │
-│  │     Job Execution & State Management          │   │
-│  │                                              │   │
-│  │  job.Status = RUNNING                         │   │
-│  │  jobStoreAdapter.UpdateJob(job) ─────────┐   │   │
-│  │                                          │   │   │
-│  └──────────────────────────────────────────┼───┘   │
-│                                             │       │
-│  ┌──────────────────────────────────────────▼───┐   │
-│  │         State IPC Client (Pooled)            │   │
-│  │  stateClient.Update(ctx, job)                │   │
-│  │  • Connection pool (20 connections)          │   │
-│  │  • Async goroutine (fire-and-forget)         │   │
-│  │  • 10-second timeout per operation           │   │
-│  │  • JSON encoding over Unix socket            │   │
-│  └──────────────────────────────────────────────┘   │
-│                           │                        │
-└───────────────────────────┼────────────────────────┘
-                            │
-           Unix Socket: /opt/joblet/run/state-ipc.sock
-                            │
-┌───────────────────────────▼────────────────────────┐
-│            Joblet State Subprocess                 │
-│         (MUST be running before joblet starts)     │
-│                                                    │
-│  ┌─────────────────────────────────────────────┐   │
-│  │           IPC Server                        │   │
-│  │  • Receives: create/update/delete/get/list  │   │
-│  │  • Returns: success/error response          │   │
-│  └─────────────────┬───────────────────────────┘   │
-│                    │                               │
-│  ┌─────────────────▼───────────────────────────┐   │
-│  │       Storage Backend Router                │   │
-│  │  • Memory Backend (in-memory map)           │   │
-│  │  • DynamoDB Backend (AWS SDK)               │   │
-│  └─────────────────┬───────────────────────────┘   │
-│                    │                               │
-└────────────────────┼───────────────────────────────┘
-                     │
-              ┌──────┴──────┐
-              │             │
-              ▼             ▼
-      ┌──────────┐   ┌──────────────┐
-      │  Memory  │   │   DynamoDB   │
-      │   Map    │   │   Table      │
-      └──────────┘   └──────────────┘
-      (In-Process)   (AWS Cloud)
+```mermaid
+flowchart TD
+    subgraph Main["Joblet Main Process"]
+        N1["STARTUP: Wait for State Service<br/>• Retry connection: 30 attempts × 1 second<br/>• Health check: List operation with timeout<br/>• PANIC if not available (prevents startup)"]
+        N2["Job Execution & State Management<br/>job.Status = RUNNING<br/>jobStoreAdapter.UpdateJob(job)"]
+        N3["State IPC Client (Pooled)<br/>stateClient.Update(ctx, job)<br/>• Connection pool (20 connections)<br/>• Async goroutine (fire-and-forget)<br/>• 10-second timeout per operation<br/>• JSON encoding over Unix socket"]
+        N1 --> N2 --> N3
+    end
+    N3 -->|"Unix Socket: /opt/joblet/run/state-ipc.sock"| N4
+    subgraph Sub["Joblet State Subprocess (MUST be running before joblet starts)"]
+        N4["IPC Server<br/>• Receives: create/update/delete/get/list<br/>• Returns: success/error response"]
+        N5["Storage Backend Router<br/>• Memory Backend (in-memory map)<br/>• DynamoDB Backend (AWS SDK)"]
+        N4 --> N5
+    end
+    N5 --> N6["Memory Map (In-Process)"]
+    N5 --> N7["DynamoDB Table (AWS Cloud)"]
 ```
 
 ### State Flow
 
 #### 1. Job Creation
 
-```
-1. Joblet creates new job
-2. jobStoreAdapter.CreateNewJob(job)
-3. async: stateClient.Create(ctx, job)
-4. IPC message → state subprocess
-5. backend.Create(ctx, job)
-6. → Memory map OR DynamoDB table
+```mermaid
+flowchart TD
+    N1["Joblet creates new job"] --> N2["jobStoreAdapter.CreateNewJob(job)"]
+    N2 --> N3["async: stateClient.Create(ctx, job)"]
+    N3 --> N4["IPC message → state subprocess"]
+    N4 --> N5["backend.Create(ctx, job)"]
+    N5 --> N6["Memory map OR DynamoDB table"]
 ```
 
 #### 2. Job Update
 
-```
-1. Job status changes (e.g., RUNNING → COMPLETED)
-2. jobStoreAdapter.UpdateJob(job)
-3. async: stateClient.Update(ctx, job)
-4. IPC message → state subprocess
-5. backend.Update(ctx, job)
-6. → Memory map OR DynamoDB PutItem
+```mermaid
+flowchart TD
+    N1["Job status changes (e.g., RUNNING → COMPLETED)"] --> N2["jobStoreAdapter.UpdateJob(job)"]
+    N2 --> N3["async: stateClient.Update(ctx, job)"]
+    N3 --> N4["IPC message → state subprocess"]
+    N4 --> N5["backend.Update(ctx, job)"]
+    N5 --> N6["Memory map OR DynamoDB PutItem"]
 ```
 
 #### 3. Job Deletion
 
-```
-1. Job cleanup triggered
-2. stateClient.Delete(ctx, jobID)
-3. IPC message → state subprocess
-4. backend.Delete(ctx, jobID)
-5. → Remove from memory OR DynamoDB DeleteItem
+```mermaid
+flowchart TD
+    N1["Job cleanup triggered"] --> N2["stateClient.Delete(ctx, jobID)"]
+    N2 --> N3["IPC message → state subprocess"]
+    N3 --> N4["backend.Delete(ctx, jobID)"]
+    N4 --> N5["Remove from memory OR DynamoDB DeleteItem"]
 ```
 
 ## Storage Backends

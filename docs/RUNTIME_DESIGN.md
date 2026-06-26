@@ -150,48 +150,16 @@ This section documents the internal implementation details of how runtimes are r
 
 When a user runs `rnx job run --runtime=python-3.11 "python script.py"`, the following flow occurs:
 
-```
-┌─────────────────────┐
-│ 1. CLI Parsing      │  internal/rnx/jobs/run.go
-│    Parse --runtime  │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ 2. gRPC Request     │  RunJobRequest protobuf
-│    Send to server   │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ 3. Job Building     │  internal/joblet/core/joblet.go
-│    Create domain.Job│
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ 4. Execution Coord  │  internal/joblet/core/execution/coordinator.go
-│    Set JOB_RUNTIME  │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ 5. Process Fork     │  Namespace isolation
-│    PID/NET/MNT/IPC  │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ 6. Filesystem Setup │  internal/joblet/core/filesystem/isolator.go
-│    Mount runtime    │
-│    Perform chroot   │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ 7. Job Execution    │  internal/modes/jobexec/jobexec.go
-│    Execute command  │
-└─────────────────────┘
+```mermaid
+flowchart TD
+    N1["1. CLI Parsing<br/>Parse --runtime<br/>internal/rnx/jobs/run.go"]
+    N2["2. gRPC Request<br/>Send to server<br/>RunJobRequest protobuf"]
+    N3["3. Job Building<br/>Create domain.Job<br/>internal/joblet/core/joblet.go"]
+    N4["4. Execution Coord<br/>Set JOB_RUNTIME<br/>internal/joblet/core/execution/coordinator.go"]
+    N5["5. Process Fork<br/>PID/NET/MNT/IPC<br/>Namespace isolation"]
+    N6["6. Filesystem Setup<br/>Mount runtime, Perform chroot<br/>internal/joblet/core/filesystem/isolator.go"]
+    N7["7. Job Execution<br/>Execute command<br/>internal/modes/jobexec/jobexec.go"]
+    N1 --> N2 --> N3 --> N4 --> N5 --> N6 --> N7
 ```
 
 ### Key Components
@@ -212,29 +180,16 @@ When a user runs `rnx job run --runtime=python-3.11 "python script.py"`, the fol
 
 The runtime specification flows through the system via environment variables:
 
-```
-CLI Input: --runtime=python-3.11
-    │
-    ▼
-gRPC RunJobRequest.Runtime = "python-3.11"
-    │
-    ▼
-domain.Job.Runtime = "python-3.11"
-    │
-    ▼
-ExecutionCoordinator.BuildEnvironment()
-    │ Creates: JOB_RUNTIME=python-3.11
-    │ Also adds runtime-specific env vars from runtime.yml
-    ▼
-JobFilesystem.loadRuntimeFromEnvironment()
-    │ Reads: f.Runtime = os.Getenv("JOB_RUNTIME")
-    ▼
-JobFilesystem.mountRuntime()
-    │ Resolves path, loads config, bind mounts
-    ▼
-Job Process
-    │ Executes with runtime binaries in PATH
-    └─ Environment includes PYTHONPATH, PATH_PREPEND, etc.
+```mermaid
+flowchart TD
+    N1["CLI Input: --runtime=python-3.11"]
+    N2["gRPC RunJobRequest.Runtime = python-3.11"]
+    N3["domain.Job.Runtime = python-3.11"]
+    N4["ExecutionCoordinator.BuildEnvironment()<br/>Creates: JOB_RUNTIME=python-3.11<br/>Also adds runtime-specific env vars from runtime.yml"]
+    N5["JobFilesystem.loadRuntimeFromEnvironment()<br/>Reads: f.Runtime = os.Getenv(JOB_RUNTIME)"]
+    N6["JobFilesystem.mountRuntime()<br/>Resolves path, loads config, bind mounts"]
+    N7["Job Process<br/>Executes with runtime binaries in PATH<br/>Environment includes PYTHONPATH, PATH_PREPEND, etc."]
+    N1 --> N2 --> N3 --> N4 --> N5 --> N6 --> N7
 ```
 
 ### Runtime Resolution Algorithm
@@ -394,14 +349,21 @@ modifying the host system.
 3. **Copy**: Installed binaries/libraries are copied from the upper layer to the runtime directory
 4. **Cleanup**: Overlay is unmounted and temp directory is removed
 
-```
-Host Root (/)          →  Lower Layer (read-only)
-                           ↓
-Temp Directory         →  Upper Layer (captures all writes)
-                           ↓
-Merged View            →  Chroot target for package installation
-                           ↓
-Runtime Directory      ←  Copy binaries/libraries from upper layer
+```mermaid
+flowchart LR
+    L1["Host Root (/)"]
+    L2["Temp Directory"]
+    L3["Merged View"]
+    L4["Runtime Directory"]
+    R1["Lower Layer (read-only)"]
+    R2["Upper Layer (captures all writes)"]
+    R3["Chroot target for package installation"]
+    R4["Copy binaries/libraries from upper layer"]
+    L1 --> R1
+    L2 --> R2
+    L3 --> R3
+    R4 --> L4
+    R1 --> R2 --> R3 --> R4
 ```
 
 **Key Files:**

@@ -112,28 +112,14 @@ When a job is scheduled, you receive confirmation with the job ID:
 
 ### Components
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Joblet Node                              │
-│                                                                  │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
-│  │   gRPC API   │───▶│   Scheduler  │───▶│ Execution Engine │  │
-│  │   (StartJob) │    │              │    │                  │  │
-│  └──────────────┘    └──────┬───────┘    └──────────────────┘  │
-│                             │                                    │
-│                      ┌──────▼───────┐                           │
-│                      │ Priority     │                           │
-│                      │ Queue        │                           │
-│                      │ (Min-Heap)   │                           │
-│                      └──────────────┘                           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │    DynamoDB      │
-                    │  (Persistence)   │
-                    └──────────────────┘
+```mermaid
+flowchart TD
+    subgraph Node["Joblet Node"]
+        N1["gRPC API<br/>(StartJob)"] --> N2["Scheduler"]
+        N2 --> N3["Execution Engine"]
+        N2 --> N4["Priority Queue<br/>(Min-Heap)"]
+    end
+    N2 --> N5["DynamoDB<br/>(Persistence)"]
 ```
 
 ### Scheduler Design
@@ -147,12 +133,14 @@ The scheduler uses a **sleep-until-next** strategy for efficient CPU usage:
 
 ### Job States
 
-```
-SCHEDULED ──▶ INITIALIZING ──▶ RUNNING ──▶ COMPLETED
-    │                              │            │
-    │                              ▼            ▼
-    ▼                           STOPPED      FAILED
- CANCELED
+```mermaid
+stateDiagram-v2
+    SCHEDULED --> INITIALIZING
+    INITIALIZING --> RUNNING
+    RUNNING --> COMPLETED
+    SCHEDULED --> CANCELED
+    RUNNING --> STOPPED
+    COMPLETED --> FAILED
 ```
 
 | Status | Description |
@@ -171,26 +159,11 @@ SCHEDULED ──▶ INITIALIZING ──▶ RUNNING ──▶ COMPLETED
 
 In multi-node deployments sharing a DynamoDB table, **scheduled jobs are node-specific**:
 
-```
-┌─────────────────┐         ┌─────────────────┐
-│    Node A       │         │    Node B       │
-│  nodeId: "a"    │         │  nodeId: "b"    │
-│                 │         │                 │
-│  Scheduler:     │         │  Scheduler:     │
-│  - job-1 (a) ✓  │         │  - job-3 (b) ✓  │
-│  - job-2 (a) ✓  │         │  - job-4 (b) ✓  │
-└────────┬────────┘         └────────┬────────┘
-         │                           │
-         └───────────┬───────────────┘
-                     ▼
-            ┌─────────────────┐
-            │    DynamoDB     │
-            │                 │
-            │  job-1 (node:a) │
-            │  job-2 (node:a) │
-            │  job-3 (node:b) │
-            │  job-4 (node:b) │
-            └─────────────────┘
+```mermaid
+flowchart TD
+    N1["Node A<br/>nodeId: a<br/>Scheduler:<br/>- job-1 (a)<br/>- job-2 (a)"] --> N3
+    N2["Node B<br/>nodeId: b<br/>Scheduler:<br/>- job-3 (b)<br/>- job-4 (b)"] --> N3
+    N3["DynamoDB<br/>job-1 (node:a)<br/>job-2 (node:a)<br/>job-3 (node:b)<br/>job-4 (node:b)"]
 ```
 
 **Behavior:**

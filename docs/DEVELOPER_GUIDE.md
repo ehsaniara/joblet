@@ -261,39 +261,18 @@ import (
 
 ## Module Dependencies
 
-```
-┌─────────────────────────────────┐
-│  github.com/ehsaniara/joblet    │
-│  (main module)                  │
-│                                 │
-│  cmd/joblet, cmd/rnx            │
-│  internal/, pkg/                │
-└────────────┬────────────────────┘
-             │
-             │ depends on (via replace)
-             ▼
-┌─────────────────────────────────┐
-│  github.com/ehsaniara/          │
-│  joblet/persist                 │
-│  (sub-module)                   │
-│                                 │
-│  cmd/persist             │
-│  internal/, pkg/                │
-└─────────────────────────────────┘
+```mermaid
+flowchart TD
+    N1["github.com/ehsaniara/joblet (main module)<br/>cmd/joblet, cmd/rnx<br/>internal/, pkg/"]
+    N2["github.com/ehsaniara/joblet/persist (sub-module)<br/>cmd/persist<br/>internal/, pkg/"]
+    N1 -->|"depends on (via replace)"| N2
 ```
 
 Both modules use shared protobuf definitions from:
 
-```
-┌──────────────────────────────────┐
-│  proto/ directory                │
-│  (local, in joblet repo)         │
-│                                  │
-│  Shared protobuf definitions     │
-│  - joblet.proto                  │
-│  - ipc.proto                     │
-│  - persist.proto                 │
-└──────────────────────────────────┘
+```mermaid
+flowchart TD
+    N1["proto/ directory (local, in joblet repo)<br/>Shared protobuf definitions<br/>- joblet.proto<br/>- ipc.proto<br/>- persist.proto"]
 ```
 
 ---

@@ -56,9 +56,11 @@ rates.
 
 #### Existing Log Streaming Pattern
 
-```
-Job Process → [Log Channel] → ├── Disk Writer Subscriber
-                              └── Client Stream Subscriber(s)
+```mermaid
+flowchart LR
+    N1["Job Process"] --> N2["Log Channel"]
+    N2 --> N3["Disk Writer Subscriber"]
+    N2 --> N4["Client Stream Subscriber(s)"]
 ```
 
 #### System Monitoring (exists but separate)
@@ -112,25 +114,30 @@ considerations.
 
 #### Collection Flow
 
-```
-Cgroup Stats → Collector → Normalize → Publish → Topic
-     ↑                                              │
-     └──────── Sample Rate Timer ──────────────────┘
+```mermaid
+flowchart LR
+    N1["Cgroup Stats"] --> N2["Collector"] --> N3["Normalize"] --> N4["Publish"] --> N5["Topic"]
+    N5 -->|"Sample Rate Timer"| N1
 ```
 
 #### Storage Flow
 
-```
-Topic → Storage Subscriber → Buffer → Batch Write → Disk
-                                │
-                                └→ Rotation Check → Archive
+```mermaid
+flowchart LR
+    N1["Topic"] --> N2["Storage Subscriber"] --> N3["Buffer"] --> N4["Batch Write"] --> N5["Disk"]
+    N3 --> N6["Rotation Check"] --> N7["Archive"]
 ```
 
 #### Query Flow
 
-```
-Historical: Disk Files → Reader → Deserialize → Filter → Response
-Live:       Topic → Stream Subscriber → Filter → Stream Response
+```mermaid
+flowchart LR
+    subgraph Historical
+        H1["Disk Files"] --> H2["Reader"] --> H3["Deserialize"] --> H4["Filter"] --> H5["Response"]
+    end
+    subgraph Live
+        L1["Topic"] --> L2["Stream Subscriber"] --> L3["Filter"] --> L4["Stream Response"]
+    end
 ```
 
 ### Configuration Design
@@ -179,9 +186,9 @@ metrics:
 
 #### Storage Optimization
 
-```
-Raw Data (5s) → 1-min Rollups → 5-min Rollups → Hourly Summaries
-   (7 days)        (30 days)       (90 days)        (1 year)
+```mermaid
+flowchart LR
+    N1["Raw Data (5s)<br/>(7 days)"] --> N2["1-min Rollups<br/>(30 days)"] --> N3["5-min Rollups<br/>(90 days)"] --> N4["Hourly Summaries<br/>(1 year)"]
 ```
 
 #### Metric Types

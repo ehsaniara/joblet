@@ -16,16 +16,12 @@ sockets (IPC) and provides:
 
 ## Architecture
 
-```
-joblet-core (execution)
-     │
-     │ IPC (Unix Socket)
-     ▼
-persist (storage)
-     │
-     ├─► Local Filesystem (default)
-     ├─► CloudWatch Logs + Metrics API
-     └─► S3 (time-partitioned objects)
+```mermaid
+flowchart TD
+    N1["joblet-core (execution)"] -->|"IPC (Unix Socket)"| N2["persist (storage)"]
+    N2 --> N3["Local Filesystem (default)"]
+    N2 --> N4["CloudWatch Logs + Metrics API"]
+    N2 --> N5["S3 (time-partitioned objects)"]
 ```
 
 ## Features
