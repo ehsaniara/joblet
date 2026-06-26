@@ -126,29 +126,15 @@ scp ec2-user@$INSTANCE_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/
 
 ## Architecture
 
-```
-┌─────────────────────────────────────┐
-│    AWS Secrets Manager              │
-│  ┌────────────────────────────┐    │
-│  │ joblet/ca-cert    (Shared) │    │
-│  │ joblet/ca-key     (Shared) │    │
-│  │ joblet/client-cert(Shared) │    │
-│  │ joblet/client-key (Shared) │    │
-│  └────────────────────────────┘    │
-└────────────┬────────────────────────┘
-             ↓
-    ┌────────┴────────┐
-    ↓                 ↓
-┌─────────┐       ┌─────────┐
-│ EC2 #1  │       │ EC2 #2  │
-│ (Cert1) │       │ (Cert2) │
-└────┬────┘       └────┬────┘
-     └────────┬────────┘
-              ↓
-      ┌───────────────┐
-      │   Clients     │
-      │ (One Config)  │
-      └───────────────┘
+```mermaid
+flowchart TD
+    subgraph SM["AWS Secrets Manager"]
+        S["joblet/ca-cert (Shared)<br/>joblet/ca-key (Shared)<br/>joblet/client-cert (Shared)<br/>joblet/client-key (Shared)"]
+    end
+    SM --> E1["EC2 #1 (Cert1)"]
+    SM --> E2["EC2 #2 (Cert2)"]
+    E1 --> C["Clients (One Config)"]
+    E2 --> C
 ```
 
 ## Load Balancer Setup
@@ -327,7 +313,7 @@ aws cloudtrail lookup-events \
 
 **Symptom:**
 
-```
+```text
 ERROR: Failed to retrieve secret joblet/ca-cert
 ERROR: Permission denied
 ```
@@ -352,7 +338,7 @@ aws ec2 terminate-instances --instance-ids i-xxx
 
 **Symptom:**
 
-```
+```text
 ERROR: Certificate expired
 ERROR: Certificate verification failed
 ```

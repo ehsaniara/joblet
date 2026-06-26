@@ -59,7 +59,7 @@ rnx job run --schedule="2025-01-15T14:00:00Z" \
 
 The schedule parameter must be in RFC3339 format:
 
-```
+```text
 YYYY-MM-DDTHH:MM:SSZ          # UTC time
 YYYY-MM-DDTHH:MM:SS+HH:MM     # With positive offset
 YYYY-MM-DDTHH:MM:SS-HH:MM     # With negative offset
@@ -112,28 +112,14 @@ When a job is scheduled, you receive confirmation with the job ID:
 
 ### Components
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Joblet Node                              │
-│                                                                  │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
-│  │   gRPC API   │───▶│   Scheduler  │───▶│ Execution Engine │  │
-│  │   (StartJob) │    │              │    │                  │  │
-│  └──────────────┘    └──────┬───────┘    └──────────────────┘  │
-│                             │                                    │
-│                      ┌──────▼───────┐                           │
-│                      │ Priority     │                           │
-│                      │ Queue        │                           │
-│                      │ (Min-Heap)   │                           │
-│                      └──────────────┘                           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │    DynamoDB      │
-                    │  (Persistence)   │
-                    └──────────────────┘
+```mermaid
+flowchart TD
+    subgraph Node["Joblet Node"]
+        N1["gRPC API<br/>(StartJob)"] --> N2["Scheduler"]
+        N2 --> N3["Execution Engine"]
+        N2 --> N4["Priority Queue<br/>(Min-Heap)"]
+    end
+    N2 --> N5["DynamoDB<br/>(Persistence)"]
 ```
 
 ### Scheduler Design
@@ -147,12 +133,19 @@ The scheduler uses a **sleep-until-next** strategy for efficient CPU usage:
 
 ### Job States
 
-```
-SCHEDULED ──▶ INITIALIZING ──▶ RUNNING ──▶ COMPLETED
-    │                              │            │
-    │                              ▼            ▼
-    ▼                           STOPPED      FAILED
- CANCELED
+```mermaid
+stateDiagram-v2
+    [*] --> SCHEDULED
+    SCHEDULED --> INITIALIZING
+    SCHEDULED --> CANCELED
+    INITIALIZING --> RUNNING
+    RUNNING --> COMPLETED
+    RUNNING --> FAILED
+    RUNNING --> STOPPED
+    COMPLETED --> [*]
+    FAILED --> [*]
+    STOPPED --> [*]
+    CANCELED --> [*]
 ```
 
 | Status | Description |
@@ -171,26 +164,11 @@ SCHEDULED ──▶ INITIALIZING ──▶ RUNNING ──▶ COMPLETED
 
 In multi-node deployments sharing a DynamoDB table, **scheduled jobs are node-specific**:
 
-```
-┌─────────────────┐         ┌─────────────────┐
-│    Node A       │         │    Node B       │
-│  nodeId: "a"    │         │  nodeId: "b"    │
-│                 │         │                 │
-│  Scheduler:     │         │  Scheduler:     │
-│  - job-1 (a) ✓  │         │  - job-3 (b) ✓  │
-│  - job-2 (a) ✓  │         │  - job-4 (b) ✓  │
-└────────┬────────┘         └────────┬────────┘
-         │                           │
-         └───────────┬───────────────┘
-                     ▼
-            ┌─────────────────┐
-            │    DynamoDB     │
-            │                 │
-            │  job-1 (node:a) │
-            │  job-2 (node:a) │
-            │  job-3 (node:b) │
-            │  job-4 (node:b) │
-            └─────────────────┘
+```mermaid
+flowchart TD
+    N1["Node A<br/>nodeId: a<br/>Scheduler:<br/>- job-1 (a)<br/>- job-2 (a)"] --> N3
+    N2["Node B<br/>nodeId: b<br/>Scheduler:<br/>- job-3 (b)<br/>- job-4 (b)"] --> N3
+    N3["DynamoDB<br/>job-1 (node:a)<br/>job-2 (node:a)<br/>job-3 (node:b)<br/>job-4 (node:b)"]
 ```
 
 **Behavior:**
@@ -237,7 +215,7 @@ This is a deliberate design choice. Future orchestration layers may add:
 
 When a Joblet node restarts:
 
-```
+```text
 1. Start Joblet
 2. SyncFromPersistentState() → Load ALL jobs from DynamoDB
 3. RecoverScheduledJobs() → Filter for:
@@ -249,7 +227,7 @@ When a Joblet node restarts:
 
 **Log output during recovery:**
 
-```
+```text
 [INFO] recovering scheduled jobs from persistent storage totalJobs=15 nodeId=node-prod-1
 [INFO] scheduled job is overdue, will execute immediately job_uuid=job-abc123 overdueBy=5m30s
 [DEBUG] recovered scheduled job job_uuid=job-def456 scheduledTime=2025-01-15T10:30:00Z

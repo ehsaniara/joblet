@@ -572,7 +572,7 @@ message Job {
 
 ### Job Status Values
 
-```
+```text
 PENDING       - Job queued, waiting to be processed
 INITIALIZING  - Job created, setting up isolation and resources
 SCHEDULED     - Job scheduled for future execution
@@ -935,9 +935,9 @@ The persist service uses two communication channels:
 
 **Purpose**: High-throughput log and metric writes from main service
 
-```text
-Joblet Service → Unix Socket → Persist Service
-                 (/opt/joblet/run/persist-ipc.sock)
+```mermaid
+flowchart LR
+    N1["Joblet Service"] --> N2["Unix Socket<br/>(/opt/joblet/run/persist-ipc.sock)"] --> N3["Persist Service"]
 ```
 
 **Protocol**: Custom IPC protocol (defined in `internal/proto/ipc.proto`)
@@ -965,8 +965,9 @@ persist:
 
 **Purpose**: Historical queries from RNX clients
 
-```text
-RNX Client → gRPC (Unix socket) → Persist Service
+```mermaid
+flowchart LR
+    N1["RNX Client"] --> N2["gRPC (Unix socket)"] --> N3["Persist Service"]
 ```
 
 **Protocol**: gRPC (defined in `internal/proto/persist.proto`)
@@ -1017,7 +1018,7 @@ message LogEntry {
 
 **Storage Location**:
 
-```
+```text
 /opt/joblet/logs/{job_uuid}/
 ├── stdout.log.gz    # Compressed stdout
 └── stderr.log.gz    # Compressed stderr
@@ -1064,7 +1065,7 @@ message MetricSample {
 
 **Storage Location**:
 
-```
+```text
 /opt/joblet/metrics/{job_uuid}/
 └── metrics.jsonl.gz    # Compressed JSON Lines metrics
 ```

@@ -462,7 +462,7 @@ telemetry:
 
 When using CloudWatch storage backend, eBPF events are shipped to dedicated log streams:
 
-```
+```text
 Log Group: /joblet/{node_id}
   {job_uuid}-exec-events     # Process execution events (JSON)
   {job_uuid}-connect-events  # Network connection events (JSON)

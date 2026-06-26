@@ -28,24 +28,20 @@ activity events into a **single telemetry pipeline** because:
 
 ### Current State
 
-```
-Metrics Collection (cgroups v2)
-         │
-         ▼
-   Persist Service ──► Local Storage OR CloudWatch Metrics
+```mermaid
+flowchart TD
+    N1["Metrics Collection (cgroups v2)"] --> N2["Persist Service"]
+    N2 --> N3["Local Storage OR CloudWatch Metrics"]
 ```
 
 ### Proposed State
 
-```
-Metrics (cgroups v2)     Activity (eBPF)
-         │                     │
-         └──────────┬──────────┘
-                    ▼
-           Telemetry Collector
-                    │
-                    ▼
-           Persist Service ──► Local Storage OR CloudWatch
+```mermaid
+flowchart TD
+    N1["Metrics (cgroups v2)"] --> N3["Telemetry Collector"]
+    N2["Activity (eBPF)"] --> N3
+    N3 --> N4["Persist Service"]
+    N4 --> N5["Local Storage OR CloudWatch"]
 ```
 
 ## Decision
@@ -55,7 +51,7 @@ through the same pipeline to the same storage backends.
 
 ### Unified View
 
-```
+```text
 $ rnx job watch ml-training-7a3f
 
 ╭─ JOB: ml-training-7a3f ─────────────────────────────────────────╮
@@ -160,57 +156,32 @@ type FileData struct {
 
 **Key Constraint**: Core joblet has NO AWS dependencies. CloudWatch integration lives in persist service only.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    JOBLET (core binary)                             │
-│              Native Linux only, no AWS SDK                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌─────────────────┐              ┌─────────────────┐               │
-│  │ Metrics Collector│              │  eBPF Monitor   │               │
-│  │ (cgroups v2)     │              │ (cilium/ebpf)   │               │
-│  └────────┬─────────┘              └────────┬────────┘               │
-│           │                                  │                        │
-│           │ MetricsData                      │ ExecData/ConnectData   │
-│           │                                  │                        │
-│           └──────────────┬───────────────────┘                       │
-│                          ▼                                           │
-│              ┌───────────────────────┐                              │
-│              │  Telemetry Collector  │                              │
-│              │  - Unify events       │                              │
-│              │  - Buffer/batch       │                              │
-│              └───────────┬───────────┘                              │
-│                          │                                           │
-│           ┌──────────────┴──────────────┐                           │
-│           ▼                             ▼                           │
-│     ┌──────────┐              ┌──────────────┐                      │
-│     │  gRPC    │              │ Unix Socket  │                      │
-│     │ Stream   │              │ IPC to       │                      │
-│     │(clients) │              │ Persist      │                      │
-│     └──────────┘              └──────┬───────┘                      │
-│                                      │                               │
-└──────────────────────────────────────┼───────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    PERSIST (separate binary)                        │
-│                    May have AWS SDK if configured                   │
-├─────────────────────────────────────────────────────────────────────┤
-│                          │                                           │
-│           ┌──────────────┴──────────────┐                           │
-│           ▼                             ▼                           │
-│     ┌───────────┐               ┌────────────┐                      │
-│     │   Local   │               │ CloudWatch │                      │
-│     │  Storage  │               │ (optional) │                      │
-│     └───────────┘               └────────────┘                      │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph JOBLET["JOBLET (core binary) — Native Linux only, no AWS SDK"]
+        N1["Metrics Collector (cgroups v2)"]
+        N2["eBPF Monitor (cilium/ebpf)"]
+        N3["Telemetry Collector<br/>- Unify events<br/>- Buffer/batch"]
+        N4["gRPC Stream (clients)"]
+        N5["Unix Socket IPC to Persist"]
+        N1 -->|MetricsData| N3
+        N2 -->|"ExecData/ConnectData"| N3
+        N3 --> N4
+        N3 --> N5
+    end
+    subgraph PERSIST["PERSIST (separate binary) — May have AWS SDK if configured"]
+        N6["Local Storage"]
+        N7["CloudWatch (optional)"]
+    end
+    N5 --> N6
+    N5 --> N7
 ```
 
 ### Storage Backends
 
 #### Local (Standalone VM)
 
-```
+```text
 /var/lib/joblet/telemetry/
 ├── {job_uuid}/
 │   └── events.jsonl     # All telemetry, line-delimited JSON
@@ -226,7 +197,7 @@ Format:
 
 #### AWS CloudWatch
 
-```
+```text
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams:
@@ -397,7 +368,7 @@ storage:
 
 ### eBPF Component
 
-```
+```text
 internal/joblet/ebpf/
 ├── telematics/
 │   ├── monitor.go           # Go monitor, emits TelemetryEvents
@@ -412,7 +383,7 @@ The eBPF monitor emits the same `TelemetryEvent` type as metrics, just with diff
 
 ### File Structure
 
-```
+```text
 # Joblet core (no AWS deps)
 internal/joblet/
 ├── telemetry/

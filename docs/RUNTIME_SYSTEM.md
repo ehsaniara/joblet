@@ -186,7 +186,7 @@ rnx runtime list
 
 **Output:**
 
-```
+```text
 RUNTIME         VERSION  TYPE    SIZE     DESCRIPTION
 -------         -------  ----    ----     -----------
 python-3.11-ml  1.0.0    system  475MB    Python 3.11 with ML packages for AI development
@@ -206,7 +206,7 @@ rnx runtime info python-3.11-ml
 
 **Output:**
 
-```
+```text
 Runtime: python-3.11-ml
 Type: system
 Version: 3.11
@@ -238,7 +238,7 @@ rnx runtime test python-3.11-ml
 
 **Output:**
 
-```
+```text
 Testing runtime: python-3.11-ml
 ✓ Runtime test passed
 Output: Runtime resolution successful
@@ -311,7 +311,7 @@ done
 
 Each runtime is installed as a self-contained environment:
 
-```
+```text
 /opt/joblet/runtimes/python-3.11-ml/1.0.0/
 ├── runtime.yml              # Generated runtime configuration
 └── isolated/                # Complete isolated filesystem
@@ -479,7 +479,7 @@ rnx job run --runtime=java:17 java Application
 Each runtime is **completely self-contained**, including both runtime-specific files AND all necessary system binaries
 in its `isolated/` directory. This eliminates dependency on host system files during job execution.
 
-```
+```text
 /opt/joblet/runtimes/
 ├── python-3.11-ml/              # Flat structure (no nested language dirs)
 │   ├── runtime.yml              # Runtime configuration

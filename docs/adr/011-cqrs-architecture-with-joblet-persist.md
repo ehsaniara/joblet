@@ -73,24 +73,12 @@ We implement a CQRS (Command Query Responsibility Segregation) architecture by:
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Client (rnx)                         │
-│                                                               │
-│  1. Query historical data (Port 50052)                       │
-│  2. Stream live data (Port 50051)                            │
-└────────────────┬───────────────────────────┬─────────────────┘
-                 │                           │
-                 │                           │
-         ┌───────▼────────┐         ┌───────▼────────┐
-         │ persist │         │  joblet-core   │
-         │  (Port 50052)  │         │  (Port 50051)  │
-         │                │         │                │
-         │ - Query logs   │◄────────│ - Job execute  │
-         │ - Query metrics│  Unix   │ - Live stream  │
-         │ - Storage      │  Socket │ - Job mgmt     │
-         │ - Retention    │  IPC    │ - Scheduling   │
-         └────────────────┘         └────────────────┘
+```mermaid
+flowchart TD
+    C["Client (rnx)<br/>1. Query historical data (Port 50052)<br/>2. Stream live data (Port 50051)"]
+    C --> P["persist (Port 50052)<br/>- Query logs<br/>- Query metrics<br/>- Storage<br/>- Retention"]
+    C --> J["joblet-core (Port 50051)<br/>- Job execute<br/>- Live stream<br/>- Job mgmt<br/>- Scheduling"]
+    J -->|"Unix Socket IPC"| P
 ```
 
 ### Data Flow

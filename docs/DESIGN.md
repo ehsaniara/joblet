@@ -103,7 +103,7 @@ return modes.RunServer(cfg)
 
 #### Linux Namespaces
 
-```
+```text
 Network: Shared (host networking for compatibility)
 Mount: Isolated (chroot + bind mounts)
 IPC: Isolated (separate IPC namespace)
@@ -302,7 +302,7 @@ StatusStopped     JobStatus = "STOPPED"
 
 ### 6.1 Cgroups v2 Integration
 
-```
+```text
 Linux Kernel Cgroups v2 Hierarchy:
 /sys/fs/cgroup/
 ├── joblet.slice/                    # Systemd slice

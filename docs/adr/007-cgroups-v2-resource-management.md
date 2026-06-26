@@ -24,7 +24,7 @@ We went all-in on cgroups v2. Single unified hierarchy. Clean API. Predictable b
 
 The integration is clean and simple:
 
-```
+```text
 /sys/fs/cgroup/
 └── joblet.slice/
     └── joblet.service/

@@ -40,22 +40,16 @@ server resources:
 
 ### How Remote Monitoring Works
 
-```
-┌─────────────────────┐    gRPC/mTLS     ┌─────────────────────┐
-│   Client Machine    │ ◄──────────────► │   Joblet Server     │
-│                     │                  │                     │
-│  ┌───────────────┐  │                  │  ┌───────────────┐  │
-│  │ rnx monitor   │  │   Monitor Req    │  │ Monitoring    │  │
-│  │ (from laptop/ │  │ ──────────────►  │  │ Service       │  │
-│  │ workstation)  │  │                  │  │               │  │
-│  │               │  │   Metrics Data   │  │ Collects:     │  │
-│  │ Displays:     │  │ ◄──────────────  │  │ - CPU/Memory  │  │
-│  │ - Server CPU  │  │                  │  │ - Disk Usage  │  │
-│  │ - Server Mem  │  │                  │  │ - Volumes     │  │
-│  │ - Server Disk │  │                  │  │ - Processes   │  │
-│  │ - Volumes     │  │                  │  │ - Network     │  │
-│  └───────────────┘  │                  │  └───────────────┘  │
-└─────────────────────┘                  └─────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Client["Client Machine"]
+        N1["rnx monitor<br/>(from laptop/workstation)<br/>Displays:<br/>- Server CPU<br/>- Server Mem<br/>- Server Disk<br/>- Volumes"]
+    end
+    subgraph Server["Joblet Server"]
+        N2["Monitoring Service<br/>Collects:<br/>- CPU/Memory<br/>- Disk Usage<br/>- Volumes<br/>- Processes<br/>- Network"]
+    end
+    N1 -->|"Monitor Req (gRPC/mTLS)"| N2
+    N2 -->|Metrics Data| N1
 ```
 
 ### Configuration Requirements
@@ -166,7 +160,7 @@ rnx --node=production monitor status # Specific server node
 
 **Example Output:**
 
-```
+```text
 System Status - 2025-10-08T18:45:14Z
 Available: true
 
@@ -747,13 +741,14 @@ rnx job metrics f47ac10b
 
 **Data Flow:**
 
-```
-eBPF Monitor → Telemetry Collector → IPC Writer → Persist Service → CloudWatch Logs
+```mermaid
+flowchart LR
+    N1["eBPF Monitor"] --> N2["Telemetry Collector"] --> N3["IPC Writer"] --> N4["Persist Service"] --> N5["CloudWatch Logs"]
 ```
 
 **CloudWatch Log Streams (per job):**
 
-```
+```text
 Log Group: /joblet/{node_id}
   - {job_uuid}-logs           # stdout/stderr logs
   - {job_uuid}-metrics        # Resource metrics
@@ -791,7 +786,7 @@ fields @timestamp, @logStream
 
 eBPF events are stored locally in compressed JSONL format:
 
-```
+```text
 /opt/joblet/events/{job-uuid}/
 ├── exec_events.jsonl.gz     # Process execution events
 └── connect_events.jsonl.gz  # Network connection events

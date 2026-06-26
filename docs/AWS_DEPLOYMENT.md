@@ -508,7 +508,7 @@ ssh -i ~/.ssh/your-key.pem -L 50051:<PRIVATE_IP>:443 ubuntu@<BASTION_IP>
 
 If you see warnings like these in the logs (`sudo journalctl -u joblet`):
 
-```
+```text
 ========================================================================
 [STATE] WARNING: Running with IN-MEMORY backend (fallback mode)
 [STATE] Job state will NOT persist across restarts!
@@ -519,7 +519,7 @@ If you see warnings like these in the logs (`sudo journalctl -u joblet`):
 
 Or:
 
-```
+```text
 ========================================================================
 [PERSIST] WARNING: Running with LOCAL storage backend (fallback mode)
 [PERSIST] Logs will be stored on disk at /opt/joblet/logs
@@ -625,7 +625,7 @@ aws logs describe-log-groups --log-group-name-prefix /joblet
 ### S3 Storage Access Denied
 
 If you see errors like:
-```
+```text
 AccessDenied: User is not authorized to perform: s3:PutObject on resource
 because no VPC endpoint policy allows the s3:PutObject action
 ```
@@ -704,54 +704,28 @@ cat /opt/joblet/config/joblet-config.yml | grep -A 20 "certificates:"
 
 ### Components
 
+```mermaid
+flowchart TD
+    CLIENT["rnx Client<br/>(your laptop)"]
+    subgraph AWS["AWS Account"]
+        subgraph VPC["VPC"]
+            subgraph EC2["EC2 Instance (Ubuntu 24.04 LTS)"]
+                N1["Joblet Server (port 443)<br/>- Job execution<br/>- gRPC API<br/>- TLS certificates (embedded)"]
+            end
+            VE1["VPC Endpoint<br/>(DynamoDB Gateway)"]
+            VE2["VPC Endpoint<br/>(S3 Gateway)*"]
+        end
+        DDB["DynamoDB<br/>Table: joblet-jobs<br/>(job state)"]
+        LOGS["CloudWatch Logs<br/>OR S3 Bucket<br/>/joblet/...<br/>(job logs)"]
+    end
+    CLIENT -->|"gRPC (port 443)"| N1
+    N1 --> VE1
+    N1 --> VE2
+    VE1 --> DDB
+    VE2 --> LOGS
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                          AWS Account                               │
-│                                                                    │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │                           VPC                                │  │
-│  │                                                              │  │
-│  │  ┌────────────────────────────────────────────────────┐     │  │
-│  │  │ EC2 Instance (Ubuntu 24.04 LTS)                     │     │  │
-│  │  │                                                    │     │  │
-│  │  │  ┌──────────────────────────────────────────┐     │     │  │
-│  │  │  │ Joblet Server (port 443)                 │     │     │  │
-│  │  │  │  - Job execution                         │     │     │  │
-│  │  │  │  - gRPC API                              │     │     │  │
-│  │  │  │  - TLS certificates (embedded)           │     │     │  │
-│  │  │  └──────────────────────────────────────────┘     │     │  │
-│  │  │                    │                               │     │  │
-│  │  └────────────────────┼───────────────────────────────┘     │  │
-│  │                       │                                      │  │
-│  │                       │                                      │  │
-│  │           ┌───────────┴───────────┐                         │  │
-│  │           ▼                       ▼                         │  │
-│  │  ┌───────────────────┐  ┌───────────────────┐              │  │
-│  │  │ VPC Endpoint      │  │ VPC Endpoint      │              │  │
-│  │  │ (DynamoDB Gateway)│  │ (S3 Gateway)*     │              │  │
-│  │  └─────────┬─────────┘  └─────────┬─────────┘              │  │
-│  │            │                      │                         │  │
-│  └────────────┼──────────────────────┼─────────────────────────┘  │
-│               │                      │                            │
-│               ▼                      ▼                            │
-│  ┌──────────────────────┐  ┌─────────────────┐                   │
-│  │ DynamoDB             │  │ CloudWatch Logs │                   │
-│  │                      │  │  OR S3 Bucket   │                   │
-│  │ Table: joblet-jobs   │  │ /joblet/...     │                   │
-│  │ (job state)          │  │ (job logs)      │                   │
-│  └──────────────────────┘  └─────────────────┘                   │
-│                                                                   │
-│  * S3 VPC Endpoint created when using --storage=s3               │
-│                                                                    │
-└───────────────────────────────────────────────────────────────────┘
-                              ↑
-                              │ gRPC (port 443)
-                              │
-                       ┌──────────────┐
-                       │ rnx Client   │
-                       │ (your laptop)│
-                       └──────────────┘
-```
+
+\* S3 VPC Endpoint created when using `--storage=s3`
 
 ### Data Flow
 

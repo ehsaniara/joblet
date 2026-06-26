@@ -77,7 +77,7 @@ sudo ~/bin/joblet-tunnel.sh  # Requires sudo
 
 Update your EC2 security group:
 
-```
+```text
 Type: Custom TCP
 Protocol: TCP
 Port: 443
@@ -124,7 +124,7 @@ server:
 
 ### Update Security Group
 
-```
+```text
 # OLD: Port 50051
 # NEW: Port 443
 ```
@@ -165,7 +165,7 @@ sudo netstat -tlnp | grep 443
 
 Should show:
 
-```
+```text
 tcp  0  0  0.0.0.0:443  0.0.0.0:*  LISTEN  12345/joblet
 ```
 
@@ -183,7 +183,7 @@ nc -zv localhost 8443
 
 Should output:
 
-```
+```text
 Connection to localhost port 8443 [tcp/*] succeeded!
 ```
 
@@ -195,7 +195,7 @@ rnx version
 
 Should show:
 
-```
+```text
 rnx version: v1.0.0
 Server version: v1.0.0
 ```
@@ -249,13 +249,13 @@ LOCAL_PORT="8443"  # In your tunnel script
 
 **Via SSH Tunnel (Recommended for security):**
 
-```
+```text
 MacBook:8443 → SSH Tunnel → EC2:443
 ```
 
 **Direct Connection (Same VPC/VPN):**
 
-```
+```text
 MacBook → EC2:443
 ```
 

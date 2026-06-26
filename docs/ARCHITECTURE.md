@@ -6,7 +6,7 @@ Joblet is a high-performance job execution system with a monorepo structure cont
 
 ## Repository Structure
 
-```
+```text
 joblet/
 ├── cmd/
 │   ├── joblet/          # Main service daemon
@@ -89,27 +89,13 @@ joblet/
 
 ## Communication Architecture
 
-```
-┌─────────────┐                    ┌──────────────────┐
-│  RNX Client │◄──── gRPC ────────►│  Joblet Service  │
-└─────────────┘     :50051         │     (main)       │
-                                   └──────────────────┘
-                                      │           │
-                          ┌───────────┘           └───────────┐
-                          │ Unix Socket                       │ Unix Socket
-                          │ IPC (logs/metrics)                │ IPC (job state)
-                          ▼                                   ▼
-                   ┌──────────────────┐             ┌──────────────────┐
-                   │     Persist      │             │      State       │
-                   │  (logs/metrics)  │             │   (job state)    │
-                   └──────────────────┘             └──────────────────┘
-                          │                                   │
-                          │ gRPC                              │
-                          ▼                                   ▼
-                   ┌──────────────────┐             ┌──────────────────┐
-                   │   RNX Queries    │             │  Storage Backend │
-                   │ (historical data)│             │ (Memory/DynamoDB)│
-                   └──────────────────┘             └──────────────────┘
+```mermaid
+flowchart TD
+    N1["RNX Client"] <-->|"gRPC :50051"| N2["Joblet Service (main)"]
+    N2 -->|"Unix Socket IPC (logs/metrics)"| N3["Persist (logs/metrics)"]
+    N2 -->|"Unix Socket IPC (job state)"| N4["State (job state)"]
+    N3 -->|gRPC| N5["RNX Queries (historical data)"]
+    N4 --> N6["Storage Backend (Memory/DynamoDB)"]
 ```
 
 ### Subprocess Management
@@ -256,39 +242,39 @@ go generate ./internal/proto  # Regenerate internal protos only
 
 ### Job Execution Flow
 
-```
-1. RNX sends RunJob request → Joblet
-2. Joblet creates job record in memory + sends to State (async IPC)
-3. State persists job metadata to backend (Memory/DynamoDB)
-4. Joblet creates isolated environment (cgroups, namespaces)
-5. Joblet executes job and streams live logs → RNX
-6. Joblet collects metrics (CPU, memory, GPU, I/O)
-7. Joblet sends logs/metrics → Persist (via IPC)
-8. Persist stores to disk (/opt/joblet/logs, /opt/joblet/metrics)
-9. Joblet updates job status + sends to State (async IPC)
+```mermaid
+flowchart TD
+    N1["RNX sends RunJob request → Joblet"] --> N2["Joblet creates job record in memory + sends to State (async IPC)"]
+    N2 --> N3["State persists job metadata to backend (Memory/DynamoDB)"]
+    N3 --> N4["Joblet creates isolated environment (cgroups, namespaces)"]
+    N4 --> N5["Joblet executes job and streams live logs → RNX"]
+    N5 --> N6["Joblet collects metrics (CPU, memory, GPU, I/O)"]
+    N6 --> N7["Joblet sends logs/metrics → Persist (via IPC)"]
+    N7 --> N8["Persist stores to disk (/opt/joblet/logs, /opt/joblet/metrics)"]
+    N8 --> N9["Joblet updates job status + sends to State (async IPC)"]
 ```
 
 ### Historical Query Flow
 
-```
-1. RNX sends QueryLogs request → Persist
-2. Persist reads from disk storage
-3. Persist streams results → RNX
+```mermaid
+flowchart TD
+    N1["RNX sends QueryLogs request → Persist"] --> N2["Persist reads from disk storage"]
+    N2 --> N3["Persist streams results → RNX"]
 ```
 
 ### State Persistence Flow
 
-```
-1. Joblet job lifecycle events (create, update, complete) → State (async IPC)
-2. State writes to backend (Memory/DynamoDB) with 5s timeout
-3. On joblet restart: Joblet requests job sync → State
-4. State reads from backend → returns all jobs
-5. Joblet populates in-memory cache with persisted jobs
+```mermaid
+flowchart TD
+    N1["Joblet job lifecycle events (create, update, complete) → State (async IPC)"] --> N2["State writes to backend (Memory/DynamoDB) with 5s timeout"]
+    N2 --> N3["On joblet restart: Joblet requests job sync → State"]
+    N3 --> N4["State reads from backend → returns all jobs"]
+    N4 --> N5["Joblet populates in-memory cache with persisted jobs"]
 ```
 
 ## Storage Layout
 
-```
+```text
 /opt/joblet/
 ├── bin/                    # Binaries
 │   ├── joblet

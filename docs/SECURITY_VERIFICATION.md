@@ -9,32 +9,32 @@ that all jobs run in properly isolated environments with effective resource limi
 
 ### 2-Stage Resource Control
 
-```
-┌─────────────────┐    ┌─────────────────┐
-│   Server Stage  │───►│   Init Stage    │
-│                 │    │                 │
-│ • Limit Config  │    │ • Cgroup Apply  │
-│ • Validation    │    │ • Verification  │
-│ • Job Creation  │    │ • Enforcement   │
-└─────────────────┘    └─────────────────┘
+```mermaid
+flowchart LR
+    subgraph N1["Server Stage"]
+        N1a["Limit Config"]
+        N1b["Validation"]
+        N1c["Job Creation"]
+    end
+    subgraph N2["Init Stage"]
+        N2a["Cgroup Apply"]
+        N2b["Verification"]
+        N2c["Enforcement"]
+    end
+    N1 --> N2
 ```
 
 ### Isolation Layers
 
-```
-┌─────────────────────────────────────────┐
-│              Job Process                │
-├─────────────────────────────────────────┤
-│          PID Namespace (PID 1)          │
-├─────────────────────────────────────────┤
-│        Filesystem (chroot jail)         │
-├─────────────────────────────────────────┤
-│      Network Namespace (bridge)         │
-├─────────────────────────────────────────┤
-│       Mount Namespace (private)         │
-├─────────────────────────────────────────┤
-│         Cgroup (resource limits)        │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    N1["Job Process"]
+    N2["PID Namespace (PID 1)"]
+    N3["Filesystem (chroot jail)"]
+    N4["Network Namespace (bridge)"]
+    N5["Mount Namespace (private)"]
+    N6["Cgroup (resource limits)"]
+    N1 --> N2 --> N3 --> N4 --> N5 --> N6
 ```
 
 ## Verified Security Features
@@ -83,7 +83,7 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 #### Test Result:
 
-```
+```text
 [DEBUG] [init] waiting for network setup | file=/tmp/joblet-network-ready-{job_uuid}
 [DEBUG] [init] network setup signal received, proceeding with initialization
 ```
@@ -97,7 +97,7 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 #### Test Result:
 
-```
+```text
 # Server Stage
 "max_cpu": 25, "max_memory": 64
 
@@ -116,7 +116,7 @@ drwxr-xr-x   5 root root  4096 Sep  3 03:30 etc
 
 #### Test Result:
 
-```
+```text
 [DEBUG] [init] making mounts private using platform abstraction
 [DEBUG] [init] /proc successfully remounted within chrooted environment
 [DEBUG] [init] isolation verification | visibleProcesses=5

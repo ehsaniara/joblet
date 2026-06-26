@@ -40,12 +40,16 @@ Understanding how volumes are isolated between jobs and how sharing works is imp
 
 Each job runs in an isolated filesystem environment (chroot) and can **only see volumes explicitly assigned to it**. A job cannot access volumes belonging to other jobs.
 
-```
-Job A (assigned: volume-a)          Job B (assigned: volume-b)
-├── /volumes/                       ├── /volumes/
-│   └── volume-a/  ✓ accessible     │   └── volume-b/  ✓ accessible
-│                                   │
-│   volume-b/      ✗ not visible    │   volume-a/      ✗ not visible
+```mermaid
+flowchart TD
+    subgraph JA["Job A (assigned: volume-a)"]
+        A1["/volumes/volume-a/ — ✓ accessible"]
+        A2["volume-b/ — ✗ not visible"]
+    end
+    subgraph JB["Job B (assigned: volume-b)"]
+        B1["/volumes/volume-b/ — ✓ accessible"]
+        B2["volume-a/ — ✗ not visible"]
+    end
 ```
 
 **Example:**
@@ -72,13 +76,10 @@ This isolation is enforced at the kernel level using bind mounts and chroot, not
 
 When **multiple jobs are assigned the same volume**, they share access to the same underlying storage. Both jobs see the same files and can read/write simultaneously.
 
-```
-Host Storage:
-/opt/joblet/volumes/shared-data/data/   ← actual files on disk
-                    │
-                    ├── bind mount ──→ Job A: /volumes/shared-data/
-                    │
-                    └── bind mount ──→ Job B: /volumes/shared-data/
+```mermaid
+flowchart LR
+    N1["Host Storage:<br/>/opt/joblet/volumes/shared-data/data/<br/>(actual files on disk)"] -->|"bind mount"| N2["Job A: /volumes/shared-data/"]
+    N1 -->|"bind mount"| N3["Job B: /volumes/shared-data/"]
 ```
 
 **Both jobs see identical content because they point to the same host directory.**

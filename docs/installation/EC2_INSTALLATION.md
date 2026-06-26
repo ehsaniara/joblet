@@ -35,19 +35,13 @@ This guide walks you through setting up Joblet on AWS EC2, including:
 
 ## Architecture Overview
 
-```
-┌─────────────┐            SSH Tunnel        ┌─────────────────┐
-│   MacBook   │◄────────(localhost:443)──────┤   EC2 Instance  │
-│   (Local)   │                              │  (Joblet Server)│
-│             │                              │                 │
-│  rnx CLI    │                              │  joblet daemon  │
-└─────────────┘                              └────────┬────────┘
-                                                      │
-                                                      ▼
-                                              ┌──────────────┐
-                                              │  CloudWatch  │
-                                              │  Logs/Metrics│
-                                              └──────────────┘
+```mermaid
+flowchart LR
+    M["MacBook (Local)<br/>rnx CLI"]
+    E["EC2 Instance (Joblet Server)<br/>joblet daemon"]
+    CW["CloudWatch<br/>Logs/Metrics"]
+    E -->|"SSH Tunnel (localhost:443)"| M
+    E --> CW
 ```
 
 ---
@@ -70,7 +64,7 @@ This guide walks you through setting up Joblet on AWS EC2, including:
 1. Go to AWS Console → EC2 → Launch Instance
 
 2. **Name and Tags:**
-   ```
+   ```text
    Name: joblet-server-prod
    Environment: production
    Project: joblet
@@ -127,14 +121,14 @@ Create a security group named `joblet-server-sg`:
 1. EC2 → Security Groups → Create Security Group
 
 2. **Basic Details:**
-   ```
+   ```text
    Name: joblet-server-sg
    Description: Security group for Joblet server
    VPC: (select your VPC)
    ```
 
 3. **Inbound Rules:**
-   ```
+   ```text
    # SSH
    Type: SSH
    Port: 22
@@ -171,7 +165,7 @@ This allows the EC2 instance to send logs to CloudWatch.
     - Search and add: `AmazonSSMManagedInstanceCore` (optional, for Systems Manager)
 
 4. **Role Details:**
-   ```
+   ```text
    Role name: JobletServerRole
    Description: IAM role for Joblet EC2 instances
    ```
@@ -190,7 +184,7 @@ This allows the EC2 instance to send logs to CloudWatch.
 If you want to manage Joblet via AWS CLI:
 
 1. IAM → Users → Create User
-   ```
+   ```text
    User name: joblet-admin
    Access type: Programmatic access
    ```
@@ -658,7 +652,7 @@ chmod +x ~/bin/joblet-tunnel.sh
 
 You should see:
 
-```
+```text
 🚇 Starting SSH tunnel to Joblet server...
    Local:  localhost:443
    Remote: ec2-18-123-45-67.compute-1.amazonaws.com:443

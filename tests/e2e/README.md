@@ -177,7 +177,7 @@ log_test_result "Test" "PASSED"      # Consistent logging
 
 ## File Structure
 
-```
+```text
 tests/e2e/
 ├── README.md                 # This guide
 ├── test-config.sh           # Global configuration

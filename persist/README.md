@@ -16,16 +16,12 @@ sockets (IPC) and provides:
 
 ## Architecture
 
-```
-joblet-core (execution)
-     │
-     │ IPC (Unix Socket)
-     ▼
-persist (storage)
-     │
-     ├─► Local Filesystem (default)
-     ├─► CloudWatch Logs + Metrics API
-     └─► S3 (time-partitioned objects)
+```mermaid
+flowchart TD
+    N1["joblet-core (execution)"] -->|"IPC (Unix Socket)"| N2["persist (storage)"]
+    N2 --> N3["Local Filesystem (default)"]
+    N2 --> N4["CloudWatch Logs + Metrics API"]
+    N2 --> N5["S3 (time-partitioned objects)"]
 ```
 
 ## Features
@@ -126,7 +122,7 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 
 ### Local Backend
 
-```
+```text
 /opt/joblet/
 ├── logs/
 │   └── <job-uuid>/
@@ -149,7 +145,7 @@ Messages received from joblet-core via Unix socket at `/opt/joblet/run/persist.s
 
 ### CloudWatch Backend
 
-```
+```text
 CloudWatch Logs:
   Log Group: /joblet/{node_id}
   Log Streams per job:
@@ -170,7 +166,7 @@ The S3 backend uses **time-partitioned keys** to avoid expensive read-modify-wri
 
 **Storage Layout:**
 
-```
+```text
 s3://{bucket}/{key_prefix}{node_id}/{job_uuid}/
   stdout/
     1704345600000000000.jsonl.gz    # First flush
@@ -248,7 +244,7 @@ Key metrics:
 
 ### Project Structure
 
-```
+```text
 persist/
 ├── cmd/
 │   └── persist/           # Main entry point

@@ -25,33 +25,17 @@ instances while maintaining a shared Certificate Authority (CA) and client certi
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  AWS Secrets Manager                        │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ joblet/ca-cert      (Shared - Generated Once)      │   │
-│  │ joblet/ca-key       (Shared - Generated Once)      │   │
-│  │ joblet/client-cert  (Shared - Generated Once)      │   │
-│  │ joblet/client-key   (Shared - Generated Once)      │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                          ↓ ↓ ↓
-        ┌─────────────────┼─┼─┼─────────────────┐
-        ↓                 ↓   ↓                 ↓
-┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-│  EC2 Instance │  │  EC2 Instance │  │  EC2 Instance │
-│      #1       │  │      #2       │  │      #3       │
-├───────────────┤  ├───────────────┤  ├───────────────┤
-│ Server Cert A │  │ Server Cert B │  │ Server Cert C │
-│  (Local)      │  │  (Local)      │  │  (Local)      │
-└───────────────┘  └───────────────┘  └───────────────┘
-        ↑                 ↑                 ↑
-        └─────────────────┼─────────────────┘
-                          ↓
-                  ┌───────────────┐
-                  │    Clients    │
-                  │ (One config)  │
-                  └───────────────┘
+```mermaid
+flowchart TD
+    subgraph SM["AWS Secrets Manager"]
+        N1["joblet/ca-cert (Shared - Generated Once)<br/>joblet/ca-key (Shared - Generated Once)<br/>joblet/client-cert (Shared - Generated Once)<br/>joblet/client-key (Shared - Generated Once)"]
+    end
+    N1 --> N2["EC2 Instance #1<br/>Server Cert A (Local)"]
+    N1 --> N3["EC2 Instance #2<br/>Server Cert B (Local)"]
+    N1 --> N4["EC2 Instance #3<br/>Server Cert C (Local)"]
+    N2 --> N5["Clients<br/>(One config)"]
+    N3 --> N5
+    N4 --> N5
 ```
 
 ## Use Cases
@@ -103,20 +87,15 @@ USE_SECRETS_MANAGER=true JOBLET_SERVER_ADDRESS=green.internal ./script.sh
 
 ### 4. Load Balancer Integration
 
-```
-                    ┌─────────────────┐
-                    │  ALB / NLB      │
-                    │  (TLS Passthru) │
-                    └────────┬────────┘
-                             │
-         ┌───────────────────┼───────────────────┐
-         ↓                   ↓                   ↓
-    ┌─────────┐         ┌─────────┐         ┌─────────┐
-    │ Server1 │         │ Server2 │         │ Server3 │
-    │ Cert A  │         │ Cert B  │         │ Cert C  │
-    └─────────┘         └─────────┘         └─────────┘
-         All signed by same CA
-         All accept same client cert
+```mermaid
+flowchart TD
+    N1["ALB / NLB<br/>(TLS Passthru)"] --> N2["Server1<br/>Cert A"]
+    N1 --> N3["Server2<br/>Cert B"]
+    N1 --> N4["Server3<br/>Cert C"]
+    N5["All signed by same CA<br/>All accept same client cert"]
+    N2 -.- N5
+    N3 -.- N5
+    N4 -.- N5
 ```
 
 ## Setup Instructions
@@ -207,7 +186,7 @@ aws secretsmanager list-secrets \
 
 Expected output:
 
-```
+```text
 ----------------------------------------
 |            ListSecrets                |
 +----------------------+----------------+

@@ -131,7 +131,7 @@ rnx job run --network=isolated wget https://example.com
 
 ## Files Included
 
-```
+```text
 basic-usage/
 ├── 01_simple_commands.sh
 ├── 02_file_operations.sh

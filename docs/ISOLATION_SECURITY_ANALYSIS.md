@@ -12,15 +12,12 @@ leaks.
 
 The system uses **automatic service-based job type detection** to route jobs to appropriate isolation levels:
 
-```
-JobService API          RuntimeService API
-     │                       │
-     ▼                       ▼
-JobType: "standard"     JobType: "runtime-build"
-     │                       │
-     ▼                       ▼
-Production Isolation    Builder Isolation
-(Minimal Chroot)       (Builder Chroot)
+```mermaid
+flowchart TD
+    N1["JobService API"] --> N2["JobType: standard"]
+    N2 --> N3["Production Isolation<br/>(Minimal Chroot)"]
+    N4["RuntimeService API"] --> N5["JobType: runtime-build"]
+    N5 --> N6["Builder Isolation<br/>(Builder Chroot)"]
 ```
 
 **Key Implementation:**
@@ -39,7 +36,7 @@ Production Isolation    Builder Isolation
 
 **Security Boundaries:**
 
-```
+```text
 Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 ├── bin/          # Minimal binaries (read-only bind mount from host)
 ├── lib/          # Required libraries (read-only bind mount from host) 
@@ -66,7 +63,7 @@ Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 
 **Security Boundaries:**
 
-```
+```text
 Builder Chroot: /opt/joblet/jobs/{BUILD_ID}/
 ├── bin/          # Full /bin from host (read-only bind mount)
 ├── lib/          # Full /lib from host (read-only bind mount)

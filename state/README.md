@@ -21,29 +21,23 @@ By default, Joblet stores job states in memory. When the service or host restart
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        joblet (main)                        │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  job_store_adapter (in-memory cache + IPC client)    │   │
-│  └────────────────────────┬─────────────────────────────┘   │
-└───────────────────────────┼─────────────────────────────────┘
-                            │ Unix Socket IPC
-                            │ /opt/joblet/run/state-ipc.sock
-┌───────────────────────────┼─────────────────────────────────┐
-│  ┌────────────────────────▼─────────────────────────────┐   │
-│  │       state IPC Server                               │   │
-│  └──────────────────────┬───────────────────────────────┘   │
-│                         │                                   │
-│  ┌──────────────────────▼───────────────────────────────┐   │
-│  │  Storage Backend Interface                           │   │
-│  │  ┌──────────┐  ┌───────────┐  ┌───────────┐          │   │
-│  │  │  Memory  │  │ DynamoDB  │  │    S3     │          │   │
-│  │  │(fallback)│  │(AWS prod) │  │ (planned) │          │   │
-│  │  └──────────┘  └───────────┘  └───────────┘          │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                            state subprocess
+```mermaid
+flowchart TD
+    subgraph N1["joblet (main)"]
+        N2["job_store_adapter (in-memory cache + IPC client)"]
+    end
+    subgraph N3["state subprocess"]
+        N4["state IPC Server"]
+        N5["Storage Backend Interface"]
+        N6["Memory (fallback)"]
+        N7["DynamoDB (AWS prod)"]
+        N8["S3 (planned)"]
+        N4 --> N5
+        N5 --> N6
+        N5 --> N7
+        N5 --> N8
+    end
+    N2 -->|"Unix Socket IPC<br/>/opt/joblet/run/state-ipc.sock"| N4
 ```
 
 ## 🚀 Quick Start
@@ -141,7 +135,7 @@ rnx job status <job-id>
 
 ### Attributes
 
-```
+```text
 jobId: String         # UUID (e.g., "abc123...")
 jobStatus: String     # PENDING, RUNNING, COMPLETED, FAILED
 command: String       # Job command

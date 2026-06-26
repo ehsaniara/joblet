@@ -10,7 +10,7 @@ establishing clearer architectural boundaries.
 
 ### 1.1 Existing Structure
 
-```
+```text
 joblet/
 ├── cmd/rnx/              # Go CLI including admin command
 ├── admin/
@@ -46,7 +46,7 @@ joblet/
 
 ### 2.1 Target Structure
 
-```
+```text
 Separate Repositories/Packages:
 
 joblet/                   # Main repository
@@ -61,11 +61,11 @@ joblet-admin/            # New repository
 
 ### 2.2 Component Interaction
 
-```
-[Browser] ←HTTP/WS→ [joblet-admin server] ←gRPC/mTLS→ [joblet server]
-                            ↓
-                    [Direct protobuf calls]
-                    (No CLI subprocess spawning)
+```mermaid
+flowchart LR
+    N1["Browser"] <-->|"HTTP/WS"| N2["joblet-admin server"]
+    N2 <-->|"gRPC/mTLS"| N3["joblet server"]
+    N2 --> N4["Direct protobuf calls<br/>(No CLI subprocess spawning)"]
 ```
 
 ### 2.3 Design Decisions
@@ -232,7 +232,7 @@ joblet-admin/            # New repository
 
 **Environment Variables:**
 
-```
+```ini
 JOBLET_ADMIN_PORT=5173
 JOBLET_ADMIN_HOST=localhost
 JOBLET_CONFIG_PATH=~/.rnx/rnx-config.yml

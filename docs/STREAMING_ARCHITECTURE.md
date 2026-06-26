@@ -28,13 +28,11 @@ Joblet implements a unified "histogram" (historical + stream) pattern for three 
 
 The architecture handles three job states:
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│    RUNNING      │    │   COMPLETED     │    │   NOT FOUND     │
-│                 │    │                 │    │                 │
-│ Historical +    │    │ Historical      │    │ Query Persist   │
-│ Live Stream     │    │ Only            │    │ Only            │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+```mermaid
+flowchart LR
+    N1["RUNNING<br/>Historical + Live Stream"]
+    N2["COMPLETED<br/>Historical Only"]
+    N3["NOT FOUND<br/>Query Persist Only"]
 ```
 
 ---
@@ -43,179 +41,106 @@ The architecture handles three job states:
 
 ### High-Level System Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              JOBLET NODE                                      │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                               │
-│  ┌─────────────────────────────────────────────────────────────────────────┐ │
-│  │                        JOB EXECUTION LAYER                               │ │
-│  │                                                                          │ │
-│  │   ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐      │ │
-│  │   │  Job 1   │     │  Job 2   │     │  Job 3   │     │  Job N   │      │ │
-│  │   │ (chroot) │     │ (chroot) │     │ (chroot) │     │ (chroot) │      │ │
-│  │   └────┬─────┘     └────┬─────┘     └────┬─────┘     └────┬─────┘      │ │
-│  │        │                │                │                │            │ │
-│  │        ▼                ▼                ▼                ▼            │ │
-│  │   ┌─────────────────────────────────────────────────────────────┐     │ │
-│  │   │                    DATA COLLECTORS                           │     │ │
-│  │   │  ┌────────────┐  ┌────────────┐  ┌────────────────────────┐ │     │ │
-│  │   │  │ stdout/err │  │  procfs    │  │   eBPF Probes          │ │     │ │
-│  │   │  │  capture   │  │  sampler   │  │ (exec/net/file/mem)    │ │     │ │
-│  │   │  └─────┬──────┘  └─────┬──────┘  └──────────┬─────────────┘ │     │ │
-│  │   └────────┼───────────────┼────────────────────┼───────────────┘     │ │
-│  └────────────┼───────────────┼────────────────────┼─────────────────────┘ │
-│               │               │                    │                       │
-│               ▼               ▼                    ▼                       │
-│  ┌─────────────────────────────────────────────────────────────────────────┐ │
-│  │                      IN-MEMORY BUFFER LAYER                             │ │
-│  │                                                                          │ │
-│  │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                 │ │
-│  │   │  LogBuffer   │  │ MetricBuffer │  │ EventBuffer  │                 │ │
-│  │   │  (per job)   │  │  (per job)   │  │  (per job)   │                 │ │
-│  │   └──────┬───────┘  └──────┬───────┘  └──────┬───────┘                 │ │
-│  │          │                 │                 │                          │ │
-│  │          ▼                 ▼                 ▼                          │ │
-│  │   ┌──────────────────────────────────────────────────────────────┐     │ │
-│  │   │              PUB/SUB SYSTEM (Generic[T any])                 │     │ │
-│  │   │                                                               │     │ │
-│  │   │   Topics: "job.{uuid}.logs", "job.{uuid}.metrics",           │     │ │
-│  │   │           "job.{uuid}.telematics"                            │     │ │
-│  │   └────────────────────────────┬─────────────────────────────────┘     │ │
-│  │                                │                                       │ │
-│  └────────────────────────────────┼───────────────────────────────────────┘ │
-│                                   │                                         │
-│               ┌───────────────────┼───────────────────┐                    │
-│               │                   │                   │                    │
-│               ▼                   ▼                   ▼                    │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐  │
-│  │   IPC Client    │ │  gRPC Server    │ │    PERSIST SERVICE         │  │
-│  │ (to persist)    │ │  (streaming)    │ │                             │  │
-│  │                 │ │                 │ │  ┌───────────────────────┐  │  │
-│  │  Write logs,    │ │  StreamLogs()   │ │  │   Local Storage       │  │  │
-│  │  metrics,       │ │  StreamMetrics()│ │  │                       │  │  │
-│  │  events to      │ │  StreamVisib()  │ │  │  /opt/joblet/logs/    │  │  │
-│  │  persist        │ │                 │ │  │  /opt/joblet/metrics/ │  │  │
-│  └────────┬────────┘ └────────┬────────┘ │  │  /opt/joblet/events/  │  │  │
-│           │                   │          │  └───────────────────────┘  │  │
-│           │                   │          └─────────────────────────────┘  │
-│           │                   │                       ▲                   │
-│           └───────────────────┼───────────────────────┘                   │
-│                               │                                           │
-└───────────────────────────────┼───────────────────────────────────────────┘
-                                │
-                                ▼
-                    ┌───────────────────────┐
-                    │      RNX CLI          │
-                    │                       │
-                    │  rnx job log <id>     │
-                    │  rnx job metrics <id> │
-                    │  rnx job telematics   │
-                    └───────────────────────┘
+```mermaid
+flowchart TD
+    subgraph NODE["JOBLET NODE"]
+        subgraph JEL["JOB EXECUTION LAYER"]
+            J1["Job 1 (chroot)"]
+            J2["Job 2 (chroot)"]
+            J3["Job 3 (chroot)"]
+            JN["Job N (chroot)"]
+            subgraph DC["DATA COLLECTORS"]
+                C1["stdout/err capture"]
+                C2["procfs sampler"]
+                C3["eBPF Probes (exec/net/file/mem)"]
+            end
+            J1 --> DC
+            J2 --> DC
+            J3 --> DC
+            JN --> DC
+        end
+        subgraph BUF["IN-MEMORY BUFFER LAYER"]
+            B1["LogBuffer (per job)"]
+            B2["MetricBuffer (per job)"]
+            B3["EventBuffer (per job)"]
+            PSN["PUB/SUB SYSTEM (Generic[T any])<br/>Topics: job.{uuid}.logs, job.{uuid}.metrics, job.{uuid}.telematics"]
+            B1 --> PSN
+            B2 --> PSN
+            B3 --> PSN
+        end
+        C1 --> B1
+        C2 --> B2
+        C3 --> B3
+        IPC["IPC Client (to persist)<br/>Write logs, metrics, events to persist"]
+        GRPC["gRPC Server (streaming)<br/>StreamLogs()<br/>StreamMetrics()<br/>StreamVisib()"]
+        subgraph PERSIST["PERSIST SERVICE"]
+            STORE["Local Storage<br/>/opt/joblet/logs/<br/>/opt/joblet/metrics/<br/>/opt/joblet/events/"]
+        end
+        PSN --> IPC
+        PSN --> GRPC
+        PSN --> PERSIST
+        IPC --> PERSIST
+    end
+    CLI["RNX CLI<br/>rnx job log &lt;id&gt;<br/>rnx job metrics &lt;id&gt;<br/>rnx job telematics"]
+    GRPC --> CLI
 ```
 
 ### Pub/Sub Message Flow
 
-```
-                              PUBLISHER
-                                 │
-                                 │ Publish(topic, message)
-                                 ▼
-┌────────────────────────────────────────────────────────────────┐
-│                        TOPIC REGISTRY                           │
-│                                                                 │
-│   ┌─────────────────┐  ┌─────────────────┐  ┌───────────────┐  │
-│   │ job.abc.logs    │  │ job.abc.metrics │  │ job.abc.vis   │  │
-│   │                 │  │                 │  │               │  │
-│   │  subscribers[]  │  │  subscribers[]  │  │ subscribers[] │  │
-│   └────────┬────────┘  └────────┬────────┘  └───────┬───────┘  │
-│            │                    │                   │          │
-└────────────┼────────────────────┼───────────────────┼──────────┘
-             │                    │                   │
-             ▼                    ▼                   ▼
-    ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-    │  chan Message  │   │  chan Message  │   │  chan Message  │
-    │  (buffered)    │   │  (buffered)    │   │  (buffered)    │
-    └───────┬────────┘   └───────┬────────┘   └───────┬────────┘
-            │                    │                    │
-            ▼                    ▼                    ▼
-       Subscriber 1         Subscriber 2         Subscriber 3
-       (gRPC stream)        (gRPC stream)        (IPC persist)
+```mermaid
+sequenceDiagram
+    participant Pub as Publisher
+    participant Reg as Topic Registry
+    participant S1 as Subscriber 1 (gRPC stream)
+    participant S2 as Subscriber 2 (gRPC stream)
+    participant S3 as Subscriber 3 (IPC persist)
+    Pub->>Reg: Publish(topic, message)
+    Note over Reg: Topics: job.abc.logs, job.abc.metrics, job.abc.vis<br/>each holds subscribers[]
+    Reg->>S1: chan Message (buffered)
+    Reg->>S2: chan Message (buffered)
+    Reg->>S3: chan Message (buffered)
 ```
 
 ### Unified Streaming Pattern (StreamWithHistory)
 
-```
-                     ┌──────────────────────┐
-                     │   Client Request     │
-                     │   (GetJobLogs, etc)  │
-                     └──────────┬───────────┘
-                                │
-                                ▼
-                     ┌──────────────────────┐
-                     │  DetermineJobState   │
-                     │                      │
-                     │  exists? completed?  │
-                     └──────────┬───────────┘
-                                │
-             ┌──────────────────┼──────────────────┐
-             │                  │                  │
-             ▼                  ▼                  ▼
-    ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
-    │  JobStateRun   │ │ JobStateComp   │ │ JobStateNotFnd │
-    │                │ │                │ │                │
-    │  Running Job   │ │ Completed Job  │ │ Old/Deleted    │
-    └───────┬────────┘ └───────┬────────┘ └───────┬────────┘
-            │                  │                  │
-            ▼                  ▼                  ▼
-    ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
-    │ 1. Query       │ │ 1. Query       │ │ Query Persist  │
-    │    Persist     │ │    Persist     │ │ Only           │
-    │                │ │                │ │                │
-    │ 2. Skip from   │ │ 2. Send all    │ │ Return what    │
-    │    Buffer      │ │    historical  │ │ persist has    │
-    │                │ │                │ └────────────────┘
-    │ 3. Subscribe   │ │ 3. Return      │
-    │    to PubSub   │ └────────────────┘
-    │                │
-    │ 4. Stream live │
-    │    until done  │
-    └────────────────┘
+```mermaid
+flowchart TD
+    N1["Client Request<br/>(GetJobLogs, etc)"]
+    N2["DetermineJobState<br/>exists? completed?"]
+    N1 --> N2
+    N3["JobStateRun<br/>Running Job"]
+    N4["JobStateComp<br/>Completed Job"]
+    N5["JobStateNotFnd<br/>Old/Deleted"]
+    N2 --> N3
+    N2 --> N4
+    N2 --> N5
+    N6["1. Query Persist<br/>2. Skip from Buffer<br/>3. Subscribe to PubSub<br/>4. Stream live until done"]
+    N7["1. Query Persist<br/>2. Send all historical<br/>3. Return"]
+    N8["Query Persist Only<br/>Return what persist has"]
+    N3 --> N6
+    N4 --> N7
+    N5 --> N8
 ```
 
 ### Gap Prevention During Persist → Live Transition
 
-```
-Timeline: ──────────────────────────────────────────────────────────────►
-
-Job starts                    Client connects              Job completes
-    │                              │                           │
-    ▼                              ▼                           ▼
-    ┌──────────────────────────────┬───────────────────────────┐
-    │         HISTORICAL           │          LIVE             │
-    │    (from persist/buffer)     │     (from pub/sub)        │
-    └──────────────────────────────┴───────────────────────────┘
-
-    Events: E1 E2 E3 E4 E5 E6 E7 | E8 E9 E10 E11 E12 E13 E14
-                                 │
-                          Client connects here
-                                 │
-    ┌────────────────────────────┼────────────────────────────┐
-    │ PERSIST HAS:               │ BUFFER HAS:                │
-    │ E1 E2 E3 E4 E5             │ E1 E2 E3 E4 E5 E6 E7       │
-    │ (flushed to disk)          │ (all in-memory)            │
-    └────────────────────────────┼────────────────────────────┘
-                                 │
-    GAP PREVENTION STRATEGY:     │
-                                 │
-    Step 1: Query persist ───────┼──► Get E1-E5 (count=5)
-                                 │
-    Step 2: Skip 5 from buffer ──┼──► Get E6-E7 only
-                                 │
-    Step 3: Subscribe to pub/sub ┼──► Get E8-E14 live
-                                 │
-    Result: E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E11 E12 E13 E14
-            └── NO GAPS ──────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph TL["Timeline: Job starts → Client connects → Job completes"]
+        H["HISTORICAL<br/>(from persist/buffer)<br/>E1 E2 E3 E4 E5 E6 E7"]
+        L["LIVE<br/>(from pub/sub)<br/>E8 E9 E10 E11 E12 E13 E14"]
+    end
+    N1["PERSIST HAS:<br/>E1 E2 E3 E4 E5<br/>(flushed to disk)"]
+    N2["BUFFER HAS:<br/>E1 E2 E3 E4 E5 E6 E7<br/>(all in-memory)"]
+    S1["Step 1: Query persist → Get E1-E5 (count=5)"]
+    S2["Step 2: Skip 5 from buffer → Get E6-E7 only"]
+    S3["Step 3: Subscribe to pub/sub → Get E8-E14 live"]
+    R["Result: E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E11 E12 E13 E14<br/>NO GAPS"]
+    N1 --> S1
+    N2 --> S2
+    S1 --> S2
+    S2 --> S3
+    S3 --> R
 ```
 
 ---
@@ -277,7 +202,7 @@ func (b *SimpleLogBuffer) ReadAfterSkip(skipCount int) [][]byte
 
 Long-term storage service with gzip-compressed JSONL files.
 
-```
+```text
 /opt/joblet/
 ├── logs/
 │   └── <job-uuid>/
@@ -298,113 +223,64 @@ Long-term storage service with gzip-compressed JSONL files.
 
 ### 1. Log Data Flow
 
-```
-Job Process
-    │
-    │ stdout/stderr
-    ▼
-┌─────────────────┐
-│  Log Capture    │
-│  (pty/pipe)     │
-└────────┬────────┘
-         │
-         ├──────────────────┐
-         │                  │
-         ▼                  ▼
-┌─────────────────┐  ┌─────────────────┐
-│  LogBuffer      │  │   PubSub        │
-│  (in-memory)    │  │  (real-time)    │
-└────────┬────────┘  └────────┬────────┘
-         │                    │
-         │                    ├──► gRPC Subscribers
-         ▼                    │
-┌─────────────────┐           │
-│ IPC to Persist  │───────────┘
-│ (async write)   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ /opt/joblet/    │
-│ logs/<uuid>/    │
-│ stdout.jsonl    │
-└─────────────────┘
+```mermaid
+flowchart TD
+    N1["Job Process"]
+    N2["Log Capture<br/>(pty/pipe)"]
+    N1 -->|"stdout/stderr"| N2
+    N3["LogBuffer<br/>(in-memory)"]
+    N4["PubSub<br/>(real-time)"]
+    N2 --> N3
+    N2 --> N4
+    N5["IPC to Persist<br/>(async write)"]
+    N6["gRPC Subscribers"]
+    N3 --> N5
+    N4 --> N6
+    N4 --> N5
+    N7["/opt/joblet/logs/&lt;uuid&gt;/stdout.jsonl"]
+    N5 --> N7
 ```
 
 ### 2. Metrics Data Flow
 
-```
-/proc/[pid]/stat
-/proc/[pid]/io
-/sys/fs/cgroup/
-    │
-    │ Sample every 1s
-    ▼
-┌─────────────────┐
-│ Metrics Sampler │
-└────────┬────────┘
-         │
-         ├──────────────────┐
-         │                  │
-         ▼                  ▼
-┌─────────────────┐  ┌─────────────────┐
-│ MetricBuffer    │  │   PubSub        │
-│ (ring buffer)   │  │  (real-time)    │
-└────────┬────────┘  └────────┬────────┘
-         │                    │
-         ▼                    ├──► gRPC Subscribers
-┌─────────────────┐           │
-│ IPC to Persist  │───────────┘
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ /opt/joblet/    │
-│ metrics/<uuid>/ │
-│ metrics.jsonl.gz│
-└─────────────────┘
+```mermaid
+flowchart TD
+    N1["/proc/[pid]/stat<br/>/proc/[pid]/io<br/>/sys/fs/cgroup/"]
+    N2["Metrics Sampler"]
+    N1 -->|"Sample every 1s"| N2
+    N3["MetricBuffer<br/>(ring buffer)"]
+    N4["PubSub<br/>(real-time)"]
+    N2 --> N3
+    N2 --> N4
+    N5["IPC to Persist"]
+    N6["gRPC Subscribers"]
+    N3 --> N5
+    N4 --> N6
+    N4 --> N5
+    N7["/opt/joblet/metrics/&lt;uuid&gt;/metrics.jsonl.gz"]
+    N5 --> N7
 ```
 
 ### 3. Telematics (eBPF) Data Flow
 
-```
-Kernel eBPF Probes
-    │
-    │ kprobe:execve
-    │ kprobe:connect
-    │ kprobe:accept
-    ▼
-┌─────────────────┐
-│ eBPF Ring Buffer│
-│ (kernel space)  │
-└────────┬────────┘
-         │
-         │ perf_event
-         ▼
-┌─────────────────┐
-│ eBPF Collector  │
-│ (user space)    │
-└────────┬────────┘
-         │
-         ├──────────────────┐
-         │                  │
-         ▼                  ▼
-┌─────────────────┐  ┌─────────────────┐
-│ EventBuffer     │  │   PubSub        │
-│ (in-memory)     │  │  (real-time)    │
-└────────┬────────┘  └────────┬────────┘
-         │                    │
-         ▼                    ├──► gRPC Subscribers
-┌─────────────────┐           │
-│ IPC to Persist  │───────────┘
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ /opt/joblet/    │
-│ events/<uuid>/  │
-│ exec_events.gz  │
-└─────────────────┘
+```mermaid
+flowchart TD
+    N1["Kernel eBPF Probes"]
+    N2["eBPF Ring Buffer<br/>(kernel space)"]
+    N1 -->|"kprobe:execve<br/>kprobe:connect<br/>kprobe:accept"| N2
+    N3["eBPF Collector<br/>(user space)"]
+    N2 -->|"perf_event"| N3
+    N4["EventBuffer<br/>(in-memory)"]
+    N5["PubSub<br/>(real-time)"]
+    N3 --> N4
+    N3 --> N5
+    N6["IPC to Persist"]
+    N7["gRPC Subscribers"]
+    N4 --> N6
+    N5 --> N7
+    N5 --> N6
+    N8["/opt/joblet/events/&lt;uuid&gt;/exec_events.gz"]
+    N6 --> N8
 ```
 
 ---
@@ -415,7 +291,7 @@ Kernel eBPF Probes
 
 When a client connects mid-execution, there's a potential gap:
 
-```
+```text
 Time:     T0────T1────T2────T3────T4────T5────T6────T7────T8
 Events:   E1    E2    E3    E4    E5    E6    E7    E8    E9
                             │
@@ -459,7 +335,7 @@ Some overlap may occur at the transition boundary. The system handles this by:
 
 ### Directory Structure
 
-```
+```text
 /opt/joblet/
 ├── logs/                          # Job log output
 │   └── <job-uuid>/

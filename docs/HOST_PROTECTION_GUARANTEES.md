@@ -15,29 +15,12 @@ system packages can be installed without contaminating the host system.
 
 **How OverlayFS Isolation Works:**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    OverlayFS Mount                          │
-├─────────────────────────────────────────────────────────────┤
-│  Lower Layer (read-only):  /  (host root)                   │
-│  Upper Layer (read-write): /tmp/rnx-isolation-XXXXX/upper   │
-│  Work Directory:           /tmp/rnx-isolation-XXXXX/work    │
-│  Merged View:              /tmp/rnx-isolation-XXXXX/merged  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Package installation (apt-get, yum, pip) runs in chroot    │
-│  inside the merged view. All writes go to Upper Layer.      │
-│  Host system (Lower Layer) remains completely untouched.    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  After installation, binaries and libraries are copied      │
-│  from Upper Layer to /opt/joblet/runtimes/<name>/<version>/ │
-│  Overlay is then unmounted and temp directory is removed.   │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    N1["OverlayFS Mount<br/>Lower Layer (read-only): / (host root)<br/>Upper Layer (read-write): /tmp/rnx-isolation-XXXXX/upper<br/>Work Directory: /tmp/rnx-isolation-XXXXX/work<br/>Merged View: /tmp/rnx-isolation-XXXXX/merged"]
+    N2["Package installation (apt-get, yum, pip) runs in chroot inside the merged view. All writes go to Upper Layer. Host system (Lower Layer) remains completely untouched."]
+    N3["After installation, binaries and libraries are copied from Upper Layer to /opt/joblet/runtimes/&lt;name&gt;/&lt;version&gt;/. Overlay is then unmounted and temp directory is removed."]
+    N1 --> N2 --> N3
 ```
 
 **Key Benefits:**

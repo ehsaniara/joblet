@@ -68,16 +68,27 @@ golangci-lint version
 
 Understanding the Joblet architecture is crucial for effective development:
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CLI Client    │    │  Joblet Server  │    │   Job Process   │
-│  (any platform) │    │  (Linux only)   │    │  (Linux only)   │
-├─────────────────┤    ├─────────────────┤    ├─────────────────┤
-│ • gRPC Client   │◄──►│ • gRPC Server   │    │ • Init Mode     │
-│ • TLS Auth      │    │ • Job Manager   │    │ • Namespaces    │
-│ • Streaming     │    │ • State Store   │    │ • Cgroups       │
-│ • CLI Commands  │    │ • Resource Mgmt │    │ • Process Exec  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+```mermaid
+flowchart LR
+    subgraph N1["CLI Client (any platform)"]
+        N1a["gRPC Client"]
+        N1b["TLS Auth"]
+        N1c["Streaming"]
+        N1d["CLI Commands"]
+    end
+    subgraph N2["Joblet Server (Linux only)"]
+        N2a["gRPC Server"]
+        N2b["Job Manager"]
+        N2c["State Store"]
+        N2d["Resource Mgmt"]
+    end
+    subgraph N3["Job Process (Linux only)"]
+        N3a["Init Mode"]
+        N3b["Namespaces"]
+        N3c["Cgroups"]
+        N3d["Process Exec"]
+    end
+    N1 <--> N2
 ```
 
 ### Key Design Patterns
