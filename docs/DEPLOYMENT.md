@@ -70,6 +70,22 @@ systemctl --version
 
 Joblet supports multiple deployment architectures depending on your infrastructure requirements:
 
+```mermaid
+flowchart TB
+    subgraph single["Single Node — vertical scaling"]
+        SN["Joblet + Persist + State"] --> SL["Local Filesystem"]
+    end
+    subgraph multi["Multi-Node Cluster — horizontal scaling"]
+        MN1["Node 1: Joblet"] --> ML1["Local FS + backup"]
+        MN2["Node 2: Joblet"] --> ML2["Local FS + backup"]
+        MNn["Node N: Joblet"] --> MLn["Local FS + backup"]
+    end
+    subgraph aws["AWS EC2 — auto-scaling"]
+        ASG["Auto Scaling Group<br/>Joblet nodes"] --> CW["CloudWatch Logs"]
+        ASG --> DDB["DynamoDB (state)"]
+    end
+```
+
 #### 1. Single Node (On-Premises / VM)
 
 - **Use Case**: Development, testing, small-scale production

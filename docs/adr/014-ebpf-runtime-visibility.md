@@ -491,6 +491,6 @@ persist/internal/
 
 - [ADR-007: Cgroups v2 Resource Management](007-cgroups-v2-resource-management.md)
 - [ADR-010: Collect Jobs Metrics](010-collect-jobs-metrics.md)
-- [ADR-011: CQRS Architecture with Persist](011-cqrs-architecture-with-persist.md)
+- [ADR-011: CQRS Architecture with Persist](011-cqrs-architecture-with-joblet-persist.md)
 - [cilium/ebpf Go library](https://github.com/cilium/ebpf)
 - [CloudWatch Logs Insights](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html)

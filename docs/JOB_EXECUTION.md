@@ -313,6 +313,22 @@ Use job UUIDs to:
 6. **STOPPED** - Job manually stopped
 7. **TIMEOUT** - Job exceeded its execution timeout (exit code 124)
 
+```mermaid
+stateDiagram-v2
+    [*] --> INITIALIZING: job accepted
+    [*] --> SCHEDULED: scheduled for future
+    SCHEDULED --> INITIALIZING: scheduled time reached
+    INITIALIZING --> RUNNING: execution begins
+    RUNNING --> COMPLETED: exit code 0
+    RUNNING --> FAILED: non-zero exit code
+    RUNNING --> STOPPED: manually stopped
+    RUNNING --> TIMEOUT: exceeded timeout (exit code 124)
+    COMPLETED --> [*]
+    FAILED --> [*]
+    STOPPED --> [*]
+    TIMEOUT --> [*]
+```
+
 ### Monitoring Job Progress
 
 ```bash

@@ -34,7 +34,34 @@ v2.
 
 ### 2.1 System Components
 
-![joblet-system-component.svg](joblet-system-component.svg)
+```mermaid
+flowchart LR
+    subgraph client["RNX Client (Linux / macOS / Windows)"]
+        CLI["CLI commands"]
+        Certs["Embedded TLS certificates"]
+    end
+    subgraph server["Joblet Server (Linux)"]
+        API["gRPC API + AuthN/AuthZ"]
+        LM["Job lifecycle manager"]
+        RE["Resource enforcement (cgroups v2)"]
+        ST["State management"]
+    end
+    subgraph job["Job Process — init mode (same binary)"]
+        NS["Namespaces: PID / mount / IPC / UTS / cgroup"]
+        EXE["Command execution"]
+        OUT["stdout / stderr capture"]
+    end
+
+    CLI <-->|"gRPC / mTLS"| API
+    API --> LM
+    LM --> RE
+    LM --> ST
+    LM -->|"fork + exec (JOBLET_MODE=init)"| NS
+    NS --> EXE
+    EXE --> OUT
+    OUT -->|"live stream"| API
+    NS -.->|"status updates"| LM
+```
 
 ### 2.2 Component Responsibilities
 
@@ -142,7 +169,22 @@ resources:
 
 ### 4.1 Job Lifecycle
 
-![joblet-lifecycle.svg](joblet-lifecycle.svg)
+```mermaid
+flowchart TD
+    A["Client: rnx job run"] -->|"gRPC request"| B["Server validates request & authorizes"]
+    B --> C["Create job — INITIALIZING"]
+    C --> D["Set up isolation:<br/>namespaces + cgroup + chroot"]
+    D --> E["fork + exec job binary (init mode)"]
+    E --> F["Job process — RUNNING"]
+    F --> G{"Outcome"}
+    G -->|"exit code 0"| H["COMPLETED"]
+    G -->|"exit code != 0"| I["FAILED"]
+    G -->|"stop request / timeout"| J["STOPPED"]
+    H --> K["Cleanup: cgroup + resources"]
+    I --> K
+    J --> K
+    F -.->|"stdout / stderr"| L["Live stream to client"]
+```
 
 ### 4.2 Process Isolation Implementation
 
@@ -289,7 +331,15 @@ StatusStopped     JobStatus = "STOPPED"
 
 #### Pub/Sub Architecture
 
-![joblet-pub-sub.svg](joblet-pub-sub.svg)
+```mermaid
+flowchart LR
+    JP["Job process<br/>stdout / stderr"] --> BUF["Per-job buffer<br/>(bounded · historical output)"]
+    BUF --> PS["Pub/Sub broker"]
+    PS -->|"history + live"| S1["Subscriber: Client A"]
+    PS -->|"history + live"| S2["Subscriber: Client B"]
+    PS -->|"history + live"| S3["Subscriber: Client N"]
+    PS -.->|"slow consumer removed<br/>(backpressure)"| S3
+```
 
 #### Stream Management
 

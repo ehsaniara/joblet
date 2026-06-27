@@ -20,6 +20,24 @@ In the isolated namespace:
 - **PID 2+**: Any child processes spawned by your job
 - **No system processes**: Host system processes are completely hidden
 
+```mermaid
+flowchart TD
+    subgraph host["Host PID Namespace"]
+        H1["systemd (PID 1)"]
+        H2["joblet daemon"]
+        H3["other host processes"]
+    end
+    subgraph job["Job PID Namespace (isolated)"]
+        J1["job command — PID 1 (init)"]
+        J2["child process — PID 2"]
+        J3["child process — PID 3+"]
+        J1 --> J2
+        J1 --> J3
+    end
+    H2 -.->|"launches job in new PID namespace"| J1
+    host -. "host processes invisible to job" .-> job
+```
+
 ## Examples
 
 ### Example 1: Simple Process with Children

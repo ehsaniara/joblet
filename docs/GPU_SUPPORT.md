@@ -98,6 +98,15 @@ jobs:
       gpu_memory_mb: 4096
 ```
 
+The `requires` fields define a dependency DAG — each stage starts only once its
+predecessor reaches `COMPLETED`:
+
+```mermaid
+flowchart LR
+    A["data-preprocessing<br/>CPU 200% · 4 GB RAM"] -->|COMPLETED| B["model-training<br/>2× GPU · 8 GB/GPU<br/>CPU 800% · 16 GB RAM"]
+    B -->|COMPLETED| C["model-evaluation<br/>1× GPU · 4 GB/GPU<br/>8 GB RAM"]
+```
+
 ```bash
 # Run the GPU-enabled workflow
 rnx workflow run ml-training-pipeline.yaml
