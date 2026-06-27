@@ -584,6 +584,24 @@ STOPPED       - Process terminated by user request or timeout
 CANCELED      - Scheduled job canceled before execution
 ```
 
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: job submitted
+    PENDING --> INITIALIZING: run now
+    PENDING --> SCHEDULED: schedule set
+    SCHEDULED --> INITIALIZING: scheduled time reached
+    SCHEDULED --> CANCELED: canceled before execution
+    INITIALIZING --> RUNNING: isolation & resources ready
+    RUNNING --> STOPPING: stop requested
+    RUNNING --> COMPLETED: exit code 0
+    RUNNING --> FAILED: exit code != 0
+    STOPPING --> STOPPED: terminated (user / timeout)
+    COMPLETED --> [*]
+    FAILED --> [*]
+    STOPPED --> [*]
+    CANCELED --> [*]
+```
+
 ### Resource Limits
 
 Default values when not specified in configuration (`joblet-config.yml`):

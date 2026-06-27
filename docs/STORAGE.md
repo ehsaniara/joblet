@@ -90,6 +90,37 @@ flowchart TD
 4. Filesystem volumes: Data persists for next use
 ```
 
+```mermaid
+sequenceDiagram
+    participant C as Client (rnx)
+    participant S as Server
+    participant JE as JobExecutor
+    participant VM as VolumeManager
+    participant VS as VolumeStore
+    participant I as Isolation Layer
+    participant J as Job
+
+    Note over C,VS: Creation
+    C->>S: volume create (name, size, type)
+    S->>S: validate request & size constraints
+    S->>VM: create volume
+    VM->>VM: create directory / tmpfs
+    VM->>VS: record volume metadata
+    S-->>C: volume ID
+
+    Note over C,J: Mounting
+    C->>JE: run job (with volume IDs)
+    JE->>JE: validate volume access permissions
+    JE->>VM: prepare mount points
+    VM->>I: bind mount volumes into job namespace
+    I-->>J: volumes available at /volumes/<name>
+
+    Note over VM,VS: Cleanup
+    J->>VM: job completion triggers unmount
+    VM->>I: unmount volumes from job namespace
+    VM->>VS: memory → data cleared / filesystem → data persists
+```
+
 ### Volume Store Implementation
 
 ```go
