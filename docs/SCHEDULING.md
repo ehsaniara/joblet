@@ -330,9 +330,11 @@ rnx job delete <job-id>
 Planned features for future releases:
 
 1. **Cron-style recurring schedules**
-2. **Job orchestration layer** with leader election
-3. **Cross-node job reassignment** on failure
-4. **Job dependencies and workflows**
+2. **Cross-node job reassignment** on failure
+
+> Job dependencies and multi-job orchestration are intentionally out of scope for the executor — they are handled by a
+> separate workflow-orchestration project that builds on joblet's Job API (see
+> [ADR-013](adr/013-extract-workflow-to-separate-project.md)).
 
 ## Best Practices
 

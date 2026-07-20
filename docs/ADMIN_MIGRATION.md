@@ -429,7 +429,6 @@ JOBLET_NODE=default
 - Volume management
 - Network configuration
 - Runtime management
-- Workflow visualization
 
 ### B. Dependencies to Migrate
 

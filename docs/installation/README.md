@@ -162,19 +162,6 @@ rnx runtime build ./examples/java-21/runtime.yaml
 rnx runtime list
 ```
 
-### Create Workflows
-
-Build your own job pipelines.
-
-```yaml
-version: "3.0"
-jobs:
-  my-job:
-    command: "python3"
-    args: [ "script.py" ]
-    runtime: "python-3.11-ml"
-```
-
 ---
 
 ## Which Guide Should I Use?

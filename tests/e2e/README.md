@@ -15,7 +15,6 @@ team-configurable parameters.
 ./run_tests.sh -t network      # Network configuration tests
 ./run_tests.sh -t schedule     # Job scheduling tests
 ./run_tests.sh -t volume       # Volume management tests
-./run_tests.sh -t workflow     # Workflow dependency tests
 
 # ⚡ Development/debugging (skip build - use cautiously)
 ./run_tests.sh --no-build      # Skip build for rapid test iteration
@@ -170,7 +169,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-config.sh"
 
 run_rnx job list                          # Configurable rnx command
-wait_for_job_completion "$workflow"   # Built-in timeout handling
+wait_for_job_completion "$job_id"     # Built-in timeout handling
 cleanup_test_resources               # Auto cleanup
 log_test_result "Test" "PASSED"      # Consistent logging
 ```
@@ -186,7 +185,7 @@ tests/e2e/
 ├── network/                # Network-specific tests
 │   ├── run-all-network-tests.sh
 │   ├── test-*.sh          # Individual network tests
-│   └── *.yaml            # Test workflows
+│   └── *.yaml            # Test configs
 └── volume/                # Volume tests (future)
 ```
 

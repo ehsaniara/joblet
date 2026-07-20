@@ -11,8 +11,11 @@
 - CUDA environment detection and mounting: Implemented
 - RNX CLI integration with `--gpu` and `--gpu-memory` flags: Implemented
 - JSON API support: Implemented
-- Workflow GPU configuration: Implemented
 - Comprehensive testing framework: Implemented
+
+> **Note**: GPU configuration in workflow definitions was removed when workflow orchestration was extracted to a
+> separate project (see [ADR-013](013-extract-workflow-to-separate-project.md)). Joblet exposes GPU allocation only
+> through the single-job `rnx job run --gpu` / `--gpu-memory` flags.
 
 ## Context
 
