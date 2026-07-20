@@ -72,8 +72,8 @@ Several forces are pushing us toward extraction:
 4. **Deployment flexibility**: Some users want joblet as a lightweight job executor without workflow overhead. Others
    want sophisticated orchestration. Currently, everyone gets both.
 
-5. **Alternative orchestrators**: Users might prefer existing workflow tools (Temporal, Airflow, Argo) while still
-   using joblet for execution. The current coupling makes this awkward.
+5. **Orchestration flexibility**: Some users want to drive joblet from their own orchestration layer while using
+   joblet purely for execution. The current coupling makes this awkward.
 
 ## Decision
 
@@ -178,8 +178,8 @@ require joblet updates. Version coupling is eliminated.
 **Deployment flexibility**: Run orchestrator centrally while distributing joblet agents. Or run both together.
 Or skip orchestrator entirely for simple use cases.
 
-**Alternative orchestrators**: Users can now easily use Temporal, Airflow, or Argo Workflows while keeping joblet
-for execution. Joblet becomes a universal job executor.
+**Universal executor**: With orchestration decoupled, joblet becomes a universal job executor that any
+orchestration layer can drive through its gRPC Job API.
 
 **Better testing**: Each project has focused test suites. Workflow integration tests use the real gRPC API,
 catching interface issues early.
@@ -216,12 +216,10 @@ YAML format, provide migration scripts.
 - Geographic distribution
 - Failure domain isolation
 
-**Pluggable backends**: The orchestrator could support multiple execution backends:
-
-- Joblet (primary)
-- Docker/Podman (alternative)
-- Kubernetes (for hybrid deployments)
-- SSH (for legacy systems)
+**Unified execution backend**: The orchestrator targets joblet as its execution backend everywhere — local,
+cloud, and multi-node. Because joblet provides isolation, resource limits, GPU allocation, and networking natively
+through Linux kernel primitives, the orchestrator gets one consistent execution surface across environments without
+having to special-case container runtimes or remote-shell transports.
 
 **Workflow-as-Code**: Without being tied to joblet's release cycle, the orchestrator can experiment with:
 
@@ -246,12 +244,14 @@ Build orchestrator as a plugin loaded at runtime. Single binary, optional capabi
 **Rejected because**: Go's plugin system is limited and brittle. Versioning plugins with the host is complex.
 Doesn't help with independent deployment.
 
-### Use Existing Orchestrator (Temporal/Airflow)
+### Adopt a Third-Party Orchestrator
 
-Don't build our own orchestrator. Document how to use existing tools with joblet.
+Don't build our own orchestrator. Document how to drive joblet from an off-the-shelf one instead.
 
-**Considered and partially accepted**: This is complementary. By extracting workflows, we make it *easier* to use
-existing orchestrators. Our orchestrator becomes one option among many, not a requirement.
+**Rejected**: A first-party orchestrator that speaks joblet's Job API natively gives users a cohesive, supported
+experience out of the box. Extracting workflows into `joblet-orchestrator` still keeps the Job API open, so teams
+with an existing orchestration layer can integrate — but joblet ships a complete solution rather than deferring to
+external tooling.
 
 ## Implementation Notes
 

@@ -197,56 +197,6 @@ test_cuda_environment() {
     fi
 }
 
-# Test workflow with GPU jobs
-test_gpu_workflow() {
-    # Create a simple GPU workflow
-    local workflow_file="/tmp/gpu_test_workflow.yaml"
-    cat > "$workflow_file" << 'EOF'
-name: "GPU Test Workflow"
-description: "Test workflow with GPU allocation"
-
-jobs:
-  gpu-preprocessing:
-    command: "echo"
-    args: ["Preprocessing with GPU"]
-    resources:
-      gpu_count: 1
-      gpu_memory_mb: 2048
-      max_memory: 1024
-
-  gpu-training:
-    command: "echo"
-    args: ["Training with GPU"]
-    requires:
-      - gpu-preprocessing: "COMPLETED"
-    resources:
-      gpu_count: 1
-      gpu_memory_mb: 4096
-      max_memory: 2048
-EOF
-
-    # Run the workflow
-    local workflow_output=$("$RNX_BINARY" --json workflow run "$workflow_file" 2>&1)
-    local exit_code=$?
-
-    # Clean up workflow file
-    rm -f "$workflow_file"
-
-    if [[ $exit_code -ne 0 ]]; then
-        if echo "$workflow_output" | grep -q -i "gpu.*not.*available\|gpu.*disabled"; then
-            echo "    ${YELLOW}GPU workflow test skipped (GPU not available)${NC}"
-            return 0
-        else
-            echo "    ${RED}GPU workflow failed${NC}"
-            echo "    ${RED}Output: $workflow_output${NC}"
-            return 1
-        fi
-    fi
-
-    echo "    ${GREEN}GPU workflow executed successfully${NC}"
-    return 0
-}
-
 # ============================================
 # Test Suite Execution
 # ============================================
@@ -271,9 +221,6 @@ main() {
     run_test "Basic GPU job execution" test_gpu_job_execution
     run_test "Multi-GPU allocation" test_multi_gpu_allocation
     run_test "CUDA environment variables" test_cuda_environment
-
-    test_section "GPU Workflows"
-    run_test "GPU workflow execution" test_gpu_workflow
 
     # Clean up
     cleanup_test_artifacts

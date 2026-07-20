@@ -59,59 +59,6 @@ rnx job run --gpu=2 --gpu-memory=8GB python multi_gpu_training.py
 rnx job run --gpu=1 --max-cpu=400 --max-memory=16384 python hybrid_workload.py
 ```
 
-## Workflow Configuration with GPU Resources
-
-GPU resource requirements can be declaratively specified in workflow definitions:
-
-```yaml
-# ml-training-pipeline.yaml
-jobs:
-  data-preprocessing:
-    command: "python3"
-    args: ["preprocess.py"]
-    runtime: "python-3.11-ml"
-    resources:
-      max_memory: 4096
-      max_cpu: 200
-
-  model-training:
-    command: "python3"
-    args: ["train.py", "--epochs", "100"]
-    runtime: "python-3.11-ml"
-    requires:
-      - data-preprocessing: "COMPLETED"
-    resources:
-      max_memory: 16384
-      max_cpu: 800
-      gpu_count: 2          # Request 2 GPUs
-      gpu_memory_mb: 8192   # 8GB minimum per GPU
-
-  model-evaluation:
-    command: "python3"
-    args: ["evaluate.py"]
-    runtime: "python-3.11-ml"
-    requires:
-      - model-training: "COMPLETED"
-    resources:
-      max_memory: 8192
-      gpu_count: 1
-      gpu_memory_mb: 4096
-```
-
-The `requires` fields define a dependency DAG — each stage starts only once its
-predecessor reaches `COMPLETED`:
-
-```mermaid
-flowchart LR
-    A["data-preprocessing<br/>CPU 200% · 4 GB RAM"] -->|COMPLETED| B["model-training<br/>2× GPU · 8 GB/GPU<br/>CPU 800% · 16 GB RAM"]
-    B -->|COMPLETED| C["model-evaluation<br/>1× GPU · 4 GB/GPU<br/>8 GB RAM"]
-```
-
-```bash
-# Run the GPU-enabled workflow
-rnx workflow run ml-training-pipeline.yaml
-```
-
 ## GPU Runtime Environment
 
 ### CUDA Runtime Integration
@@ -220,7 +167,6 @@ rnx job run --gpu=1 --gpu-memory=8GB \
 1. **Pre-validate Memory Requirements**: Profile model memory consumption before production deployment
 2. **Right-size GPU Allocation**: Request only necessary GPU resources to maximize cluster efficiency
 3. **Balance Resource Profiles**: Configure complementary CPU and memory limits for optimal performance
-4. **Leverage Workflow Orchestration**: Design pipelines that efficiently sequence GPU and CPU workloads
 
 ### Resource Allocation Patterns
 
@@ -240,9 +186,6 @@ rnx job run --gpu=2 --gpu-memory=8GB --max-memory=16384 --max-cpu=800 \
 # Separate preprocessing (CPU-only) from training (GPU)
 rnx job run --max-cpu=400 --max-memory=8192 python preprocess.py
 rnx job run --gpu=1 --gpu-memory=8GB python train.py
-
-# Use workflows for complex pipelines
-rnx workflow run ml-pipeline.yaml
 ```
 
 ### Environment-Specific Configuration

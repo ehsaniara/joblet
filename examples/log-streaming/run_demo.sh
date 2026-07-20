@@ -88,11 +88,11 @@ run_demo_job() {
     echo_header "Demo: $description"
     
     echo_info "Starting job: $job_name"
-    echo_command "rnx workflow run jobs.yaml
-    
+    echo_command "rnx job run --upload=high_frequency_logger.py python3 high_frequency_logger.py"
+
     # Start the job and capture the job ID
     local job_output
-    job_output=$(rnx workflow run jobs.yaml 2>&1)
+    job_output=$(rnx job run --upload=high_frequency_logger.py python3 high_frequency_logger.py 2>&1)
     local job_id
     job_id=$(echo "$job_output" | grep -E "Job [A-Za-z0-9-]+ started" | awk '{print $2}' || echo "")
     
@@ -152,9 +152,9 @@ demo_concurrent_logging() {
     
     # Start multiple jobs concurrently
     for i in {1..3}; do
-        echo_command "rnx workflow run jobs.yaml (job $i)"
+        echo_command "rnx job run --upload=high_frequency_logger.py python3 high_frequency_logger.py (job $i)"
         local job_output
-        job_output=$(rnx workflow run jobs.yaml 2>&1)
+        job_output=$(rnx job run --upload=high_frequency_logger.py python3 high_frequency_logger.py 2>&1)
         local job_id
         job_id=$(echo "$job_output" | grep -E "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" | head -1 | awk '{print $1}' || echo "")
         
@@ -279,7 +279,7 @@ echo_header "🚀 Next Steps"
 echo_info "Try these commands to explore the async log system further:"
 echo
 echo_command "# Run custom logging patterns"
-echo_command "START_NUM=5000 END_NUM=6000 INTERVAL=0.05 rnx workflow run jobs.yaml
+echo_command "rnx job run --upload=high_frequency_logger.py --env=START_NUM=5000 --env=END_NUM=6000 --env=INTERVAL=0.05 python3 high_frequency_logger.py"
 echo
 echo_command "# Monitor system performance during logging"
 echo_command "rnx monitor status  # View system metrics in real-time"
@@ -287,8 +287,8 @@ echo
 echo_command "# View all current jobs"
 echo_command "rnx job list"
 echo
-echo_command "# Run concurrent workflow"
-echo_command "rnx workflow run concurrent-logging.yaml"
+echo_command "# Run another logging job concurrently"
+echo_command "rnx job run --upload=high_frequency_logger.py python3 high_frequency_logger.py"
 
 echo_success "🎉 Async log system demo completed successfully!"
 echo_info "The rate-decoupled async architecture ensures your jobs never wait for disk I/O,"
