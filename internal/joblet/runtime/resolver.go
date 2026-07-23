@@ -188,25 +188,31 @@ func (r *Resolver) ResolveRuntime(runtimeSpec string) (*RuntimeConfig, error) {
 		return nil, nil
 	}
 
-	// Find the runtime directory
+	_, config, err := r.ResolveRuntimeDirectory(runtimeSpec)
+	return config, err
+}
+
+// ResolveRuntimeDirectory finds the directory for a runtime specification,
+// loads its runtime.yml, and validates it against this node (architecture
+// compatibility). Callers that only need one of the results can discard the
+// other; the config is always loaded and validated before either is returned.
+func (r *Resolver) ResolveRuntimeDirectory(runtimeSpec string) (string, *RuntimeConfig, error) {
 	runtimeDir, err := r.FindRuntimeDirectory(runtimeSpec)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", pkgerrors.ErrRuntimeNotFound, err)
+		return "", nil, fmt.Errorf("%w: %v", pkgerrors.ErrRuntimeNotFound, err)
 	}
 
-	// Load runtime configuration
 	configPath := filepath.Join(runtimeDir, "runtime.yml")
 	config, err := r.loadRuntimeConfig(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load runtime config: %w", err)
+		return "", nil, fmt.Errorf("failed to load runtime config: %w", err)
 	}
 
-	// Basic validation
 	if err := r.validateRuntime(config); err != nil {
-		return nil, fmt.Errorf("runtime validation failed: %w", err)
+		return "", nil, fmt.Errorf("runtime validation failed: %w", err)
 	}
 
-	return config, nil
+	return runtimeDir, config, nil
 }
 
 // FindRuntimeDirectory finds the directory for a runtime specification (fully generic)
@@ -485,7 +491,7 @@ func (r *Resolver) validateRuntime(config *RuntimeConfig) error {
 		currentArch := runtime.GOARCH
 		archCompatible := false
 		for _, arch := range config.Requirements.Architectures {
-			if arch == currentArch || arch == "x86_64" && currentArch == "amd64" {
+			if normalizeArch(arch) == currentArch {
 				archCompatible = true
 				break
 			}
@@ -497,6 +503,18 @@ func (r *Resolver) validateRuntime(config *RuntimeConfig) error {
 	}
 
 	return nil
+}
+
+// normalizeArch maps common uname-style architecture names to Go's GOARCH values
+func normalizeArch(arch string) string {
+	switch arch {
+	case "x86_64":
+		return "amd64"
+	case "aarch64":
+		return "arm64"
+	default:
+		return arch
+	}
 }
 
 // IsGPUEnabled checks if a runtime has GPU support based on its name and tags

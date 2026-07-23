@@ -60,8 +60,6 @@ func TestCUDAVersion_IsCompatible(t *testing.T) {
 }
 
 func TestParseVersionString(t *testing.T) {
-	detector := &CUDADetector{}
-
 	tests := []struct {
 		name        string
 		versionStr  string
@@ -97,7 +95,7 @@ func TestParseVersionString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			version, err := detector.parseVersionString(tt.versionStr)
+			version, err := ParseCUDAVersion(tt.versionStr)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
