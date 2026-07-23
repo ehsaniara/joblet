@@ -1147,10 +1147,13 @@ func (f *JobFilesystem) mountRuntimeWithManager(runtimeBasePath string) error {
 		Environment map[string]string `yaml:"environment"`
 	}
 
-	// Use runtime resolver to find the actual runtime directory
-	// This handles versioned runtimes like python-3.11@1.3.1 -> /opt/joblet/runtimes/python-3.11/1.3.1/
+	// Resolve the runtime spec to its directory, handling versioned runtimes
+	// like python-3.11@1.3.1 -> /opt/joblet/runtimes/python-3.11/1.3.1/.
+	// This validates the runtime even though submission already did: scheduled
+	// jobs can run long after submission, and the runtime may be gone or
+	// changed by then.
 	runtimeResolver := runtime.NewResolver(runtimeBasePath, f.platform)
-	runtimeDir, err := runtimeResolver.FindRuntimeDirectory(f.Runtime)
+	runtimeDir, _, err := runtimeResolver.ResolveRuntimeDirectory(f.Runtime)
 	if err != nil {
 		return fmt.Errorf("failed to resolve runtime path for %s: %w", f.Runtime, err)
 	}

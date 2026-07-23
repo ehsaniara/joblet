@@ -69,7 +69,7 @@ func StartGRPCServer(jobStore adapters.JobStorer, telemetryCollector *telemetry.
 	}
 
 	// Create job service (lean, no workflow orchestration)
-	jobService := NewJobServiceServer(auth, jobStore, telemetryCollector, joblet, persistClient)
+	jobService := NewJobServiceServer(auth, jobStore, telemetryCollector, joblet, persistClient, cfg.Runtime.BasePath, platform)
 	pb.RegisterJobServiceServer(grpcServer, jobService)
 
 	// Create and register network service

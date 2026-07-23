@@ -354,7 +354,7 @@ func (c *CUDADetector) extractVersionFromPath(path string) (CUDAVersion, error) 
 	}
 
 	versionStr := strings.TrimPrefix(base, "cuda-")
-	return c.parseVersionString(versionStr)
+	return ParseCUDAVersion(versionStr)
 }
 
 // getVersionFromNvcc gets version by running nvcc --version
@@ -440,8 +440,8 @@ func (c *CUDADetector) parseVersionFromContent(content string) (CUDAVersion, err
 	return CUDAVersion{}, fmt.Errorf("could not parse version from content")
 }
 
-// parseVersionString parses a version string like "12.1"
-func (c *CUDADetector) parseVersionString(versionStr string) (CUDAVersion, error) {
+// ParseCUDAVersion parses a version string like "12.1" into a CUDAVersion
+func ParseCUDAVersion(versionStr string) (CUDAVersion, error) {
 	parts := strings.Split(versionStr, ".")
 	if len(parts) < 2 {
 		return CUDAVersion{}, fmt.Errorf("invalid version format: %s", versionStr)

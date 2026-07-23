@@ -684,3 +684,64 @@ mounts: []
 		require.NoError(b, err)
 	}
 }
+
+func TestResolver_ResolveRuntimeDirectory(t *testing.T) {
+	tempDir := t.TempDir()
+	runtimesPath := filepath.Join(tempDir, "runtimes")
+	runtimeDir := filepath.Join(runtimesPath, "python-3.11")
+	require.NoError(t, os.MkdirAll(runtimeDir, 0755))
+
+	config := `name: python-3.11
+language: python
+version: "1.0.0"
+`
+	require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.yml"), []byte(config), 0644))
+
+	resolver := NewResolver(runtimesPath, platform.NewPlatform())
+
+	dir, cfg, err := resolver.ResolveRuntimeDirectory("python-3.11")
+	require.NoError(t, err)
+	assert.Equal(t, runtimeDir, dir)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "python-3.11", cfg.Name)
+}
+
+func TestResolver_ResolveRuntimeDirectory_NotFound(t *testing.T) {
+	tempDir := t.TempDir()
+	runtimesPath := filepath.Join(tempDir, "runtimes")
+	require.NoError(t, os.MkdirAll(runtimesPath, 0755))
+
+	resolver := NewResolver(runtimesPath, platform.NewPlatform())
+
+	_, _, err := resolver.ResolveRuntimeDirectory("does-not-exist")
+	require.Error(t, err)
+}
+
+func TestResolver_ResolveRuntimeDirectory_IncompatibleArchitecture(t *testing.T) {
+	tempDir := t.TempDir()
+	runtimesPath := filepath.Join(tempDir, "runtimes")
+	runtimeDir := filepath.Join(runtimesPath, "python-3.11")
+	require.NoError(t, os.MkdirAll(runtimeDir, 0755))
+
+	config := `name: python-3.11
+language: python
+version: "1.0.0"
+requirements:
+  architectures: ["mips64"]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.yml"), []byte(config), 0644))
+
+	resolver := NewResolver(runtimesPath, platform.NewPlatform())
+
+	_, _, err := resolver.ResolveRuntimeDirectory("python-3.11")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "architecture")
+}
+
+func TestNormalizeArch(t *testing.T) {
+	assert.Equal(t, "amd64", normalizeArch("x86_64"))
+	assert.Equal(t, "arm64", normalizeArch("aarch64"))
+	assert.Equal(t, "amd64", normalizeArch("amd64"))
+	assert.Equal(t, "arm64", normalizeArch("arm64"))
+	assert.Equal(t, "riscv64", normalizeArch("riscv64"))
+}

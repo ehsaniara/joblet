@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
@@ -12,11 +11,14 @@ import (
 	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	"github.com/ehsaniara/joblet/internal/joblet/mappers"
+	jobletruntime "github.com/ehsaniara/joblet/internal/joblet/runtime"
 	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
 	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
+	"github.com/ehsaniara/joblet/pkg/platform"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -38,17 +40,21 @@ type JobServiceServer struct {
 	telemetryCollector *telemetry.Collector
 	joblet             interfaces.Joblet
 	persistClient      persistpb.PersistServiceClient
+	runtimeResolver    *jobletruntime.Resolver
+	cudaDetector       *gpu.CUDADetector
 	logger             *logger.Logger
 }
 
 // NewJobServiceServer creates a new gRPC service server for job operations.
-func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, telemetryCollector *telemetry.Collector, joblet interfaces.Joblet, persistClient persistpb.PersistServiceClient) *JobServiceServer {
+func NewJobServiceServer(auth auth2.GRPCAuthorization, jobStore adapters.JobStorer, telemetryCollector *telemetry.Collector, joblet interfaces.Joblet, persistClient persistpb.PersistServiceClient, runtimesBasePath string, platform platform.Platform) *JobServiceServer {
 	return &JobServiceServer{
 		auth:               auth,
 		jobStore:           jobStore,
 		telemetryCollector: telemetryCollector,
 		joblet:             joblet,
 		persistClient:      persistClient,
+		runtimeResolver:    jobletruntime.NewResolver(runtimesBasePath, platform),
+		cudaDetector:       gpu.NewCUDADetector(platform),
 		logger:             logger.WithField("component", "job-grpc"),
 	}
 }
@@ -194,6 +200,8 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           jobType,
+		GPUCount:          req.GpuCount,
+		GPUMemoryMB:       int64(req.GpuMemoryMb),
 		Timeout:           req.Timeout,
 	}
 
@@ -215,6 +223,9 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 	if req.Resources.MaxIOBPS < 0 {
 		return fmt.Errorf("maxIOBPS cannot be negative")
 	}
+	if req.GPUCount < 0 {
+		return fmt.Errorf("gpuCount cannot be negative")
+	}
 
 	validNetworks := map[string]bool{
 		"bridge": true,
@@ -232,7 +243,7 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 	}
 
 	if req.Runtime != "" {
-		if err := s.validateRuntime(req.Runtime); err != nil {
+		if err := s.validateRuntime(req); err != nil {
 			return fmt.Errorf("invalid runtime: %w", err)
 		}
 	}
@@ -240,27 +251,28 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 	return nil
 }
 
-// validateRuntime validates the runtime specification
-func (s *JobServiceServer) validateRuntime(runtimeSpec string) error {
-	if runtimeSpec == "" {
-		return fmt.Errorf("runtime specification cannot be empty")
+// validateRuntime resolves the runtime specification and validates it against
+// this node: the runtime must exist on disk, be compatible with the node's
+// architecture, and its GPU/CUDA requirements from runtime.yml must be
+// satisfiable by the job request. The filesystem isolator validates again at
+// launch, since a scheduled job's runtime can be removed before it runs.
+func (s *JobServiceServer) validateRuntime(req *interfaces.StartJobRequest) error {
+	config, err := s.runtimeResolver.ResolveRuntime(req.Runtime)
+	if err != nil {
+		return err
 	}
 
-	if strings.Contains(runtimeSpec, ":") {
-		parts := strings.Split(runtimeSpec, ":")
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid runtime format: expected 'language:version', got '%s'", runtimeSpec)
+	if config.Requirements.GPU && req.GPUCount == 0 {
+		return fmt.Errorf("runtime %s requires a GPU but the job does not request any", req.Runtime)
+	}
+
+	if req.GPUCount > 0 && config.Requirements.CUDAVersion != "" {
+		required, err := gpu.ParseCUDAVersion(config.Requirements.CUDAVersion)
+		if err != nil {
+			return fmt.Errorf("runtime %s declares invalid cuda_version %q: %w", req.Runtime, config.Requirements.CUDAVersion, err)
 		}
-		if parts[0] == "" || parts[1] == "" {
-			return fmt.Errorf("runtime language and version cannot be empty")
-		}
-	} else {
-		parts := strings.Split(runtimeSpec, "-")
-		if len(parts) < 2 {
-			return fmt.Errorf("invalid runtime format: expected 'language-version[-tags]', got '%s'", runtimeSpec)
-		}
-		if parts[0] == "" || parts[1] == "" {
-			return fmt.Errorf("runtime language and version cannot be empty")
+		if _, err := s.cudaDetector.FindCompatibleCUDA(required); err != nil {
+			return fmt.Errorf("runtime %s requires CUDA %s: %w", req.Runtime, config.Requirements.CUDAVersion, err)
 		}
 	}
 
