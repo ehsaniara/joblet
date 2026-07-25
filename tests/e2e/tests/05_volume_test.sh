@@ -60,6 +60,40 @@ verify_remote_directory() {
 # Test Functions
 # ============================================
 
+test_upload_directory() {
+    # Upload a nested directory - exercises the relative-path (subdir) upload
+    # flow end to end, which routes through the server's path-containment
+    # check (issue #1). Verifies nested files land at the right workspace path.
+    local test_dir="/tmp/test_uploaddir_$$"
+    mkdir -p "$test_dir/sub"
+    echo "$TEST_DATA" > "$test_dir/sub/nested.txt"
+
+    echo -e "    ${BLUE}Testing nested directory upload to $TEST_HOST${NC}"
+
+    local job_output=$("$RNX_BINARY" job run \
+        --upload="$test_dir" \
+        sh -c "
+if [ -f '/work/$(basename "$test_dir")/sub/nested.txt' ]; then
+    echo 'NESTED_FOUND'
+    cat '/work/$(basename "$test_dir")/sub/nested.txt' | sed 's/^/NESTED:/'
+else
+    echo 'NESTED_NOT_FOUND'
+    find /work -type f
+fi
+" 2>&1)
+
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
+    local logs=$(get_job_logs "$job_id" 5)
+
+    rm -rf "$test_dir"
+    if assert_contains "$logs" "NESTED:$TEST_DATA" "Nested upload should land at its subdir path"; then
+        echo -e "    ${GREEN}✓ Nested directory upload preserved subdir structure${NC}"
+        return 0
+    else
+        return 1
+    fi
+}
+
 test_upload_file() {
     # Test uploading a file to a job with remote host verification
     local test_file="/tmp/test_upload_$$.txt"
@@ -367,6 +401,7 @@ main() {
     # Run tests
     test_section "File Transfer"
     run_test "Upload file to job" test_upload_file
+    run_test "Upload nested directory to job" test_upload_directory
     run_test "Download results from job" test_download_result
     
     test_section "Volume Operations"

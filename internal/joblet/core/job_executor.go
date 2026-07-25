@@ -164,16 +164,21 @@ func (ee *ExecutionEngineV2) executeCICommand(ctx context.Context, opts *StartPr
 	// Process uploads if any
 	if len(opts.Uploads) > 0 {
 		for _, upload := range opts.Uploads {
-			fullPath := filepath.Join(workDir, upload.Path)
+			// SECURITY: reject "../" traversal before writing as root (issue #259)
+			fullPath, err := domain.ResolveUploadPath(workDir, upload.Path)
+			if err != nil {
+				return nil, err
+			}
+			mode := domain.SanitizeUploadMode(upload.Mode)
 			if upload.IsDirectory {
-				if err := os.MkdirAll(fullPath, os.FileMode(upload.Mode)); err != nil {
+				if err := os.MkdirAll(fullPath, mode); err != nil {
 					return nil, fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
 				}
 			} else {
 				if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 					return nil, fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
 				}
-				if err := os.WriteFile(fullPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+				if err := os.WriteFile(fullPath, upload.Content, mode); err != nil {
 					return nil, fmt.Errorf("failed to write file %s: %w", upload.Path, err)
 				}
 			}

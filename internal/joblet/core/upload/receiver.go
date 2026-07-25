@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
@@ -100,7 +101,12 @@ func (r *Receiver) processFilesFromPipe(pipe io.Reader, workspacePath string) er
 			return fmt.Errorf("invalid directory flag: %s", isDirStr)
 		}
 
-		fullPath := filepath.Join(workspacePath, filePath)
+		// SECURITY: the path comes from the pipe header; reject "../" traversal
+		// before writing (this runs as root inside the chroot pre-exec).
+		fullPath, err := domain.ResolveUploadPath(workspacePath, filePath)
+		if err != nil {
+			return err
+		}
 
 		log.Debug("processing file from pipe",
 			"path", filePath,

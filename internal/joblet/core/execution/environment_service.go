@@ -147,10 +147,16 @@ func (es *EnvironmentService) processUploads(uploads []domain.FileUpload, workDi
 	es.logger.Debug("processing uploads", "count", len(uploads), "workDir", workDir)
 
 	for _, upload := range uploads {
-		fullPath := filepath.Join(workDir, upload.Path)
+		// SECURITY: uploads are written as root on the host before any chroot
+		// exists; a client-supplied "../" path would escape the workspace.
+		fullPath, err := domain.ResolveUploadPath(workDir, upload.Path)
+		if err != nil {
+			return err
+		}
+		mode := domain.SanitizeUploadMode(upload.Mode)
 
 		if upload.IsDirectory {
-			if err := os.MkdirAll(fullPath, os.FileMode(upload.Mode)); err != nil {
+			if err := os.MkdirAll(fullPath, mode); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
 			}
 		} else {
@@ -158,7 +164,7 @@ func (es *EnvironmentService) processUploads(uploads []domain.FileUpload, workDi
 				return fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
 			}
 
-			if err := os.WriteFile(fullPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+			if err := os.WriteFile(fullPath, upload.Content, mode); err != nil {
 				return fmt.Errorf("failed to write file %s: %w", upload.Path, err)
 			}
 		}
