@@ -516,6 +516,26 @@ test_reserved_env_rejected() {
 
 run_test_check "Reserved environment variables rejected" test_reserved_env_rejected
 
+echo -e "\n${YELLOW}▶ 10. Runtime Allowed Mounts${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+
+test_runtime_allowed_mounts() {
+    # The server's installed per-distro runtime config lists the host dirs
+    # mounted into the sandbox, including the TLS trust store. These must reach
+    # the job init via forwarding rather than falling back to the truncated
+    # built-in set (which lacks /usr/sbin and /etc/ssl).
+    local out=$(run_remote_job "ls -d /usr/sbin /etc/ssl >/dev/null 2>&1 && echo MOUNTS_PRESENT || echo MOUNTS_MISSING")
+
+    if echo "$out" | grep -q "MOUNTS_PRESENT"; then
+        echo "    Distro allowed_mounts present in sandbox (/usr/sbin, /etc/ssl)"
+        return 0
+    fi
+    echo "    Distro allowed_mounts missing from sandbox (built-in fallback?): $out"
+    return 1
+}
+
+run_test_check "Runtime allowed mounts forwarded to sandbox" test_runtime_allowed_mounts
+
 # ============================================
 # SUMMARY
 # ============================================

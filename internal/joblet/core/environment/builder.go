@@ -2,6 +2,7 @@ package environment
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,24 @@ func ForwardFilesystemEnv(fs *config.FilesystemConfig) []string {
 		fmt.Sprintf("JOB_FS_BASE_DIR=%s", fs.BaseDir),
 		fmt.Sprintf("JOB_FS_TMP_DIR=%s", fs.TmpDir),
 	}
+}
+
+// ForwardRuntimeEnv renders the server's effective runtime settings that the
+// job init process consumes - the runtime base path and the list of host dirs
+// allowed to be mounted into the sandbox - as JOB_RT_* environment variables.
+// Init cannot read the server config file, so without these it falls back to
+// the truncated built-in AllowedMounts and jobs lose the mounts the operator's
+// distro runtime config provides (e.g. /usr/sbin, /usr/lib, /etc/ssl, the TLS
+// trust store). AllowedMounts is joined with the OS path-list separator.
+func ForwardRuntimeEnv(rt *config.RuntimeConfig) []string {
+	env := []string{
+		fmt.Sprintf("JOB_RT_BASE_PATH=%s", rt.BasePath),
+	}
+	if len(rt.AllowedMounts) > 0 {
+		env = append(env, fmt.Sprintf("JOB_RT_ALLOWED_MOUNTS=%s",
+			strings.Join(rt.AllowedMounts, string(os.PathListSeparator))))
+	}
+	return env
 }
 
 // Builder handles environment variable construction for job execution
@@ -111,6 +130,7 @@ func (b *Builder) buildCoreEnvironment(job *domain.Job, execPath string) []strin
 	// loaded config values rather than assuming built-in defaults
 	if b.config != nil {
 		env = append(env, ForwardFilesystemEnv(&b.config.Filesystem)...)
+		env = append(env, ForwardRuntimeEnv(&b.config.Runtime)...)
 	}
 
 	if !job.Limits.CPUCores.IsEmpty() {
