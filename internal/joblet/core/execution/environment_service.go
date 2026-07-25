@@ -8,6 +8,7 @@ import (
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
@@ -149,7 +150,7 @@ func (es *EnvironmentService) processUploads(uploads []domain.FileUpload, workDi
 	for _, upload := range uploads {
 		// SECURITY: uploads are written as root on the host before any chroot
 		// exists; a client-supplied "../" path would escape the workspace.
-		fullPath, err := domain.ResolveUploadPath(workDir, upload.Path)
+		fullPath, err := validation.ValidatePathWithinBase(workDir, upload.Path)
 		if err != nil {
 			return err
 		}

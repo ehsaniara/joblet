@@ -66,26 +66,6 @@ func (us *UploadSession) OptimizeForMemory(memoryLimitMB int32) {
 	}
 }
 
-// ResolveUploadPath joins baseDir with a client-supplied relative upload path
-// and guarantees the result stays within baseDir. Every filesystem write
-// driven by a client-controlled upload path MUST go through this - the join
-// alone (filepath.Join) silently resolves "../" and escapes the workspace,
-// and these writes happen as root on the host before any chroot exists.
-func ResolveUploadPath(baseDir, uploadPath string) (string, error) {
-	if uploadPath == "" {
-		return "", fmt.Errorf("empty upload path")
-	}
-	if filepath.IsAbs(uploadPath) {
-		return "", fmt.Errorf("absolute upload path not allowed: %q", uploadPath)
-	}
-	full := filepath.Join(baseDir, uploadPath)
-	rel, err := filepath.Rel(baseDir, full)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("upload path escapes workspace: %q", uploadPath)
-	}
-	return full, nil
-}
-
 // SanitizeUploadMode masks a client-supplied file mode to permission bits
 // only, stripping setuid/setgid/sticky so a client cannot request a setuid
 // file be written as root.

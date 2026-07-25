@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
@@ -103,7 +103,7 @@ func (r *Receiver) processFilesFromPipe(pipe io.Reader, workspacePath string) er
 
 		// SECURITY: the path comes from the pipe header; reject "../" traversal
 		// before writing (this runs as root inside the chroot pre-exec).
-		fullPath, err := domain.ResolveUploadPath(workspacePath, filePath)
+		fullPath, err := validation.ValidatePathWithinBase(workspacePath, filePath)
 		if err != nil {
 			return err
 		}

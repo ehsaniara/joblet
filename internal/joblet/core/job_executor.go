@@ -14,6 +14,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
 	"github.com/ehsaniara/joblet/internal/joblet/core/unprivileged"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	"github.com/ehsaniara/joblet/internal/joblet/network"
@@ -165,7 +166,7 @@ func (ee *ExecutionEngineV2) executeCICommand(ctx context.Context, opts *StartPr
 	if len(opts.Uploads) > 0 {
 		for _, upload := range opts.Uploads {
 			// SECURITY: reject "../" traversal before writing as root (issue #259)
-			fullPath, err := domain.ResolveUploadPath(workDir, upload.Path)
+			fullPath, err := validation.ValidatePathWithinBase(workDir, upload.Path)
 			if err != nil {
 				return nil, err
 			}
