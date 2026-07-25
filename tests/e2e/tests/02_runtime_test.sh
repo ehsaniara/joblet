@@ -13,12 +13,11 @@ JOBLET_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 
 # Runtimes that will be tested (these have example runtime.yaml files)
 AVAILABLE_RUNTIMES=("openjdk-21" "openjdk-17" "python-3.11-ml" "python-3.11" "python-analytics")
-REMOTE_HOST="192.168.1.161"
-REMOTE_USER="jay"
+TEST_HOST="$(get_test_host_display)"
 
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  Complete Runtime Lifecycle Tests${NC}"
-echo -e "${CYAN}  Testing against remote host: ${REMOTE_HOST}${NC}"
+echo -e "${CYAN}  Testing against: ${TEST_HOST}${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 
@@ -49,15 +48,15 @@ run_test_check() {
 # ============================================
 
 check_host_contamination() {
-    echo "  Checking for host contamination on $REMOTE_HOST..."
+    echo "  Checking for host contamination on $TEST_HOST..."
     
     # Check for joblet-specific runtime installations outside /opt/joblet
     # Look for newly installed runtimes, not system Python/Java
-    local contamination_check=$(ssh "$REMOTE_USER@$REMOTE_HOST" "
+    local contamination_check=$(run_remote_command "
         # Check for joblet-installed runtimes in unexpected locations
         find /usr/local -name '*graalvm*' -o -name '*openjdk-21*' 2>/dev/null | grep -v /opt/joblet
         find /usr/local -path '*/python3.11*' -newer /tmp 2>/dev/null | grep -v /opt/joblet
-    " 2>/dev/null)
+    " 30)
     
     if [[ -z "$contamination_check" ]]; then
         echo "    Host system clean - no joblet runtime contamination"
@@ -198,19 +197,13 @@ test_runtime_execution() {
 test_initial_state() {
     echo "  Checking initial runtime state..."
     
-    # Verify we're connected to remote host
-    if ! grep -q "$REMOTE_HOST" ~/.rnx/rnx-config.yml 2>/dev/null; then
-        echo "    Not connected to remote host $REMOTE_HOST"
-        return 1
-    fi
-    
-    # Check runtime list command works
+    # Check runtime list command works (verifies connectivity)
     if ! "$RNX_BINARY" runtime list >/dev/null 2>&1; then
         echo "    Runtime list command failed"
         return 1
     fi
     
-    echo "    Connected to remote host and runtime commands working"
+    echo "    Connected to $TEST_HOST and runtime commands working"
     return 0
 }
 
@@ -428,7 +421,7 @@ run_test_check "Test environment cleanup" test_cleanup
 echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  Test Summary${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "Remote Host:    ${BLUE}$REMOTE_HOST${NC}"
+echo -e "Test Host:      ${BLUE}$TEST_HOST${NC}"
 echo -e "Total Tests:    $TOTAL_TESTS"
 echo -e "Passed:         ${GREEN}$PASSED_TESTS${NC}"
 echo -e "Failed:         ${RED}$FAILED_TESTS${NC}"
@@ -442,7 +435,7 @@ echo -e "\n${BLUE}Completed: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
 
 if [[ $FAILED_TESTS -eq 0 ]]; then
     echo -e "\n${GREEN}✅ ALL RUNTIME LIFECYCLE TESTS PASSED!${NC}"
-    echo -e "${GREEN}Runtime management working correctly on $REMOTE_HOST${NC}"
+    echo -e "${GREEN}Runtime management working correctly on $TEST_HOST${NC}"
     exit 0
 else
     echo -e "\n${RED}❌ SOME RUNTIME LIFECYCLE TESTS FAILED${NC}"

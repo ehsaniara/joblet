@@ -9,19 +9,13 @@
 #
 # Examples:
 #   ./11_metrics_gap_test.sh                                    # Test locally
-#   JOBLET_TEST_HOST=192.168.1.161 ./11_metrics_gap_test.sh   # Test remote host
+#   JOBLET_TEST_HOST=192.0.2.10 ./11_metrics_gap_test.sh   # Test remote host
 
 # Source test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration (consistent with other tests)
-REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
-REMOTE_USER="${REMOTE_USER:-jay}"
-
-# Set JOBLET_TEST_HOST for test framework's run_rnx_command to work
-export JOBLET_TEST_HOST="$REMOTE_HOST"
-export JOBLET_TEST_USER="$REMOTE_USER"
-export JOBLET_TEST_USE_SSH="true"
+# Target host comes from the framework (local by default, JOBLET_TEST_HOST for remote)
+TEST_HOST="$(get_test_host_display)"
 
 # Test configuration
 # Note: Metrics collection is automatic, no interval flag needed
@@ -30,13 +24,12 @@ export JOBLET_TEST_USE_SSH="true"
 # Helper Functions
 # ============================================
 
-# Run command on remote host via SSH (for host-level verification)
+# Run command on the test host (SSH when remote, local otherwise) for host-level verification
 run_ssh_command() {
     local command="$1"
     local timeout="${2:-10}"
 
-    timeout "$timeout" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
-        "$REMOTE_USER@$REMOTE_HOST" "$command" 2>/dev/null || echo "SSH_FAILED"
+    run_remote_command "$command" "$timeout"
 }
 
 # Start a metrics test job
@@ -169,7 +162,7 @@ test_gap_detection() {
 
     # Extract timestamps from metrics output
     local timestamps=$(get_timestamps "$full_metrics")
-    local timestamp_count=$(echo "$timestamps" | grep -c ":" || echo "0")
+    local timestamp_count=$(echo "$timestamps" | grep -c ":" || true)
 
     # With current metrics collection behavior, we typically get 2-3 samples
     # Require at least 2 samples to test gap detection (buffer → live transition)
@@ -283,7 +276,7 @@ main() {
     # Initialize test suite
     echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Metrics Gap Prevention Tests${NC}"
-    echo -e "${CYAN}  Testing against remote host: ${REMOTE_HOST}${NC}"
+    echo -e "${CYAN}  Testing against: ${TEST_HOST}${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 
@@ -293,12 +286,12 @@ main() {
         exit 1
     fi
 
-    # Verify SSH connectivity to remote host
-    if ! run_ssh_command "echo 'SSH_OK'" | grep -q "SSH_OK"; then
-        echo -e "${RED}Cannot connect to remote host $REMOTE_HOST${NC}"
+    # Verify connectivity to the test host
+    if ! run_ssh_command "echo 'HOST_OK'" | grep -q "HOST_OK"; then
+        echo -e "${RED}Cannot connect to test host $TEST_HOST${NC}"
         exit 1
     fi
-    echo -e "  ${GREEN}✓ Connected to remote host $REMOTE_HOST${NC}\n"
+    echo -e "  ${GREEN}✓ Connected to test host $TEST_HOST${NC}\n"
 
     # Track test results
     local tests_passed=0
@@ -379,7 +372,7 @@ main() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Test Summary${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo "Remote Host:    ${BLUE}${REMOTE_HOST}${NC}"
+    echo "Test Host:      ${BLUE}${TEST_HOST}${NC}"
     echo "Total Tests:    $tests_total"
     echo "Passed:         ${GREEN}${tests_passed}${NC}"
     echo "Failed:         ${RED}${tests_failed}${NC}"

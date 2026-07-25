@@ -147,6 +147,7 @@ OPTIONS:
     -h, --help          Show this help message
     -v, --verbose       Enable verbose output
     -t, --test PATTERN  Run only tests matching pattern
+    -x, --exclude PAT   Skip tests matching pattern (comma-separated, e.g. "02_,09_")
     -l, --list          List available tests without running
 
 EXAMPLES:
@@ -188,6 +189,7 @@ list_tests() {
 
 main() {
     local test_pattern=""
+    local exclude_patterns=""
     local list_only=false
     
     # Parse command line arguments
@@ -203,6 +205,10 @@ main() {
                 ;;
             -t|--test)
                 test_pattern="$2"
+                shift 2
+                ;;
+            -x|--exclude)
+                exclude_patterns="$2"
                 shift 2
                 ;;
             -l|--list)
@@ -230,6 +236,24 @@ main() {
         TESTS_TO_RUN=("${filtered[@]}")
     fi
     
+    # Apply exclusion patterns
+    if [[ -n "$exclude_patterns" ]]; then
+        local kept=()
+        for test in "${TESTS_TO_RUN[@]}"; do
+            local excluded=false
+            IFS=',' read -ra patterns <<< "$exclude_patterns"
+            for pat in "${patterns[@]}"; do
+                if [[ "$(basename "$test")" == *"$pat"* ]]; then
+                    excluded=true
+                    echo -e "${YELLOW}⊘ Excluding: $(basename "$test" .sh) (matched '$pat')${NC}"
+                    break
+                fi
+            done
+            [[ "$excluded" == "false" ]] && kept+=("$test")
+        done
+        TESTS_TO_RUN=("${kept[@]}")
+    fi
+
     # List tests if requested
     if [[ "$list_only" == "true" ]]; then
         list_tests
@@ -248,7 +272,10 @@ main() {
     else
         echo -e "${YELLOW}⊘ Skipping build and deploy (SKIP_DEPLOY=1)${NC}\n"
     fi
-    
+
+    # Start from a clean slate: remove jobs/networks/volumes left by prior runs
+    cleanup_previous_test_state
+
     # Run tests
     run_all_tests
     exit $?

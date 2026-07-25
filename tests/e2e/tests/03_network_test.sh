@@ -7,9 +7,7 @@
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration
-REMOTE_HOST="192.168.1.161"
-REMOTE_USER="jay"
+TEST_HOST="$(get_test_host_display)"
 
 # Test configuration
 CUSTOM_NETWORK_1="test-network-1"
@@ -21,13 +19,12 @@ CUSTOM_CIDR_2="10.100.2.0/24"
 # Helper Functions
 # ============================================
 
-# Run command on remote host via SSH (for host-level verification)
+# Run command on the test host (SSH when remote, local otherwise) for host-level verification
 run_ssh_command() {
     local command="$1"
     local timeout="${2:-10}"
-    
-    timeout "$timeout" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
-        "$REMOTE_USER@$REMOTE_HOST" "$command" 2>/dev/null || echo "SSH_FAILED"
+
+    run_remote_command "$command" "$timeout"
 }
 
 # Verify host-level network interfaces (bridges, veth pairs, etc.)
@@ -145,7 +142,7 @@ cleanup_test_networks() {
 # ============================================
 
 test_bridge_network_interfaces() {
-    echo -e "    ${BLUE}Testing bridge network on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing bridge network on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Count network interfaces from /proc/net/dev
@@ -190,7 +187,7 @@ test_bridge_network_interfaces() {
 }
 
 test_bridge_internet_access() {
-    echo -e "    ${BLUE}Testing bridge network internet access on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing bridge network internet access on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Test internet connectivity using common tools
@@ -243,7 +240,7 @@ test_bridge_internet_access() {
 }
 
 test_bridge_dns_resolution() {
-    echo -e "    ${BLUE}Testing bridge network DNS resolution on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing bridge network DNS resolution on $TEST_HOST${NC}"
     
     # Use nslookup instead of Python for DNS testing to avoid runtime dependency issues
     local job_id=$(run_job_with_network "
@@ -286,7 +283,7 @@ test_bridge_dns_resolution() {
 # ============================================
 
 test_isolated_network_interfaces() {
-    echo -e "    ${BLUE}Testing isolated network interfaces on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing isolated network interfaces on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Count network interfaces from /proc/net/dev  
@@ -329,7 +326,7 @@ test_isolated_network_interfaces() {
 }
 
 test_isolated_internet_access() {
-    echo -e "    ${BLUE}Testing isolated network internet access on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing isolated network internet access on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Test internet connectivity using multiple methods
@@ -384,7 +381,7 @@ test_isolated_internet_access() {
 }
 
 test_isolated_no_inter_job_communication() {
-    echo -e "    ${BLUE}Testing network isolation between jobs on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing network isolation between jobs on $TEST_HOST${NC}"
     
     # Start first job in isolated network  
     local job1=$(run_job_with_network "
@@ -459,7 +456,7 @@ test_isolated_no_inter_job_communication() {
 # ============================================
 
 test_none_network_interfaces() {
-    echo -e "    ${BLUE}Testing none network interfaces on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing none network interfaces on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Count network interfaces from /proc/net/dev
@@ -499,7 +496,7 @@ test_none_network_interfaces() {
 }
 
 test_none_network_no_internet() {
-    echo -e "    ${BLUE}Testing none network blocks internet access on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing none network blocks internet access on $TEST_HOST${NC}"
 
     local job_id=$(run_job_with_network "
         # Test that internet connectivity is blocked in none network mode
@@ -580,7 +577,7 @@ test_none_network_no_internet() {
 }
 
 test_none_network_loopback_only() {
-    echo -e "    ${BLUE}Testing none network allows loopback only on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing none network allows loopback only on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Test that loopback connectivity works in none network mode
@@ -672,7 +669,7 @@ test_custom_network_listing() {
 }
 
 test_custom_network_inter_job_communication() {
-    echo -e "    ${BLUE}Testing inter-job communication in same custom network on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing inter-job communication in same custom network on $TEST_HOST${NC}"
     
     # Simplified approach: Test if jobs in same network can communicate using shell commands
     echo -e "    ${BLUE}Starting simple server in custom network...${NC}"
@@ -750,7 +747,7 @@ test_custom_network_inter_job_communication() {
 }
 
 test_custom_network_isolation_between_networks() {
-    echo -e "    ${BLUE}Testing network isolation between different custom networks on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing network isolation between different custom networks on $TEST_HOST${NC}"
     
     # Simplified approach: Test that jobs in different networks CANNOT communicate
     echo -e "    ${BLUE}Starting server in first custom network...${NC}"
@@ -836,7 +833,7 @@ test_custom_network_isolation_between_networks() {
 }
 
 test_custom_network_internet_access() {
-    echo -e "    ${BLUE}Testing custom network internet access on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing custom network internet access on $TEST_HOST${NC}"
     
     local job_id=$(run_job_with_network "
         # Test internet connectivity in custom network
@@ -898,7 +895,7 @@ main() {
     # Initialize test suite with remote host info
     echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Comprehensive Network Configuration Tests${NC}"
-    echo -e "${CYAN}  Testing against remote host: ${REMOTE_HOST}${NC}"
+    echo -e "${CYAN}  Testing against: ${TEST_HOST}${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
     
@@ -906,14 +903,6 @@ main() {
     if ! check_prerequisites; then
         echo -e "${RED}Prerequisites check failed${NC}"
         exit 1
-    fi
-    
-    # Check RNX configuration points to remote host
-    if grep -q "$REMOTE_HOST" ~/.rnx/rnx-config.yml 2>/dev/null; then
-        echo -e "  ${GREEN}✓ RNX configured for remote host $REMOTE_HOST${NC}"
-    else
-        echo -e "  ${RED}✗ RNX not configured for remote host${NC}"
-        echo -e "  ${YELLOW}Warning: Tests may not be running against correct host${NC}"
     fi
     
     # Ensure runtime is available

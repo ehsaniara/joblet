@@ -7,8 +7,7 @@
 source "$(dirname "$0")/../lib/test_framework.sh"
 
 # Remote host configuration
-REMOTE_HOST="192.168.1.161"
-REMOTE_USER="jay"
+TEST_HOST="$(get_test_host_display)"
 
 # Test configuration
 TEST_VOLUME_NAME="test-volume-$$"
@@ -67,7 +66,7 @@ test_upload_file() {
     echo "$TEST_DATA" > "$test_file"
     local uploaded_basename=$(basename "$test_file")
     
-    echo -e "    ${BLUE}Testing file upload to remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing file upload to $TEST_HOST${NC}"
     
     local job_output=$("$RNX_BINARY" job run \
         --upload="$test_file" \
@@ -150,7 +149,7 @@ test_volume_creation() {
 
 test_volume_mounting() {
     # Test mounting a volume to a job with remote host verification
-    echo -e "    ${BLUE}Testing volume mounting on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing volume mounting on $TEST_HOST${NC}"
     
     local job_output=$("$RNX_BINARY" job run \
         --volume="$TEST_VOLUME_NAME:/data" \
@@ -198,7 +197,7 @@ fi
 
 test_volume_persistence() {
     # Test that data persists across jobs with remote host verification
-    echo -e "    ${BLUE}Testing data persistence isolation on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing data persistence isolation on $TEST_HOST${NC}"
     
     # First job: write data to /work
     local job1_output=$("$RNX_BINARY" job run sh -c "
@@ -277,7 +276,7 @@ test_concurrent_volume_access() {
 
 test_volume_size_limits() {
     # Test volume size restrictions with remote host verification
-    echo -e "    ${BLUE}Testing volume size limits on remote host $REMOTE_HOST${NC}"
+    echo -e "    ${BLUE}Testing volume size limits on $TEST_HOST${NC}"
     
     local job_output=$("$RNX_BINARY" job run sh -c "
 # Try to write a large file (10MB)
@@ -352,7 +351,7 @@ main() {
     # Initialize test suite
     echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Volume Management Tests${NC}"
-    echo -e "${CYAN}  Testing against remote host: ${REMOTE_HOST}${NC}"
+    echo -e "${CYAN}  Testing against: ${TEST_HOST}${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
     
@@ -360,14 +359,6 @@ main() {
     if ! check_prerequisites; then
         echo -e "${RED}Prerequisites check failed${NC}"
         exit 1
-    fi
-    
-    # Check RNX configuration points to remote host
-    if grep -q "$REMOTE_HOST" ~/.rnx/rnx-config.yml 2>/dev/null; then
-        echo -e "  ${GREEN}✓ RNX configured for remote host $REMOTE_HOST${NC}"
-    else
-        echo -e "  ${RED}✗ RNX not configured for remote host${NC}"
-        echo -e "  ${YELLOW}Warning: Tests may not be running against correct host${NC}"
     fi
     
     # No runtime required - using basic shell commands
@@ -395,7 +386,7 @@ main() {
     echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Volume Management Tests Summary${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "Remote Host:    ${BLUE}$REMOTE_HOST${NC}"
+    echo -e "Test Host:      ${BLUE}$TEST_HOST${NC}"
     echo -e "Total Tests:    $TOTAL_TESTS"
     echo -e "Passed:         ${GREEN}$PASSED_TESTS${NC}"
     echo -e "Failed:         ${RED}$FAILED_TESTS${NC}"
@@ -410,7 +401,7 @@ main() {
     
     if [[ $FAILED_TESTS -eq 0 && $TOTAL_TESTS -gt 0 ]]; then
         echo -e "\n${GREEN}✅ ALL VOLUME TESTS PASSED!${NC}"
-        echo -e "${GREEN}Volume management is working correctly on $REMOTE_HOST${NC}"
+        echo -e "${GREEN}Volume management is working correctly on $TEST_HOST${NC}"
         exit 0
     elif [[ $FAILED_TESTS -gt 0 ]]; then
         echo -e "\n${RED}❌ SOME VOLUME TESTS FAILED${NC}"

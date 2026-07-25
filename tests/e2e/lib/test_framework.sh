@@ -343,6 +343,39 @@ cleanup_test_artifacts() {
     # Note: Add job cleanup logic here if needed
 }
 
+# Remove all state left behind by previous test runs so suites start clean:
+# jobs (stopped/canceled then deleted), test-* networks, test-* volumes, temp files
+cleanup_previous_test_state() {
+    echo -e "${YELLOW}▶ Cleaning up state from previous test runs${NC}"
+
+    local jobs
+    jobs=$("$RNX_BINARY" job list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
+
+    # Cancel scheduled and stop running jobs so delete-all can remove everything
+    echo "$jobs" | awk '$3 == "SCHEDULED" {print $1}' | while read -r id; do
+        "$RNX_BINARY" job cancel "$id" >/dev/null 2>&1 || true
+    done
+    echo "$jobs" | awk '$3 == "RUNNING" || $3 == "INITIALIZING" {print $1}' | while read -r id; do
+        "$RNX_BINARY" job stop "$id" >/dev/null 2>&1 || true
+    done
+
+    local job_count
+    job_count=$(echo "$jobs" | grep -cE '^[0-9a-f]{8}-' || true)
+    "$RNX_BINARY" job delete-all >/dev/null 2>&1 || true
+
+    # Remove leftover test networks and volumes (test-* naming convention)
+    "$RNX_BINARY" network list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $1}' | grep '^test-' | while read -r net; do
+        "$RNX_BINARY" network remove "$net" >/dev/null 2>&1 || true
+    done
+    "$RNX_BINARY" volume list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $1}' | grep '^test-' | while read -r vol; do
+        "$RNX_BINARY" volume remove "$vol" >/dev/null 2>&1 || true
+    done
+
+    rm -f /tmp/test_*.txt /tmp/test_*.yaml /tmp/test_*.log 2>/dev/null || true
+
+    echo -e "  ${GREEN}✓ Previous test state cleaned (removed $job_count leftover jobs)${NC}\n"
+}
+
 # ============================================
 # Remote Execution Helpers
 # ============================================
@@ -373,8 +406,10 @@ run_rnx_command() {
         ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
             "$JOBLET_TEST_USER@$JOBLET_TEST_HOST" "rnx $rnx_args" 2>&1 || true
     else
-        # Local RNX
-        "$RNX_BINARY" $rnx_args 2>&1 || true
+        # Local RNX - eval so quoted arguments are parsed the same way the
+        # remote shell parses them (plain $rnx_args would split on spaces and
+        # pass quote characters through literally)
+        eval '"$RNX_BINARY"' "$rnx_args" 2>&1 || true
     fi
 }
 
@@ -392,5 +427,5 @@ export -f test_suite_init test_section run_test skip_test
 export -f assert_equals assert_contains assert_numeric_le assert_file_exists
 export -f run_job run_python_job get_job_logs get_clean_output check_job_status
 export -f runtime_exists ensure_runtime get_runtime_info get_runtime_example_dir
-export -f test_suite_summary check_prerequisites cleanup_test_artifacts
+export -f test_suite_summary check_prerequisites cleanup_test_artifacts cleanup_previous_test_state
 export -f run_remote_command run_rnx_command get_test_host_display

@@ -12,14 +12,20 @@
 # Source test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration
-REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
-REMOTE_USER="${REMOTE_USER:-jay}"
+# Target host comes from the framework (local by default, JOBLET_TEST_HOST for remote)
 
-# Set JOBLET_TEST_HOST for test framework
-export JOBLET_TEST_HOST="$REMOTE_HOST"
-export JOBLET_TEST_USER="$REMOTE_USER"
-export JOBLET_TEST_USE_SSH="true"
+# Stream job logs for a bounded time (SSH when remote, local otherwise)
+stream_job_logs() {
+    local job_id="$1"
+    local duration="$2"
+    local output_file="$3"
+
+    if [[ "$JOBLET_TEST_USE_SSH" == "true" ]]; then
+        timeout "$duration" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$JOBLET_TEST_USER@$JOBLET_TEST_HOST" "rnx job log '$job_id'" > "$output_file" 2>&1 || true
+    else
+        timeout "$duration" "$RNX_BINARY" job log "$job_id" > "$output_file" 2>&1 || true
+    fi
+}
 
 # Initialize test suite
 test_suite_init "Live Log Gap Prevention Tests"
@@ -54,8 +60,7 @@ test_live_log_streaming_no_gaps() {
     trap "rm -f $log_output" EXIT
 
     # Stream logs for 8 seconds (enough to get rest of job + ensure completion)
-    # Use SSH directly instead of through run_rnx_command to avoid timeout issues with bash functions
-    timeout 8 ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" "rnx job log '$job_id'" > "$log_output" 2>&1 || true
+    stream_job_logs "$job_id" 8 "$log_output"
 
     # Wait for job to complete
     sleep 2
@@ -159,8 +164,7 @@ test_live_log_streaming_early_check() {
     trap "rm -f $log_output" EXIT
 
     # Stream for 5 seconds
-    # Use SSH directly instead of through run_rnx_command to avoid timeout issues
-    timeout 5 ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" "rnx job log '$job_id'" > "$log_output" 2>&1 || true
+    stream_job_logs "$job_id" 5 "$log_output"
 
     # Count logs (filter out DEBUG lines)
     local total=$(grep "^Early [0-9]" "$log_output" 2>/dev/null | wc -l || echo "0")
