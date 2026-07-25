@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -903,6 +904,13 @@ func TestInitConfig(t *testing.T) {
 			os.Unsetenv("JOB_FS_TMP_DIR")
 		}()
 
+		os.Setenv("JOB_RT_BASE_PATH", "/custom-runtimes")
+		os.Setenv("JOB_RT_ALLOWED_MOUNTS", "/usr/bin:/usr/sbin:/etc/ssl")
+		defer func() {
+			os.Unsetenv("JOB_RT_BASE_PATH")
+			os.Unsetenv("JOB_RT_ALLOWED_MOUNTS")
+		}()
+
 		cfg := InitConfig()
 		if cfg.Filesystem.WorkspaceDir != "/custom-work" {
 			t.Errorf("expected forwarded workspace dir, got %q", cfg.Filesystem.WorkspaceDir)
@@ -912,6 +920,13 @@ func TestInitConfig(t *testing.T) {
 		}
 		if cfg.Filesystem.TmpDir != "/custom-tmp/{JOB_ID}" {
 			t.Errorf("expected forwarded tmp dir, got %q", cfg.Filesystem.TmpDir)
+		}
+		if cfg.Runtime.BasePath != "/custom-runtimes" {
+			t.Errorf("expected forwarded runtime base path, got %q", cfg.Runtime.BasePath)
+		}
+		wantMounts := []string{"/usr/bin", "/usr/sbin", "/etc/ssl"}
+		if strings.Join(cfg.Runtime.AllowedMounts, ":") != strings.Join(wantMounts, ":") {
+			t.Errorf("expected forwarded allowed mounts %v, got %v", wantMounts, cfg.Runtime.AllowedMounts)
 		}
 	})
 }

@@ -61,6 +61,7 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 
 	if es.config != nil {
 		jobEnv = append(jobEnv, environment.ForwardFilesystemEnv(&es.config.Filesystem)...)
+		jobEnv = append(jobEnv, environment.ForwardRuntimeEnv(&es.config.Runtime)...)
 	}
 
 	for i, arg := range job.Args {

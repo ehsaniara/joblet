@@ -573,6 +573,12 @@ func InitConfig() *Config {
 	if v := os.Getenv("JOB_FS_TMP_DIR"); v != "" {
 		cfg.Filesystem.TmpDir = v
 	}
+	if v := os.Getenv("JOB_RT_BASE_PATH"); v != "" {
+		cfg.Runtime.BasePath = v
+	}
+	if v := os.Getenv("JOB_RT_ALLOWED_MOUNTS"); v != "" {
+		cfg.Runtime.AllowedMounts = filepath.SplitList(v)
+	}
 	return &cfg
 }
 

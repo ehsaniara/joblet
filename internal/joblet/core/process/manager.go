@@ -505,6 +505,7 @@ func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string
 
 	if m.config != nil {
 		jobEnv = append(jobEnv, environment.ForwardFilesystemEnv(&m.config.Filesystem)...)
+		jobEnv = append(jobEnv, environment.ForwardRuntimeEnv(&m.config.Runtime)...)
 	}
 
 	return append(baseEnv, jobEnv...)
