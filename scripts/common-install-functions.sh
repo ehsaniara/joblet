@@ -139,8 +139,10 @@ check_network_conflicts() {
     print_info "Checking for network conflicts..."
 
     # Check if the network range is already in use
-    if ip route | grep -q "172.20."; then
-        local conflicting_route=$(ip route | grep "172.20." | head -1)
+    # A route on our own joblet0 bridge is not a conflict - it is the
+    # leftover from a previous install (normal during upgrades) and gets reused
+    if ip route | grep "172.20." | grep -qv "dev joblet0"; then
+        local conflicting_route=$(ip route | grep "172.20." | grep -v "dev joblet0" | head -1)
         print_error "Network conflict detected!"
         print_error "The 172.20.0.0/16 range is already in use: $conflicting_route"
         print_warning "Joblet requires 172.20.0.0/16 for job isolation"
@@ -151,7 +153,7 @@ check_network_conflicts() {
 
     # Check if bridge already exists
     if ip link show joblet0 >/dev/null 2>&1; then
-        print_warning "Bridge joblet0 already exists, will reuse it"
+        print_warning "Bridge joblet0 already exists (previous install), will reuse it"
         return 0
     fi
 
