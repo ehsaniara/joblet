@@ -63,19 +63,22 @@ verify_remote_directory() {
 test_upload_directory() {
     # Upload a nested directory - exercises the relative-path (subdir) upload
     # flow end to end, which routes through the server's path-containment
-    # check (issue #1). Verifies nested files land at the right workspace path.
+    # check, and verifies nested files land at the right workspace path.
     local test_dir="/tmp/test_uploaddir_$$"
     mkdir -p "$test_dir/sub"
     echo "$TEST_DATA" > "$test_dir/sub/nested.txt"
 
     echo -e "    ${BLUE}Testing nested directory upload to $TEST_HOST${NC}"
 
+    # rnx uploads a directory's CONTENTS relative to the dir, so sub/nested.txt
+    # lands at /work/sub/nested.txt (no basename prefix). This exercises the
+    # server-side relative-path containment check for a subdir path.
     local job_output=$("$RNX_BINARY" job run \
         --upload="$test_dir" \
         sh -c "
-if [ -f '/work/$(basename "$test_dir")/sub/nested.txt' ]; then
+if [ -f '/work/sub/nested.txt' ]; then
     echo 'NESTED_FOUND'
-    cat '/work/$(basename "$test_dir")/sub/nested.txt' | sed 's/^/NESTED:/'
+    cat '/work/sub/nested.txt' | sed 's/^/NESTED:/'
 else
     echo 'NESTED_NOT_FOUND'
     find /work -type f

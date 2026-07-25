@@ -8,10 +8,10 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-// TestConvertToJobRequest_IgnoresClientJobTypeEnv is a regression test for
-// the runtime-build privilege-escalation bug (issue #258). The server must
-// never derive the JobType from client-supplied environment variables;
-// RunJob always produces standard-isolation jobs.
+// TestConvertToJobRequest_IgnoresClientJobTypeEnv guards the rule that the
+// server never derives JobType from client-supplied environment variables:
+// a client-set JOB_TYPE=runtime-build would otherwise skip the privilege drop
+// and run as host root. RunJob must always produce standard-isolation jobs.
 func TestConvertToJobRequest_IgnoresClientJobTypeEnv(t *testing.T) {
 	tests := []struct {
 		name string

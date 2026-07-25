@@ -9,10 +9,10 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
-// TestProcessUploadsRejectsTraversal is the regression test for issue #1:
-// a client-supplied "../" upload path must be rejected before any write, and
-// nothing may be written outside the workspace. processUploads runs as root
-// on the host before chroot, so an escape is host compromise.
+// TestProcessUploadsRejectsTraversal verifies that a client-supplied "../"
+// upload path is rejected before any write and nothing lands outside the
+// workspace. processUploads runs as root on the host before chroot, so an
+// escaping path would be an arbitrary host file-write.
 func TestProcessUploadsRejectsTraversal(t *testing.T) {
 	root := t.TempDir()
 	workDir := filepath.Join(root, "jobs", "abc", "work")

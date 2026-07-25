@@ -165,7 +165,8 @@ func (ee *ExecutionEngineV2) executeCICommand(ctx context.Context, opts *StartPr
 	// Process uploads if any
 	if len(opts.Uploads) > 0 {
 		for _, upload := range opts.Uploads {
-			// SECURITY: reject "../" traversal before writing as root (issue #259)
+			// Reject "../" traversal before writing: this runs as root on the
+			// host with no chroot, so an escaping path is an arbitrary host write.
 			fullPath, err := validation.ValidatePathWithinBase(workDir, upload.Path)
 			if err != nil {
 				return nil, err
