@@ -174,23 +174,23 @@ Tests verify:
 
 ```mermaid
 flowchart LR
-    subgraph bridge["bridge (default) — 172.20.0.0/16"]
+    subgraph bridge["bridge (default): 172.20.0.0/16"]
         direction TB
         BJ1["Job"] --- BBR["Bridge + NAT"]
         BJ2["Job"] --- BBR
         BBR --> BNET["Internet"]
     end
-    subgraph custom["custom — user CIDR (e.g. 10.10.0.0/24)"]
+    subgraph custom["custom: user CIDR (e.g. 10.10.0.0/24)"]
         direction TB
         CJ1["Job"] --- CBR["Custom bridge + NAT"]
         CJ2["Job"] --- CBR
         CBR --> CNET["Internet"]
     end
-    subgraph isolated["isolated — point-to-point"]
+    subgraph isolated["isolated: point-to-point"]
         direction TB
         IJ["Job"] -->|"veth + NAT"| INET["Internet"]
     end
-    subgraph none["none — loopback only"]
+    subgraph none["none: loopback only"]
         direction TB
         NJ["Job (lo only, no external access)"]
     end

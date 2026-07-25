@@ -1,0 +1,32 @@
+# Compatibility
+
+Joblet (and the **RNX** CLI it ships) speaks the `joblet-proto` gRPC contract.
+The **proto major** is the compatibility boundary: proto **v1.x** and **v2.x**
+do **not** interoperate. Every client must target the same proto major as the
+running server. Release versions are tracked by **git tag**; treat the tag as
+authoritative.
+
+> **RNX version == Joblet server version**: RNX ships inside this repo.
+
+## Joblet server ↔ proto
+
+| Joblet server (= RNX)          | joblet-proto |
+|--------------------------------|--------------|
+| **v5.0.2 – v5.6.11** (current) | v2.x         |
+| v4.5.0 – v5.0.1                | v1.x         |
+
+Latest: Joblet/RNX **v5.6.11** ↔ proto **v2.5.9** (the version this server
+build depends on).
+
+## Client tools
+
+Client tools derive their compatibility from the proto major they target:
+
+| Consumer     | Current | joblet-proto |
+|--------------|---------|--------------|
+| Python SDK   | v2.5.2  | v2.x         |
+| MCP Server   | v1.1.4  | v2.x         |
+| joblet-admin | v1.0.6  | v2.x         |
+
+The authoritative cross-project matrix and the per-RPC feature timeline live in
+[joblet-proto/COMPATIBILITY.md](https://github.com/ehsaniara/joblet-proto/blob/main/COMPATIBILITY.md).

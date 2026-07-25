@@ -48,15 +48,15 @@ nodes:
       ... (full CA certificate content) ...
       -----END CERTIFICATE-----
   
-  viewer:
+  reader:
     address: "192.168.1.100:50051"
     cert: |
       -----BEGIN CERTIFICATE-----
-      ... (viewer certificate with read-only permissions) ...
+      ... (reader certificate with read-only permissions) ...
       -----END CERTIFICATE-----
     key: |
       -----BEGIN PRIVATE KEY-----
-      ... (viewer private key) ...
+      ... (reader private key) ...
       -----END PRIVATE KEY-----
     ca: |
       -----BEGIN CERTIFICATE-----
@@ -73,7 +73,7 @@ nodes:
 	fmt.Println()
 	fmt.Println("Usage examples:")
 	fmt.Println("  rnx job list                    # uses 'default' node")
-	fmt.Println("  rnx --node=viewer job list      # uses 'viewer' node (read-only)")
+	fmt.Println("  rnx --node=reader job list      # uses 'reader' node (read-only)")
 	fmt.Println("  rnx --node=production job list  # uses 'production' node")
 	fmt.Println("  rnx --config=my-rnx-config.yml job list  # uses custom config file")
 	fmt.Println()

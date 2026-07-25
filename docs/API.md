@@ -39,7 +39,7 @@ access control for organizational deployment scenarios.
 - **Communication Protocol**: gRPC over TLS 1.3 with HTTP/2 multiplexing
 - **Message Serialization**: Protocol Buffers (protobuf) for efficient binary encoding
 - **Security Framework**: Mutual TLS authentication with X.509 client certificate validation
-- **Access Control**: Role-based authorization system (Administrative/Viewer permissions)
+- **Access Control**: Role-based authorization system (admin, maintainer, developer, and reader roles)
 - **Real-time Capabilities**: Server-side streaming for live log aggregation and job monitoring
 - **Isolation Architecture**: Linux kernel namespaces with configurable network policies
 - **Logging Infrastructure**: Asynchronous log persistence system supporting 5M+ writes per second
@@ -89,9 +89,15 @@ issued by the same Certificate Authority (CA) that signed the server certificate
 Client Certificate Subject Format:
 CN=<client-name>, OU=<role>, O=<organization>
 
-Supported Roles:
-- OU=admin  → Full access (all operations)
-- OU=viewer → Read-only access (get, list, stream)
+Supported Roles (OU matched case-insensitively):
+- OU=admin      → Full access, including removal of runtimes, networks, and volumes
+- OU=maintainer → Developer access plus runtime builds and network/volume creation;
+                  meant for CI/CD service accounts. No removal of shared infrastructure
+- OU=developer  → Run, stop, and delete jobs; test runtimes; read everything else
+- OU=reader     → Read-only: job status, logs, listings, metrics
+
+"viewer" is still accepted and treated as reader. Certificates whose OU doesn't
+match any role are rejected on every call.
 ```
 
 #### Certificate Files Required
@@ -99,16 +105,30 @@ Supported Roles:
 ```text
 certs/
 ├── ca-cert.pem           # Certificate Authority
-├── client-cert.pem       # Client certificate (admin or viewer)
+├── client-cert.pem       # Client certificate (role carried in OU)
 └── client-key.pem        # Client private key
 ```
 
 ### Role-Based Authorization
 
-| Role       | RunJob | GetJobStatus | StopJob | CancelJob | DeleteJob | DeleteAllJobs | ListJobs | GetJobLogs | GetJobMetrics |
-|------------|--------|--------------|---------|-----------|-----------|---------------|----------|------------|---------------|
-| **admin**  | ✅      | ✅            | ✅       | ✅         | ✅         | ✅             | ✅        | ✅          | ✅             |
-| **viewer** | ❌      | ✅            | ❌       | ❌         | ❌         | ❌             | ✅        | ✅          | ✅             |
+Every operation requires a certificate with a recognized role. Authorization per service and method:
+
+| Service               | Methods                                                                          | admin | maintainer | developer | reader |
+|-----------------------|----------------------------------------------------------------------------------|-------|------------|-----------|--------|
+| **JobService**        | RunJob, StopJob, CancelJob, DeleteJob, DeleteAllJobs                             | ✅     | ✅          | ✅         | ❌      |
+| **JobService**        | GetJobStatus, ListJobs, GetJobLogs, GetJobMetrics, and log/status/metric streams | ✅     | ✅          | ✅         | ✅      |
+| **RuntimeService**    | ListRuntimes, GetRuntimeInfo                                                     | ✅     | ✅          | ✅         | ✅      |
+| **RuntimeService**    | TestRuntime                                                                      | ✅     | ✅          | ✅         | ❌      |
+| **RuntimeService**    | BuildRuntime, ValidateRuntimeYAML                                                | ✅     | ✅          | ❌         | ❌      |
+| **RuntimeService**    | RemoveRuntime                                                                    | ✅     | ❌          | ❌         | ❌      |
+| **NetworkService**    | ListNetworks                                                                     | ✅     | ✅          | ✅         | ✅      |
+| **NetworkService**    | CreateNetwork                                                                    | ✅     | ✅          | ❌         | ❌      |
+| **NetworkService**    | RemoveNetwork                                                                    | ✅     | ❌          | ❌         | ❌      |
+| **VolumeService**     | ListVolumes                                                                      | ✅     | ✅          | ✅         | ✅      |
+| **VolumeService**     | CreateVolume                                                                     | ✅     | ✅          | ❌         | ❌      |
+| **VolumeService**     | RemoveVolume                                                                     | ✅     | ❌          | ❌         | ❌      |
+| **MonitoringService** | GetSystemStatus, StreamSystemMetrics                                             | ✅     | ✅          | ✅         | ✅      |
+| **Persist**           | Historical log and metric queries                                                | ✅     | ✅          | ✅         | ✅      |
 
 ## Service Definition
 
@@ -139,7 +159,7 @@ service JobService {
 Creates and starts a new job with specified command and resource limits. Jobs execute on the Linux server with complete
 process isolation.
 
-**Authorization**: Admin only
+**Authorization**: admin, maintainer, developer
 
 ```protobuf
 rpc RunJob(RunJobRequest) returns (RunJobResponse);
@@ -185,7 +205,7 @@ Network: host (shared with system)
 
 Retrieves detailed information about a specific job, including current status, resource usage, and execution metadata.
 
-**Authorization**: Admin, Viewer
+**Authorization**: All roles (admin, maintainer, developer, reader)
 
 ```protobuf
 rpc GetJobStatus(GetJobStatusReq) returns (GetJobStatusRes);
@@ -221,7 +241,7 @@ ExitCode: 0
 
 Terminates a running job using graceful shutdown (SIGTERM) followed by force termination (SIGKILL) if necessary.
 
-**Authorization**: Admin only
+**Authorization**: admin, maintainer, developer
 
 ```protobuf
 rpc StopJob(StopJobReq) returns (StopJobRes);
@@ -261,7 +281,7 @@ EndTime: 2024-01-15T10:45:00Z
 
 Cancels a scheduled job before it starts executing. This is specifically for jobs in SCHEDULED status.
 
-**Authorization**: Admin only
+**Authorization**: admin, maintainer, developer
 
 ```protobuf
 rpc CancelJob(CancelJobReq) returns (CancelJobRes);
@@ -310,7 +330,7 @@ CanceledAt: 2024-01-15T10:45:00Z
 
 Permanently deletes a job and all its associated data including logs, metrics, and metadata.
 
-**Authorization**: Admin only
+**Authorization**: admin, maintainer, developer
 
 ```protobuf
 rpc DeleteJob(DeleteJobReq) returns (DeleteJobRes);
@@ -358,7 +378,7 @@ ID: f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 Deletes all non-running jobs from the system in a single operation. Running and scheduled jobs are preserved.
 
-**Authorization**: Admin only
+**Authorization**: admin, maintainer, developer
 
 ```protobuf
 rpc DeleteAllJobs(DeleteAllJobsReq) returns (DeleteAllJobsRes);
@@ -399,7 +419,7 @@ Successfully deleted 15 jobs, skipped 3 running/scheduled jobs
 
 Lists all jobs with their current status and metadata. Useful for monitoring overall system activity.
 
-**Authorization**: Admin, Viewer
+**Authorization**: All roles (admin, maintainer, developer, reader)
 
 ```protobuf
 rpc ListJobs(EmptyRequest) returns (Jobs);
@@ -428,7 +448,7 @@ f47ac10b-58cc-4372-a567-0e02b2c3d479 COMPLETED StartTime: 2024-01-15T10:30:00Z C
 Streams job output in real-time, including historical logs and live updates. Supports multiple concurrent clients
 streaming the same job.
 
-**Authorization**: Admin, Viewer
+**Authorization**: All roles (admin, maintainer, developer, reader)
 
 ```protobuf
 rpc GetJobLogs(GetJobLogsReq) returns (stream DataChunk);
@@ -470,7 +490,7 @@ Script completed successfully
 Streams resource usage metrics for a job as time-series data. Shows CPU, memory, I/O, network, process, and GPU metrics
 collected during job execution.
 
-**Authorization**: Admin, Viewer
+**Authorization**: All roles (admin, maintainer, developer, reader)
 
 ```protobuf
 rpc GetJobMetrics(JobMetricsRequest) returns (stream JobMetricsSample);
@@ -684,7 +704,7 @@ message DataChunk {
 | Code                | Description                           | Common Causes                     |
 |---------------------|---------------------------------------|-----------------------------------|
 | `UNAUTHENTICATED`   | Invalid or missing client certificate | Certificate expired, wrong CA     |
-| `PERMISSION_DENIED` | Insufficient role permissions         | Viewer trying admin operation     |
+| `PERMISSION_DENIED` | Insufficient role permissions         | Reader trying to run a job        |
 | `NOT_FOUND`         | Job not found                         | Invalid job UUID                  |
 | `INTERNAL`          | Server-side error                     | Job creation failed, system error |
 | `CANCELED`          | Operation canceled                    | Client disconnected during stream |
@@ -708,8 +728,8 @@ message DataChunk {
 # Missing certificate
 Error: failed to extract client role: no TLS information found
 
-# Wrong role (viewer trying to run job)
-Error: role viewer is not allowed to perform operation run_job
+# Wrong role (reader trying to run job)
+Error: role reader is not allowed to perform operation run_job
 
 # Invalid certificate
 Error: certificate verify failed: certificate has expired
@@ -1213,7 +1233,7 @@ find /opt/joblet/metrics -type d -mtime +90 -exec rm -rf {} \;
 - **ListJobs**: Fully implemented job listing functionality
     - Returns all jobs with complete metadata
     - Includes job status, resource limits, and timestamps
-    - Proper authorization checks for admin/viewer roles
+  - Proper role-based authorization checks
 
 #### Monitoring Enhancements
 

@@ -7,6 +7,7 @@ operations.
 ## Reference Documentation Structure
 
 - [Global Options](#global-options)
+- [Client Roles](#client-roles)
 - [Job Commands](#job-commands)
     - [run](#rnx-job-run)
     - [list](#rnx-job-list)
@@ -61,6 +62,50 @@ RNX resolves configuration files using the following precedence hierarchy:
 3. `~/.rnx/rnx-config.yml`
 4. `/etc/joblet/rnx-config.yml`
 5. `/opt/joblet/config/rnx-config.yml`
+
+## Client Roles
+
+Every RNX command is authorized on the server against the role in your client certificate's OU field. There are four
+roles:
+
+| Role           | Access                                                                                                          |
+|----------------|------------------------------------------------------------------------------------------------------------------|
+| **admin**      | Everything, including `remove` of runtimes, networks, and volumes                                               |
+| **maintainer** | Developer access plus `runtime build`/`validate` and network/volume `create`. The role for CI/CD pipelines      |
+| **developer**  | Full job lifecycle (`run`, `stop`, `delete`) and `runtime test`, plus every read command                        |
+| **reader**     | Read commands only: job status, logs, listings, and monitoring                                                  |
+
+Certificates with the older `viewer` OU behave like reader. Any other OU value gets `PermissionDenied` on every
+command.
+
+### Required Role per Command
+
+| Command                                                                                      | admin | maintainer | developer | reader |
+|----------------------------------------------------------------------------------------------|-------|------------|-----------|--------|
+| `rnx job run` / `rnx job stop` / `rnx job cancel` / `rnx job delete` / `rnx job delete-all`  | ✅     | ✅          | ✅         | ❌      |
+| `rnx job list` / `rnx job status` / `rnx job log` / `rnx job metrics` / `rnx job telematics` | ✅     | ✅          | ✅         | ✅      |
+| `rnx runtime list` / `rnx runtime info`                                                      | ✅     | ✅          | ✅         | ✅      |
+| `rnx runtime test`                                                                           | ✅     | ✅          | ✅         | ❌      |
+| `rnx runtime build` / `rnx runtime validate`                                                 | ✅     | ✅          | ❌         | ❌      |
+| `rnx runtime remove`                                                                         | ✅     | ❌          | ❌         | ❌      |
+| `rnx network list`                                                                           | ✅     | ✅          | ✅         | ✅      |
+| `rnx network create`                                                                         | ✅     | ✅          | ❌         | ❌      |
+| `rnx network remove`                                                                         | ✅     | ❌          | ❌         | ❌      |
+| `rnx volume list`                                                                            | ✅     | ✅          | ✅         | ✅      |
+| `rnx volume create`                                                                          | ✅     | ✅          | ❌         | ❌      |
+| `rnx volume remove`                                                                          | ✅     | ❌          | ❌         | ❌      |
+| `rnx monitor`                                                                                | ✅     | ✅          | ✅         | ✅      |
+
+The certificate generation script (`certs_gen_embedded.sh`) creates one client certificate per role. As a client you
+normally receive a single `rnx-config-<role>.yml` from your operator; save it as `~/.rnx/rnx-config.yml` and run
+`rnx` with no extra flags, since your role is its `default` node. Operators working on the server itself have the
+combined `rnx-config.yml` with every role and pick one per invocation:
+
+```bash
+rnx --node reader job list
+rnx --node maintainer runtime build ./examples/python-3.11-ml/runtime.yaml
+rnx --node admin volume remove old-data
+```
 
 ## Job Management Commands
 
@@ -1439,11 +1484,11 @@ nodes:
       ...
     # ... rest of credentials
 
-  viewer:
+  reader:
     address: "prod-server:50051"
     cert: |
       -----BEGIN CERTIFICATE-----
-      # Viewer certificate with OU=viewer
+      # Reader certificate with OU=reader
       ...
     # ... rest of credentials
 ```
@@ -1458,8 +1503,8 @@ rnx --node=default run production-task.sh
 rnx --node=staging run test-suite.sh
 
 # Read-only access
-rnx --node=viewer list
-rnx --node=viewer monitor status
+rnx --node=reader job list
+rnx --node=reader monitor status
 ```
 
 ## Best Practices

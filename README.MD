@@ -301,6 +301,7 @@ npm run dev
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
 - **[Monitoring Guide](docs/MONITORING.md)** - eBPF telemetry, metrics, and observability
 - **[Working Examples](examples/)** - Production-ready runtime configurations and job examples
+- **[Compatibility](COMPATIBILITY.md)** - Joblet/RNX ↔ `joblet-proto` ↔ client-tool version matrix
 
 ## Related Projects
 

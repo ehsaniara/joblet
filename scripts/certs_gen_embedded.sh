@@ -184,14 +184,19 @@ openssl x509 -req -days 365 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem \
 
 print_success "Server certificate generated"
 
-# Generate admin client certificate
-print_info "Generating admin client certificate..."
-openssl genrsa -out admin-client-key.pem 2048
-openssl req -new -key admin-client-key.pem -out admin-client.csr \
-    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=admin/CN=admin-client"
-openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.pem \
-    -CAcreateserial -out admin-client-cert.pem
-print_success "Admin client certificate generated"
+# Generate one client certificate per role. The certificate OU carries the
+# role: admin (full access), maintainer (provision infrastructure + run jobs),
+# developer (run jobs on existing infrastructure), reader (read-only).
+CLIENT_ROLES="admin maintainer developer reader"
+for ROLE in $CLIENT_ROLES; do
+    print_info "Generating $ROLE client certificate..."
+    openssl genrsa -out "$ROLE-client-key.pem" 2048
+    openssl req -new -key "$ROLE-client-key.pem" -out "$ROLE-client.csr" \
+        -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=$ROLE/CN=$ROLE-client"
+    openssl x509 -req -days 365 -in "$ROLE-client.csr" -CA ca-cert.pem -CAkey ca-key.pem \
+        -CAcreateserial -out "$ROLE-client-cert.pem"
+    print_success "$ROLE client certificate generated"
+done
 
 # Function to read and indent certificate content for YAML
 read_cert_for_yaml() {
@@ -313,7 +318,9 @@ fi
 print_info "Updating client configuration with embedded certificates..."
 CLIENT_CONFIG="$CONFIG_DIR/rnx-config.yml"
 
-# Create client configuration with embedded certificates
+# Create client configuration with embedded certificates.
+# "default" uses the admin certificate; one node per role is added so
+# clients can select a role with: rnx --node <role> ...
 cat > "$CLIENT_CONFIG" << EOF
 version: "3.0"
 
@@ -329,7 +336,43 @@ $(read_cert_for_yaml admin-client-key.pem "      ")
 $(read_cert_for_yaml ca-cert.pem "      ")
 EOF
 
-print_success "Client configuration created with embedded certificates"
+for ROLE in $CLIENT_ROLES; do
+    cat >> "$CLIENT_CONFIG" << EOF
+  $ROLE:
+    address: "$SERVER_ADDRESS:50051"
+    nodeId: "$NODE_ID"
+    cert: |
+$(read_cert_for_yaml "$ROLE-client-cert.pem" "      ")
+    key: |
+$(read_cert_for_yaml "$ROLE-client-key.pem" "      ")
+    ca: |
+$(read_cert_for_yaml ca-cert.pem "      ")
+EOF
+done
+
+# One config file per role for distribution: each contains only that role's
+# credentials, so handing rnx-config-developer.yml to a developer does not
+# also hand over the admin key.
+for ROLE in $CLIENT_ROLES; do
+    ROLE_CONFIG="$CONFIG_DIR/rnx-config-$ROLE.yml"
+    cat > "$ROLE_CONFIG" << EOF
+version: "3.0"
+
+nodes:
+  default:
+    address: "$SERVER_ADDRESS:50051"
+    nodeId: "$NODE_ID"
+    cert: |
+$(read_cert_for_yaml "$ROLE-client-cert.pem" "      ")
+    key: |
+$(read_cert_for_yaml "$ROLE-client-key.pem" "      ")
+    ca: |
+$(read_cert_for_yaml ca-cert.pem "      ")
+EOF
+    chmod 600 "$ROLE_CONFIG" 2>/dev/null || true
+done
+
+print_success "Client configurations created with embedded certificates"
 
 # Verify all certificates
 print_info "Verifying all certificates..."
@@ -342,12 +385,14 @@ else
     CERT_ERRORS=$((CERT_ERRORS + 1))
 fi
 
-if openssl verify -CAfile ca-cert.pem admin-client-cert.pem > /dev/null 2>&1; then
-    print_success "Admin client certificate verified"
-else
-    print_error "Admin client certificate verification failed"
-    CERT_ERRORS=$((CERT_ERRORS + 1))
-fi
+for ROLE in $CLIENT_ROLES; do
+    if openssl verify -CAfile ca-cert.pem "$ROLE-client-cert.pem" > /dev/null 2>&1; then
+        print_success "$ROLE client certificate verified"
+    else
+        print_error "$ROLE client certificate verification failed"
+        CERT_ERRORS=$((CERT_ERRORS + 1))
+    fi
+done
 
 # Set secure permissions on config files
 print_info "Setting secure permissions on configuration files..."
@@ -365,9 +410,14 @@ fi
 echo
 print_info "📋 Configuration files updated:"
 echo "  🖥️  Server Config: $SERVER_CONFIG"
-echo "  📱 Client Config: $CLIENT_CONFIG"
+echo "  📱 Operator Client Config (all roles): $CLIENT_CONFIG"
+for ROLE in $CLIENT_ROLES; do
+    echo "  📱 $ROLE Client Config: $CONFIG_DIR/rnx-config-$ROLE.yml"
+done
 echo "  🔐 All certificates are now embedded in configuration files"
 echo "  🗑️  No separate certificate files needed"
+echo "  ⚠️  Distribute only the per-role config file each party needs;"
+echo "      the combined rnx-config.yml contains the admin key and stays on the server"
 echo
 
 print_info "🚀 Usage:"

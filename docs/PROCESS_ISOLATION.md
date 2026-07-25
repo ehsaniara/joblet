@@ -28,9 +28,9 @@ flowchart TD
         H3["other host processes"]
     end
     subgraph job["Job PID Namespace (isolated)"]
-        J1["job command — PID 1 (init)"]
-        J2["child process — PID 2"]
-        J3["child process — PID 3+"]
+        J1["job command: PID 1 (init)"]
+        J2["child process: PID 2"]
+        J3["child process: PID 3+"]
         J1 --> J2
         J1 --> J3
     end

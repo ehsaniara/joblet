@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// writeTestRuntime creates <base>/<name>/runtime.yml with the given content
 func writeTestRuntime(t *testing.T, basePath, name, yml string) {
 	t.Helper()
 	dir := filepath.Join(basePath, name)

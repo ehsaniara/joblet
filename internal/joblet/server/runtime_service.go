@@ -47,7 +47,7 @@ func (s *RuntimeServiceServer) ListRuntimes(ctx context.Context, req *pb.EmptyRe
 	log := s.logger.WithField("operation", "ListRuntimes")
 
 	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth.ListRuntimesOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *RuntimeServiceServer) GetRuntimeInfo(ctx context.Context, req *pb.GetRu
 	log := s.logger.WithFields("operation", "GetRuntimeInfo", "runtime", req.Runtime)
 
 	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth.GetRuntimeInfoOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (s *RuntimeServiceServer) TestRuntime(ctx context.Context, req *pb.TestRunt
 	log := s.logger.WithFields("operation", "TestRuntime", "runtime", req.Runtime)
 
 	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.RunJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth.TestRuntimeOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.Remove
 	log.Info("runtime removal request received")
 
 	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.RunJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth.RemoveRuntimeOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func (s *RuntimeServiceServer) BuildRuntime(req *pb.BuildRuntimeRequest, stream 
 	log := s.logger.WithField("operation", "BuildRuntime")
 
 	// Authorization check
-	if err := s.auth.Authorized(stream.Context(), auth.RunJobOp); err != nil {
+	if err := s.auth.Authorized(stream.Context(), auth.BuildRuntimeOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return err
 	}
@@ -430,7 +430,7 @@ func (s *RuntimeServiceServer) ValidateRuntimeYAML(ctx context.Context, req *pb.
 	log := s.logger.WithField("operation", "ValidateRuntimeYAML")
 
 	// Authorization check
-	if err := s.auth.Authorized(ctx, auth.GetJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth.ValidateRuntimeOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}

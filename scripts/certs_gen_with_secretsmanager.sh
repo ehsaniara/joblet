@@ -347,6 +347,17 @@ store_secret() {
     fi
 }
 
+# Secret names for a role's client certificate pair. The unsuffixed
+# client-cert/client-key names are the admin pair; they predate the
+# four-role model and are kept so existing deployments continue to work.
+client_cert_secret() {
+    if [ "$1" = "admin" ]; then echo "${SECRETS_PREFIX}/client-cert"; else echo "${SECRETS_PREFIX}/client-cert-$1"; fi
+}
+
+client_key_secret() {
+    if [ "$1" = "admin" ]; then echo "${SECRETS_PREFIX}/client-key"; else echo "${SECRETS_PREFIX}/client-key-$1"; fi
+}
+
 # Validate certificate is still valid
 validate_cert() {
     local cert_file="$1"
@@ -462,7 +473,8 @@ fi
 # ============================================================================
 
 CA_FROM_SM="false"
-CLIENT_FROM_SM="false"
+CLIENT_ROLES="admin maintainer developer reader"
+RETRIEVED_ROLES=""
 
 if [ "$SHOULD_USE_SM" = "true" ] && [ "$FORCE_REGENERATE" != "true" ]; then
     print_info "Checking AWS Secrets Manager for existing CA and client certificates..."
@@ -495,32 +507,33 @@ if [ "$SHOULD_USE_SM" = "true" ] && [ "$FORCE_REGENERATE" != "true" ]; then
         print_warning "CA certificates not found in Secrets Manager (looked for ${SECRETS_PREFIX}/ca-cert and ${SECRETS_PREFIX}/ca-key)"
     fi
 
-    # Try to retrieve client certificate from Secrets Manager
-    if secret_exists "${SECRETS_PREFIX}/client-cert" "$EC2_REGION" && \
-       secret_exists "${SECRETS_PREFIX}/client-key" "$EC2_REGION"; then
-        print_info "Found client certificates in Secrets Manager, retrieving..."
+    # Try to retrieve the client certificate of each role from Secrets Manager
+    for ROLE in $CLIENT_ROLES; do
+        CERT_SECRET=$(client_cert_secret "$ROLE")
+        KEY_SECRET=$(client_key_secret "$ROLE")
 
-        CLIENT_CERT=$(get_secret "${SECRETS_PREFIX}/client-cert" "$EC2_REGION")
-        CLIENT_KEY=$(get_secret "${SECRETS_PREFIX}/client-key" "$EC2_REGION")
+        if secret_exists "$CERT_SECRET" "$EC2_REGION" && secret_exists "$KEY_SECRET" "$EC2_REGION"; then
+            CLIENT_CERT=$(get_secret "$CERT_SECRET" "$EC2_REGION")
+            CLIENT_KEY=$(get_secret "$KEY_SECRET" "$EC2_REGION")
 
-        if [ -n "$CLIENT_CERT" ] && [ -n "$CLIENT_KEY" ]; then
-            echo "$CLIENT_CERT" > admin-client-cert.pem
-            echo "$CLIENT_KEY" > admin-client-key.pem
+            if [ -n "$CLIENT_CERT" ] && [ -n "$CLIENT_KEY" ]; then
+                echo "$CLIENT_CERT" > "${ROLE}-client-cert.pem"
+                echo "$CLIENT_KEY" > "${ROLE}-client-key.pem"
 
-            # Validate client certificate
-            if validate_cert admin-client-cert.pem; then
-                print_success "Retrieved valid client certificate from Secrets Manager"
-                CLIENT_FROM_SM="true"
+                if validate_cert "${ROLE}-client-cert.pem"; then
+                    print_success "Retrieved valid $ROLE client certificate from Secrets Manager"
+                    RETRIEVED_ROLES="$RETRIEVED_ROLES $ROLE"
+                else
+                    print_warning "$ROLE client certificate from Secrets Manager is expired or invalid"
+                    rm -f "${ROLE}-client-cert.pem" "${ROLE}-client-key.pem"
+                fi
             else
-                print_warning "Client certificate from Secrets Manager is expired or invalid"
-                rm -f admin-client-cert.pem admin-client-key.pem
+                print_warning "$ROLE client certificate content is empty from Secrets Manager"
             fi
         else
-            print_warning "Client certificate content is empty from Secrets Manager"
+            print_warning "$ROLE client certificate not found in Secrets Manager (looked for $CERT_SECRET and $KEY_SECRET)"
         fi
-    else
-        print_warning "Client certificates not found in Secrets Manager (looked for ${SECRETS_PREFIX}/client-cert and ${SECRETS_PREFIX}/client-key)"
-    fi
+    done
 fi
 
 # Generate CA if not retrieved from Secrets Manager
@@ -543,27 +556,29 @@ else
     print_info "Using existing CA certificate from Secrets Manager"
 fi
 
-# Generate client certificate if not retrieved from Secrets Manager
-if [ "$CLIENT_FROM_SM" != "true" ]; then
-    print_info "Generating new admin client certificate..."
-    openssl genrsa -out admin-client-key.pem 2048
-    openssl req -new -key admin-client-key.pem -out admin-client.csr \
-        -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=admin/CN=admin-client"
-    openssl x509 -req -days 365 -in admin-client.csr -CA ca-cert.pem -CAkey ca-key.pem \
-        -CAcreateserial -out admin-client-cert.pem
-    print_success "Admin client certificate generated"
+# Generate client certificates for roles not retrieved from Secrets Manager
+for ROLE in $CLIENT_ROLES; do
+    case " $RETRIEVED_ROLES " in *" $ROLE "*)
+        print_info "Using existing $ROLE client certificate from Secrets Manager"
+        continue;;
+    esac
 
-    # Store in Secrets Manager if enabled
+    print_info "Generating new $ROLE client certificate..."
+    openssl genrsa -out "${ROLE}-client-key.pem" 2048
+    openssl req -new -key "${ROLE}-client-key.pem" -out "${ROLE}-client.csr" \
+        -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=${ROLE}/CN=${ROLE}-client"
+    openssl x509 -req -days 365 -in "${ROLE}-client.csr" -CA ca-cert.pem -CAkey ca-key.pem \
+        -CAcreateserial -out "${ROLE}-client-cert.pem"
+    print_success "$ROLE client certificate generated"
+
     if [ "$SHOULD_USE_SM" = "true" ]; then
-        print_info "Storing client certificate in Secrets Manager..."
-        store_secret "${SECRETS_PREFIX}/client-cert" "$(cat admin-client-cert.pem)" "$EC2_REGION" \
-            "Joblet Admin Client Certificate - shared across all clients"
-        store_secret "${SECRETS_PREFIX}/client-key" "$(cat admin-client-key.pem)" "$EC2_REGION" \
-            "Joblet Admin Client Private Key - shared across all clients"
+        print_info "Storing $ROLE client certificate in Secrets Manager..."
+        store_secret "$(client_cert_secret "$ROLE")" "$(cat "${ROLE}-client-cert.pem")" "$EC2_REGION" \
+            "Joblet $ROLE client certificate - shared across all clients with this role"
+        store_secret "$(client_key_secret "$ROLE")" "$(cat "${ROLE}-client-key.pem")" "$EC2_REGION" \
+            "Joblet $ROLE client private key - shared across all clients with this role"
     fi
-else
-    print_info "Using existing client certificate from Secrets Manager"
-fi
+done
 
 # ============================================================================
 # Server Certificate Generation (Always Generated Per-Instance)
@@ -700,7 +715,8 @@ fi
 print_info "Updating client configuration with embedded certificates..."
 CLIENT_CONFIG="$CONFIG_DIR/rnx-config.yml"
 
-# Create client configuration with embedded certificates
+# The combined config is the operator's copy: it contains every role's
+# credentials, admin included, and must stay on the server.
 cat > "$CLIENT_CONFIG" << EOF
 version: "3.0"
 
@@ -716,7 +732,43 @@ $(read_cert_for_yaml admin-client-key.pem "      ")
 $(read_cert_for_yaml ca-cert.pem "      ")
 EOF
 
-print_success "Client configuration created with embedded certificates"
+for ROLE in $CLIENT_ROLES; do
+    cat >> "$CLIENT_CONFIG" << EOF
+  $ROLE:
+    address: "$SERVER_ADDRESS:50051"
+    nodeId: "$NODE_ID"
+    cert: |
+$(read_cert_for_yaml "$ROLE-client-cert.pem" "      ")
+    key: |
+$(read_cert_for_yaml "$ROLE-client-key.pem" "      ")
+    ca: |
+$(read_cert_for_yaml ca-cert.pem "      ")
+EOF
+done
+
+# One config file per role for distribution: each contains only that role's
+# credentials, so handing rnx-config-developer.yml to a developer does not
+# also hand over the admin key.
+for ROLE in $CLIENT_ROLES; do
+    ROLE_CONFIG="$CONFIG_DIR/rnx-config-$ROLE.yml"
+    cat > "$ROLE_CONFIG" << EOF
+version: "3.0"
+
+nodes:
+  default:
+    address: "$SERVER_ADDRESS:50051"
+    nodeId: "$NODE_ID"
+    cert: |
+$(read_cert_for_yaml "$ROLE-client-cert.pem" "      ")
+    key: |
+$(read_cert_for_yaml "$ROLE-client-key.pem" "      ")
+    ca: |
+$(read_cert_for_yaml ca-cert.pem "      ")
+EOF
+    chmod 600 "$ROLE_CONFIG" 2>/dev/null || true
+done
+
+print_success "Client configurations created with embedded certificates"
 
 # Verify all certificates
 print_info "Verifying all certificates..."
@@ -729,12 +781,14 @@ else
     CERT_ERRORS=$((CERT_ERRORS + 1))
 fi
 
-if openssl verify -CAfile ca-cert.pem admin-client-cert.pem > /dev/null 2>&1; then
-    print_success "Admin client certificate verified"
-else
-    print_error "Admin client certificate verification failed"
-    CERT_ERRORS=$((CERT_ERRORS + 1))
-fi
+for ROLE in $CLIENT_ROLES; do
+    if openssl verify -CAfile ca-cert.pem "$ROLE-client-cert.pem" > /dev/null 2>&1; then
+        print_success "$ROLE client certificate verified"
+    else
+        print_error "$ROLE client certificate verification failed"
+        CERT_ERRORS=$((CERT_ERRORS + 1))
+    fi
+done
 
 # Set secure permissions on config files
 print_info "Setting secure permissions on configuration files..."
@@ -752,8 +806,13 @@ fi
 echo
 print_info "📋 Configuration files updated:"
 echo "  🖥️  Server Config: $SERVER_CONFIG"
-echo "  📱 Client Config: $CLIENT_CONFIG"
+echo "  📱 Operator Client Config (all roles): $CLIENT_CONFIG"
+for ROLE in $CLIENT_ROLES; do
+    echo "  📱 $ROLE Client Config: $CONFIG_DIR/rnx-config-$ROLE.yml"
+done
 echo "  🔐 All certificates are now embedded in configuration files"
+echo "  ⚠️  Distribute only the per-role config file each party needs;"
+echo "      the combined rnx-config.yml contains the admin key and stays on the server"
 if [ "$SHOULD_USE_SM" = "true" ]; then
     echo ""
     print_info "🔑 AWS Secrets Manager Integration:"
@@ -762,16 +821,17 @@ if [ "$SHOULD_USE_SM" = "true" ]; then
     else
         echo "  ✨ CA Certificate: Generated and stored in Secrets Manager (shared)"
     fi
-    if [ "$CLIENT_FROM_SM" = "true" ]; then
-        echo "  ✅ Client Certificate: Retrieved from Secrets Manager (shared)"
-    else
-        echo "  ✨ Client Certificate: Generated and stored in Secrets Manager (shared)"
-    fi
+    for ROLE in $CLIENT_ROLES; do
+        case " $RETRIEVED_ROLES " in
+            *" $ROLE "*) echo "  ✅ $ROLE Client Certificate: Retrieved from Secrets Manager (shared)";;
+            *) echo "  ✨ $ROLE Client Certificate: Generated and stored in Secrets Manager (shared)";;
+        esac
+    done
     echo "  🆕 Server Certificate: Generated locally (instance-specific)"
     echo ""
     print_info "📊 Scaling Benefits:"
     echo "  • Additional instances will reuse the same CA and client certificates"
-    echo "  • Clients only need one config file to connect to all instances"
+    echo "  • Grant each client's IAM principal access to only its role's secrets"
     echo "  • Each server gets its own certificate for security"
 fi
 echo

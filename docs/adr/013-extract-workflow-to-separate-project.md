@@ -216,7 +216,7 @@ YAML format, provide migration scripts.
 - Geographic distribution
 - Failure domain isolation
 
-**Unified execution backend**: The orchestrator targets joblet as its execution backend everywhere — local,
+**Unified execution backend**: The orchestrator targets joblet as its execution backend everywhere: local,
 cloud, and multi-node. Because joblet provides isolation, resource limits, GPU allocation, and networking natively
 through Linux kernel primitives, the orchestrator gets one consistent execution surface across environments without
 having to special-case container runtimes or remote-shell transports.
@@ -250,7 +250,7 @@ Don't build our own orchestrator. Document how to drive joblet from an off-the-s
 
 **Rejected**: A first-party orchestrator that speaks joblet's Job API natively gives users a cohesive, supported
 experience out of the box. Extracting workflows into `joblet-orchestrator` still keeps the Job API open, so teams
-with an existing orchestration layer can integrate — but joblet ships a complete solution rather than deferring to
+with an existing orchestration layer can integrate, but joblet ships a complete solution rather than deferring to
 external tooling.
 
 ## Implementation Notes

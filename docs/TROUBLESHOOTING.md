@@ -522,19 +522,28 @@ openssl verify -CAfile ca-cert.pem client-cert.pem
 ### Permission Denied (RBAC)
 
 ```bash
-# Error: "permission denied" for admin operations
+# Error: "PermissionDenied: role developer is not allowed to perform operation create_network"
 
-# 1. Check client role
+# 1. Check the client role (carried in the certificate's OU field, case-insensitive)
 openssl x509 -in client-cert.pem -noout -subject
+```
 
-# 2. Should show OU=admin for admin operations
-# Generate admin certificate if needed
-openssl req -new -key client-key.pem -out admin.csr \
-  -subj "/CN=admin-client/OU=admin"
+The OU must be one of the four roles:
 
-# 3. Use viewer certificate for read-only
-openssl req -new -key client-key.pem -out viewer.csr \
-  -subj "/CN=viewer-client/OU=viewer"
+- `admin` - everything
+- `maintainer` - provision runtimes, networks, and volumes, and run jobs (no removals)
+- `developer` - run jobs, plus all reads
+- `reader` - reads only (`viewer` on older certificates means the same thing)
+
+Any other OU value fails every request.
+
+```bash
+# 2. Use a node with a sufficient role
+# The generated rnx-config.yml contains one node per role plus "default" (admin certificate)
+rnx --node admin volume remove old-data
+
+# 3. Regenerate role certificates if needed
+sudo /usr/local/bin/certs_gen_embedded.sh
 ```
 
 ### TLS Handshake Failure

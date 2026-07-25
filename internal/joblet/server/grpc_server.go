@@ -81,7 +81,7 @@ func StartGRPCServer(jobStore adapters.JobStorer, telemetryCollector *telemetry.
 	pb.RegisterVolumeServiceServer(grpcServer, volumeService)
 
 	// Create and register monitoring service
-	monitoringGrpcService := NewMonitoringServiceServer(monitoringService, cfg)
+	monitoringGrpcService := NewMonitoringServiceServer(auth, monitoringService, cfg)
 	pb.RegisterMonitoringServiceServer(grpcServer, monitoringGrpcService)
 
 	// Create and register runtime service

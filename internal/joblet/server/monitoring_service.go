@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
+	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring"
 	"github.com/ehsaniara/joblet/internal/joblet/monitoring/domain"
 	"github.com/ehsaniara/joblet/pkg/config"
@@ -20,14 +21,16 @@ import (
 // MonitoringServiceServer implements the gRPC monitoring service
 type MonitoringServiceServer struct {
 	pb.UnimplementedMonitoringServiceServer
+	auth    auth2.GRPCAuthorization
 	monitor *monitoring.Service
 	config  *config.Config
 	logger  *logger.Logger
 }
 
 // NewMonitoringServiceServer creates a new monitoring service server
-func NewMonitoringServiceServer(monitor *monitoring.Service, cfg *config.Config) *MonitoringServiceServer {
+func NewMonitoringServiceServer(auth auth2.GRPCAuthorization, monitor *monitoring.Service, cfg *config.Config) *MonitoringServiceServer {
 	return &MonitoringServiceServer{
+		auth:    auth,
 		monitor: monitor,
 		config:  cfg,
 		logger:  logger.WithField("component", "monitoring-grpc"),
@@ -36,6 +39,10 @@ func NewMonitoringServiceServer(monitor *monitoring.Service, cfg *config.Config)
 
 // GetSystemStatus returns the current system status
 func (s *MonitoringServiceServer) GetSystemStatus(ctx context.Context, req *pb.EmptyRequest) (*pb.SystemStatusResponse, error) {
+	if err := s.auth.Authorized(ctx, auth2.GetMetricsOp); err != nil {
+		s.logger.Warn("authorization failed", "error", err)
+		return nil, err
+	}
 
 	systemStatus := s.monitor.GetSystemStatus()
 	if systemStatus == nil {
@@ -48,6 +55,11 @@ func (s *MonitoringServiceServer) GetSystemStatus(ctx context.Context, req *pb.E
 // StreamSystemMetrics streams system metrics at the specified interval
 func (s *MonitoringServiceServer) StreamSystemMetrics(req *pb.StreamMetricsRequest, stream pb.MonitoringService_StreamSystemMetricsServer) error {
 	s.logger.Debug("StreamSystemMetrics called", "interval", req.IntervalSeconds, "filters", req.MetricTypes)
+
+	if err := s.auth.Authorized(stream.Context(), auth2.GetMetricsOp); err != nil {
+		s.logger.Warn("authorization failed", "error", err)
+		return err
+	}
 
 	// Default to 5 seconds if not specified
 	interval := time.Duration(req.IntervalSeconds) * time.Second

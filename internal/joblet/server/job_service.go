@@ -94,7 +94,6 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 		}
 	}
 
-	// Convert protobuf request to domain request object
 	jobRequest, err := s.convertToJobRequest(req)
 	if err != nil {
 		log.Error("failed to convert request", "error", err)
@@ -142,7 +141,6 @@ func (s *JobServiceServer) RunJob(ctx context.Context, req *pb.RunJobRequest) (*
 	}, nil
 }
 
-// convertToJobRequest converts protobuf request to domain request object
 func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfaces.StartJobRequest, error) {
 	if req.Command == "" {
 		return nil, fmt.Errorf("%w: command is required", pkgerrors.ErrInvalidJobSpec)
@@ -174,7 +172,6 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 			"totalSize", totalSize)
 	}
 
-	// Determine job type from environment variables
 	jobType := domain.JobTypeStandard
 	if req.Environment != nil {
 		if envJobType, exists := req.Environment["JOB_TYPE"]; exists && envJobType == "runtime-build" {
@@ -212,7 +209,6 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 	return jobRequest, nil
 }
 
-// validateJobRequest validates the job request
 func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) error {
 	if req.Resources.MaxCPU < 0 {
 		return fmt.Errorf("maxCPU cannot be negative")
@@ -284,7 +280,7 @@ func (s *JobServiceServer) ListJobs(ctx context.Context, req *pb.EmptyRequest) (
 	log := s.logger.WithField("operation", "ListJobs")
 	log.Debug("list jobs request received")
 
-	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.ListJobsOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -305,7 +301,7 @@ func (s *JobServiceServer) GetJobStatus(ctx context.Context, req *pb.GetJobStatu
 	log := s.logger.WithFields("operation", "GetJobStatus", "job_uuid", req.GetUuid())
 	log.Debug("get job status request received")
 
-	if err := s.auth.Authorized(ctx, auth2.GetJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.GetJobStatusOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -388,7 +384,7 @@ func (s *JobServiceServer) DeleteJob(ctx context.Context, req *pb.DeleteJobReque
 	log := s.logger.WithFields("operation", "DeleteJob", "job_uuid", req.GetUuid())
 	log.Debug("delete job request received")
 
-	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.DeleteJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -423,7 +419,7 @@ func (s *JobServiceServer) DeleteAllJobs(ctx context.Context, req *pb.DeleteAllJ
 	log := s.logger.WithField("operation", "DeleteAllJobs")
 	log.Debug("delete all jobs request received")
 
-	if err := s.auth.Authorized(ctx, auth2.StopJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.DeleteJobOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -465,7 +461,7 @@ func (s *JobServiceServer) GetJobLogs(req *pb.GetJobLogsRequest, stream pb.JobSe
 	log := s.logger.WithFields("operation", "GetJobLogs", "job_uuid", req.GetUuid())
 	log.Debug("get job logs request received")
 
-	if err := s.auth.Authorized(stream.Context(), auth2.GetJobOp); err != nil {
+	if err := s.auth.Authorized(stream.Context(), auth2.GetJobLogsOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return err
 	}

@@ -22,7 +22,7 @@ Joblet implements multi-layered security:
 ```mermaid
 flowchart TD
     N1["Transport Layer<br/>mTLS + Certificate Auth"]
-    N2["Authorization Layer<br/>RBAC (admin/viewer)"]
+    N2["Authorization Layer<br/>RBAC (admin/maintainer/developer/reader)"]
     N3["Process Isolation<br/>Namespaces + cgroups + chroot"]
     N4["Network Isolation<br/>Custom networks + traffic"]
     N5["Filesystem Isolation<br/>Per-job workspaces + volumes"]
@@ -32,7 +32,7 @@ flowchart TD
 ### Key Security Features
 
 - **mTLS**: Mutual TLS with certificate-based authentication
-- **RBAC**: Role-based access control (admin/viewer)
+- **RBAC**: Role-based access control (admin/maintainer/developer/reader)
 - **Service-Based Isolation**: Automatic job routing based on API service
 - **Dual Chroot System**: Production isolation (minimal) vs builder isolation (controlled)
 - **Runtime Cleanup**: Self-contained runtime isolation preventing host filesystem exposure
@@ -58,7 +58,13 @@ This creates:
 
 - **CA Certificate**: Root certificate authority
 - **Server Certificate**: For Joblet daemon
-- **Client Certificates**: For RNX clients
+- **Client Certificates**: One per role (admin, maintainer, developer, reader)
+
+The script writes the operator's `rnx-config.yml` (all roles, admin key included, keep it on the server) and one
+`rnx-config-<role>.yml` per role for distribution. Give each party only its role's file. The AWS variant
+(`certs_gen_with_secretsmanager.sh`) produces the same files and also stores each role's certificate pair in Secrets
+Manager as `joblet/client-cert-<role>` and `joblet/client-key-<role>`; scope each client's IAM policy to its role's
+secrets. The unsuffixed `joblet/client-cert` and `joblet/client-key` names hold the admin pair.
 
 ### Certificate Structure
 
@@ -69,11 +75,13 @@ flowchart TD
     N2 --> N4["Used by Joblet daemon"]
     N2 --> N5["Validates server identity"]
     N3 --> N6["Admin Certificate (OU=admin)"]
-    N3 --> N7["Viewer Certificate (OU=viewer)"]
-    N6 --> N8["Full access to all operations"]
-    N6 --> N9["Can run, stop, manage jobs"]
-    N7 --> N10["Read-only access"]
-    N7 --> N11["Can list, view status, logs"]
+    N3 --> N7["Maintainer Certificate (OU=maintainer)"]
+    N3 --> N8["Developer Certificate (OU=developer)"]
+    N3 --> N9["Reader Certificate (OU=reader)"]
+    N6 --> N10["Every operation, including removals"]
+    N7 --> N11["Provision infrastructure + run jobs"]
+    N8 --> N12["Run jobs on existing infrastructure"]
+    N9 --> N13["Read-only access"]
 ```
 
 ### Manual Certificate Generation
@@ -93,19 +101,14 @@ openssl x509 -req -in server.csr -CA ca-cert.pem -CAkey ca-key.pem \
   -extensions v3_req -extfile <(echo "[v3_req]
 subjectAltName = DNS:localhost,DNS:joblet,IP:127.0.0.1,IP:${SERVER_IP}")
 
-# 3. Admin client certificate
-openssl genrsa -out admin-key.pem 4096
-openssl req -new -key admin-key.pem -out admin.csr \
-  -subj "/CN=admin-client/OU=admin"
-openssl x509 -req -in admin.csr -CA ca-cert.pem -CAkey ca-key.pem \
-  -out admin-cert.pem -days 365 -CAcreateserial
-
-# 4. Viewer client certificate
-openssl genrsa -out viewer-key.pem 4096
-openssl req -new -key viewer-key.pem -out viewer.csr \
-  -subj "/CN=viewer-client/OU=viewer"
-openssl x509 -req -in viewer.csr -CA ca-cert.pem -CAkey ca-key.pem \
-  -out viewer-cert.pem -days 365 -CAcreateserial
+# 3. Client certificates (one per role; the OU field carries the role)
+for role in admin maintainer developer reader; do
+  openssl genrsa -out ${role}-key.pem 4096
+  openssl req -new -key ${role}-key.pem -out ${role}.csr \
+    -subj "/CN=${role}-client/OU=${role}"
+  openssl x509 -req -in ${role}.csr -CA ca-cert.pem -CAkey ca-key.pem \
+    -out ${role}-cert.pem -days 365 -CAcreateserial
+done
 ```
 
 ### Certificate Rotation
@@ -157,42 +160,104 @@ security:
 
 ### Role-Based Access Control
 
-Joblet uses certificate Organization Unit (OU) for roles:
+Joblet reads the client's role from the certificate Organizational Unit (OU) field (case-insensitive):
 
-| Role   | OU Value | Permissions                                              |
-|--------|----------|----------------------------------------------------------|
-| Admin  | `admin`  | Full access: run, stop, list, logs, volumes, networks    |
-| Viewer | `viewer` | Read-only: list, status, logs (but cannot run/stop jobs) |
+| Role       | OU Value     | Permissions                                                                                                                                    |
+|------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| Admin      | `admin`      | Every operation, including removing runtimes, networks, and volumes                                                                            |
+| Maintainer | `maintainer` | Provisions infrastructure (builds runtimes, validates runtime YAML, creates networks and volumes) and everything a developer can do         |
+| Developer  | `developer`  | Runs, stops, and deletes jobs, tests runtimes, and reads everything. Cannot change infrastructure                                              |
+| Reader     | `reader`     | Reads only: jobs, logs, status, resource listings, and metrics. Meant for dashboards and reporting                                             |
+
+Issue `maintainer` certificates to CI/CD service accounts: they can provision what their pipelines need but can never
+remove shared infrastructure. Certificates carrying the older `viewer` OU keep working and behave as `reader`. Any
+other OU is denied everything, and a certificate carrying more than one role OU gets the least privileged of them.
+
+### Permission Matrix
+
+| Service           | Operation                                  | Admin | Maintainer | Developer | Reader |
+|-------------------|--------------------------------------------|:-----:|:----------:|:---------:|:------:|
+| JobService        | RunJob                                     |   ✅   |     ✅      |     ✅     |   ❌    |
+| JobService        | StopJob                                    |   ✅   |     ✅      |     ✅     |   ❌    |
+| JobService        | DeleteJob, DeleteAllJobs                   |   ✅   |     ✅      |     ✅     |   ❌    |
+| JobService        | GetJobStatus, ListJobs, log/status streams |   ✅   |     ✅      |     ✅     |   ✅    |
+| RuntimeService    | ListRuntimes, GetRuntimeInfo               |   ✅   |     ✅      |     ✅     |   ✅    |
+| RuntimeService    | TestRuntime                                |   ✅   |     ✅      |     ✅     |   ❌    |
+| RuntimeService    | BuildRuntime, ValidateRuntimeYAML          |   ✅   |     ✅      |     ❌     |   ❌    |
+| RuntimeService    | RemoveRuntime                              |   ✅   |     ❌      |     ❌     |   ❌    |
+| NetworkService    | ListNetworks                               |   ✅   |     ✅      |     ✅     |   ✅    |
+| NetworkService    | CreateNetwork                              |   ✅   |     ✅      |     ❌     |   ❌    |
+| NetworkService    | RemoveNetwork                              |   ✅   |     ❌      |     ❌     |   ❌    |
+| VolumeService     | ListVolumes                                |   ✅   |     ✅      |     ✅     |   ✅    |
+| VolumeService     | CreateVolume                               |   ✅   |     ✅      |     ❌     |   ❌    |
+| VolumeService     | RemoveVolume                               |   ✅   |     ❌      |     ❌     |   ❌    |
+| MonitoringService | GetSystemStatus, StreamSystemMetrics       |   ✅   |     ✅      |     ✅     |   ✅    |
+| Persist           | Query historical logs/metrics              |   ✅   |     ✅      |     ✅     |   ✅    |
+
+Monitoring endpoints go through the same authorization as everything else: a valid certificate alone is not enough;
+it must carry a recognized role.
 
 ### Admin Role (OU=admin)
 
 ```bash
-# Full access operations
-rnx job run echo "Admin can run jobs"
-rnx job stop <job-id>
-rnx volume create admin-vol --size=1GB
-rnx network create admin-net --cidr=10.1.0.0/24
+# Every operation, including removal of shared infrastructure
+rnx runtime remove openjdk-21
+rnx network remove old-net
+rnx volume remove old-vol
 
-# All monitoring operations
-rnx monitor
-rnx job list
-rnx job status <job-id>
-rnx job log <job-id>
+# Plus everything maintainer, developer, and reader can do
 ```
 
-### Viewer Role (OU=viewer)
+### Maintainer Role (OU=maintainer)
+
+```bash
+# Infrastructure provisioning (allowed)
+rnx runtime build ./examples/java-21/runtime.yaml
+rnx runtime validate ./examples/java-21/runtime.yaml
+rnx network create ci-net --cidr=10.1.0.0/24
+rnx volume create ci-vol --size=1GB
+
+# Plus everything developer can do
+
+# Removal of shared infrastructure (denied)
+rnx runtime remove openjdk-21    # ERROR: Permission denied
+rnx network remove ci-net        # ERROR: Permission denied
+rnx volume remove ci-vol         # ERROR: Permission denied
+```
+
+### Developer Role (OU=developer)
+
+```bash
+# Job execution on existing infrastructure (allowed)
+rnx job run echo "Developers can run jobs"
+rnx job stop <job-id>
+rnx job delete <job-id>
+rnx runtime test openjdk-21
+
+# Plus all read access
+
+# Infrastructure changes (denied)
+rnx runtime build ./runtime.yaml # ERROR: Permission denied
+rnx network create dev-net       # ERROR: Permission denied
+rnx volume create dev-vol        # ERROR: Permission denied
+```
+
+### Reader Role (OU=reader)
 
 ```bash
 # Read-only operations (allowed)
 rnx job list
 rnx job status <job-id>
 rnx job log <job-id>
+rnx runtime list
+rnx network list
+rnx volume list
 rnx monitor status
 
-# Write operations (denied)
+# Create, execute, and delete operations (denied)
 rnx job run echo "test"          # ERROR: Permission denied
 rnx job stop <job-id>            # ERROR: Permission denied
-rnx volume create test       # ERROR: Permission denied
+rnx volume create test           # ERROR: Permission denied
 ```
 
 ### Multi-User Setup
@@ -203,47 +268,23 @@ rnx volume create test       # ERROR: Permission denied
 openssl req -new -key devops-key.pem -out devops.csr \
   -subj "/CN=devops-team/OU=admin"
 
-# Developers (viewer access)
-openssl req -new -key dev-key.pem -out dev.csr \
-  -subj "/CN=developer/OU=viewer"
+# CI/CD service account (maintainer access)
+openssl req -new -key cicd-key.pem -out cicd.csr \
+  -subj "/CN=cicd-pipeline/OU=maintainer"
 
-# QA team (viewer access)
-openssl req -new -key qa-key.pem -out qa.csr \
-  -subj "/CN=qa-team/OU=viewer"
+# Developers (developer access)
+openssl req -new -key dev-key.pem -out dev.csr \
+  -subj "/CN=developer/OU=developer"
+
+# Reporting/observability (reader access)
+openssl req -new -key report-key.pem -out report.csr \
+  -subj "/CN=reporting/OU=reader"
 
 # Sign all certificates with CA
-for cert in devops dev qa; do
+for cert in devops cicd dev report; do
   openssl x509 -req -in ${cert}.csr -CA ca-cert.pem -CAkey ca-key.pem \
     -out ${cert}-cert.pem -days 365 -CAcreateserial
 done
-```
-
-### Fine-Grained Permissions (Future)
-
-Current RBAC is binary (admin/viewer). For more granular control:
-
-```yaml
-# Conceptual fine-grained permissions
-authorization:
-  roles:
-    admin:
-      - job:*
-      - volume:*
-      - network:*
-      - monitor:*
-
-    developer:
-      - job:run
-      - job:list
-      - job:status
-      - job:logs
-      - volume:list
-
-    qa:
-      - job:list
-      - job:status
-      - job:logs
-      - monitor:status
 ```
 
 ## Process Isolation
@@ -751,7 +792,7 @@ sudo grep "auth_success" /var/log/joblet/audit.log | tail -1000
 ### ✅ Do's
 
 1. **Always use mTLS** - Never disable certificate verification
-2. **Implement RBAC** - Use viewer certificates for read-only access
+2. **Implement RBAC** - Give each user the least-privileged role (reader for read-only access)
 3. **Network isolation** - Use custom networks for sensitive workloads
 4. **Resource limits** - Always set appropriate CPU/memory limits
 5. **Audit logging** - Enable comprehensive security logging
@@ -766,7 +807,7 @@ sudo grep "auth_success" /var/log/joblet/audit.log | tail -1000
 3. **Don't disable TLS** in production
 4. **Don't use unlimited resources** for untrusted jobs
 5. **Don't ignore audit logs** - Monitor for anomalies
-6. **Don't share admin certificates** - Use viewer certificates for most users
+6. **Don't share admin certificates** - Use maintainer, developer, or reader certificates for most users
 7. **Don't run Joblet as non-root** - It needs privileges for isolation
 8. **Don't trust user input** - Validate and sanitize all inputs
 

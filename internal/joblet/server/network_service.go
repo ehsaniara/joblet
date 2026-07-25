@@ -39,7 +39,7 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 
 	log.Debug("create network request received")
 
-	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.CreateNetworkOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 func (s *NetworkServiceServer) ListNetworks(ctx context.Context, req *pb.EmptyRequest) (*pb.Networks, error) {
 	log := s.logger.WithField("operation", "ListNetworks")
 
-	if err := s.auth.Authorized(ctx, auth2.StreamJobsOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.ListNetworksOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (s *NetworkServiceServer) RemoveNetwork(ctx context.Context, req *pb.Remove
 
 	log.Debug("remove network request received")
 
-	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.RemoveNetworkOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
