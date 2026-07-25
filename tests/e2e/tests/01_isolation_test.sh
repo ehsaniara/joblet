@@ -487,6 +487,35 @@ test_uts_namespace() {
 
 run_test_check "UTS namespace isolation" test_uts_namespace
 
+echo -e "\n${YELLOW}▶ 9. Reserved Environment Rejection${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+
+test_reserved_env_rejected() {
+    # A client must not be able to set joblet's control vars: JOBLET_MODE=server
+    # would flip the job process into the daemon (un-chrooted root). The server
+    # must reject the request, not run the job.
+    local out=$("$RNX_BINARY" job run --env JOBLET_MODE=server echo should-not-run 2>&1)
+    local id=$(echo "$out" | grep "^ID:" | awk '{print $2}')
+
+    if [[ -z "$id" ]] && echo "$out" | grep -qiE "reserved|cannot be set"; then
+        echo "    Reserved env JOBLET_MODE rejected at submission"
+    else
+        echo "    Reserved env was NOT rejected (id=$id): $out"
+        return 1
+    fi
+
+    # Same for the secret env map, and for the JOB_* namespace.
+    local out2=$("$RNX_BINARY" job run --secret-env JOB_ID=attacker echo x 2>&1)
+    if echo "$out2" | grep -qiE "reserved|cannot be set" && ! echo "$out2" | grep -q "^ID:"; then
+        echo "    Reserved secret env JOB_ID rejected at submission"
+        return 0
+    fi
+    echo "    Reserved secret env was NOT rejected: $out2"
+    return 1
+}
+
+run_test_check "Reserved environment variables rejected" test_reserved_env_rejected
+
 # ============================================
 # SUMMARY
 # ============================================

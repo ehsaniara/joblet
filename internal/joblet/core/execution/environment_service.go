@@ -82,9 +82,22 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_RUNTIME=%s", job.Runtime))
 	}
 
-	// Combine all environment variables
-	env := append(baseEnv, jobEnv...)
+	// Assemble so joblet's own control variables always win. Jobs launch via
+	// os/exec, which keeps the last duplicate of a key, so the trusted jobEnv
+	// block is appended LAST - after client, runtime, and GPU env - and cannot
+	// be overridden by anything earlier.
+	env := baseEnv
 
+	// Client-supplied environment (lowest priority; already validated to be
+	// outside joblet's reserved namespace at the request boundary).
+	for key, value := range job.Environment {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+	for key, value := range job.SecretEnvironment {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	// Runtime (admin-authored runtime.yml) and GPU environment.
 	if job.Runtime != "" {
 		runtimeEnv, err := es.getRuntimeEnvironment(job.Runtime)
 		if err != nil {
@@ -93,20 +106,12 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 			env = append(env, runtimeEnv...)
 		}
 	}
-
-	// Add GPU environment variables if GPUs are allocated
 	if job.HasGPURequirement() && job.IsGPUAllocated() {
-		gpuEnv := es.buildGPUEnvironment(job)
-		env = append(env, gpuEnv...)
+		env = append(env, es.buildGPUEnvironment(job)...)
 	}
 
-	for key, value := range job.Environment {
-		env = append(env, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	for key, value := range job.SecretEnvironment {
-		env = append(env, fmt.Sprintf("%s=%s", key, value))
-	}
+	// Trusted control block last so it wins the os/exec last-duplicate race.
+	env = append(env, jobEnv...)
 
 	return env
 }

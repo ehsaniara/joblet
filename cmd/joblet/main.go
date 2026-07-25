@@ -26,6 +26,12 @@ func main() {
 		cfg.Server.Mode = "init"
 		path = config.BuiltInDefaultsPath
 	} else {
+		// Defense in depth: a process holding job-control vars but not running
+		// in init mode means the mode was tampered with; never start the daemon.
+		if config.LooksLikeJobProcess() {
+			log.Fatalf("Refusing to start server: job-control environment is present but JOBLET_MODE is not 'init'. The execution mode may have been tampered with.")
+		}
+
 		var err error
 		cfg, path, err = config.LoadConfig()
 		if err != nil {
