@@ -603,7 +603,7 @@ The certificate generation includes proper SAN (Subject Alternative Name) config
 DNS.1 = joblet
 DNS.2 = localhost
 DNS.3 = joblet-server
-IP.1 = 192.168.1.161
+IP.1 = 192.0.2.10
 IP.2 = 127.0.0.1
 IP.3 = 0.0.0.0
 

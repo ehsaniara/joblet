@@ -314,7 +314,7 @@ Single systemd service:
 ### Deployment Command
 
 ```bash
-make deploy REMOTE_HOST=192.168.1.161 REMOTE_USER=jay
+make deploy REMOTE_HOST=192.0.2.10 REMOTE_USER=admin
 ```
 
 This builds all binaries, copies to remote server, and restarts services.

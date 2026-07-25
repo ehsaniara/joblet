@@ -17,6 +17,8 @@ case "$1" in
         # Remove symlinks
         rm -f /usr/bin/joblet
         rm -f /usr/bin/rnx
+        rm -f /usr/local/bin/joblet
+        rm -f /usr/local/bin/rnx
 
         # Note: Job logs in ${JOBLET_HOME}/logs are preserved
         # Use 'apt purge joblet' to remove all data including job logs
@@ -34,6 +36,18 @@ case "$1" in
             userdel joblet 2>/dev/null || true
         fi
 
+        # Remove per-user rnx client configs installed by postinst
+        rm -rf /root/.rnx
+        for home in /home/*; do
+            rm -rf "$home/.rnx" 2>/dev/null || true
+        done
+
+        # Clean up journal logs: remove a dedicated joblet namespace if present,
+        # and rotate so shared-journal entries expire with journald retention
+        systemctl stop systemd-journald@joblet.service 2>/dev/null || true
+        rm -rf /var/log/journal/*.joblet /run/log/journal/*.joblet 2>/dev/null || true
+        journalctl --rotate 2>/dev/null || true
+
         # Count log files before removal
         LOG_COUNT=0
         if [ -d "${JOBLET_HOME}/logs" ]; then
@@ -47,10 +61,19 @@ case "$1" in
         # Remove symlinks
         rm -f /usr/bin/joblet
         rm -f /usr/bin/rnx
+        rm -f /usr/local/bin/joblet
+        rm -f /usr/local/bin/rnx
 
         if [ "$LOG_COUNT" -gt 0 ]; then
             echo "Removed $LOG_COUNT job log files"
         fi
+
+        # Forget stored debconf answers so a future install asks again
+        if [ -f /usr/share/debconf/confmodule ]; then
+            . /usr/share/debconf/confmodule
+            db_purge
+        fi
+
         echo "Joblet service purged successfully!"
         ;;
 esac

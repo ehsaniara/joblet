@@ -193,12 +193,12 @@ func (m *Monitor) Start() error {
 	// Attach tracepoints based on configuration
 	goroutineCount := 0
 
-	// execve tracepoint (always attach if enabled)
+	// exec tracepoint (always attach if enabled)
 	if m.eventConfig.Exec {
-		execLink, err := link.Tracepoint("syscalls", "sys_enter_execve", m.objs.TracepointSyscallsSysEnterExecve, nil)
+		execLink, err := link.Tracepoint("sched", "sched_process_exec", m.objs.TracepointSchedSchedProcessExec, nil)
 		if err != nil {
 			m.objs.Close()
-			return fmt.Errorf("failed to attach execve tracepoint: %w", err)
+			return fmt.Errorf("failed to attach exec tracepoint: %w", err)
 		}
 		m.links = append(m.links, execLink)
 		goroutineCount++

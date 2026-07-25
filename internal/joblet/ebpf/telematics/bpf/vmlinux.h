@@ -132,6 +132,18 @@ struct trace_event_raw_sys_exit {
     long int ret;
 };
 
+// sched:sched_process_exec fires after a successful exec; the kernel stores
+// the resolved filename inline in the event record via a __data_loc offset
+struct trace_event_raw_sched_process_exec {
+    unsigned short common_type;
+    unsigned char common_flags;
+    unsigned char common_preempt_count;
+    int common_pid;
+    __u32 __data_loc_filename;
+    int pid;
+    int old_pid;
+};
+
 // __sk_buff for network helpers (stub, not used by our program)
 struct __sk_buff {
     __u32 len;

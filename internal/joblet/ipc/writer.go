@@ -275,13 +275,12 @@ func (w *Writer) WriteFileEvent(event *ipcpb.FileEvent) error {
 	return w.write(msg)
 }
 
-// write sends a message with backpressure (blocks up to writeTimeout)
+// write sends a message with backpressure (blocks up to writeTimeout).
+// Messages are queued even while disconnected: the channel acts as a bounded
+// buffer during the persist warmup window and across reconnections, and
+// writeLoop delivers once the connection is up. Without this, everything a
+// job produces in the first seconds after service start is silently lost.
 func (w *Writer) write(msg *ipcpb.IPCMessage) error {
-	if !w.connected.Load() {
-		w.msgsDropped.Add(1)
-		return fmt.Errorf("not connected to persist service")
-	}
-
 	// Try non-blocking first for fast path
 	select {
 	case w.writeChan <- msg:
@@ -321,6 +320,14 @@ func (w *Writer) writeLoop() {
 		case <-w.ctx.Done():
 			return
 		case msg := <-w.writeChan:
+			// Hold the message until the connection is up (bounded wait) so
+			// queued messages survive the initial persist warmup and brief
+			// reconnections instead of being dropped
+			if !w.waitForConnection() {
+				w.msgsDropped.Add(1)
+				w.logger.Warn("Dropping message, persist unavailable past wait cap", "job_uuid", msg.JobUuid)
+				continue
+			}
 			if err := w.sendMessage(msg, lengthBuf); err != nil {
 				w.writeErrors.Add(1)
 				w.logger.Error("Failed to send IPC message", "error", err, "job_uuid", msg.JobUuid)
@@ -330,6 +337,33 @@ func (w *Writer) writeLoop() {
 				w.closeConnection()
 			} else {
 				w.msgsSent.Add(1)
+			}
+		}
+	}
+}
+
+// waitForConnection blocks until the writer is connected, a wait cap elapses,
+// or the writer shuts down. Returns true when connected.
+func (w *Writer) waitForConnection() bool {
+	if w.connected.Load() {
+		return true
+	}
+
+	const connectionWaitCap = 30 * time.Second
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(connectionWaitCap)
+	defer deadline.Stop()
+
+	for {
+		select {
+		case <-w.ctx.Done():
+			return false
+		case <-deadline.C:
+			return false
+		case <-ticker.C:
+			if w.connected.Load() {
+				return true
 			}
 		}
 	}

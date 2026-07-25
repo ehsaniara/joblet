@@ -40,7 +40,7 @@ func NewJobExecutor(platform platform.Platform, logger *logger.Logger, cfg *conf
 	uploadManager := upload.NewManager(platform, logger)
 
 	// Create environment builder with the correct parameters
-	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
+	envBuilder := environment.NewBuilder(platform, uploadManager, cfg, logger)
 
 	return &JobExecutor{
 		platform:      platform,
@@ -79,12 +79,10 @@ func (je *JobExecutor) ExecuteInInitMode() error {
 // Execute executes the job using consolidated environment handling
 func Execute(logger *logger.Logger) error {
 	p := platform.NewPlatform()
-	// Load configuration - this is needed for workspace directory
-	cfg, _, err := config.LoadConfig()
-	if err != nil {
-		return errors.WrapConfigError("joblet", "config", err)
-	}
-	executor := NewJobExecutor(p, logger, cfg)
+	// Runs inside the job filesystem: no server config exists here. The
+	// server forwarded its effective filesystem settings via JOB_FS_* env
+	// vars; everything else arrives via the other JOB_* variables.
+	executor := NewJobExecutor(p, logger, config.InitConfig())
 	return executor.ExecuteJob()
 }
 

@@ -156,9 +156,13 @@ static __always_inline int is_monitored() {
     return marker != NULL;
 }
 
-// Tracepoint for execve syscall enter
-SEC("tracepoint/syscalls/sys_enter_execve")
-int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
+// Tracepoint for successful exec (sched:sched_process_exec).
+// Fires after the kernel has resolved the binary, so the filename comes from
+// kernel memory via __data_loc and is always readable - unlike the user-space
+// pointer at sys_enter_execve, which fails when the page is not resident.
+// It also only fires for execs that succeeded, and comm is the new program.
+SEC("tracepoint/sched/sched_process_exec")
+int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_exec *ctx) {
     if (!is_monitored())
         return 0;
 
@@ -177,11 +181,13 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter *ctx
 
     bpf_get_current_comm(&event->comm, sizeof(event->comm));
 
-    // Read filename from syscall args
-    const char *filename = (const char *)ctx->args[0];
-    bpf_probe_read_user_str(&event->filename, sizeof(event->filename), filename);
+    // Filename lives inline in the event record; low 16 bits of the
+    // __data_loc field are the offset from the start of the record
+    __u32 fname_off = ctx->__data_loc_filename & 0xFFFF;
+    bpf_probe_read_kernel_str(&event->filename, sizeof(event->filename),
+                              (void *)ctx + fname_off);
 
-    event->retval = 0; // Will be set on exit
+    event->retval = 0; // sched_process_exec only fires on success
 
     bpf_ringbuf_submit(event, 0);
     return 0;

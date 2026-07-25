@@ -42,7 +42,7 @@ func NewEnvironmentService(
 
 // BuildEnvironment builds the environment variables for a job
 func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []string {
-	baseEnv := es.platform.Environ()
+	baseEnv := environment.FilterServerConfigEnv(es.platform.Environ())
 
 	jobEnv := []string{
 		"JOBLET_MODE=init",
@@ -56,6 +56,10 @@ func (es *EnvironmentService) BuildEnvironment(job *domain.Job, phase string) []
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.IOBandwidth.BytesPerSecond()),
 		fmt.Sprintf("JOB_COMMAND=%s", job.Command),
 		fmt.Sprintf("JOB_ARGS_COUNT=%d", len(job.Args)),
+	}
+
+	if es.config != nil {
+		jobEnv = append(jobEnv, environment.ForwardFilesystemEnv(&es.config.Filesystem)...)
 	}
 
 	for i, arg := range job.Args {

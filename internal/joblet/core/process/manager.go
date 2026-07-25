@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/config"
@@ -481,7 +482,7 @@ func (m *Manager) CreateSysProcAttr(enableNetworkNS bool) *syscall.SysProcAttr {
 
 // BuildJobEnvironment builds environment variables for a specific job
 func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string {
-	baseEnv := m.platform.Environ()
+	baseEnv := environment.FilterServerConfigEnv(m.platform.Environ())
 
 	// Job-specific environment with mode indicator
 	jobEnv := []string{
@@ -502,6 +503,10 @@ func (m *Manager) BuildJobEnvironment(job *domain.Job, execPath string) []string
 		jobEnv = append(jobEnv, fmt.Sprintf("JOB_ARG_%d=%s", i, arg))
 	}
 
+	if m.config != nil {
+		jobEnv = append(jobEnv, environment.ForwardFilesystemEnv(&m.config.Filesystem)...)
+	}
+
 	return append(baseEnv, jobEnv...)
 }
 
@@ -510,7 +515,7 @@ func (m *Manager) PrepareEnvironment(baseEnv []string, jobEnvVars []string) []st
 	if baseEnv == nil {
 		baseEnv = m.platform.Environ()
 	}
-	return append(baseEnv, jobEnvVars...)
+	return append(environment.FilterServerConfigEnv(baseEnv), jobEnvVars...)
 }
 
 // IsProcessAlive checks if a process is still alive

@@ -26,7 +26,10 @@ type Isolator struct {
 
 // NewIsolator creates a new isolator with the given platform
 func NewIsolator(p platform.Platform, logger *logger.Logger) *Isolator {
-	cfg, _, _ := config.LoadConfig()
+	// Runs inside the job init path: no server config exists in the job
+	// filesystem. The server forwarded its effective filesystem settings
+	// via JOB_FS_* env vars; defaults cover the rest.
+	cfg := config.InitConfig()
 
 	return &Isolator{
 		platform:   p,

@@ -150,6 +150,18 @@ case "$1" in
             # Users can copy to ~/.rnx/ for personal use or use directly
             chmod 644 ${JOBLET_HOME}/config/rnx-config.yml
 
+            # Set up ~/.rnx for the user who ran the install (sudo), so rnx
+            # works out of the box for them
+            if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+                SUDO_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+                if [ -n "$SUDO_USER_HOME" ] && [ -d "$SUDO_USER_HOME" ]; then
+                    mkdir -p "$SUDO_USER_HOME/.rnx"
+                    cp ${JOBLET_HOME}/config/rnx-config.yml "$SUDO_USER_HOME/.rnx/rnx-config.yml"
+                    chown -R "$SUDO_USER:" "$SUDO_USER_HOME/.rnx"
+                    echo "  Client config installed to $SUDO_USER_HOME/.rnx/rnx-config.yml"
+                fi
+            fi
+
         else
             print_error "Failed to generate certificates"
             exit 1
@@ -185,6 +197,13 @@ case "$1" in
         # Enable systemd services
         systemctl daemon-reload
         systemctl enable joblet.service
+
+        # On upgrade ($2 = old version), restart the service that prerm stopped;
+        # on fresh install leave it stopped so the operator starts it explicitly
+        if [ -n "$2" ]; then
+            print_info "Restarting joblet service after upgrade..."
+            systemctl restart joblet.service || print_error "joblet service failed to start - check: journalctl -u joblet"
+        fi
 
         # Clean up temporary files (EC2 info may be used for AWS deployments)
         rm -f /tmp/joblet-ec2-info

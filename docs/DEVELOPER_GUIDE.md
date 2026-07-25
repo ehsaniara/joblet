@@ -352,7 +352,7 @@ cd tests/e2e
 ./tests/01_isolation_test.sh
 
 # Run with custom host
-JOBLET_TEST_HOST=192.168.1.161 JOBLET_TEST_USER=jay ./run_tests.sh
+JOBLET_TEST_HOST=192.0.2.10 JOBLET_TEST_USER=admin ./run_tests.sh
 ```
 
 **Available E2E Tests:**

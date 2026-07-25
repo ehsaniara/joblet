@@ -3,17 +3,47 @@ package environment
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
+	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
+
+// FilterServerConfigEnv removes server config path variables from an
+// environment destined for a job: they reference host files that do not
+// exist inside the job filesystem, and the init process must fall back to
+// built-in defaults instead of failing on them.
+func FilterServerConfigEnv(env []string) []string {
+	filtered := env[:0:0]
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "JOBLET_CONFIG_PATH=") || strings.HasPrefix(kv, "JOBLET_RUNTIME_CONFIG_PATH=") {
+			continue
+		}
+		filtered = append(filtered, kv)
+	}
+	return filtered
+}
+
+// ForwardFilesystemEnv renders the server's effective filesystem settings as
+// JOB_FS_* environment variables for the job init process. Init cannot (and
+// must not) read the server config file; these variables carry the loaded
+// in-memory values across the process boundary instead.
+func ForwardFilesystemEnv(fs *config.FilesystemConfig) []string {
+	return []string{
+		fmt.Sprintf("JOB_FS_WORKSPACE_DIR=%s", fs.WorkspaceDir),
+		fmt.Sprintf("JOB_FS_BASE_DIR=%s", fs.BaseDir),
+		fmt.Sprintf("JOB_FS_TMP_DIR=%s", fs.TmpDir),
+	}
+}
 
 // Builder handles environment variable construction for job execution
 type Builder struct {
 	platform      platform.Platform
 	uploadManager domain.UploadManager
+	config        *config.Config
 	logger        *logger.Logger
 }
 
@@ -21,11 +51,13 @@ type Builder struct {
 func NewBuilder(
 	platform platform.Platform,
 	uploadManager domain.UploadManager,
+	cfg *config.Config,
 	logger *logger.Logger,
 ) *Builder {
 	return &Builder{
 		platform:      platform,
 		uploadManager: uploadManager,
+		config:        cfg,
 		logger:        logger.WithField("component", "env-builder"),
 	}
 }
@@ -43,6 +75,8 @@ func (b *Builder) BuildJobEnvironment(config *JobEnvironmentConfig) ([]string, d
 	if config.BaseEnv == nil {
 		config.BaseEnv = b.platform.Environ()
 	}
+
+	config.BaseEnv = FilterServerConfigEnv(config.BaseEnv)
 
 	// Build core job environment
 	jobEnv := b.buildCoreEnvironment(config.Job, config.ExecutePath)
@@ -71,6 +105,12 @@ func (b *Builder) buildCoreEnvironment(job *domain.Job, execPath string) []strin
 		fmt.Sprintf("JOB_MAX_CPU=%d", job.Limits.CPU.Value()),
 		fmt.Sprintf("JOB_MAX_MEMORY=%d", job.Limits.Memory.Megabytes()),
 		fmt.Sprintf("JOB_MAX_IOBPS=%d", job.Limits.IOBandwidth.BytesPerSecond()),
+	}
+
+	// Forward the server's effective filesystem settings so init uses the
+	// loaded config values rather than assuming built-in defaults
+	if b.config != nil {
+		env = append(env, ForwardFilesystemEnv(&b.config.Filesystem)...)
 	}
 
 	if !job.Limits.CPUCores.IsEmpty() {
