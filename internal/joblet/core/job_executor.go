@@ -14,6 +14,7 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
 	"github.com/ehsaniara/joblet/internal/joblet/core/unprivileged"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	"github.com/ehsaniara/joblet/internal/joblet/network"
@@ -164,16 +165,22 @@ func (ee *ExecutionEngineV2) executeCICommand(ctx context.Context, opts *StartPr
 	// Process uploads if any
 	if len(opts.Uploads) > 0 {
 		for _, upload := range opts.Uploads {
-			fullPath := filepath.Join(workDir, upload.Path)
+			// Reject "../" traversal before writing: this runs as root on the
+			// host with no chroot, so an escaping path is an arbitrary host write.
+			fullPath, err := validation.ValidatePathWithinBase(workDir, upload.Path)
+			if err != nil {
+				return nil, err
+			}
+			mode := domain.SanitizeUploadMode(upload.Mode)
 			if upload.IsDirectory {
-				if err := os.MkdirAll(fullPath, os.FileMode(upload.Mode)); err != nil {
+				if err := os.MkdirAll(fullPath, mode); err != nil {
 					return nil, fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
 				}
 			} else {
 				if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 					return nil, fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
 				}
-				if err := os.WriteFile(fullPath, upload.Content, os.FileMode(upload.Mode)); err != nil {
+				if err := os.WriteFile(fullPath, upload.Content, mode); err != nil {
 					return nil, fmt.Errorf("failed to write file %s: %w", upload.Path, err)
 				}
 			}

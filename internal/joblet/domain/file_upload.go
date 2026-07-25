@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -63,6 +64,13 @@ func (us *UploadSession) OptimizeForMemory(memoryLimitMB int32) {
 	if us.ChunkSize < 4096 {
 		us.ChunkSize = 4096
 	}
+}
+
+// SanitizeUploadMode masks a client-supplied file mode to permission bits
+// only, stripping setuid/setgid/sticky so a client cannot request a setuid
+// file be written as root.
+func SanitizeUploadMode(mode uint32) os.FileMode {
+	return os.FileMode(mode) & 0o777
 }
 
 // validateFilePath ensures file paths are safe

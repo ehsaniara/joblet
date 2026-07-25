@@ -172,10 +172,11 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 			"totalSize", totalSize)
 	}
 
-	// SECURITY (issue #258): the isolation mode is a server-side decision and
-	// must never be derived from client input. Jobs submitted through RunJob
-	// always use standard (unprivileged) isolation; privileged runtime builds
-	// run through the dedicated, separately-authorized BuildRuntime RPC.
+	// The isolation mode is a server-side decision and must never be derived
+	// from client input: runtime-build jobs skip the privilege drop and network
+	// isolation, so a client that could pick the mode could run as host root.
+	// RunJob always produces standard (unprivileged) jobs; privileged runtime
+	// builds go through the dedicated, separately-authorized BuildRuntime RPC.
 	jobType := domain.JobTypeStandard
 
 	// Strip reserved control variables so a client cannot inject JOB_TYPE (or
