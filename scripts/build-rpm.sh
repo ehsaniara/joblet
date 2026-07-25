@@ -287,6 +287,18 @@ if generate_and_embed_certificates; then
     chmod 600 /opt/joblet/config/joblet-config.yml 2>/dev/null || true
     # rnx-config.yml needs to be readable for client usage
     chmod 644 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
+
+    # Set up ~/.rnx for the user who ran the install (sudo), so rnx
+    # works out of the box for them
+    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+        SUDO_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+        if [ -n "$SUDO_USER_HOME" ] && [ -d "$SUDO_USER_HOME" ]; then
+            mkdir -p "$SUDO_USER_HOME/.rnx"
+            cp /opt/joblet/config/rnx-config.yml "$SUDO_USER_HOME/.rnx/rnx-config.yml"
+            chown -R "$SUDO_USER:" "$SUDO_USER_HOME/.rnx"
+            echo "  Client config installed to $SUDO_USER_HOME/.rnx/rnx-config.yml"
+        fi
+    fi
 fi
 
 # Setup network requirements
@@ -492,6 +504,6 @@ echo "  - Bridge network:   rnx job run --network=bridge <command>"
 echo "  - Isolated network: rnx job run --network=isolated <command>"
 echo "  - Custom networks:  rnx network create <name> --cidr=<cidr>"
 echo ""
-echo "  With custom IP:     JOBLET_SERVER_IP='your-ip' sudo -E yum localinstall -y $PACKAGE_FILE"
+echo "  With custom IP:     JOBLET_CERT_INTERNAL_IP='your-ip' sudo -E yum localinstall -y $PACKAGE_FILE"
 echo "  Verification:       rpm -V joblet"
 echo "  Service:            sudo systemctl start joblet && sudo systemctl enable joblet"

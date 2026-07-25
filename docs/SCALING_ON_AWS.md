@@ -104,10 +104,12 @@ aws secretsmanager list-secrets \
   --output table
 
 # Expected output:
-# joblet/ca-cert       - Shared CA certificate
-# joblet/ca-key        - Shared CA private key
-# joblet/client-cert   - Shared client certificate
-# joblet/client-key    - Shared client private key
+# joblet/ca-cert                - Shared CA certificate
+# joblet/ca-key                 - Shared CA private key
+# joblet/client-cert            - admin client certificate (unsuffixed = admin)
+# joblet/client-key             - admin client private key
+# joblet/client-cert-<role>     - maintainer/developer/reader client certificates
+# joblet/client-key-<role>      - maintainer/developer/reader client private keys
 ```
 
 ### 5. Download Client Config
@@ -129,7 +131,7 @@ scp ec2-user@$INSTANCE_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```mermaid
 flowchart TD
     subgraph SM["AWS Secrets Manager"]
-        S["joblet/ca-cert (Shared)<br/>joblet/ca-key (Shared)<br/>joblet/client-cert (Shared)<br/>joblet/client-key (Shared)"]
+        S["joblet/ca-cert, joblet/ca-key (Shared)<br/>joblet/client-cert, joblet/client-key (admin)<br/>joblet/client-cert-&lt;role&gt;, joblet/client-key-&lt;role&gt;<br/>(maintainer, developer, reader)"]
     end
     SM --> E1["EC2 #1 (Cert1)"]
     SM --> E2["EC2 #2 (Cert2)"]
@@ -235,7 +237,7 @@ aws secretsmanager get-secret-value \
   --query SecretString --output text | \
   openssl x509 -noout -dates
 
-# Check client certificate expiration
+# Check client certificate expiration (repeat for client-cert-<role>)
 aws secretsmanager get-secret-value \
   --secret-id joblet/client-cert \
   --query SecretString --output text | \

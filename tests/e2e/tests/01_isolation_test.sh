@@ -1,31 +1,28 @@
 #!/bin/bash
 
 # Core Isolation Tests - Testing Joblet's Main Principles
-# Tests against remote host at 192.168.1.161
+# Runs against the local joblet by default; set JOBLET_TEST_HOST for a remote instance
 # Verifies: 2-stage execution, namespace isolation, init process, cgroups, filesystem isolation
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration
-REMOTE_HOST="192.168.1.161"
-REMOTE_USER="jay"
+TEST_HOST="$(get_test_host_display)"
 
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  Joblet Core Isolation Tests${NC}"
-echo -e "${CYAN}  Testing against remote host: ${REMOTE_HOST}${NC}"
+echo -e "${CYAN}  Testing against: ${TEST_HOST}${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}Started: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 
-# Verify we're connected to remote host
-echo -e "${YELLOW}▶ Verifying Remote Connection${NC}"
+# Verify we can reach the joblet service
+echo -e "${YELLOW}▶ Verifying Joblet Connection${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}\n"
 
-# Check RNX configuration points to remote host
-if grep -q "$REMOTE_HOST" ~/.rnx/rnx-config.yml 2>/dev/null; then
-    echo -e "  ${GREEN}✓ RNX configured for remote host $REMOTE_HOST${NC}"
+if check_prerequisites; then
+    echo -e "  ${GREEN}✓ Connected to joblet on $TEST_HOST${NC}"
 else
-    echo -e "  ${RED}✗ RNX not configured for remote host${NC}"
+    echo -e "  ${RED}✗ Cannot connect to joblet on $TEST_HOST${NC}"
     exit 1
 fi
 
@@ -475,14 +472,16 @@ echo -e "\n${YELLOW}▶ 8. UTS Namespace Isolation${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 
 test_uts_namespace() {
-    local output=$(run_remote_job "hostname")
-    
-    # In isolated UTS namespace, hostname should be different from host
-    if [[ -n "$output" ]] && [[ "$output" != "$REMOTE_HOST" ]]; then
-        echo "    Hostname isolated: $output"
+    # Joblet unshares UTS but keeps the inherited hostname, so compare
+    # namespace identity rather than hostname strings
+    local job_ns=$(run_remote_job "readlink /proc/self/ns/uts")
+    local host_ns=$(run_remote_command "readlink /proc/self/ns/uts")
+
+    if [[ -n "$job_ns" ]] && [[ -n "$host_ns" ]] && [[ "$job_ns" != "$host_ns" ]]; then
+        echo "    UTS namespace isolated (job: $job_ns, host: $host_ns)"
         return 0
     fi
-    echo "    UTS namespace may not be isolated"
+    echo "    UTS namespace may not be isolated (job: $job_ns, host: $host_ns)"
     return 1
 }
 
@@ -495,7 +494,7 @@ run_test_check "UTS namespace isolation" test_uts_namespace
 echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  Test Summary${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "Remote Host:    ${BLUE}$REMOTE_HOST${NC}"
+echo -e "Test Host:      ${BLUE}$TEST_HOST${NC}"
 echo -e "Total Tests:    $TOTAL_TESTS"
 echo -e "Passed:         ${GREEN}$PASSED_TESTS${NC}"
 echo -e "Failed:         ${RED}$FAILED_TESTS${NC}"
@@ -509,7 +508,7 @@ echo -e "\n${BLUE}Completed: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
 
 if [[ $FAILED_TESTS -eq 0 ]]; then
     echo -e "\n${GREEN}✅ ALL CORE ISOLATION TESTS PASSED!${NC}"
-    echo -e "${GREEN}Joblet isolation is working correctly on $REMOTE_HOST${NC}"
+    echo -e "${GREEN}Joblet isolation is working correctly on $TEST_HOST${NC}"
     exit 0
 else
     echo -e "\n${RED}❌ SOME CORE ISOLATION TESTS FAILED${NC}"

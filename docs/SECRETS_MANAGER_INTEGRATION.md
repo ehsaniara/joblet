@@ -28,7 +28,7 @@ instances while maintaining a shared Certificate Authority (CA) and client certi
 ```mermaid
 flowchart TD
     subgraph SM["AWS Secrets Manager"]
-        N1["joblet/ca-cert (Shared - Generated Once)<br/>joblet/ca-key (Shared - Generated Once)<br/>joblet/client-cert (Shared - Generated Once)<br/>joblet/client-key (Shared - Generated Once)"]
+        N1["joblet/ca-cert, joblet/ca-key (Shared - Generated Once)<br/>joblet/client-cert, joblet/client-key (admin pair)<br/>joblet/client-cert-maintainer, joblet/client-key-maintainer<br/>joblet/client-cert-developer, joblet/client-key-developer<br/>joblet/client-cert-reader, joblet/client-key-reader"]
     end
     N1 --> N2["EC2 Instance #1<br/>Server Cert A (Local)"]
     N1 --> N3["EC2 Instance #2<br/>Server Cert B (Local)"]
@@ -190,10 +190,16 @@ Expected output:
 ----------------------------------------
 |            ListSecrets                |
 +----------------------+----------------+
-|  joblet/ca-cert      | Joblet Root CA Certificate - shared across all instances  |
-|  joblet/ca-key       | Joblet Root CA Private Key - shared across all instances  |
-|  joblet/client-cert  | Joblet Admin Client Certificate - shared across all clients |
-|  joblet/client-key   | Joblet Admin Client Private Key - shared across all clients |
+|  joblet/ca-cert                 | Joblet Root CA Certificate - shared across all instances |
+|  joblet/ca-key                  | Joblet Root CA Private Key - shared across all instances |
+|  joblet/client-cert             | admin client certificate (unsuffixed names predate the four-role model) |
+|  joblet/client-key              | admin client private key |
+|  joblet/client-cert-maintainer  | maintainer client certificate |
+|  joblet/client-key-maintainer   | maintainer client private key |
+|  joblet/client-cert-developer   | developer client certificate |
+|  joblet/client-key-developer    | developer client private key |
+|  joblet/client-cert-reader      | reader client certificate |
+|  joblet/client-key-reader       | reader client private key |
 +----------------------+----------------+
 ```
 

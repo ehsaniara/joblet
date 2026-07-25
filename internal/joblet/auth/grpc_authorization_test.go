@@ -78,9 +78,27 @@ func TestGrpcAuthorization_ExtractClientRole(t *testing.T) {
 			expectError:  false,
 		},
 		{
-			name:         "Viewer role",
+			name:         "Maintainer role",
+			context:      createMockContext([]string{"maintainer"}),
+			expectedRole: MaintainerRole,
+			expectError:  false,
+		},
+		{
+			name:         "Developer role",
+			context:      createMockContext([]string{"developer"}),
+			expectedRole: DeveloperRole,
+			expectError:  false,
+		},
+		{
+			name:         "Reader role",
+			context:      createMockContext([]string{"reader"}),
+			expectedRole: ReaderRole,
+			expectError:  false,
+		},
+		{
+			name:         "Viewer maps to reader (legacy alias)",
 			context:      createMockContext([]string{"viewer"}),
-			expectedRole: ViewerRole,
+			expectedRole: ReaderRole,
 			expectError:  false,
 		},
 		{
@@ -92,13 +110,25 @@ func TestGrpcAuthorization_ExtractClientRole(t *testing.T) {
 		{
 			name:         "Viewer role (case insensitive)",
 			context:      createMockContext([]string{"VIEWER"}),
-			expectedRole: ViewerRole,
+			expectedRole: ReaderRole,
 			expectError:  false,
 		},
 		{
 			name:         "Multiple OUs with admin",
 			context:      createMockContext([]string{"something", "admin", "other"}),
 			expectedRole: AdminRole,
+			expectError:  false,
+		},
+		{
+			name:         "Multiple role OUs resolve to least privileged",
+			context:      createMockContext([]string{"admin", "reader"}),
+			expectedRole: ReaderRole,
+			expectError:  false,
+		},
+		{
+			name:         "Maintainer and developer OUs resolve to developer",
+			context:      createMockContext([]string{"developer", "maintainer"}),
+			expectedRole: DeveloperRole,
 			expectError:  false,
 		},
 		{
@@ -161,26 +191,68 @@ func TestGrpcAuthorization_IsOperationAllowed(t *testing.T) {
 		operation Operation
 		allowed   bool
 	}{
-		// Admin role - should allow all operations
+		// Admin role - should allow all operations, including destructive ones
 		{AdminRole, RunJobOp, true},
 		{AdminRole, GetJobOp, true},
 		{AdminRole, StopJobOp, true},
 		{AdminRole, ListJobsOp, true},
-		{AdminRole, StreamJobsOp, true},
+		{AdminRole, RemoveRuntimeOp, true},
+		{AdminRole, RemoveNetworkOp, true},
+		{AdminRole, RemoveVolumeOp, true},
 
-		// Viewer role - should allow only read operations
-		{ViewerRole, RunJobOp, false},
-		{ViewerRole, GetJobOp, true},
-		{ViewerRole, StopJobOp, false},
-		{ViewerRole, ListJobsOp, true},
-		{ViewerRole, StreamJobsOp, true},
+		// Maintainer role - provisioning and jobs, but no removal of shared infrastructure
+		{MaintainerRole, RunJobOp, true},
+		{MaintainerRole, BuildRuntimeOp, true},
+		{MaintainerRole, ValidateRuntimeOp, true},
+		{MaintainerRole, CreateNetworkOp, true},
+		{MaintainerRole, CreateVolumeOp, true},
+		{MaintainerRole, GetJobOp, true},
+		{MaintainerRole, RemoveRuntimeOp, false},
+		{MaintainerRole, RemoveNetworkOp, false},
+		{MaintainerRole, RemoveVolumeOp, false},
+
+		// Developer role - job execution on existing infrastructure only
+		{DeveloperRole, RunJobOp, true},
+		{DeveloperRole, StopJobOp, true},
+		{DeveloperRole, DeleteJobOp, true},
+		{DeveloperRole, TestRuntimeOp, true},
+		{DeveloperRole, GetJobOp, true},
+		{DeveloperRole, ListRuntimesOp, true},
+		{DeveloperRole, ListNetworksOp, true},
+		{DeveloperRole, ListVolumesOp, true},
+		{DeveloperRole, BuildRuntimeOp, false},
+		{DeveloperRole, ValidateRuntimeOp, false},
+		{DeveloperRole, CreateNetworkOp, false},
+		{DeveloperRole, CreateVolumeOp, false},
+		{DeveloperRole, RemoveRuntimeOp, false},
+		{DeveloperRole, RemoveNetworkOp, false},
+		{DeveloperRole, RemoveVolumeOp, false},
+
+		// Reader role - should allow only read operations
+		{ReaderRole, RunJobOp, false},
+		{ReaderRole, GetJobOp, true},
+		{ReaderRole, StopJobOp, false},
+		{ReaderRole, DeleteJobOp, false},
+		{ReaderRole, ListJobsOp, true},
+		{ReaderRole, GetJobLogsOp, true},
+		{ReaderRole, GetJobStatusOp, true},
+		{ReaderRole, ListRuntimesOp, true},
+		{ReaderRole, GetRuntimeInfoOp, true},
+		{ReaderRole, ListNetworksOp, true},
+		{ReaderRole, ListVolumesOp, true},
+		{ReaderRole, GetMetricsOp, true},
+		{ReaderRole, QueryLogsOp, true},
+		{ReaderRole, QueryMetricsOp, true},
+		{ReaderRole, TestRuntimeOp, false},
+		{ReaderRole, BuildRuntimeOp, false},
+		{ReaderRole, CreateNetworkOp, false},
+		{ReaderRole, CreateVolumeOp, false},
 
 		// Unknown role - should not allow any operations
 		{UnknownRole, RunJobOp, false},
 		{UnknownRole, GetJobOp, false},
 		{UnknownRole, StopJobOp, false},
 		{UnknownRole, ListJobsOp, false},
-		{UnknownRole, StreamJobsOp, false},
 	}
 
 	for _, tt := range tests {
@@ -229,9 +301,9 @@ func TestGrpcAuthorization_Authorized(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Admin can stream jobs",
+			name:        "Admin can read job logs",
 			context:     createMockContext([]string{"admin"}),
-			operation:   StreamJobsOp,
+			operation:   GetJobLogsOp,
 			expectError: false,
 		},
 		{
@@ -247,9 +319,9 @@ func TestGrpcAuthorization_Authorized(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Viewer can stream jobs",
+			name:        "Viewer can read job logs",
 			context:     createMockContext([]string{"viewer"}),
-			operation:   StreamJobsOp,
+			operation:   GetJobLogsOp,
 			expectError: false,
 		},
 		{
@@ -329,7 +401,9 @@ func TestClientRole_String(t *testing.T) {
 		expected string
 	}{
 		{AdminRole, "admin"},
-		{ViewerRole, "viewer"},
+		{MaintainerRole, "maintainer"},
+		{DeveloperRole, "developer"},
+		{ReaderRole, "reader"},
 		{UnknownRole, "unknown"},
 	}
 
@@ -349,7 +423,6 @@ func TestOperation_String(t *testing.T) {
 		{GetJobOp, "get_job"},
 		{StopJobOp, "stop_job"},
 		{ListJobsOp, "list_jobs"},
-		{StreamJobsOp, "stream_jobs"},
 	}
 
 	for _, tt := range tests {

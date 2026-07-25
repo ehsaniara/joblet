@@ -268,7 +268,7 @@ When using S3 storage backend, the pre-setup script also configures:
 ### Secrets Manager (TLS Certificates)
 
 - **Shared CA certificate** (`joblet/ca-cert`, `joblet/ca-key`) - Same across all instances
-- **Shared client certificate** (`joblet/client-cert`, `joblet/client-key`) - Same for all clients
+- **Client certificates, one pair per role** (`joblet/client-cert[-<role>]`, `joblet/client-key[-<role>]`; unsuffixed names are the admin pair) - Scope each client's IAM policy to only its role's secrets
 - **Instance-specific server certificate** - Generated fresh on each EC2 instance
 - **Enables horizontal scaling** - Multiple Joblet instances share the same CA/client trust
 - **Created automatically** by the pre-setup script

@@ -181,8 +181,7 @@ func (r *Resolver) getDirectorySize(path string) (int64, error) {
 	return size, err
 }
 
-// ResolveRuntime resolves a runtime spec to config (for runtime info command)
-// This is a simplified version that just loads the config directly
+// ResolveRuntime resolves a runtime spec to its validated config
 func (r *Resolver) ResolveRuntime(runtimeSpec string) (*RuntimeConfig, error) {
 	if runtimeSpec == "" {
 		return nil, nil
@@ -192,10 +191,9 @@ func (r *Resolver) ResolveRuntime(runtimeSpec string) (*RuntimeConfig, error) {
 	return config, err
 }
 
-// ResolveRuntimeDirectory finds the directory for a runtime specification,
-// loads its runtime.yml, and validates it against this node (architecture
-// compatibility). Callers that only need one of the results can discard the
-// other; the config is always loaded and validated before either is returned.
+// ResolveRuntimeDirectory finds the directory for a runtime specification
+// (e.g. python-3.11@1.3.1 resolves to /opt/joblet/runtimes/python-3.11/1.3.1),
+// loads its runtime.yml, and validates it against this node's architecture.
 func (r *Resolver) ResolveRuntimeDirectory(runtimeSpec string) (string, *RuntimeConfig, error) {
 	runtimeDir, err := r.FindRuntimeDirectory(runtimeSpec)
 	if err != nil {

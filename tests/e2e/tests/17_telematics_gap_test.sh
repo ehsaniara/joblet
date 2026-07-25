@@ -56,13 +56,13 @@ test_telematics_live_streaming_no_gaps() {
     echo -e "${BLUE}Analyzing telematics event completeness...${NC}"
 
     # Count EXEC events for /usr/bin/sleep
-    local exec_count=$(grep "EXEC" "$vis_output" 2>/dev/null | grep -c "sleep" 2>/dev/null || echo 0)
+    local exec_count=$(grep "EXEC" "$vis_output" 2>/dev/null | grep -c "sleep" 2>/dev/null || true)
     exec_count=$(echo "$exec_count" | tr -d '[:space:]')
     echo -e "  Total EXEC (sleep) events: $exec_count/200"
 
     # Extract PIDs to check for duplicates and gaps
     local pids=$(grep "EXEC" "$vis_output" 2>/dev/null | grep "sleep" | awk -F'pid=' '{print $2}' | awk '{print $1}' | sort -n)
-    local unique_pids=$(echo "$pids" | sort -u | grep -c "[0-9]" 2>/dev/null || echo 0)
+    local unique_pids=$(echo "$pids" | sort -u | grep -c "[0-9]" 2>/dev/null || true)
     unique_pids=$(echo "$unique_pids" | tr -d '[:space:]')
     echo -e "  Unique PIDs: $unique_pids"
 
@@ -116,7 +116,7 @@ test_telematics_early_check() {
     timeout 8 $RNX_BINARY job telematics "$job_id" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > "$vis_output" || true
 
     # Count EXEC events
-    local exec_count=$(grep -c "EXEC" "$vis_output" 2>/dev/null || echo 0)
+    local exec_count=$(grep -c "EXEC" "$vis_output" 2>/dev/null || true)
     exec_count=$(echo "$exec_count" | tr -d '[:space:]')
     echo -e "  EXEC events received: $exec_count"
 
@@ -159,7 +159,7 @@ test_telematics_for_completed_job() {
     timeout 10 $RNX_BINARY job telematics "$job_id" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > "$vis_output" || true
 
     # Count EXEC events (expect at least bash + 10 sleep calls)
-    local exec_count=$(grep -c "EXEC" "$vis_output" 2>/dev/null || echo 0)
+    local exec_count=$(grep -c "EXEC" "$vis_output" 2>/dev/null || true)
     exec_count=$(echo "$exec_count" | tr -d '[:space:]')
     echo -e "  EXEC events received: $exec_count"
 
@@ -203,7 +203,7 @@ test_telematics_gap_detection() {
     timeout 12 $RNX_BINARY job telematics "$job_id" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > "$vis_output" || true
 
     # Extract timestamps from EXEC events
-    local timestamp_count=$(grep "EXEC" "$vis_output" 2>/dev/null | grep -c "sleep" 2>/dev/null || echo 0)
+    local timestamp_count=$(grep "EXEC" "$vis_output" 2>/dev/null | grep -c "sleep" 2>/dev/null || true)
     timestamp_count=$(echo "$timestamp_count" | tr -d '[:space:]')
 
     echo -e "  Events captured: $timestamp_count"
@@ -248,9 +248,9 @@ test_telematics_deduplication() {
 
     # Extract PIDs and check for exact duplicates
     local pids=$(grep "EXEC" "$vis_output" 2>/dev/null | grep "sleep" | awk -F'pid=' '{print $2}' | awk '{print $1}')
-    local total=$(echo "$pids" | grep -c "[0-9]" 2>/dev/null || echo 0)
+    local total=$(echo "$pids" | grep -c "[0-9]" 2>/dev/null || true)
     total=$(echo "$total" | tr -d '[:space:]')
-    local unique=$(echo "$pids" | sort -u | grep -c "[0-9]" 2>/dev/null || echo 0)
+    local unique=$(echo "$pids" | sort -u | grep -c "[0-9]" 2>/dev/null || true)
     unique=$(echo "$unique" | tr -d '[:space:]')
 
     # Cleanup

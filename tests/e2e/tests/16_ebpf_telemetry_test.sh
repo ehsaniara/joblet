@@ -7,10 +7,6 @@
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration (consistent with other tests)
-REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
-REMOTE_USER="${REMOTE_USER:-jay}"
-
 # Initialize test suite
 test_suite_init "eBPF Telematics Tests"
 

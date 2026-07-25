@@ -7,9 +7,7 @@
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration
-REMOTE_HOST="${JOBLET_TEST_HOST:-192.168.1.161}"
-REMOTE_USER="${JOBLET_TEST_USER:-jay}"
+# Target host comes from the framework (local by default, JOBLET_TEST_HOST for remote)
 
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  State Client Load Test (1000+ Concurrent Jobs)${NC}"
@@ -45,7 +43,7 @@ test_state_service_running() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     # Check if state socket exists on remote host
-    if ssh "${REMOTE_USER}@${REMOTE_HOST}" "test -S ${STATE_SOCKET}" 2>/dev/null; then
+    if [[ "$(run_remote_command "test -S ${STATE_SOCKET} && echo EXISTS")" == *EXISTS* ]]; then
         echo -e "  ${GREEN}✓ State socket exists${NC}"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
@@ -102,8 +100,7 @@ test_rapid_job_creation() {
     # Check job completion
     sleep 5  # Give jobs time to complete
 
-    local completed_count=$(ssh "${REMOTE_USER}@${REMOTE_HOST}" \
-        "$RNX_BINARY job list 2>/dev/null | grep 'COMPLETED' | grep -c 'load-test-' || echo 0")
+    local completed_count=$(run_rnx_command "job list" | grep 'COMPLETED' | grep -c 'load-test-' || echo 0)
     # Ensure we have a valid number (default to 0 if empty or invalid)
     completed_count=${completed_count:-0}
     completed_count=$(echo "$completed_count" | tr -d '\n')
@@ -185,8 +182,7 @@ test_connection_pool_stats() {
     echo -e "  ${BLUE}Checking connection pool metrics...${NC}"
 
     local log_file="/opt/joblet/logs/joblet.log"
-    local recent_stats=$(ssh "${REMOTE_USER}@${REMOTE_HOST}" \
-        "tail -1000 ${log_file} 2>/dev/null | grep -i 'pool.*stat' | tail -1" || echo "")
+    local recent_stats=$(run_remote_command "tail -1000 ${log_file} 2>/dev/null | grep -i 'pool.*stat' | tail -1" || echo "")
 
     if [[ -n "$recent_stats" ]]; then
         echo -e "  ${BLUE}Recent pool stats:${NC}"

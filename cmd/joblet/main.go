@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ehsaniara/joblet/internal/modes"
 	"github.com/ehsaniara/joblet/pkg/config"
@@ -14,10 +15,32 @@ import (
 )
 
 func main() {
-	// Load configuration first
-	cfg, path, err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+	// Determine mode before touching any config: the init process runs inside
+	// the job filesystem where no server config exists (and must not - it
+	// embeds private keys). Init gets everything it needs from JOB_* env vars
+	// and built-in defaults, without any config file I/O.
+	var cfg *config.Config
+	var path string
+	if os.Getenv("JOBLET_MODE") == "init" {
+		cfg = config.InitConfig()
+		cfg.Server.Mode = "init"
+		path = config.BuiltInDefaultsPath
+	} else {
+		var err error
+		cfg, path, err = config.LoadConfig()
+		if err != nil {
+			log.Fatalf("Failed to load configuration: %v", err)
+		}
+
+		// Fail fast: a server without a config file is a broken installation.
+		// Running on built-in defaults would silently use wrong addresses, no
+		// certificates, and wrong paths.
+		if cfg.Server.Mode == "server" && strings.HasPrefix(path, config.BuiltInDefaultsPath) {
+			log.Fatalf("No configuration file found - refusing to start server with built-in defaults.\n" +
+				"This indicates a broken installation. Expected config at one of:\n" +
+				"  $JOBLET_CONFIG_PATH, /opt/joblet/config/joblet-config.yml, ./config/joblet-config.yml, ./joblet-config.yml, /etc/joblet/joblet-config.yml\n" +
+				"Reinstall the joblet package or run: JOBLET_SERVER_ADDRESS='<ip>' /usr/local/bin/certs_gen_embedded.sh")
+		}
 	}
 
 	// Initialize logging with configuration

@@ -17,7 +17,7 @@ team-configurable parameters.
 ./run_tests.sh -t volume       # Volume management tests
 
 # ⚡ Development/debugging (skip build - use cautiously)
-./run_tests.sh --no-build      # Skip build for rapid test iteration
+SKIP_DEPLOY=1 ./run_tests.sh   # Skip build/deploy for rapid test iteration
 
 # 📋 List available tests
 ./run_tests.sh --list
@@ -37,10 +37,10 @@ Tests can run **locally** (default) or against a **remote joblet instance**:
 ./run_tests.sh
 
 # Remote testing - Useful for integration testing across machines
-JOBLET_TEST_HOST=192.168.1.161 ./run_tests.sh
+JOBLET_TEST_HOST=192.0.2.10 ./run_tests.sh
 
 # Run specific test remotely
-JOBLET_TEST_HOST=192.168.1.161 ./tests/11_metrics_gap_test.sh
+JOBLET_TEST_HOST=192.0.2.10 ./tests/11_metrics_gap_test.sh
 ```
 
 **Environment Variables**:

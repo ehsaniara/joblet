@@ -39,6 +39,23 @@ else
     echo "📦 Using existing binaries from ./bin/..."
 fi
 
+# Verify binary architecture matches the target package architecture
+case "$ARCH" in
+    amd64) EXPECTED_ARCH="x86-64" ;;
+    arm64) EXPECTED_ARCH="aarch64" ;;
+    *) EXPECTED_ARCH="" ;;
+esac
+if [ -n "$EXPECTED_ARCH" ]; then
+    for bin in joblet rnx persist state; do
+        if ! file "./bin/$bin" | grep -q "$EXPECTED_ARCH"; then
+            echo "❌ ./bin/$bin is not $EXPECTED_ARCH but package arch is $ARCH"
+            echo "   Rebuild with: make all GOARCH=$ARCH"
+            exit 1
+        fi
+    done
+    echo "✅ Binary architecture verified: $EXPECTED_ARCH"
+fi
+
 # Clean and create build directory
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
@@ -118,6 +135,10 @@ chmod +x "$BUILD_DIR/usr/local/bin/certs_gen_with_secretsmanager.sh"
 cp ./scripts/common-install-functions.sh "$BUILD_DIR/opt/joblet/scripts/"
 chmod 644 "$BUILD_DIR/opt/joblet/scripts/common-install-functions.sh"
 
+# Copy uninstall script
+cp ./scripts/uninstall.sh "$BUILD_DIR/opt/joblet/scripts/"
+chmod 755 "$BUILD_DIR/opt/joblet/scripts/uninstall.sh"
+
 # Create control file
 cat > "$BUILD_DIR/DEBIAN/control" << EOF
 Package: $PACKAGE_NAME
@@ -176,6 +197,6 @@ dpkg-deb -c "$PACKAGE_FILE"
 echo
 echo "🚀 Installation methods:"
 echo "  Interactive:    sudo dpkg -i $PACKAGE_FILE"
-echo "  Pre-configured: JOBLET_SERVER_IP='your-ip' sudo -E dpkg -i $PACKAGE_FILE"
+echo "  Pre-configured: JOBLET_CERT_INTERNAL_IP='your-ip' sudo -E dpkg -i $PACKAGE_FILE"
 echo "  Automated:      DEBIAN_FRONTEND=noninteractive sudo dpkg -i $PACKAGE_FILE"
 echo "  Reconfigure:    sudo dpkg-reconfigure joblet"

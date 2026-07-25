@@ -54,8 +54,8 @@ type telematicsSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type telematicsProgramSpecs struct {
+	TracepointSchedSchedProcessExec    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSyscallsSysEnterConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
-	TracepointSyscallsSysEnterExecve   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_execve"`
 	TracepointSyscallsSysEnterMmap     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_mmap"`
 	TracepointSyscallsSysEnterMprotect *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_mprotect"`
 	TracepointSyscallsSysEnterRecvfrom *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
@@ -133,8 +133,8 @@ type telematicsVariables struct {
 //
 // It can be passed to loadTelematicsObjects or ebpf.CollectionSpec.LoadAndAssign.
 type telematicsPrograms struct {
+	TracepointSchedSchedProcessExec    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSyscallsSysEnterConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
-	TracepointSyscallsSysEnterExecve   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_execve"`
 	TracepointSyscallsSysEnterMmap     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_mmap"`
 	TracepointSyscallsSysEnterMprotect *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_mprotect"`
 	TracepointSyscallsSysEnterRecvfrom *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
@@ -144,8 +144,8 @@ type telematicsPrograms struct {
 
 func (p *telematicsPrograms) Close() error {
 	return _TelematicsClose(
+		p.TracepointSchedSchedProcessExec,
 		p.TracepointSyscallsSysEnterConnect,
-		p.TracepointSyscallsSysEnterExecve,
 		p.TracepointSyscallsSysEnterMmap,
 		p.TracepointSyscallsSysEnterMprotect,
 		p.TracepointSyscallsSysEnterRecvfrom,

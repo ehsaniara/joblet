@@ -18,7 +18,7 @@ v2.
 - **Real-time Streaming**: Live output streaming with pub/sub architecture
 - **Async Log Persistence**: Rate-decoupled log system with 5M+ writes/second for HPC workloads
 - **Cross-Platform CLI**: Multi-platform client support for remote job management
-- **Role-Based Security**: Certificate-based authentication with admin/viewer roles
+- **Role-Based Security**: Certificate-based authentication with admin, maintainer, developer, and reader roles
 - **Embedded Certificates**: Configuration files contain all necessary certificates
 
 ### 1.2 Design Goals
@@ -46,7 +46,7 @@ flowchart LR
         RE["Resource enforcement (cgroups v2)"]
         ST["State management"]
     end
-    subgraph job["Job Process — init mode (same binary)"]
+    subgraph job["Job Process: init mode (same binary)"]
         NS["Namespaces: PID / mount / IPC / UTS / cgroup"]
         EXE["Command execution"]
         OUT["stdout / stderr capture"]
@@ -122,8 +122,16 @@ return modes.RunServer(cfg)
 
 #### Certificate-Based Roles
 
-- **Admin Certificate** (`OU=admin`): Full job control (run, stop, view)
-- **Viewer Certificate** (`OU=viewer`): Read-only access (status, logs, list)
+The client role is carried in the certificate's OU field (matched case-insensitively):
+
+- **Admin Certificate** (`OU=admin`): Full control of the node, including removing runtimes, networks, and volumes
+- **Maintainer Certificate** (`OU=maintainer`): Provisions runtimes, networks, and volumes and runs jobs; the role
+  to issue to CI/CD pipelines. Removal of shared infrastructure stays with admin
+- **Developer Certificate** (`OU=developer`): Runs jobs against the runtimes, networks, and volumes that already
+  exist on the node
+- **Reader Certificate** (`OU=reader`): Observation only: job status, logs, and metrics. Certificates with the
+  older `OU=viewer` behave the same way
+- **No Recognized Role**: Any other OU is rejected on every request
 - **Embedded Certificates**: All certificates stored in configuration files
 
 ### 3.2 Process Isolation
@@ -172,10 +180,10 @@ resources:
 ```mermaid
 flowchart TD
     A["Client: rnx job run"] -->|"gRPC request"| B["Server validates request & authorizes"]
-    B --> C["Create job — INITIALIZING"]
+    B --> C["Create job (INITIALIZING)"]
     C --> D["Set up isolation:<br/>namespaces + cgroup + chroot"]
     D --> E["fork + exec job binary (init mode)"]
-    E --> F["Job process — RUNNING"]
+    E --> F["Job process (RUNNING)"]
     F --> G{"Outcome"}
     G -->|"exit code 0"| H["COMPLETED"]
     G -->|"exit code != 0"| I["FAILED"]
@@ -462,11 +470,14 @@ nodes:
     ca: |
       -----BEGIN CERTIFICATE-----
       # CA certificate
-  viewer:
+  reader:
     address: "192.168.1.100:50051"
     cert: |
       -----BEGIN CERTIFICATE-----
-      # Viewer client certificate (OU=viewer)
+      # Reader client certificate (OU=reader)
+  # certs_gen_embedded.sh writes one node per role (admin, maintainer,
+  # developer, reader) plus "default", which uses the admin certificate.
+  # Select a role with: rnx --node <role> ...
 ```
 
 ### 7.2 Configuration Benefits

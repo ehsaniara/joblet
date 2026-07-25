@@ -498,37 +498,49 @@ func (a *jobStoreAdapter) SendUpdatesToClientWithSkip(ctx context.Context, id st
 	isCompleted := task.job.IsCompleted()
 	a.tasksMutex.RUnlock()
 
-	// Send existing buffer content, skipping items already sent by persist
-	// ONLY when persist is enabled - otherwise skip buffer entirely to avoid stale data
-	if a.persistEnabled && logBuffer != nil {
-		var chunks [][]byte
-		if skipCount > 0 {
-			chunks = logBuffer.ReadAfterSkip(skipCount)
-			a.logger.Debug("reading buffer with skip", "job_uuid", id, "skipCount", skipCount, "remainingChunks", len(chunks))
-		} else {
-			chunks = logBuffer.ReadAll()
-		}
-
-		if len(chunks) > 0 {
-			for _, chunk := range chunks {
-				if err := stream.SendData(chunk); err != nil {
-					a.logger.Warn("failed to send existing log chunk", "job_uuid", id, "error", err)
-					return err
-				}
+	// sendBuffered sends the buffer snapshot, skipping items already sent by
+	// persist. ONLY when persist is enabled - otherwise skip buffer entirely
+	// to avoid stale data
+	sendBuffered := func() error {
+		if a.persistEnabled && logBuffer != nil {
+			var chunks [][]byte
+			if skipCount > 0 {
+				chunks = logBuffer.ReadAfterSkip(skipCount)
+				a.logger.Debug("reading buffer with skip", "job_uuid", id, "skipCount", skipCount, "remainingChunks", len(chunks))
+			} else {
+				chunks = logBuffer.ReadAll()
 			}
-			a.logger.Debug("sent existing logs", "job_uuid", id, "chunkCount", len(chunks), "skipped", skipCount)
+
+			if len(chunks) > 0 {
+				for _, chunk := range chunks {
+					if err := stream.SendData(chunk); err != nil {
+						a.logger.Warn("failed to send existing log chunk", "job_uuid", id, "error", err)
+						return err
+					}
+				}
+				a.logger.Debug("sent existing logs", "job_uuid", id, "chunkCount", len(chunks), "skipped", skipCount)
+			}
+		} else if !a.persistEnabled {
+			a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "job_uuid", id)
 		}
-	} else if !a.persistEnabled {
-		a.logger.Debug("persist disabled - skipping buffer read (live streaming only)", "job_uuid", id)
+		return nil
 	}
 
-	// If job is completed, we're done
+	// If job is completed, send the buffer and we're done
 	if isCompleted {
+		if err := sendBuffered(); err != nil {
+			return err
+		}
 		a.logger.Debug("job is completed, finishing stream", "job_uuid", id)
 		return nil
 	}
 
-	return a.subscribeToJobUpdates(ctx, resolvedUuid, stream)
+	// Running job: subscribe BEFORE sending the buffer snapshot. Lines
+	// published while the snapshot is in flight queue up in the subscription
+	// channel instead of falling into the seam between snapshot and
+	// subscription - that seam silently lost lines; the overlap this creates
+	// only produces duplicates, which clients tolerate.
+	return a.subscribeToJobUpdates(ctx, resolvedUuid, stream, sendBuffered)
 }
 
 // PubSub returns the pub-sub instance for external integration (e.g., IPC)
@@ -885,7 +897,11 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 // subscribeToJobUpdates creates a real-time subscription for job events.
 // Handles LOG_CHUNK events by streaming data to client, and UPDATED events by checking
 // for job completion. Manages subscription lifecycle and cleanup automatically.
-func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID string, stream interfaces.DomainStreamer) error {
+// sendBuffered, when non-nil, is invoked after the subscription is
+// established but before live events are pumped, so the pre-subscription
+// snapshot reaches the client first and nothing falls between snapshot
+// and subscription.
+func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID string, stream interfaces.DomainStreamer, sendBuffered func() error) error {
 	// Subscribe to single "jobs" topic (filter by JobUUID in loop)
 	topic := "jobs"
 	a.logger.Debug("subscribing to job events for streaming", "job_uuid", jobUUID, "topic", topic)
@@ -923,6 +939,23 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID str
 	task.subscribers[subID] = subContext
 	task.subMutex.Unlock()
 	a.tasksMutex.RUnlock()
+
+	// Subscription is live: deliver the buffer snapshot first so output stays
+	// ordered. Events published meanwhile accumulate in the updates channel.
+	if sendBuffered != nil {
+		if err := sendBuffered(); err != nil {
+			unsubscribe()
+			cancel()
+			a.tasksMutex.RLock()
+			if task, exists := a.tasks[jobUUID]; exists {
+				task.subMutex.Lock()
+				delete(task.subscribers, subID)
+				task.subMutex.Unlock()
+			}
+			a.tasksMutex.RUnlock()
+			return err
+		}
+	}
 
 	// Create a channel to signal when subscription ends
 	done := make(chan error, 1)

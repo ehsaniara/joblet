@@ -832,7 +832,8 @@ openssl x509 -req -in server.csr -CA ca-cert.pem -CAkey ca-key.pem \
   -extensions v3_req -extfile <(echo "[v3_req]
 subjectAltName = DNS:localhost,DNS:joblet,IP:127.0.0.1,IP:${JOBLET_SERVER_ADDRESS}")
 
-# Create client certificate
+# Create client certificate. The OU carries the role; repeat with
+# OU=maintainer, OU=developer, or OU=reader for the other roles
 openssl genrsa -out client-key.pem 4096
 openssl req -new -key client-key.pem -out client.csr \
   -subj "/CN=admin-client/OU=admin"

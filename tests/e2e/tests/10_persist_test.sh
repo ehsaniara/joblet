@@ -7,9 +7,7 @@
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
 
-# Remote host configuration (consistent with other tests)
-REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
-REMOTE_USER="${REMOTE_USER:-jay}"
+# Target host comes from the framework (local by default, JOBLET_TEST_HOST for remote)
 
 # Initialize test suite
 test_suite_init "Persist Subprocess Integration Tests"
@@ -22,12 +20,12 @@ test_persist_service_running() {
     echo "Checking if persist subprocess is running..."
 
     # Check if persist is running as subprocess of joblet
-    local persist_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep '/persist' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
-    local joblet_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps aux | grep '/opt/joblet/bin/joblet\$' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
+    local persist_pid=$(run_remote_command "ps aux | grep '/persist' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
+    local joblet_pid=$(run_remote_command "ps aux | grep '/opt/joblet/bin/joblet\$' | grep -v grep | awk '{print \$2}'" 2>/dev/null)
 
     if [[ -n "$persist_pid" ]] && [[ -n "$joblet_pid" ]]; then
         # Verify persist is a child of joblet
-        local parent_pid=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "ps -o ppid= -p $persist_pid" 2>/dev/null | tr -d ' ')
+        local parent_pid=$(run_remote_command "ps -o ppid= -p $persist_pid" 2>/dev/null | tr -d ' ')
 
         if [[ "$parent_pid" == "$joblet_pid" ]]; then
             echo "  ✓ persist subprocess is running (PID: $persist_pid, Parent: $joblet_pid)"
@@ -41,7 +39,7 @@ test_persist_service_running() {
         echo "  ✗ persist subprocess is not running"
         echo "    Joblet PID: ${joblet_pid:-not found}"
         echo "    Persist PID: ${persist_pid:-not found}"
-        ssh ${REMOTE_USER}@${REMOTE_HOST} "ps auxf | grep joblet | grep -v grep" || true
+        run_remote_command "ps auxf | grep joblet | grep -v grep" || true
         return 1
     fi
 }
@@ -50,16 +48,16 @@ test_persist_socket_exists() {
     echo "Checking if persist Unix socket exists..."
 
     # Socket path is /opt/joblet/run/persist-ipc.sock
-    if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist-ipc.sock" 2>/dev/null | grep -q "persist"; then
+    if run_remote_command "sudo ss -xlnp | grep persist-ipc.sock" 2>/dev/null | grep -q "persist"; then
         echo "  ✓ Persist IPC socket exists at /opt/joblet/run/persist-ipc.sock"
         return 0
-    elif ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/run/persist-ipc.sock" 2>/dev/null | grep -q "persist-ipc.sock"; then
+    elif run_remote_command "sudo ls -la /opt/joblet/run/persist-ipc.sock" 2>/dev/null | grep -q "persist-ipc.sock"; then
         echo "  ✓ Persist IPC socket file exists at /opt/joblet/run/persist-ipc.sock"
         return 0
     else
         echo "  ✗ Persist socket does not exist"
         echo "  Checking socket locations:"
-        ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist || echo 'No persist sockets found'" 2>/dev/null
+        run_remote_command "sudo ss -xlnp | grep persist || echo 'No persist sockets found'" 2>/dev/null
         return 1
     fi
 }
@@ -118,10 +116,15 @@ test_metric_persistence() {
 
     # Test metrics via streaming API (telemetry collector)
     # The metrics command streams from the telemetry collector
-    local metrics_output=$(timeout 10 ssh ${REMOTE_USER}@${REMOTE_HOST} "rnx job metrics $job_id" 2>&1 || true)
+    local metrics_output
+    if [[ "$JOBLET_TEST_USE_SSH" == "true" ]]; then
+        metrics_output=$(timeout 10 ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$JOBLET_TEST_USER@$JOBLET_TEST_HOST" "rnx job metrics $job_id" 2>&1 || true)
+    else
+        metrics_output=$(timeout 10 "$RNX_BINARY" job metrics "$job_id" 2>&1 || true)
+    fi
 
     # Check if we got any metrics samples
-    local sample_count=$(echo "$metrics_output" | grep -c "Metrics at" 2>/dev/null || echo "0")
+    local sample_count=$(echo "$metrics_output" | grep -c "Metrics at" 2>/dev/null || true)
 
     if [[ "$sample_count" -gt 0 ]]; then
         echo "  ✓ Metrics streaming working - received $sample_count samples"
@@ -158,7 +161,7 @@ test_log_directory_structure() {
     sleep 3
 
     # Check log directory structure
-    local log_dir=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls -la /opt/joblet/logs/$job_id/" 2>/dev/null)
+    local log_dir=$(run_remote_command "sudo ls -la /opt/joblet/logs/$job_id/" 2>/dev/null)
 
     if echo "$log_dir" | grep -q "stdout.log.gz"; then
         echo "  ✓ stdout.log.gz exists"
@@ -200,7 +203,7 @@ test_multiple_jobs_persistence() {
     # Verify logs for all jobs
     local success_count=0
     for job_id in "${job_ids[@]}"; do
-        if ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ls /opt/joblet/logs/$job_id/stdout.log.gz" 2>/dev/null; then
+        if run_remote_command "sudo ls /opt/joblet/logs/$job_id/stdout.log.gz" 2>/dev/null; then
             ((success_count++))
         fi
     done
@@ -218,7 +221,7 @@ test_persist_service_logs() {
     echo "Checking persist subprocess logs for errors..."
 
     # Persist logs are now in joblet service logs with [PERSIST] prefix
-    local logs=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo journalctl -u joblet.service --since '5 minutes ago' --no-pager | grep '\[PERSIST\]'" 2>&1)
+    local logs=$(run_remote_command "sudo journalctl -u joblet.service --since '5 minutes ago' --no-pager | grep '\[PERSIST\]'" 2>&1)
 
     # Check for error patterns
     if echo "$logs" | grep -qi "panic\|fatal\|\[ERROR\].*failed"; then
@@ -238,7 +241,7 @@ test_ipc_socket_permissions() {
     echo "Testing IPC socket permissions..."
 
     # Check if socket is accessible and listening
-    local socket_info=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo ss -xlnp | grep persist-ipc.sock" 2>&1)
+    local socket_info=$(run_remote_command "sudo ss -xlnp | grep persist-ipc.sock" 2>&1)
 
     if echo "$socket_info" | grep -q "LISTEN"; then
         echo "  ✓ Socket is listening and accessible"
@@ -253,7 +256,7 @@ test_ipc_socket_permissions() {
 test_persist_binary_version() {
     echo "Checking persist binary version..."
 
-    local version=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "/opt/joblet/bin/persist version 2>&1" || echo "version command not available")
+    local version=$(run_remote_command "/opt/joblet/bin/persist version 2>&1" || echo "version command not available")
 
     echo "  Persist version: $version"
 
@@ -269,8 +272,8 @@ test_persist_binary_version() {
 test_storage_disk_usage() {
     echo "Checking storage disk usage..."
 
-    local logs_size=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo du -sh /opt/joblet/logs 2>/dev/null | cut -f1" || echo "unknown")
-    local metrics_size=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo du -sh /opt/joblet/metrics 2>/dev/null | cut -f1" || echo "unknown")
+    local logs_size=$(run_remote_command "sudo du -sh /opt/joblet/logs 2>/dev/null | cut -f1" || echo "unknown")
+    local metrics_size=$(run_remote_command "sudo du -sh /opt/joblet/metrics 2>/dev/null | cut -f1" || echo "unknown")
 
     echo "  Logs storage: $logs_size"
     echo "  Metrics storage: $metrics_size"

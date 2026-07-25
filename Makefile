@@ -1,6 +1,14 @@
 # Simple Joblet Makefile
-REMOTE_HOST ?= 192.168.1.161
-REMOTE_USER ?= jay
+#
+# Everything targets this machine by default; pass parameters to override:
+#   make deploy                                  # deploy to localhost, native arch
+#   make deploy REMOTE_HOST=10.0.0.5             # deploy to a remote host over ssh
+#   make deploy REMOTE_HOST=10.0.0.5 GOARCH=amd64  # remote host with a different arch
+REMOTE_HOST ?=
+REMOTE_USER ?= $(USER)
+
+# Target architecture (native unless specified)
+GOARCH ?= $(shell go env GOARCH)
 
 # Fix GOPATH if IntelliJ IDEA has set it incorrectly
 export GOPATH := $(HOME)/go
@@ -26,29 +34,29 @@ LDFLAGS := -s -w \
 	-X github.com/ehsaniara/joblet/pkg/version.GitTag=$(GIT_TAG) \
 	-X github.com/ehsaniara/joblet/pkg/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all clean deploy test proto bpf help joblet rnx persist state version
+.PHONY: all clean deploy fresh-install pre-pr test proto bpf help joblet rnx persist state version
 
 all: joblet rnx persist state
 	@echo "✅ Build complete - all binaries ready"
 
 joblet:
 	@echo "Building joblet daemon..."
-	@GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=joblet" -o bin/joblet ./cmd/joblet
+	@GOOS=linux GOARCH=$(GOARCH) go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=joblet" -o bin/joblet ./cmd/joblet
 	@echo "✅ joblet built (version: $(VERSION))"
 
 rnx:
 	@echo "Building rnx CLI..."
-	@GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=rnx" -o bin/rnx ./cmd/rnx
+	@GOOS=linux GOARCH=$(GOARCH) go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=rnx" -o bin/rnx ./cmd/rnx
 	@echo "✅ rnx built (version: $(VERSION))"
 
 persist:
 	@echo "Building persist..."
-	@cd persist && GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=persist" -o ../bin/persist ./cmd/persist
+	@cd persist && GOOS=linux GOARCH=$(GOARCH) go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=persist" -o ../bin/persist ./cmd/persist
 	@echo "✅ persist built (version: $(VERSION))"
 
 state:
 	@echo "Building state..."
-	@cd state && GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=state" -o ../bin/state ./cmd/state
+	@cd state && GOOS=linux GOARCH=$(GOARCH) go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=state" -o ../bin/state ./cmd/state
 	@echo "✅ state built (version: $(VERSION))"
 
 proto:
@@ -72,7 +80,24 @@ clean:
 	rm -f internal/joblet/ebpf/telematics/telematics_*_bpfel.o
 
 deploy: all
-	@echo "Deploying to $(REMOTE_USER)@$(REMOTE_HOST)..."
+ifeq ($(strip $(REMOTE_HOST)),)
+	@test -d /opt/joblet/bin || { echo "❌ /opt/joblet/bin not found - install the joblet package first"; exit 1; }
+	@echo "Deploying to localhost ($(GOARCH))..."
+	@echo "Stopping services..."
+	@sudo systemctl stop joblet.service || true
+	@echo "Installing binaries..."
+	@sudo cp bin/joblet bin/rnx bin/persist bin/state /opt/joblet/bin/ && sudo chmod +x /opt/joblet/bin/*
+	@echo "Starting services..."
+	@sudo systemctl start joblet.service
+	@echo "Waiting for service readiness (persist socket + gRPC)..."
+	@ready=0; for i in $$(seq 1 30); do \
+		if [ -S /opt/joblet/run/persist-ipc.sock ] && ./bin/rnx job list >/dev/null 2>&1; then ready=1; sleep 1; break; fi; \
+		sleep 0.5; \
+	done; \
+	if [ $$ready -eq 1 ]; then echo "✅ Local deployment complete (persist and state run as subprocesses)"; \
+	else echo "⚠️  Service started but not ready after 15s - check: journalctl -u joblet"; exit 1; fi
+else
+	@echo "Deploying to $(REMOTE_USER)@$(REMOTE_HOST) ($(GOARCH))..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
 	@echo "Copying binaries..."
 	@scp bin/joblet bin/rnx bin/persist bin/state $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
@@ -82,7 +107,28 @@ deploy: all
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo cp /tmp/joblet/build/* /opt/joblet/bin/ && sudo chmod +x /opt/joblet/bin/*'
 	@echo "Starting services..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl start joblet.service'
-	@echo "✅ Deployment complete (persist and state run as subprocesses)"
+	@echo "✅ Remote deployment complete (persist and state run as subprocesses)"
+endif
+
+fresh-install: all
+	@echo "Purging existing joblet installation..."
+	@sudo ./scripts/uninstall.sh --purge
+	@echo "Building package from local working tree..."
+	@./scripts/build-deb.sh $(GOARCH) $(VERSION)
+	@echo "Installing package..."
+	@sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$$(ls -t joblet_*_$(GOARCH).deb | head -1)"
+	@echo "Starting service..."
+	@sudo systemctl start joblet.service
+	@echo "Waiting for service readiness (persist socket + gRPC)..."
+	@ready=0; for i in $$(seq 1 30); do \
+		if [ -S /opt/joblet/run/persist-ipc.sock ] && ./bin/rnx job list >/dev/null 2>&1; then ready=1; sleep 1; break; fi; \
+		sleep 0.5; \
+	done; \
+	if [ $$ready -eq 1 ]; then echo "✅ Fresh install complete - brand new setup from local build"; \
+	else echo "⚠️  Service started but not ready after 15s - check: journalctl -u joblet"; exit 1; fi
+
+pre-pr:
+	@./scripts/pre-pr-check.sh
 
 test:
 	@echo "Running tests..."
@@ -108,7 +154,9 @@ help:
 	@echo "  make version        - Show version information"
 	@echo "  make clean          - Remove build artifacts"
 	@echo "  make test           - Run all tests (all modules)"
-	@echo "  make deploy         - Deploy to remote server"
+	@echo "  make deploy         - Deploy to this host (default) or REMOTE_HOST=ip for remote"
+	@echo "  make fresh-install  - Purge install, rebuild local .deb, install from scratch"
+	@echo "  make pre-pr         - Full pre-PR check: deploy + e2e + packaged install"
 	@echo ""
 	@echo "Version Information:"
 	@echo "  Version:    $(VERSION)"
@@ -122,6 +170,5 @@ help:
 	@echo "Proto Version:"
 	@echo "  $(shell go list -m github.com/ehsaniara/joblet-proto 2>/dev/null | awk '{print $$2}' || echo 'not found')"
 	@echo ""
-	@echo "Deployment:"
-	@echo "  REMOTE_HOST=$(REMOTE_HOST)"
-	@echo "  REMOTE_USER=$(REMOTE_USER)"
+	@echo "Deployment (localhost by default; override parametrically):"
+	@echo "  make deploy REMOTE_HOST=<ip> REMOTE_USER=<user> GOARCH=<arch>"

@@ -180,7 +180,7 @@ use (
 
 ### One-time setup: compile the BPF objects
 
-The joblet daemon embeds compiled BPF programs (`internal/joblet/ebpf/telematics/telematics_*_bpfel.o`). These are not tracked in git — bytes depend on local `clang`/`llvm`/`libbpf-dev` versions and are rebuilt from `bpf/telematics.c`. Run once after clone, and whenever you edit a `.c` file:
+The joblet daemon embeds compiled BPF programs (`internal/joblet/ebpf/telematics/telematics_*_bpfel.o`). These are not tracked in git: bytes depend on local `clang`/`llvm`/`libbpf-dev` versions and are rebuilt from `bpf/telematics.c`. Run once after clone, and whenever you edit a `.c` file:
 
 ```bash
 sudo apt-get install -y clang llvm libbpf-dev   # Ubuntu/Debian
@@ -189,7 +189,7 @@ make bpf
 
 `make bpf` runs `go generate ./internal/joblet/ebpf/telematics`, which produces both the amd64 and arm64 `.o` files in a single invocation. Without it, building `joblet` will fail with `pattern telematics_*.o: no matching files found`.
 
-> CLI-only contributors (only touching `rnx`) can skip this — `rnx` uses a stub on non-Linux targets and doesn't import the BPF package on Linux either.
+> CLI-only contributors (only touching `rnx`) can skip this; `rnx` uses a stub on non-Linux targets and doesn't import the BPF package on Linux either.
 
 ### Build All Binaries
 
@@ -352,7 +352,7 @@ cd tests/e2e
 ./tests/01_isolation_test.sh
 
 # Run with custom host
-JOBLET_TEST_HOST=192.168.1.161 JOBLET_TEST_USER=jay ./run_tests.sh
+JOBLET_TEST_HOST=192.0.2.10 JOBLET_TEST_USER=admin ./run_tests.sh
 ```
 
 **Available E2E Tests:**

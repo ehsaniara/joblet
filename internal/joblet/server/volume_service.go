@@ -40,7 +40,7 @@ func (s *VolumeServiceServer) CreateVolume(ctx context.Context, req *pb.CreateVo
 
 	log.Debug("create volume request received")
 
-	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.CreateVolumeOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *VolumeServiceServer) CreateVolume(ctx context.Context, req *pb.CreateVo
 func (s *VolumeServiceServer) ListVolumes(ctx context.Context, req *pb.EmptyRequest) (*pb.Volumes, error) {
 	log := s.logger.WithField("operation", "ListVolumes")
 
-	if err := s.auth.Authorized(ctx, auth2.StreamJobsOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.ListVolumesOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (s *VolumeServiceServer) RemoveVolume(ctx context.Context, req *pb.RemoveVo
 
 	log.Debug("remove volume request received")
 
-	if err := s.auth.Authorized(ctx, auth2.RunJobOp); err != nil {
+	if err := s.auth.Authorized(ctx, auth2.RemoveVolumeOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
 	}

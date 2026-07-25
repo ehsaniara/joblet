@@ -327,6 +327,18 @@ MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBALr6hQ7lhZhh3j1f
 func TestLoadConfig(t *testing.T) {
 	// Test environment variable overrides
 	t.Run("environment overrides", func(t *testing.T) {
+		// Isolate from any joblet installed on this host: point both config
+		// paths into an empty temp dir so /opt/joblet is never consulted
+		tmpDir := t.TempDir()
+		os.Setenv("JOBLET_RUNTIME_CONFIG_PATH", filepath.Join(tmpDir, "no-runtime-config.yml"))
+		defer os.Unsetenv("JOBLET_RUNTIME_CONFIG_PATH")
+		configPath := filepath.Join(tmpDir, "joblet-config.yml")
+		if err := os.WriteFile(configPath, []byte("version: \"3.0\"\n"), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+		os.Setenv("JOBLET_CONFIG_PATH", configPath)
+		defer os.Unsetenv("JOBLET_CONFIG_PATH")
+
 		// Set environment variables
 		os.Setenv("JOBLET_SERVER_ADDRESS", "192.168.1.100")
 		os.Setenv("JOBLET_MODE", "init")
@@ -616,6 +628,9 @@ logging:
 
 		os.Setenv("JOBLET_CONFIG_PATH", configPath)
 		defer os.Unsetenv("JOBLET_CONFIG_PATH")
+		// Isolate from a runtime-config.yml installed on this host
+		os.Setenv("JOBLET_RUNTIME_CONFIG_PATH", filepath.Join(tmpDir, "no-runtime-config.yml"))
+		defer os.Unsetenv("JOBLET_RUNTIME_CONFIG_PATH")
 
 		config, path, err := LoadConfig()
 		if err != nil {
@@ -867,5 +882,36 @@ nodes:
 			t.Logf("LoadClientConfig found a config unexpectedly - system may have configs in /etc or /opt")
 		}
 		// Error is expected when no config is found
+	})
+}
+
+func TestInitConfig(t *testing.T) {
+	t.Run("defaults when nothing forwarded", func(t *testing.T) {
+		cfg := InitConfig()
+		if cfg.Filesystem.WorkspaceDir != DefaultConfig.Filesystem.WorkspaceDir {
+			t.Errorf("expected default workspace dir, got %q", cfg.Filesystem.WorkspaceDir)
+		}
+	})
+
+	t.Run("server-forwarded values win", func(t *testing.T) {
+		os.Setenv("JOB_FS_WORKSPACE_DIR", "/custom-work")
+		os.Setenv("JOB_FS_BASE_DIR", "/custom-jobs")
+		os.Setenv("JOB_FS_TMP_DIR", "/custom-tmp/{JOB_ID}")
+		defer func() {
+			os.Unsetenv("JOB_FS_WORKSPACE_DIR")
+			os.Unsetenv("JOB_FS_BASE_DIR")
+			os.Unsetenv("JOB_FS_TMP_DIR")
+		}()
+
+		cfg := InitConfig()
+		if cfg.Filesystem.WorkspaceDir != "/custom-work" {
+			t.Errorf("expected forwarded workspace dir, got %q", cfg.Filesystem.WorkspaceDir)
+		}
+		if cfg.Filesystem.BaseDir != "/custom-jobs" {
+			t.Errorf("expected forwarded base dir, got %q", cfg.Filesystem.BaseDir)
+		}
+		if cfg.Filesystem.TmpDir != "/custom-tmp/{JOB_ID}" {
+			t.Errorf("expected forwarded tmp dir, got %q", cfg.Filesystem.TmpDir)
+		}
 	})
 }

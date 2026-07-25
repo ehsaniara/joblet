@@ -43,12 +43,12 @@ Each job runs in an isolated filesystem environment (chroot) and can **only see 
 ```mermaid
 flowchart TD
     subgraph JA["Job A (assigned: volume-a)"]
-        A1["/volumes/volume-a/ — ✓ accessible"]
-        A2["volume-b/ — ✗ not visible"]
+        A1["/volumes/volume-a/ (✓ accessible)"]
+        A2["volume-b/ (✗ not visible)"]
     end
     subgraph JB["Job B (assigned: volume-b)"]
-        B1["/volumes/volume-b/ — ✓ accessible"]
-        B2["volume-a/ — ✗ not visible"]
+        B1["/volumes/volume-b/ (✓ accessible)"]
+        B2["volume-a/ (✗ not visible)"]
     end
 ```
 

@@ -171,7 +171,7 @@ Host Information:
   Architecture: amd64
   Uptime:       33d 4h 58m
   Node ID:      8eb41e22-2940-4f83-9066-7d739d057ad2
-  Server IPs:   192.168.1.161, 172.20.0.1
+  Server IPs:   192.0.2.10, 172.20.0.1
   MAC Addresses: 5e:9f:b0:c0:61:22, 1e:45:87:fe:bc:53
 
 Joblet Server:
@@ -184,7 +184,7 @@ Joblet Server:
 
 Network Interfaces:
   ens18:
-    IP:   192.168.1.161
+    IP:   192.0.2.10
     MAC:  5e:9f:b0:c0:61:22
     RX:   16.1 GB (10264780 packets, 0 errors)
     TX:   986.9 MB (3558641 packets, 0 errors)

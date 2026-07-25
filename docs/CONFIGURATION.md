@@ -295,7 +295,9 @@ security:
 
   # Authorization
   enable_rbac: true              # Enable role-based access control
-  default_role: "viewer"         # Default role for unknown OUs
+  # Role comes from the client certificate OU: admin, maintainer,
+  # developer, or reader (the old "viewer" still works and maps to
+  # reader). Anything else is rejected.
 
   # Audit logging
   audit:
@@ -771,12 +773,12 @@ nodes:
       -----END CERTIFICATE-----
     # ... rest of credentials
 
-  viewer:
+  reader:
     address: "prod.joblet.company.com:50051"
-    nodeId: "a1b2c3d4-5678-9abc-def0-123456789012"  # Same as production (viewer access)
+    nodeId: "a1b2c3d4-5678-9abc-def0-123456789012"  # Same as production (read-only access)
     cert: |
       -----BEGIN CERTIFICATE-----
-      # Viewer certificate (OU=viewer)
+      # Reader certificate (OU=reader)
       -----END CERTIFICATE-----
     # ... rest of credentials
 
@@ -837,26 +839,58 @@ nodes:
 
 ### Authentication Roles
 
-Joblet uses certificate Organization Units (OU) for role-based access:
+A client's role comes from the OU field of its certificate (case doesn't matter). Certificates without one of these
+OUs are rejected on every request.
+
+| Role         | Access                                                                                                                                    |
+|--------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `admin`      | Everything, including removing runtimes, networks, and volumes                                                                            |
+| `maintainer` | Developer access plus building runtimes, validating runtime YAML, and creating networks and volumes; intended for CI/CD. No removals     |
+| `developer`  | Run, stop, and delete jobs; test runtimes; read everything. No infrastructure changes                                                     |
+| `reader`     | Read-only: jobs, logs, telemetry, and resource listings, for dashboards and reporting                                                    |
+
+Certificates issued with the old `viewer` OU keep working; they are treated as `reader`.
 
 ```yaml
-# Admin role certificate (full access)
-# Certificate subject: /CN=admin-client/OU=admin
-
-# Viewer role certificate (read-only)
-# Certificate subject: /CN=viewer-client/OU=viewer
+# Certificate subjects per role
+# /CN=admin-client/OU=admin
+# /CN=maintainer-client/OU=maintainer
+# /CN=developer-client/OU=developer
+# /CN=reader-client/OU=reader
 ```
 
-Generate role-specific certificates:
+Both certificate scripts (`scripts/certs_gen_embedded.sh` and the AWS variant
+`scripts/certs_gen_with_secretsmanager.sh`) generate one client certificate per role and write two kinds of client
+config:
+
+- `rnx-config.yml`: the operator's copy, with one node per role plus `default` (admin certificate). It contains the
+  admin key, so it stays on the server. On the server, select a role with `rnx --node <role> ...`.
+- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node as `default`. Hand each party the
+  file for its role and nothing else; a developer holding `rnx-config-developer.yml` never sees the admin key.
+
+The AWS variant additionally stores each role's certificate pair in Secrets Manager
+(`joblet/client-cert-<role>` and `joblet/client-key-<role>`; the unsuffixed `joblet/client-cert` and
+`joblet/client-key` are the admin pair, kept under their original names). Scope each client's IAM policy to only its
+role's secrets so clients can fetch their own credentials without any file distribution.
+
+Generate role-specific certificates manually:
 
 ```bash
 # Admin certificate
 openssl req -new -key client-key.pem -out admin.csr \
   -subj "/CN=admin-client/OU=admin"
 
-# Viewer certificate  
-openssl req -new -key client-key.pem -out viewer.csr \
-  -subj "/CN=viewer-client/OU=viewer"
+# Maintainer certificate
+openssl req -new -key client-key.pem -out maintainer.csr \
+  -subj "/CN=maintainer-client/OU=maintainer"
+
+# Developer certificate
+openssl req -new -key client-key.pem -out developer.csr \
+  -subj "/CN=developer-client/OU=developer"
+
+# Reader certificate
+openssl req -new -key client-key.pem -out reader.csr \
+  -subj "/CN=reader-client/OU=reader"
 ```
 
 ## Environment Variables

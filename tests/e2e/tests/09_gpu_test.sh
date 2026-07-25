@@ -12,7 +12,7 @@ source "$(dirname "$0")/../lib/test_framework.sh"
 
 # Check if we should run GPU tests
 GPU_TEST_MODE="${GPU_TEST_MODE:-mock}"  # mock, real, skip
-REMOTE_HOST="${REMOTE_HOST:-192.168.1.161}"
+TEST_HOST="$(get_test_host_display)"
 
 # ============================================
 # GPU Test Helper Functions
@@ -211,7 +211,7 @@ main() {
     fi
 
     echo -e "${CYAN}GPU Test Mode: $GPU_TEST_MODE${NC}"
-    echo -e "${CYAN}Remote Host: $REMOTE_HOST${NC}"
+    echo -e "${CYAN}Test Host: $TEST_HOST${NC}"
 
     test_section "GPU Flag Parsing"
     run_test "GPU flag parsing" test_gpu_flag_parsing

@@ -158,7 +158,7 @@ type FileData struct {
 
 ```mermaid
 flowchart TD
-    subgraph JOBLET["JOBLET (core binary) — Native Linux only, no AWS SDK"]
+    subgraph JOBLET["JOBLET (core binary): Native Linux only, no AWS SDK"]
         N1["Metrics Collector (cgroups v2)"]
         N2["eBPF Monitor (cilium/ebpf)"]
         N3["Telemetry Collector<br/>- Unify events<br/>- Buffer/batch"]
@@ -169,7 +169,7 @@ flowchart TD
         N3 --> N4
         N3 --> N5
     end
-    subgraph PERSIST["PERSIST (separate binary) — May have AWS SDK if configured"]
+    subgraph PERSIST["PERSIST (separate binary): May have AWS SDK if configured"]
         N6["Local Storage"]
         N7["CloudWatch (optional)"]
     end

@@ -72,15 +72,15 @@ Joblet supports multiple deployment architectures depending on your infrastructu
 
 ```mermaid
 flowchart TB
-    subgraph single["Single Node — vertical scaling"]
+    subgraph single["Single Node (vertical scaling)"]
         SN["Joblet + Persist + State"] --> SL["Local Filesystem"]
     end
-    subgraph multi["Multi-Node Cluster — horizontal scaling"]
+    subgraph multi["Multi-Node Cluster (horizontal scaling)"]
         MN1["Node 1: Joblet"] --> ML1["Local FS + backup"]
         MN2["Node 2: Joblet"] --> ML2["Local FS + backup"]
         MNn["Node N: Joblet"] --> MLn["Local FS + backup"]
     end
-    subgraph aws["AWS EC2 — auto-scaling"]
+    subgraph aws["AWS EC2 (auto-scaling)"]
         ASG["Auto Scaling Group<br/>Joblet nodes"] --> CW["CloudWatch Logs"]
         ASG --> DDB["DynamoDB (state)"]
     end
@@ -578,14 +578,21 @@ sudo systemctl stop joblet.service
 The Joblet includes comprehensive certificate management:
 
 ```bash
-# Generate all certificates (CA, server, admin, viewer)
+# Generate all certificates: CA, server, and one client certificate per role
+# (admin, maintainer, developer, reader)
 sudo /usr/local/bin/certs_gen_embedded.sh
 
 # Certificate structure created:
 # /opt/joblet/config/
 # ├── joblet-config.yml           # Server config with embedded certificates
-# └── rnx-config.yml             # Client config with embedded certificates
+# └── rnx-config.yml             # Client config with one node per role plus
+#                                 # "default" (admin certificate)
 ```
+
+The certificate OU decides what each client may do: `admin` can do everything, `maintainer` adds runtime builds and
+network/volume creation on top of `developer`, which can only run jobs, and `reader` is limited to reads.
+Certificates issued with the old `viewer` OU still work and behave like `reader`. The full permission matrix is in
+[SECURITY.md](SECURITY.md).
 
 ### Certificate Configuration
 
@@ -596,7 +603,7 @@ The certificate generation includes proper SAN (Subject Alternative Name) config
 DNS.1 = joblet
 DNS.2 = localhost
 DNS.3 = joblet-server
-IP.1 = 192.168.1.161
+IP.1 = 192.0.2.10
 IP.2 = 127.0.0.1
 IP.3 = 0.0.0.0
 
@@ -607,11 +614,19 @@ openssl x509 -in /opt/joblet/certs/server-cert.pem -noout -text | grep -A 10 "Su
 ### Certificate Distribution
 
 ```bash
-# For admin clients
-scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+# Give each party the config file for its role and nothing else.
+# The combined rnx-config.yml contains the admin key and stays on the server.
+scp server:/opt/joblet/config/rnx-config-developer.yml dev-box:~/.rnx/rnx-config.yml
+scp server:/opt/joblet/config/rnx-config-maintainer.yml ci-runner:~/.rnx/rnx-config.yml
+scp server:/opt/joblet/config/rnx-config-reader.yml dashboard:~/.rnx/rnx-config.yml
 
-# For viewer clients (if separate viewer config exists)
-scp server:/opt/joblet/config/rnx-config-viewer.yml ~/.rnx/rnx-config.yml
+# Each per-role file is self-contained with its role as "default",
+# so recipients run rnx with no --node flag
+rnx job list
+
+# On AWS, skip the file copying: each role's certificate pair is in Secrets
+# Manager (joblet/client-cert-<role>), so scope each client's IAM policy to
+# its role's secrets and let clients fetch their own credentials
 
 # Set proper permissions
 chmod 600 ~/.rnx/rnx-config.yml

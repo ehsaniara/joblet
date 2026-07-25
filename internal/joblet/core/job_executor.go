@@ -54,7 +54,7 @@ func NewExecutionEngineV2(
 	gpuManager gpu.GPUManagerInterface,
 ) *ExecutionEngineV2 {
 	// Create environment builder
-	envBuilder := environment.NewBuilder(platform, uploadManager, logger)
+	envBuilder := environment.NewBuilder(platform, uploadManager, config, logger)
 
 	// Create environment service (runtime functionality now handled by filesystem isolator)
 	envService := execution.NewEnvironmentService(

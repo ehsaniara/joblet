@@ -509,8 +509,18 @@ func LoadConfig() (*Config, string, error) {
 // Returns the path of the loaded file or "built-in defaults" if no file found.
 // Does not return error if no file is found - uses defaults instead.
 func loadFromFile(config *Config) (string, error) {
+	// An explicitly set JOBLET_CONFIG_PATH is authoritative: no fallback to
+	// system locations, and a missing file is an error rather than silently
+	// loading a different config. (The job init path never calls LoadConfig -
+	// it uses built-in defaults directly.)
+	if envPath := os.Getenv("JOBLET_CONFIG_PATH"); envPath != "" {
+		if _, err := os.Stat(envPath); os.IsNotExist(err) {
+			return "", fmt.Errorf("JOBLET_CONFIG_PATH is set but file does not exist: %s", envPath)
+		}
+		return readConfigFile(config, envPath)
+	}
+
 	configPaths := []string{
-		os.Getenv("JOBLET_CONFIG_PATH"),
 		"/opt/joblet/config/joblet-config.yml",
 		"./config/joblet-config.yml",
 		"./joblet-config.yml",
@@ -526,19 +536,48 @@ func loadFromFile(config *Config) (string, error) {
 			continue
 		}
 
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to read config file %s: %w", path, err)
-		}
-
-		if err := yaml.Unmarshal(data, config); err != nil {
-			return "", fmt.Errorf("failed to parse config file %s: %w", path, err)
-		}
-
-		return path, nil
+		return readConfigFile(config, path)
 	}
 
-	return "built-in defaults (no config file found)", nil
+	return BuiltInDefaultsPath, nil
+}
+
+// BuiltInDefaultsPath is the path value LoadConfig reports when no config
+// file was found anywhere. Server mode treats this as a fatal installation
+// error; init mode inside job containers tolerates it.
+const BuiltInDefaultsPath = "built-in defaults (no config file found)"
+
+// InitConfig returns the configuration for the job init process: built-in
+// defaults overridden by the effective values the server loaded at startup
+// and forwarded through the job environment (JOB_FS_*). Init never reads
+// config files - the server config does not exist inside the job filesystem
+// and embeds private keys that jobs must not see.
+func InitConfig() *Config {
+	cfg := DefaultConfig
+	if v := os.Getenv("JOB_FS_WORKSPACE_DIR"); v != "" {
+		cfg.Filesystem.WorkspaceDir = v
+	}
+	if v := os.Getenv("JOB_FS_BASE_DIR"); v != "" {
+		cfg.Filesystem.BaseDir = v
+	}
+	if v := os.Getenv("JOB_FS_TMP_DIR"); v != "" {
+		cfg.Filesystem.TmpDir = v
+	}
+	return &cfg
+}
+
+// readConfigFile reads and parses a single config file into config
+func readConfigFile(config *Config, path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read config file %s: %w", path, err)
+	}
+
+	if err := yaml.Unmarshal(data, config); err != nil {
+		return "", fmt.Errorf("failed to parse config file %s: %w", path, err)
+	}
+
+	return path, nil
 }
 
 // runtimeConfigWrapper is used to unmarshal runtime config which only has the runtime section.
@@ -551,12 +590,19 @@ type runtimeConfigWrapper struct {
 // Searches for runtime-config.yml in standard locations.
 // Returns empty string if no runtime config file is found (not an error - uses main config values).
 func loadRuntimeConfig(config *Config) (string, error) {
-	runtimePaths := []string{
-		os.Getenv("JOBLET_RUNTIME_CONFIG_PATH"),
-		"/opt/joblet/config/runtime-config.yml",
-		"./config/runtime-config.yml",
-		"./runtime-config.yml",
-		"/etc/joblet/runtime-config.yml",
+	// An explicitly set JOBLET_RUNTIME_CONFIG_PATH is authoritative: no
+	// fallback to system locations. Runtime config is optional, so a missing
+	// explicit path just means no runtime config.
+	var runtimePaths []string
+	if envPath := os.Getenv("JOBLET_RUNTIME_CONFIG_PATH"); envPath != "" {
+		runtimePaths = []string{envPath}
+	} else {
+		runtimePaths = []string{
+			"/opt/joblet/config/runtime-config.yml",
+			"./config/runtime-config.yml",
+			"./runtime-config.yml",
+			"/etc/joblet/runtime-config.yml",
+		}
 	}
 
 	for _, path := range runtimePaths {
