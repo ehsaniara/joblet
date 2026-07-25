@@ -172,13 +172,17 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 			"totalSize", totalSize)
 	}
 
+	// SECURITY (issue #258): the isolation mode is a server-side decision and
+	// must never be derived from client input. Jobs submitted through RunJob
+	// always use standard (unprivileged) isolation; privileged runtime builds
+	// run through the dedicated, separately-authorized BuildRuntime RPC.
 	jobType := domain.JobTypeStandard
-	if req.Environment != nil {
-		if envJobType, exists := req.Environment["JOB_TYPE"]; exists && envJobType == "runtime-build" {
-			jobType = domain.JobTypeRuntimeBuild
-			s.logger.Info("detected runtime build job from environment", "envJobType", envJobType)
-		}
-	}
+
+	// Strip reserved control variables so a client cannot inject JOB_TYPE (or
+	// other trusted JOB_* vars) into the job process environment, which the
+	// in-namespace init reads to decide isolation behavior (see
+	// internal/modes/jobexec and internal/modes/isolation).
+	environment := sanitizeClientEnvironment(req.Environment)
 
 	jobRequest := &interfaces.StartJobRequest{
 		Command: req.Command,
@@ -194,7 +198,7 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 		Network:           network,
 		Volumes:           req.Volumes,
 		Runtime:           req.Runtime,
-		Environment:       req.Environment,
+		Environment:       environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           jobType,
 		GPUCount:          req.GpuCount,
@@ -207,6 +211,30 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 	}
 
 	return jobRequest, nil
+}
+
+// reservedEnvKeys are environment variables the joblet runtime sets and the
+// isolation layer trusts; clients must not be able to supply them through a
+// job request.
+var reservedEnvKeys = map[string]bool{
+	"JOB_TYPE": true,
+}
+
+// sanitizeClientEnvironment returns a copy of the client-supplied environment
+// with reserved control variables removed. A nil or empty input is returned
+// unchanged.
+func sanitizeClientEnvironment(env map[string]string) map[string]string {
+	if len(env) == 0 {
+		return env
+	}
+	sanitized := make(map[string]string, len(env))
+	for k, v := range env {
+		if reservedEnvKeys[k] {
+			continue
+		}
+		sanitized[k] = v
+	}
+	return sanitized
 }
 
 func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) error {
