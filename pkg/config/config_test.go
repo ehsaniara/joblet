@@ -915,3 +915,22 @@ func TestInitConfig(t *testing.T) {
 		}
 	})
 }
+
+func TestLooksLikeJobProcess(t *testing.T) {
+	for _, k := range []string{"JOB_ID", "JOB_CGROUP_HOST_PATH"} {
+		t.Run("set/"+k, func(t *testing.T) {
+			os.Setenv(k, "x")
+			defer os.Unsetenv(k)
+			if !LooksLikeJobProcess() {
+				t.Errorf("LooksLikeJobProcess() = false with %s set; want true", k)
+			}
+		})
+	}
+	t.Run("none set", func(t *testing.T) {
+		os.Unsetenv("JOB_ID")
+		os.Unsetenv("JOB_CGROUP_HOST_PATH")
+		if LooksLikeJobProcess() {
+			t.Error("LooksLikeJobProcess() = true with no job vars; want false")
+		}
+	})
+}

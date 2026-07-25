@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	"github.com/ehsaniara/joblet/internal/joblet/mappers"
@@ -179,11 +181,15 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 	// builds go through the dedicated, separately-authorized BuildRuntime RPC.
 	jobType := domain.JobTypeStandard
 
-	// Strip reserved control variables so a client cannot inject JOB_TYPE (or
-	// other trusted JOB_* vars) into the job process environment, which the
-	// in-namespace init reads to decide isolation behavior (see
-	// internal/modes/jobexec and internal/modes/isolation).
-	environment := sanitizeClientEnvironment(req.Environment)
+	// Reject any client env var in joblet's reserved namespace (both the plain
+	// and secret maps) so a client cannot inject the control variables the
+	// in-namespace init trusts to decide execution mode and isolation.
+	if err := validateClientEnvironment(req.Environment); err != nil {
+		return nil, err
+	}
+	if err := validateClientEnvironment(req.SecretEnvironment); err != nil {
+		return nil, err
+	}
 
 	jobRequest := &interfaces.StartJobRequest{
 		Command: req.Command,
@@ -199,7 +205,7 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 		Network:           network,
 		Volumes:           req.Volumes,
 		Runtime:           req.Runtime,
-		Environment:       environment,
+		Environment:       req.Environment,
 		SecretEnvironment: req.SecretEnvironment,
 		JobType:           jobType,
 		GPUCount:          req.GpuCount,
@@ -214,28 +220,40 @@ func (s *JobServiceServer) convertToJobRequest(req *pb.RunJobRequest) (*interfac
 	return jobRequest, nil
 }
 
-// reservedEnvKeys are environment variables the joblet runtime sets and the
-// isolation layer trusts; clients must not be able to supply them through a
-// job request.
-var reservedEnvKeys = map[string]bool{
-	"JOB_TYPE": true,
+// reservedEnvPrefixes and reservedEnvExact name the environment namespace the
+// joblet runtime controls. The in-namespace init and the isolation layer read
+// these to decide the execution mode, filesystem paths, and runtime/volume
+// mounts, so a client that could set one could flip the job process into server
+// mode (JOBLET_MODE - runs the daemon as un-chrooted root with the private-key
+// config) or bind arbitrary host paths into the sandbox. Jobs launch via
+// os/exec, which keeps the LAST duplicate of a key, so a client value appended
+// after the trusted one would win - hence these are rejected at the request
+// boundary, not merely stripped.
+var reservedEnvPrefixes = []string{"JOB_", "JOBLET_"}
+
+var reservedEnvExact = map[string]bool{
+	"RUNTIME_MANAGER_PATH": true,
+	"NETWORK_READY_FILE":   true,
 }
 
-// sanitizeClientEnvironment returns a copy of the client-supplied environment
-// with reserved control variables removed. A nil or empty input is returned
-// unchanged.
-func sanitizeClientEnvironment(env map[string]string) map[string]string {
-	if len(env) == 0 {
-		return env
-	}
-	sanitized := make(map[string]string, len(env))
+// validateClientEnvironment rejects client-supplied environment variables that
+// collide with the reserved joblet namespace or are malformed. It is applied to
+// both the plain and secret environment maps.
+func validateClientEnvironment(env map[string]string) error {
 	for k, v := range env {
-		if reservedEnvKeys[k] {
-			continue
+		if err := validation.ValidateEnvironmentVariable(k, v); err != nil {
+			return err
 		}
-		sanitized[k] = v
+		if reservedEnvExact[k] {
+			return fmt.Errorf("environment variable %q is reserved by joblet and cannot be set by a client", k)
+		}
+		for _, p := range reservedEnvPrefixes {
+			if strings.HasPrefix(k, p) {
+				return fmt.Errorf("environment variable %q uses the reserved %q namespace and cannot be set by a client", k, p)
+			}
+		}
 	}
-	return sanitized
+	return nil
 }
 
 func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) error {

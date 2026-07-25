@@ -547,6 +547,16 @@ func loadFromFile(config *Config) (string, error) {
 // error; init mode inside job containers tolerates it.
 const BuiltInDefaultsPath = "built-in defaults (no config file found)"
 
+// LooksLikeJobProcess reports whether the current environment carries the
+// job-control variables the server sets only when launching a job's init
+// process. Such a process must run in init mode; if it instead reaches the
+// server path, the execution mode was tampered with (e.g. a client-injected
+// JOBLET_MODE that won the os/exec last-duplicate race) and it must refuse to
+// start the daemon rather than run it as un-chrooted root inside a job.
+func LooksLikeJobProcess() bool {
+	return os.Getenv("JOB_ID") != "" || os.Getenv("JOB_CGROUP_HOST_PATH") != ""
+}
+
 // InitConfig returns the configuration for the job init process: built-in
 // defaults overridden by the effective values the server loaded at startup
 // and forwarded through the job environment (JOB_FS_*). Init never reads
