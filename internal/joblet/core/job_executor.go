@@ -5,8 +5,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	"github.com/ehsaniara/joblet/internal/joblet/core/environment"
@@ -14,7 +12,6 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
 	"github.com/ehsaniara/joblet/internal/joblet/core/unprivileged"
 	"github.com/ehsaniara/joblet/internal/joblet/core/upload"
-	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	"github.com/ehsaniara/joblet/internal/joblet/network"
@@ -123,11 +120,6 @@ func (ee *ExecutionEngineV2) StartProcess(ctx context.Context, opts *StartProces
 	log := ee.logger.WithField("job_uuid", opts.Job.Uuid)
 	log.Debug("starting job process", "hasUploads", len(opts.Uploads) > 0)
 
-	// Check if we're in CI mode - if so, use lightweight isolation
-	if ee.platform.Getenv("JOBLET_CI_MODE") == "true" {
-		return ee.executeCICommand(ctx, opts)
-	}
-
 	// Use coordinator for full isolation
 	execOpts := &execution.StartProcessOptions{
 		Job:               opts.Job,
@@ -149,89 +141,6 @@ func (ee *ExecutionEngineV2) StartProcessWithUploads(ctx context.Context, job *d
 		EnableStreaming: true,
 	}
 	return ee.StartProcess(ctx, opts)
-}
-
-// executeCICommand executes a job in CI mode with minimal isolation
-func (ee *ExecutionEngineV2) executeCICommand(ctx context.Context, opts *StartProcessOptions) (platform.Command, error) {
-	log := ee.logger.WithField("job_uuid", opts.Job.Uuid).WithField("mode", "ci-isolated")
-
-	// Create job directory for workspace
-	jobDir := filepath.Join(ee.config.Filesystem.BaseDir, opts.Job.Uuid)
-	workDir := filepath.Join(jobDir, "work")
-	if err := ee.platform.MkdirAll(workDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create work directory: %w", err)
-	}
-
-	// Process uploads if any
-	if len(opts.Uploads) > 0 {
-		for _, upload := range opts.Uploads {
-			// Reject "../" traversal before writing: this runs as root on the
-			// host with no chroot, so an escaping path is an arbitrary host write.
-			fullPath, err := validation.ValidatePathWithinBase(workDir, upload.Path)
-			if err != nil {
-				return nil, err
-			}
-			mode := domain.SanitizeUploadMode(upload.Mode)
-			if upload.IsDirectory {
-				if err := os.MkdirAll(fullPath, mode); err != nil {
-					return nil, fmt.Errorf("failed to create directory %s: %w", upload.Path, err)
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-					return nil, fmt.Errorf("failed to create parent directory for %s: %w", upload.Path, err)
-				}
-				if err := os.WriteFile(fullPath, upload.Content, mode); err != nil {
-					return nil, fmt.Errorf("failed to write file %s: %w", upload.Path, err)
-				}
-			}
-		}
-		log.Debug("processed uploads for CI mode", "count", len(opts.Uploads))
-	}
-
-	// Build environment
-	environment := ee.buildEnvironmentForCI(opts.Job)
-
-	outputWriter := NewWrite(ee.store, opts.Job.Uuid)
-
-	// Create command directly (no isolation)
-	cmd := ee.platform.CreateCommand(opts.Job.Command, opts.Job.Args...)
-	cmd.SetEnv(environment)
-	cmd.SetDir(workDir)
-	cmd.SetStdout(outputWriter)
-	cmd.SetStderr(outputWriter)
-
-	log.Info("starting CI command", "command", opts.Job.Command, "args", opts.Job.Args)
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start CI command: %w", err)
-	}
-
-	log.Info("CI command started successfully")
-	return cmd, nil
-}
-
-// buildEnvironmentForCI creates a simplified environment for CI execution
-func (ee *ExecutionEngineV2) buildEnvironmentForCI(job *domain.Job) []string {
-	// Get base environment from platform
-	baseEnv := ee.platform.Environ()
-
-	// Create job-specific environment
-	jobEnv := make([]string, 0, len(baseEnv)+len(job.Environment)+len(job.SecretEnvironment))
-
-	// Add base environment
-	jobEnv = append(jobEnv, baseEnv...)
-
-	// Add job environment variables
-	for key, value := range job.Environment {
-		jobEnv = append(jobEnv, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	// Add secret environment variables
-	for key, value := range job.SecretEnvironment {
-		jobEnv = append(jobEnv, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	return jobEnv
 }
 
 // Adapter implementations to bridge between the new interfaces and existing implementations
