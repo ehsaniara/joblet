@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
+	"github.com/ehsaniara/joblet/internal/joblet/core/unprivileged"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
@@ -201,6 +202,16 @@ func (m *Manager) createVolumeStorage(volume *domain.Volume) error {
 		if err := m.setupMemoryVolume(volume, dataDir); err != nil {
 			return fmt.Errorf("failed to setup memory volume: %w", err)
 		}
+	}
+
+	// Jobs run as the unprivileged user (nobody) and the volume data dir is bind
+	// mounted into the job at /volumes/<name>. The dir - and, for loop/tmpfs
+	// volumes, the freshly created filesystem root - is root-owned by default, so
+	// without this the job cannot write to its own volume. Chown to the job user
+	// after the mount so it is the owner and can read/write. Done last so it
+	// applies to whatever filesystem now backs dataDir.
+	if err := os.Chown(dataDir, unprivileged.UnprivilegedUID, unprivileged.UnprivilegedGID); err != nil {
+		return fmt.Errorf("failed to set volume data ownership to job user: %w", err)
 	}
 
 	log.Debug("volume storage created", "dataDir", dataDir, "metaFile", metaFile)
