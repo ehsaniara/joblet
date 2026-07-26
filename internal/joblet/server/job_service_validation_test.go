@@ -144,3 +144,34 @@ func TestValidateJobRequest_NegativeGPUCount(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gpuCount")
 }
+
+func TestValidateJobRequest_RejectsTraversalVolumeNames(t *testing.T) {
+	// Volume names reach a root-side bind-mount path in the job init process;
+	// a name containing "../" or a slash could escape the volumes base, so
+	// submission must reject anything that isn't a plain volume name.
+	s := newTestJobService(t.TempDir())
+
+	bad := []string{
+		"../etc",
+		"../../etc/passwd",
+		"foo/bar",
+		"/etc",
+		"..",
+		"foo/../bar",
+		"",
+	}
+	for _, name := range bad {
+		err := s.validateJobRequest(&interfaces.StartJobRequest{Volumes: []string{name}})
+		require.Error(t, err, "expected rejection for volume name %q", name)
+		assert.Contains(t, err.Error(), "volume name", "name %q", name)
+	}
+}
+
+func TestValidateJobRequest_AcceptsPlainVolumeNames(t *testing.T) {
+	s := newTestJobService(t.TempDir())
+
+	for _, name := range []string{"data", "my-vol", "vol_1", "cache123"} {
+		err := s.validateJobRequest(&interfaces.StartJobRequest{Volumes: []string{name}})
+		assert.NoError(t, err, "expected plain volume name %q to be accepted", name)
+	}
+}

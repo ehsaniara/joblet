@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/ehsaniara/joblet/internal/joblet/core/validation"
 	"github.com/ehsaniara/joblet/internal/joblet/runtime"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
@@ -934,6 +935,17 @@ func (f *JobFilesystem) mountVolumes() error {
 func (f *JobFilesystem) mountSingleVolume(volumeName string) error {
 	log := f.logger.WithField("volume", volumeName)
 	// Mounting volume
+
+	// Defense in depth: the server already rejects malformed volume names at the
+	// API boundary, but this runs as root and builds bind-mount paths from the
+	// name, so re-verify the resolved mount point stays under the volumes base
+	// before creating any directory or mounting. A "../" name would otherwise
+	// escape the chroot's /volumes and land the mount anywhere on the host.
+	volumesBase := filepath.Join(f.RootDir, "volumes")
+	if _, err := validation.ValidatePathWithinBase(volumesBase, volumeName); err != nil {
+		log.Error("refusing to mount volume with unsafe name", "error", err, "volumeName", volumeName)
+		return fmt.Errorf("invalid volume name %q: %w", volumeName, err)
+	}
 
 	// Host volume path - this is where the actual volume data lives
 	hostVolumePath := fmt.Sprintf("%s/%s/data", f.getVolumesBasePath(), volumeName)
