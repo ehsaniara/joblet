@@ -591,9 +591,11 @@ func (c *cgroup) AddProcessToCgroup(cgroupPath string, pid int) error {
 	return nil
 }
 
-// SetGPUDevices configures GPU device access for cgroups v2
-// In cgroups v2, device access control is handled through namespace isolation
-// and device node creation rather than the legacy devices controller
+// SetGPUDevices dispatches GPU device handling by cgroup version. On v1 it writes
+// devices.allow rules; on v2 (the default on modern hosts) it only logs, since v2
+// has no devices controller. Either way the effect is limited today: the matching
+// /dev/nvidia* nodes are never created inside the job (device-node passthrough is
+// not wired into job execution), so a GPU job sees only visible-devices env vars.
 func (c *cgroup) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "gpuIndices", gpuIndices)
 	log.Debug("configuring GPU device access for cgroups v2")
@@ -677,41 +679,19 @@ func (c *cgroup) setGPUDevicesV1(cgroupPath string, gpuIndices []int, log *logge
 	return nil
 }
 
-// setGPUDevicesV2 handles GPU device access control for cgroups v2
+// setGPUDevicesV2 does not enforce GPU device access on cgroups v2. cgroups v2
+// has no devices controller, and the device-node passthrough that would restrict
+// access is not wired into the execution path (CreateGPUDeviceNodes is a no-op),
+// so this function only validates the cgroup and logs. A GPU job today is limited
+// to visible-devices env vars, not kernel-enforced device isolation.
 func (c *cgroup) setGPUDevicesV2(cgroupPath string, gpuIndices []int, log *logger.Logger) error {
-	log.Debug("using cgroups v2 approach for GPU access control")
-
-	// In cgroups v2, device access control has been moved out of cgroups
-	// Device access is now controlled through:
-	// 1. Namespace isolation (mount namespace) - handled by IsolationManager.CreateGPUDeviceNodes()
-	// 2. Device node creation with proper permissions - handled by filesystem isolator
-	// 3. Optional: eBPF programs for fine-grained control (not implemented here)
-
 	// Validate that the cgroup exists
 	if _, err := c.platform.Stat(cgroupPath); c.platform.IsNotExist(err) {
 		return fmt.Errorf("cgroup path does not exist: %s", cgroupPath)
 	}
 
-	// Log that device access control is handled by namespace isolation
-	log.Info("GPU device access control in cgroups v2 is handled by namespace isolation and device node creation",
+	log.Debug("cgroups v2 has no devices controller; GPU device access is not kernel-enforced",
 		"cgroupPath", cgroupPath,
-		"gpuIndices", gpuIndices,
-		"approach", "namespace-isolation")
-
-	// In cgroups v2, we don't need to write to device control files
-	// The actual device access control happens in:
-	// - internal/joblet/core/filesystem/isolator.go:CreateGPUDeviceNodes()
-	// - Mount namespace isolation restricts device access to only created nodes
-
-	// Verify that device nodes will be created properly by logging the expected devices
-	expectedDevices := []string{"/dev/nvidiactl", "/dev/nvidia-uvm"}
-	for _, gpuIndex := range gpuIndices {
-		expectedDevices = append(expectedDevices, fmt.Sprintf("/dev/nvidia%d", gpuIndex))
-	}
-
-	log.Debug("GPU device access will be controlled by namespace isolation",
-		"expectedDevices", expectedDevices,
-		"note", "device nodes created by IsolationManager.CreateGPUDeviceNodes()")
-
+		"gpuIndices", gpuIndices)
 	return nil
 }

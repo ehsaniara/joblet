@@ -194,10 +194,10 @@ func (i *Isolator) verifyIsolation() error {
 		pid1Process := strings.TrimSpace(string(comm))
 		// PID 1 check passed
 
-		// In isolated namespace, PID 1 should be either:
-		// - "joblet" (original binary name)
-		// - "init" (renamed for security)
-		// - The actual command after exec (e.g., "ps", "bash", etc.)
+		// In an isolated namespace, PID 1 is one of:
+		// - "joblet" (the binary name)
+		// - "init" (the process name the job init runs under)
+		// - the actual command after exec (e.g., "ps", "bash", etc.)
 		validPid1Names := []string{"joblet", "init", "systemd"}
 
 		isValid := false

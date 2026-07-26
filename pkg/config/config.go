@@ -146,9 +146,9 @@ type RuntimeConfig struct {
 	BasePath      string   `yaml:"base_path" json:"base_path"`
 	CommonPaths   []string `yaml:"common_paths" json:"common_paths"`
 	AllowedMounts []string `yaml:"allowed_mounts" json:"allowed_mounts"` // Paths mounted read-only into job sandbox
-	// Note: Runtime builds now use OverlayFS isolation (see pkg/builder/isolation.go)
-	// The entire host filesystem is mounted read-only as the lower layer,
-	// so InstallWritablePaths, InstallHostBinds, and InstallEnvPath are no longer needed.
+	// Runtime builds isolate via OverlayFS (pkg/builder/isolation.go): the host
+	// filesystem is the read-only lower layer, so no per-runtime writable-path,
+	// host-bind, or env-path settings are required here.
 }
 
 // GPUConfig holds GPU support configuration
@@ -651,8 +651,6 @@ func loadRuntimeConfig(config *Config) (string, error) {
 		if len(runtimeWrapper.Runtime.AllowedMounts) > 0 {
 			config.Runtime.AllowedMounts = runtimeWrapper.Runtime.AllowedMounts
 		}
-		// Note: InstallWritablePaths, InstallHostBinds, InstallEnvPath are no longer used
-		// Runtime builds now use OverlayFS isolation (see pkg/builder/isolation.go)
 
 		return path, nil
 	}
