@@ -64,8 +64,6 @@ type MetricQuery struct {
 }
 
 // EventReader provides generic streaming access to events of type T.
-// This replaces the previous type-specific readers (LogReader, MetricReader, etc.)
-// reducing ~70 lines of duplicated struct definitions.
 type EventReader[T any] struct {
 	Channel chan T
 	Error   chan error

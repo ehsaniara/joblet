@@ -115,7 +115,7 @@ func RunServer(cfg *config.Config) error {
 		log.Info("connected to persist service for historical data deletion", "socket", persistSocketPath)
 	}
 
-	// Create telemetry collector for unified telemetry streaming (ADR-014)
+	// Create telemetry collector for unified telemetry streaming
 	telemetryCollector := telemetry.NewCollector(1000) // Buffer up to 1000 events per job
 
 	metricsStoreAdapter := adapters.NewMetricsStoreAdapter(
@@ -124,7 +124,7 @@ func RunServer(cfg *config.Config) error {
 		logger.WithField("component", "metrics-store"),
 	)
 
-	// Create volume manager using the new adapter
+	// Create volume manager
 	if cfg.Volumes.BasePath == "" {
 		return fmt.Errorf("volumes base path not configured")
 	}
@@ -136,13 +136,13 @@ func RunServer(cfg *config.Config) error {
 		// Continue - don't fail server startup due to volume scan errors
 	}
 
-	// Create joblet with configuration using new adapters directly
+	// Create joblet with configuration and store adapters
 	jobletInstance := joblet.NewJoblet(jobStoreAdapter, metricsStoreAdapter, cfg, networkStoreAdapter)
 	if jobletInstance == nil {
 		return fmt.Errorf("failed to create joblet for current platform")
 	}
 
-	// Initialize eBPF telematics monitor for job activity tracking (ADR-014)
+	// Initialize eBPF telematics monitor for job activity tracking
 	var telematicsMonitor *telematics.Monitor
 	if err := telematics.IsSupported(); err != nil {
 		log.Info("eBPF telematics not available", "reason", err)
@@ -277,7 +277,7 @@ func RunServer(cfg *config.Config) error {
 		}
 	}
 
-	// Start gRPC server with configuration using new adapters
+	// Start gRPC server with configuration
 	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, telemetryCollector, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)
@@ -354,7 +354,7 @@ func RunJobInit(cfg *config.Config) error {
 	case "execute":
 		return runExecutePhase(cfg, initLogger, platformInstance)
 	default:
-		// Legacy support - treat as execute phase
+		// No phase specified: default to the execute phase.
 		initLogger.Warn("no phase specified, assuming execute phase")
 		return runExecutePhase(cfg, initLogger, platformInstance)
 	}
@@ -406,7 +406,7 @@ func runUploadPhase(cfg *config.Config, logger *logger.Logger, platform platform
 	return processUploadsInCgroup(cfg, logger, platform)
 }
 
-// runExecutePhase handles the execution phase (existing logic refactored).
+// runExecutePhase handles the execution phase.
 // Executes the actual job command within full isolation and resource constraints.
 // Waits for network setup, assigns to cgroup, verifies resource limits,
 // and delegates to the job execution engine.

@@ -27,8 +27,8 @@ const (
 	// but cannot create or remove infrastructure.
 	DeveloperRole ClientRole = "developer"
 	// ReaderRole has read-only access to jobs, logs, and telemetry, for
-	// reporting and observability. Certificates with OU "viewer" (the
-	// pre-four-role name) map to this role.
+	// reporting and observability. Certificates with OU "reader" or
+	// "viewer" both map to this role.
 	ReaderRole  ClientRole = "reader"
 	UnknownRole ClientRole = "unknown"
 )
@@ -162,7 +162,7 @@ func (s *grpcAuthorization) extractClientRole(ctx context.Context) (ClientRole, 
 			candidate = MaintainerRole
 		case "developer":
 			candidate = DeveloperRole
-		case "reader", "viewer": // "viewer" is the pre-four-role name
+		case "reader", "viewer": // "viewer" is an accepted alias for reader
 			candidate = ReaderRole
 		default:
 			continue

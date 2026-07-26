@@ -63,7 +63,7 @@ func (m *Manager) PrepareUploadSession(jobID string, uploads []domain.FileUpload
 	return session, nil
 }
 
-// CreateTransport creates a transport for uploads (replaces CreateUploadPipe)
+// CreateTransport creates a transport for uploads
 func (m *Manager) CreateTransport(jobID string) (domain.UploadTransport, error) {
 	pipeDir := fmt.Sprintf("/opt/joblet/jobs/%s/pipes", jobID)
 

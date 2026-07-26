@@ -92,7 +92,7 @@ func (c *CUDADetector) DetectCUDAInstallations() ([]CUDAInstallation, error) {
 func (c *CUDADetector) DetectCUDA() ([]string, error) {
 	c.logger.Debug("detecting CUDA installations")
 
-	// Common CUDA installation paths (as specified in design doc)
+	// Common CUDA installation paths
 	candidatePaths := []string{
 		"/usr/local/cuda",
 		"/opt/cuda",

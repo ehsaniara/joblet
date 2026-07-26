@@ -1,7 +1,6 @@
 package constants
 
-// System constants that are used across the codebase
-// These values were previously hard-coded in various places
+// System constants shared across the codebase, kept here as a single source of truth
 
 const (
 	// Memory and storage units

@@ -54,7 +54,7 @@ func NewExecutionEngineV2(
 	// Create environment builder
 	envBuilder := environment.NewBuilder(platform, uploadManager, config, logger)
 
-	// Create environment service (runtime functionality now handled by filesystem isolator)
+	// Create environment service (runtime functionality is handled by the filesystem isolator)
 	envService := execution.NewEnvironmentService(
 		envBuilder,
 		uploadManager,
@@ -291,30 +291,26 @@ func (ima *isolationManagerAdapter) DestroyIsolatedEnvironment(jobID string) err
 	return nil
 }
 
-// CreateGPUDeviceNodes creates GPU device nodes in the isolated environment
+// CreateGPUDeviceNodes is a no-op: GPU device-node passthrough is not wired into
+// the job execution path. The job only receives CUDA_VISIBLE_DEVICES/NVIDIA_VISIBLE_DEVICES
+// env vars; no /dev/nvidia* nodes are created inside the job. A working mknod
+// implementation exists in the filesystem isolator but is not currently invoked.
 func (ima *isolationManagerAdapter) CreateGPUDeviceNodes(jobID string, gpuIndices []int) error {
 	if len(gpuIndices) == 0 {
 		return nil
 	}
-
-	// Note: GPU device node creation will happen during job execution
-	// when the filesystem isolator creates the job environment.
-	// This is a placeholder that stores the requirement for later use.
-
-	ima.logger.Debug("GPU device nodes will be created during job execution", "job_uuid", jobID, "gpuIndices", gpuIndices)
+	ima.logger.Debug("GPU device node passthrough not wired; job uses visible-devices env vars only", "job_uuid", jobID, "gpuIndices", gpuIndices)
 	return nil
 }
 
-// MountCUDALibraries mounts CUDA libraries in the isolated environment
+// MountCUDALibraries is a no-op: CUDA library mounting is not wired into the job
+// execution path. No CUDA libraries are bind mounted into the job; only the
+// visible-devices env vars are set. A working implementation exists in the
+// filesystem isolator but is not currently invoked.
 func (ima *isolationManagerAdapter) MountCUDALibraries(jobID string, cudaPath string) error {
 	if cudaPath == "" {
 		return fmt.Errorf("empty CUDA path")
 	}
-
-	// Note: CUDA library mounting will happen during job execution
-	// when the filesystem isolator sets up the job environment.
-	// This is a placeholder that stores the requirement for later use.
-
-	ima.logger.Debug("CUDA libraries will be mounted during job execution", "job_uuid", jobID, "cudaPath", cudaPath)
+	ima.logger.Debug("CUDA library mounting not wired; job uses visible-devices env vars only", "job_uuid", jobID, "cudaPath", cudaPath)
 	return nil
 }

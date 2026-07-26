@@ -1,6 +1,6 @@
 // Package telemetry provides unified telemetry collection for jobs.
 // It combines metrics (from cgroups v2) and activity events (from eBPF)
-// into a single telemetry pipeline as described in ADR-014.
+// into a single telemetry pipeline.
 package telemetry
 
 import (

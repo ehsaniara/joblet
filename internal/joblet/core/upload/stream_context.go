@@ -328,7 +328,7 @@ func (m *Manager) ProcessDirectUploads(ctx context.Context, config *StreamConfig
 		return fmt.Errorf("failed to prepare upload session: %w", err)
 	}
 
-	// Process files directly to workspace - simplified for now
+	// Files are validated and counted during session preparation above
 	log.Debug("direct upload processing completed", "filesProcessed", len(session.Files))
 	return nil
 }

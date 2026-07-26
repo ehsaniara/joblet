@@ -113,8 +113,8 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 		status.FilesCleaned = true
 	}
 
-	// 3. Runtime cleanup is now handled by the filesystem isolator during unmounting
-	// No separate runtime cleanup needed since runtime mounts are cleaned up with job filesystem
+	// 3. Runtime cleanup happens in the filesystem isolator during unmounting;
+	// runtime mounts are cleaned up together with the job filesystem
 
 	// Clean up network resources if network store is available
 	if c.networkStore != nil {
