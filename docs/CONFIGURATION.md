@@ -906,7 +906,6 @@ openssl req -new -key client-key.pem -out reader.csr \
 | `JOBLET_SERVER_PORT`         | Server port override               | from config                             |
 | `JOBLET_NODE_ID`             | Node identifier override           | from config                             |
 | `JOBLET_MAX_JOBS`            | Maximum concurrent jobs            | from config                             |
-| `JOBLET_CI_MODE`             | Enable CI mode (relaxed isolation) | `false`                                 |
 
 ### Client Environment Variables
 
