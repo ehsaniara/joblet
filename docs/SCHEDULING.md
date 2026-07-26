@@ -18,7 +18,7 @@ for future execution, architecture details, multi-node behavior, and persistence
 
 ## Overview
 
-Joblet supports scheduling jobs for future execution using RFC3339 timestamps. Scheduled jobs are:
+Joblet supports scheduling jobs for future execution using either relative durations (e.g. `30min`, `2h30m`) or absolute RFC3339 timestamps. Scheduled jobs are:
 
 - **Persisted** to DynamoDB for durability across restarts
 - **Node-specific** - each job runs only on the node that created it
@@ -29,7 +29,7 @@ Joblet supports scheduling jobs for future execution using RFC3339 timestamps. S
 
 | Feature | Behavior |
 |---------|----------|
-| Time Format | RFC3339 (e.g., `2025-01-15T10:30:00Z`) |
+| Time Format | Relative duration (e.g., `30min`, `2h30m`) or RFC3339 (e.g., `2025-01-15T10:30:00Z`) |
 | Timezone | UTC recommended, local time supported |
 | Persistence | DynamoDB (survives restarts) |
 | Node Affinity | Jobs execute on creating node only |
@@ -57,17 +57,36 @@ rnx job run --schedule="2025-01-15T14:00:00Z" \
 
 ### Schedule Format
 
-The schedule parameter must be in RFC3339 format:
+The schedule parameter accepts either a relative duration or an absolute timestamp.
+
+**Relative durations** (from now):
+
+```text
+45s        # 45 seconds from now
+30min      # 30 minutes from now
+1hour      # 1 hour from now
+2h30m      # 2 hours 30 minutes from now
+```
+
+Supported units are hours (`h`, `hour`, `hours`), minutes (`m`, `min`, `mins`,
+`minute`, `minutes`), and seconds (`s`, `sec`, `secs`, `second`, `seconds`).
+The minimum is 1 second and the maximum is 1 year.
+
+**Absolute timestamps** (RFC3339):
 
 ```text
 YYYY-MM-DDTHH:MM:SSZ          # UTC time
 YYYY-MM-DDTHH:MM:SS+HH:MM     # With positive offset
 YYYY-MM-DDTHH:MM:SS-HH:MM     # With negative offset
+YYYY-MM-DDTHH:MM:SS           # No timezone (assumed local time)
 ```
 
 **Examples:**
 
 ```bash
+# Relative duration
+--schedule="30min"
+
 # UTC time
 --schedule="2025-06-15T09:00:00Z"
 
@@ -83,16 +102,16 @@ YYYY-MM-DDTHH:MM:SS-HH:MM     # With negative offset
 Scheduled jobs support file uploads. Files are staged immediately and stored until execution:
 
 ```bash
-# Schedule job with file upload
+# Schedule job with file upload (files land under /work at their base name)
 rnx job run --schedule="2025-01-15T10:00:00Z" \
-    --upload=./data.csv:/workspace/data.csv \
-    python3 /workspace/process.py
+    --upload=./data.csv \
+    python3 process.py
 
 # Multiple files
 rnx job run --schedule="2025-01-15T10:00:00Z" \
-    --upload=./config.yaml:/app/config.yaml \
-    --upload=./script.py:/app/script.py \
-    python3 /app/script.py
+    --upload=./config.yaml \
+    --upload=./script.py \
+    python3 script.py
 ```
 
 ### Response
@@ -251,11 +270,11 @@ Jobs whose scheduled time passed during downtime execute immediately:
 # List all jobs (includes scheduled)
 rnx job list
 
-# Filter by status
-rnx job list --status=SCHEDULED
+# Filter by status client-side (job list has no server-side filter)
+rnx job list --json | jq '.[] | select(.status == "SCHEDULED")'
 
-# JSON output for scripting
-rnx job list --status=SCHEDULED --json
+# Just the UUIDs of scheduled jobs
+rnx job list --json | jq -r '.[] | select(.status == "SCHEDULED") | .id'
 ```
 
 ### View Scheduled Job Details
@@ -275,12 +294,8 @@ Node:       node-prod-1
 ### gRPC API
 
 ```protobuf
-// List scheduled jobs
-rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
-
-message ListJobsRequest {
-  string status_filter = 1;  // "SCHEDULED"
-}
+// List all jobs (no server-side filter; filter by status on the client)
+rpc ListJobs(EmptyRequest) returns (Jobs);
 ```
 
 ## Canceling Scheduled Jobs
@@ -288,12 +303,12 @@ message ListJobsRequest {
 ### Cancel Before Execution
 
 ```bash
-# Cancel a scheduled job
-rnx job stop <job-id>
-
-# Force cancel (if stuck)
-rnx job stop --force <job-id>
+# Cancel a scheduled job (before it starts)
+rnx job cancel <job-id>
 ```
+
+Use `rnx job cancel` for jobs still in `SCHEDULED` status. `rnx job stop` is for
+jobs that are already `RUNNING` (which transition to `STOPPED`, not `CANCELED`).
 
 **Result:**
 - Job removed from scheduler queue
@@ -321,7 +336,6 @@ rnx job delete <job-id>
 ### Not Supported
 
 - **Cron expressions** (e.g., `0 */2 * * *`)
-- **Relative scheduling** (e.g., "5 minutes from now")
 - **Job dependencies** (e.g., "run after job X completes")
 - **Cross-node execution** (jobs only run on creating node)
 
@@ -357,7 +371,7 @@ rnx job run --schedule="2025-01-15T10:00:00-05:00" ./script.sh
 rnx job run --schedule="2025-01-15T02:00:00Z" \
     --max-cpu=80 \
     --max-memory=2048 \
-    --max-io=50 \
+    --max-iobps=52428800 \
     ./nightly_backup.sh
 ```
 
@@ -422,7 +436,7 @@ rnx job run --schedule="2020-01-01T00:00:00Z" echo "runs now"
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `invalid schedule format` | Non-RFC3339 timestamp | Use `YYYY-MM-DDTHH:MM:SSZ` format |
+| `invalid schedule` | Unrecognized schedule spec | Use a relative duration (e.g. `30min`) or RFC3339 timestamp |
 | `job not found` | Job deleted or wrong ID | Verify job ID with `rnx job list` |
 | `state client not available` | DynamoDB connection issue | Check state service logs |
 

@@ -327,9 +327,9 @@ rnx job run ls /opt/joblet         # No access to joblet internals
 
 ```bash
 # Controlled host OS access (ONLY during runtime building)
-# - Full host filesystem (read-only)
-# - Package managers available 
-# - /opt/joblet/runtimes writable
+# - Full host filesystem via OverlayFS (host root is a read-only lower layer)
+# - Writes are captured in an upper layer; the host filesystem is never modified
+# - Package managers available (runtime builds share host networking)
 # - Automatic cleanup creates isolated runtime structure
 ```
 
@@ -576,22 +576,19 @@ joblet:
 security:
   require_client_cert: true
   verify_client_cert: true
-  enable_rbac: true
-
-  # Comprehensive auditing
-  audit:
-    enabled: true
-    log_all_operations: true
-    log_failed_auth: true
-
-filesystem:
-  enable_chroot: true
-  readonly_rootfs: true
-
-process:
-  default_user: "nobody"
-  allow_setuid: false
 ```
+
+**Note on what is and isn't configurable:**
+
+- **RBAC is always on and has no toggle.** Authorization is enforced from the client certificate's OU field on every
+  request (see [Authorization and RBAC](#authorization-and-rbac)); there is no `security.enable_rbac` setting to turn
+  it off.
+- **setuid escalation is mitigated by the privilege drop, not by mount flags.** Standard jobs drop to uid/gid 65534
+  (`nobody`) before the command executes, so a setuid binary in the chroot cannot elevate them. Joblet does not
+  currently apply `nosuid`/`nodev`/`noexec` mount flags (the constants are defined in the codebase but not used in any
+  mount call), and there is no `process.allow_setuid`, `process.default_user`, or `filesystem.readonly_rootfs` setting.
+- **There is no built-in audit-log subsystem to configure.** The `security.audit.*` keys shown in earlier revisions of
+  this guide are not implemented. Use standard logging plus your host's audit tooling instead.
 
 ### File Permissions
 
@@ -613,6 +610,10 @@ sudo chown root:joblet /var/log/joblet/*.log
 
 ### Security Logging
 
+> **Illustrative.** The `security.audit.*` block below is **not** a supported configuration subsystem - Joblet does not
+> read these keys. Joblet writes operational logs (the daemon logs authorization decisions and job lifecycle events);
+> route those to a file or syslog with your host's logging stack rather than expecting a built-in audit config.
+
 ```yaml
 # Enable comprehensive logging
 logging:
@@ -627,6 +628,7 @@ logging:
     - type: "syslog"
       facility: "auth"
 
+# NOTE: the security.audit.* keys below are aspirational and NOT read by Joblet
 security:
   audit:
     enabled: true
@@ -688,8 +690,14 @@ echo "*/5 * * * * /opt/joblet/scripts/security_monitor.sh" | sudo crontab -
 
 ### SOC 2 Compliance
 
+> **Illustrative / aspirational - NOT currently supported.** The keys below (`security.audit.*`,
+> `access_control.require_mfa`, `session_timeout`, `logging.immutable_logs`, `log_integrity_check`) are **not**
+> implemented in Joblet and setting them has no effect. They are shown only to sketch the controls a SOC 2 program
+> typically expects; implement them at the host/platform layer (external audit log shipping, MFA on the operator's
+> access path, immutable log storage). RBAC and mTLS, which Joblet does enforce, are covered above.
+
 ```yaml
-# Configuration for SOC 2
+# Aspirational sketch - these keys are NOT read by Joblet
 security:
   audit:
     enabled: true

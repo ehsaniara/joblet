@@ -162,16 +162,15 @@ Joblet validates environment variables for:
 
 ### Name Validation
 
-- Format: `^[A-Z][A-Z0-9_]*$`
-- Must start with uppercase letter
-- Can contain uppercase letters, numbers, and underscores
-- Maximum length: 256 characters
+- Format: `^[a-zA-Z_][a-zA-Z0-9_]*$`
+- Must start with a letter or underscore
+- Can contain letters (upper or lower case), numbers, and underscores
+- No maximum name length is enforced
 
 ### Value Validation
 
-- Maximum size: 32KB per variable
-- No null bytes allowed
-- UTF-8 encoding required
+- Maximum size: 32KB (32768 bytes) per variable value
+- No other content checks are applied (no null-byte or UTF-8 validation)
 
 ### Conflict Detection
 
@@ -185,7 +184,24 @@ jobs:
 
 ### Reserved Variables
 
-Warning issued for system variables:
+#### Rejected (hard error)
+
+The server **rejects the job outright** (gRPC error, job not created) if any
+client-supplied variable — from **either** `--env` or `--secret-env` — collides
+with the reserved joblet namespace. These names are controlled by the runtime
+and cannot be set by a client:
+
+- Any name starting with the prefix `JOB_`
+- Any name starting with the prefix `JOBLET_`
+- The exact name `RUNTIME_MANAGER_PATH`
+- The exact name `NETWORK_READY_FILE`
+
+Setting any of these causes the run to fail immediately rather than being
+silently stripped.
+
+#### Warned (system variables)
+
+A soft warning (the job still runs) is issued for common system variables:
 
 - `PATH`, `HOME`, `USER`, `SHELL`
 - `PWD`, `OLDPWD`, `LANG`

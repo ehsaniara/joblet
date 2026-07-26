@@ -251,7 +251,7 @@ rnx volume create exact --size=1073741824  # Bytes (1GB)
 
 Volume names must:
 
-- Start with a letter
+- Start and end with an alphanumeric character (a leading digit is allowed)
 - Contain only letters, numbers, hyphens, underscores
 - Be unique within the Joblet instance
 - Be 1-63 characters long
@@ -261,9 +261,9 @@ Volume names must:
 rnx volume create user-data --size=1GB
 rnx volume create app_cache_v2 --size=500MB
 rnx volume create Dataset2024 --size=10GB
+rnx volume create 123data --size=1GB      # Leading digit is valid
 
 # Invalid names (will fail)
-rnx volume create 123data --size=1GB      # Starts with number
 rnx volume create my.data --size=1GB      # Contains period
 rnx volume create "my data" --size=1GB    # Contains space
 ```

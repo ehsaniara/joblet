@@ -57,36 +57,36 @@ Production Chroot: /opt/joblet/jobs/{JOB_ID}/
 
 ### 2. Runtime Build Jobs (RuntimeService → `runtime-build` jobs)
 
-**Isolation Method:** Builder chroot with controlled host filesystem access
+**Isolation Method:** OverlayFS build environment layered over the host root
 
-**Implementation:** `jobFS.SetupBuilder()` in `filesystem/isolator.go`
+**Implementation:** `IsolatedEnvironment.Setup()` in `pkg/builder/isolation.go`
 
 **Security Boundaries:**
 
+The live `rnx runtime build` path mounts an OverlayFS in which the host root (`/`) is the **read-only lower layer**, an
+upper layer captures every write, and the merged view is what the build process actually sees:
+
 ```text
-Builder Chroot: /opt/joblet/jobs/{BUILD_ID}/
-├── bin/          # Full /bin from host (read-only bind mount)
-├── lib/          # Full /lib from host (read-only bind mount)
-├── usr/          # Full /usr from host (read-only bind mount)  
-├── etc/          # Full /etc from host (read-only bind mount)
-├── var/          # Full /var from host (read-only bind mount)
-├── home/         # Full /home from host (read-only bind mount)
-├── root/         # Full /root from host (read-only bind mount)
-├── work/         # Build workspace (writable, isolated)
-├── tmp/          # Isolated tmp: /tmp/job-{BUILD_ID}/ (writable, isolated)
-└── opt/
-    ├── [other]/  # Other /opt contents (read-only bind mount)
-    └── joblet/
-        └── runtimes/  # ONLY runtimes dir (read-write bind mount)
+OverlayFS build environment:
+  lowerdir = /                # Host root, READ-ONLY (writes never reach it)
+  upperdir = <build>/upper    # All writes land here, isolated from the host
+  workdir  = <build>/work     # OverlayFS bookkeeping (required by overlayfs)
+  merged   = <build>/merged   # Unified view the build process operates on
 ```
+
+Because the host root is the lower layer, the build has full read access to the host OS environment for compilation but
+cannot modify any host file - writes are redirected into the upper layer and discarded (or promoted into the runtime
+tree) at the end of the build. Package managers (`apt`, `pip`, `npm`) work because runtime builds share host
+networking and have working DNS.
 
 **Key Security Features:**
 
-- **Host filesystem (read-only)**: Full OS environment for compilation
-- **Recursive exclusion prevention**: `/opt/joblet/` completely excluded except `runtimes/`
-- **Controlled write access**: Only `/opt/joblet/runtimes/` is writable
-- **Isolated tmp**: Each build gets `/tmp/job-{BUILD_ID}/`
-- **Same process isolation**: PID namespace, cgroups, etc.
+- **Host root as read-only lower layer**: The build sees the full OS but every write is redirected into the upper
+  layer; the host filesystem is never modified.
+- **Writes isolated in the upper layer**: Build output is captured separately; only the produced runtime tree is
+  promoted.
+- **Isolated tmp**: Each build gets its own temporary space.
+- **Same process isolation**: PID, mount, IPC, UTS, and cgroup namespaces (runtime builds share host networking).
 
 ## Critical Security Analysis
 
@@ -176,15 +176,20 @@ func (i *Isolator) CreateBuilderFilesystem(jobID string) (*JobFilesystem, error)
 
 ### 4. Process Isolation Parity - SECURE
 
-Both job types use identical process isolation:
+Both job types use the same core process isolation:
 
 **Shared Security Features:**
 
 - **PID Namespace**: Each job is PID 1 in its own namespace
 - **Mount Namespace**: Isolated mount table
-- **Network Namespace**: Controlled networking (bridge mode)
 - **Cgroups**: Resource limits (CPU, memory, I/O)
-- **User Namespace**: Same unprivileged user context
+- **Privilege drop, not UID remapping**: No user namespace (`CLONE_NEWUSER`) is used - it is deliberately omitted
+  because it breaks the mount operations Joblet relies on. Instead, isolation of the user context comes from dropping
+  privileges to uid/gid 65534 (nobody) after isolation setup but before the job command executes.
+
+**Where they differ:** the **Network Namespace** is not shared behavior - production jobs get their own network
+namespace (bridge networking), while runtime-build jobs share the host network stack for internet access during the
+build.
 
 **Implementation Verification:**
 

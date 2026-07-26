@@ -15,13 +15,17 @@ cgroup. Full isolation, like what Docker does. But we're not building another co
 execution system, and that changes the calculus significantly.
 
 The critical realization came when we looked at our users' actual needs. They weren't trying to run isolated
-microservices. They were running data processing jobs, build tasks, and system maintenance scripts. These jobs often
-needed to interact with local services, access specific ports, or communicate with other processes on the host.
+microservices. They were running data processing jobs, build tasks, and system maintenance scripts. Most of these jobs
+run untrusted code and should be kept off the host network stack, but one class - runtime builds - genuinely needs
+outbound internet access to download packages during the build. That tension is what drove a job-type-aware decision
+rather than a single blanket policy.
 
 ## Decision
 
-We chose a selective namespace isolation strategy. We isolate PID, mount, IPC, UTS, and cgroup namespaces, but
-deliberately share the network namespace with the host.
+We chose a selective, job-type-aware namespace isolation strategy. Production jobs (submitted through JobService via
+`rnx job run`) isolate PID, mount, IPC, UTS, cgroup, AND network namespaces. Runtime-build jobs (submitted through
+RuntimeService via `rnx runtime build`) isolate everything except the network namespace, which they deliberately share
+with the host so package managers can reach the internet during the build.
 
 Here's the reasoning for each choice:
 
@@ -31,59 +35,64 @@ Here's the reasoning for each choice:
 - **IPC namespace (isolated)**: Prevents jobs from accessing host IPC resources. Security win with minimal downside.
 - **UTS namespace (isolated)**: Jobs can have their own hostname. Nice for clarity, no compatibility impact.
 - **Cgroup namespace (isolated)**: Jobs can't see or modify host cgroup settings. Essential for resource isolation.
-- **Network namespace (shared)**: Jobs use the host network stack. This was the controversial one.
+- **Network namespace (isolated for production jobs, shared for runtime builds)**: Production jobs get their own
+  network namespace (`CLONE_NEWNET`) and reach the outside world through Joblet's bridge networking. Runtime-build jobs
+  share the host network stack so `apt`, `pip`, and `npm` can fetch dependencies during the build. This was the
+  controversial one.
 
-The network namespace decision was deliberate and carefully considered. Isolated networking means complexity - bridge
-networks, NAT, port mapping, DNS configuration. It means jobs can't easily talk to localhost services. It means
-debugging network issues becomes a nightmare.
+The network namespace decision was deliberate and carefully considered. Isolating production job networking means
+complexity - bridge networks, NAT, port mapping, DNS configuration - but Joblet manages that for you, and keeping
+untrusted job code off the host network stack is a real security boundary worth the cost. Runtime builds are a
+controlled, admin/maintainer-initiated exception where internet access during the build outweighs network isolation.
 
 ## Consequences
 
 ### The Good
 
-The shared network namespace has been a huge win for usability. Jobs can connect to databases running on localhost. They
-can bind to specific ports without port mapping configuration. They can use the host's DNS settings without any setup.
-It just works, which is what users expect from a job runner.
+Isolating production job networking keeps untrusted job code off the host network stack. A job can't sniff host
+traffic, can't bind to arbitrary host ports, and can't interfere with host network services. Outbound traffic is
+routed through Joblet's bridge networking, and named networks (`--network=...`) let operators segment workloads into
+separate security zones, while `--network=none` removes networking entirely for the most sensitive jobs.
 
-From an operational perspective, this choice eliminated an entire class of problems. No troubleshooting bridge networks.
-No NAT issues. No "why can't my job reach this service" tickets. Network traffic from jobs appears as regular host
-traffic, which means existing monitoring and security tools work without modification.
+From an operational perspective, Joblet manages the bridge, NAT, and DNS setup, so for most jobs the isolation is
+transparent - they get outbound access without any per-job configuration.
 
-Performance is better too. No virtual network interfaces, no packet routing between namespaces, no NAT overhead. For
-network-heavy jobs, this matters.
+Runtime builds keep the host network stack on purpose. Building a runtime means downloading packages, which needs
+working internet access with the host's DNS and routing. Because runtime builds are admin/maintainer-initiated and run
+in the builder environment, sharing the host network here is a controlled, deliberate exception rather than the default.
 
 ### The Trade-offs
 
-Obviously, sharing the network namespace means jobs aren't network-isolated. A job can see all network traffic on the
-host (though it still can't access processes or files without permission). A job can potentially interfere with network
-services.
+Isolated networking is more moving parts than sharing the host stack: bridges, NAT rules, and DNS all have to be set
+up and maintained. We accept that cost because network isolation is a real security boundary for the untrusted code
+production jobs run.
 
-We've accepted this trade-off because our threat model is different from a multi-tenant container platform. Joblet users
-are running their own code on their own infrastructure. The isolation is about preventing accidents and containing
-failures, not about protecting against malicious actors who already have code execution rights.
+The runtime-build exception means build jobs are NOT network-isolated - they can reach the host network stack. We
+accept this because builds are initiated by trusted roles and their explicit purpose is to pull in external
+dependencies.
 
 ### The Mitigations
 
-We didn't just accept the network sharing blindly. The other namespace isolations compensate significantly:
+Network isolation is reinforced by the other namespace isolations and the privilege model:
 
 - Jobs can't see host processes, so they can't attack services directly
 - Jobs can't access the host filesystem beyond their chroot, so they can't steal credentials
-- Jobs are resource-limited through cgroups, so they can't DoS the network
-- Jobs run with limited capabilities, reducing what they can do even with network access
+- Jobs are resource-limited through cgroups, so they can't DoS the host
+- Jobs run with limited capabilities, reducing what they can do
 - **Jobs run as unprivileged user (nobody/65534)** - Even if a job escapes the chroot, it cannot elevate privileges or
   damage the host system. This privilege dropping happens after isolation setup but before the job command executes.
+  Note that Joblet does not use a user namespace (`CLONE_NEWUSER`); the user context is isolated by this post-setup
+  privilege drop, not by UID remapping.
 
-We also made it clear in documentation that Joblet provides process and filesystem isolation, not full container-style
-network isolation. Users who need network isolation can run Joblet inside a container or VM.
+For the runtime-build exception, the same process, filesystem, and privilege isolations still apply - only the network
+namespace is shared.
 
 ### The Unexpected Benefits
 
-The simplified networking made some features trivial to implement. Service discovery just works because jobs can talk to
-localhost. Distributed tracing works because jobs share the host's network context. Integration with existing
-infrastructure required zero network configuration.
-
-It also made Joblet much easier to adopt. Teams could drop it into existing environments without redesigning their
-network architecture. No firewall rules to update, no service mesh to configure, no CNI plugins to debug.
+Driving network isolation off the job type kept the design simple: production jobs are secure by default, and the one
+place that genuinely needs host networking - runtime builds - opts out explicitly rather than every job having to opt
+in. Operators who need stricter segmentation compose named networks and `--network=none` on top of the default
+isolation without touching the daemon.
 
 ## Learn More
 
