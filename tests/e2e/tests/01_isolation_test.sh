@@ -516,6 +516,36 @@ test_reserved_env_rejected() {
 
 run_test_check "Reserved environment variables rejected" test_reserved_env_rejected
 
+echo -e "\n${YELLOW}▶ 9b. Volume Name Traversal Rejection${NC}"
+echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
+
+test_volume_traversal_rejected() {
+    # A volume name becomes a root-side bind-mount path in the job init process.
+    # A "../" name must be rejected at submission, otherwise it could escape the
+    # chroot's /volumes base and mount over an arbitrary host path.
+    local out=$("$RNX_BINARY" job run --volume="../../etc" echo should-not-run 2>&1)
+    local id=$(echo "$out" | grep "^ID:" | awk '{print $2}')
+
+    if [[ -z "$id" ]] && echo "$out" | grep -qiE "invalid volume name"; then
+        echo "    Traversal volume name '../../etc' rejected at submission"
+    else
+        echo "    Traversal volume name was NOT rejected (id=$id): $out"
+        return 1
+    fi
+
+    # A plain-name volume that simply does not exist must fail for a different
+    # reason (not-found), confirming the rejection above is about the name form.
+    local out2=$("$RNX_BINARY" job run --volume="no-such-volume-xyz" echo x 2>&1)
+    if echo "$out2" | grep -qiE "invalid volume name"; then
+        echo "    Plain volume name wrongly rejected as invalid: $out2"
+        return 1
+    fi
+    echo "    Plain volume name accepted by name validation (not rejected as invalid)"
+    return 0
+}
+
+run_test_check "Volume name traversal rejected" test_volume_traversal_rejected
+
 echo -e "\n${YELLOW}▶ 10. Runtime Allowed Mounts${NC}"
 echo -e "${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 

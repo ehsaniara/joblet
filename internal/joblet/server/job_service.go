@@ -279,9 +279,12 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 		s.logger.Debug("using custom network", "network", req.Network)
 	}
 
+	// Volume names reach a root-side bind-mount path in the job init process;
+	// reject anything that isn't a plain name so a "../" name cannot escape the
+	// volume base or the job root.
 	for _, volume := range req.Volumes {
-		if volume == "" {
-			return fmt.Errorf("empty volume name not allowed")
+		if !domain.IsValidVolumeName(volume) {
+			return fmt.Errorf("invalid volume name %q: must be 1-63 characters of [a-zA-Z0-9_-], starting and ending alphanumeric", volume)
 		}
 	}
 

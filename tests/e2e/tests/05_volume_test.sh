@@ -185,51 +185,40 @@ test_volume_creation() {
 }
 
 test_volume_mounting() {
-    # Test mounting a volume to a job with remote host verification
+    # A volume is referenced by bare name (rnx job run --volume=NAME) and always
+    # mounts inside the job at /volumes/<name> - the mount path is derived from
+    # the name, not client-supplied. Verify the volume created earlier actually
+    # mounts there and is writable.
     echo -e "    ${BLUE}Testing volume mounting on $TEST_HOST${NC}"
-    
+
+    local mount_path="/volumes/$TEST_VOLUME_NAME"
     local job_output=$("$RNX_BINARY" job run \
-        --volume="$TEST_VOLUME_NAME:/data" \
+        --volume="$TEST_VOLUME_NAME" \
         sh -c "
-if [ -d '/data' ]; then
+if [ -d '$mount_path' ]; then
     echo 'VOLUME_MOUNTED'
-    echo 'VOLUME_DATA' > /data/test.txt
+    echo 'VOLUME_DATA' > '$mount_path/test.txt'
     echo 'FILE_WRITTEN'
-    ls -la /data/
+    ls -la '$mount_path/'
 else
     echo 'NO_VOLUME'
 fi
 " 2>&1 || echo "")
-    
-    if echo "$job_output" | grep -q "volume.*not\|unrecognized option"; then
-        echo -e "    ${YELLOW}Volume mounting not supported${NC}"
-        return 0
+
+    local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
+    if [[ -z "$job_id" ]]; then
+        echo -e "    ${RED}✗ Volume job was not accepted: $job_output${NC}"
+        return 1
     fi
-    
-    if echo "$job_output" | grep -q "ID:"; then
-        local job_id=$(echo "$job_output" | grep "^ID:" | awk '{print $2}')
-        local logs=$(get_job_logs "$job_id")
-        
-        # Client-side verification
-        if assert_contains "$logs" "VOLUME_MOUNTED" "Volume should be mounted"; then
-            echo -e "    ${GREEN}✓ Client-side volume mount verification passed${NC}"
-            
-            # Remote host verification - check if volume directory exists and file was written
-            echo -e "    ${BLUE}Verifying volume mount on remote host...${NC}"
-            if verify_remote_directory "/data" && verify_remote_file "/data/test.txt" "VOLUME_DATA"; then
-                echo -e "    ${GREEN}✓ Remote host volume verification passed${NC}"
-                return 0
-            else
-                echo -e "    ${YELLOW}Volume directory exists but file verification may be limited${NC}"
-                return 0
-            fi
-        else
-            echo -e "    ${YELLOW}Volume feature may be limited${NC}"
-            return 0
-        fi
-    else
-        return 0
+
+    local logs=$(get_job_logs "$job_id")
+    if ! assert_contains "$logs" "VOLUME_MOUNTED" "Volume should be mounted at $mount_path"; then
+        echo -e "    ${RED}✗ Volume did not mount at $mount_path${NC}"
+        return 1
     fi
+    assert_contains "$logs" "FILE_WRITTEN" "Volume should be writable" || return 1
+    echo -e "    ${GREEN}✓ Volume mounted at $mount_path and writable${NC}"
+    return 0
 }
 
 test_volume_persistence() {
