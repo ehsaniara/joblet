@@ -46,6 +46,13 @@ go test ./tests/gpu -v
 
 ### 3. System Tests (Real GPUs)
 
+> ⚠️ **Caveat — device-node passthrough is not yet wired.** Joblet does not currently create
+> `/dev/nvidia*` device nodes inside a job or bind-mount CUDA libraries. As a result, running
+> `nvidia-smi` or checking for `/dev/nvidia*` **inside a job** will not find GPU devices, even on a
+> host with working GPUs. What a job does receive today is the `CUDA_VISIBLE_DEVICES` /
+> `NVIDIA_VISIBLE_DEVICES` environment variables. The `nvidia-smi` checks below only work when run
+> **on the host**, not inside a job.
+
 #### Prerequisites
 
 - NVIDIA GPU installed
@@ -63,17 +70,19 @@ export GPU_TEST_MODE=real
 ./tests/e2e/tests/09_gpu_test.sh
 
 # Test specific GPU scenarios
+# NOTE: `nvidia-smi` inside a job will NOT see GPUs today (no device-node passthrough).
+# It only works if nvidia-smi and the driver devices are already present in the job's filesystem.
 rnx job run --gpu=1 --gpu-memory=4GB nvidia-smi
 rnx job run --gpu=2 --gpu-memory=8GB python gpu_test.py
 ```
 
 #### What System Tests Cover
 
-- Actual GPU allocation and isolation
-- CUDA environment setup
-- Device node creation (`/dev/nvidia*`)
-- Real GPU memory limits
-- Multi-GPU scenarios
+- GPU allocation bookkeeping
+- `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment setup
+- Device node creation (`/dev/nvidia*`) — *not yet wired; these nodes will not appear inside a job*
+- GPU memory selection filtering (runtime limits *not yet enforced*)
+- Multi-GPU allocation scenarios
 
 ## Test Scenarios by Environment
 
@@ -221,12 +230,17 @@ rnx job status <job-uuid>  # Should show GPU info if allocated
 
 ### Check Job GPU Environment
 
+> ⚠️ Only the `CUDA_VISIBLE_DEVICES` / `env | grep CUDA` checks below will succeed today. Because
+> device-node passthrough is not yet wired, `ls -la /dev/nvidia*` will report "No such file or
+> directory" and `nvidia-smi` will fail inside the job even when the host has working GPUs. This is
+> expected in the current implementation, not a misconfiguration.
+
 ```bash
 # Create debug job
 rnx job run --gpu=1 bash -c "
   echo 'CUDA_VISIBLE_DEVICES='$CUDA_VISIBLE_DEVICES
-  ls -la /dev/nvidia*
-  nvidia-smi || echo 'nvidia-smi not available'
+  ls -la /dev/nvidia*                 # not yet wired: expect no nodes inside the job
+  nvidia-smi || echo 'nvidia-smi not available'   # not yet wired: expect failure inside the job
   env | grep CUDA
 "
 ```

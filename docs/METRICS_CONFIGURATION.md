@@ -14,25 +14,36 @@ tracking with minimal performance overhead. You can customize the configuration 
 
 ### Basic Configuration
 
-Add the following section to your `/opt/joblet/joblet-config.yml` (or your custom config path):
+Metrics collection is configured under the `telemetry:` section of your
+`/opt/joblet/config/joblet-config.yml` (or your custom config path):
 
 ```yaml
-job_metrics:
-  enabled: true                       # Enable metrics collection
-  default_sample_rate: 5s             # Sample every 5 seconds
-  storage_dir: "/opt/joblet/metrics"  # Where to store metrics files
-  retention_days: 7                   # Keep metrics for 7 days
+telemetry:
+  # How often to sample resource metrics (CPU, memory, disk I/O, network)
+  metrics_interval: "5s"     # Default: 5 seconds (minimum: 1s)
+
+  # eBPF-based activity tracking (Linux 5.8+ required)
+  ebpf_enabled: true         # Enable eBPF telemetry collection (default: true)
+
+  # Enabled eBPF event types (omit or leave empty for all)
+  # Valid values: exec, connect, accept, mmap, mprotect, file, socket_data
+  event_types:
+    - exec
+    - connect
+    - accept
 ```
 
-### Full Configuration Example
+### Fields
 
-```yaml
-job_metrics:
-  enabled: true                       # Enable metrics collection
-  default_sample_rate: 5s             # Sample every 5 seconds
-  storage_dir: "/opt/joblet/metrics"  # Where to store metrics files
-  retention_days: 7                   # Keep metrics for 7 days
-```
+| Field              | Type     | Default | Description                                                                 |
+|--------------------|----------|---------|-----------------------------------------------------------------------------|
+| `metrics_interval` | duration | `5s`    | How often to sample resource metrics (minimum: 1s)                          |
+| `ebpf_enabled`     | bool     | `true`  | Enable eBPF telemetry collection (requires Linux 5.8+)                       |
+| `event_types`      | list     | all     | Enabled eBPF event types; empty/omitted means all types are enabled         |
+
+Storage location and retention for metrics are handled by the persist service
+(`persist.storage`), not by the telemetry section. See
+[CONFIGURATION.md](CONFIGURATION.md) and [PERSISTENCE.md](PERSISTENCE.md) for details.
 
 ## Prerequisites
 
@@ -206,7 +217,7 @@ Metrics collection has minimal overhead:
 
 ### Metrics Not Showing
 
-1. Check if metrics are enabled: `grep "job_metrics" /opt/joblet/joblet-config.yml`
+1. Check the telemetry config: `grep -A5 "telemetry:" /opt/joblet/config/joblet-config.yml`
 2. Check if directory exists: `ls -la /opt/joblet/metrics`
 3. Check joblet logs: `journalctl -u joblet.service | grep metrics`
 

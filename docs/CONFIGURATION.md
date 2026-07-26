@@ -67,18 +67,12 @@ server:
   address: "0.0.0.0"               # Listen address
   port: 50051                      # gRPC port
   nodeId: ""                       # Unique node identifier (UUID, auto-generated during setup)
-
-  # TLS configuration
-  tls:
-    enabled: true                  # Enable TLS (recommended)
-    min_version: "1.3"            # Minimum TLS version
-
-  # Connection settings
-  max_message_size: 104857600     # Max gRPC message size (100MB)
-  keepalive:
-    time: 120s                    # Keepalive time
-    timeout: 20s                  # Keepalive timeout
 ```
+
+The `server:` section holds only these four fields. TLS is always required
+(mTLS) and is configured via embedded certificates under [`security:`](#security-settings);
+gRPC message sizes and keepalive settings live under the [`grpc:`](#grpc-configuration)
+section.
 
 ### Node Identification
 
@@ -125,107 +119,55 @@ joblet:
   # Default resource limits for jobs
   defaultCpuLimit: 100            # Default CPU limit (100 = 1 core)
   defaultMemoryLimit: 512         # Default memory limit in MB
-  defaultIoLimit: 10485760        # Default I/O limit in bytes/sec (10MB/s)
+  defaultIoLimit: 0               # Default I/O limit in bytes/sec (0 = unlimited)
 
   # Job execution settings
   maxConcurrentJobs: 100          # Maximum concurrent jobs
-  jobTimeout: "24h"               # Maximum job runtime (0 = unlimited). Can be overridden per-job with --timeout flag
-
-  # Command validation
-  validateCommands: true          # Validate commands before execution
+  jobTimeout: "1h"                # Maximum job runtime (0 = unlimited). Can be overridden per-job with --timeout flag
 
   # Cleanup settings
-  cleanupTimeout: "30s"          # Timeout for cleanup operations
-
-  # Isolation configuration
-  isolation:
-    service_based_routing: true   # Enable automatic service-based job routing
-
-    # Production jobs (JobService API)
-    production:
-      type: "minimal_chroot"      # Minimal chroot isolation
-      runtime_isolation: true     # Use isolated runtime copies
-      # NOTE: allowed_mounts is now configured under runtime.allowed_mounts
-
-    # Runtime build jobs (RuntimeService API)
-    builder:
-      type: "builder_chroot"      # Builder chroot with controlled host access
-      host_access: "readonly"     # Host filesystem access level
-      runtime_cleanup: true       # Automatic runtime cleanup after build
-      cleanup_on_completion: true # Clean up builder environment
+  cleanupTimeout: "5s"            # Timeout for cleanup operations
 ```
+
+These six fields are the entire `joblet:` section. Job isolation (chroot,
+namespaces, OverlayFS runtime isolation) is applied automatically and is not
+configurable here.
 
 ### Network Configuration
 
 ```yaml
 network:
-  enabled: true                   # Enable network management
+  enabled: true                    # Enable network management
   state_dir: "/opt/joblet/network" # Network state directory
 
   # Default network settings
-  default_network: "bridge"       # Default network for jobs
-  allow_custom_networks: true     # Allow custom network creation
-  max_custom_networks: 50         # Maximum custom networks
+  default_network: "bridge"        # Default network for jobs
+  allow_custom_networks: true      # Allow custom network creation
 
-  # Predefined networks
+  # Persistent network state storage
+  storage:
+    path: "/opt/joblet/network"    # Where network state is persisted
+
+  # Predefined networks. Each network has only these two fields.
   networks:
     bridge:
-      cidr: "172.20.0.0/16"      # Bridge network CIDR
-      bridge_name: "joblet0"      # Bridge interface name
-      enable_nat: true            # Enable NAT for internet access
-      enable_icc: true            # Inter-container communication
-
-    host:
-      type: "host"                # Use host network namespace
-
-    none:
-      type: "none"                # No network access
-
-  # DNS configuration
-  dns:
-    servers:
-      - "8.8.8.8"
-      - "8.8.4.4"
-    search:
-      - "local"
-    options:
-      - "ndots:1"
-
-  # Traffic control
-  traffic_control:
-    enabled: true                 # Enable bandwidth limiting
-    default_ingress: 0            # Default ingress limit (0 = unlimited)
-    default_egress: 0             # Default egress limit
+      cidr: "172.20.0.0/16"        # Bridge network CIDR
+      bridge_name: "joblet0"       # Bridge interface name
 ```
+
+The built-in `host` and `none` networks (host namespace / no network) are
+handled internally and are not declared in this section. Each entry under
+`networks:` accepts only `cidr` and `bridge_name`.
 
 ### Volume Configuration
 
 ```yaml
-volume:
-  enabled: true                   # Enable volume management
-  state_dir: "/opt/joblet/state"  # Volume state directory
-  base_path: "/opt/joblet/volumes" # Volume storage path
-
-  # Volume limits
-  max_volumes: 100                # Maximum number of volumes
-  max_size: "100GB"              # Maximum total volume size
-  default_size: "1GB"            # Default volume size
-
-  # Volume types configuration
-  filesystem:
-    enabled: true
-    default_fs: "ext4"           # Default filesystem type
-    mount_options: "noatime,nodiratime"
-
-  memory:
-    enabled: true
-    max_memory_volumes: 10       # Maximum memory volumes
-    max_memory_usage: "10GB"     # Maximum total memory usage
-
-  # Cleanup settings
-  auto_cleanup: false            # Auto-remove unused volumes
-  cleanup_interval: "24h"        # Cleanup check interval
+volumes:
+  base_path: "/opt/joblet/volumes"      # Volume storage path
+  default_disk_quota_bytes: 1048576     # Default per-volume disk quota in bytes (1MB)
 ```
+
+The `volumes:` section (note the plural key) has only these two fields.
 
 ### Runtime Configuration
 
@@ -288,25 +230,15 @@ security:
     -----BEGIN CERTIFICATE-----
     MIIFazCCA1OgAwIBAgIUX...
     -----END CERTIFICATE-----
-
-  # Authentication settings
-  require_client_cert: true       # Require client certificates
-  verify_client_cert: true        # Verify client certificates
-
-  # Authorization
-  enable_rbac: true              # Enable role-based access control
-  # Role comes from the client certificate OU: admin, maintainer,
-  # developer, or reader (the old "viewer" still works and maps to
-  # reader). Anything else is rejected.
-
-  # Audit logging
-  audit:
-    enabled: true
-    log_file: "/var/log/joblet/audit.log"
-    log_successful_auth: true
-    log_failed_auth: true
-    log_job_operations: true
 ```
+
+The `security:` section holds only these three embedded PEM fields:
+`serverCert`, `serverKey`, and `caCert`. There are no toggles for client-cert
+verification or RBAC — mTLS is always enforced (the server requires and
+verifies client certificates against `caCert`), and role-based access control
+is always on. A client's role is derived from the OU field of its certificate:
+`admin`, `maintainer`, `developer`, or `reader` (the old `viewer` still works
+and maps to `reader`). Any other OU is rejected.
 
 ### Buffer Configuration
 
@@ -589,97 +521,63 @@ characteristics, DynamoDB setup, monitoring, and troubleshooting.
 
 ```yaml
 logging:
-  level: "info"                  # Log level: debug, info, warn, error
-  format: "json"                 # Log format: json or text
-
-  # Output configuration
-  outputs:
-    - type: "file"
-      path: "/var/log/joblet/joblet.log"
-      rotate: true
-      max_size: "100MB"
-      max_backups: 10
-      max_age: 30
-
-    - type: "stdout"
-      format: "text"             # Override format for stdout
-
-  # Component-specific logging
-  components:
-    grpc: "warn"
-    cgroup: "info"
-    network: "info"
-    volume: "info"
-    auth: "info"
+  level: "INFO"                  # Log level: DEBUG, INFO, WARN, ERROR (case-insensitive)
+  format: "text"                 # Log format: text or json
+  output: "stdout"               # Single output destination (e.g. "stdout")
 ```
+
+The `logging:` section has exactly three fields: `level`, `format`, and a
+single `output` string. There is no multi-output list or per-component log
+configuration.
 
 ### Advanced Settings
 
 ```yaml
-# Cgroup configuration
+# Cgroup configuration (cgroups v2 only)
 cgroup:
-  baseDir: "/sys/fs/cgroup/joblet.slice" # Cgroup hierarchy path
-  version: "v2"                          # Cgroup version (v1 or v2)
+  baseDir: "/sys/fs/cgroup/joblet.slice/joblet.service" # Cgroup hierarchy path
+  namespaceMount: "/sys/fs/cgroup"                       # Cgroup namespace mount point
 
   # Controllers to enable
   enableControllers:
-    - memory
     - cpu
+    - memory
     - io
     - pids
     - cpuset
+    - devices
 
-  # Resource accounting
-  accounting:
-    enabled: true
-    interval: "10s"              # Metrics collection interval
+  cleanupTimeout: "5s"           # Timeout for cgroup cleanup operations
 
 # Filesystem isolation
 filesystem:
   baseDir: "/opt/joblet/jobs"    # Base directory for job workspaces
-  tmpDir: "/opt/joblet/tmp"      # Temporary directory
+  tmpDir: "/tmp/job-{JOB_ID}"    # Per-job temporary directory template
+  workspaceDir: "/work"          # Workspace mount point inside the job
 
-  # Workspace settings
-  workspace:
-    default_quota: "1MB"         # Default workspace size
-    cleanup_on_exit: true        # Clean workspace after job
-    preserve_on_failure: true    # Keep workspace on failure
-
-  # Security
-  enable_chroot: true            # Use chroot isolation
-  readonly_rootfs: false         # Make root filesystem read-only
-
-# Process management
-process:
-  default_user: "nobody"         # Default user for jobs
-  default_group: "nogroup"       # Default group for jobs
-  allow_setuid: false           # Allow setuid in jobs
-
-  # Namespace configuration
-  namespaces:
-    - pid                       # Process isolation
-    - mount                     # Filesystem isolation
-    - network                   # Network isolation
-    - ipc                       # IPC isolation
-    - uts                       # Hostname isolation
-    - cgroup                    # Cgroup isolation
-
-# Monitoring configuration
+# Monitoring configuration (system-level host metrics)
 monitoring:
-  enabled: true
-  bind_address: "127.0.0.1:9090" # Prometheus metrics endpoint
+  system_interval: "10s"         # How often to sample host system metrics
+  cloud_detection: true          # Detect cloud provider/instance metadata
+```
 
-  collection:
-    system_interval: "15s"       # System metrics interval
-    process_interval: "30s"      # Process metrics interval
+The `cgroup:`, `filesystem:`, and `monitoring:` sections have only the fields
+shown above. Chroot isolation and job namespaces are applied automatically and
+are not configurable. There is no separate `process:` section.
 
-  # Metrics to collect
-  metrics:
-    - cpu
-    - memory
-    - disk
-    - network
-    - processes
+### gRPC Configuration
+
+gRPC message sizes and keepalive/timeout settings live in the `grpc:` section:
+
+```yaml
+grpc:
+  maxRecvMsgSize: 134217728        # Max received message size (default: 128MB)
+  maxSendMsgSize: 134217728        # Max sent message size (default: 128MB)
+  maxHeaderListSize: 16777216      # Max header list size (default: 16MB)
+  keepAliveTime: "10s"             # Keepalive ping interval
+  keepAliveTimeout: "3s"           # Keepalive ping timeout
+  maxConcurrentStreams: 1000       # Max concurrent streams per connection
+  connectionTimeout: "10s"         # Connection establishment timeout
 ```
 
 ## Client Configuration
@@ -899,13 +797,12 @@ openssl req -new -key client-key.pem -out reader.csr \
 
 | Variable                     | Description                        | Default                                 |
 |------------------------------|------------------------------------|-----------------------------------------|
-| `JOBLET_CONFIG_PATH`         | Path to main configuration file    | `/opt/joblet/config/joblet-config.yml`  |
-| `JOBLET_RUNTIME_CONFIG_PATH` | Path to runtime configuration file | `/opt/joblet/config/runtime-config.yml` |
-| `JOBLET_LOG_LEVEL`           | Log level override                 | from config                             |
+| `JOBLET_CONFIG_PATH`         | Path to main configuration file    | searches standard locations             |
+| `JOBLET_RUNTIME_CONFIG_PATH` | Path to runtime configuration file | searches standard locations             |
 | `JOBLET_SERVER_ADDRESS`      | Server address override            | from config                             |
-| `JOBLET_SERVER_PORT`         | Server port override               | from config                             |
-| `JOBLET_NODE_ID`             | Node identifier override           | from config                             |
-| `JOBLET_MAX_JOBS`            | Maximum concurrent jobs            | from config                             |
+| `JOBLET_MODE`                | Server mode override (`server`/`init`) | from config                         |
+| `JOBLET_LOG_LEVEL`           | Log level override                 | from config                             |
+| `JOBLET_LOG_FORMAT`          | Log format override (`text`/`json`) | from config                            |
 
 ### Client Environment Variables
 
@@ -919,42 +816,33 @@ openssl req -new -key client-key.pem -out reader.csr \
 
 ### High-Security Production Setup
 
+TLS (mTLS) is always enforced via the embedded certificates under `security:`,
+so there are no TLS or RBAC toggles to set here.
+
 ```yaml
 version: "3.0"
 
 server:
   address: "0.0.0.0"
   port: 50051
-  tls:
-    enabled: true
-    min_version: "1.3"
-    cipher_suites:
-      - TLS_AES_256_GCM_SHA384
-      - TLS_CHACHA20_POLY1305_SHA256
 
 joblet:
-  validateCommands: true
-  allowedCommands:
-    - python3
-    - node
   maxConcurrentJobs: 50
   jobTimeout: "1h"
 
 security:
-  require_client_cert: true
-  verify_client_cert: true
-  enable_rbac: true
-  audit:
-    enabled: true
-    log_all_operations: true
-
-filesystem:
-  enable_chroot: true
-  readonly_rootfs: true
-
-process:
-  default_user: "nobody"
-  allow_setuid: false
+  serverCert: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+  serverKey: |
+    -----BEGIN PRIVATE KEY-----
+    ...
+    -----END PRIVATE KEY-----
+  caCert: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
 ```
 
 ### Development Environment Setup
@@ -970,21 +858,20 @@ joblet:
   defaultCpuLimit: 0      # No limits in dev
   defaultMemoryLimit: 0
   defaultIoLimit: 0
-  validateCommands: false # Allow any command
 
 logging:
-  level: "debug"
+  level: "DEBUG"
   format: "text"
 
 network:
   networks:
     bridge:
       cidr: "172.30.0.0/16"
-      enable_nat: true
+      bridge_name: "joblet0"
 
-volume:
-  max_volumes: 1000
-  max_size: "1TB"
+volumes:
+  base_path: "/opt/joblet/volumes"
+  default_disk_quota_bytes: 1048576
 ```
 
 ### CI/CD Optimized Setup
@@ -1000,22 +887,11 @@ joblet:
   maxConcurrentJobs: 200
   jobTimeout: "30m"
   cleanupTimeout: "5s"
-  preserveFailedJobs: false
-
-filesystem:
-  workspace:
-    cleanup_on_exit: true
-    preserve_on_failure: false
-
-cgroup:
-  accounting:
-    enabled: false      # Reduce overhead
 
 logging:
-  level: "warn"        # Reduce log volume
-  outputs:
-    - type: "stdout"
-      format: "json"   # Structured logs for CI
+  level: "WARN"        # Reduce log volume
+  format: "json"       # Structured logs for CI
+  output: "stdout"
 ```
 
 ## Best Practices
@@ -1024,10 +900,9 @@ logging:
 2. **Resource Limits**: Set appropriate defaults to prevent resource exhaustion
 3. **Monitoring**: Enable metrics collection for production environments
 4. **Logging**: Use JSON format for easier log parsing
-5. **Cleanup**: Configure automatic cleanup to prevent disk space issues
-6. **Validation**: Enable command validation in production
-7. **Audit**: Enable audit logging for compliance
-8. **Backup**: Keep configuration file backups
+5. **State Persistence**: Use the `local` or `dynamodb` state backend so jobs survive restarts
+6. **Access Control**: Issue per-role client certificates (OU = admin/maintainer/developer/reader); RBAC is enforced automatically via mTLS
+7. **Backup**: Keep configuration file backups
 
 ## Configuration Validation
 

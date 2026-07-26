@@ -4,14 +4,28 @@
 
 **Accepted** - September 2025
 
-**Implementation Status**: ✅ **Complete**
+**Implementation Status**: ⚠️ **Partial / Experimental**
 
-- GPU discovery and management: Implemented
-- Security isolation with cgroups device controller: Implemented
-- CUDA environment detection and mounting: Implemented
-- RNX CLI integration with `--gpu` and `--gpu-memory` flags: Implemented
+The user-facing allocation and validation path works, but the runtime isolation mechanisms
+described below are NOT yet wired into the execution path. Current state:
+
+- GPU discovery and management: Implemented (in-memory detection and allocation bookkeeping)
+- RNX CLI integration with `--gpu` and `--gpu-memory` flags: Implemented (flags parse and validate)
+- Compatibility validation (GPU count, runtime GPU/CUDA compatibility): Implemented
+- `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env injection: Implemented
 - JSON API support: Implemented
-- Comprehensive testing framework: Implemented
+- Security isolation with cgroups v2 device controller: **NOT yet wired** — the cgroup device
+  code path logs and returns without writing device rules
+- Device-node creation (`mknod` for `/dev/nvidia*`) inside the job namespace: **NOT yet wired** —
+  the execution path only logs a placeholder; jobs do not receive `/dev/nvidia*` nodes
+- CUDA library bind-mounting into the job namespace: **NOT yet wired** — placeholder only
+- GPU memory enforcement and clearing between jobs: **NOT yet wired** — `--gpu-memory` only
+  filters candidate GPUs at selection time; it is not enforced at runtime
+
+> **Implementation note**: Working `mknod` device-node creation and CUDA bind-mount
+> implementations exist in the filesystem isolator (`internal/joblet/core/filesystem/isolator.go`,
+> `CreateGPUDeviceNodes` / `MountCUDALibraries`) but are currently dead code — they are not invoked
+> by the job execution path, which calls placeholder adapters that only log and return.
 
 > **Note**: GPU configuration in workflow definitions was removed when workflow orchestration was extracted to a
 > separate project (see [ADR-013](013-extract-workflow-to-separate-project.md)). Joblet exposes GPU allocation only
@@ -92,6 +106,13 @@ spreading (to minimize thermal contention).
 
 #### GPU Isolation Implementation
 
+> ⚠️ **Status: designed but NOT yet wired into the execution path.** The three mechanisms below
+> (cgroups v2 device control, `mknod` device-node creation, and CUDA bind-mounting) describe the
+> intended design. Today the execution path invokes placeholder adapters that log and return, so
+> jobs do not currently receive GPU device nodes, cgroup device rules, or bind-mounted CUDA
+> libraries. Only the `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment variables are
+> actually injected into GPU jobs.
+
 Extending Joblet's isolation system to support GPUs required careful integration with our existing namespace and cgroups
 architecture. GPUs were not originally designed for the fine-grained isolation that modern multi-tenant systems require,
 necessitating a sophisticated approach using native Linux kernel features.
@@ -144,10 +165,10 @@ This implementation delivers enterprise-grade GPU support that matches capabilit
 Slurm, while maintaining Joblet's core philosophy of using native Linux kernel features without containerization
 overhead. Users continue to benefit from Joblet's simplicity and directness, now extended to GPU workloads.
 
-**Robust Security Model**: Our GPU isolation maintains the same rigorous security standards as our existing CPU and
-memory isolation. GPU memory remains completely isolated between jobs using kernel-level features. The cgroups device
-controller ensures jobs cannot access unauthorized GPU resources, providing security equivalent to containerized
-solutions without the associated overhead.
+**Robust Security Model** (target state, not yet delivered): The GPU isolation design aims to match the same rigorous
+security standards as our existing CPU and memory isolation, using the cgroups v2 device controller to ensure jobs
+cannot access unauthorized GPU resources. ⚠️ This isolation is not yet enforced — the cgroup device rules and per-job
+device nodes are not currently written, so the memory- and device-isolation guarantees below are not in effect today.
 
 **User Experience Excellence**: The system eliminates the complexity traditionally associated with GPU computing. Users
 can request resources using simple, intuitive syntax ("2 GPUs with 16GB each") while the system automatically handles
@@ -214,8 +235,10 @@ can disable it again if issues arise. Non-GPU jobs continue to operate normally 
 GPU hardware was not originally designed with multi-tenancy security as a primary concern, requiring additional security
 measures to ensure safe operation in shared environments:
 
-**Memory Sanitization**: GPU memory is completely cleared between job allocations to prevent data leakage. While this
-process introduces latency, it is essential for maintaining security in multi-tenant environments.
+**Memory Sanitization** (planned, not yet reliable): GPU memory clearing between allocations is intended to prevent
+data leakage. ⚠️ The current implementation shells out to `nvidia-smi --gpu-reset` with a best-effort fallback that
+does not actually overwrite memory, so complete clearing is NOT guaranteed and should not be relied upon in
+multi-tenant environments today.
 
 **Execution Time Limits**: GPU kernel execution time limits prevent resource abuse, including unauthorized
 cryptocurrency mining or other malicious activities that could monopolize expensive GPU resources.

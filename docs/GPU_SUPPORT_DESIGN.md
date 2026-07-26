@@ -95,6 +95,11 @@ GPUDevice:
 
 ### 2.3 Resource Isolation Integration
 
+> ⚠️ **DESIGN / PLANNED — not delivered.** The cgroups v2 device controller and GPU memory limits
+> described in this section are the intended design. They are **not** wired into the current
+> execution path: the cgroup GPU device code logs and returns without writing device rules, and
+> `--gpu-memory` is only used to filter candidate GPUs at selection time, not enforced at runtime.
+
 #### Cgroups v2 Device Controller
 
 ```yaml
@@ -124,6 +129,12 @@ Cgroup Path Structure:
 - **Method 3**: MIG (Multi-Instance GPU) partitioning for hard limits
 
 ### 2.4 Filesystem Isolation Extensions
+
+> ⚠️ **DESIGN / PLANNED — not delivered.** The chroot GPU device-node creation (`mknod`) and CUDA
+> library bind-mounts described here are the intended design. Working implementations exist in the
+> filesystem isolator (`internal/joblet/core/filesystem/isolator.go`) but are currently **dead
+> code** — the execution path calls placeholder adapters that only log and return, so jobs do not
+> receive `/dev/nvidia*` nodes or bind-mounted CUDA libraries today.
 
 #### GPU Device Nodes in Chroot
 
@@ -457,12 +468,15 @@ Log Events:
 
 ### Functional Requirements
 
-- ✓ Detect and enumerate NVIDIA GPUs
-- ✓ Allocate GPUs to jobs based on requirements
-- ✓ Pass through GPU devices to isolated jobs
-- ✓ Mount CUDA libraries in job environment
-- ✓ Enforce GPU resource limits
-- ✓ Clean up GPU resources after job completion
+> ⚠️ These are target criteria. Checkmarks below indicate design intent, not current delivery
+> status. Items marked *(planned)* are not yet wired into the execution path.
+
+- ✓ Detect and enumerate NVIDIA GPUs *(working)*
+- ✓ Allocate GPUs to jobs based on requirements *(working — in-memory bookkeeping)*
+- ✓ Pass through GPU devices to isolated jobs *(planned — device nodes not yet created in jobs)*
+- ✓ Mount CUDA libraries in job environment *(planned — bind-mount not yet wired)*
+- ✓ Enforce GPU resource limits *(planned — `--gpu-memory` filters at selection only, not enforced)*
+- ✓ Clean up GPU resources after job completion *(partial — allocation bookkeeping released; GPU memory not reliably cleared)*
 
 ### Performance Requirements
 

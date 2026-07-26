@@ -250,7 +250,8 @@ rnx job run --schedule="2h" cleanup.sh
 # Run in 30 seconds
 rnx job run --schedule="30s" quick_task.sh
 
-# Supported units: s, m, min, h, d
+# Supported units: s/sec/secs/second/seconds, m/min/mins/minute/minutes, h/hour/hours
+# Minimum 1 second, maximum 1 year (no day unit)
 ```
 
 ### Absolute Time Scheduling
@@ -273,11 +274,11 @@ rnx job run --schedule="$TOMORROW_NOON" lunch_reminder.sh
 # List scheduled jobs
 rnx job list --json | jq '.[] | select(.status == "SCHEDULED")'
 
-# Cancel scheduled job
-rnx job stop <job-uuid>
+# Cancel scheduled job (use cancel, not stop, for SCHEDULED jobs)
+rnx job cancel <job-uuid>
 
 # Example with actual UUID:
-rnx job stop f47ac10b-58cc-4372-a567-0e02b2c3d479
+rnx job cancel f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Check when job will run
 rnx job status <job-uuid>
@@ -358,7 +359,7 @@ rnx job status <job-uuid> | grep "Exit Code"
 rnx job log <job-uuid> | tail -20
 
 # Script to wait for completion
-JOB_UUID=$(rnx job run --json long_task.sh | jq -r .id)
+JOB_UUID=$(rnx job run --json long_task.sh | jq -r .job_uuid)
 # JOB_UUID will be something like: f47ac10b-58cc-4372-a567-0e02b2c3d479
 while [[ $(rnx job status --json $JOB_UUID | jq -r .status) == "RUNNING" ]]; do
   sleep 5
@@ -480,7 +481,7 @@ rnx job telematics f47ac10b --types exec,connect,accept
 PREP_JOB=$(rnx job run --json \
   --volume=pipeline-data \
   --upload=prepare_data.py \
-  python3 prepare_data.py | jq -r .id)
+  python3 prepare_data.py | jq -r .job_uuid)
 # PREP_JOB will be something like: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 # Wait for completion
@@ -509,7 +510,7 @@ rnx job run \
 
 ```bash
 # Simple dependency chain
-JOB1=$(rnx job run --json setup.sh | jq -r .id)
+JOB1=$(rnx job run --json setup.sh | jq -r .job_uuid)
 # JOB1 will be something like: 12345678-abcd-ef12-3456-7890abcdef12
 # Wait for job1
 while [[ $(rnx job status --json $JOB1 | jq -r .status) == "RUNNING" ]]; do
@@ -589,7 +590,7 @@ submit_job() {
   local retry=0
   
   while [ $retry -lt $max_retries ]; do
-    JOB_UUID=$(rnx job run --json $cmd | jq -r .id)
+    JOB_UUID=$(rnx job run --json $cmd | jq -r .job_uuid)
     
     if [ $? -eq 0 ]; then
       echo "Job submitted: $JOB_UUID"  # e.g., f47ac10b-58cc-4372-a567-0e02b2c3d479
@@ -620,7 +621,7 @@ rnx job run --volume=temp-vol process_data.sh
 ```bash
 # Comprehensive logging
 JOB_UUID=$(rnx job run --json \
-  backup.sh | jq -r .id)
+  backup.sh | jq -r .job_uuid)
 # JOB_UUID will be something like: f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 # Save all job info

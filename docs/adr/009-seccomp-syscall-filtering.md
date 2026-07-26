@@ -73,8 +73,8 @@ networks.
 
 ### The Performance Story with BPF
 
-Let's talk about performance, because this is where the tradeoffs get real. Classic seccomp-BPF (what we use for Levels
-1-3) is fast because it's just a simple bytecode interpreter in the kernel. But it's limited - you can check syscall
+Let's talk about performance, because this is where the tradeoffs get real. Classic seccomp-BPF (what Levels 1-3 would
+use) is fast because it's just a simple bytecode interpreter in the kernel. But it's limited - you can check syscall
 numbers and basic arguments, but that's it.
 
 For Level 4, we're talking about eBPF (extended BPF). This is the new hotness in the Linux kernel. eBPF programs are
@@ -156,18 +156,18 @@ The key insight: CPU-bound workloads barely notice seccomp because they don't ma
 stuff (web servers, shell scripts) that sees the impact. But even then, we're talking single-digit percentage overhead
 for massive security gains.
 
-### How It Actually Works
+### How It Would Work
 
-When we spawn a job, right after we've set up the namespaces but before we exec the actual job command, we install the
-seccomp filter. We're using seccomp's BPF mode, which lets us write complex filters that can inspect syscall arguments,
-not just syscall numbers.
+When a job is spawned, right after the namespaces are set up but before the actual job command is exec'd, Joblet would
+install the seccomp filter. It would use seccomp's BPF mode, which lets you write complex filters that can inspect
+syscall arguments, not just syscall numbers.
 
 The beautiful thing about seccomp is that once you install a filter, you can't remove it. You can only make it more
-restrictive. So even if a job gets compromised, it can't disable its own syscall filtering.
+restrictive. So even if a job gets compromised, it couldn't disable its own syscall filtering.
 
-We're also using seccomp's SECCOMP_RET_ERRNO mode for blocked syscalls, which returns a clear error to the process
-instead of just killing it. This makes debugging much easier - you get "Operation not permitted" instead of mysterious
-crashes.
+We'd also use seccomp's SECCOMP_RET_ERRNO mode for blocked syscalls, which returns a clear error to the process
+instead of just killing it. This would make debugging much easier - you get "Operation not permitted" instead of
+mysterious crashes.
 
 ## Consequences
 

@@ -6,13 +6,21 @@ allocation, memory isolation, and CUDA environment integration.
 
 ## Executive Overview
 
-Joblet's GPU orchestration framework enables organizations to:
+> ⚠️ **Status:** GPU support is currently partial/experimental. GPU discovery, allocation
+> bookkeeping, request validation, and `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env
+> injection work today. Runtime memory enforcement, hardware-level device isolation, and automatic
+> CUDA library provisioning are designed but **not yet wired into the execution path** — see the
+> notes in the sections below.
 
-- **Automated GPU Discovery and Allocation**: Intelligent assignment of GPU resources based on job requirements
-- **Memory Quota Management**: Enforce GPU memory constraints to prevent resource contention
-- **Hardware-Level Isolation**: Secure GPU access boundaries between concurrent workloads
-- **Comprehensive Observability**: Real-time GPU utilization metrics through multiple interfaces
-- **CUDA Integration**: Automatic CUDA runtime provisioning and library path configuration
+Joblet's GPU orchestration framework is designed to enable organizations to:
+
+- **Automated GPU Discovery and Allocation**: Assignment of GPU resources based on job requirements *(working)*
+- **Memory Quota Management** *(not yet enforced)*: `--gpu-memory` filters candidate GPUs at selection time only; it is
+  not enforced at runtime
+- **Hardware-Level Isolation** *(planned)*: Per-job device access boundaries are designed but not yet applied
+- **Comprehensive Observability**: GPU allocation metadata through multiple interfaces
+- **CUDA Integration**: `CUDA_VISIBLE_DEVICES` env configuration *(working)*; automatic CUDA library provisioning is
+  *planned, not yet active*
 
 ## Getting Started with GPU Workloads
 
@@ -63,17 +71,30 @@ rnx job run --gpu=1 --max-cpu=400 --max-memory=16384 python hybrid_workload.py
 
 ### CUDA Runtime Integration
 
-Upon GPU allocation request, Joblet performs the following automated operations:
+> ⚠️ **Current state:** Today Joblet provides GPU visibility to jobs through environment variables
+> only. Per-job device-node passthrough (`/dev/nvidia*`), cgroup device access controls, and CUDA
+> library bind-mounting are designed but **not yet wired into the execution path**. Steps 3 and 4
+> below are not active yet, so `nvidia-smi` and CUDA libraries are only usable inside a job if they
+> already exist in the job's runtime/host filesystem — Joblet does not currently provision or
+> restrict them per job.
+
+Upon GPU allocation request, Joblet performs the following operations:
 
 1. **GPU Discovery**: Enumerates available NVIDIA devices via `/proc/driver/nvidia/gpus/` and `nvidia-smi` interfaces
-2. **Device Allocation**: Assigns specific GPU indices to job instances with tracking in job metadata
-3. **Permission Configuration**: Establishes appropriate device access controls for job namespaces
-4. **Library Provisioning**: Binds CUDA runtime libraries from system installation paths
-5. **Environment Setup**: Configures `CUDA_VISIBLE_DEVICES` for framework compatibility
+2. **Device Allocation**: Assigns specific GPU indices to job instances with tracking in job metadata (in-memory bookkeeping)
+3. **Permission Configuration** *(not yet active)*: Intended to establish per-job device access controls; the cgroup
+   device path currently logs and returns without applying any rules
+4. **Library Provisioning** *(not yet active)*: Intended to bind CUDA runtime libraries into the job; the execution
+   path currently only logs a placeholder and mounts nothing
+5. **Environment Setup**: Configures `CUDA_VISIBLE_DEVICES` and `NVIDIA_VISIBLE_DEVICES` for framework compatibility
 
 ### CUDA Library Path Resolution
 
-Joblet automatically discovers and mounts CUDA installations from standard locations:
+> ⚠️ **Not yet active:** CUDA library bind-mounting into the job namespace is not currently wired
+> into the execution path. The paths below describe where Joblet is designed to discover CUDA
+> installations; today no CUDA libraries are mounted into jobs by Joblet.
+
+Joblet is designed to discover CUDA installations from standard locations:
 
 - `/usr/local/cuda`
 - `/opt/cuda`

@@ -47,8 +47,8 @@ flowchart TD
 #### 1. Filesystem Volumes
 
 - **Purpose**: Persistent storage that survives job restarts and system reboots
-- **Implementation**: Directory-based storage on host filesystem
-- **Location**: `/var/lib/joblet/volumes/<volume-id>`
+- **Implementation**: Loop-mounted ext4 image (backing file) for size enforcement, with a plain-directory fallback if loop setup fails
+- **Location**: `/opt/joblet/volumes/<name>/data` (keyed by volume name)
 - **Features**:
     - Persistent across job executions
     - Survives daemon restarts
@@ -59,9 +59,9 @@ flowchart TD
 
 - **Purpose**: High-performance temporary storage
 - **Implementation**: tmpfs-based in-memory filesystem
-- **Location**: Mounted at `/var/lib/joblet/volumes/<volume-id>` (tmpfs)
+- **Location**: Mounted at `/opt/joblet/volumes/<name>/data` (tmpfs, keyed by volume name)
 - **Features**:
-    - Cleared after job completion
+    - Persists across jobs; cleared when the volume is removed (or on host reboot)
     - Ultra-fast I/O operations
     - No disk persistence
     - Ideal for temporary data and caches
@@ -86,7 +86,7 @@ flowchart TD
 // Volume cleanup flow
 1. Job completion triggers unmount
 2. VolumeManager: Unmounts volumes from job namespace
-3. Memory volumes: Data cleared automatically
+3. Memory volumes: tmpfs stays mounted; data persists across jobs and is cleared only when the volume is removed
 4. Filesystem volumes: Data persists for next use
 ```
 
@@ -118,7 +118,7 @@ sequenceDiagram
     Note over VM,VS: Cleanup
     J->>VM: job completion triggers unmount
     VM->>I: unmount volumes from job namespace
-    VM->>VS: memory → data cleared / filesystem → data persists
+    VM->>VS: both types persist across jobs; cleared only on volume removal
 ```
 
 ### Volume Store Implementation
@@ -130,17 +130,17 @@ volumes map[string]*domain.Volume
 }
 
 type Volume struct {
-ID          string
-Name        string
-Type        VolumeType // FILESYSTEM or MEMORY
-Size        int64  // Size in bytes
-Path        string // Host path
-MountPath   string // Path inside container
-CreatedAt   time.Time
-LastUsed    time.Time
-InUse       bool
-JobUUID     string // Current job using volume
+Name        string     // Unique volume identifier (also the store key)
+Type        VolumeType // filesystem or memory
+Size        string     // Size limit (e.g., "1GB", "500MB")
+SizeBytes   int64      // Parsed size in bytes
+Path        string     // Host filesystem path where volume is stored
+CreatedTime time.Time
+JobCount    int32      // Number of jobs currently using this volume
 }
+
+// MountPath is derived, not stored: "/volumes/<name>"
+// IsInUse() reports JobCount > 0
 ```
 
 ## Filesystem Isolation
@@ -246,8 +246,7 @@ service VolumeService {
   // Volume lifecycle operations
   rpc CreateVolume(CreateVolumeRequest) returns (CreateVolumeResponse);
   rpc ListVolumes(ListVolumesRequest) returns (ListVolumesResponse);
-  rpc GetVolume(GetVolumeRequest) returns (GetVolumeResponse);
-  rpc DeleteVolume(DeleteVolumeRequest) returns (DeleteVolumeResponse);
+  rpc RemoveVolume(RemoveVolumeRequest) returns (RemoveVolumeResponse);
 
   // Volume usage operations
   rpc AttachVolume(AttachVolumeRequest) returns (AttachVolumeResponse);
@@ -256,20 +255,17 @@ service VolumeService {
 
 message CreateVolumeRequest {
   string name = 1;
-  VolumeType type = 2;
-  int64 size_bytes = 3;
-  map<string, string> labels = 4;
+  string type = 2;   // "filesystem" or "memory"
+  string size = 3;   // e.g., "1GB", "500MB"
 }
 
 message Volume {
-  string id = 1;
-  string name = 2;
-  VolumeType type = 3;
+  string name = 1;
+  string type = 2;
+  string size = 3;
   int64 size_bytes = 4;
-  string status = 5;
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp last_used = 7;
-  string current_job_uuid = 8;
+  int32 job_count = 5;      // jobs currently using the volume
+  google.protobuf.Timestamp created_time = 6;
 }
 ```
 
@@ -278,22 +274,17 @@ message Volume {
 ```bash
 # Volume management commands
 rnx volume create <name> [options]
-  --size=SIZE       Volume size (e.g., 1GB, 512MB)
-  --type=TYPE       Volume type: filesystem|memory
-  --label=KEY=VAL   Metadata labels
+  --size=SIZE       Volume size (e.g., 1GB, 512MB) (required)
+  --type=TYPE       Volume type: filesystem|memory (default: filesystem)
 
-rnx volume list [options]
-  --filter=KEY=VAL  Filter by label
-  --format=FORMAT   Output format: table|json|yaml
+rnx volume list
+  # Table output by default; add the global --json flag for JSON
 
-rnx volume inspect <name>
-  Shows detailed volume information
+rnx volume remove <name>
+  # Volume must not be in use by any active jobs
 
-rnx volume remove <name> [options]
-  --force           Remove even if in use
-
-# Job execution with volumes
-rnx job run --volume=data:/data --volume=cache:/cache <command>
+# Job execution with volumes (bare volume name; mounted at /volumes/<name>)
+rnx job run --volume=data --volume=cache <command>
 ```
 
 ### Internal Interfaces
@@ -302,9 +293,9 @@ rnx job run --volume=data:/data --volume=cache:/cache <command>
 // VolumeManager interface
 type VolumeManager interface {
 CreateVolume(ctx context.Context, req *CreateVolumeRequest) (*Volume, error)
-GetVolume(ctx context.Context, id string) (*Volume, error)
+GetVolume(ctx context.Context, name string) (*Volume, error)
 ListVolumes(ctx context.Context, filter *VolumeFilter) ([]*Volume, error)
-DeleteVolume(ctx context.Context, id string) error
+RemoveVolume(ctx context.Context, name string) error
 
 // Job integration
 PrepareVolumes(ctx context.Context, jobID string, volumeIDs []string) error
