@@ -277,7 +277,7 @@ func RunServer(cfg *config.Config) error {
 		}
 	}
 
-	// Start gRPC server with configuration using new adapters
+	// Start gRPC server with configuration
 	grpcServer, err := server.StartGRPCServer(jobStoreAdapter, telemetryCollector, jobletInstance, cfg, networkStoreAdapter, volumeManager, monitoringService, platformInstance)
 	if err != nil {
 		return fmt.Errorf("failed to start gRPC server: %w", err)

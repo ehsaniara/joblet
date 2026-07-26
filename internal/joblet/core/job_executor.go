@@ -54,7 +54,7 @@ func NewExecutionEngineV2(
 	// Create environment builder
 	envBuilder := environment.NewBuilder(platform, uploadManager, config, logger)
 
-	// Create environment service (runtime functionality now handled by filesystem isolator)
+	// Create environment service (runtime functionality is handled by the filesystem isolator)
 	envService := execution.NewEnvironmentService(
 		envBuilder,
 		uploadManager,

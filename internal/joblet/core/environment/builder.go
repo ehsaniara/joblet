@@ -179,9 +179,8 @@ func (b *Builder) buildUploadEnvironment(job *domain.Job, uploads []domain.FileU
 			env = append(env, fmt.Sprintf("JOB_UPLOAD_PIPE=%s", pipeTransport.GetPath()))
 		}
 
-		// Note: The streaming context creation would need to be handled differently
-		// For now, returning the transport reference but this may need redesign
-		return env, nil // Temporarily return nil for streamer
+		// No streamer is returned here; the upload env vars above carry the transport info.
+		return env, nil
 	}
 
 	return env, nil

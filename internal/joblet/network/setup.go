@@ -670,9 +670,9 @@ func (ns *NetworkSetup) cleanupNetworkIsolation(bridgeName string) {
 			"-i", otherBridge, "-o", bridgeName, "-j", "DROP")
 	}
 
-	// Also remove NAT rule for this network's CIDR
-	// This would need the CIDR passed in or looked up
-	// For now, this is a simplified version
+	// NAT rule cleanup for the network's CIDR is handled by the caller
+	// (RemoveBridge), which looks up the CIDR; this method only removes
+	// the inter-bridge isolation rules.
 }
 
 // RemoveBridge completely removes a network bridge and associated resources.

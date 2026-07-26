@@ -444,7 +444,7 @@ func (f *JobFilesystem) mountAllowedDirs() error {
 		targetPath := filepath.Join(f.RootDir, strings.TrimPrefix(allowedDir, "/"))
 
 		// Create ALL parent directories needed for the mount
-		// This replaces the need to pre-create them in createEssentialDirs
+		// Allowed-mount directories are created here dynamically, not in createEssentialDirs
 		targetDir := filepath.Dir(targetPath)
 		if err := f.platform.MkdirAll(targetDir, 0755); err != nil {
 			f.logger.Warn("failed to create mount parent directory", "dir", targetDir, "error", err)
