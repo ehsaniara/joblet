@@ -167,21 +167,23 @@ echo 'DOWNLOAD_TEST_DATA' > /work/output.txt && echo 'FILE_CREATED'
 }
 
 test_volume_creation() {
-    # Test creating a named volume
-    local volume_output=$("$RNX_BINARY" volume create "$TEST_VOLUME_NAME" 2>&1 || echo "")
-    
-    if echo "$volume_output" | grep -q "not found\|not recognized\|unknown"; then
-        echo -e "    ${YELLOW}Volume management not implemented${NC}"
-        return 0
+    # Create a named filesystem volume. --size is required by the CLI; without
+    # it the volume is never created (which previously made the mount test below
+    # silently pass against a non-existent volume).
+    local volume_output=$("$RNX_BINARY" volume create "$TEST_VOLUME_NAME" --size 100MB 2>&1 || echo "")
+
+    if ! echo "$volume_output" | grep -qi "created successfully"; then
+        echo -e "    ${RED}✗ Volume creation failed: $volume_output${NC}"
+        return 1
     fi
-    
-    # If volume commands exist, test them
-    if echo "$volume_output" | grep -q "created\|success"; then
-        return 0
-    else
-        echo -e "    ${YELLOW}Volume creation may not be supported${NC}"
-        return 0
+
+    # Confirm it shows up in the listing.
+    if ! "$RNX_BINARY" volume list 2>&1 | grep -q "$TEST_VOLUME_NAME"; then
+        echo -e "    ${RED}✗ Created volume not present in 'volume list'${NC}"
+        return 1
     fi
+    echo -e "    ${GREEN}✓ Volume $TEST_VOLUME_NAME created (100MB) and listed${NC}"
+    return 0
 }
 
 test_volume_mounting() {
@@ -191,17 +193,24 @@ test_volume_mounting() {
     # mounts there and is writable.
     echo -e "    ${BLUE}Testing volume mounting on $TEST_HOST${NC}"
 
+    # The volume data dir is chowned to the job user at creation, so the
+    # unprivileged job (nobody) can write to its own volume. Verify both the
+    # mount (name -> /volumes/<name> contract) and that a write succeeds and
+    # reads back.
     local mount_path="/volumes/$TEST_VOLUME_NAME"
     local job_output=$("$RNX_BINARY" job run \
         --volume="$TEST_VOLUME_NAME" \
         sh -c "
 if [ -d '$mount_path' ]; then
     echo 'VOLUME_MOUNTED'
-    echo 'VOLUME_DATA' > '$mount_path/test.txt'
-    echo 'FILE_WRITTEN'
-    ls -la '$mount_path/'
+    if echo 'VOLUME_DATA' > '$mount_path/test.txt' && [ \"\$(cat '$mount_path/test.txt')\" = 'VOLUME_DATA' ]; then
+        echo 'FILE_WRITTEN'
+    else
+        echo 'WRITE_FAILED'
+    fi
 else
     echo 'NO_VOLUME'
+    ls -la /volumes/ 2>&1
 fi
 " 2>&1 || echo "")
 
@@ -216,9 +225,60 @@ fi
         echo -e "    ${RED}✗ Volume did not mount at $mount_path${NC}"
         return 1
     fi
-    assert_contains "$logs" "FILE_WRITTEN" "Volume should be writable" || return 1
-    echo -e "    ${GREEN}✓ Volume mounted at $mount_path and writable${NC}"
+    if ! assert_contains "$logs" "FILE_WRITTEN" "Unprivileged job should be able to write to its volume"; then
+        echo -e "    ${RED}✗ Job could not write to volume at $mount_path${NC}"
+        return 1
+    fi
+    echo -e "    ${GREEN}✓ Volume mounted at $mount_path and writable by the job${NC}"
     return 0
+}
+
+test_volume_cross_job_persistence() {
+    # The point of a named volume: data written by one job is visible to a later,
+    # separate job that mounts the same volume. Full lifecycle in one test:
+    # create -> job A writes -> job B reads back -> remove.
+    local vol="persist-vol-$$"
+    local mount_path="/volumes/$vol"
+    local marker="CROSS_JOB_$(date +%s)"
+
+    echo -e "    ${BLUE}Testing cross-job persistence with volume $vol${NC}"
+
+    # Create a dedicated volume for this scenario.
+    if ! "$RNX_BINARY" volume create "$vol" --size 50MB 2>&1 | grep -qi "created successfully"; then
+        echo -e "    ${RED}✗ Could not create volume $vol${NC}"
+        return 1
+    fi
+
+    # Job A: write a marker into the volume.
+    local jobA_output=$("$RNX_BINARY" job run --volume="$vol" \
+        sh -c "echo '$marker' > '$mount_path/persist.txt' && echo WROTE_A" 2>&1)
+    local jobA=$(echo "$jobA_output" | grep "^ID:" | awk '{print $2}')
+    local logsA=$(get_job_logs "$jobA")
+    if ! assert_contains "$logsA" "WROTE_A" "Job A should write to the volume"; then
+        echo -e "    ${RED}✗ Job A failed to write to $vol${NC}"
+        "$RNX_BINARY" volume remove "$vol" >/dev/null 2>&1
+        return 1
+    fi
+
+    sleep 2
+
+    # Job B: a separate job mounts the same volume and reads the marker back.
+    local jobB_output=$("$RNX_BINARY" job run --volume="$vol" \
+        sh -c "if [ -f '$mount_path/persist.txt' ]; then echo FOUND_B; cat '$mount_path/persist.txt'; else echo MISSING_B; fi" 2>&1)
+    local jobB=$(echo "$jobB_output" | grep "^ID:" | awk '{print $2}')
+    local logsB=$(get_job_logs "$jobB")
+
+    local ok=0
+    if assert_contains "$logsB" "$marker" "Job B should read data written by Job A"; then
+        echo -e "    ${GREEN}✓ Data persisted across jobs via volume $vol${NC}"
+    else
+        echo -e "    ${RED}✗ Job B did not see Job A's data in $vol${NC}"
+        echo "$logsB" | head -5
+        ok=1
+    fi
+
+    "$RNX_BINARY" volume remove "$vol" >/dev/null 2>&1
+    return $ok
 }
 
 test_volume_persistence() {
@@ -344,18 +404,20 @@ fi
 }
 
 test_volume_cleanup() {
-    # Test volume deletion/cleanup
-    local volume_list=$("$RNX_BINARY" volume list 2>&1 || echo "")
-    
-    if echo "$volume_list" | grep -q "not found\|not recognized"; then
-        echo -e "    ${YELLOW}Volume management commands not available${NC}"
-        return 0
+    # Remove the test volume (the CLI subcommand is 'remove', not 'delete').
+    local remove_output=$("$RNX_BINARY" volume remove "$TEST_VOLUME_NAME" 2>&1 || echo "")
+
+    if ! echo "$remove_output" | grep -qi "removed successfully"; then
+        echo -e "    ${RED}✗ Volume removal failed: $remove_output${NC}"
+        return 1
     fi
-    
-    # Try to delete test volume if it exists
-    local delete_output=$("$RNX_BINARY" volume delete "$TEST_VOLUME_NAME" 2>&1 || echo "")
-    
-    # Success if deleted or doesn't exist
+
+    # Confirm it is gone from the listing.
+    if "$RNX_BINARY" volume list 2>&1 | grep -q "$TEST_VOLUME_NAME"; then
+        echo -e "    ${RED}✗ Volume still present after removal${NC}"
+        return 1
+    fi
+    echo -e "    ${GREEN}✓ Volume $TEST_VOLUME_NAME removed${NC}"
     return 0
 }
 
@@ -399,6 +461,7 @@ main() {
     test_section "Volume Operations"
     run_test "Volume creation" test_volume_creation
     run_test "Volume mounting" test_volume_mounting
+    run_test "Cross-job volume persistence" test_volume_cross_job_persistence
     run_test "Data persistence" test_volume_persistence
     
     test_section "Advanced Volume Features"
