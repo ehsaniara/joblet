@@ -3,7 +3,6 @@
 package jobexec
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,30 +51,6 @@ func NewJobExecutor(platform platform.Platform, logger *logger.Logger, cfg *conf
 }
 
 // ExecuteInInitMode executes a job in init mode
-func (je *JobExecutor) ExecuteInInitMode() error {
-	// Load job configuration from environment
-	config, err := je.envBuilder.LoadJobConfigFromEnvironment()
-	if err != nil {
-		return errors.WrapConfigError("job", "config", err)
-	}
-
-	log := je.logger.WithField("job_uuid", config.JobUUID).
-		WithField("totalFiles", config.TotalFiles)
-
-	// Executing job with provided configuration
-
-	// Process uploads if present
-	if config.HasUploadSession && config.UploadPipePath != "" {
-		if e := je.processUploads(config); e != nil {
-			log.Error("failed to process uploads", "error", e)
-			// Continue execution even if upload fails
-		}
-	}
-
-	// Execute the command
-	return je.executeCommand(config)
-}
-
 // Execute executes the job using consolidated environment handling
 func Execute(logger *logger.Logger) error {
 	p := platform.NewPlatform()
@@ -110,29 +85,6 @@ func (je *JobExecutor) ExecuteJob() error {
 	default:
 		return errors.WrapConfigError("job", "phase", fmt.Errorf("unknown phase: %s", phase))
 	}
-}
-
-// processUploads handles upload processing from the pipe
-func (je *JobExecutor) processUploads(config *environment.JobConfig) error {
-	workspaceDir := je.config.Filesystem.WorkspaceDir
-	if workspaceDir == "" {
-		return errors.WrapConfigError("job", "workspace", fmt.Errorf("directory not configured"))
-	}
-	// Processing uploads from pipe
-
-	// Create workspace
-	if err := je.platform.MkdirAll(workspaceDir, 0755); err != nil {
-		return errors.WrapFilesystemError(workspaceDir, "create", err)
-	}
-
-	// Create receiver and process files
-	receiver := upload.NewReceiver(je.platform, je.logger)
-	if err := receiver.ProcessAllFiles(config.UploadPipePath, workspaceDir); err != nil {
-		return errors.WrapFilesystemError("", "process_upload", err)
-	}
-
-	// Upload processing completed
-	return nil
 }
 
 // executeCommand uses fork to create a child process while keeping init as PID 1
@@ -265,20 +217,6 @@ func (je *JobExecutor) resolveCommandPath(command string) (string, error) {
 	// Log what we checked for debugging
 	je.logger.Debug("command not found in any location", "command", command, "checked", commonPaths)
 	return "", fmt.Errorf("%w: %s", errors.ErrRuntimeNotFound, command)
-}
-
-// SetupCgroup sets up cgroup constraints (called before executing)
-func (je *JobExecutor) SetupCgroup(cgroupPath string) error {
-	// This is typically called from the joblet before switching to init mode
-	// The init process will already be in the correct cgroup
-	// Cgroup setup requested
-	return nil
-}
-
-// HandleSignals sets up signal handling for graceful shutdown
-func (je *JobExecutor) HandleSignals(ctx context.Context) {
-	// Signal handling can be added here if needed
-	// Signal handling setup
 }
 
 // loadRuntimeEnvironment loads runtime environment variables from /joblet/runtime.env

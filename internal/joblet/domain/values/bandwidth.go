@@ -2,8 +2,6 @@ package values
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 // Bandwidth represents I/O bandwidth with unit conversions
@@ -27,55 +25,6 @@ func NewBandwidth(bytesPerSec int64) (Bandwidth, error) {
 		return Bandwidth{}, fmt.Errorf("bandwidth cannot be negative: %d", bytesPerSec)
 	}
 	return Bandwidth{bytesPerSecond: bytesPerSec}, nil
-}
-
-// ParseBandwidth parses a string like "10MB/s", "1GB/s", "1024KB/s"
-func ParseBandwidth(s string) (Bandwidth, error) {
-	s = strings.TrimSpace(s)
-	if s == "" || s == "0" {
-		return Bandwidth{}, nil
-	}
-
-	// Remove /s suffix if present
-	s = strings.TrimSuffix(s, "/s")
-	s = strings.TrimSuffix(s, "/S")
-
-	// Find where the number ends and unit begins
-	var numEnd int
-	for i, r := range s {
-		if !strings.ContainsRune("0123456789.", r) {
-			numEnd = i
-			break
-		}
-	}
-
-	if numEnd == 0 {
-		return Bandwidth{}, fmt.Errorf("invalid bandwidth format: %s", s)
-	}
-
-	numStr := s[:numEnd]
-	unitStr := strings.ToUpper(strings.TrimSpace(s[numEnd:]))
-
-	value, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
-		return Bandwidth{}, fmt.Errorf("invalid bandwidth number: %s", numStr)
-	}
-
-	var bytesPerSec int64
-	switch unitStr {
-	case "B", "BPS", "":
-		bytesPerSec = int64(value)
-	case "K", "KB", "KBPS":
-		bytesPerSec = int64(value * 1024)
-	case "M", "MB", "MBPS":
-		bytesPerSec = int64(value * 1024 * 1024)
-	case "G", "GB", "GBPS":
-		bytesPerSec = int64(value * 1024 * 1024 * 1024)
-	default:
-		return Bandwidth{}, fmt.Errorf("unknown bandwidth unit: %s", unitStr)
-	}
-
-	return NewBandwidth(bytesPerSec)
 }
 
 // BytesPerSecond returns the bandwidth in bytes per second

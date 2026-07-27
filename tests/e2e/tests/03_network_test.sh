@@ -653,10 +653,46 @@ test_custom_network_creation() {
     
     if "$RNX_BINARY" network create "$CUSTOM_NETWORK_2" --cidr="$CUSTOM_CIDR_2" >/dev/null 2>&1; then
         echo -e "    ${GREEN}✓ Created custom network $CUSTOM_NETWORK_2${NC}"
-        return 0
     else
         return 1
     fi
+
+    # A custom network's bridge is created on the host when a job first uses it.
+    # Bridge names are derived safely (hashed when "joblet-<name>" would exceed the
+    # 15-char interface limit), so even a long network name must yield a real
+    # bridge. Verify one actually appears - this guards against the bridge being
+    # silently skipped when the name is too long.
+    "$RNX_BINARY" job run --network="$CUSTOM_NETWORK_1" echo BRIDGE_PROBE >/dev/null 2>&1
+    sleep 1
+    local custom_bridges=$(ip -o link show 2>/dev/null | grep -oE 'joblet[-0-9a-f]+' | grep -v '^joblet0$' | sort -u)
+    if [[ -n "$custom_bridges" ]]; then
+        echo -e "    ${GREEN}✓ Custom-network bridge present on host${NC}"
+        return 0
+    fi
+    echo -e "    ${RED}✗ No custom-network bridge created on host (silent bridge-name overflow?)${NC}"
+    return 1
+}
+
+test_custom_network_name_rejected() {
+    # A network name becomes a host bridge interface name and is passed to
+    # ip/iptables commands, so malformed names must be rejected at submission.
+    local out=$("$RNX_BINARY" network create "bad/name" --cidr="10.111.0.0/24" 2>&1)
+    if echo "$out" | grep -qiE "invalid network name"; then
+        echo -e "    ${GREEN}✓ Invalid network name rejected by 'network create'${NC}"
+    else
+        echo -e "    ${RED}✗ Invalid network name not rejected by create: $out${NC}"
+        "$RNX_BINARY" network remove "bad/name" >/dev/null 2>&1
+        return 1
+    fi
+
+    local out2=$("$RNX_BINARY" job run --network="bad;name" echo x 2>&1)
+    local id=$(echo "$out2" | grep "^ID:" | awk '{print $2}')
+    if [[ -z "$id" ]] && echo "$out2" | grep -qiE "invalid network name"; then
+        echo -e "    ${GREEN}✓ Invalid --network rejected at job submission${NC}"
+        return 0
+    fi
+    echo -e "    ${RED}✗ Invalid --network not rejected at submission (id=$id): $out2${NC}"
+    return 1
 }
 
 test_custom_network_listing() {
@@ -929,6 +965,7 @@ main() {
     # Custom Network Tests
     test_section "Custom Network Management"
     run_test "Custom network creation" test_custom_network_creation
+    run_test "Custom network name validation" test_custom_network_name_rejected
     run_test "Custom network listing" test_custom_network_listing
     
     test_section "Custom Network Communication"

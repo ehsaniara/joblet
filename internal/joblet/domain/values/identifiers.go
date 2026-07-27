@@ -25,11 +25,6 @@ func NewJobUUID(id string) (JobUUID, error) {
 	return JobUUID{value: id}, nil
 }
 
-// MustJobUUID creates a JobUUID without validation (for constants)
-func MustJobUUID(id string) JobUUID {
-	return JobUUID{value: id}
-}
-
 // String returns the string representation
 func (j JobUUID) String() string {
 	return j.value

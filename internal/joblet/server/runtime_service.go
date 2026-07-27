@@ -184,22 +184,6 @@ func (s *RuntimeServiceServer) TestRuntime(ctx context.Context, req *pb.TestRunt
 	}, nil
 }
 
-// extractLanguageFromName extracts language from runtime name (e.g., "python-3.11-ml" -> "python")
-func extractLanguageFromName(name string) string {
-	// Simple extraction - take first part before hyphen
-	if len(name) == 0 {
-		return ""
-	}
-
-	for i, char := range name {
-		if char == '-' {
-			return name[:i]
-		}
-	}
-
-	return name // No hyphen found, return whole name
-}
-
 // RemoveRuntime removes an installed runtime and cleans up its files
 func (s *RuntimeServiceServer) RemoveRuntime(ctx context.Context, req *pb.RemoveRuntimeRequest) (*pb.RemoveRuntimeResponse, error) {
 	log := s.logger.WithFields(

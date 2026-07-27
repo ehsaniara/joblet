@@ -108,14 +108,6 @@ func WithBufferSize[T any](size int) Option[T] {
 	}
 }
 
-// WithMaxTopics sets the maximum number of topics allowed.
-func WithMaxTopics[T any](max int) Option[T] {
-	return func(p *memoryPubSub[T]) {
-		// This could be used to limit the number of topics
-		// Implementation would require additional fields
-	}
-}
-
 // NewPubSub creates a new in-memory pub-sub system with functional options.
 func NewPubSub[T any](opts ...Option[T]) PubSub[T] {
 	p := &memoryPubSub[T]{

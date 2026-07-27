@@ -3,12 +3,37 @@ package network
 import (
 	"bytes"
 	"fmt"
+	"hash/fnv"
 	"net"
 	"strings"
 
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
+
+// maxIfaceNameLen is the maximum length of a Linux network-interface name
+// (IFNAMSIZ is 16 including the trailing NUL, leaving 15 usable characters).
+const maxIfaceNameLen = 15
+
+// bridgeNameForNetwork returns the host bridge interface name for a joblet
+// network. The default "bridge" network uses the shared "joblet0" bridge.
+// Other networks use the readable "joblet-<name>" form when it fits within the
+// interface-name limit; when it would be too long, a deterministic short hash
+// of the name is used instead ("joblet-<8 hex>"). The mapping is stable for a
+// given network name, so bridge creation, veth attachment, isolation rules, and
+// removal all resolve to the same interface.
+func bridgeNameForNetwork(networkName string) string {
+	if networkName == "bridge" {
+		return "joblet0"
+	}
+	candidate := "joblet-" + networkName
+	if len(candidate) <= maxIfaceNameLen {
+		return candidate
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(networkName))
+	return fmt.Sprintf("joblet-%08x", h.Sum32())
+}
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
@@ -258,10 +283,7 @@ func (ns *NetworkSetup) setupBridgeNetwork(alloc *JobAllocation, pid int) error 
 	}
 
 	// Attach host side to bridge
-	bridgeName := fmt.Sprintf("joblet-%s", alloc.Network)
-	if alloc.Network == "bridge" {
-		bridgeName = "joblet0"
-	}
+	bridgeName := bridgeNameForNetwork(alloc.Network)
 
 	if err := ns.execCommand("ip", "link", "set", alloc.VethHost, "master", bridgeName); err != nil {
 		return fmt.Errorf("failed to attach veth to bridge: %w", err)
@@ -318,10 +340,7 @@ func (ns *NetworkSetup) setupBridgeNetwork(alloc *JobAllocation, pid int) error 
 //
 // The bridge serves as the central hub for all jobs in the same network.
 func (ns *NetworkSetup) ensureBridge(networkName string) error {
-	bridgeName := fmt.Sprintf("joblet-%s", networkName)
-	if networkName == "bridge" {
-		bridgeName = "joblet0"
-	}
+	bridgeName := bridgeNameForNetwork(networkName)
 
 	// Check if bridge exists
 	if err := ns.execCommand("ip", "link", "show", bridgeName); err == nil {
@@ -686,10 +705,7 @@ func (ns *NetworkSetup) cleanupNetworkIsolation(bridgeName string) {
 // partial failures gracefully. Some cleanup steps may fail if resources
 // were already cleaned up, but the core bridge deletion will still proceed.
 func (ns *NetworkSetup) RemoveBridge(networkName string) error {
-	bridgeName := fmt.Sprintf("joblet-%s", networkName)
-	if networkName == "bridge" {
-		bridgeName = "joblet0"
-	}
+	bridgeName := bridgeNameForNetwork(networkName)
 
 	// Clean up isolation rules first
 	ns.cleanupNetworkIsolation(bridgeName)

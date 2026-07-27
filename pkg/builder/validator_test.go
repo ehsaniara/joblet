@@ -3,15 +3,26 @@
 package builder
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestValidateSpec_Valid(t *testing.T) {
-	spec, err := ParseSpec(filepath.Join("testdata", "python-basic.yaml"))
+func loadSpecFromFile(t *testing.T, name string) *RuntimeYAMLSpec {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("ParseSpec failed: %v", err)
+		t.Fatalf("failed to read spec file: %v", err)
 	}
+	spec, err := ParseSpecFromBytes(data)
+	if err != nil {
+		t.Fatalf("ParseSpecFromBytes failed: %v", err)
+	}
+	return spec
+}
+
+func TestValidateSpec_Valid(t *testing.T) {
+	spec := loadSpecFromFile(t, "python-basic.yaml")
 
 	if err := ValidateSpec(spec); err != nil {
 		t.Errorf("ValidateSpec failed: %v", err)
@@ -19,12 +30,9 @@ func TestValidateSpec_Valid(t *testing.T) {
 }
 
 func TestValidateSpec_InvalidName(t *testing.T) {
-	spec, err := ParseSpec(filepath.Join("testdata", "invalid-name.yaml"))
-	if err != nil {
-		t.Fatalf("ParseSpec failed: %v", err)
-	}
+	spec := loadSpecFromFile(t, "invalid-name.yaml")
 
-	err = ValidateSpec(spec)
+	err := ValidateSpec(spec)
 	if err == nil {
 		t.Error("expected error for invalid name")
 	}

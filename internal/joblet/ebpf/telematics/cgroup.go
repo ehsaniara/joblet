@@ -186,47 +186,12 @@ func init() {
 	defaultPlatform = platform.NewLinuxPlatform()
 }
 
-// GetCgroupID returns the cgroup v2 ID for a given cgroup path.
-func GetCgroupID(cgroupPath string) (uint64, error) {
-	return NewCgroupOps(defaultPlatform).GetCgroupID(cgroupPath)
-}
-
-// GetCgroupIDFromFD returns the cgroup v2 ID from an open file descriptor.
-func GetCgroupIDFromFD(fd int) (uint64, error) {
-	return NewCgroupOps(defaultPlatform).GetCgroupIDFromFD(fd)
-}
-
-// GetProcessCgroupID returns the cgroup v2 ID for a given process.
-func GetProcessCgroupID(pid int) (uint64, error) {
-	return NewCgroupOps(defaultPlatform).GetProcessCgroupID(pid)
-}
-
-// GetProcessCgroupPath returns the cgroup v2 path for a given process.
-func GetProcessCgroupPath(pid int) (string, error) {
-	return NewCgroupOps(defaultPlatform).GetProcessCgroupPath(pid)
-}
-
 // CgroupIDFromPath returns the cgroup ID for an absolute cgroup path.
 func CgroupIDFromPath(jobletCgroupPath string) (uint64, error) {
 	return NewCgroupOps(defaultPlatform).CgroupIDFromPath(jobletCgroupPath)
 }
 
-// ValidateCgroupPath checks if a cgroup path exists and is a directory.
-func ValidateCgroupPath(cgroupPath string) error {
-	return NewCgroupOps(defaultPlatform).ValidateCgroupPath(cgroupPath)
-}
-
 // IsCgroupV2 checks if the system is using cgroup v2.
 func IsCgroupV2() bool {
 	return NewCgroupOps(defaultPlatform).IsCgroupV2()
-}
-
-// GetCgroupControllers returns the list of controllers enabled for a cgroup.
-func GetCgroupControllers(cgroupPath string) ([]string, error) {
-	return NewCgroupOps(defaultPlatform).GetCgroupControllers(cgroupPath)
-}
-
-// ReadCgroupStat reads a specific stat from a cgroup.
-func ReadCgroupStat(cgroupPath, statName string) (uint64, error) {
-	return NewCgroupOps(defaultPlatform).ReadCgroupStat(cgroupPath, statName)
 }
