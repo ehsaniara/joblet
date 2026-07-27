@@ -270,13 +270,15 @@ func (s *JobServiceServer) validateJobRequest(req *interfaces.StartJobRequest) e
 		return fmt.Errorf("gpuCount cannot be negative")
 	}
 
-	validNetworks := map[string]bool{
+	// Built-in networks are always allowed; a custom network name reaches a host
+	// bridge interface name, so it must be a plain identifier.
+	builtinNetworks := map[string]bool{
 		"bridge": true,
 		"host":   true,
 		"none":   true,
 	}
-	if req.Network != "" && !validNetworks[req.Network] {
-		s.logger.Debug("using custom network", "network", req.Network)
+	if req.Network != "" && !builtinNetworks[req.Network] && !domain.IsValidNetworkName(req.Network) {
+		return fmt.Errorf("invalid network name %q: must be 1-63 characters of [a-zA-Z0-9_-], starting and ending alphanumeric", req.Network)
 	}
 
 	// Volume names reach a root-side bind-mount path in the job init process;

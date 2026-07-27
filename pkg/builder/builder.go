@@ -31,14 +31,6 @@ func NewBuilder(runtimesPath string, logger BuildLogger) *Builder {
 	}
 }
 
-// NewBuilderWithDefaults creates a new runtime builder with default settings
-func NewBuilderWithDefaults(dryRun, verbose bool) *Builder {
-	return &Builder{
-		runtimesPath: RuntimesBasePath,
-		logger:       NewBuildLogger(verbose),
-	}
-}
-
 const totalPhases = 14
 
 // Build executes the 14-phase build process from YAML content
@@ -171,15 +163,6 @@ func (b *Builder) Build(ctx context.Context, yamlContent string, dryRun bool) (*
 	b.logger.Info("Duration: %s", result.TotalDuration.Round(time.Second))
 
 	return result, nil
-}
-
-// BuildFromFile executes the 14-phase build process from a file path
-func (b *Builder) BuildFromFile(ctx context.Context, specPath string, dryRun bool) (*BuildResult, error) {
-	content, err := os.ReadFile(specPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read spec file: %w", err)
-	}
-	return b.Build(ctx, string(content), dryRun)
 }
 
 func (b *Builder) phase1ParseValidateContent(yamlContent string, result *BuildResult) (*RuntimeYAMLSpec, error) {

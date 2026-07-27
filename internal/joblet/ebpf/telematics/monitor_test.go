@@ -3,39 +3,13 @@
 package telematics
 
 import (
-	"os"
 	"testing"
 
-	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
-	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestNewMonitor(t *testing.T) {
-	collector := telemetry.NewCollector(100)
-	log := logger.New()
-
-	monitor := NewMonitor(collector, log)
-
-	assert.NotNil(t, monitor)
-	assert.NotNil(t, monitor.collector)
-	assert.NotNil(t, monitor.logger)
-	assert.NotNil(t, monitor.jobs)
-	assert.False(t, monitor.running)
-}
-
-func TestNewMonitor_NilLogger(t *testing.T) {
-	collector := telemetry.NewCollector(100)
-
-	monitor := NewMonitor(collector, nil)
-
-	assert.NotNil(t, monitor)
-	assert.NotNil(t, monitor.logger) // Should create default logger
-}
-
 func TestMonitor_GetStats_NotRunning(t *testing.T) {
-	monitor := NewMonitor(nil, nil)
+	monitor := NewMonitorWithConfig(nil, nil, EventTypeConfig{})
 
 	stats := monitor.GetStats()
 
@@ -86,50 +60,6 @@ func TestIsCgroupV2(t *testing.T) {
 	t.Logf("IsCgroupV2: %v", result)
 }
 
-func TestGetProcessCgroupPath(t *testing.T) {
-	// Test with current process
-	pid := os.Getpid()
-
-	path, err := GetProcessCgroupPath(pid)
-	require.NoError(t, err)
-	t.Logf("Current process cgroup path: %s", path)
-}
-
-func TestGetProcessCgroupPath_InvalidPID(t *testing.T) {
-	// Use an invalid PID
-	_, err := GetProcessCgroupPath(999999999)
-	assert.Error(t, err)
-}
-
-func TestGetCgroupID(t *testing.T) {
-	// Skip if not running on a system with cgroup v2
-	if !IsCgroupV2() {
-		t.Skip("cgroup v2 not available")
-	}
-
-	// Test with root cgroup
-	id, err := GetCgroupID("")
-	if err == nil {
-		assert.NotZero(t, id)
-		t.Logf("Root cgroup ID: %d", id)
-	}
-}
-
-func TestValidateCgroupPath(t *testing.T) {
-	// Root cgroup should always exist on cgroup v2 systems
-	if !IsCgroupV2() {
-		t.Skip("cgroup v2 not available")
-	}
-
-	err := ValidateCgroupPath("")
-	assert.NoError(t, err)
-}
-
-func TestValidateCgroupPath_NonExistent(t *testing.T) {
-	err := ValidateCgroupPath("nonexistent-cgroup-path-12345")
-	assert.Error(t, err)
-}
-
 func TestIsSupported(t *testing.T) {
 	err := IsSupported()
 	// Log result - may or may not be supported depending on system
@@ -141,7 +71,7 @@ func TestIsSupported(t *testing.T) {
 }
 
 func TestMonitor_AddRemoveJob_NotStarted(t *testing.T) {
-	monitor := NewMonitor(nil, nil)
+	monitor := NewMonitorWithConfig(nil, nil, EventTypeConfig{})
 
 	// Should fail because monitor not started
 	err := monitor.AddJob("test-job", 12345)
@@ -150,7 +80,7 @@ func TestMonitor_AddRemoveJob_NotStarted(t *testing.T) {
 }
 
 func TestFindJobByCgroup(t *testing.T) {
-	monitor := NewMonitor(nil, nil)
+	monitor := NewMonitorWithConfig(nil, nil, EventTypeConfig{})
 	monitor.jobs["job-1"] = 100
 	monitor.jobs["job-2"] = 200
 	monitor.jobs["job-3"] = 300

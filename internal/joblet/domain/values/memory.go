@@ -2,8 +2,6 @@ package values
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 // MemorySize represents memory size with unit conversions
@@ -36,52 +34,6 @@ func NewMemorySizeFromMB(mb int32) (MemorySize, error) {
 	}
 	bytes := int64(mb) * 1024 * 1024
 	return MemorySize{bytes: bytes}, nil
-}
-
-// ParseMemorySize parses a string like "512MB", "2GB", "1024KB"
-func ParseMemorySize(s string) (MemorySize, error) {
-	s = strings.TrimSpace(s)
-	if s == "" || s == "0" {
-		return MemorySize{}, nil
-	}
-
-	// Find where the number ends and unit begins
-	var numEnd int
-	for i, r := range s {
-		if !strings.ContainsRune("0123456789.", r) {
-			numEnd = i
-			break
-		}
-	}
-
-	// If numEnd is still 0, it means the entire string is numeric
-	if numEnd == 0 {
-		numEnd = len(s)
-	}
-
-	numStr := s[:numEnd]
-	unitStr := strings.ToUpper(strings.TrimSpace(s[numEnd:]))
-
-	value, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
-		return MemorySize{}, fmt.Errorf("invalid memory size number: %s", numStr)
-	}
-
-	var bytes int64
-	switch unitStr {
-	case "B", "":
-		bytes = int64(value)
-	case "K", "KB":
-		bytes = int64(value * 1024)
-	case "M", "MB":
-		bytes = int64(value * 1024 * 1024)
-	case "G", "GB":
-		bytes = int64(value * 1024 * 1024 * 1024)
-	default:
-		return MemorySize{}, fmt.Errorf("unknown memory unit: %s", unitStr)
-	}
-
-	return NewMemorySize(bytes)
 }
 
 // Bytes returns the size in bytes

@@ -11,18 +11,6 @@ type Path struct {
 	value string
 }
 
-// NewPath creates a new Path with validation
-func NewPath(path string) (Path, error) {
-	if strings.TrimSpace(path) == "" {
-		return Path{}, fmt.Errorf("path cannot be empty")
-	}
-
-	// Clean the path
-	cleaned := filepath.Clean(path)
-
-	return Path{value: cleaned}, nil
-}
-
 // NewAbsolutePath creates a new absolute Path with validation
 func NewAbsolutePath(path string) (Path, error) {
 	if strings.TrimSpace(path) == "" {
@@ -122,50 +110,4 @@ func (c CgroupPath) IsV1() bool {
 // IsV2 returns true if this is a cgroup v2 path
 func (c CgroupPath) IsV2() bool {
 	return strings.HasPrefix(c.path.Value(), "/sys/fs/cgroup2/")
-}
-
-// WorkspacePath represents a job workspace directory path
-type WorkspacePath struct {
-	path Path
-}
-
-// NewWorkspacePath creates a new WorkspacePath with validation
-func NewWorkspacePath(basePath, jobID string) (WorkspacePath, error) {
-	if strings.TrimSpace(basePath) == "" {
-		return WorkspacePath{}, fmt.Errorf("base path cannot be empty")
-	}
-
-	if strings.TrimSpace(jobID) == "" {
-		return WorkspacePath{}, fmt.Errorf("job ID cannot be empty")
-	}
-
-	// Create workspace path: basePath/jobID/work
-	workspaceDir := filepath.Join(basePath, jobID, "work")
-
-	p, err := NewAbsolutePath(workspaceDir)
-	if err != nil {
-		return WorkspacePath{}, fmt.Errorf("invalid workspace path: %w", err)
-	}
-
-	return WorkspacePath{path: p}, nil
-}
-
-// String returns the string representation
-func (w WorkspacePath) String() string {
-	return w.path.String()
-}
-
-// Value returns the underlying string value
-func (w WorkspacePath) Value() string {
-	return w.path.Value()
-}
-
-// Path returns the underlying Path
-func (w WorkspacePath) Path() Path {
-	return w.path
-}
-
-// JobDir returns the parent job directory
-func (w WorkspacePath) JobDir() Path {
-	return w.path.Dir()
 }

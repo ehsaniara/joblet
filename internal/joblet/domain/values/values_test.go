@@ -35,45 +35,6 @@ func TestNewBandwidth(t *testing.T) {
 	}
 }
 
-func TestParseBandwidth(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		want    int64
-		wantErr bool
-	}{
-		{"empty string", "", 0, false},
-		{"zero", "0", 0, false},
-		{"bytes", "100B/s", 100, false},
-		{"bytes no suffix", "100B", 100, false},
-		{"kilobytes", "10KB/s", 10 * 1024, false},
-		{"kilobytes short", "10K", 10 * 1024, false},
-		{"megabytes", "5MB/s", 5 * 1024 * 1024, false},
-		{"megabytes short", "5M", 5 * 1024 * 1024, false},
-		{"gigabytes", "1GB/s", 1024 * 1024 * 1024, false},
-		{"gigabytes short", "1G", 1024 * 1024 * 1024, false},
-		{"fractional megabytes", "1.5MB/s", int64(1.5 * 1024 * 1024), false},
-		{"lowercase suffix", "10mb/s", 10 * 1024 * 1024, false},
-		{"uppercase S suffix", "10MB/S", 10 * 1024 * 1024, false},
-		{"invalid unit", "10XB/s", 0, true},
-		{"no number", "MB/s", 0, true},
-		{"invalid number", "abcMB/s", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			bw, err := ParseBandwidth(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseBandwidth() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && bw.BytesPerSecond() != tt.want {
-				t.Errorf("BytesPerSecond() = %v, want %v", bw.BytesPerSecond(), tt.want)
-			}
-		})
-	}
-}
-
 func TestBandwidth_IsUnlimited(t *testing.T) {
 	bw, _ := NewBandwidth(0)
 	if !bw.IsUnlimited() {
@@ -168,20 +129,13 @@ func TestNewJobUUID(t *testing.T) {
 	}
 }
 
-func TestMustJobUUID(t *testing.T) {
-	jid := MustJobUUID("test-job-id")
-	if jid.Value() != "test-job-id" {
-		t.Errorf("MustJobUUID() Value() = %v, want test-job-id", jid.Value())
-	}
-}
-
 func TestJobUUID_IsEmpty(t *testing.T) {
-	jid := MustJobUUID("")
+	jid := JobUUID{}
 	if !jid.IsEmpty() {
 		t.Error("empty JobUUID should return true for IsEmpty()")
 	}
 
-	jid = MustJobUUID("test-id")
+	jid = JobUUID{value: "test-id"}
 	if jid.IsEmpty() {
 		t.Error("non-empty JobUUID should return false for IsEmpty()")
 	}
@@ -410,32 +364,6 @@ func TestRuntimeSpec_Version(t *testing.T) {
 // Path Tests
 // ============================================================================
 
-func TestNewPath(t *testing.T) {
-	tests := []struct {
-		name    string
-		path    string
-		wantErr bool
-	}{
-		{"valid absolute path", "/usr/local/bin", false},
-		{"valid relative path", "local/bin", false},
-		{"empty", "", true},
-		{"whitespace only", "   ", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p, err := NewPath(tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewPath() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && p.IsEmpty() {
-				t.Error("non-empty path should not return true for IsEmpty()")
-			}
-		})
-	}
-}
-
 func TestNewAbsolutePath(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -462,7 +390,7 @@ func TestNewAbsolutePath(t *testing.T) {
 }
 
 func TestPath_Dir(t *testing.T) {
-	p, _ := NewPath("/usr/local/bin/file.txt")
+	p, _ := NewAbsolutePath("/usr/local/bin/file.txt")
 	dir := p.Dir()
 	if dir.Value() != "/usr/local/bin" {
 		t.Errorf("Dir() = %v, want /usr/local/bin", dir.Value())
@@ -470,14 +398,14 @@ func TestPath_Dir(t *testing.T) {
 }
 
 func TestPath_Base(t *testing.T) {
-	p, _ := NewPath("/usr/local/bin/file.txt")
+	p, _ := NewAbsolutePath("/usr/local/bin/file.txt")
 	if p.Base() != "file.txt" {
 		t.Errorf("Base() = %v, want file.txt", p.Base())
 	}
 }
 
 func TestPath_Join(t *testing.T) {
-	p, _ := NewPath("/usr/local")
+	p, _ := NewAbsolutePath("/usr/local")
 	joined := p.Join("bin", "file.txt")
 	if joined.Value() != "/usr/local/bin/file.txt" {
 		t.Errorf("Join() = %v, want /usr/local/bin/file.txt", joined.Value())
@@ -526,49 +454,6 @@ func TestCgroupPath_IsV2(t *testing.T) {
 	cp, _ := NewCgroupPath("/sys/fs/cgroup2/joblet.slice")
 	if !cp.IsV2() {
 		t.Error("/sys/fs/cgroup2/ path should be V2")
-	}
-}
-
-// ============================================================================
-// WorkspacePath Tests
-// ============================================================================
-
-func TestNewWorkspacePath(t *testing.T) {
-	tests := []struct {
-		name     string
-		basePath string
-		jobID    string
-		wantErr  bool
-	}{
-		{"valid workspace", "/opt/joblet/jobs", "job-123", false},
-		{"empty base path", "", "job-123", true},
-		{"empty job ID", "/opt/joblet/jobs", "", true},
-		{"whitespace base path", "   ", "job-123", true},
-		{"whitespace job ID", "/opt/joblet/jobs", "   ", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			wp, err := NewWorkspacePath(tt.basePath, tt.jobID)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewWorkspacePath() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr {
-				expected := tt.basePath + "/" + tt.jobID + "/work"
-				if wp.Value() != expected {
-					t.Errorf("Value() = %v, want %v", wp.Value(), expected)
-				}
-			}
-		})
-	}
-}
-
-func TestWorkspacePath_JobDir(t *testing.T) {
-	wp, _ := NewWorkspacePath("/opt/joblet/jobs", "job-123")
-	jobDir := wp.JobDir()
-	if jobDir.Value() != "/opt/joblet/jobs/job-123" {
-		t.Errorf("JobDir() = %v, want /opt/joblet/jobs/job-123", jobDir.Value())
 	}
 }
 
@@ -655,13 +540,6 @@ func TestNewEnvironment(t *testing.T) {
 	vars["KEY3"] = "value3"
 	if env.Count() != 2 {
 		t.Error("NewEnvironment should create a copy, not reference")
-	}
-}
-
-func TestEmptyEnvironment(t *testing.T) {
-	env := EmptyEnvironment()
-	if !env.IsEmpty() {
-		t.Error("EmptyEnvironment() should return empty environment")
 	}
 }
 

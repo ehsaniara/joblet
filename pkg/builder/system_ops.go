@@ -3,7 +3,6 @@
 package builder
 
 import (
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -120,22 +119,4 @@ func (r *RealCmdRunner) SetEnv(env []string) {
 // CombinedOutput runs the command and returns combined stdout and stderr
 func (r *RealCmdRunner) CombinedOutput() ([]byte, error) {
 	return r.cmd.CombinedOutput()
-}
-
-// Helper function to copy file contents (used by isolation)
-func CopyFileContents(sysOps SystemOps, src, dest string, mode os.FileMode) error {
-	srcFile, err := sysOps.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	destFile, err := sysOps.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, srcFile)
-	return err
 }

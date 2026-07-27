@@ -10,6 +10,7 @@ import (
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
+	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
@@ -42,6 +43,13 @@ func (s *NetworkServiceServer) CreateNetwork(ctx context.Context, req *pb.Create
 	if err := s.auth.Authorized(ctx, auth2.CreateNetworkOp); err != nil {
 		log.Warn("authorization failed", "error", err)
 		return nil, err
+	}
+
+	// The name becomes a host bridge interface name and is passed to ip/iptables
+	// commands, so reject anything that isn't a plain identifier.
+	if !domain.IsValidNetworkName(req.Name) {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"invalid network name %q: must be 1-63 characters of [a-zA-Z0-9_-], starting and ending alphanumeric", req.Name)
 	}
 
 	// Create network config for the adapter

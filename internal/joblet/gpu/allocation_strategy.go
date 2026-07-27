@@ -190,23 +190,3 @@ func GetAllocationStrategy(strategy string) GPUAllocationStrategy {
 		return &FirstFitStrategy{}
 	}
 }
-
-// ValidateStrategy checks if a strategy name is valid
-func ValidateStrategy(strategy string) error {
-	switch AllocationStrategy(strategy) {
-	case StrategyFirstFit, StrategyPack, StrategySpread, StrategyBestFit, "":
-		return nil
-	default:
-		return fmt.Errorf("unknown GPU allocation strategy: %s", strategy)
-	}
-}
-
-// GetAvailableStrategies returns all available allocation strategies
-func GetAvailableStrategies() []string {
-	return []string{
-		string(StrategyFirstFit),
-		string(StrategyPack),
-		string(StrategySpread),
-		string(StrategyBestFit),
-	}
-}

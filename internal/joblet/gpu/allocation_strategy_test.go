@@ -171,35 +171,3 @@ func TestGetAllocationStrategy(t *testing.T) {
 		})
 	}
 }
-
-func TestValidateStrategy(t *testing.T) {
-	tests := []struct {
-		name     string
-		strategy string
-		wantErr  bool
-	}{
-		{"ValidFirstFit", "first-fit", false},
-		{"ValidPack", "pack", false},
-		{"ValidSpread", "spread", false},
-		{"ValidBestFit", "best-fit", false},
-		{"ValidEmpty", "", false},
-		{"Invalid", "invalid", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateStrategy(tt.strategy)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestGetAvailableStrategies(t *testing.T) {
-	strategies := GetAvailableStrategies()
-	expected := []string{"first-fit", "pack", "spread", "best-fit"}
-	assert.Equal(t, expected, strategies)
-}

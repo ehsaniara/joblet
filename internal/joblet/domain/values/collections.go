@@ -93,11 +93,6 @@ func NewEnvironment(vars map[string]string) Environment {
 	return Environment{variables: envVars}
 }
 
-// EmptyEnvironment returns an empty environment
-func EmptyEnvironment() Environment {
-	return Environment{variables: make(map[string]string)}
-}
-
 // ToMap returns the environment as a map (copy)
 func (e Environment) ToMap() map[string]string {
 	result := make(map[string]string)

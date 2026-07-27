@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -8,6 +9,35 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
 )
+
+// StreamConfig describes a set of uploads to process directly into a job workspace.
+type StreamConfig struct {
+	JobUUID      string
+	Uploads      []domain.FileUpload
+	MemoryLimit  int32
+	WorkspaceDir string
+}
+
+// ProcessDirectUploads prepares an upload session for the given files (used for
+// scheduled jobs and immediate processing). Files are validated and counted
+// during session preparation.
+func (m *Manager) ProcessDirectUploads(ctx context.Context, config *StreamConfig) error {
+	if len(config.Uploads) == 0 {
+		return nil
+	}
+
+	log := m.logger.WithField("operation", "process-direct-uploads")
+	log.Debug("processing direct uploads", "job_uuid", config.JobUUID,
+		"uploadCount", len(config.Uploads), "workspace", config.WorkspaceDir)
+
+	session, err := m.PrepareUploadSession(config.JobUUID, config.Uploads, config.MemoryLimit)
+	if err != nil {
+		return fmt.Errorf("failed to prepare upload session: %w", err)
+	}
+
+	log.Debug("direct upload processing completed", "filesProcessed", len(session.Files))
+	return nil
+}
 
 // Ensure Manager implements domain.UploadManager
 var _ domain.UploadManager = (*Manager)(nil)

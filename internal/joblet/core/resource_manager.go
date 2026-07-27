@@ -31,24 +31,6 @@ type ResourceManager struct {
 // NewResourceManager creates a new resource manager.
 // Initializes manager with cgroup resource, filesystem isolator,
 // platform interface, and upload manager for complete resource handling.
-func NewResourceManager(
-	cgroup resource.Resource,
-	filesystem *filesystem.Isolator,
-	platform platform.Platform,
-	config *config.Config,
-	uploadMgr *upload.Manager,
-	logger *logger.Logger,
-) *ResourceManager {
-	return &ResourceManager{
-		cgroup:     cgroup,
-		filesystem: filesystem,
-		platform:   platform,
-		config:     config,
-		logger:     logger.WithField("component", "resource-manager"),
-		uploadMgr:  uploadMgr,
-	}
-}
-
 // SetupJobResources sets up all resources for a job (cgroup, filesystem).
 // Creates workspace directory, establishes cgroup with resource limits,
 // and applies CPU core restrictions if specified. Cleans up on failure.

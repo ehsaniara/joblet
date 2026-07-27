@@ -175,3 +175,20 @@ func TestValidateJobRequest_AcceptsPlainVolumeNames(t *testing.T) {
 		assert.NoError(t, err, "expected plain volume name %q to be accepted", name)
 	}
 }
+
+func TestValidateJobRequest_NetworkNames(t *testing.T) {
+	s := newTestJobService(t.TempDir())
+
+	// Built-in networks and valid custom names are accepted.
+	for _, name := range []string{"", "bridge", "host", "none", "my-net", "backend1"} {
+		err := s.validateJobRequest(&interfaces.StartJobRequest{Network: name})
+		assert.NoError(t, err, "expected network %q to be accepted", name)
+	}
+
+	// Malformed custom network names are rejected at submission.
+	for _, name := range []string{"a/b", "../etc", "bad name", "net;rm", "-bad"} {
+		err := s.validateJobRequest(&interfaces.StartJobRequest{Network: name})
+		require.Error(t, err, "expected network %q to be rejected", name)
+		assert.Contains(t, err.Error(), "network name", "name %q", name)
+	}
+}

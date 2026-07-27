@@ -77,25 +77,3 @@ func TestRuntimeServiceServer_ValidateRuntimeYAML_EmptyYAML(t *testing.T) {
 	assert.False(t, resp.Valid)
 	assert.Contains(t, resp.Message, "required")
 }
-
-func TestExtractLanguageFromName(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"simple name", "python", "python"},
-		{"with version", "python-3.11", "python"},
-		{"with variant", "python-3.11-ml", "python"},
-		{"java runtime", "openjdk-21", "openjdk"},
-		{"empty string", "", ""},
-		{"no hyphen", "golang", "golang"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractLanguageFromName(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}

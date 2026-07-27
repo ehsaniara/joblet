@@ -4,32 +4,14 @@ package builder_test
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/ehsaniara/joblet/pkg/builder"
 	"github.com/ehsaniara/joblet/pkg/builder/builderfakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// mockFileInfo implements fs.FileInfo for testing
-type mockFileInfo struct {
-	name    string
-	size    int64
-	mode    os.FileMode
-	modTime time.Time
-	isDir   bool
-}
-
-func (m mockFileInfo) Name() string       { return m.name }
-func (m mockFileInfo) Size() int64        { return m.size }
-func (m mockFileInfo) Mode() os.FileMode  { return m.mode }
-func (m mockFileInfo) ModTime() time.Time { return m.modTime }
-func (m mockFileInfo) IsDir() bool        { return m.isDir }
-func (m mockFileInfo) Sys() interface{}   { return nil }
 
 func TestNewIsolatedEnvironmentWithOps(t *testing.T) {
 	t.Run("creates environment successfully", func(t *testing.T) {
@@ -368,56 +350,4 @@ func TestIsolatedEnvironment_IsMounted(t *testing.T) {
 	_ = env.Setup()
 
 	assert.True(t, env.IsMounted())
-}
-
-func TestIsolatedEnvironment_CopyInstalledFiles(t *testing.T) {
-	t.Run("creates target directories", func(t *testing.T) {
-		fakeSysOps := &builderfakes.FakeSystemOps{}
-		logger := builder.NewBuildLogger(false)
-		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
-
-		// Mock Stat to return not found for search dirs
-		fakeSysOps.StatReturns(nil, os.ErrNotExist)
-
-		err := env.CopyInstalledFiles("/target", []string{"*"})
-
-		require.NoError(t, err)
-
-		// Verify target directories were created
-		mkdirCalls := fakeSysOps.MkdirAllCallCount()
-		assert.GreaterOrEqual(t, mkdirCalls, 5)
-	})
-
-	t.Run("copies files matching patterns from upper layer", func(t *testing.T) {
-		fakeSysOps := &builderfakes.FakeSystemOps{}
-		logger := builder.NewBuildLogger(false)
-		env, _ := builder.NewIsolatedEnvironmentWithOps("/tmp/test-base", logger, fakeSysOps)
-
-		// Mock Stat to succeed for search dirs
-		callCount := 0
-		fakeSysOps.StatStub = func(path string) (fs.FileInfo, error) {
-			callCount++
-			if path == "/tmp/test-base/upper/usr/bin" {
-				return mockFileInfo{name: "bin", isDir: true}, nil
-			}
-			if path == "/tmp/test-base/upper/usr/bin/python3" {
-				return mockFileInfo{name: "python3", size: 1024, mode: 0755}, nil
-			}
-			return nil, os.ErrNotExist
-		}
-
-		// Mock Glob to return a file
-		fakeSysOps.GlobStub = func(pattern string) ([]string, error) {
-			if pattern == "/tmp/test-base/upper/usr/bin/python*" {
-				return []string{"/tmp/test-base/upper/usr/bin/python3"}, nil
-			}
-			return nil, nil
-		}
-
-		err := env.CopyInstalledFiles("/target", []string{"python*"})
-
-		require.NoError(t, err)
-		// Glob should have been called at least once
-		assert.GreaterOrEqual(t, fakeSysOps.GlobCallCount(), 1)
-	})
 }

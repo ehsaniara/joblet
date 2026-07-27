@@ -37,19 +37,6 @@ type EventTypeConfig struct {
 	SocketData bool
 }
 
-// DefaultEventTypeConfig returns a config with all event types enabled
-func DefaultEventTypeConfig() EventTypeConfig {
-	return EventTypeConfig{
-		Exec:       true,
-		Connect:    true,
-		Accept:     true,
-		Mmap:       true,
-		Mprotect:   true,
-		File:       true,
-		SocketData: true,
-	}
-}
-
 // Monitor provides eBPF-based telematics into job activity.
 // It tracks process execution (execve) and network connections (connect)
 // for processes running in monitored cgroups.
@@ -144,12 +131,6 @@ type MprotectEvent struct {
 	Prot      uint32
 	Addr      uint64
 	Length    uint64
-}
-
-// NewMonitor creates a new eBPF telematics monitor.
-// The collector is used to emit telemetry events.
-func NewMonitor(collector *telemetry.Collector, log *logger.Logger) *Monitor {
-	return NewMonitorWithConfig(collector, log, DefaultEventTypeConfig())
 }
 
 // NewMonitorWithConfig creates a new eBPF telematics monitor with custom event type configuration.

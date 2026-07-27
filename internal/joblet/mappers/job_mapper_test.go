@@ -112,31 +112,6 @@ func TestDomainToProtobuf_EmptyArgs(t *testing.T) {
 	}
 }
 
-func TestDomainToRunJobResponse(t *testing.T) {
-	limits := domain.NewResourceLimitsFromParams(50, "", 256, 500)
-
-	job := &domain.Job{
-		Uuid:      "run-job-test",
-		Command:   "echo",
-		Args:      []string{"test"},
-		Limits:    *limits,
-		Status:    domain.StatusRunning,
-		StartTime: time.Now(),
-		ExitCode:  0,
-	}
-
-	mapper := NewJobMapper()
-	response := mapper.DomainToRunJobResponse(job)
-
-	// Verify it's a proper RunJobResponse (simplified to just job_uuid and status)
-	if response.JobUuid != job.Uuid {
-		t.Errorf("Expected ID %v, got %v", job.Uuid, response.JobUuid)
-	}
-	if response.Status != string(job.Status) {
-		t.Errorf("Expected status %v, got %v", string(job.Status), response.Status)
-	}
-}
-
 // Test all status values mapping correctly
 func TestStatusMapping(t *testing.T) {
 	statuses := []domain.JobStatus{
@@ -161,15 +136,11 @@ func TestStatusMapping(t *testing.T) {
 
 		// Test mapper function
 		pbJob := mapper.DomainToProtobuf(job)
-		runJobRes := mapper.DomainToRunJobResponse(job)
 
 		expectedStatus := string(status)
 
 		if pbJob.Status != expectedStatus {
 			t.Errorf("DomainToProtobuf: Expected status %v, got %v", expectedStatus, pbJob.Status)
-		}
-		if runJobRes.Status != expectedStatus {
-			t.Errorf("DomainToRunJobResponse: Expected status %v, got %v", expectedStatus, runJobRes.Status)
 		}
 	}
 }
@@ -337,26 +308,6 @@ func BenchmarkDomainToProtobuf(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mapper.DomainToProtobuf(job)
-	}
-}
-
-func BenchmarkDomainToRunJobResponse(b *testing.B) {
-	limits := domain.NewResourceLimits()
-
-	job := &domain.Job{
-		Uuid:      "benchmark-run-job",
-		Command:   "echo",
-		Args:      []string{"test"},
-		Status:    domain.StatusRunning,
-		StartTime: time.Now(),
-		Limits:    *limits,
-	}
-
-	mapper := NewJobMapper()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		mapper.DomainToRunJobResponse(job)
 	}
 }
 
