@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
@@ -245,37 +246,35 @@ func (ec *ExecutionCoordinator) setupGPUEnvironment(ctx context.Context, job *do
 	log := ec.logger.WithField("job_uuid", job.Uuid)
 	log.Debug("setting up GPU environment", "gpuIndices", job.GPUIndices)
 
-	// 1. Create GPU device nodes in isolated filesystem
 	gpuIndices := make([]int, len(job.GPUIndices))
 	for i, idx := range job.GPUIndices {
 		gpuIndices[i] = int(idx)
 	}
-	if err := ec.isolationManager.CreateGPUDeviceNodes(job.Uuid, gpuIndices); err != nil {
-		return fmt.Errorf("failed to create GPU device nodes: %w", err)
-	}
 
-	// 2. Detect and mount CUDA libraries
+	// Device nodes and CUDA mounts are created in the job's mount namespace by
+	// the init process; here we only detect CUDA and forward what init needs.
 	cudaPaths, err := ec.environmentManager.DetectCUDA()
 	if err != nil {
 		log.Warn("CUDA not found, GPU job may fail without CUDA runtime", "error", err)
-	} else {
-		// Try to mount CUDA libraries
-		for _, cudaPath := range cudaPaths {
-			if err := ec.isolationManager.MountCUDALibraries(job.Uuid, cudaPath); err != nil {
-				log.Warn("failed to mount CUDA from path", "path", cudaPath, "error", err)
-				continue
-			}
-			log.Debug("successfully mounted CUDA libraries", "path", cudaPath)
-			break // Successfully mounted CUDA
-		}
 	}
 
-	// 3. Set CUDA environment variables
 	if job.Environment == nil {
 		job.Environment = make(map[string]string)
 	}
-	job.Environment["CUDA_VISIBLE_DEVICES"] = formatGPUIndices(gpuIndices)
-	job.Environment["NVIDIA_VISIBLE_DEVICES"] = formatGPUIndices(gpuIndices)
+	// A MIG instance is targeted by its UUID, not a GPU index.
+	visible := formatGPUIndices(gpuIndices)
+	if len(job.GPUMIGUUIDs) > 0 {
+		visible = strings.Join(job.GPUMIGUUIDs, ",")
+	}
+	job.Environment["CUDA_VISIBLE_DEVICES"] = visible
+	job.Environment["NVIDIA_VISIBLE_DEVICES"] = visible
+
+	// Forwarded to the init process (JOB_ namespace is reserved from clients):
+	// which device nodes to create, and which host CUDA dirs to bind mount.
+	job.Environment["JOB_GPU_INDICES"] = formatGPUIndices(gpuIndices)
+	if len(cudaPaths) > 0 {
+		job.Environment["JOB_GPU_CUDA_MOUNTS"] = strings.Join(cudaPaths, string(os.PathListSeparator))
+	}
 
 	// Add CUDA environment variables if available
 	if len(cudaPaths) > 0 {

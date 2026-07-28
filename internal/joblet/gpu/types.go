@@ -11,14 +11,26 @@ type GPU struct {
 	InUse       bool       `json:"in_use"`                 // Is currently allocated to a job
 	JobUUID     string     `json:"job_uuid"`               // Which job is using this GPU (empty if not in use)
 	AllocatedAt *time.Time `json:"allocated_at,omitempty"` // When GPU was allocated
+
+	// MIG (Multi-Instance GPU): when IsMIG is set, this entry is a hardware GPU
+	// instance rather than a whole card. The instance is the unit of isolation.
+	IsMIG     bool   `json:"is_mig,omitempty"`
+	MIGUUID   string `json:"mig_uuid,omitempty"`   // MIG device UUID (MIG-...), used for NVIDIA_VISIBLE_DEVICES
+	CapMinors []int  `json:"cap_minors,omitempty"` // /dev/nvidia-caps/nvidia-cap<M> minors this instance needs
+
+	// Quarantined GPUs are excluded from allocation. Set when a scrub-on-release
+	// could not verify the memory was cleared, so it is not handed to another job.
+	Quarantined      bool   `json:"quarantined,omitempty"`
+	QuarantineReason string `json:"quarantine_reason,omitempty"`
 }
 
 // GPUAllocation represents a GPU allocation for a job
 type GPUAllocation struct {
 	JobUUID     string    `json:"job_uuid"`
-	GPUIndices  []int     `json:"gpu_indices"`   // Which GPUs are allocated
-	GPUCount    int       `json:"gpu_count"`     // Number of GPUs requested
-	GPUMemoryMB int64     `json:"gpu_memory_mb"` // Memory requirement (0 = any)
+	GPUIndices  []int     `json:"gpu_indices"`         // Which GPUs are allocated
+	MIGUUIDs    []string  `json:"mig_uuids,omitempty"` // MIG instance UUIDs when the allocation is MIG
+	GPUCount    int       `json:"gpu_count"`           // Number of GPUs requested
+	GPUMemoryMB int64     `json:"gpu_memory_mb"`       // Memory requirement (0 = any)
 	AllocatedAt time.Time `json:"allocated_at"`
 }
 

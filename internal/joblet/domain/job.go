@@ -69,9 +69,10 @@ type Job struct {
 	SecretEnvironment map[string]string // Secret environment variables
 
 	// GPU allocation
-	GPUIndices  []int32 // Which GPUs are allocated to this job
-	GPUCount    int32   // Number of GPUs requested/allocated
-	GPUMemoryMB int64   // GPU memory requirement in MB
+	GPUIndices  []int32  // Which GPUs are allocated to this job
+	GPUMIGUUIDs []string // MIG instance UUIDs when the allocation is MIG (targets the instance)
+	GPUCount    int32    // Number of GPUs requested/allocated
+	GPUMemoryMB int64    // GPU memory requirement in MB
 
 	// Node identification
 	NodeId string // Unique identifier of the Joblet node that executed this job
@@ -387,6 +388,7 @@ func (j *Job) DeepCopy() *Job {
 
 		// GPU allocation
 		GPUIndices:  make([]int32, len(j.GPUIndices)),
+		GPUMIGUUIDs: append([]string(nil), j.GPUMIGUUIDs...),
 		GPUCount:    j.GPUCount,
 		GPUMemoryMB: j.GPUMemoryMB,
 

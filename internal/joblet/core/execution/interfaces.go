@@ -53,8 +53,6 @@ type IsolationManager interface {
 	CreateIsolatedEnvironment(jobID string) (*IsolationContext, error)
 	CreateBuilderEnvironment(jobID string) (*IsolationContext, error)
 	DestroyIsolatedEnvironment(jobID string) error
-	CreateGPUDeviceNodes(jobID string, gpuIndices []int) error
-	MountCUDALibraries(jobID string, cudaPath string) error
 }
 
 // StartProcessOptions contains options for starting a process

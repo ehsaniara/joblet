@@ -39,20 +39,22 @@ func NewIsolator(cfg *config.Config, platform platform.Platform) *Isolator {
 
 // JobFilesystem represents an isolated filesystem for a job
 type JobFilesystem struct {
-	JobUUID       string
-	RootDir       string
-	TmpDir        string
-	WorkDir       string
-	InitPath      string            // Path to the init binary inside the isolated environment
-	Volumes       []string          // Volume names to mount
-	Runtime       string            // Runtime specification
-	RuntimePath   string            // Path to runtime base directory
-	RuntimeConfig interface{}       // Runtime configuration data
-	RuntimeEnv    map[string]string // Runtime environment variables from runtime.yml
-	IsBuilder     bool              // True for runtime build jobs requiring full host filesystem access
-	platform      platform.Platform
-	config        *config.Config
-	logger        *logger.Logger
+	JobUUID        string
+	RootDir        string
+	TmpDir         string
+	WorkDir        string
+	InitPath       string            // Path to the init binary inside the isolated environment
+	Volumes        []string          // Volume names to mount
+	Runtime        string            // Runtime specification
+	RuntimePath    string            // Path to runtime base directory
+	RuntimeConfig  interface{}       // Runtime configuration data
+	RuntimeEnv     map[string]string // Runtime environment variables from runtime.yml
+	IsBuilder      bool              // True for runtime build jobs requiring full host filesystem access
+	GPUIndices     []int             // Allocated GPU indices; device nodes are created for these
+	CUDAMountPaths []string          // Host CUDA dirs bind mounted read-only into the job
+	platform       platform.Platform
+	config         *config.Config
+	logger         *logger.Logger
 }
 
 // PrepareInitBinary copies the joblet init binary to /sbin/init in the chroot.
@@ -292,6 +294,28 @@ func (f *JobFilesystem) Setup() error {
 		return fmt.Errorf("failed to mount runtime: %w", err)
 	}
 
+	// GPU libraries are bind mounted before the chroot, while host paths are still
+	// reachable. Best effort: nothing here is fatal.
+	f.loadGPUFromEnvironment()
+	if len(f.GPUIndices) > 0 {
+		// Inject the host driver's user-space libraries so CUDA can initialize.
+		if libs := f.discoverDriverLibraries(); len(libs) > 0 {
+			if err := f.injectDriverLibraries(libs); err != nil {
+				log.Warn("failed to inject GPU driver libraries", "error", err)
+			}
+		} else {
+			log.Warn("no NVIDIA driver libraries found on host; GPU job may fail to initialize CUDA")
+		}
+
+		// A CUDA toolkit dir, only if explicitly forwarded (it normally ships in
+		// the runtime image, not here).
+		if len(f.CUDAMountPaths) > 0 {
+			if err := f.MountCUDALibraries("", f.CUDAMountPaths); err != nil {
+				log.Warn("failed to mount CUDA toolkit paths", "error", err)
+			}
+		}
+	}
+
 	if len(f.Volumes) == 0 {
 		f.loadVolumesFromEnvironment()
 	}
@@ -332,6 +356,14 @@ func (f *JobFilesystem) Setup() error {
 
 	if err := f.mountEssentialFS(); err != nil {
 		return fmt.Errorf("failed to mount essential filesystems: %w", err)
+	}
+
+	// GPU device nodes are created after the chroot, using absolute /dev paths
+	// inside the job root, so the job can open /dev/nvidia*.
+	if len(f.GPUIndices) > 0 {
+		if err := f.CreateGPUDeviceNodes(f.GPUIndices); err != nil {
+			return fmt.Errorf("failed to create GPU device nodes: %w", err)
+		}
 	}
 
 	return nil
@@ -667,8 +699,9 @@ func (f *JobFilesystem) CreateGPUDeviceNodes(gpuIndices []int) error {
 		major int
 		minor int
 	}{
-		{"/dev/nvidiactl", 195, 255}, // NVIDIA control device
-		{"/dev/nvidia-uvm", 237, 0},  // Unified Virtual Memory
+		{"/dev/nvidiactl", 195, 255},      // NVIDIA control device
+		{"/dev/nvidia-uvm", 237, 0},       // Unified Virtual Memory
+		{"/dev/nvidia-uvm-tools", 237, 1}, // UVM tools device (required by the CUDA runtime)
 	}
 
 	for _, device := range commonDevices {
@@ -766,6 +799,115 @@ func (f *JobFilesystem) MountCUDALibraries(cudaPath string, mountPaths []string)
 	}
 
 	log.Info("CUDA library mounting completed", "cudaPath", cudaPath, "mountedPaths", len(mountPaths))
+	return nil
+}
+
+// driverLibraryPrefixes are the NVIDIA driver user-space libraries required for
+// CUDA compute. These are the driver stack (versioned to the running kernel
+// module), not the CUDA toolkit which ships in the runtime image.
+var driverLibraryPrefixes = []string{
+	"libcuda.so",
+	"libnvidia-ml.so",
+	"libnvidia-ptxjitcompiler.so",
+	"libnvidia-nvvm.so",
+	"libnvidia-cfg.so",
+}
+
+// driverLibraryDirs are the standard shared-library directories the dynamic
+// loader searches; the driver libraries live in one of these on the host.
+var driverLibraryDirs = []string{
+	"/usr/lib/x86_64-linux-gnu",
+	"/usr/lib/aarch64-linux-gnu",
+	"/usr/lib64",
+	"/usr/lib",
+	"/lib/x86_64-linux-gnu",
+	"/lib/aarch64-linux-gnu",
+}
+
+// discoverDriverLibraries returns the host paths of the NVIDIA driver user-space
+// libraries (the real versioned files, not symlinks). Native fallback for hosts
+// without the NVIDIA Container Toolkit, which otherwise handles this better.
+func (f *JobFilesystem) discoverDriverLibraries() []string {
+	var libs []string
+	seen := map[string]bool{}
+	for _, dir := range driverLibraryDirs {
+		entries, err := f.platform.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			// Only the real versioned files; SONAME symlinks are recreated in the
+			// job root by injectDriverLibraries.
+			if e.IsDir() || e.Type()&os.ModeSymlink != 0 {
+				continue
+			}
+			name := e.Name()
+			for _, p := range driverLibraryPrefixes {
+				if strings.HasPrefix(name, p) {
+					full := filepath.Join(dir, name)
+					if !seen[full] {
+						seen[full] = true
+						libs = append(libs, full)
+					}
+					break
+				}
+			}
+		}
+	}
+	return libs
+}
+
+// driverSoname derives the SONAME symlink for an NVIDIA driver library filename.
+// The core driver libraries carry a ".so.1" SONAME (e.g. libcuda.so.550.x ->
+// libcuda.so.1). Returns "" when the name has no version suffix to link.
+func driverSoname(name string) string {
+	i := strings.Index(name, ".so.")
+	if i < 0 {
+		return ""
+	}
+	soname := name[:i+4] + "1" // "libcuda.so." + "1"
+	if soname == name {
+		return ""
+	}
+	return soname
+}
+
+// injectDriverLibraries bind mounts each host driver library read-only into the
+// job root at its original path and creates the SONAME symlink alongside it, so
+// the dynamic loader resolves e.g. libcuda.so.1 from a standard library dir
+// without needing ldconfig. Runs before the chroot, while host paths are visible.
+func (f *JobFilesystem) injectDriverLibraries(libs []string) error {
+	log := f.logger.WithField("operation", "inject-driver-libraries")
+	mounted := 0
+	for _, hostLib := range libs {
+		target := filepath.Join(f.RootDir, strings.TrimPrefix(hostLib, "/"))
+		if err := f.platform.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			log.Warn("failed to create driver library dir", "target", target, "error", err)
+			continue
+		}
+		// Bind mounts need an existing target file.
+		if err := f.platform.WriteFile(target, []byte{}, 0644); err != nil && !f.platform.IsExist(err) {
+			log.Warn("failed to create driver library mount point", "target", target, "error", err)
+			continue
+		}
+		if err := f.platform.Mount(hostLib, target, "", uintptr(syscall.MS_BIND), ""); err != nil {
+			log.Warn("failed to bind mount driver library", "source", hostLib, "target", target, "error", err)
+			continue
+		}
+		// Remount read-only (best effort).
+		_ = f.platform.Mount("", target, "", uintptr(syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY), "")
+
+		// Recreate the SONAME symlink (e.g. libcuda.so.1 -> libcuda.so.550.x).
+		if soname := driverSoname(filepath.Base(hostLib)); soname != "" {
+			link := filepath.Join(filepath.Dir(target), soname)
+			_ = f.platform.Remove(link)
+			if err := f.platform.Symlink(filepath.Base(hostLib), link); err != nil {
+				log.Debug("failed to create SONAME symlink", "link", link, "error", err)
+			}
+		}
+		mounted++
+	}
+	log.Info("driver library injection completed", "found", len(libs), "mounted", mounted)
 	return nil
 }
 
@@ -1035,6 +1177,34 @@ func (f *JobFilesystem) loadVolumesFromEnvironment() {
 
 	f.Volumes = volumes
 	f.logger.Debug("loaded volumes from environment", "volumes", volumes, "volumeCount", len(volumes), "job_uuid", f.JobUUID)
+}
+
+// loadGPUFromEnvironment reads the allocated GPU indices and the host CUDA dirs
+// to bind mount from the JOB_GPU_* variables the server forwards. Empty when the
+// job has no GPUs, in which case no device nodes or CUDA mounts are created.
+func (f *JobFilesystem) loadGPUFromEnvironment() {
+	indicesStr := f.platform.Getenv("JOB_GPU_INDICES")
+	if indicesStr != "" {
+		var indices []int
+		for _, part := range strings.Split(indicesStr, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if idx, err := strconv.Atoi(part); err == nil {
+				indices = append(indices, idx)
+			}
+		}
+		f.GPUIndices = indices
+	}
+
+	if mounts := f.platform.Getenv("JOB_GPU_CUDA_MOUNTS"); mounts != "" {
+		f.CUDAMountPaths = filepath.SplitList(mounts)
+	}
+
+	if len(f.GPUIndices) > 0 {
+		f.logger.Debug("loaded GPU config from environment", "gpuIndices", f.GPUIndices, "cudaMounts", f.CUDAMountPaths, "job_uuid", f.JobUUID)
+	}
 }
 
 // setupLimitedWorkDir creates a size-limited work directory for jobs without volumes.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -156,6 +157,17 @@ type GPUConfig struct {
 	Enabled            bool     `yaml:"enabled" json:"enabled"`                         // Enable GPU support (off by default)
 	CUDAPaths          []string `yaml:"cuda_paths" json:"cuda_paths"`                   // CUDA installation paths
 	AllocationStrategy string   `yaml:"allocation_strategy" json:"allocation_strategy"` // GPU allocation strategy (first-fit, pack, spread, best-fit)
+	// ScrubPolicy controls GPU memory clearing on release, since the driver does
+	// not scrub GPU memory and a later job could otherwise read a prior job's
+	// data. "off" = no scrub; "reset" (default) = best-effort reset, GPU returns
+	// to the pool regardless; "strict" = reset then verify the memory is cleared,
+	// and quarantine the GPU (exclude from allocation) if it cannot be verified.
+	ScrubPolicy string `yaml:"scrub_policy" json:"scrub_policy"`
+
+	// Simulate presents fake GPUs so the GPU control plane runs without hardware.
+	// The devices are non-functional (CUDA cannot run). Testing only.
+	Simulate      bool `yaml:"simulate" json:"simulate"`
+	SimulateCount int  `yaml:"simulate_count" json:"simulate_count"` // Number of fake GPUs (default 2)
 }
 
 // IPCConfig holds IPC configuration for persist integration
@@ -493,6 +505,19 @@ func LoadConfig() (*Config, string, error) {
 	}
 	if val := os.Getenv("JOBLET_LOG_FORMAT"); val != "" {
 		config.Logging.Format = val
+	}
+	// JOBLET_GPU_ENABLED=1 turns on GPU support (real discovery); used by tests to
+	// enable GPUs on a host that has them without editing the config file.
+	if val := os.Getenv("JOBLET_GPU_ENABLED"); val == "1" || val == "true" {
+		config.GPU.Enabled = true
+	}
+	// JOBLET_GPU_SIMULATE=<count> presents fake GPUs for testing without hardware.
+	if val := os.Getenv("JOBLET_GPU_SIMULATE"); val != "" {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			config.GPU.Enabled = true
+			config.GPU.Simulate = true
+			config.GPU.SimulateCount = n
+		}
 	}
 
 	// Validate the configuration

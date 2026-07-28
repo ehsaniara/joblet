@@ -73,6 +73,7 @@ func (gs *GPUService) AllocateGPU(ctx context.Context, job *domain.Job) (*gpu.GP
 	for i, gpuIndex := range allocation.GPUIndices {
 		job.GPUIndices[i] = int32(gpuIndex)
 	}
+	job.GPUMIGUUIDs = allocation.MIGUUIDs
 
 	log.Info("GPUs allocated", "allocatedGPUs", allocation.GPUIndices)
 

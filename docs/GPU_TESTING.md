@@ -46,12 +46,12 @@ go test ./tests/gpu -v
 
 ### 3. System Tests (Real GPUs)
 
-> ⚠️ **Caveat — device-node passthrough is not yet wired.** Joblet does not currently create
-> `/dev/nvidia*` device nodes inside a job or bind-mount CUDA libraries. As a result, running
-> `nvidia-smi` or checking for `/dev/nvidia*` **inside a job** will not find GPU devices, even on a
-> host with working GPUs. What a job does receive today is the `CUDA_VISIBLE_DEVICES` /
-> `NVIDIA_VISIBLE_DEVICES` environment variables. The `nvidia-smi` checks below only work when run
-> **on the host**, not inside a job.
+>**Caveat — device-node passthrough is newly wired and not yet validated on GPU hardware.**
+> Joblet now creates `/dev/nvidia*` device nodes inside a job and bind-mounts CUDA libraries, so
+> running `nvidia-smi` or checking for `/dev/nvidia*` **inside a job** is expected to work on a host
+> with working GPUs. A job also receives the `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES`
+> environment variables. This path has not yet been exercised on a host with an NVIDIA GPU — validate
+> it by running `09_gpu_test` in `GPU_TEST_MODE=real` on real hardware before relying on it.
 
 #### Prerequisites
 
@@ -70,8 +70,8 @@ export GPU_TEST_MODE=real
 ./tests/e2e/tests/09_gpu_test.sh
 
 # Test specific GPU scenarios
-# NOTE: `nvidia-smi` inside a job will NOT see GPUs today (no device-node passthrough).
-# It only works if nvidia-smi and the driver devices are already present in the job's filesystem.
+# NOTE: device-node passthrough is now wired, so `nvidia-smi` inside a job is expected to see the
+# allocated GPUs on a real GPU host. This path is newly wired and pending validation on GPU hardware.
 rnx job run --gpu=1 --gpu-memory=4GB nvidia-smi
 rnx job run --gpu=2 --gpu-memory=8GB python gpu_test.py
 ```
@@ -80,8 +80,8 @@ rnx job run --gpu=2 --gpu-memory=8GB python gpu_test.py
 
 - GPU allocation bookkeeping
 - `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment setup
-- Device node creation (`/dev/nvidia*`) — *not yet wired; these nodes will not appear inside a job*
-- GPU memory selection filtering (runtime limits *not yet enforced*)
+- Device node creation (`/dev/nvidia*`) — *now wired; nodes are expected to appear inside a job on a real GPU host (pending validation)*
+- GPU memory selection filtering (runtime limits *not enforced*)
 - Multi-GPU allocation scenarios
 
 ## Test Scenarios by Environment
@@ -230,17 +230,18 @@ rnx job status <job-uuid>  # Should show GPU info if allocated
 
 ### Check Job GPU Environment
 
-> ⚠️ Only the `CUDA_VISIBLE_DEVICES` / `env | grep CUDA` checks below will succeed today. Because
-> device-node passthrough is not yet wired, `ls -la /dev/nvidia*` will report "No such file or
-> directory" and `nvidia-smi` will fail inside the job even when the host has working GPUs. This is
-> expected in the current implementation, not a misconfiguration.
+> Device-node passthrough is now wired, so on a real GPU host all of the checks below are expected
+> to succeed: `ls -la /dev/nvidia*` should list the allocated device nodes and `nvidia-smi` should run
+> inside the job, alongside the `CUDA_VISIBLE_DEVICES` / `env | grep CUDA` checks. This path is newly
+> wired and pending validation on GPU hardware — confirm it with `09_gpu_test` (`GPU_TEST_MODE=real`)
+> on a host with an NVIDIA GPU.
 
 ```bash
 # Create debug job
 rnx job run --gpu=1 bash -c "
   echo 'CUDA_VISIBLE_DEVICES='$CUDA_VISIBLE_DEVICES
-  ls -la /dev/nvidia*                 # not yet wired: expect no nodes inside the job
-  nvidia-smi || echo 'nvidia-smi not available'   # not yet wired: expect failure inside the job
+  ls -la /dev/nvidia*                 # now wired: expect the allocated nodes inside the job (pending GPU-hardware validation)
+  nvidia-smi || echo 'nvidia-smi not available'   # now wired: expect success on a real GPU host (pending GPU-hardware validation)
   env | grep CUDA
 "
 ```

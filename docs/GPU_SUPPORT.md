@@ -6,21 +6,22 @@ allocation, memory isolation, and CUDA environment integration.
 
 ## Executive Overview
 
-> ⚠️ **Status:** GPU support is currently partial/experimental. GPU discovery, allocation
-> bookkeeping, request validation, and `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env
-> injection work today. Runtime memory enforcement, hardware-level device isolation, and automatic
-> CUDA library provisioning are designed but **not yet wired into the execution path** — see the
-> notes in the sections below.
+> ⚠️ **Status:** GPU support is currently experimental. GPU discovery, allocation bookkeeping,
+> request validation, and `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env injection work today.
+> Per-job device-node creation (`/dev/nvidia*`) and automatic CUDA library provisioning are now wired
+> into the execution path, but this path has **not yet been validated on a host with an NVIDIA GPU**.
+> Runtime GPU memory enforcement is still **not implemented** — see the notes in the sections below.
 
 Joblet's GPU orchestration framework is designed to enable organizations to:
 
 - **Automated GPU Discovery and Allocation**: Assignment of GPU resources based on job requirements *(working)*
 - **Memory Quota Management** *(not yet enforced)*: `--gpu-memory` filters candidate GPUs at selection time only; it is
   not enforced at runtime
-- **Hardware-Level Isolation** *(planned)*: Per-job device access boundaries are designed but not yet applied
+- **Hardware-Level Isolation** *(implemented, pending GPU-hardware validation)*: Per-job `/dev/nvidia*` device nodes are
+  now created inside the job; cgroup device rules are still not applied
 - **Comprehensive Observability**: GPU allocation metadata through multiple interfaces
 - **CUDA Integration**: `CUDA_VISIBLE_DEVICES` env configuration *(working)*; automatic CUDA library provisioning is
-  *planned, not yet active*
+  *implemented, pending GPU-hardware validation*
 
 ## Getting Started with GPU Workloads
 
@@ -71,30 +72,32 @@ rnx job run --gpu=1 --max-cpu=400 --max-memory=16384 python hybrid_workload.py
 
 ### CUDA Runtime Integration
 
-> ⚠️ **Current state:** Today Joblet provides GPU visibility to jobs through environment variables
-> only. Per-job device-node passthrough (`/dev/nvidia*`), cgroup device access controls, and CUDA
-> library bind-mounting are designed but **not yet wired into the execution path**. Steps 3 and 4
-> below are not active yet, so `nvidia-smi` and CUDA libraries are only usable inside a job if they
-> already exist in the job's runtime/host filesystem — Joblet does not currently provision or
-> restrict them per job.
+> ⚠️ **Current state:** Per-job device-node passthrough (`/dev/nvidia*`) and CUDA library
+> bind-mounting are now wired into the execution path: the server forwards the allocated GPU indices
+> and detected CUDA paths to the init process (via the `JOB_GPU_INDICES` / `JOB_GPU_CUDA_MOUNTS` env
+> vars), which creates the device nodes post-chroot and bind-mounts the CUDA libraries read-only
+> pre-chroot. This path has **not yet been validated on a host with an NVIDIA GPU**. cgroup device
+> access controls are still **not applied**.
 
 Upon GPU allocation request, Joblet performs the following operations:
 
 1. **GPU Discovery**: Enumerates available NVIDIA devices via `/proc/driver/nvidia/gpus/` and `nvidia-smi` interfaces
 2. **Device Allocation**: Assigns specific GPU indices to job instances with tracking in job metadata (in-memory bookkeeping)
-3. **Permission Configuration** *(not yet active)*: Intended to establish per-job device access controls; the cgroup
-   device path currently logs and returns without applying any rules
-4. **Library Provisioning** *(not yet active)*: Intended to bind CUDA runtime libraries into the job; the execution
-   path currently only logs a placeholder and mounts nothing
+3. **Device Node Creation** *(implemented, pending GPU-hardware validation)*: Creates the per-job `/dev/nvidia*`,
+   `/dev/nvidiactl`, and `/dev/nvidia-uvm` nodes inside the job (post-chroot) for the allocated GPU indices. Note:
+   cgroup device-access rules are still not applied
+4. **Library Provisioning** *(implemented, pending GPU-hardware validation)*: Bind-mounts the detected host CUDA
+   directories read-only into the job (pre-chroot)
 5. **Environment Setup**: Configures `CUDA_VISIBLE_DEVICES` and `NVIDIA_VISIBLE_DEVICES` for framework compatibility
 
 ### CUDA Library Path Resolution
 
-> ⚠️ **Not yet active:** CUDA library bind-mounting into the job namespace is not currently wired
-> into the execution path. The paths below describe where Joblet is designed to discover CUDA
-> installations; today no CUDA libraries are mounted into jobs by Joblet.
+> ⚠️ **Implemented, pending GPU-hardware validation:** CUDA library bind-mounting into the job
+> namespace is now wired into the execution path; the detected CUDA directories are bind-mounted
+> read-only into the job. This has not yet been validated on a host with an NVIDIA GPU. The paths
+> below describe where Joblet discovers CUDA installations.
 
-Joblet is designed to discover CUDA installations from standard locations:
+Joblet discovers CUDA installations from standard locations:
 
 - `/usr/local/cuda`
 - `/opt/cuda`
