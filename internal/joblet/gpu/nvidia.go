@@ -30,6 +30,12 @@ func NewNvidiaDiscovery(platform platform.Platform) *NvidiaDiscovery {
 func (n *NvidiaDiscovery) DiscoverGPUs() ([]*GPU, error) {
 	n.logger.Debug("starting NVIDIA GPU discovery")
 
+	// If any GPU is in MIG mode, the MIG instances are the allocatable units.
+	if mig := n.discoverMIG(); len(mig) > 0 {
+		n.logger.Info("discovered MIG instances", "count", len(mig))
+		return mig, nil
+	}
+
 	// First try /proc/driver/nvidia/gpus/ (most reliable)
 	gpus, err := n.discoverFromProc()
 	if err == nil && len(gpus) > 0 {
@@ -143,6 +149,17 @@ func (n *NvidiaDiscovery) parseGPUInfo(content string) *GPU {
 }
 
 // discoverFromNvidiaSmi discovers GPUs using nvidia-smi command
+// discoverMIG lists MIG instances via `nvidia-smi -L`. Returns nil when no GPU
+// is in MIG mode or nvidia-smi is unavailable.
+func (n *NvidiaDiscovery) discoverMIG() []*GPU {
+	cmd := n.platform.CreateCommand("nvidia-smi", "-L")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	return ParseMIGDevices(string(out))
+}
+
 func (n *NvidiaDiscovery) discoverFromNvidiaSmi() ([]*GPU, error) {
 	// Try to run nvidia-smi
 	cmd := n.platform.CreateCommand("nvidia-smi",

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +25,16 @@ type Manager struct {
 	mutex              sync.RWMutex
 	config             config.GPUConfig
 	logger             *logger.Logger
+
+	// verifyMemUsedMB returns a GPU's used memory in MB; used by the strict scrub
+	// policy to confirm memory was cleared. Injectable for testing.
+	verifyMemUsedMB func(gpuIndex int) (int64, error)
 }
+
+// scrubResidualThresholdMB is the used-memory ceiling (MB) below which a GPU is
+// considered clean after a reset. A freshly reset GPU with no processes reports
+// near zero; anything above this under the strict policy triggers quarantine.
+const scrubResidualThresholdMB = 64
 
 // NewManager creates a new GPU manager with the given configuration
 func NewManager(cfg config.GPUConfig, discovery GPUDiscoveryInterface, cudaDetector CUDADetectorInterface) *Manager {
@@ -37,6 +48,7 @@ func NewManager(cfg config.GPUConfig, discovery GPUDiscoveryInterface, cudaDetec
 		config:             cfg,
 		logger:             logger.New().WithField("component", "gpu-manager"),
 	}
+	manager.verifyMemUsedMB = manager.queryMemoryUsedMB
 
 	// Initialize GPU monitor if enabled
 	if cfg.Enabled {
@@ -96,7 +108,7 @@ func (m *Manager) GetAvailableGPUs() ([]*GPU, error) {
 
 	available := make([]*GPU, 0)
 	for _, gpu := range m.gpus {
-		if !gpu.InUse {
+		if !gpu.InUse && !gpu.Quarantined {
 			available = append(available, gpu)
 		}
 	}
@@ -146,7 +158,7 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 	// Find available GPUs that meet memory requirements
 	availableGPUs := make([]*GPU, 0)
 	for _, gpu := range m.gpus {
-		if !gpu.InUse {
+		if !gpu.InUse && !gpu.Quarantined {
 			// Check memory requirement if specified
 			if gpuMemoryMB > 0 && gpu.MemoryMB < gpuMemoryMB {
 				log.Debug("skipping GPU due to insufficient memory",
@@ -167,6 +179,7 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 
 	// Allocate the selected GPUs
 	allocatedIndices := make([]int, gpuCount)
+	var migUUIDs []string
 	allocatedAt := time.Now()
 
 	for i, gpu := range selectedGPUs {
@@ -174,6 +187,9 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 		gpu.JobUUID = jobID
 		gpu.AllocatedAt = &allocatedAt
 		allocatedIndices[i] = gpu.Index
+		if gpu.IsMIG {
+			migUUIDs = append(migUUIDs, gpu.MIGUUID)
+		}
 
 		log.Debug("allocated GPU to job",
 			"gpuIndex", gpu.Index,
@@ -185,6 +201,7 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 	allocation := &GPUAllocation{
 		JobUUID:     jobID,
 		GPUIndices:  allocatedIndices,
+		MIGUUIDs:    migUUIDs,
 		GPUCount:    gpuCount,
 		GPUMemoryMB: gpuMemoryMB,
 		AllocatedAt: allocatedAt,
@@ -235,11 +252,10 @@ func (m *Manager) ReleaseGPUs(jobID string) error {
 	// Remove allocation record
 	delete(m.allocations, jobID)
 
-	// Clear GPU memory for security
-	if err := m.ClearGPUMemory(allocation.GPUIndices); err != nil {
-		log.Warn("failed to clear GPU memory", "error", err, "gpuIndices", allocation.GPUIndices)
-		// Don't fail the release operation due to memory clearing issues
-	}
+	// Scrub GPU memory before the GPU can be reallocated. Under the strict policy
+	// a GPU whose memory cannot be verified clean is quarantined rather than
+	// handed to another job.
+	m.scrubOnRelease(allocation.GPUIndices)
 
 	log.Info("successfully released GPUs for job",
 		"releasedGPUs", allocation.GPUIndices,
@@ -291,53 +307,88 @@ func (m *Manager) RefreshGPUInfo() error {
 }
 
 // ClearGPUMemory clears GPU memory for security between job allocations
-func (m *Manager) ClearGPUMemory(gpuIndices []int) error {
-	if len(gpuIndices) == 0 {
-		return nil
+// scrubOnRelease clears GPU memory according to the configured scrub policy.
+// Caller must hold m.mutex.
+func (m *Manager) scrubOnRelease(gpuIndices []int) {
+	policy := m.config.ScrubPolicy
+	if policy == "" {
+		policy = "reset"
+	}
+	if policy == "off" || len(gpuIndices) == 0 {
+		return
 	}
 
-	log := m.logger.WithField("gpuIndices", gpuIndices)
-	log.Debug("clearing GPU memory for security")
-
-	// Method 1: Try nvidia-smi GPU reset (recommended)
 	for _, idx := range gpuIndices {
-		cmd := exec.Command("nvidia-smi", "--gpu-reset", "-i", fmt.Sprintf("%d", idx))
-		if err := cmd.Run(); err != nil {
-			// GPU reset might not be supported on all cards, log warning but continue
-			log.Warn("GPU reset failed, attempting alternative memory clearing",
-				"gpuIndex", idx, "error", err)
-
-			// Method 2: Alternative - force memory cleanup using nvidia-smi
-			if err := m.forceMemoryCleanup(idx); err != nil {
-				log.Warn("memory cleanup failed", "gpuIndex", idx, "error", err)
-			}
-		} else {
-			log.Debug("successfully reset GPU", "gpuIndex", idx)
+		log := m.logger.WithField("gpuIndex", idx)
+		if err := m.resetGPU(idx); err != nil {
+			log.Warn("GPU reset failed during scrub", "error", err)
 		}
-	}
 
+		if policy != "strict" {
+			// Best effort: the GPU returns to the pool regardless.
+			continue
+		}
+
+		// Strict: only return the GPU to the pool if its memory is verifiably
+		// clear; otherwise quarantine it so no later job can read stale data.
+		usedMB, err := m.verifyMemUsedMB(idx)
+		if err != nil {
+			m.quarantine(idx, fmt.Sprintf("could not verify memory after scrub: %v", err))
+			continue
+		}
+		if usedMB > scrubResidualThresholdMB {
+			m.quarantine(idx, fmt.Sprintf("%dMB still in use after scrub (> %dMB)", usedMB, scrubResidualThresholdMB))
+			continue
+		}
+		log.Debug("GPU memory verified clear after scrub", "usedMB", usedMB)
+	}
+}
+
+// quarantine marks a GPU unavailable for allocation. Caller must hold m.mutex.
+func (m *Manager) quarantine(gpuIndex int, reason string) {
+	gpu, ok := m.gpus[gpuIndex]
+	if !ok {
+		return
+	}
+	gpu.Quarantined = true
+	gpu.QuarantineReason = reason
+	m.logger.Error("quarantining GPU after unverified scrub; excluded from allocation until cleared",
+		"gpuIndex", gpuIndex, "reason", reason)
+}
+
+// ClearQuarantine returns a quarantined GPU to the allocatable pool. For operator
+// use once the GPU has been verified or reset out of band.
+func (m *Manager) ClearQuarantine(gpuIndex int) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	gpu, ok := m.gpus[gpuIndex]
+	if !ok {
+		return fmt.Errorf("GPU %d not found", gpuIndex)
+	}
+	gpu.Quarantined = false
+	gpu.QuarantineReason = ""
+	m.logger.Info("cleared GPU quarantine", "gpuIndex", gpuIndex)
 	return nil
 }
 
-// forceMemoryCleanup attempts alternative memory cleanup methods
-func (m *Manager) forceMemoryCleanup(gpuIndex int) error {
-	// Alternative method: Query GPU processes and attempt cleanup
-	// This is less reliable than GPU reset but better than nothing
-	cmd := exec.Command("nvidia-smi", "--query-compute-apps=pid",
-		"--format=csv,noheader,nounits", "-i", fmt.Sprintf("%d", gpuIndex))
+// resetGPU attempts a best-effort GPU reset via nvidia-smi.
+func (m *Manager) resetGPU(gpuIndex int) error {
+	return exec.Command("nvidia-smi", "--gpu-reset", "-i", fmt.Sprintf("%d", gpuIndex)).Run()
+}
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to query GPU processes: %w", err)
+// queryMemoryUsedMB returns a GPU's used memory in MB via nvidia-smi.
+func (m *Manager) queryMemoryUsedMB(gpuIndex int) (int64, error) {
+	out, err := exec.Command("nvidia-smi", "--query-gpu=memory.used",
+		"--format=csv,noheader,nounits", "-i", fmt.Sprintf("%d", gpuIndex)).Output()
+	if err != nil {
+		return 0, fmt.Errorf("failed to query GPU memory: %w", err)
 	}
-
-	// Note: In a production environment, you might want to implement more
-	// sophisticated memory clearing, such as:
-	// 1. Using nvidia-ml-py to directly control GPU memory
-	// 2. Running a small CUDA kernel to overwrite memory
-	// 3. Integration with container runtime memory clearing
-
-	m.logger.Debug("completed alternative memory cleanup", "gpuIndex", gpuIndex)
-	return nil
+	txt := strings.TrimSpace(string(out))
+	used, err := strconv.ParseInt(txt, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse memory.used %q: %w", txt, err)
+	}
+	return used, nil
 }
 
 // GetMonitor returns the GPU monitoring service

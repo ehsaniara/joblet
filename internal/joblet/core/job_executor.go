@@ -290,27 +290,3 @@ func (ima *isolationManagerAdapter) DestroyIsolatedEnvironment(jobID string) err
 	// Cleanup isolation environment
 	return nil
 }
-
-// CreateGPUDeviceNodes is a no-op: GPU device-node passthrough is not wired into
-// the job execution path. The job only receives CUDA_VISIBLE_DEVICES/NVIDIA_VISIBLE_DEVICES
-// env vars; no /dev/nvidia* nodes are created inside the job. A working mknod
-// implementation exists in the filesystem isolator but is not currently invoked.
-func (ima *isolationManagerAdapter) CreateGPUDeviceNodes(jobID string, gpuIndices []int) error {
-	if len(gpuIndices) == 0 {
-		return nil
-	}
-	ima.logger.Debug("GPU device node passthrough not wired; job uses visible-devices env vars only", "job_uuid", jobID, "gpuIndices", gpuIndices)
-	return nil
-}
-
-// MountCUDALibraries is a no-op: CUDA library mounting is not wired into the job
-// execution path. No CUDA libraries are bind mounted into the job; only the
-// visible-devices env vars are set. A working implementation exists in the
-// filesystem isolator but is not currently invoked.
-func (ima *isolationManagerAdapter) MountCUDALibraries(jobID string, cudaPath string) error {
-	if cudaPath == "" {
-		return fmt.Errorf("empty CUDA path")
-	}
-	ima.logger.Debug("CUDA library mounting not wired; job uses visible-devices env vars only", "job_uuid", jobID, "cudaPath", cudaPath)
-	return nil
-}

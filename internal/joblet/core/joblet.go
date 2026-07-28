@@ -848,8 +848,14 @@ func (je *jobletExecutor) ExecuteScheduledJob(ctx context.Context, job *domain.J
 
 // createGPUManager creates and initializes a GPU manager based on configuration
 func createGPUManager(gpuConfig config.GPUConfig, platform platform.Platform, logger *logger.Logger) gpu.GPUManagerInterface {
-	// Create GPU discovery service
-	gpuDiscovery := gpu.NewNvidiaDiscovery(platform)
+	// Simulation mode presents fake GPUs (testing without hardware).
+	var gpuDiscovery gpu.GPUDiscoveryInterface = gpu.NewNvidiaDiscovery(platform)
+	if gpuConfig.Simulate {
+		logger.Warn("GPU simulation enabled - presenting fake GPUs; CUDA cannot actually run",
+			"count", gpuConfig.SimulateCount)
+		gpuDiscovery = gpu.NewSimulatedDiscovery(gpuConfig.SimulateCount)
+		gpuConfig.Enabled = true
+	}
 
 	// Create CUDA detector
 	cudaDetector := gpu.NewCUDADetector(platform)

@@ -6,26 +6,34 @@
 
 **Implementation Status**: ⚠️ **Partial / Experimental**
 
-The user-facing allocation and validation path works, but the runtime isolation mechanisms
-described below are NOT yet wired into the execution path. Current state:
+The user-facing allocation and validation path works, and device-node creation and CUDA-library
+provisioning are now wired into the execution path (pending end-to-end validation on GPU
+hardware). Current state:
 
 - GPU discovery and management: Implemented (in-memory detection and allocation bookkeeping)
 - RNX CLI integration with `--gpu` and `--gpu-memory` flags: Implemented (flags parse and validate)
 - Compatibility validation (GPU count, runtime GPU/CUDA compatibility): Implemented
 - `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env injection: Implemented
 - JSON API support: Implemented
-- Security isolation with cgroups v2 device controller: **NOT yet wired** — the cgroup device
-  code path logs and returns without writing device rules
-- Device-node creation (`mknod` for `/dev/nvidia*`) inside the job namespace: **NOT yet wired** —
-  the execution path only logs a placeholder; jobs do not receive `/dev/nvidia*` nodes
-- CUDA library bind-mounting into the job namespace: **NOT yet wired** — placeholder only
-- GPU memory enforcement and clearing between jobs: **NOT yet wired** — `--gpu-memory` only
-  filters candidate GPUs at selection time; it is not enforced at runtime
+- Device-node creation (`mknod` for `/dev/nvidia*`) inside the job namespace: **Implemented** — the
+  server (`coordinator.setupGPUEnvironment`) forwards the allocated GPU indices to the init process
+  via the `JOB_GPU_INDICES` env var, and the init-side filesystem `Setup()` creates the device nodes
+  (`/dev/nvidia*`, `/dev/nvidiactl`, `/dev/nvidia-uvm`) inside the job post-chroot. **Pending
+  validation on GPU hardware.**
+- CUDA library bind-mounting into the job namespace: **Implemented** — the server forwards the
+  detected CUDA mount paths via the `JOB_GPU_CUDA_MOUNTS` env var, and the init-side `Setup()`
+  bind-mounts those host CUDA directories read-only into the job pre-chroot. **Pending validation on
+  GPU hardware.**
+- GPU memory enforcement and clearing between jobs: **NOT yet implemented** — `--gpu-memory` only
+  filters candidate GPUs at selection time; it is not enforced at runtime, and GPU memory is not
+  reliably cleared between jobs (best-effort only)
 
-> **Implementation note**: Working `mknod` device-node creation and CUDA bind-mount
-> implementations exist in the filesystem isolator (`internal/joblet/core/filesystem/isolator.go`,
-> `CreateGPUDeviceNodes` / `MountCUDALibraries`) but are currently dead code — they are not invoked
-> by the job execution path, which calls placeholder adapters that only log and return.
+> **Implementation note**: The `mknod` device-node creation (`CreateGPUDeviceNodes`) and CUDA
+> bind-mount (`MountCUDALibraries`) implementations in the filesystem isolator
+> (`internal/joblet/core/filesystem/isolator.go`) are now invoked by the job execution path via the
+> init-side `Setup()`, driven by the `JOB_GPU_INDICES` and `JOB_GPU_CUDA_MOUNTS` env vars the server
+> sets. The old server-side no-op adapter methods have been removed. This path has not yet been
+> exercised on a host with an NVIDIA GPU, so it remains pending end-to-end validation.
 
 > **Note**: GPU configuration in workflow definitions was removed when workflow orchestration was extracted to a
 > separate project (see [ADR-013](013-extract-workflow-to-separate-project.md)). Joblet exposes GPU allocation only
@@ -106,12 +114,15 @@ spreading (to minimize thermal contention).
 
 #### GPU Isolation Implementation
 
-> ⚠️ **Status: designed but NOT yet wired into the execution path.** The three mechanisms below
-> (cgroups v2 device control, `mknod` device-node creation, and CUDA bind-mounting) describe the
-> intended design. Today the execution path invokes placeholder adapters that log and return, so
-> jobs do not currently receive GPU device nodes, cgroup device rules, or bind-mounted CUDA
-> libraries. Only the `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment variables are
-> actually injected into GPU jobs.
+> ⚠️ **Status: `mknod` device-node creation and CUDA bind-mounting are now wired into the execution
+> path (pending validation on GPU hardware); cgroup device rules are not.** The server forwards the
+> allocated GPU indices and detected CUDA paths to the init process via the `JOB_GPU_INDICES` and
+> `JOB_GPU_CUDA_MOUNTS` env vars; the init-side filesystem `Setup()` then creates the per-job
+> `/dev/nvidia*` device nodes (post-chroot) and bind-mounts the host CUDA libraries read-only
+> (pre-chroot). This path has not yet been exercised on a host with an NVIDIA GPU, so it remains
+> pending end-to-end validation. The cgroups v2 device-rule path described below is still not applied,
+> and the `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment variables continue to be
+> injected as before.
 
 Extending Joblet's isolation system to support GPUs required careful integration with our existing namespace and cgroups
 architecture. GPUs were not originally designed for the fine-grained isolation that modern multi-tenant systems require,
@@ -167,8 +178,9 @@ overhead. Users continue to benefit from Joblet's simplicity and directness, now
 
 **Robust Security Model** (target state, not yet delivered): The GPU isolation design aims to match the same rigorous
 security standards as our existing CPU and memory isolation, using the cgroups v2 device controller to ensure jobs
-cannot access unauthorized GPU resources. ⚠️ This isolation is not yet enforced — the cgroup device rules and per-job
-device nodes are not currently written, so the memory- and device-isolation guarantees below are not in effect today.
+cannot access unauthorized GPU resources. ⚠️ Per-job `/dev/nvidia*` device nodes are now created by the isolator
+(pending validation on GPU hardware), but the cgroup device rules are still not written and GPU memory-limit enforcement
+is not implemented, so the memory-isolation guarantees below are not yet in effect.
 
 **User Experience Excellence**: The system eliminates the complexity traditionally associated with GPU computing. Users
 can request resources using simple, intuitive syntax ("2 GPUs with 16GB each") while the system automatically handles

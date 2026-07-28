@@ -593,9 +593,8 @@ func (c *cgroup) AddProcessToCgroup(cgroupPath string, pid int) error {
 
 // SetGPUDevices dispatches GPU device handling by cgroup version. On v1 it writes
 // devices.allow rules; on v2 (the default on modern hosts) it only logs, since v2
-// has no devices controller. Either way the effect is limited today: the matching
-// /dev/nvidia* nodes are never created inside the job (device-node passthrough is
-// not wired into job execution), so a GPU job sees only visible-devices env vars.
+// has no devices controller. The matching /dev/nvidia* nodes themselves are
+// created inside the job by the filesystem isolator during init-time setup.
 func (c *cgroup) SetGPUDevices(cgroupPath string, gpuIndices []int) error {
 	log := c.logger.WithFields("cgroupPath", cgroupPath, "gpuIndices", gpuIndices)
 	log.Debug("configuring GPU device access for cgroups v2")
@@ -679,11 +678,10 @@ func (c *cgroup) setGPUDevicesV1(cgroupPath string, gpuIndices []int, log *logge
 	return nil
 }
 
-// setGPUDevicesV2 does not enforce GPU device access on cgroups v2. cgroups v2
-// has no devices controller, and the device-node passthrough that would restrict
-// access is not wired into the execution path (CreateGPUDeviceNodes is a no-op),
-// so this function only validates the cgroup and logs. A GPU job today is limited
-// to visible-devices env vars, not kernel-enforced device isolation.
+// setGPUDevicesV2 does not enforce GPU device access on cgroups v2: v2 has no
+// devices controller, so this only validates the cgroup and logs. Device access
+// is instead bounded by which /dev/nvidia* nodes the filesystem isolator creates
+// inside the job, not by a kernel cgroup rule.
 func (c *cgroup) setGPUDevicesV2(cgroupPath string, gpuIndices []int, log *logger.Logger) error {
 	// Validate that the cgroup exists
 	if _, err := c.platform.Stat(cgroupPath); c.platform.IsNotExist(err) {
