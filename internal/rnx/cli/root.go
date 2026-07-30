@@ -79,8 +79,8 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&common.ConfigPath, "config", "",
 		"Path to client configuration file (searches common locations if not specified)")
-	rootCmd.PersistentFlags().StringVar(&common.NodeName, "node", "default",
-		"Node name from configuration file")
+	rootCmd.PersistentFlags().StringVar(&common.NodeName, "node", "",
+		"Node name from configuration file (defaults to the node marked isDefault: true)")
 	rootCmd.PersistentFlags().BoolVar(&common.JSONOutput, "json", false,
 		"Output in JSON format")
 

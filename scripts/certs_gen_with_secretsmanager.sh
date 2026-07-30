@@ -721,9 +721,10 @@ cat > "$CLIENT_CONFIG" << EOF
 version: "3.0"
 
 nodes:
-  default:
+  admin:
     address: "$SERVER_ADDRESS:50051"
     nodeId: "$NODE_ID"
+    isDefault: true
     cert: |
 $(read_cert_for_yaml admin-client-cert.pem "      ")
     key: |
@@ -733,6 +734,8 @@ $(read_cert_for_yaml ca-cert.pem "      ")
 EOF
 
 for ROLE in $CLIENT_ROLES; do
+    # admin is already present above as the default node
+    [ "$ROLE" = "admin" ] && continue
     cat >> "$CLIENT_CONFIG" << EOF
   $ROLE:
     address: "$SERVER_ADDRESS:50051"
@@ -755,9 +758,10 @@ for ROLE in $CLIENT_ROLES; do
 version: "3.0"
 
 nodes:
-  default:
+  $ROLE:
     address: "$SERVER_ADDRESS:50051"
     nodeId: "$NODE_ID"
+    isDefault: true
     cert: |
 $(read_cert_for_yaml "$ROLE-client-cert.pem" "      ")
     key: |

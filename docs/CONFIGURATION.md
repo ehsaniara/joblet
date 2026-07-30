@@ -589,13 +589,11 @@ The RNX client configuration file is typically located at `~/.rnx/rnx-config.yml
 ```yaml
 version: "3.0"
 
-# Default node configuration
-default_node: "default"
-
 nodes:
-  default:
+  admin:
     address: "joblet-server:50051"
     nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Optional: Joblet node identifier
+    isDefault: true  # Used when --node is not specified; only one node may set this
 
     # Embedded certificates
     cert: |
@@ -761,9 +759,9 @@ Both certificate scripts (`scripts/certs_gen_embedded.sh` and the AWS variant
 `scripts/certs_gen_with_secretsmanager.sh`) generate one client certificate per role and write two kinds of client
 config:
 
-- `rnx-config.yml`: the operator's copy, with one node per role plus `default` (admin certificate). It contains the
-  admin key, so it stays on the server. On the server, select a role with `rnx --node <role> ...`.
-- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node as `default`. Hand each party the
+- `rnx-config.yml`: the operator's copy, with one node per role; the `admin` node is marked `isDefault: true`. It
+  contains the admin key, so it stays on the server. On the server, select a role with `rnx --node <role> ...`.
+- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node marked `isDefault: true`. Hand each party the
   file for its role and nothing else; a developer holding `rnx-config-developer.yml` never sees the admin key.
 
 The AWS variant additionally stores each role's certificate pair in Secrets Manager

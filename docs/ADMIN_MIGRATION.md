@@ -442,8 +442,9 @@ JOBLET_NODE=default
 ```yaml
 version: "3.0"
 nodes:
-  default:
+  admin:
     address: "localhost:50051"
+    isDefault: true
     cert: "..."
     key: "..."
     ca: "..."

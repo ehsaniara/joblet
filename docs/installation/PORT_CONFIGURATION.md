@@ -38,10 +38,12 @@ ssh -L 8443:localhost:443 ubuntu@ec2-host
 
 ```yaml
 # ~/.rnx/rnx-config.yml
-default:
-  server: "localhost:8443"  # Via SSH tunnel
-  # OR
-  # server: "ec2-host:443"  # Direct connection (if in same VPC)
+nodes:
+  admin:
+    isDefault: true  # used when no node name is specified
+    address: "localhost:8443"  # Via SSH tunnel
+    # OR
+    # address: "ec2-host:443"  # Direct connection (if in same VPC)
 ```
 
 ---

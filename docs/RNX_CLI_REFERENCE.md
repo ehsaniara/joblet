@@ -47,7 +47,7 @@ The following options are available across all RNX commands:
 
 ```bash
 --config <path>    # Path to configuration file (default: searches standard locations)
---node <name>      # Node name from configuration (default: "default")
+--node <name>      # Node name from configuration (default: the node marked isDefault: true)
 --json             # Output in JSON format
 --version, -v      # Show version information for both client and server
 --help, -h         # Show help for command
@@ -98,7 +98,7 @@ command.
 
 The certificate generation script (`certs_gen_embedded.sh`) creates one client certificate per role. As a client you
 normally receive a single `rnx-config-<role>.yml` from your operator; save it as `~/.rnx/rnx-config.yml` and run
-`rnx` with no extra flags, since your role is its `default` node. Operators working on the server itself have the
+`rnx` with no extra flags, since your role's node is marked `isDefault: true`. Operators working on the server itself have the
 combined `rnx-config.yml` with every role and pick one per invocation:
 
 ```bash
@@ -1465,8 +1465,9 @@ done
 ```yaml
 version: "3.0"
 nodes:
-  default:
+  production:
     address: "prod-server:50051"
+    isDefault: true  # used when --node is not specified; only one node may set this
     cert: |
       -----BEGIN CERTIFICATE-----
       ...
@@ -1496,8 +1497,8 @@ nodes:
 ### Usage with Different Nodes
 
 ```bash
-# Production jobs
-rnx --node=default run production-task.sh
+# Production jobs (marked isDefault: true, so --node is optional)
+rnx run production-task.sh
 
 # Staging tests
 rnx --node=staging run test-suite.sh

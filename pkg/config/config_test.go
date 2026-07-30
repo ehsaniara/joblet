@@ -497,6 +497,175 @@ func TestClientConfigMethods(t *testing.T) {
 	})
 }
 
+func TestDefaultNodeResolution(t *testing.T) {
+	boolPtr := func(b bool) *bool { return &b }
+
+	t.Run("isDefault marks the default node", func(t *testing.T) {
+		config := &ClientConfig{
+			Version: "3.0",
+			Nodes: map[string]*Node{
+				"admin":  {Address: "admin.example.com:50051", IsDefault: boolPtr(true)},
+				"reader": {Address: "reader.example.com:50051"},
+			},
+		}
+
+		if name := config.DefaultNodeName(); name != "admin" {
+			t.Errorf("DefaultNodeName() = %q, want 'admin'", name)
+		}
+
+		node, err := config.GetNode("")
+		if err != nil {
+			t.Fatalf("GetNode(\"\") unexpected error: %v", err)
+		}
+		if node.Address != "admin.example.com:50051" {
+			t.Errorf("Expected default address 'admin.example.com:50051', got '%s'", node.Address)
+		}
+	})
+
+	t.Run("isDefault wins over node named default", func(t *testing.T) {
+		config := &ClientConfig{
+			Version: "3.0",
+			Nodes: map[string]*Node{
+				"default": {Address: "legacy.example.com:50051"},
+				"admin":   {Address: "admin.example.com:50051", IsDefault: boolPtr(true)},
+			},
+		}
+
+		if name := config.DefaultNodeName(); name != "admin" {
+			t.Errorf("DefaultNodeName() = %q, want 'admin'", name)
+		}
+	})
+
+	t.Run("legacy node named default still works", func(t *testing.T) {
+		config := &ClientConfig{
+			Version: "3.0",
+			Nodes: map[string]*Node{
+				"default": {Address: "legacy.example.com:50051"},
+				"reader":  {Address: "reader.example.com:50051"},
+			},
+		}
+
+		if name := config.DefaultNodeName(); name != "default" {
+			t.Errorf("DefaultNodeName() = %q, want 'default'", name)
+		}
+	})
+
+	t.Run("single node is the implicit default", func(t *testing.T) {
+		config := &ClientConfig{
+			Version: "3.0",
+			Nodes: map[string]*Node{
+				"prod": {Address: "prod.example.com:50051"},
+			},
+		}
+
+		if name := config.DefaultNodeName(); name != "prod" {
+			t.Errorf("DefaultNodeName() = %q, want 'prod'", name)
+		}
+	})
+
+	t.Run("no resolvable default returns error", func(t *testing.T) {
+		config := &ClientConfig{
+			Version: "3.0",
+			Nodes: map[string]*Node{
+				"prod":    {Address: "prod.example.com:50051"},
+				"staging": {Address: "staging.example.com:50051"},
+			},
+		}
+
+		if name := config.DefaultNodeName(); name != "" {
+			t.Errorf("DefaultNodeName() = %q, want empty", name)
+		}
+		if _, err := config.GetNode(""); err == nil {
+			t.Errorf("GetNode(\"\") expected error when no default is resolvable")
+		}
+	})
+}
+
+func TestLoadClientConfigDefaultValidation(t *testing.T) {
+	writeConfig := func(t *testing.T, content string) string {
+		t.Helper()
+		configPath := filepath.Join(t.TempDir(), "rnx-config.yml")
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+		return configPath
+	}
+
+	t.Run("single isDefault loads", func(t *testing.T) {
+		configPath := writeConfig(t, `version: "3.0"
+nodes:
+  admin:
+    address: "localhost:50051"
+    isDefault: true
+    cert: "c"
+    key: "k"
+    ca: "ca"
+  reader:
+    address: "localhost:50051"
+    cert: "c"
+    key: "k"
+    ca: "ca"`)
+
+		config, err := LoadClientConfig(configPath)
+		if err != nil {
+			t.Fatalf("LoadClientConfig() error = %v", err)
+		}
+		if name := config.DefaultNodeName(); name != "admin" {
+			t.Errorf("DefaultNodeName() = %q, want 'admin'", name)
+		}
+	})
+
+	t.Run("multiple isDefault rejected", func(t *testing.T) {
+		configPath := writeConfig(t, `version: "3.0"
+nodes:
+  admin:
+    address: "localhost:50051"
+    isDefault: true
+    cert: "c"
+    key: "k"
+    ca: "ca"
+  reader:
+    address: "localhost:50051"
+    isDefault: true
+    cert: "c"
+    key: "k"
+    ca: "ca"`)
+
+		_, err := LoadClientConfig(configPath)
+		if err == nil {
+			t.Fatalf("LoadClientConfig() expected error for multiple isDefault nodes")
+		}
+		if !strings.Contains(err.Error(), "isDefault") {
+			t.Errorf("Expected error to mention isDefault, got: %v", err)
+		}
+	})
+
+	t.Run("isDefault false does not count", func(t *testing.T) {
+		configPath := writeConfig(t, `version: "3.0"
+nodes:
+  admin:
+    address: "localhost:50051"
+    isDefault: true
+    cert: "c"
+    key: "k"
+    ca: "ca"
+  reader:
+    address: "localhost:50051"
+    isDefault: false
+    cert: "c"
+    key: "k"
+    ca: "ca"`)
+
+		config, err := LoadClientConfig(configPath)
+		if err != nil {
+			t.Fatalf("LoadClientConfig() error = %v", err)
+		}
+		if name := config.DefaultNodeName(); name != "admin" {
+			t.Errorf("DefaultNodeName() = %q, want 'admin'", name)
+		}
+	})
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||

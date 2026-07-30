@@ -45,6 +45,8 @@ func runNodes(jsonOutput bool) error {
 	// Sort nodes for consistent output
 	sort.Strings(nodeNames)
 
+	defaultNode := common.NodeConfig.DefaultNodeName()
+
 	if jsonOutput {
 		var nodes []NodeInfo
 
@@ -60,7 +62,7 @@ func runNodes(jsonOutput bool) error {
 				Address: node.Address,
 				NodeId:  node.NodeId,
 				Status:  status,
-				Default: name == "default",
+				Default: name == defaultNode,
 			})
 		}
 
@@ -85,7 +87,7 @@ func runNodes(jsonOutput bool) error {
 
 		// Mark default node
 		marker := "  "
-		if name == "default" {
+		if name == defaultNode {
 			marker = "* "
 		}
 
@@ -121,9 +123,11 @@ func runNodes(jsonOutput bool) error {
 	}
 
 	fmt.Printf("Usage examples:\n")
-	fmt.Printf("  rnx job list                    # uses 'default' node\n")
+	if defaultNode != "" {
+		fmt.Printf("  rnx job list                    # uses '%s' node (default)\n", defaultNode)
+	}
 	for _, name := range nodeNames {
-		if name != "default" {
+		if name != defaultNode {
 			fmt.Printf("  rnx --node=%s job list         # uses '%s' node\n", name, name)
 			break
 		}

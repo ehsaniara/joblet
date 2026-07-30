@@ -223,7 +223,7 @@ Download the client config from **any** instance:
 scp ec2-user@instance1:/opt/joblet/config/rnx-config.yml ~/.rnx/
 
 # This config works with ALL instances!
-rnx --node=default job list
+rnx job list  # uses the node marked isDefault: true
 ```
 
 ## Certificate Lifecycle
