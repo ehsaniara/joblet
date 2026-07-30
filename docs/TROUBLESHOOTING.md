@@ -539,7 +539,7 @@ Any other OU value fails every request.
 
 ```bash
 # 2. Use a node with a sufficient role
-# The generated rnx-config.yml contains one node per role plus "default" (admin certificate)
+# The generated rnx-config.yml contains one node per role; "admin" is marked isDefault: true
 rnx --node admin volume remove old-data
 
 # 3. Regenerate role certificates if needed

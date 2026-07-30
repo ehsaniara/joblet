@@ -8,9 +8,10 @@ version: "3.0"
 # with the following structure:
 #
 # nodes:
-#   default:
+#   admin:
 #     address: "SERVER_ADDRESS:50051"               # joblet gRPC service (job execution, logs, metrics)
 #     nodeId: "8f94c5b2-1234-5678-9abc-def012345678"  # Optional: Joblet node identifier for display
+#     isDefault: true                               # Optional: used when --node is not specified (only one node may set this)
 #     cert: |
 #       -----BEGIN CERTIFICATE-----
 #       [admin certificate content]

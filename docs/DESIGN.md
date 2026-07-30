@@ -459,8 +459,9 @@ security:
 # /opt/joblet/config/rnx-config.yml (Client)
 version: "3.0"
 nodes:
-  default:
+  admin:
     address: "192.168.1.100:50051"
+    isDefault: true
     cert: |
       -----BEGIN CERTIFICATE-----
       # Admin client certificate

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -123,11 +125,12 @@ type ClientConfig struct {
 
 // Node represents a single server configuration with embedded certificates
 type Node struct {
-	Address string `yaml:"address"`
-	NodeId  string `yaml:"nodeId,omitempty"` // Unique identifier of the Joblet node (optional, for display purposes)
-	Cert    string `yaml:"cert"`             // Embedded PEM certificate
-	Key     string `yaml:"key"`              // Embedded PEM private key
-	CA      string `yaml:"ca"`               // Embedded PEM CA certificate
+	Address   string `yaml:"address"`
+	NodeId    string `yaml:"nodeId,omitempty"`    // Unique identifier of the Joblet node (optional, for display purposes)
+	IsDefault *bool  `yaml:"isDefault,omitempty"` // Marks this node as the one used when --node is not specified
+	Cert      string `yaml:"cert"`                // Embedded PEM certificate
+	Key       string `yaml:"key"`                 // Embedded PEM private key
+	CA        string `yaml:"ca"`                  // Embedded PEM CA certificate
 }
 
 // BuffersConfig holds buffer and pub-sub configuration
@@ -782,17 +785,55 @@ func LoadClientConfig(configPath string) (*ClientConfig, error) {
 		return nil, fmt.Errorf("no nodes configured in %s", configPath)
 	}
 
+	// Validate that at most one node is marked as default
+	var defaults []string
+	for name, node := range config.Nodes {
+		if node.IsDefault != nil && *node.IsDefault {
+			defaults = append(defaults, name)
+		}
+	}
+	if len(defaults) > 1 {
+		sort.Strings(defaults)
+		return nil, fmt.Errorf("multiple nodes marked with isDefault: true in %s: %s (only one node can be the default)",
+			configPath, strings.Join(defaults, ", "))
+	}
+
 	return &config, nil
 }
 
+// DefaultNodeName returns the name of the node used when no --node is specified.
+// Resolution order: the node marked isDefault: true, then a node literally named
+// "default" (legacy configs), then the only node if exactly one is configured.
+// Returns empty string if no default can be determined.
+func (c *ClientConfig) DefaultNodeName() string {
+	for name, node := range c.Nodes {
+		if node.IsDefault != nil && *node.IsDefault {
+			return name
+		}
+	}
+	if _, exists := c.Nodes["default"]; exists {
+		return "default"
+	}
+	if len(c.Nodes) == 1 {
+		for name := range c.Nodes {
+			return name
+		}
+	}
+	return ""
+}
+
 // GetNode retrieves the configuration for a named Joblet server node.
-// If nodeName is empty, defaults to "default" node.
+// If nodeName is empty, resolves the default node via DefaultNodeName.
 // Returns the Node configuration containing server address and certificates,
 // or error if the specified node name is not found in the configuration.
 // Used by RNX client to select which Joblet server to connect to.
 func (c *ClientConfig) GetNode(nodeName string) (*Node, error) {
 	if nodeName == "" {
-		nodeName = "default"
+		nodeName = c.DefaultNodeName()
+		if nodeName == "" {
+			return nil, fmt.Errorf("no default node configured: mark one node with isDefault: true or use --node to select one of: %s",
+				strings.Join(c.ListNodes(), ", "))
+		}
 	}
 
 	node, exists := c.Nodes[nodeName]

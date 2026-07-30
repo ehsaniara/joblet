@@ -129,7 +129,8 @@ persist:
 
 ```yaml
 nodes:
-  default:
+  admin:
+    isDefault: true  # used when no node name is specified
     address: "server:50051"        # joblet-core
     persistAddress: "server:50052"  # persist (optional)
 ```

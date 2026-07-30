@@ -29,8 +29,9 @@ func runConfigHelp(cmd *cobra.Command, args []string) error {
 	fmt.Println(`version: "3.0"
 
 nodes:
-  default:
+  admin:
     address: "192.168.1.100:50051"
+    isDefault: true
     cert: |
       -----BEGIN CERTIFICATE-----
       MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
@@ -72,7 +73,7 @@ nodes:
 	fmt.Println("5. /opt/joblet/config/rnx-config.yml")
 	fmt.Println()
 	fmt.Println("Usage examples:")
-	fmt.Println("  rnx job list                    # uses 'default' node")
+	fmt.Println("  rnx job list                    # uses the node marked isDefault: true")
 	fmt.Println("  rnx --node=reader job list      # uses 'reader' node (read-only)")
 	fmt.Println("  rnx --node=production job list  # uses 'production' node")
 	fmt.Println("  rnx --config=my-rnx-config.yml job list  # uses custom config file")
