@@ -15,7 +15,7 @@ trap 'rm -rf "$BIN_DIR"' EXIT
 (cd "$REPO_ROOT" && go build -o "$BIN_DIR/protoc-gen-go-grpc" google.golang.org/grpc/cmd/protoc-gen-go-grpc)
 
 cd "$REPO_ROOT/internal/proto"
-mkdir -p gen/ipc gen/persist
+mkdir -p gen/ipc
 
 protoc \
   --plugin=protoc-gen-go="$BIN_DIR/protoc-gen-go" \
@@ -23,13 +23,3 @@ protoc \
   --go_out=gen/ipc \
   --go_opt=paths=source_relative \
   ipc.proto
-
-protoc \
-  --plugin=protoc-gen-go="$BIN_DIR/protoc-gen-go" \
-  --plugin=protoc-gen-go-grpc="$BIN_DIR/protoc-gen-go-grpc" \
-  --proto_path=. \
-  --go_out=gen/persist \
-  --go-grpc_out=gen/persist \
-  --go_opt=paths=source_relative \
-  --go-grpc_opt=paths=source_relative \
-  persist.proto

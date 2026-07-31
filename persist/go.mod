@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.58.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0
 	github.com/ehsaniara/joblet v0.0.0-00010101000000-000000000000
+	github.com/ehsaniara/joblet-proto/v2 v2.6.0
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1

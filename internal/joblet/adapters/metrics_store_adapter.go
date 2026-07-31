@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	pb "github.com/ehsaniara/joblet-proto/v2/gen/persist"
 	"github.com/ehsaniara/joblet/internal/joblet/metrics"
 	"github.com/ehsaniara/joblet/internal/joblet/metrics/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
-	pb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 

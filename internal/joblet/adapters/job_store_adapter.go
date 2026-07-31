@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	pb "github.com/ehsaniara/joblet-proto/v2/gen/persist"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/interfaces"
 	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
 	"github.com/ehsaniara/joblet/internal/joblet/state"
-	pb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
@@ -901,6 +901,12 @@ func (a *jobStoreAdapter) publishEvent(event JobEvent) error {
 // established but before live events are pumped, so the pre-subscription
 // snapshot reaches the client first and nothing falls between snapshot
 // and subscription.
+// drainQuietPeriod is how long the live stream keeps draining after a job
+// reaches a terminal status. The deadline resets on every log chunk delivered
+// during the drain, so a final flush that lags the completion event (its chunks
+// are published after COMPLETED) is delivered instead of being cut off.
+const drainQuietPeriod = 500 * time.Millisecond
+
 func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID string, stream interfaces.DomainStreamer, sendBuffered func() error) error {
 	// Subscribe to single "jobs" topic (filter by JobUUID in loop)
 	topic := "jobs"
@@ -1040,6 +1046,13 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID str
 							return
 						}
 						a.logger.Debug("successfully sent log chunk to client", "job_uuid", jobUUID, "chunkSize", len(event.LogChunk))
+
+						// A chunk arriving during the drain means the final flush is
+						// still in progress; extend the quiet window so the tail is
+						// not cut off.
+						if jobCompleted {
+							drainDeadline = time.Now().Add(drainQuietPeriod)
+						}
 					}
 				case "UPDATED":
 					a.logger.Debug("received job status update", "job_uuid", jobUUID, "status", event.Status)
@@ -1047,8 +1060,8 @@ func (a *jobStoreAdapter) subscribeToJobUpdates(ctx context.Context, jobUUID str
 					if event.Status == "COMPLETED" || event.Status == "FAILED" || event.Status == "STOPPED" {
 						if !jobCompleted {
 							jobCompleted = true
-							// Set drain deadline to allow final log chunks to arrive
-							drainDeadline = time.Now().Add(500 * time.Millisecond)
+							// Start the drain; the deadline resets on each late chunk.
+							drainDeadline = time.Now().Add(drainQuietPeriod)
 							a.logger.Debug("job completed, entering drain mode", "job_uuid", jobUUID, "finalStatus", event.Status, "drainDeadline", drainDeadline)
 						}
 					}
