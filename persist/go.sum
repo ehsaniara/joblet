@@ -38,6 +38,8 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.38.6 h1:p3jIvqYwUZgu/XYeI48bJxOhvm47
 github.com/aws/aws-sdk-go-v2/service/sts v1.38.6/go.mod h1:WtKK+ppze5yKPkZ0XwqIVWD4beCwv056ZbPQNoeHqM8=
 github.com/aws/smithy-go v1.24.0 h1:LpilSUItNPFr1eY85RYgTIg5eIEPtvFbskaFcmmIUnk=
 github.com/aws/smithy-go v1.24.0/go.mod h1:LEj2LM3rBRQJxPZTB4KuzZkaZYnZPnvgIhb4pu07mx0=
+github.com/ehsaniara/joblet-proto/v2 v2.6.0 h1:+6Wgg3iDE+fGpKW9/6gxXXhzUl3mX8jOK1A+NSEGXVc=
+github.com/ehsaniara/joblet-proto/v2 v2.6.0/go.mod h1:Ie5fkoH5PkhxSHDJvTu+exdqUnUSWK8KjpENb+K5TVY=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

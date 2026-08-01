@@ -804,7 +804,8 @@ func LoadClientConfig(configPath string) (*ClientConfig, error) {
 // DefaultNodeName returns the name of the node used when no --node is specified.
 // Resolution order: the node marked isDefault: true, then a node literally named
 // "default" (legacy configs), then the only node if exactly one is configured.
-// Returns empty string if no default can be determined.
+// Returns empty string if no default can be determined. Assumes at most one node
+// is marked isDefault (enforced by LoadClientConfig).
 func (c *ClientConfig) DefaultNodeName() string {
 	for name, node := range c.Nodes {
 		if node.IsDefault != nil && *node.IsDefault {
@@ -849,10 +850,11 @@ func (c *ClientConfig) GetNode(nodeName string) (*Node, error) {
 // Used by RNX client for node discovery and selection.
 // Returns empty slice if no nodes are configured.
 func (c *ClientConfig) ListNodes() []string {
-	var nodes []string
+	nodes := make([]string, 0, len(c.Nodes))
 	for name := range c.Nodes {
 		nodes = append(nodes, name)
 	}
+	sort.Strings(nodes)
 	return nodes
 }
 

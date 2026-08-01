@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/ehsaniara/joblet-proto/v2/gen"
+	persistpb "github.com/ehsaniara/joblet-proto/v2/gen/persist"
 	"github.com/ehsaniara/joblet/internal/joblet/adapters"
 	auth2 "github.com/ehsaniara/joblet/internal/joblet/auth"
 	"github.com/ehsaniara/joblet/internal/joblet/core/interfaces"
@@ -17,7 +18,6 @@ import (
 	"github.com/ehsaniara/joblet/internal/joblet/mappers"
 	jobletruntime "github.com/ehsaniara/joblet/internal/joblet/runtime"
 	"github.com/ehsaniara/joblet/internal/joblet/telemetry"
-	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	pkgerrors "github.com/ehsaniara/joblet/pkg/errors"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"

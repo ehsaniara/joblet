@@ -2,7 +2,8 @@
 //
 // This package defines internal protos that are NOT part of the public API:
 // - ipc.proto: Binary IPC between joblet-core and persist subprocess
-// - persist.proto: gRPC service for querying historical logs/metrics
+//
+// PersistService moved to joblet-proto (github.com/ehsaniara/joblet-proto/v2/gen/persist).
 //
 // To regenerate proto files:
 //

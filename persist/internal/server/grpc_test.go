@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	persistpb "github.com/ehsaniara/joblet-proto/v2/gen/persist"
 	"github.com/ehsaniara/joblet/internal/joblet/auth/authfakes"
 	ipcpb "github.com/ehsaniara/joblet/internal/proto/gen/ipc"
-	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/persist/internal/config"
 	"github.com/ehsaniara/joblet/persist/internal/storage"
 	"github.com/ehsaniara/joblet/persist/internal/storage/storagefakes"

@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	persistpb "github.com/ehsaniara/joblet-proto/v2/gen/persist"
 	"github.com/ehsaniara/joblet/internal/joblet/domain"
 	"github.com/ehsaniara/joblet/internal/joblet/pubsub"
 	"github.com/ehsaniara/joblet/internal/joblet/state"
-	persistpb "github.com/ehsaniara/joblet/internal/proto/gen/persist"
 	"github.com/ehsaniara/joblet/pkg/client"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
