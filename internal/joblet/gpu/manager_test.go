@@ -302,3 +302,31 @@ func TestManager_CUDADetection(t *testing.T) {
 	// Note: CUDA detection happens during job allocation with GPU requirement
 	// The manager only stores the CUDA detector for later use
 }
+
+func TestManager_AllocateGPUs_DeterministicOrder(t *testing.T) {
+	// Regression: m.gpus is a map, so without sorting the default first-fit
+	// strategy allocated a random index (flaky 19_gpu_mock_test)
+	for i := 0; i < 50; i++ {
+		fakeDiscovery := &gpufakes.FakeGPUDiscoveryInterface{}
+		fakeCuda := &gpufakes.FakeCUDADetectorInterface{}
+		fakeDiscovery.DiscoverGPUsReturns([]*gpu.GPU{
+			{Index: 0, UUID: "GPU-0", Name: "Fake", MemoryMB: 16384, InUse: false},
+			{Index: 1, UUID: "GPU-1", Name: "Fake", MemoryMB: 16384, InUse: false},
+			{Index: 2, UUID: "GPU-2", Name: "Fake", MemoryMB: 16384, InUse: false},
+			{Index: 3, UUID: "GPU-3", Name: "Fake", MemoryMB: 16384, InUse: false},
+		}, nil)
+
+		manager := gpu.NewManager(config.GPUConfig{Enabled: true}, fakeDiscovery, fakeCuda)
+		if err := manager.Initialize(); err != nil {
+			t.Fatalf("Failed to initialize manager: %v", err)
+		}
+
+		allocation, err := manager.AllocateGPUs("job-determinism", 1, 0)
+		if err != nil {
+			t.Fatalf("Expected successful allocation, got error: %v", err)
+		}
+		if len(allocation.GPUIndices) != 1 || allocation.GPUIndices[0] != 0 {
+			t.Fatalf("iteration %d: expected GPU index 0, got %v", i, allocation.GPUIndices)
+		}
+	}
+}

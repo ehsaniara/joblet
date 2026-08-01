@@ -354,6 +354,10 @@ get_configuration() {
         JOBLET_SERVER_PORT="50051"
     fi
 
+    # Bind is decoupled from the advertised address: 0.0.0.0 survives DHCP moves
+    JOBLET_BIND_ADDRESS="${JOBLET_BIND_ADDRESS:-$JOBLET_SERVER_ADDRESS}"
+    print_info "Server bind address: $JOBLET_BIND_ADDRESS"
+
     # === Auto-detect internal IP if not set (all paths) ===
     if [ -z "$JOBLET_CERT_INTERNAL_IP" ]; then
         JOBLET_CERT_INTERNAL_IP=$(detect_internal_ip)
@@ -607,6 +611,9 @@ configure_storage_backends() {
 generate_and_embed_certificates() {
     print_info "Generating certificates with configured IPs and domains..."
 
+    # Safety net if a caller skipped get_configuration
+    JOBLET_BIND_ADDRESS="${JOBLET_BIND_ADDRESS:-0.0.0.0}"
+
     # Export variables for the certificate generation script
     export JOBLET_SERVER_ADDRESS="$JOBLET_CERT_PRIMARY"  # Primary address for certificate CN
     export JOBLET_ADDITIONAL_NAMES="$JOBLET_ADDITIONAL_NAMES"
@@ -652,12 +659,11 @@ generate_and_embed_certificates() {
         if "$CERT_SCRIPT"; then
             print_success "Certificates generated successfully"
 
-            # Update the server configuration with the actual bind address and port
+            # Bind address only - the advertised/cert address goes in rnx-config below
             if [ -f ${JOBLET_HOME}/config/joblet-config.yml ]; then
-                # Update server bind address and port in the config
-                sed -i "s/^  address:.*/  address: \"$JOBLET_SERVER_ADDRESS\"/" ${JOBLET_HOME}/config/joblet-config.yml
+                sed -i "s/^  address:.*/  address: \"$JOBLET_BIND_ADDRESS\"/" ${JOBLET_HOME}/config/joblet-config.yml
                 sed -i "s/^  port:.*/  port: $JOBLET_SERVER_PORT/" ${JOBLET_HOME}/config/joblet-config.yml
-                print_success "Updated server configuration: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
+                print_success "Updated server configuration: bind $JOBLET_BIND_ADDRESS:$JOBLET_SERVER_PORT"
             fi
 
             # Update client configuration files with all valid connection endpoints
@@ -732,7 +738,7 @@ display_quickstart_info() {
     fi
     echo ""
     print_info "📱 Remote Access:"
-    echo "  The service accepts connections on: $JOBLET_SERVER_ADDRESS:$JOBLET_SERVER_PORT"
+    echo "  The service listens on: $JOBLET_BIND_ADDRESS:$JOBLET_SERVER_PORT"
     echo "  Clients can connect using any of these addresses:"
     echo "    - $JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT (Internal network)"
     if [ -n "$JOBLET_CERT_PUBLIC_IP" ]; then

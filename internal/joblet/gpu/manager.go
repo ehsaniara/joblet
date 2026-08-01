@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -170,6 +171,10 @@ func (m *Manager) AllocateGPUs(jobID string, gpuCount int, gpuMemoryMB int64) (*
 			availableGPUs = append(availableGPUs, gpu)
 		}
 	}
+	// m.gpus is a map: sort so first-fit is deterministic (lowest index first)
+	sort.Slice(availableGPUs, func(i, j int) bool {
+		return availableGPUs[i].Index < availableGPUs[j].Index
+	})
 
 	// Use allocation strategy to select GPUs
 	selectedGPUs, err := m.allocationStrategy.SelectGPUs(availableGPUs, gpuCount, gpuMemoryMB)
