@@ -34,6 +34,18 @@ certs
 tmp
 /config
 
+# TLS material and populated client configs - never committed (cert scripts
+# write IP-bearing working files to the CWD)
+*.pem
+*.key
+*.crt
+*.cnf
+*.csr
+*.srl
+rnx-config.yml
+rnx-config-*.yml
+!scripts/rnx-config-template.yml
+
 # Runtime cgroup directories (created during tests/execution)
 joblet-main/
 

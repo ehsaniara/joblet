@@ -15,16 +15,16 @@ hardware). Current state:
 - Compatibility validation (GPU count, runtime GPU/CUDA compatibility): Implemented
 - `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env injection: Implemented
 - JSON API support: Implemented
-- Device-node creation (`mknod` for `/dev/nvidia*`) inside the job namespace: **Implemented** — the
+- Device-node creation (`mknod` for `/dev/nvidia*`) inside the job namespace: **Implemented** - the
   server (`coordinator.setupGPUEnvironment`) forwards the allocated GPU indices to the init process
   via the `JOB_GPU_INDICES` env var, and the init-side filesystem `Setup()` creates the device nodes
   (`/dev/nvidia*`, `/dev/nvidiactl`, `/dev/nvidia-uvm`) inside the job post-chroot. **Pending
   validation on GPU hardware.**
-- CUDA library bind-mounting into the job namespace: **Implemented** — the server forwards the
+- CUDA library bind-mounting into the job namespace: **Implemented** - the server forwards the
   detected CUDA mount paths via the `JOB_GPU_CUDA_MOUNTS` env var, and the init-side `Setup()`
   bind-mounts those host CUDA directories read-only into the job pre-chroot. **Pending validation on
   GPU hardware.**
-- GPU memory enforcement and clearing between jobs: **NOT yet implemented** — `--gpu-memory` only
+- GPU memory enforcement and clearing between jobs: **NOT yet implemented** - `--gpu-memory` only
   filters candidate GPUs at selection time; it is not enforced at runtime, and GPU memory is not
   reliably cleared between jobs (best-effort only)
 

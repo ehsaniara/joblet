@@ -152,7 +152,7 @@ When a user runs `rnx job run --runtime=python-3.11 "python script.py"`, the fol
 
 ```mermaid
 flowchart TD
-    N1["1. CLI Parsing<br/>Parse --runtime<br/>internal/rnx/jobs/run.go"]
+    N1["1. CLI Parsing<br/>Parse --runtime<br/>joblet-rnx repo: internal/rnx/jobs/run.go"]
     N2["2. gRPC Request<br/>Send to server<br/>RunJobRequest protobuf"]
     N3["3. Job Building<br/>Create domain.Job<br/>internal/joblet/core/joblet.go"]
     N4["4. Execution Coord<br/>Set JOB_RUNTIME<br/>internal/joblet/core/execution/coordinator.go"]
@@ -166,7 +166,7 @@ flowchart TD
 
 | Component             | File                                                    | Key Functions                                 |
 |-----------------------|---------------------------------------------------------|-----------------------------------------------|
-| CLI Run Command       | `internal/rnx/jobs/run.go`                              | `runRun()` (lines 137-376)                    |
+| CLI Run Command       | `internal/rnx/jobs/run.go` (in the joblet-rnx repo)     | `runRun()`                                    |
 | Job Handler           | `internal/joblet/core/joblet.go`                        | `StartJob()` (lines 99-160)                   |
 | Execution Coordinator | `internal/joblet/core/execution/coordinator.go`         | `StartJob()` (lines 52-184)                   |
 | Environment Builder   | `internal/joblet/core/execution/environment_service.go` | `BuildEnvironment()` (lines 44-107)           |

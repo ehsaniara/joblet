@@ -701,27 +701,26 @@ chmod +x ~/bin/joblet-tunnel-persistent.sh
 On your **MacBook**:
 
 ```bash
-# Download rnx CLI for macOS
-JOBLET_VERSION="v1.0.0"  # Check latest release
+# Download the rnx CLI for macOS from the joblet-rnx releases page:
+# https://github.com/ehsaniara/joblet-rnx/releases/latest
+RNX_VERSION="v6.0.0"  # Check latest joblet-rnx release
 cd ~/Downloads
 
 # For M1/M2 Macs (ARM)
-wget https://github.com/ehsaniara/joblet/releases/download/${JOBLET_VERSION}/rnx-darwin-arm64
+curl -LO https://github.com/ehsaniara/joblet-rnx/releases/download/${RNX_VERSION}/rnx-${RNX_VERSION}-darwin-arm64.tar.gz
+tar xzf rnx-${RNX_VERSION}-darwin-arm64.tar.gz
+mv rnx-darwin-arm64 rnx
 
 # For Intel Macs
-wget https://github.com/ehsaniara/joblet/releases/download/${JOBLET_VERSION}/rnx-darwin-amd64
-
-# Rename and move to PATH
-# For ARM:
-mv rnx-darwin-arm64 rnx
-# For Intel:
+# curl -LO https://github.com/ehsaniara/joblet-rnx/releases/download/${RNX_VERSION}/rnx-${RNX_VERSION}-darwin-amd64.tar.gz
+# tar xzf rnx-${RNX_VERSION}-darwin-amd64.tar.gz
 # mv rnx-darwin-amd64 rnx
 
 chmod +x rnx
 sudo mv rnx /usr/local/bin/
 
 # Verify
-rnx version
+rnx --version
 ```
 
 ### 6.2 Copy TLS Certificates from EC2
@@ -806,7 +805,7 @@ rnx job list
 
 ```bash
 $ rnx version
-rnx version: v1.0.0
+rnx version: v6.0.0
 Server version: v1.0.0
 
 $ rnx nodes list

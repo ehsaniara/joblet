@@ -10,7 +10,7 @@ allocation, memory isolation, and CUDA environment integration.
 > request validation, and `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` env injection work today.
 > Per-job device-node creation (`/dev/nvidia*`) and automatic CUDA library provisioning are now wired
 > into the execution path, but this path has **not yet been validated on a host with an NVIDIA GPU**.
-> Runtime GPU memory enforcement is still **not implemented** — see the notes in the sections below.
+> Runtime GPU memory enforcement is still **not implemented** - see the notes in the sections below.
 
 Joblet's GPU orchestration framework is designed to enable organizations to:
 

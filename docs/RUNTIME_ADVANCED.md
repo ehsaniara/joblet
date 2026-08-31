@@ -34,7 +34,7 @@ The Joblet runtime system provides a sophisticated isolation and mounting archit
     - Defines data structures for runtime configurations
     - Simplified structure supporting self-contained runtimes
 
-4. **CLI Integration** (`internal/rnx/resources/runtime.go`)
+4. **CLI Integration** (`internal/rnx/resources/runtime.go` in the [joblet-rnx](https://github.com/ehsaniara/joblet-rnx) repo)
     - Runtime management commands (`rnx runtime build/list/info`)
     - Runtime build using declarative YAML specifications
 

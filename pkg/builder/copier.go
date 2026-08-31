@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 )
 
@@ -40,6 +41,13 @@ var essentialLibraryPatterns = []string{
 	"librt.so*",
 	"librt-*.so",
 	"ld-linux*.so*",
+	// coreutils/bash runtime deps on Debian/Ubuntu
+	"libselinux.so*",
+	"libpcre2-8.so*",
+	"libacl.so*",
+	"libattr.so*",
+	"libtinfo.so*",
+	"libgcc_s.so*",
 }
 
 // fixupSymlinks ensures generic symlinks (python3, node, etc.) point to the correct versioned binary
@@ -65,13 +73,8 @@ func fixupSymlinks(binDir string, profile *LanguageProfile, copiedBinaries map[s
 				break
 			}
 		}
-	case "java":
-		for binary := range copiedBinaries {
-			if strings.HasPrefix(binary, "java") && binary != "java" {
-				symlinks["java"] = binary
-				break
-			}
-		}
+		// java has no version-suffixed binary name; CopyJavaRuntimeFromPath
+		// owns the java symlinks
 	}
 
 	// Create the symlinks
@@ -228,13 +231,18 @@ func CopyBinariesFromPath(rootPath string, platform *PlatformInfo, profile *Lang
 		// Track which binaries we copied
 		copiedBinaries[binary] = true
 
-		// Create symlink if original was a symlink
+		// Recreate same-directory symlinks (e.g. python3 -> python3.11); a
+		// same-name target would produce a self-loop, so keep the real copy
 		if binaryPath != realPath {
 			linkPath := filepath.Join(binDir, filepath.Base(binaryPath))
 			realName := filepath.Base(realPath)
-			os.Remove(linkPath) // Remove if exists
-			if err := os.Symlink(realName, linkPath); err != nil {
-				logger.Warn("Failed to create symlink for %s: %v", binary, err)
+			if realName != filepath.Base(binaryPath) {
+				if _, err := os.Stat(filepath.Join(binDir, realName)); err == nil {
+					os.Remove(linkPath)
+					if err := os.Symlink(realName, linkPath); err != nil {
+						logger.Warn("Failed to create symlink for %s: %v", binary, err)
+					}
+				}
 			}
 		}
 
@@ -257,14 +265,17 @@ func CopyJavaRuntimeFromPath(rootPath string, profile *LanguageProfile, isolated
 
 	// Find the JVM installation directory within the root path
 	jvmPaths := []string{
+		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("java-%s-openjdk-%s", profile.Version, goruntime.GOARCH)),
 		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("java-%s-openjdk-amd64", profile.Version)),
 		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("java-%s-openjdk", profile.Version)),
 		filepath.Join(rootPath, "usr", "lib", "jvm", fmt.Sprintf("openjdk-%s", profile.Version)),
 	}
 
+	// A candidate must actually contain bin/java: distro packages also create
+	// stub jvm directories (docs, src.zip) that must not be selected
 	var jvmSrc string
 	for _, path := range jvmPaths {
-		if _, err := os.Stat(path); err == nil {
+		if _, err := os.Stat(filepath.Join(path, "bin", "java")); err == nil {
 			jvmSrc = path
 			break
 		}

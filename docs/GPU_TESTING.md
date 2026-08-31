@@ -46,11 +46,11 @@ go test ./tests/gpu -v
 
 ### 3. System Tests (Real GPUs)
 
->**Caveat — device-node passthrough is newly wired and not yet validated on GPU hardware.**
+>**Caveat - device-node passthrough is newly wired and not yet validated on GPU hardware.**
 > Joblet now creates `/dev/nvidia*` device nodes inside a job and bind-mounts CUDA libraries, so
 > running `nvidia-smi` or checking for `/dev/nvidia*` **inside a job** is expected to work on a host
 > with working GPUs. A job also receives the `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES`
-> environment variables. This path has not yet been exercised on a host with an NVIDIA GPU — validate
+> environment variables. This path has not yet been exercised on a host with an NVIDIA GPU - validate
 > it by running `09_gpu_test` in `GPU_TEST_MODE=real` on real hardware before relying on it.
 
 #### Prerequisites
@@ -80,7 +80,7 @@ rnx job run --gpu=2 --gpu-memory=8GB python gpu_test.py
 
 - GPU allocation bookkeeping
 - `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment setup
-- Device node creation (`/dev/nvidia*`) — *now wired; nodes are expected to appear inside a job on a real GPU host (pending validation)*
+- Device node creation (`/dev/nvidia*`) - *now wired; nodes are expected to appear inside a job on a real GPU host (pending validation)*
 - GPU memory selection filtering (runtime limits *not enforced*)
 - Multi-GPU allocation scenarios
 
@@ -233,7 +233,7 @@ rnx job status <job-uuid>  # Should show GPU info if allocated
 > Device-node passthrough is now wired, so on a real GPU host all of the checks below are expected
 > to succeed: `ls -la /dev/nvidia*` should list the allocated device nodes and `nvidia-smi` should run
 > inside the job, alongside the `CUDA_VISIBLE_DEVICES` / `env | grep CUDA` checks. This path is newly
-> wired and pending validation on GPU hardware — confirm it with `09_gpu_test` (`GPU_TEST_MODE=real`)
+> wired and pending validation on GPU hardware - confirm it with `09_gpu_test` (`GPU_TEST_MODE=real`)
 > on a host with an NVIDIA GPU.
 
 ```bash

@@ -27,15 +27,12 @@ joblet/ (repo root)
 ├── go.sum
 │
 ├── cmd/
-│   ├── joblet/                # Main daemon binary
-│   │   └── main.go
-│   └── rnx/                   # CLI client binary
+│   └── joblet/                # Main daemon binary
 │       └── main.go
 │
 ├── internal/                  # Joblet internals (private)
 │   ├── joblet/                # Core job execution
-│   ├── modes/                 # Execution modes (server, init)
-│   └── rnx/                   # RNX CLI internals
+│   └── modes/                 # Execution modes (server, init)
 │
 ├── pkg/                       # Joblet packages (public)
 │   ├── config/
@@ -96,7 +93,10 @@ joblet/ (repo root)
 **Binaries:**
 
 - `cmd/joblet/` → `bin/joblet` (daemon)
-- `cmd/rnx/` → `bin/rnx` (CLI client)
+
+The `rnx` CLI client lives in its own repository,
+[joblet-rnx](https://github.com/ehsaniara/joblet-rnx); `make rnx` resolves a
+binary into `bin/rnx` via `scripts/get-rnx.sh` for deploy/e2e use.
 
 **Dependencies:**
 
@@ -110,16 +110,9 @@ joblet/ (repo root)
 module github.com/ehsaniara/joblet
 
 require (
-    github.com/ehsaniara/joblet-proto v2.0.1+incompatible
-    github.com/ehsaniara/joblet/persist v0.0.0  // Local persist module
-    github.com/spf13/cobra v1.10.1
-    google.golang.org/grpc v1.75.1
+    github.com/ehsaniara/joblet-proto/v2 v2.6.0
+    google.golang.org/grpc v1.77.0
     ...
-)
-
-replace (
-    github.com/ehsaniara/joblet-proto => ../joblet-proto  // Local dev
-    github.com/ehsaniara/joblet/persist => ./persist       // Local persist
 )
 ```
 
@@ -189,7 +182,7 @@ make bpf
 
 `make bpf` runs `go generate ./internal/joblet/ebpf/telematics`, which produces both the amd64 and arm64 `.o` files in a single invocation. Without it, building `joblet` will fail with `pattern telematics_*.o: no matching files found`.
 
-> CLI-only contributors (only touching `rnx`) can skip this; `rnx` uses a stub on non-Linux targets and doesn't import the BPF package on Linux either.
+> CLI contributors work in the [joblet-rnx](https://github.com/ehsaniara/joblet-rnx) repository, which has no BPF dependency.
 
 ### Build All Binaries
 
@@ -199,7 +192,6 @@ make all
 
 # Or manually:
 go build -o bin/joblet ./cmd/joblet
-go build -o bin/rnx ./cmd/rnx
 cd persist && go build -o ../bin/persist ./cmd/persist
 ```
 
@@ -209,18 +201,17 @@ cd persist && go build -o ../bin/persist ./cmd/persist
 # Joblet daemon
 go build -o bin/joblet ./cmd/joblet
 
-# RNX CLI
-go build -o bin/rnx ./cmd/rnx
-
 # Persist service (must be in persist/ directory)
 cd persist && go build -o ../bin/persist ./cmd/persist
+
+# rnx CLI (resolved from joblet-rnx: $RNX_BINARY, sibling checkout, or release download)
+make rnx
 ```
 
 ### Cross-compile for Linux
 
 ```bash
 GOOS=linux GOARCH=amd64 go build -o bin/joblet ./cmd/joblet
-GOOS=linux GOARCH=amd64 go build -o bin/rnx ./cmd/rnx
 cd persist && GOOS=linux GOARCH=amd64 go build -o ../bin/persist ./cmd/persist
 ```
 
@@ -263,7 +254,7 @@ import (
 
 ```mermaid
 flowchart TD
-    N1["github.com/ehsaniara/joblet (main module)<br/>cmd/joblet, cmd/rnx<br/>internal/, pkg/"]
+    N1["github.com/ehsaniara/joblet (main module)<br/>cmd/joblet<br/>internal/, pkg/"]
     N2["github.com/ehsaniara/joblet/persist (sub-module)<br/>cmd/persist<br/>internal/, pkg/"]
     N1 -->|"depends on (via replace)"| N2
 ```
@@ -343,12 +334,23 @@ End-to-end tests validate complete workflows against a running joblet instance.
 
 **Running E2E Tests:**
 
+The default flow is a clean-room validation: remove previous build artifacts,
+purge any existing joblet/rnx install, build and install a .deb from the
+working tree, then run every suite against that packaged install (needs
+sudo, run in a real terminal).
+
 ```bash
-# Run all e2e tests
+# Full clean install + all e2e tests (default)
 cd tests/e2e
 ./run_tests.sh
 
-# Run specific test
+# Fast iteration: swap binaries onto the existing install instead
+QUICK_DEPLOY=1 ./run_tests.sh
+
+# Test whatever is already running (no build, no install)
+SKIP_DEPLOY=1 ./run_tests.sh
+
+# Run specific test against the running service
 ./tests/01_isolation_test.sh
 
 # Run with custom host
@@ -362,15 +364,17 @@ JOBLET_TEST_HOST=192.0.2.10 JOBLET_TEST_USER=admin ./run_tests.sh
 3. `03_network_test.sh` - Network isolation
 4. `04_schedule_test.sh` - Job scheduling
 5. `05_volume_test.sh` - Volume management
-6. `07_github_runtime_test.sh` - GitHub runtime registry
-7. `08_rnx_json_test.sh` - JSON output format
-8. `09_gpu_test.sh` - GPU allocation
-9. `10_persist_test.sh` - Log/metric persistence
-10. `11_metrics_gap_test.sh` - Metrics continuity
-11. `12_log_gap_simple_test.sh` - Log continuity (simple)
-12. `13_log_gap_live_test.sh` - Log continuity (live)
-13. `14_registry_runtime_test.sh` - Runtime registry
-14. `15_state_load_test.sh` - State client load test (1000+ jobs)
+6. `08_rnx_json_test.sh` - JSON output format
+7. `09_gpu_test.sh` - GPU allocation
+8. `10_persist_test.sh` - Log/metric persistence
+9. `11_metrics_gap_test.sh` - Metrics continuity
+10. `12_log_gap_simple_test.sh` - Log continuity (simple)
+11. `13_log_gap_live_test.sh` - Log continuity (live)
+12. `15_state_load_test.sh` - State client load test (1000+ jobs)
+13. `16_ebpf_telemetry_test.sh` - eBPF telemetry collection
+14. `17_telematics_gap_test.sh` - Telematics continuity
+15. `18_timeout_test.sh` - Job timeout enforcement
+16. `19_gpu_mock_test.sh` - GPU allocation (mock devices)
 
 **State Load Tests:**
 
@@ -408,14 +412,15 @@ go test -short ./tests/e2e
 
 ## Packaging
 
-Both binaries are included in the same `.deb` and `.rpm` packages:
+The server binaries are included in the same `.deb` and `.rpm` packages; the
+`rnx` client is packaged and released separately from
+[joblet-rnx](https://github.com/ehsaniara/joblet-rnx):
 
 **Debian (.deb):**
 
 ```text
 /opt/joblet/bin/
 ├── joblet           # From cmd/joblet
-├── rnx              # From cmd/rnx
 └── persist   # From persist/cmd/persist
 ```
 
@@ -424,7 +429,6 @@ Both binaries are included in the same `.deb` and `.rpm` packages:
 ```text
 /opt/joblet/bin/
 ├── joblet
-├── rnx
 └── persist
 ```
 
@@ -487,8 +491,7 @@ joblet/              # Monorepo with 2 modules
 ├── go.work          # NEW
 ├── go.mod           # Main module
 ├── cmd/
-│   ├── joblet/
-│   └── rnx/
+│   └── joblet/      # (rnx later moved to the joblet-rnx repo)
 ├── internal/
 ├── pkg/
 └── persist/         # Sub-module

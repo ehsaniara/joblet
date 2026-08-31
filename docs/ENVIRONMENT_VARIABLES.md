@@ -187,7 +187,7 @@ jobs:
 #### Rejected (hard error)
 
 The server **rejects the job outright** (gRPC error, job not created) if any
-client-supplied variable — from **either** `--env` or `--secret-env` — collides
+client-supplied variable - from **either** `--env` or `--secret-env` - collides
 with the reserved joblet namespace. These names are controlled by the runtime
 and cannot be set by a client:
 

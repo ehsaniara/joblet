@@ -5,6 +5,7 @@
 
 # Source the test framework
 source "$(dirname "$0")/../lib/test_framework.sh"
+source "$(dirname "$0")/../lib/gpu_helpers.sh"
 
 # ============================================
 # GPU Test Configuration
@@ -212,6 +213,24 @@ main() {
 
     echo -e "${CYAN}GPU Test Mode: $GPU_TEST_MODE${NC}"
     echo -e "${CYAN}Test Host: $TEST_HOST${NC}"
+
+    # A fresh install has GPU support off; enable it (real or simulated) for
+    # the duration of this suite, the same way 19_gpu_mock_test does
+    if [[ "$GPU_TEST_MODE" != "skip" ]]; then
+        if ! sudo -n true 2>/dev/null; then
+            skip_test "GPU e2e ($GPU_TEST_MODE)" "cached/passwordless sudo required to toggle GPU support"
+            test_suite_summary
+            exit $?
+        fi
+        trap gpu_cleanup EXIT
+        local env_line="Environment=JOBLET_GPU_SIMULATE=2"
+        [[ "$GPU_TEST_MODE" == "real" ]] && env_line="Environment=JOBLET_GPU_ENABLED=1"
+        if ! enable_gpu "$env_line" || ! canary_ready; then
+            run_test "Enable GPU support and restart daemon" false
+            test_suite_summary
+            exit $?
+        fi
+    fi
 
     test_section "GPU Flag Parsing"
     run_test "GPU flag parsing" test_gpu_flag_parsing
