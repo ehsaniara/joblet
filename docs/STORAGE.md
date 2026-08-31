@@ -47,7 +47,8 @@ flowchart TD
 #### 1. Filesystem Volumes
 
 - **Purpose**: Persistent storage that survives job restarts and system reboots
-- **Implementation**: Loop-mounted ext4 image (backing file) for size enforcement, with a plain-directory fallback if loop setup fails
+- **Implementation**: Loop-mounted ext4 image (backing file) for size enforcement, with a plain-directory fallback if
+  loop setup fails
 - **Location**: `/opt/joblet/volumes/<name>/data` (keyed by volume name)
 - **Features**:
     - Persistent across job executions

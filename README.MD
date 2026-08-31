@@ -39,9 +39,11 @@ workloads.
 - **⏱️ Execution Timeouts**: Per-job wall-clock limits that terminate runaway or hung jobs automatically
 - **🛡️ Enterprise Security**: mTLS encryption with certificate-based authentication and role-based
   access control
-- **🐍 Runtime Environments**: Build Python ML, Java, and custom runtime environments from declarative YAML specifications
+- **🐍 Runtime Environments**: Build Python ML, Java, and custom runtime environments from declarative YAML
+  specifications
 - **🤖 AI-Native Integration**: Drive Joblet from AI assistants and agent frameworks through the
-  [Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server) and [Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)
+  [Joblet MCP Server](https://github.com/ehsaniara/joblet-mcp-server)
+  and [Python SDK](https://github.com/ehsaniara/joblet-sdk-python/)
 
 ## Getting Started
 
@@ -79,8 +81,9 @@ sudo systemctl enable joblet
 
 The `rnx` client is released separately from
 [joblet-rnx](https://github.com/ehsaniara/joblet-rnx/releases/latest), with
-binaries for Linux, macOS, and Windows (amd64/arm64). See its README for all
-install options.
+binaries for Linux, macOS, and Windows (amd64/arm64). The server package
+installer installs the latest rnx on the server host automatically; on other
+machines use one of the options below (see the joblet-rnx README for all).
 
 #### macOS and Linux (Homebrew)
 

@@ -106,11 +106,11 @@ public class VirtualThreadExample {
 
 ## Performance Benefits
 
-| Feature | Traditional Threads | Virtual Threads |
-|---------|---------------------|-----------------|
-| Memory per thread | ~1MB stack | ~1KB |
-| Max concurrent | ~4,000 (4GB RAM) | ~4,000,000 |
-| Context switch | ~1-10 μs | ~0.1-1 μs |
+| Feature           | Traditional Threads | Virtual Threads |
+|-------------------|---------------------|-----------------|
+| Memory per thread | ~1MB stack          | ~1KB            |
+| Max concurrent    | ~4,000 (4GB RAM)    | ~4,000,000      |
+| Context switch    | ~1-10 μs            | ~0.1-1 μs       |
 
 ## Related
 

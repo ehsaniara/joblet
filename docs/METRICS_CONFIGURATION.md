@@ -35,11 +35,11 @@ telemetry:
 
 ### Fields
 
-| Field              | Type     | Default | Description                                                                 |
-|--------------------|----------|---------|-----------------------------------------------------------------------------|
-| `metrics_interval` | duration | `5s`    | How often to sample resource metrics (minimum: 1s)                          |
-| `ebpf_enabled`     | bool     | `true`  | Enable eBPF telemetry collection (requires Linux 5.8+)                       |
-| `event_types`      | list     | all     | Enabled eBPF event types; empty/omitted means all types are enabled         |
+| Field              | Type     | Default | Description                                                         |
+|--------------------|----------|---------|---------------------------------------------------------------------|
+| `metrics_interval` | duration | `5s`    | How often to sample resource metrics (minimum: 1s)                  |
+| `ebpf_enabled`     | bool     | `true`  | Enable eBPF telemetry collection (requires Linux 5.8+)              |
+| `event_types`      | list     | all     | Enabled eBPF event types; empty/omitted means all types are enabled |
 
 Storage location and retention for metrics are handled by the persist service
 (`persist.storage`), not by the telemetry section. See

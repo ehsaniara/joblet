@@ -2,18 +2,17 @@
 
 ## Overview
 
-Joblet is a high-performance job execution system with a monorepo structure containing two main services and a CLI tool.
+Joblet is a high-performance job execution system. This repository contains the server-side services (joblet, persist,
+state); the `rnx` CLI client lives in [joblet-rnx](https://github.com/ehsaniara/joblet-rnx).
 
 ## Repository Structure
 
 ```text
 joblet/
 ├── cmd/
-│   ├── joblet/          # Main service daemon
-│   └── rnx/             # CLI client
+│   └── joblet/          # Main service daemon
 ├── internal/
 │   ├── joblet/          # Main service implementation
-│   ├── rnx/             # CLI implementation
 │   └── proto/           # Internal protocol buffers (IPC, persist)
 ├── persist/             # Persistence service (sub-module)
 │   ├── cmd/persist/
@@ -77,9 +76,10 @@ joblet/
     - **Memory**: RAM-only (testing, lost on restart)
     - **DynamoDB**: AWS cloud persistence (production, survives restarts)
 
-### 4. RNX (CLI Client)
+### 4. rnx (CLI client, separate repository)
 
-- **Binary**: `bin/rnx`
+- **Repository**: [joblet-rnx](https://github.com/ehsaniara/joblet-rnx), versioned independently
+- **Binary**: `/usr/local/bin/rnx` (installed by the joblet package from the latest joblet-rnx release)
 - **Purpose**: Command-line interface
 - **Features**:
     - Job management (run, status, stop, logs)
@@ -211,7 +211,7 @@ Both services support TLS encryption:
 
 - `make all` - Build all binaries
 - `make joblet` - Build main service only
-- `make rnx` - Build CLI only
+- `make rnx` - Fetch the rnx client into `bin/` via `scripts/get-rnx.sh` (deploy/e2e use)
 - `make persist` - Build persist service only
 - `make proto` - Generate all proto files
 - `make clean` - Remove build artifacts
@@ -278,7 +278,6 @@ flowchart TD
 /opt/joblet/
 ├── bin/                    # Binaries
 │   ├── joblet
-│   ├── rnx
 │   ├── persist
 │   └── state               # State persistence service
 ├── config/                 # Configuration
@@ -317,7 +316,7 @@ Single systemd service:
 make deploy REMOTE_HOST=192.0.2.10 REMOTE_USER=admin
 ```
 
-This builds all binaries, copies to remote server, and restarts services.
+This builds the server binaries, fetches rnx, copies to the remote server, and restarts services.
 
 ## Development Workflow
 

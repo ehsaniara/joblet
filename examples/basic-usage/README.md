@@ -26,14 +26,14 @@ This runs all examples in sequence with explanations.
 
 ## Examples Overview
 
-| Example | Script | Description |
-|---------|--------|-------------|
-| Simple Commands | `01_simple_commands.sh` | Execute basic shell commands |
+| Example         | Script                  | Description                   |
+|-----------------|-------------------------|-------------------------------|
+| Simple Commands | `01_simple_commands.sh` | Execute basic shell commands  |
 | File Operations | `02_file_operations.sh` | Upload files, workspace usage |
-| Resource Limits | `03_resource_limits.sh` | CPU, memory, I/O limits |
-| Volume Storage | `04_volume_storage.sh` | Persistent data between jobs |
-| Job Monitoring | `05_job_monitoring.sh` | Status tracking, log viewing |
-| Network Basics | `07_network_basics.sh` | Network isolation modes |
+| Resource Limits | `03_resource_limits.sh` | CPU, memory, I/O limits       |
+| Volume Storage  | `04_volume_storage.sh`  | Persistent data between jobs  |
+| Job Monitoring  | `05_job_monitoring.sh`  | Status tracking, log viewing  |
+| Network Basics  | `07_network_basics.sh`  | Network isolation modes       |
 
 ## Simple Commands
 

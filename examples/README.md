@@ -189,6 +189,7 @@ cd examples/advanced
 ```
 
 This demonstrates:
+
 - Sequential job processing with dependencies
 - Data exchange via shared volumes
 - Job synchronization patterns

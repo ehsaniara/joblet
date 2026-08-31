@@ -173,16 +173,20 @@ use (
 
 ### One-time setup: compile the BPF objects
 
-The joblet daemon embeds compiled BPF programs (`internal/joblet/ebpf/telematics/telematics_*_bpfel.o`). These are not tracked in git: bytes depend on local `clang`/`llvm`/`libbpf-dev` versions and are rebuilt from `bpf/telematics.c`. Run once after clone, and whenever you edit a `.c` file:
+The joblet daemon embeds compiled BPF programs (`internal/joblet/ebpf/telematics/telematics_*_bpfel.o`). These are not
+tracked in git: bytes depend on local `clang`/`llvm`/`libbpf-dev` versions and are rebuilt from `bpf/telematics.c`. Run
+once after clone, and whenever you edit a `.c` file:
 
 ```bash
 sudo apt-get install -y clang llvm libbpf-dev   # Ubuntu/Debian
 make bpf
 ```
 
-`make bpf` runs `go generate ./internal/joblet/ebpf/telematics`, which produces both the amd64 and arm64 `.o` files in a single invocation. Without it, building `joblet` will fail with `pattern telematics_*.o: no matching files found`.
+`make bpf` runs `go generate ./internal/joblet/ebpf/telematics`, which produces both the amd64 and arm64 `.o` files in a
+single invocation. Without it, building `joblet` will fail with `pattern telematics_*.o: no matching files found`.
 
-> CLI contributors work in the [joblet-rnx](https://github.com/ehsaniara/joblet-rnx) repository, which has no BPF dependency.
+> CLI contributors work in the [joblet-rnx](https://github.com/ehsaniara/joblet-rnx) repository, which has no BPF
+> dependency.
 
 ### Build All Binaries
 

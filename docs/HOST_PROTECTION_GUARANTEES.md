@@ -24,6 +24,7 @@ flowchart TD
 ```
 
 **Key Benefits:**
+
 - **Zero Host Contamination**: All package writes go to the ephemeral upper layer
 - **Full Package Manager Support**: apt-get, yum, dnf, pip all work normally
 - **Automatic Cleanup**: Overlay and temp directories are removed after build
@@ -33,10 +34,10 @@ flowchart TD
 
 Joblet uses two distinct isolation levels:
 
-| Type                | Purpose            | Isolation Method                 | Host Protection        |
-|---------------------|--------------------|----------------------------------|------------------------|
-| **Production Jobs** | Run user workloads | Minimal chroot (~50MB)           | Complete isolation     |
-| **Runtime Builds**  | Install runtimes   | OverlayFS chroot                 | Zero host modification |
+| Type                | Purpose            | Isolation Method       | Host Protection        |
+|---------------------|--------------------|------------------------|------------------------|
+| **Production Jobs** | Run user workloads | Minimal chroot (~50MB) | Complete isolation     |
+| **Runtime Builds**  | Install runtimes   | OverlayFS chroot       | Zero host modification |
 
 ### 3. Critical Safety Features
 
@@ -111,6 +112,7 @@ The runtime builder uses OverlayFS to create an isolated environment for package
 The implementation is in `pkg/builder/isolation.go`.
 
 **Setup Phase:**
+
 ```go
 // Create overlay directories
 upperDir  := filepath.Join(baseDir, "upper")   // Captures all writes
@@ -128,6 +130,7 @@ mount("/dev", mergedDir+"/dev", "", MS_BIND|MS_REC)
 ```
 
 **Package Installation Phase:**
+
 ```go
 // Run apt-get install inside chroot
 cmd := exec.Command("chroot", mergedDir, "apt-get", "install", "-y", packages...)
@@ -139,6 +142,7 @@ cmd.Run()
 ```
 
 **Copy Phase:**
+
 ```go
 // Copy binaries from upper layer (only new/modified files)
 // Upper layer contains ONLY the changes from package installation
@@ -147,6 +151,7 @@ copyFromPath(upperDir+"/usr/lib", runtimeDir+"/lib", libraries)
 ```
 
 **Cleanup Phase:**
+
 ```go
 // Unmount in reverse order
 syscall.Unmount(mergedDir+"/dev", MNT_DETACH)
@@ -160,12 +165,12 @@ os.RemoveAll(baseDir)
 
 ### Key Source Files
 
-| File | Purpose |
-|------|---------|
-| `pkg/builder/isolation.go` | OverlayFS isolation environment |
-| `pkg/builder/system_ops.go` | System operations interface (for testing) |
-| `pkg/builder/builder.go` | Main build orchestration with isolated phases |
-| `pkg/builder/copier.go` | Copy binaries/libraries from overlay |
+| File                        | Purpose                                       |
+|-----------------------------|-----------------------------------------------|
+| `pkg/builder/isolation.go`  | OverlayFS isolation environment               |
+| `pkg/builder/system_ops.go` | System operations interface (for testing)     |
+| `pkg/builder/builder.go`    | Main build orchestration with isolated phases |
+| `pkg/builder/copier.go`     | Copy binaries/libraries from overlay          |
 
 ### Environment Detection
 

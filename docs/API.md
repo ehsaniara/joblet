@@ -1233,7 +1233,7 @@ find /opt/joblet/metrics -type d -mtime +90 -exec rm -rf {} \;
 - **ListJobs**: Fully implemented job listing functionality
     - Returns all jobs with complete metadata
     - Includes job status, resource limits, and timestamps
-  - Proper role-based authorization checks
+    - Proper role-based authorization checks
 
 #### Monitoring Enhancements
 

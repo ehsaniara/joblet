@@ -436,13 +436,14 @@ persist:
 
 **Cost Comparison:**
 
-| Backend    | Ingestion Cost | Storage Cost  | Best For                    |
-|------------|----------------|---------------|-----------------------------|
-| Local      | Free           | Disk space    | Development, single-node    |
-| CloudWatch | ~$0.50/GB      | ~$0.03/GB/mo  | AWS monitoring integration  |
-| S3         | Free           | ~$0.023/GB/mo | Long-term archival, cost    |
+| Backend    | Ingestion Cost | Storage Cost  | Best For                   |
+|------------|----------------|---------------|----------------------------|
+| Local      | Free           | Disk space    | Development, single-node   |
+| CloudWatch | ~$0.50/GB      | ~$0.03/GB/mo  | AWS monitoring integration |
+| S3         | Free           | ~$0.023/GB/mo | Long-term archival, cost   |
 
 **When to use S3:**
+
 - Long-term log archival (cheaper than CloudWatch)
 - High-volume telemetry data
 - Custom query requirements (Athena, Spark)

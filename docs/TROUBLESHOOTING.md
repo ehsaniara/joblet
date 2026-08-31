@@ -58,12 +58,11 @@ rnx monitor status
 # Error: "joblet: command not found"
 
 # Check if binary exists
-ls -la /usr/local/bin/joblet
+ls -la /opt/joblet/bin/joblet
 
-# If missing, reinstall
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet
+# If missing, reinstall the package (the binary lives in /opt/joblet/bin)
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
+sudo dpkg -i joblet_*_amd64.deb
 ```
 
 ### Permission Denied

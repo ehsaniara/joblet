@@ -68,12 +68,12 @@ RNX resolves configuration files using the following precedence hierarchy:
 Every RNX command is authorized on the server against the role in your client certificate's OU field. There are four
 roles:
 
-| Role           | Access                                                                                                          |
-|----------------|------------------------------------------------------------------------------------------------------------------|
-| **admin**      | Everything, including `remove` of runtimes, networks, and volumes                                               |
-| **maintainer** | Developer access plus `runtime build`/`validate` and network/volume `create`. The role for CI/CD pipelines      |
-| **developer**  | Full job lifecycle (`run`, `stop`, `delete`) and `runtime test`, plus every read command                        |
-| **reader**     | Read commands only: job status, logs, listings, and monitoring                                                  |
+| Role           | Access                                                                                                     |
+|----------------|------------------------------------------------------------------------------------------------------------|
+| **admin**      | Everything, including `remove` of runtimes, networks, and volumes                                          |
+| **maintainer** | Developer access plus `runtime build`/`validate` and network/volume `create`. The role for CI/CD pipelines |
+| **developer**  | Full job lifecycle (`run`, `stop`, `delete`) and `runtime test`, plus every read command                   |
+| **reader**     | Read commands only: job status, logs, listings, and monitoring                                             |
 
 Certificates with the older `viewer` OU behave like reader. Any other OU value gets `PermissionDenied` on every
 command.
@@ -98,7 +98,8 @@ command.
 
 The certificate generation script (`certs_gen_embedded.sh`) creates one client certificate per role. As a client you
 normally receive a single `rnx-config-<role>.yml` from your operator; save it as `~/.rnx/rnx-config.yml` and run
-`rnx` with no extra flags, since your role's node is marked `isDefault: true`. Operators working on the server itself have the
+`rnx` with no extra flags, since your role's node is marked `isDefault: true`. Operators working on the server itself
+have the
 combined `rnx-config.yml` with every role and pick one per invocation:
 
 ```bash
@@ -851,18 +852,18 @@ rnx runtime info python-3.11-ml --json
 
 The command displays comprehensive runtime information:
 
-| Field | Description |
-|-------|-------------|
-| Runtime | Runtime name |
-| Version | Runtime version (e.g., "1.0.0") |
-| Description | Human-readable description |
-| Language | Language and version (e.g., "python 3.11") |
-| Size | Total runtime size |
-| Requirements | GPU requirements and supported architectures |
-| Pre-installed Packages | Pip/npm packages included |
-| Library Patterns | Shared library patterns copied |
-| Environment Variables | Pre-configured environment |
-| Build Info | When built, platform used |
+| Field                  | Description                                  |
+|------------------------|----------------------------------------------|
+| Runtime                | Runtime name                                 |
+| Version                | Runtime version (e.g., "1.0.0")              |
+| Description            | Human-readable description                   |
+| Language               | Language and version (e.g., "python 3.11")   |
+| Size                   | Total runtime size                           |
+| Requirements           | GPU requirements and supported architectures |
+| Pre-installed Packages | Pip/npm packages included                    |
+| Library Patterns       | Shared library patterns copied               |
+| Environment Variables  | Pre-configured environment                   |
+| Build Info             | When built, platform used                    |
 
 #### Example Output
 
@@ -912,10 +913,10 @@ rnx runtime build <path> [flags]
 
 #### Flags
 
-| Flag        | Short | Description                                      | Default |
-|-------------|-------|--------------------------------------------------|---------|
-| `--force`   | `-f`  | Overwrite existing runtime if it already exists  | false   |
-| `--verbose` | `-v`  | Enable verbose output with debug logs            | false   |
+| Flag        | Short | Description                                     | Default |
+|-------------|-------|-------------------------------------------------|---------|
+| `--force`   | `-f`  | Overwrite existing runtime if it already exists | false   |
+| `--verbose` | `-v`  | Enable verbose output with debug logs           | false   |
 
 #### Description
 
@@ -1045,7 +1046,8 @@ rnx runtime validate <path>
 
 #### Description
 
-Performs comprehensive server-side validation of the runtime YAML specification. This command sends the specification to the Joblet server for validation, which runs the first 4 phases of the build pipeline without actually building.
+Performs comprehensive server-side validation of the runtime YAML specification. This command sends the specification to
+the Joblet server for validation, which runs the first 4 phases of the build pipeline without actually building.
 
 **Validation checks include:**
 
@@ -1060,7 +1062,8 @@ Performs comprehensive server-side validation of the runtime YAML specification.
 - Package validation (base packages, pip, npm)
 - Existing runtime conflict detection (warns if runtime already exists)
 
-This is the recommended way to check your runtime specification before building. It provides the same validation as `rnx runtime build` without actually installing anything.
+This is the recommended way to check your runtime specification before building. It provides the same validation as
+`rnx runtime build` without actually installing anything.
 
 #### Examples
 
@@ -1119,18 +1122,18 @@ rnx version
 
 # Output:
 # RNX Client:
-# rnx version v4.3.3 (4c11220)
-# Built: 2025-09-14T05:17:17Z
-# Commit: 4c11220b6e4f98960853fa0379b5c25d2f19e33f
+# rnx version v6.0.2 (6cc97f37)
+# Built: 2026-08-31T01:20:11Z
+# Commit: 6cc97f3778c89bfe306884cda7eecc4ecd56768a
 # Go: go1.24.0
-# Platform: linux/amd64
+# Platform: linux/arm64
 #
 # Joblet Server (default):
-# joblet version v4.3.3 (4c11220)
-# Built: 2025-09-14T05:18:24Z
-# Commit: 4c11220b6e4f98960853fa0379b5c25d2f19e33f
+# joblet version v5.7.0 (1888e7d1)
+# Built: 2026-07-30T18:02:45Z
+# Commit: 1888e7d1c0a1b2c3d4e5f60718293a4b5c6d7e8f
 # Go: go1.24.0
-# Platform: linux/amd64
+# Platform: linux/arm64
 
 # Show version as JSON
 rnx version --json
@@ -1148,7 +1151,8 @@ rnx --version
 
 #### Use Cases
 
-- **Version Compatibility**: Ensure client and server versions are compatible
+- **Version Compatibility**: Client and server are versioned independently; confirm both speak the same joblet-proto
+  major (see COMPATIBILITY.md)
 - **Debugging**: Identify specific builds when reporting issues
 - **Deployment Tracking**: Verify which version is deployed on production servers
 - **Development**: Track development builds with `+dev` suffix

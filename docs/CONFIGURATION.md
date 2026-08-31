@@ -738,12 +738,12 @@ nodes:
 A client's role comes from the OU field of its certificate (case doesn't matter). Certificates without one of these
 OUs are rejected on every request.
 
-| Role         | Access                                                                                                                                    |
-|--------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| `admin`      | Everything, including removing runtimes, networks, and volumes                                                                            |
-| `maintainer` | Developer access plus building runtimes, validating runtime YAML, and creating networks and volumes; intended for CI/CD. No removals     |
-| `developer`  | Run, stop, and delete jobs; test runtimes; read everything. No infrastructure changes                                                     |
-| `reader`     | Read-only: jobs, logs, telemetry, and resource listings, for dashboards and reporting                                                    |
+| Role         | Access                                                                                                                               |
+|--------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `admin`      | Everything, including removing runtimes, networks, and volumes                                                                       |
+| `maintainer` | Developer access plus building runtimes, validating runtime YAML, and creating networks and volumes; intended for CI/CD. No removals |
+| `developer`  | Run, stop, and delete jobs; test runtimes; read everything. No infrastructure changes                                                |
+| `reader`     | Read-only: jobs, logs, telemetry, and resource listings, for dashboards and reporting                                                |
 
 Certificates issued with the old `viewer` OU keep working; they are treated as `reader`.
 
@@ -761,7 +761,8 @@ config:
 
 - `rnx-config.yml`: the operator's copy, with one node per role; the `admin` node is marked `isDefault: true`. It
   contains the admin key, so it stays on the server. On the server, select a role with `rnx --node <role> ...`.
-- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node marked `isDefault: true`. Hand each party the
+- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node marked `isDefault: true`. Hand each
+  party the
   file for its role and nothing else; a developer holding `rnx-config-developer.yml` never sees the admin key.
 
 The AWS variant additionally stores each role's certificate pair in Secrets Manager
@@ -793,14 +794,44 @@ openssl req -new -key client-key.pem -out reader.csr \
 
 ### Server Environment Variables
 
-| Variable                     | Description                        | Default                                 |
-|------------------------------|------------------------------------|-----------------------------------------|
-| `JOBLET_CONFIG_PATH`         | Path to main configuration file    | searches standard locations             |
-| `JOBLET_RUNTIME_CONFIG_PATH` | Path to runtime configuration file | searches standard locations             |
-| `JOBLET_SERVER_ADDRESS`      | Server address override            | from config                             |
-| `JOBLET_MODE`                | Server mode override (`server`/`init`) | from config                         |
-| `JOBLET_LOG_LEVEL`           | Log level override                 | from config                             |
-| `JOBLET_LOG_FORMAT`          | Log format override (`text`/`json`) | from config                            |
+| Variable                     | Description                            | Default                     |
+|------------------------------|----------------------------------------|-----------------------------|
+| `JOBLET_CONFIG_PATH`         | Path to main configuration file        | searches standard locations |
+| `JOBLET_RUNTIME_CONFIG_PATH` | Path to runtime configuration file     | searches standard locations |
+| `JOBLET_SERVER_ADDRESS`      | Server address override                | from config                 |
+| `JOBLET_MODE`                | Server mode override (`server`/`init`) | from config                 |
+| `JOBLET_LOG_LEVEL`           | Log level override                     | from config                 |
+| `JOBLET_LOG_FORMAT`          | Log format override (`text`/`json`)    | from config                 |
+
+### Installer Environment Variables
+
+Read by the .deb/.rpm postinst (pass with `sudo -E dpkg -i ...` or set for
+`dpkg-reconfigure joblet`):
+
+| Variable                  | Description                                                    | Default       |
+|---------------------------|----------------------------------------------------------------|---------------|
+| `JOBLET_BIND_ADDRESS`     | Address the gRPC server binds to                               | `0.0.0.0`     |
+| `JOBLET_SERVER_PORT`      | gRPC port                                                      | `50051`       |
+| `JOBLET_CERT_INTERNAL_IP` | Primary certificate IP and the endpoint written to rnx configs | auto-detected |
+| `JOBLET_CERT_PUBLIC_IP`   | Additional public IP added to the certificate SANs             | none          |
+| `JOBLET_CERT_DOMAIN`      | Additional DNS name(s) added to the certificate SANs           | none          |
+| `JOBLET_SKIP_RNX_INSTALL` | Set to `1` to skip downloading the rnx client on the host      | unset         |
+| `JOBLET_HOME`             | Installation directory                                         | `/opt/joblet` |
+
+### Installer Environment Variables
+
+Read by the .deb/.rpm postinst (pass with `sudo -E dpkg -i ...` or set for
+`dpkg-reconfigure joblet`):
+
+| Variable                  | Description                                                    | Default        |
+|---------------------------|----------------------------------------------------------------|----------------|
+| `JOBLET_BIND_ADDRESS`     | Address the gRPC server binds to                               | `0.0.0.0`      |
+| `JOBLET_SERVER_PORT`      | gRPC port                                                      | `50051`        |
+| `JOBLET_CERT_INTERNAL_IP` | Primary certificate IP and the endpoint written to rnx configs | auto-detected  |
+| `JOBLET_CERT_PUBLIC_IP`   | Additional public IP added to the certificate SANs             | none           |
+| `JOBLET_CERT_DOMAIN`      | Additional DNS name(s) added to the certificate SANs           | none           |
+| `JOBLET_SKIP_RNX_INSTALL` | Set to `1` to skip downloading the rnx client on the host      | unset          |
+| `JOBLET_HOME`             | Installation directory                                         | `/opt/joblet`  |
 
 ### Client Environment Variables
 
@@ -899,7 +930,8 @@ logging:
 3. **Monitoring**: Enable metrics collection for production environments
 4. **Logging**: Use JSON format for easier log parsing
 5. **State Persistence**: Use the `local` or `dynamodb` state backend so jobs survive restarts
-6. **Access Control**: Issue per-role client certificates (OU = admin/maintainer/developer/reader); RBAC is enforced automatically via mTLS
+6. **Access Control**: Issue per-role client certificates (OU = admin/maintainer/developer/reader); RBAC is enforced
+   automatically via mTLS
 7. **Backup**: Keep configuration file backups
 
 ## Configuration Validation
