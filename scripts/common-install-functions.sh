@@ -724,6 +724,52 @@ display_system_changes_warning() {
     echo ""
 }
 
+# Install the rnx client from joblet-rnx releases. Best-effort: never fails the
+# package install; skipped if rnx is already on PATH or JOBLET_SKIP_RNX_INSTALL=1
+install_rnx_client() {
+    if [ "$JOBLET_SKIP_RNX_INSTALL" = "1" ]; then
+        print_info "Skipping rnx client install (JOBLET_SKIP_RNX_INSTALL=1)"
+        return 0
+    fi
+    if command -v rnx >/dev/null 2>&1; then
+        print_info "rnx client already installed: $(command -v rnx)"
+        return 0
+    fi
+
+    local RELEASES="https://github.com/ehsaniara/joblet-rnx/releases"
+    local ARCH
+    case "$(uname -m)" in
+        x86_64) ARCH=amd64 ;;
+        aarch64|arm64) ARCH=arm64 ;;
+        *) print_warning "rnx client: unsupported arch $(uname -m), install manually from ${RELEASES}/latest"; return 0 ;;
+    esac
+
+    print_info "Installing rnx client from ${RELEASES}/latest..."
+    local TAG TMP
+    TAG=$(curl -fsSL "${RELEASES}/latest" -o /dev/null -w '%{url_effective}' 2>/dev/null | grep -oE 'v[0-9][^/]*$') || TAG=""
+    if [ -z "$TAG" ]; then
+        print_warning "rnx client: could not reach ${RELEASES}/latest - install manually"
+        return 0
+    fi
+    TMP=$(mktemp -d) || { print_warning "rnx client: mktemp failed - install manually from ${RELEASES}/latest"; return 0; }
+    if curl -fsSL "${RELEASES}/download/${TAG}/rnx-${TAG}-linux-${ARCH}.tar.gz" -o "$TMP/rnx.tar.gz" 2>/dev/null \
+        && curl -fsSL "${RELEASES}/download/${TAG}/checksums.txt" -o "$TMP/checksums.txt" 2>/dev/null \
+        && (cd "$TMP" \
+            && EXPECTED=$(awk -v f="rnx-${TAG}-linux-${ARCH}.tar.gz" '$2 == f {print $1}' checksums.txt) \
+            && [ -n "$EXPECTED" ] \
+            && echo "$EXPECTED  rnx.tar.gz" | sha256sum -c --quiet) \
+        && tar -xzf "$TMP/rnx.tar.gz" -C "$TMP" \
+        && install -m 0755 "$TMP/rnx-linux-${ARCH}" /usr/local/bin/rnx; then
+        # Marker holds the binary's sha256 so uninstall removes only this exact binary
+        sha256sum /usr/local/bin/rnx | awk '{print $1}' > "${JOBLET_HOME}/.rnx-installed-by-joblet"
+        print_success "rnx client ${TAG} installed to /usr/local/bin/rnx"
+    else
+        print_warning "rnx client install failed - download manually from ${RELEASES}/latest"
+    fi
+    rm -rf "$TMP"
+    return 0
+}
+
 display_quickstart_info() {
     local PACKAGE_TYPE="${1:-generic}"
 
@@ -732,9 +778,20 @@ display_quickstart_info() {
     echo ""
     print_info "🚀 Quick Start:"
     echo "  sudo systemctl start joblet    # Start the service"
-    echo "  sudo rnx job list              # Test local connection"
+    echo ""
+    if command -v rnx >/dev/null 2>&1; then
+        print_info "📥 rnx CLI: $(command -v rnx) ($(rnx --version 2>/dev/null | head -1))"
+        echo "  For same-host admin use:"
+    else
+        print_info "📥 rnx CLI (released separately):"
+        echo "  Download for your platform from:"
+        echo "    https://github.com/ehsaniara/joblet-rnx/releases/latest"
+        echo "  Then for same-host admin use:"
+    fi
+    echo "    mkdir -p ~/.rnx && cp ${JOBLET_HOME}/config/rnx-config-admin.yml ~/.rnx/rnx-config.yml"
+    echo "    rnx job list                 # Test local connection"
     if [ "$EC2_CLOUDWATCH_CONFIGURED" = "true" ]; then
-        echo "  sudo rnx job run echo 'Hello CloudWatch'  # Test job with CloudWatch logging"
+        echo "    rnx job run echo 'Hello CloudWatch'  # Test job with CloudWatch logging"
     fi
     echo ""
     print_info "📱 Remote Access:"

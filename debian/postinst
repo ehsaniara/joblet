@@ -100,7 +100,6 @@ case "$1" in
         chmod 755 ${JOBLET_HOME}
         chmod 755 ${JOBLET_HOME}/bin
         chmod 755 ${JOBLET_HOME}/bin/joblet
-        chmod 755 ${JOBLET_HOME}/bin/rnx
         chmod 755 ${JOBLET_HOME}/bin/persist
         chmod 755 ${JOBLET_HOME}/bin/state
         chmod 755 ${JOBLET_HOME}/scripts
@@ -114,14 +113,16 @@ case "$1" in
         # Select and install the appropriate runtime config for this distro
         select_runtime_config ${JOBLET_HOME}/scripts ${JOBLET_HOME}/config
 
-        # Create symlinks
-        if [ ! -L /usr/bin/rnx ]; then
-            ln -sf ${JOBLET_HOME}/bin/rnx /usr/bin/rnx
-        fi
+        # Remove stale bundled rnx and dangling symlinks
+        rm -f ${JOBLET_HOME}/bin/rnx
+        for link in /usr/bin/rnx /usr/local/bin/rnx; do
+            if [ -L "$link" ] && [ ! -e "$link" ]; then
+                rm -f "$link"
+            fi
+        done
 
-        if [ ! -L /usr/local/bin/rnx ]; then
-            ln -sf ${JOBLET_HOME}/bin/rnx /usr/local/bin/rnx
-        fi
+        # Install the rnx client from its own repo (best-effort, non-fatal)
+        install_rnx_client
 
         get_configuration_debian
 

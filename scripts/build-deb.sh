@@ -20,15 +20,14 @@ fi
 echo "🔨 Building Debian package for $PACKAGE_NAME v$CLEAN_VERSION ($ARCH)..."
 
 # Check if binaries already exist (CI mode)
-if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ] && [ -f "./state" ]; then
+if [ -f "./joblet" ] && [ -f "./persist" ] && [ -f "./state" ]; then
     echo "📦 Using pre-built binaries from root directory (CI mode)..."
     mkdir -p ./bin
     cp ./joblet ./bin/joblet
-    cp ./rnx ./bin/rnx
     cp ./persist ./bin/persist
     cp ./state ./bin/state
-    chmod +x ./bin/joblet ./bin/rnx ./bin/persist ./bin/state
-elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
+    chmod +x ./bin/joblet ./bin/persist ./bin/state
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
     # Build all binaries if they don't exist
     echo "📦 Building all binaries..."
     make all || {
@@ -46,7 +45,7 @@ case "$ARCH" in
     *) EXPECTED_ARCH="" ;;
 esac
 if [ -n "$EXPECTED_ARCH" ]; then
-    for bin in joblet rnx persist state; do
+    for bin in joblet persist state; do
         if ! file "./bin/$bin" | grep -q "$EXPECTED_ARCH"; then
             echo "❌ ./bin/$bin is not $EXPECTED_ARCH but package arch is $ARCH"
             echo "   Rebuild with: make all GOARCH=$ARCH"
@@ -74,12 +73,6 @@ if [ ! -f "./bin/joblet" ]; then
     exit 1
 fi
 cp ./bin/joblet "$BUILD_DIR/opt/joblet/bin/"
-
-if [ ! -f "./bin/rnx" ]; then
-    echo "❌ RNX CLI binary not found!"
-    exit 1
-fi
-cp ./bin/rnx "$BUILD_DIR/opt/joblet/bin/"
 
 if [ ! -f "./bin/persist" ]; then
     echo "❌ persist binary not found!"
@@ -153,9 +146,10 @@ Description: Joblet Job Isolation Platform with Embedded Certificates
  A job isolation platform that provides secure execution of containerized
  workloads with resource management and namespace isolation.
  .
- This package includes the joblet daemon, rnx CLI tools, and embedded certificate
- management. All certificates are embedded directly in configuration files
- for simplified deployment and management.
+ This package includes the joblet daemon and embedded certificate management.
+ All certificates are embedded directly in configuration files for simplified
+ deployment and management. The rnx CLI is released separately at
+ https://github.com/ehsaniara/joblet-rnx
 Installed-Size: $(du -sk $BUILD_DIR | cut -f1)
 EOF
 
@@ -188,6 +182,8 @@ dpkg-deb --build "$BUILD_DIR" "$PACKAGE_FILE"
 echo "✅ Package built successfully: $PACKAGE_FILE"
 
 # Verify package
+rm -rf "$BUILD_DIR"
+
 echo "📋 Package information:"
 dpkg-deb -I "$PACKAGE_FILE"
 

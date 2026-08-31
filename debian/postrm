@@ -16,9 +16,13 @@ case "$1" in
 
         # Remove symlinks
         rm -f /usr/bin/joblet
-        rm -f /usr/bin/rnx
         rm -f /usr/local/bin/joblet
-        rm -f /usr/local/bin/rnx
+        # Only symlinks into this install; a standalone rnx must survive
+        for link in /usr/bin/rnx /usr/local/bin/rnx; do
+            case "$(readlink "$link" 2>/dev/null)" in
+                /opt/joblet/*) rm -f "$link" ;;
+            esac
+        done
 
         # Note: Job logs in ${JOBLET_HOME}/logs are preserved
         # Use 'apt purge joblet' to remove all data including job logs
@@ -54,15 +58,33 @@ case "$1" in
             LOG_COUNT=$(find ${JOBLET_HOME}/logs -name "*.log" -type f 2>/dev/null | wc -l)
         fi
 
+        # Marker holds the installed sha256; a mismatch means the user replaced it.
+        # Must run before JOBLET_HOME is removed
+        if [ -f ${JOBLET_HOME}/.rnx-installed-by-joblet ]; then
+            MARKER_SHA=$(cat ${JOBLET_HOME}/.rnx-installed-by-joblet 2>/dev/null)
+            CURRENT_SHA=$(sha256sum /usr/local/bin/rnx 2>/dev/null | awk '{print $1}')
+            if [ -z "$MARKER_SHA" ] || [ "$MARKER_SHA" = "$CURRENT_SHA" ]; then
+                rm -f /usr/local/bin/rnx
+            fi
+        fi
+
+        # Installer-written system config (IP forwarding, module loading)
+        rm -f /etc/sysctl.d/99-joblet.conf
+        rm -f /etc/modules-load.d/joblet.conf
+
         # Remove all joblet files including job logs, volumes, and configuration
         rm -rf ${JOBLET_HOME}
         rm -rf /var/log/joblet
 
         # Remove symlinks
         rm -f /usr/bin/joblet
-        rm -f /usr/bin/rnx
         rm -f /usr/local/bin/joblet
-        rm -f /usr/local/bin/rnx
+        # Only symlinks into this install; a standalone rnx must survive
+        for link in /usr/bin/rnx /usr/local/bin/rnx; do
+            case "$(readlink "$link" 2>/dev/null)" in
+                /opt/joblet/*) rm -f "$link" ;;
+            esac
+        done
 
         if [ "$LOG_COUNT" -gt 0 ]; then
             echo "Removed $LOG_COUNT job log files"

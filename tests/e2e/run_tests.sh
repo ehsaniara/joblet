@@ -18,21 +18,85 @@ VERBOSE=false
 # Build and Deploy Functions
 # ============================================
 
-build_and_deploy() {
+# Clean-room setup: purge any joblet/rnx install, install this tree's .deb,
+# wait for readiness. Tests then run against the same artifact users install.
+fresh_install() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}  Build and Deployment${NC}"
+    echo -e "${CYAN}  Clean Install (purge + packaged install)${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    
+
     cd "$JOBLET_ROOT"
-    
-    echo -e "${BLUE}Building RNX CLI...${NC}"
-    if ! make all >/dev/null 2>&1; then
+
+    echo -e "${BLUE}Removing previous build artifacts (bin/, dist/, packages)...${NC}"
+    rm -rf bin/ dist/ joblet-deb-*/ rpmbuild/ joblet_*.deb joblet-*.rpm
+
+    echo -e "${BLUE}Building joblet binaries and resolving rnx...${NC}"
+    if ! make all rnx >/dev/null 2>&1; then
         echo -e "${RED}Build failed!${NC}"
         exit 1
     fi
-    
+
+    echo -e "${BLUE}Purging existing joblet installation...${NC}"
+    if ! sudo ./scripts/uninstall.sh --purge; then
+        echo -e "${RED}Purge failed!${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}Building .deb from working tree...${NC}"
+    local ARCH VERSION DEB
+    ARCH=$(go env GOARCH)
+    VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0-dev")
+    if ! ./scripts/build-deb.sh "$ARCH" "$VERSION" >/dev/null; then
+        echo -e "${RED}Package build failed!${NC}"
+        exit 1
+    fi
+    DEB=$(ls -t "$JOBLET_ROOT"/joblet_*_"$ARCH".deb | head -1)
+
+    echo -e "${BLUE}Installing: $DEB${NC}"
+    if ! sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$DEB"; then
+        echo -e "${RED}Package install failed!${NC}"
+        exit 1
+    fi
+    sudo systemctl start joblet.service
+
+    echo -e "${BLUE}Waiting for service readiness (persist socket + gRPC)...${NC}"
+    local ready=0 i
+    for i in $(seq 1 60); do
+        if sudo test -S /opt/joblet/run/persist-ipc.sock && "$RNX_BINARY" job list >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 0.5
+    done
+    if [[ "$ready" -ne 1 ]]; then
+        echo -e "${RED}Service not ready after 30s - check: journalctl -u joblet${NC}"
+        exit 1
+    fi
+    if [[ ! -f "$HOME/.rnx/rnx-config.yml" ]]; then
+        echo -e "${RED}~/.rnx/rnx-config.yml not created by installer${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Clean packaged install ready${NC}\n"
+    cd "$SCRIPT_DIR"
+}
+
+# Quick iteration mode (QUICK_DEPLOY=1): swap binaries onto the existing
+# install instead of the full purge + packaged install
+build_and_deploy() {
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}  Build and Deployment (quick mode)${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
+    cd "$JOBLET_ROOT"
+
+    echo -e "${BLUE}Building joblet binaries and resolving rnx...${NC}"
+    if ! make all rnx >/dev/null 2>&1; then
+        echo -e "${RED}Build failed!${NC}"
+        exit 1
+    fi
+
     echo -e "${BLUE}Deploying to joblet service...${NC}"
-    if ! make deploy >/dev/null 2>&1; then
+    if ! make deploy; then
         echo -e "${RED}Deployment failed!${NC}"
         exit 1
     fi
@@ -137,11 +201,15 @@ Usage: $0 [OPTIONS] [TEST_PATTERN]
 Run Joblet E2E tests with full build and deployment for 100% confidence.
 
 This script ALWAYS performs these steps for 100% confidence testing:
-  1. Build the entire Joblet codebase (make all)
-  2. Deploy to the joblet service (make deploy)  
-  3. Run all E2E test suites to validate functionality
+  1. Remove previous build artifacts (bin/, dist/, packages)
+  2. Build the Joblet codebase and resolve rnx (make all rnx)
+  3. Purge any existing joblet/rnx install (/opt/joblet, symlinks, configs)
+  4. Build a .deb from the working tree and install it (needs sudo)
+  5. Run all E2E test suites against the clean packaged install
 
-This ensures that all tests run against the latest code changes.
+This validates the same artifact a user would install. Modes:
+  QUICK_DEPLOY=1  swap binaries onto the existing install (fast iteration)
+  SKIP_DEPLOY=1   test the already-running service as-is
 
 OPTIONS:
     -h, --help          Show this help message
@@ -191,6 +259,14 @@ main() {
     local test_pattern=""
     local exclude_patterns=""
     local list_only=false
+
+    # One run at a time: a second run would purge the install and remove bin/
+    # underneath the first
+    exec 9>/tmp/joblet-e2e.lock
+    if ! flock -n 9; then
+        echo -e "${RED}Another e2e/pre-pr run is already in progress (lock: /tmp/joblet-e2e.lock)${NC}"
+        exit 1
+    fi
     
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -266,11 +342,14 @@ main() {
         exit 1
     fi
 
-    # Build and deploy unless SKIP_DEPLOY is set
-    if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
+    # Default: purge + packaged install. QUICK_DEPLOY=1 swaps binaries onto the
+    # existing install; SKIP_DEPLOY=1 tests the running service as-is
+    if [[ "${SKIP_DEPLOY:-}" == "1" ]]; then
+        echo -e "${YELLOW}⊘ Skipping install (SKIP_DEPLOY=1) - testing the running service${NC}\n"
+    elif [[ "${QUICK_DEPLOY:-}" == "1" ]]; then
         build_and_deploy
     else
-        echo -e "${YELLOW}⊘ Skipping build and deploy (SKIP_DEPLOY=1)${NC}\n"
+        fresh_install
     fi
 
     # Start from a clean slate: remove jobs/networks/volumes left by prior runs

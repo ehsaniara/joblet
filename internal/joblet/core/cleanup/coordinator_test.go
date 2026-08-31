@@ -12,6 +12,7 @@ import (
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
 	"github.com/ehsaniara/joblet/internal/joblet/core/resource/resourcefakes"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu/gpufakes"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform/platformfakes"
@@ -434,4 +435,32 @@ func TestCleanupJob_NonExistentDirectory(t *testing.T) {
 
 	// Should succeed (nothing to clean up is not an error)
 	assert.NoError(t, err)
+}
+
+func TestCleanup_ReleasesGPUs(t *testing.T) {
+	fakePlatform := &platformfakes.FakePlatform{}
+	cfg := &config.Config{
+		Cgroup: config.CgroupConfig{CleanupTimeout: 5 * time.Second},
+		Filesystem: config.FilesystemConfig{
+			BaseDir: t.TempDir(),
+			TmpDir:  filepath.Join(t.TempDir(), "{JOB_ID}", "tmp"),
+		},
+	}
+	log := logger.New().WithField("component", "test")
+	procMgr := process.NewProcessManager(fakePlatform, cfg)
+
+	// Without a GPU manager cleanup must still succeed
+	coordinator := NewCoordinator(procMgr, &resourcefakes.FakeResource{}, fakePlatform, cfg, log, nil)
+	require.NoError(t, coordinator.CleanupJob("job-no-gpu-manager"))
+
+	fakeGPU := &gpufakes.FakeGPUManagerInterface{}
+	coordinator = NewCoordinator(procMgr, &resourcefakes.FakeResource{}, fakePlatform, cfg, log, nil)
+	coordinator.SetGPUManager(fakeGPU)
+
+	require.NoError(t, coordinator.CleanupJob("job-full"))
+	require.NoError(t, coordinator.CleanupJobSystemResourcesOnly("job-system-only"))
+
+	require.Equal(t, 2, fakeGPU.ReleaseGPUsCallCount())
+	assert.Equal(t, "job-full", fakeGPU.ReleaseGPUsArgsForCall(0))
+	assert.Equal(t, "job-system-only", fakeGPU.ReleaseGPUsArgsForCall(1))
 }

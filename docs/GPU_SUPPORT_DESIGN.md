@@ -95,7 +95,7 @@ GPUDevice:
 
 ### 2.3 Resource Isolation Integration
 
-> ⚠️ **DESIGN / PLANNED — not delivered.** The cgroups v2 device controller and GPU memory limits
+> ⚠️ **DESIGN / PLANNED - not delivered.** The cgroups v2 device controller and GPU memory limits
 > described in this section are the intended design and are **not** wired into the current execution
 > path: `--gpu-memory` is only used to filter candidate GPUs at selection time, not enforced at
 > runtime. Note that cgroups v2 has no standalone "devices" controller (device access is governed via
@@ -133,7 +133,7 @@ Cgroup Path Structure:
 
 ### 2.4 Filesystem Isolation Extensions
 
-> ⚠️ **IMPLEMENTED — pending validation on GPU hardware.** The chroot GPU device-node creation
+> ⚠️ **IMPLEMENTED - pending validation on GPU hardware.** The chroot GPU device-node creation
 > (`mknod`) and CUDA library bind-mounts described here are now wired into the execution path. The
 > server (`coordinator.setupGPUEnvironment`) forwards the allocated GPU indices and detected CUDA
 > paths to the init process via the `JOB_GPU_INDICES` / `JOB_GPU_CUDA_MOUNTS` env vars, and the
@@ -474,15 +474,15 @@ Log Events:
 ### Functional Requirements
 
 > ⚠️ These are target criteria. Checkmarks below indicate design intent, not current delivery
-> status. Each item is annotated with its actual state: *(working)*, *(implemented — pending
+> status. Each item is annotated with its actual state: *(working)*, *(implemented - pending
 > GPU-hardware validation)*, *(partial)*, or *(not implemented)*.
 
 - ✓ Detect and enumerate NVIDIA GPUs *(working)*
-- ✓ Allocate GPUs to jobs based on requirements *(working — in-memory bookkeeping)*
-- ✓ Pass through GPU devices to isolated jobs *(implemented — per-job `/dev/nvidia*` nodes created; pending GPU-hardware validation)*
-- ✓ Mount CUDA libraries in job environment *(implemented — read-only bind-mount wired; pending GPU-hardware validation)*
-- ✓ Enforce GPU resource limits *(not implemented — `--gpu-memory` filters at selection only, not enforced)*
-- ✓ Clean up GPU resources after job completion *(partial — allocation bookkeeping released; GPU memory not reliably cleared)*
+- ✓ Allocate GPUs to jobs based on requirements *(working - in-memory bookkeeping)*
+- ✓ Pass through GPU devices to isolated jobs *(implemented - per-job `/dev/nvidia*` nodes created; pending GPU-hardware validation)*
+- ✓ Mount CUDA libraries in job environment *(implemented - read-only bind-mount wired; pending GPU-hardware validation)*
+- ✓ Enforce GPU resource limits *(not implemented - `--gpu-memory` filters at selection only, not enforced)*
+- ✓ Clean up GPU resources after job completion *(partial - allocation bookkeeping released; GPU memory not reliably cleared)*
 
 ### Performance Requirements
 

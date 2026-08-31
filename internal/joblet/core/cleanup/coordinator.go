@@ -15,6 +15,7 @@ import (
 
 	"github.com/ehsaniara/joblet/internal/joblet/core/process"
 	"github.com/ehsaniara/joblet/internal/joblet/core/resource"
+	"github.com/ehsaniara/joblet/internal/joblet/gpu"
 	"github.com/ehsaniara/joblet/pkg/config"
 	"github.com/ehsaniara/joblet/pkg/logger"
 	"github.com/ehsaniara/joblet/pkg/platform"
@@ -35,6 +36,7 @@ type Coordinator struct {
 
 	networkSetup *network.NetworkSetup
 	networkStore adapters.NetworkStorer
+	gpuManager   gpu.GPUManagerInterface
 }
 
 // CleanupStatus tracks the status of a cleanup operation with error collection,
@@ -77,6 +79,20 @@ func NewCoordinator(
 	}
 }
 
+// SetGPUManager enables GPU release as part of job cleanup.
+func (c *Coordinator) SetGPUManager(gm gpu.GPUManagerInterface) {
+	c.gpuManager = gm
+}
+
+func (c *Coordinator) releaseGPUs(jobID string) {
+	if c.gpuManager == nil {
+		return
+	}
+	if err := c.gpuManager.ReleaseGPUs(jobID); err != nil {
+		c.logger.WithField("job_uuid", jobID).Error("GPU release failed", "error", err)
+	}
+}
+
 // CleanupJob performs all cleanup operations for a job.
 // Main cleanup entry point: handles process termination, cgroup cleanup,
 // filesystem removal, network cleanup with race condition protection.
@@ -104,6 +120,7 @@ func (c *Coordinator) CleanupJob(jobID string) error {
 	// 1. Clean up cgroup (releases resources)
 	c.cleanupCgroup(jobID)
 	status.CgroupCleaned = true
+	c.releaseGPUs(jobID)
 
 	// 2. Clean up filesystem (removes job artifacts)
 	if err := c.cleanupFilesystem(jobID); err != nil {
@@ -182,6 +199,7 @@ func (c *Coordinator) CleanupJobSystemResourcesOnly(jobID string) error {
 	// 1. Clean up cgroup (releases system resources)
 	c.cleanupCgroup(jobID)
 	status.CgroupCleaned = true
+	c.releaseGPUs(jobID)
 
 	// 2. Skip filesystem cleanup to preserve runtime artifacts
 	log.Info("skipping filesystem cleanup - preserving runtime artifacts in /opt/joblet/runtimes")

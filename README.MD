@@ -63,41 +63,44 @@ sudo systemctl start joblet
 sudo systemctl enable joblet
 ```
 
-#### Option 2: Manual Installation (Any Linux Distribution)
+#### Option 2: RPM Installation (RHEL/CentOS/Fedora)
 
 ```bash
-# Download and extract the release
-curl -L -o rnx-linux-amd64.tar.gz $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*linux-amd64.tar.gz" | cut -d '"' -f 4)
-tar -xzf rnx-linux-amd64.tar.gz
-cd rnx-linux-amd64
+# Download and install the latest release
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*\.rpm" | cut -d '"' -f 4)
+sudo rpm -i joblet-*.rpm
 
-# Run the installation script
-sudo ./install.sh
+# Start the service
 sudo systemctl start joblet
+sudo systemctl enable joblet
 ```
 
 ### B. RNX Client Installation (Cross-Platform)
 
-#### macOS (Homebrew)
+The `rnx` client is released separately from
+[joblet-rnx](https://github.com/ehsaniara/joblet-rnx/releases/latest), with
+binaries for Linux, macOS, and Windows (amd64/arm64). See its README for all
+install options.
+
+#### macOS and Linux (Homebrew)
 
 ```bash
-# Add the Joblet tap
-brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
-brew install rnx              # Installs RNX CLI
+brew tap ehsaniara/rnx https://github.com/ehsaniara/joblet-rnx
+brew install rnx
 
 # Copy configuration from server
+mkdir -p ~/.rnx
 scp user@joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
 ```
 
 #### Windows
 
 ```powershell
-# Download the Windows binary
-Invoke-WebRequest -Uri "https://github.com/ehsaniara/joblet/releases/latest/download/rnx-windows-amd64.exe" -OutFile "rnx.exe"
-
-# Add to PATH
+# Download rnx-<version>-windows-amd64.zip from
+# https://github.com/ehsaniara/joblet-rnx/releases/latest and extract it
+Expand-Archive rnx-*-windows-amd64.zip -DestinationPath .
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin"
-Move-Item rnx.exe "$env:USERPROFILE\bin\"
+Move-Item rnx-windows-amd64.exe "$env:USERPROFILE\bin\rnx.exe"
 [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:USERPROFILE\bin", [EnvironmentVariableTarget]::User)
 
 # Copy configuration from Joblet server to %USERPROFILE%\.rnx\rnx-config.yml
@@ -301,7 +304,7 @@ npm run dev
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
 - **[Monitoring Guide](docs/MONITORING.md)** - eBPF telemetry, metrics, and observability
 - **[Working Examples](examples/)** - Production-ready runtime configurations and job examples
-- **[Compatibility](COMPATIBILITY.md)** - Joblet/RNX ↔ `joblet-proto` ↔ client-tool version matrix
+- **[Compatibility](COMPATIBILITY.md)** - Joblet ↔ `joblet-proto` ↔ client-tool version matrix
 
 ## Related Projects
 

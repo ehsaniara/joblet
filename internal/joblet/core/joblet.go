@@ -816,6 +816,7 @@ func initializeComponents(store adapters.JobStorer, cfg *config.Config, platform
 		logger,
 		networkStore,
 	)
+	c.SetGPUManager(gpuManager)
 
 	return &components{
 		cgroup:          cgroupResource,

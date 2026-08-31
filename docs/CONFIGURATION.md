@@ -234,7 +234,7 @@ security:
 
 The `security:` section holds only these three embedded PEM fields:
 `serverCert`, `serverKey`, and `caCert`. There are no toggles for client-cert
-verification or RBAC — mTLS is always enforced (the server requires and
+verification or RBAC - mTLS is always enforced (the server requires and
 verifies client certificates against `caCert`), and role-based access control
 is always on. A client's role is derived from the OU field of its certificate:
 `admin`, `maintainer`, `developer`, or `reader` (the old `viewer` still works

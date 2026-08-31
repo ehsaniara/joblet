@@ -27,6 +27,11 @@ cross-platform environments.
 
 ## Linux Platform Installation
 
+> **Note**: The `rnx` client CLI is released separately from the
+> [joblet-rnx repository](https://github.com/ehsaniara/joblet-rnx/releases/latest)
+> and is not part of the Joblet server packages or release archives. See
+> [Client Installation](#client-installation-rnx-cli) below.
+
 ### Ubuntu/Debian Installation (Version 20.04 and Later)
 
 ```bash
@@ -39,9 +44,8 @@ sudo apt install -y curl tar make gcc
 # Download and install
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
-sudo mv rnx /usr/local/bin/
 sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
 
 # Create directories
 sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
@@ -49,7 +53,6 @@ sudo mkdir -p /var/log/joblet
 
 # Verify installation
 joblet --version
-rnx --version
 persist version
 ```
 
@@ -62,9 +65,8 @@ sudo dnf install -y curl tar make gcc
 # Download and install
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
-sudo mv rnx /usr/local/bin/
 sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
 
 # Create directories
 sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
@@ -84,9 +86,8 @@ sudo yum install -y curl tar make gcc
 # Download and install
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
-sudo mv rnx /usr/local/bin/
 sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
 
 # Create directories
 sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
@@ -103,7 +104,6 @@ yay -S joblet
 sudo pacman -S curl tar make gcc
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
-sudo mv rnx /usr/local/bin/
 ```
 
 ### ARM64 Architecture Systems (Raspberry Pi, AWS Graviton)
@@ -112,9 +112,8 @@ sudo mv rnx /usr/local/bin/
 # Download ARM64 version
 curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-arm64.tar.gz | tar xz
 sudo mv joblet /usr/local/bin/
-sudo mv rnx /usr/local/bin/
 sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/rnx /usr/local/bin/persist
+sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
 ```
 
 ## AWS EC2 Deployment with Terraform
@@ -639,21 +638,56 @@ rnx --version
 rnx job run echo "Hello from AWS EC2!"
 ```
 
-## macOS Client Installation
+## Client Installation (rnx CLI)
 
-### Installation via Homebrew Package Manager (Recommended)
+The `rnx` client is developed and released in its own repository:
+[joblet-rnx](https://github.com/ehsaniara/joblet-rnx). Binaries for Linux,
+macOS, and Windows are published on its
+[releases page](https://github.com/ehsaniara/joblet-rnx/releases/latest).
+Any rnx release works with any Joblet release that speaks the same
+joblet-proto contract (see the joblet-rnx compatibility table).
+
+### Homebrew (macOS and Linux)
 
 ```bash
-# Add Joblet tap
-brew tap ehsaniara/joblet https://github.com/ehsaniara/joblet
-
-# Install RNX client
+brew tap ehsaniara/rnx https://github.com/ehsaniara/joblet-rnx
 brew install rnx
 ```
 
-The Homebrew installation includes:
+### Linux / macOS (manual)
 
-- **RNX CLI**: Command-line interface for job management
+```bash
+# Pick the tarball for your platform from the releases page, e.g.:
+#   rnx-<version>-linux-amd64.tar.gz
+#   rnx-<version>-linux-arm64.tar.gz
+#   rnx-<version>-darwin-amd64.tar.gz   (Intel Macs)
+#   rnx-<version>-darwin-arm64.tar.gz   (Apple Silicon)
+VERSION=v6.0.0  # substitute the latest release tag
+OS=linux ARCH=amd64
+curl -L https://github.com/ehsaniara/joblet-rnx/releases/download/${VERSION}/rnx-${VERSION}-${OS}-${ARCH}.tar.gz | tar xz
+sudo install -m 0755 rnx-${OS}-${ARCH} /usr/local/bin/rnx
+
+# Create config directory
+mkdir -p ~/.rnx
+```
+
+### Windows
+
+1. Download `rnx-<version>-windows-amd64.zip` from the
+   [joblet-rnx releases page](https://github.com/ehsaniara/joblet-rnx/releases/latest)
+
+2. Extract to a directory (e.g., `C:\Program Files\Joblet`) and rename the
+   binary to `rnx.exe`
+
+3. Add to PATH:
+   ```powershell
+   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Joblet", "User")
+   ```
+
+4. Create config directory:
+   ```powershell
+   mkdir $env:USERPROFILE\.rnx
+   ```
 
 ### Joblet Admin UI (Standalone Package)
 
@@ -682,52 +716,6 @@ npm run dev
 
 **Learn more**: See the [Admin UI Documentation](./ADMIN_UI.md) for complete setup and usage instructions.
 
-### Manual Binary Installation
-
-```bash
-# Intel Macs
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/rnx-darwin-amd64.tar.gz | tar xz
-
-# Apple Silicon (M1/M2)
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/rnx-darwin-arm64.tar.gz | tar xz
-
-# Install
-sudo mv rnx /usr/local/bin/
-sudo chmod +x /usr/local/bin/rnx
-
-# Create config directory
-mkdir -p ~/.rnx
-```
-
-## Windows Client Installation
-
-### Installation via Scoop Package Manager
-
-```powershell
-# Add Joblet bucket
-scoop bucket add joblet https://github.com/ehsaniara/scoop-joblet
-
-# Install RNX
-scoop install rnx
-```
-
-### Manual Binary Installation
-
-1. Download the Windows binary:
-    - [rnx-windows-amd64.zip](https://github.com/ehsaniara/joblet/releases/latest/download/rnx-windows-amd64.zip)
-
-2. Extract to a directory (e.g., `C:\Program Files\Joblet`)
-
-3. Add to PATH:
-   ```powershell
-   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Joblet", "User")
-   ```
-
-4. Create config directory:
-   ```powershell
-   mkdir $env:USERPROFILE\.rnx
-   ```
-
 ## 🔨 Building from Source
 
 ### Prerequisites
@@ -744,12 +732,11 @@ scoop install rnx
 git clone https://github.com/ehsaniara/joblet.git
 cd joblet
 
-# Build all binaries
+# Build all server binaries
 make all
 
 # Or build manually
 go build -o bin/joblet ./cmd/joblet
-go build -o bin/rnx ./cmd/rnx
 cd persist && go build -o ../bin/persist ./cmd/persist
 
 # Run tests
@@ -759,9 +746,14 @@ make test
 sudo make install
 ```
 
+To build the `rnx` client from source, clone
+[joblet-rnx](https://github.com/ehsaniara/joblet-rnx) and run `make build`
+there.
+
 ### Verify Installation
 
-After installation, verify both client and server versions:
+After installation, verify both client and server versions (with `rnx`
+installed from joblet-rnx as described above):
 
 ```bash
 # Check RNX client version
@@ -791,12 +783,12 @@ rnx job list  # Should connect to server and list jobs
 # Build for Linux AMD64
 GOOS=linux GOARCH=amd64 go build -o joblet-linux-amd64 ./cmd/joblet
 
-# Build for macOS ARM64
-GOOS=darwin GOARCH=arm64 go build -o rnx-darwin-arm64 ./cmd/rnx
-
-# Build for Windows
-GOOS=windows GOARCH=amd64 go build -o rnx.exe ./cmd/rnx
+# Build for Linux ARM64
+GOOS=linux GOARCH=arm64 go build -o joblet-linux-arm64 ./cmd/joblet
 ```
+
+The joblet server binaries are Linux-only; cross-platform builds of the
+`rnx` client are done in the joblet-rnx repository.
 
 ## 🔐 Certificate Generation
 
@@ -973,6 +965,37 @@ rnx job list
 # Run test job
 rnx job run echo "Installation successful!"
 ```
+
+## Uninstalling
+
+```bash
+sudo /opt/joblet/scripts/uninstall.sh              # keep job logs and volumes
+sudo /opt/joblet/scripts/uninstall.sh --purge      # remove everything
+sudo /opt/joblet/scripts/uninstall.sh --purge --all-users   # also every user's ~/.rnx
+```
+
+Removed: the service and its `joblet.slice` cgroup, the package registration,
+`/opt/joblet`, `/etc/joblet`, `/var/log/joblet`, `/var/lib/joblet`, the
+installer-written `/etc/sysctl.d/99-joblet.conf` and
+`/etc/modules-load.d/joblet.conf`, joblet symlinks and cert scripts in
+`/usr/bin` and `/usr/local/bin`, joblet bridges, veths and iptables rules,
+the joblet user and group, and `~/.rnx` for root and the invoking user.
+
+Kept on purpose:
+
+- A user-managed `/usr/local/bin/rnx`. Only an rnx that the installer
+  downloaded is removed, and only if its sha256 still matches the one the
+  installer recorded; a replaced binary stays.
+- Loaded kernel modules (`br_netfilter`, `nf_conntrack`, `nf_nat`) until the
+  next reboot; their persistent load config is removed.
+- joblet entries in the shared systemd journal, which expire with journald
+  retention (deleting them would also delete other services' logs).
+- Other users' `~/.rnx` unless `--all-users` is given.
+
+Safety: the script refuses any `JOBLET_HOME` outside `/opt/joblet*`, matches
+iptables rules by interface flag rather than substring, skips network cleanup
+when no joblet install is present, and with `--purge` ends by scanning the
+host for leftovers, failing loudly if anything remains.
 
 ## 🔧 Troubleshooting Installation
 

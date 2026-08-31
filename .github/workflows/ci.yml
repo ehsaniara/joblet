@@ -68,7 +68,7 @@ jobs:
     strategy:
       matrix:
         arch: [ amd64, arm64 ]
-        component: [ joblet, rnx, persist, state ]
+        component: [ joblet, persist, state ]
     steps:
       - uses: actions/checkout@v4
         with:

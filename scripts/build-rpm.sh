@@ -38,15 +38,14 @@ fi
 echo "🔨 Building RPM package for $PACKAGE_NAME v$CLEAN_VERSION ($RPM_ARCH)..."
 
 # Check if binaries already exist (CI mode)
-if [ -f "./joblet" ] && [ -f "./rnx" ] && [ -f "./persist" ] && [ -f "./state" ]; then
+if [ -f "./joblet" ] && [ -f "./persist" ] && [ -f "./state" ]; then
     echo "📦 Using pre-built binaries from root directory (CI mode)..."
     mkdir -p ./bin
     cp ./joblet ./bin/joblet
-    cp ./rnx ./bin/rnx
     cp ./persist ./bin/persist
     cp ./state ./bin/state
-    chmod +x ./bin/joblet ./bin/rnx ./bin/persist ./bin/state
-elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/rnx" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
+    chmod +x ./bin/joblet ./bin/persist ./bin/state
+elif [ ! -f "./bin/joblet" ] || [ ! -f "./bin/persist" ] || [ ! -f "./bin/state" ]; then
     # Build all binaries if they don't exist
     echo "📦 Building all binaries..."
     make all || {
@@ -73,12 +72,6 @@ if [ ! -f "./bin/joblet" ]; then
     exit 1
 fi
 cp ./bin/joblet "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
-
-if [ ! -f "./bin/rnx" ]; then
-    echo "❌ RNX CLI binary not found!"
-    exit 1
-fi
-cp ./bin/rnx "$BUILD_DIR/SOURCES/${PACKAGE_NAME}-${CLEAN_VERSION}/"
 
 if [ ! -f "./bin/persist" ]; then
     echo "❌ persist binary not found!"
@@ -167,7 +160,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 Joblet is a job isolation platform that provides secure execution of containerized
 workloads with resource management, namespace isolation, and network isolation.
 
-This package includes the joblet daemon, rnx CLI tools, embedded certificate
+This package includes the joblet daemon and embedded certificate
 management, and network isolation features (bridge, isolated, and custom networks).
 
 %prep
@@ -189,7 +182,6 @@ mkdir -p \$RPM_BUILD_ROOT/etc/modules-load.d
 
 # Install binaries to /opt/joblet/bin
 cp joblet \$RPM_BUILD_ROOT/opt/joblet/bin/
-cp rnx \$RPM_BUILD_ROOT/opt/joblet/bin/
 cp persist \$RPM_BUILD_ROOT/opt/joblet/bin/
 cp state \$RPM_BUILD_ROOT/opt/joblet/bin/
 
@@ -215,13 +207,6 @@ cp scripts/certs_gen_embedded.sh \$RPM_BUILD_ROOT/usr/local/bin/
 chmod +x \$RPM_BUILD_ROOT/usr/local/bin/certs_gen_embedded.sh
 cp scripts/certs_gen_with_secretsmanager.sh \$RPM_BUILD_ROOT/usr/local/bin/
 chmod +x \$RPM_BUILD_ROOT/usr/local/bin/certs_gen_with_secretsmanager.sh
-
-# Create symlinks for system-wide commands
-ln -sf /opt/joblet/bin/rnx \$RPM_BUILD_ROOT/usr/local/bin/rnx
-
-# Create /usr/bin symlink as well (ensures rnx works everywhere in PATH)
-mkdir -p \$RPM_BUILD_ROOT/usr/bin
-ln -sf /opt/joblet/bin/rnx \$RPM_BUILD_ROOT/usr/bin/rnx
 
 # Create br_netfilter module loading config
 cat > \$RPM_BUILD_ROOT/etc/modules-load.d/joblet.conf << 'MODULESEOF'
@@ -261,6 +246,9 @@ chmod 755 /opt/joblet/config
 
 # Select and install the appropriate runtime config for this distro
 select_runtime_config /opt/joblet/scripts /opt/joblet/config
+
+# Install the rnx client from its own repo (best-effort, non-fatal)
+install_rnx_client
 
 # Get configuration from environment variables
 get_configuration
@@ -418,7 +406,6 @@ fi
 %files
 %defattr(-,root,root,-)
 /opt/joblet/bin/joblet
-/opt/joblet/bin/rnx
 /opt/joblet/bin/persist
 /opt/joblet/bin/state
 /opt/joblet/scripts/joblet-config-template.yml
@@ -431,8 +418,6 @@ fi
 /etc/systemd/system/joblet.service
 /usr/local/bin/certs_gen_embedded.sh
 /usr/local/bin/certs_gen_with_secretsmanager.sh
-/usr/local/bin/rnx
-/usr/bin/rnx
 /etc/modules-load.d/joblet.conf
 
 %dir /opt/joblet

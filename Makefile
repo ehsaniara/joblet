@@ -36,7 +36,7 @@ LDFLAGS := -s -w \
 
 .PHONY: all clean deploy fresh-install pre-pr test proto bpf help joblet rnx persist state version
 
-all: joblet rnx persist state
+all: joblet persist state
 	@echo "✅ Build complete - all binaries ready"
 
 joblet:
@@ -45,9 +45,7 @@ joblet:
 	@echo "✅ joblet built (version: $(VERSION))"
 
 rnx:
-	@echo "Building rnx CLI..."
-	@GOOS=linux GOARCH=$(GOARCH) go build -ldflags="$(LDFLAGS) -X github.com/ehsaniara/joblet/pkg/version.Component=rnx" -o bin/rnx ./cmd/rnx
-	@echo "✅ rnx built (version: $(VERSION))"
+	@./scripts/get-rnx.sh
 
 persist:
 	@echo "Building persist..."
@@ -77,16 +75,17 @@ version:
 
 clean:
 	rm -rf bin/ dist/ api/gen/ internal/proto/gen/
+	rm -rf joblet-deb-*/ rpmbuild/ joblet_*.deb joblet-*.rpm
 	rm -f internal/joblet/ebpf/telematics/telematics_*_bpfel.o
 
-deploy: all
+deploy: all rnx
 ifeq ($(strip $(REMOTE_HOST)),)
 	@test -d /opt/joblet/bin || { echo "❌ /opt/joblet/bin not found - install the joblet package first"; exit 1; }
 	@echo "Deploying to localhost ($(GOARCH))..."
 	@echo "Stopping services..."
 	@sudo systemctl stop joblet.service || true
 	@echo "Installing binaries..."
-	@sudo cp bin/joblet bin/rnx bin/persist bin/state /opt/joblet/bin/ && sudo chmod +x /opt/joblet/bin/*
+	@sudo cp bin/joblet bin/persist bin/state /opt/joblet/bin/ && sudo chmod +x /opt/joblet/bin/*
 	@echo "Starting services..."
 	@sudo systemctl start joblet.service
 	@echo "Waiting for service readiness (persist socket + gRPC)..."
@@ -100,7 +99,7 @@ else
 	@echo "Deploying to $(REMOTE_USER)@$(REMOTE_HOST) ($(GOARCH))..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p /tmp/joblet/build"
 	@echo "Copying binaries..."
-	@scp bin/joblet bin/rnx bin/persist bin/state $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
+	@scp bin/joblet bin/persist bin/state $(REMOTE_USER)@$(REMOTE_HOST):/tmp/joblet/build/
 	@echo "Stopping services..."
 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) 'sudo systemctl stop joblet.service || true'
 	@echo "Installing binaries..."
@@ -110,7 +109,7 @@ else
 	@echo "✅ Remote deployment complete (persist and state run as subprocesses)"
 endif
 
-fresh-install: all
+fresh-install: all rnx
 	@echo "Purging existing joblet installation..."
 	@sudo ./scripts/uninstall.sh --purge
 	@echo "Building package from local working tree..."
@@ -144,9 +143,9 @@ help:
 	@echo "Joblet Monorepo Build System"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make all            - Build all binaries (joblet, rnx, persist, state)"
+	@echo "  make all            - Build all binaries (joblet, persist, state)"
 	@echo "  make joblet         - Build joblet daemon only"
-	@echo "  make rnx            - Build rnx CLI only"
+	@echo "  make rnx            - Get rnx CLI into bin/ (from ../joblet-rnx or releases)"
 	@echo "  make persist        - Build persist only"
 	@echo "  make state          - Build state only"
 	@echo "  make proto          - Generate proto files"
