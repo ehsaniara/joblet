@@ -256,14 +256,14 @@ state:
 
 **DynamoDB Operations:**
 
-| Operation | DynamoDB API   | Condition                     | TTL Behavior                |
-|-----------|----------------|-------------------------------|-----------------------------|
+| Operation | DynamoDB API   | Condition                        | TTL Behavior                |
+|-----------|----------------|----------------------------------|-----------------------------|
 | Create    | PutItem        | `attribute_not_exists(job_uuid)` | No TTL (job running)        |
 | Update    | PutItem        | `attribute_exists(job_uuid)`     | TTL set if COMPLETED/FAILED |
-| Delete    | DeleteItem     | None                          | Immediate deletion          |
-| Get       | GetItem        | None                          | N/A                         |
-| List      | Scan           | Optional FilterExpression     | N/A                         |
-| Sync      | BatchWriteItem | None                          | 25 items per batch          |
+| Delete    | DeleteItem     | None                             | Immediate deletion          |
+| Get       | GetItem        | None                             | N/A                         |
+| List      | Scan           | Optional FilterExpression        | N/A                         |
+| Sync      | BatchWriteItem | None                             | 25 items per batch          |
 
 **TTL Logic:**
 

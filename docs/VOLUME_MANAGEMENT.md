@@ -34,11 +34,13 @@ Joblet volumes provide persistent and temporary storage for jobs, enabling:
 
 ## Volume Isolation and Sharing
 
-Understanding how volumes are isolated between jobs and how sharing works is important for designing secure and correct workflows.
+Understanding how volumes are isolated between jobs and how sharing works is important for designing secure and correct
+workflows.
 
 ### Volume Isolation
 
-Each job runs in an isolated filesystem environment (chroot) and can **only see volumes explicitly assigned to it**. A job cannot access volumes belonging to other jobs.
+Each job runs in an isolated filesystem environment (chroot) and can **only see volumes explicitly assigned to it**. A
+job cannot access volumes belonging to other jobs.
 
 ```mermaid
 flowchart TD
@@ -74,7 +76,8 @@ This isolation is enforced at the kernel level using bind mounts and chroot, not
 
 ### Shared Volume Access
 
-When **multiple jobs are assigned the same volume**, they share access to the same underlying storage. Both jobs see the same files and can read/write simultaneously.
+When **multiple jobs are assigned the same volume**, they share access to the same underlying storage. Both jobs see the
+same files and can read/write simultaneously.
 
 ```mermaid
 flowchart LR
@@ -113,17 +116,18 @@ rnx job run --volume=shared-data cat /volumes/shared-data/message.txt
 
 ### Concurrent Access Considerations
 
-Joblet does **not** provide automatic file locking or coordination between jobs accessing the same volume. This is intentional and consistent with how shared storage works in other systems (Docker volumes, Kubernetes PVCs, NFS).
+Joblet does **not** provide automatic file locking or coordination between jobs accessing the same volume. This is
+intentional and consistent with how shared storage works in other systems (Docker volumes, Kubernetes PVCs, NFS).
 
 **Your responsibility when sharing volumes:**
 
-| Concern | Joblet's Role | Your Responsibility |
-|---------|---------------|---------------------|
-| Volume mounting | Handled automatically | Assign correct volumes to jobs |
-| File visibility | Enforced via isolation | Design which jobs share which volumes |
-| Concurrent writes | Not managed | Coordinate access patterns |
-| File locking | Not provided | Implement if needed (flock, advisory locks) |
-| Data consistency | Not enforced | Use separate files or implement synchronization |
+| Concern           | Joblet's Role          | Your Responsibility                             |
+|-------------------|------------------------|-------------------------------------------------|
+| Volume mounting   | Handled automatically  | Assign correct volumes to jobs                  |
+| File visibility   | Enforced via isolation | Design which jobs share which volumes           |
+| Concurrent writes | Not managed            | Coordinate access patterns                      |
+| File locking      | Not provided           | Implement if needed (flock, advisory locks)     |
+| Data consistency  | Not enforced           | Use separate files or implement synchronization |
 
 **Safe patterns for concurrent access:**
 
@@ -170,12 +174,12 @@ echo $((count + 1)) > /volumes/shared/counter.txt  # Lost updates!
 
 ### Summary
 
-| Scenario | Behavior |
-|----------|----------|
+| Scenario                               | Behavior                                            |
+|----------------------------------------|-----------------------------------------------------|
 | Job A has volume X, Job B has volume Y | Fully isolated - neither can see the other's volume |
-| Job A and Job B both have volume X | Shared access - both see same files in real-time |
-| Concurrent writes to same file | No automatic coordination - user must handle |
-| Volume not assigned to job | Not visible in job's `/volumes/` directory |
+| Job A and Job B both have volume X     | Shared access - both see same files in real-time    |
+| Concurrent writes to same file         | No automatic coordination - user must handle        |
+| Volume not assigned to job             | Not visible in job's `/volumes/` directory          |
 
 ## Volume Types
 

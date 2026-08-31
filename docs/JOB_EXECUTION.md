@@ -659,8 +659,8 @@ Common issues and solutions:
 3. **Job Hangs**
     - Check CPU limits
     - Monitor with `rnx job log <job-uuid>`
-   - Set a per-job timeout: `rnx job run --timeout=5m long_task.sh`
-   - Or configure global timeout in `joblet-config.yml` via `jobTimeout`
+    - Set a per-job timeout: `rnx job run --timeout=5m long_task.sh`
+    - Or configure global timeout in `joblet-config.yml` via `jobTimeout`
 
 4. **File Not Found**
     - Verify upload succeeded

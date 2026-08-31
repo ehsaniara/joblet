@@ -5,28 +5,33 @@ typically takes 10-15 minutes for a basic deployment.
 
 ## Installation Methods
 
-### Method 1: Pre-Built Binary Installation
+### Method 1: Package Installation
 
 ```bash
-# Download the latest release
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-sudo mv rnx /usr/local/bin/
+# Ubuntu/Debian: download and install the latest release
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*_amd64\.deb" | cut -d '"' -f 4)
+sudo dpkg -i joblet_*_amd64.deb
 ```
+
+RPM packages for RHEL/CentOS/Fedora are on the same releases page. The
+installer also installs the latest `rnx` client on the host; for other
+machines see the [client install options](INSTALLATION.md#client-installation-rnx-cli).
 
 ### Method 2: Source Code Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/ehsaniara/joblet.git
 cd joblet
 
-# Build binaries
-make build
+# Build the server binaries and fetch the rnx client into bin/
+make all rnx
 
-# Install binaries
-sudo make install
+# Build a .deb from the working tree and install it (uses sudo)
+make fresh-install
 ```
+
+The `rnx` client itself is developed in
+[joblet-rnx](https://github.com/ehsaniara/joblet-rnx).
 
 ## Server Configuration
 
@@ -110,9 +115,10 @@ The version command displays:
 
 - **RNX Client Version**: Version of the local command-line interface
 - **Joblet Server Version**: Version of the remote server instance
-- **API Compatibility**: Confirmation of API version compatibility
 
-Note: Significant version discrepancies may require client or server updates.
+Client and server are versioned independently. Compatibility is defined by the
+shared joblet-proto contract: any rnx v6.x works with any Joblet v5.0.2+ (see
+[COMPATIBILITY.md](../COMPATIBILITY.md)).
 
 ```bash
 # Validate server connectivity

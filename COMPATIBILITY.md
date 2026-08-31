@@ -8,18 +8,18 @@ versions are tracked by **git tag**; treat the tag as authoritative.
 > The **rnx** CLI lives in its own repository,
 > [joblet-rnx](https://github.com/ehsaniara/joblet-rnx), and versions
 > independently; any rnx release works with any Joblet release on the same
-> proto major. (Through Joblet v5.6.x, rnx was bundled in this repo and shared
+> proto major. (Through Joblet v5.7.0, rnx was bundled in this repo and shared
 > its version number.)
 
 ## Joblet server ↔ proto
 
-| Joblet server        | joblet-proto |
-|----------------------|--------------|
-| **v5.0.2+** (current)| v2.x         |
-| v4.5.0 – v5.0.1      | v1.x         |
+| Joblet server         | joblet-proto |
+|-----------------------|--------------|
+| **v5.0.2+** (current) | v2.x         |
+| v4.5.0 – v5.0.1       | v1.x         |
 
-Latest: Joblet server **v5.6.11** ↔ proto **v2.6.0** (the version this server
-build depends on).
+Latest release: Joblet server **v5.8.0** ↔ proto **v2.6.0** (the first release
+without a bundled rnx; the installer fetches the rnx client instead).
 
 ## Client tools
 
@@ -27,7 +27,7 @@ Client tools derive their compatibility from the proto major they target:
 
 | Consumer     | Current | joblet-proto |
 |--------------|---------|--------------|
-| rnx CLI      | v6.0.0+ | v2.x         |
+| rnx CLI      | v6.0.2  | v2.x         |
 | Python SDK   | v2.5.2  | v2.x         |
 | MCP Server   | v1.1.4  | v2.x         |
 | joblet-admin | v1.0.6  | v2.x         |

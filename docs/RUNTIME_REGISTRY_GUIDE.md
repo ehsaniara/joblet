@@ -141,49 +141,50 @@ hooks:
 
 ### Field Reference
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `schema_version` | Yes | Must be "1.0" |
-| `name` | Yes | Runtime identifier (lowercase, hyphens, dots) |
-| `version` | Yes | Semantic version X.Y.Z |
-| `description` | Yes | Human-readable description (max 256 chars) |
-| `base.language` | Yes | Base language: python, java, node, go, rust |
-| `base.version` | Yes | Language version (e.g., "3.11", "21") |
-| `pip` | No | List of Python packages |
-| `pip_options` | No | Additional pip install options |
-| `npm` | No | List of Node.js packages |
-| `libraries` | No | Additional library patterns to copy (e.g., `libopenblas*`) |
-| `environment` | No | Environment variables |
-| `requirements` | No | GPU and memory requirements |
-| `platforms` | No | Supported platforms |
-| `hooks` | No | Pre/post-install scripts |
+| Field            | Required | Description                                                |
+|------------------|----------|------------------------------------------------------------|
+| `schema_version` | Yes      | Must be "1.0"                                              |
+| `name`           | Yes      | Runtime identifier (lowercase, hyphens, dots)              |
+| `version`        | Yes      | Semantic version X.Y.Z                                     |
+| `description`    | Yes      | Human-readable description (max 256 chars)                 |
+| `base.language`  | Yes      | Base language: python, java, node, go, rust                |
+| `base.version`   | Yes      | Language version (e.g., "3.11", "21")                      |
+| `pip`            | No       | List of Python packages                                    |
+| `pip_options`    | No       | Additional pip install options                             |
+| `npm`            | No       | List of Node.js packages                                   |
+| `libraries`      | No       | Additional library patterns to copy (e.g., `libopenblas*`) |
+| `environment`    | No       | Environment variables                                      |
+| `requirements`   | No       | GPU and memory requirements                                |
+| `platforms`      | No       | Supported platforms                                        |
+| `hooks`          | No       | Pre/post-install scripts                                   |
 
 ## Build Process
 
 The runtime builder executes a 14-phase pipeline:
 
-| Phase | Name | Description |
-|-------|------|-------------|
-| 1 | Parse & Validate | Parse YAML and validate schema |
-| 2 | Detect Platform | Identify OS, architecture, package manager |
-| 3 | Check Disk Space | Ensure sufficient disk space (1GB minimum) |
-| 4 | Validate Packages | Verify packages are available |
-| 5 | Prepare Directories | Create runtime directory structure |
-| 6 | Pre-install Hook | Run pre-install script (if defined) |
-| 7 | Install Base | Install base language packages |
-| 8 | Install Packages | Install pip/npm packages |
-| 9 | Post-install Hook | Run post-install script (if defined) |
-| 10 | Copy Binaries | Copy language binaries to isolated dir |
-| 11 | Copy Libraries | Copy required shared libraries |
-| 12 | Copy Configuration | Copy SSL certs, resolv.conf, etc. |
-| 13 | Generate Config | Generate runtime.yml for joblet |
-| 14 | Validate Build | Verify build integrity |
+| Phase | Name                | Description                                |
+|-------|---------------------|--------------------------------------------|
+| 1     | Parse & Validate    | Parse YAML and validate schema             |
+| 2     | Detect Platform     | Identify OS, architecture, package manager |
+| 3     | Check Disk Space    | Ensure sufficient disk space (1GB minimum) |
+| 4     | Validate Packages   | Verify packages are available              |
+| 5     | Prepare Directories | Create runtime directory structure         |
+| 6     | Pre-install Hook    | Run pre-install script (if defined)        |
+| 7     | Install Base        | Install base language packages             |
+| 8     | Install Packages    | Install pip/npm packages                   |
+| 9     | Post-install Hook   | Run post-install script (if defined)       |
+| 10    | Copy Binaries       | Copy language binaries to isolated dir     |
+| 11    | Copy Libraries      | Copy required shared libraries             |
+| 12    | Copy Configuration  | Copy SSL certs, resolv.conf, etc.          |
+| 13    | Generate Config     | Generate runtime.yml for joblet            |
+| 14    | Validate Build      | Verify build integrity                     |
 
 ### Build Output
 
 Runtimes are installed to: `/opt/joblet/runtimes/{name}/{version}/`
 
 Directory structure:
+
 ```text
 /opt/joblet/runtimes/python-3.11-ml/1.0.0/
 ├── runtime.yml           # Generated runtime configuration
@@ -224,6 +225,7 @@ build_info:
 ```
 
 View runtime details:
+
 ```bash
 rnx runtime info python-3.11-ml
 ```
@@ -395,6 +397,7 @@ hooks:
 Runs after base package installation but before pip/npm packages.
 
 Use cases:
+
 - Configure system settings
 - Install additional system dependencies
 - Set up authentication for private package repositories
@@ -404,6 +407,7 @@ Use cases:
 Runs after all packages are installed.
 
 Use cases:
+
 - Verify installation
 - Compile assets
 - Run tests
@@ -412,6 +416,7 @@ Use cases:
 ### Hook Environment
 
 Hooks execute with:
+
 - Root privileges (sudo)
 - Working directory: runtime's isolated directory
 - Access to installed packages
@@ -426,6 +431,7 @@ Error: package not found: python3.11-dev
 ```
 
 **Solution:** The package name might differ on your platform. Check available packages:
+
 ```bash
 apt-cache search python3.11
 ```
@@ -437,6 +443,7 @@ Error: pip install failed: Could not find a version that satisfies the requireme
 ```
 
 **Solutions:**
+
 - Check package name spelling
 - Verify package exists on PyPI
 - Check network connectivity on the server
@@ -465,6 +472,7 @@ Error: pre-install hook timed out after 20m
 ```
 
 **Solution:** Increase timeout in hooks configuration:
+
 ```yaml
 hooks:
   timeout: "60m"

@@ -116,7 +116,6 @@ internal/
 │   ├── auth/                # Authentication/authorization
 │   ├── state/               # Job state management
 │   └── domain/              # Business logic
-├── cli/                     # CLI client implementation
 pkg/
 ├── platform/                # Platform abstraction layer
 ├── config/                  # Configuration management
@@ -153,8 +152,8 @@ go test -v ./internal/joblet/state/ -run TestStore
 # 4. Run linting
 golangci-lint run
 
-# 5. Build and test integration
-make all
+# 5. Build and test integration (make rnx fetches the client from joblet-rnx)
+make all rnx
 ./bin/joblet &
 ./bin/rnx job run echo "test"
 
@@ -402,38 +401,23 @@ assert.Contains(t, string(output), "integration-test")
 
 #### 3. End-to-End Tests
 
+The e2e suites live in `tests/e2e/tests/` and drive a real joblet through the
+`rnx` CLI, asserting real OS and result outcomes. The runner validates the
+packaged product from scratch (needs sudo, run in a real terminal):
+
 ```bash
-# E2E test script: scripts/e2e-test.sh
-#!/bin/bash
-set -e
+# Purge any existing install, build and install a .deb from the working
+# tree, then run every suite against it
+./tests/e2e/run_tests.sh
 
-echo "Starting E2E tests..."
+# Fast iteration: swap binaries onto the existing install
+QUICK_DEPLOY=1 ./tests/e2e/run_tests.sh
 
-# Start server in background
-./bin/joblet &
-SERVER_PID=$!
-trap "kill $SERVER_PID" EXIT
+# Test the already-running service; -t / -x select or skip suites
+SKIP_DEPLOY=1 ./tests/e2e/run_tests.sh -t isolation
 
-# Wait for server to start
-sleep 2
-
-# Test basic job execution
-echo "Testing basic job execution..."
-JOB_ID=$(./bin/rnx job run echo "e2e-test" | grep "ID:" | cut -d' ' -f2)
-
-# Test job status
-echo "Testing job status..."
-./bin/rnx job status "$JOB_ID"
-
-# Test job listing
-echo "Testing job listing..."
-./bin/rnx job list | grep "$JOB_ID"
-
-# Test log streaming
-echo "Testing log streaming..."
-./bin/rnx job log "$JOB_ID" | grep "e2e-test"
-
-echo "E2E tests completed successfully!"
+# The full pre-PR gate: unit tests + the clean-room e2e run
+make pre-pr
 ```
 
 ### Running Tests
@@ -633,10 +617,10 @@ message SetJobTimeoutRes {
 }
 ```
 
-#### 5. CLI Command
+#### 5. CLI Command (in the joblet-rnx repository)
 
 ```go
-// internal/cli/timeout.go
+// joblet-rnx: internal/rnx/jobs/timeout.go
 func newTimeoutCmd() *cobra.Command {
 cmd := &cobra.Command{
 Use:   "timeout <job-id> <timeout-seconds>",
@@ -723,56 +707,25 @@ func (dp *DarwinPlatform) SetProcessTimeout(pid int32, timeout time.Duration) er
 
 The project uses Make for consistent builds:
 
-```makefile
-# Development targets
-.PHONY: dev test lint build clean
-
-dev: setup-dev
-	@echo "Development environment ready"
-
-test:
-	go test -v -race ./...
-
-test-integration:
-	go test -v -tags=integration ./test/integration/...
-
-lint:
-	golangci-lint run --timeout 5m
-
-build: joblet cli
-	@echo "Build completed"
-
-joblet:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bin/joblet ./cmd/joblet
-
-cli:
-	go build -ldflags="-w -s" -o bin/rnx ./cmd/cli
-
-# Platform-specific builds
-build-linux:
-	GOOS=linux GOARCH=amd64 go build -o bin/joblet-linux ./cmd/joblet
-	GOOS=linux GOARCH=amd64 go build -o bin/rnx ./cmd/cli
-
-build-darwin:
-	GOOS=darwin GOARCH=amd64 go build -o bin/rnx-darwin ./cmd/cli
-
-# Code generation
-generate:
-	go generate ./...
-	protoc --go_out=. --go-grpc_out=. api/joblet.proto
-
-# Development setup
-setup-dev: generate build certs-local
-	@echo "✅ Development environment setup complete"
-
-certs-local:
-	@./scripts/certs_gen.sh
-
-clean:
-	rm -rf bin/
-	rm -rf certs/
-	go clean -cache
+```text
+make all            Build the server binaries: joblet, persist, state (Linux)
+make joblet         Build the joblet daemon only
+make persist        Build persist only
+make state          Build state only
+make rnx            Fetch the rnx client into bin/ via scripts/get-rnx.sh
+                    ($RNX_BINARY, else ../joblet-rnx checkout, else latest release)
+make proto          Generate proto files
+make bpf            Generate the eBPF objects
+make test           Run unit tests
+make deploy         Copy binaries into the local /opt/joblet install and restart
+                    (REMOTE_HOST=... deploys over ssh)
+make fresh-install  Purge, build a .deb from the working tree, install it
+make pre-pr         Unit tests + clean-room e2e (the pre-PR gate)
+make clean          Remove build artifacts and packages
+make version        Show the version stamped into builds
 ```
+
+Cross-platform rnx builds are done in the joblet-rnx repository.
 
 ### Build Flags and Optimization
 

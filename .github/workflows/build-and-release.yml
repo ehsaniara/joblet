@@ -375,8 +375,9 @@ jobs:
 
             ## RNX CLI (Client)
 
-            The `rnx` CLI lives in its own repository and is released separately:
-            download the binary for your platform from
+            The `rnx` CLI lives in its own repository and is released separately.
+            The .deb/.rpm installer installs the latest rnx on the server host;
+            for other machines download the binary for your platform from
             [joblet-rnx releases](https://github.com/ehsaniara/joblet-rnx/releases/latest).
             Any rnx release works with any Joblet release that speaks the same
             joblet-proto contract (see the joblet-rnx compatibility table).

@@ -46,7 +46,7 @@ go test ./tests/gpu -v
 
 ### 3. System Tests (Real GPUs)
 
->**Caveat - device-node passthrough is newly wired and not yet validated on GPU hardware.**
+> **Caveat - device-node passthrough is newly wired and not yet validated on GPU hardware.**
 > Joblet now creates `/dev/nvidia*` device nodes inside a job and bind-mounts CUDA libraries, so
 > running `nvidia-smi` or checking for `/dev/nvidia*` **inside a job** is expected to work on a host
 > with working GPUs. A job also receives the `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES`
@@ -80,7 +80,8 @@ rnx job run --gpu=2 --gpu-memory=8GB python gpu_test.py
 
 - GPU allocation bookkeeping
 - `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES` environment setup
-- Device node creation (`/dev/nvidia*`) - *now wired; nodes are expected to appear inside a job on a real GPU host (pending validation)*
+- Device node creation (`/dev/nvidia*`) - *now wired; nodes are expected to appear inside a job on a real GPU host (
+  pending validation)*
 - GPU memory selection filtering (runtime limits *not enforced*)
 - Multi-GPU allocation scenarios
 

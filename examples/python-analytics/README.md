@@ -48,11 +48,11 @@ rnx job run --runtime=python-analytics \
 
 ## Pre-installed Packages
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| pandas | 2.1.3 | Data manipulation |
-| matplotlib | 3.8.2 | Data visualization |
-| seaborn | 0.13.0 | Statistical plotting |
+| Package    | Version | Purpose              |
+|------------|---------|----------------------|
+| pandas     | 2.1.3   | Data manipulation    |
+| matplotlib | 3.8.2   | Data visualization   |
+| seaborn    | 0.13.0  | Statistical plotting |
 
 ## Example Files
 

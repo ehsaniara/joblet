@@ -119,7 +119,8 @@ rnx job run --runtime=openjdk-17 --upload=App.java javac App.java
 
 ### 1. Build Runtime Environments
 
-Runtimes are built using the RNX CLI with a declarative YAML specification. The build executes remotely on the Joblet server:
+Runtimes are built using the RNX CLI with a declarative YAML specification. The build executes remotely on the Joblet
+server:
 
 ```bash
 # Create a runtime.yaml specification
@@ -589,20 +590,20 @@ original_yaml: |
 
 #### Runtime Configuration Fields
 
-| Field | Description |
-|-------|-------------|
-| `name` | Runtime name (e.g., "python-3.11-ml") |
-| `language` | Base language (python, java, node, go, rust) |
-| `language_version` | Language version (e.g., "3.11") |
-| `version` | Runtime version (semantic versioning) |
-| `description` | Human-readable description |
-| `mounts` | Filesystem mount points from isolated/ directory |
-| `environment` | Environment variables set for jobs |
-| `packages` | Pre-installed pip/npm packages |
-| `libraries` | Custom library patterns copied |
-| `requirements` | System requirements (architectures, GPU) |
-| `build_info` | Build timestamp, builder version, platform |
-| `original_yaml` | Original runtime.yaml content (for reference) |
+| Field              | Description                                      |
+|--------------------|--------------------------------------------------|
+| `name`             | Runtime name (e.g., "python-3.11-ml")            |
+| `language`         | Base language (python, java, node, go, rust)     |
+| `language_version` | Language version (e.g., "3.11")                  |
+| `version`          | Runtime version (semantic versioning)            |
+| `description`      | Human-readable description                       |
+| `mounts`           | Filesystem mount points from isolated/ directory |
+| `environment`      | Environment variables set for jobs               |
+| `packages`         | Pre-installed pip/npm packages                   |
+| `libraries`        | Custom library patterns copied                   |
+| `requirements`     | System requirements (architectures, GPU)         |
+| `build_info`       | Build timestamp, builder version, platform       |
+| `original_yaml`    | Original runtime.yaml content (for reference)    |
 
 ### Isolation Mechanism
 
@@ -738,7 +739,8 @@ rnx runtime info python-3.12-custom
 
 The runtime will be installed to `/opt/joblet/runtimes/python-3.12-custom/1.0.0/` with the complete isolated filesystem.
 
-> **Note**: See [RUNTIME_REGISTRY_GUIDE.md](RUNTIME_REGISTRY_GUIDE.md) for the complete YAML specification and advanced customization options.
+> **Note**: See [RUNTIME_REGISTRY_GUIDE.md](RUNTIME_REGISTRY_GUIDE.md) for the complete YAML specification and advanced
+> customization options.
 
 ## ✅ Best Practices
 

@@ -37,7 +37,7 @@ cgroup:
 gpu:
   enabled: false                    # Enable GPU support (default: false, opt-in only)
   allocation_strategy: "first-fit"  # GPU allocation strategy: first-fit, pack, spread, best-fit
-  cuda_paths:                       # CUDA installation paths to search
+  cuda_paths: # CUDA installation paths to search
     - "/usr/local/cuda"
     - "/opt/cuda"
 
@@ -116,7 +116,7 @@ telemetry:
   # List of enabled eBPF event types (omit or leave empty for all)
   # Valid: exec, connect, accept, mmap, mprotect, file, socket_data
   # Disable high-volume events (mmap, file, socket_data) to reduce overhead
-  event_types: []            # Empty = all enabled (default)
+  event_types: [ ]            # Empty = all enabled (default)
   # Example - enable only low-volume events:
   # event_types:
   #   - exec

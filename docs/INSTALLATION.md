@@ -29,48 +29,38 @@ cross-platform environments.
 
 > **Note**: The `rnx` client CLI is released separately from the
 > [joblet-rnx repository](https://github.com/ehsaniara/joblet-rnx/releases/latest)
-> and is not part of the Joblet server packages or release archives. See
+> and is not part of the Joblet server packages or release archives. The .deb
+> and .rpm installers download the latest rnx to `/usr/local/bin/rnx` on the
+> server host (set `JOBLET_SKIP_RNX_INSTALL=1` to skip). For other machines see
 > [Client Installation](#client-installation-rnx-cli) below.
 
 ### Ubuntu/Debian Installation (Version 20.04 and Later)
 
 ```bash
-# Update package list
-sudo apt update
+# Download the latest .deb for this machine's architecture (amd64 or arm64)
+ARCH=$(dpkg --print-architecture)
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*_${ARCH}\.deb" | cut -d '"' -f 4)
 
-# Install dependencies
-sudo apt install -y curl tar make gcc
-
-# Download and install
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
-
-# Create directories
-sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
-sudo mkdir -p /var/log/joblet
+# Install (the installer generates certificates and configs, sets up networking,
+# and installs the latest rnx client)
+sudo dpkg -i joblet_*_${ARCH}.deb
+sudo systemctl enable --now joblet
 
 # Verify installation
-joblet --version
-persist version
+systemctl status joblet
+rnx job list
 ```
 
 ### Red Hat Enterprise Linux/CentOS/Fedora Installation (Version 8 and Later)
 
 ```bash
-# Install dependencies
-sudo dnf install -y curl tar make gcc
+# Download the latest .rpm for this machine's architecture (x86_64 or aarch64)
+ARCH=$(uname -m)
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*\.${ARCH}\.rpm" | cut -d '"' -f 4)
 
-# Download and install
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
-
-# Create directories
-sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
-sudo mkdir -p /var/log/joblet
+# Install (resolves dependencies) and start
+sudo dnf install -y ./joblet-*.${ARCH}.rpm
+sudo systemctl enable --now joblet
 
 # Enable cgroups v2 if needed
 sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=1"
@@ -80,41 +70,24 @@ sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=1"
 ### Amazon Linux 2 Installation
 
 ```bash
-# Install dependencies
-sudo yum install -y curl tar make gcc
-
-# Download and install
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
-
-# Create directories
-sudo mkdir -p /opt/joblet/{config,state,certs,jobs,volumes,logs,metrics,run}
-sudo mkdir -p /var/log/joblet
+ARCH=$(uname -m)
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*\.${ARCH}\.rpm" | cut -d '"' -f 4)
+sudo yum install -y ./joblet-*.${ARCH}.rpm
+sudo systemctl enable --now joblet
 ```
+
+For EC2 the user-data script in [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md)
+automates the same steps.
 
 ### Arch Linux Installation
 
-```bash
-# Install from AUR (if available)
-yay -S joblet
-
-# Or manual installation
-sudo pacman -S curl tar make gcc
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-```
+No native Arch package is published. Build from source (see Building from
+Source below) or install the .deb/.rpm through a converter of your choice.
 
 ### ARM64 Architecture Systems (Raspberry Pi, AWS Graviton)
 
-```bash
-# Download ARM64 version
-curl -L https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-arm64.tar.gz | tar xz
-sudo mv joblet /usr/local/bin/
-sudo mv persist /usr/local/bin/
-sudo chmod +x /usr/local/bin/joblet /usr/local/bin/persist
-```
+Every release ships arm64 (.deb) and aarch64 (.rpm) packages; the commands
+above pick the right one automatically.
 
 ## AWS EC2 Deployment with Terraform
 
@@ -484,7 +457,7 @@ fi
 
 # Download the latest Debian package
 JOBLET_VERSION=$(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | jq -r '.tag_name')
-JOBLET_DEB_URL="https://github.com/ehsaniara/joblet/releases/download/${JOBLET_VERSION}/joblet-${JOBLET_VERSION#v}-linux-${JOBLET_ARCH}.deb"
+JOBLET_DEB_URL="https://github.com/ehsaniara/joblet/releases/download/${JOBLET_VERSION}/joblet_${JOBLET_VERSION#v}_${JOBLET_ARCH}.deb"
 
 log "Downloading Joblet ${JOBLET_VERSION} for ${JOBLET_ARCH}"
 wget -O joblet.deb "$JOBLET_DEB_URL"
@@ -647,6 +620,11 @@ macOS, and Windows are published on its
 Any rnx release works with any Joblet release that speaks the same
 joblet-proto contract (see the joblet-rnx compatibility table).
 
+On the server host itself the package installer already installs the latest
+rnx (`/usr/local/bin/rnx`, skipped if an rnx is already on PATH or
+`JOBLET_SKIP_RNX_INSTALL=1` is set, never fatal to the install). The methods
+below are for client machines and for hosts without network access.
+
 ### Homebrew (macOS and Linux)
 
 ```bash
@@ -742,8 +720,8 @@ cd persist && go build -o ../bin/persist ./cmd/persist
 # Run tests
 make test
 
-# Install binaries
-sudo make install
+# Purge any existing install, build a .deb from the working tree, install it (uses sudo)
+make fresh-install
 ```
 
 To build the `rnx` client from source, clone
@@ -913,8 +891,8 @@ make all
 # Run tests
 make test
 
-# Install locally for development
-sudo make install
+# Install locally for development (builds and installs a .deb, uses sudo)
+make fresh-install
 ```
 
 ### Native Process Isolation

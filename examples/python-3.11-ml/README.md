@@ -54,14 +54,14 @@ print(f'Model accuracy: {clf.score(X, y):.2f}')
 
 The runtime includes these ML/data science packages:
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| numpy | 1.26.2 | Numerical computing |
-| pandas | 2.1.3 | Data manipulation |
-| scikit-learn | 1.3.2 | Machine learning |
-| matplotlib | 3.8.2 | Data visualization |
-| seaborn | 0.13.0 | Statistical plotting |
-| joblib | 1.3.2 | Model persistence |
+| Package      | Version | Purpose              |
+|--------------|---------|----------------------|
+| numpy        | 1.26.2  | Numerical computing  |
+| pandas       | 2.1.3   | Data manipulation    |
+| scikit-learn | 1.3.2   | Machine learning     |
+| matplotlib   | 3.8.2   | Data visualization   |
+| seaborn      | 0.13.0  | Statistical plotting |
+| joblib       | 1.3.2   | Model persistence    |
 
 ## Example Files
 

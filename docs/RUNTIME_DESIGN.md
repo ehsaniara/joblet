@@ -367,6 +367,7 @@ flowchart LR
 ```
 
 **Key Files:**
+
 - `pkg/builder/isolation.go` - OverlayFS isolation implementation
 - `pkg/builder/system_ops.go` - System operations interface (for testing)
 - `pkg/builder/isolation_test.go` - Unit tests with mocked system operations

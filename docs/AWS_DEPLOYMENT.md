@@ -6,7 +6,8 @@ Deploy Joblet on AWS EC2 in **2 simple steps** (~10 minutes total).
 
 ### Step 1: AWS Pre-Setup (CloudShell - 1 minute)
 
-Open **AWS Console → CloudShell** (top-right toolbar icon) and run ONE of the following based on your storage preference:
+Open **AWS Console → CloudShell** (top-right toolbar icon) and run ONE of the following based on your storage
+preference:
 
 <details>
 <summary><b>CloudWatch (Recommended)</b></summary>
@@ -14,6 +15,7 @@ Open **AWS Console → CloudShell** (top-right toolbar icon) and run ONE of the 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=cloudwatch
 ```
+
 </details>
 
 <details>
@@ -24,9 +26,11 @@ curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/p
 ```
 
 The script will prompt you to enter your S3 bucket name. Create the bucket first if it doesn't exist:
+
 ```bash
 aws s3 mb s3://your-bucket-name
 ```
+
 </details>
 
 <details>
@@ -35,14 +39,15 @@ aws s3 mb s3://your-bucket-name
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehsaniara/joblet/main/scripts/aws/pre-setup.sh | bash -s -- --storage=local
 ```
+
 </details>
 
 This interactive script creates:
 
 - `JobletEC2Role` IAM role with permissions based on your storage selection:
-  - CloudWatch: CloudWatch Logs + DynamoDB + Secrets Manager
-  - S3: S3 bucket access + DynamoDB + Secrets Manager
-  - Local: DynamoDB + Secrets Manager only
+    - CloudWatch: CloudWatch Logs + DynamoDB + Secrets Manager
+    - S3: S3 bucket access + DynamoDB + Secrets Manager
+    - Local: DynamoDB + Secrets Manager only
 - `joblet-jobs` DynamoDB table for job state persistence
 - **DynamoDB VPC Endpoint** (required) for secure access to DynamoDB
 - **S3 VPC Endpoint** (when using S3 storage) with bucket-specific policy
@@ -74,7 +79,8 @@ The script will:
     - **IAM Instance Profile**: Select `JobletEC2Role` ⬅️ Created in Step 1
     - **Storage**: 30 GB gp3 (default)
 
-3. **Expand "Advanced Details" → Scroll to "User data"** and paste ONE of the following scripts based on your storage preference:
+3. **Expand "Advanced Details" → Scroll to "User data"** and paste ONE of the following scripts based on your storage
+   preference:
 
    #### Choose Your Storage Backend:
 
@@ -103,7 +109,8 @@ The script will:
 
    > ⚠️ **Important**: Replace `your-bucket-name` with your actual S3 bucket name (the same one you used in Step 1).
 
-   **Prerequisites**: Create an S3 bucket first. Run `pre-setup.sh --storage=s3 --s3-bucket=your-bucket-name` in Step 1 to configure IAM permissions.
+   **Prerequisites**: Create an S3 bucket first. Run `pre-setup.sh --storage=s3 --s3-bucket=your-bucket-name` in Step 1
+   to configure IAM permissions.
 
    **Features**: Low cost, unlimited storage, lifecycle policies for archival
 
@@ -136,9 +143,9 @@ When the instance boots, the user data script automatically:
 - **Detects EC2 environment** (region, instance ID, metadata)
 - **Installs Joblet** via Debian/RPM package
 - **Configures storage backend** based on your selection:
-  - CloudWatch: Creates `/joblet` log group for real-time aggregation
-  - S3: Configures bucket and prefix for batch uploads
-  - Local: Uses `/opt/joblet/logs/` on disk
+    - CloudWatch: Creates `/joblet` log group for real-time aggregation
+    - S3: Configures bucket and prefix for batch uploads
+    - Local: Uses `/opt/joblet/logs/` on disk
 - **Fetches CA/client certificates** from Secrets Manager (shared across instances)
 - **Generates server TLS certificate** (instance-specific, embedded in config)
 - **Starts Joblet server** on port 443 (systemd service)
@@ -263,12 +270,15 @@ When using S3 storage backend, the pre-setup script also configures:
 - **Actions allowed**: PutObject, GetObject, DeleteObject, ListBucket
 - **Created/updated automatically** by `pre-setup.sh --storage=s3`
 
-**Note**: If the S3 VPC Endpoint policy doesn't allow access to your bucket, you'll see `AccessDenied` errors in the persist service logs. The pre-setup script updates the endpoint policy automatically to allow access to the specified bucket.
+**Note**: If the S3 VPC Endpoint policy doesn't allow access to your bucket, you'll see `AccessDenied` errors in the
+persist service logs. The pre-setup script updates the endpoint policy automatically to allow access to the specified
+bucket.
 
 ### Secrets Manager (TLS Certificates)
 
 - **Shared CA certificate** (`joblet/ca-cert`, `joblet/ca-key`) - Same across all instances
-- **Client certificates, one pair per role** (`joblet/client-cert[-<role>]`, `joblet/client-key[-<role>]`; unsuffixed names are the admin pair) - Scope each client's IAM policy to only its role's secrets
+- **Client certificates, one pair per role** (`joblet/client-cert[-<role>]`, `joblet/client-key[-<role>]`; unsuffixed
+  names are the admin pair) - Scope each client's IAM policy to only its role's secrets
 - **Instance-specific server certificate** - Generated fresh on each EC2 instance
 - **Enables horizontal scaling** - Multiple Joblet instances share the same CA/client trust
 - **Created automatically** by the pre-setup script
@@ -291,13 +301,14 @@ ensures Joblet remains functional for development/testing even without proper AW
 
 ### Storage Backend Options
 
-Joblet supports three storage backends for logs and metrics. Select your preferred backend in [Step 2](#step-2-launch-ec2-instance-console---5-minutes) when configuring User Data.
+Joblet supports three storage backends for logs and metrics. Select your preferred backend
+in [Step 2](#step-2-launch-ec2-instance-console---5-minutes) when configuring User Data.
 
-| Backend | Best For | Pros | Cons |
-|---------|----------|------|------|
-| **CloudWatch** (default) | Real-time monitoring, AWS integration | Native AWS integration, real-time queries, CloudWatch Insights | Higher cost for high-volume logs |
-| **S3** | Long-term archival, cost optimization | Very low cost, unlimited storage, lifecycle policies | Not real-time, requires S3 bucket setup |
-| **Local** | Development, testing, VMs | No AWS dependencies, zero cost | Lost on instance termination, no aggregation |
+| Backend                  | Best For                              | Pros                                                           | Cons                                         |
+|--------------------------|---------------------------------------|----------------------------------------------------------------|----------------------------------------------|
+| **CloudWatch** (default) | Real-time monitoring, AWS integration | Native AWS integration, real-time queries, CloudWatch Insights | Higher cost for high-volume logs             |
+| **S3**                   | Long-term archival, cost optimization | Very low cost, unlimited storage, lifecycle policies           | Not real-time, requires S3 bucket setup      |
+| **Local**                | Development, testing, VMs             | No AWS dependencies, zero cost                                 | Lost on instance termination, no aggregation |
 
 #### Command-Line Options (Preferred)
 
@@ -326,11 +337,11 @@ No additional configuration needed. CloudWatch log group `/joblet` is created au
 
 **Environment variables (alternative):**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PERSIST_BACKEND` | `cloudwatch` | Explicitly set backend |
-| `CLOUDWATCH_LOG_GROUP` | `/joblet` | Custom log group name |
-| `CLOUDWATCH_RETENTION_DAYS` | `7` | Log retention period |
+| Variable                    | Default      | Description            |
+|-----------------------------|--------------|------------------------|
+| `PERSIST_BACKEND`           | `cloudwatch` | Explicitly set backend |
+| `CLOUDWATCH_LOG_GROUP`      | `/joblet`    | Custom log group name  |
+| `CLOUDWATCH_RETENTION_DAYS` | `7`          | Log retention period   |
 
 #### Option 2: S3 Storage
 
@@ -340,12 +351,12 @@ No additional configuration needed. CloudWatch log group `/joblet` is created au
 
 **Environment variables (alternative):**
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `PERSIST_BACKEND` | Yes | - | Must be `s3` |
-| `S3_BUCKET` | Yes | - | Your S3 bucket name |
-| `S3_PREFIX` | No | `joblet` | Key prefix for all objects |
-| `S3_STORAGE_CLASS` | No | `STANDARD` | Storage class (see below) |
+| Variable           | Required | Default    | Description                |
+|--------------------|----------|------------|----------------------------|
+| `PERSIST_BACKEND`  | Yes      | -          | Must be `s3`               |
+| `S3_BUCKET`        | Yes      | -          | Your S3 bucket name        |
+| `S3_PREFIX`        | No       | `joblet`   | Key prefix for all objects |
+| `S3_STORAGE_CLASS` | No       | `STANDARD` | Storage class (see below)  |
 
 **S3 Storage Classes:**
 
@@ -357,7 +368,8 @@ No additional configuration needed. CloudWatch log group `/joblet` is created au
 
 **S3 IAM Permissions:**
 
-When you run `pre-setup.sh --storage=s3 --s3-bucket=YOUR_BUCKET`, the IAM policy is automatically configured with these permissions scoped to your bucket:
+When you run `pre-setup.sh --storage=s3 --s3-bucket=YOUR_BUCKET`, the IAM policy is automatically configured with these
+permissions scoped to your bucket:
 
 ```json
 {
@@ -375,7 +387,8 @@ When you run `pre-setup.sh --storage=s3 --s3-bucket=YOUR_BUCKET`, the IAM policy
 }
 ```
 
-> **Note**: If you ran `pre-setup.sh` without `--storage=s3`, you'll need to manually add S3 permissions to `JobletEC2Role` or re-run the pre-setup with the correct storage option.
+> **Note**: If you ran `pre-setup.sh` without `--storage=s3`, you'll need to manually add S3 permissions to
+`JobletEC2Role` or re-run the pre-setup with the correct storage option.
 
 **S3 Lifecycle Rules (Recommended):**
 
@@ -403,6 +416,7 @@ For development, testing, or VM deployments without AWS. No S3 bucket or CloudWa
 ```
 
 **Local Storage Behavior:**
+
 - Logs stored in `/opt/joblet/logs/`
 - Metrics stored in `/opt/joblet/metrics/`
 - Job state is in-memory (lost on restart)
@@ -410,10 +424,10 @@ For development, testing, or VM deployments without AWS. No S3 bucket or CloudWa
 
 **Environment variables (alternative):**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PERSIST_BACKEND` | - | Must be `local` |
-| `LOCAL_LOG_DIR` | `/opt/joblet/logs` | Custom log directory |
+| Variable            | Default               | Description              |
+|---------------------|-----------------------|--------------------------|
+| `PERSIST_BACKEND`   | -                     | Must be `local`          |
+| `LOCAL_LOG_DIR`     | `/opt/joblet/logs`    | Custom log directory     |
 | `LOCAL_METRICS_DIR` | `/opt/joblet/metrics` | Custom metrics directory |
 
 ### Alternative: Fully Automated CLI Deployment
@@ -450,9 +464,11 @@ To deploy without CloudWatch or DynamoDB:
 1. **Skip Step 1** (IAM role not needed)
 2. In Step 2, select the **💾 Local Storage** option
 
-> **Note**: `ENABLE_CLOUDWATCH=false` is still supported for backward compatibility, but `PERSIST_BACKEND=local` is preferred.
+> **Note**: `ENABLE_CLOUDWATCH=false` is still supported for backward compatibility, but `PERSIST_BACKEND=local` is
+> preferred.
 
 This results in:
+
 - Logs stored locally at `/opt/joblet/logs/`
 - Job state in-memory (lost on restart)
 - No AWS permissions required
@@ -625,6 +641,7 @@ aws logs describe-log-groups --log-group-name-prefix /joblet
 ### S3 Storage Access Denied
 
 If you see errors like:
+
 ```text
 AccessDenied: User is not authorized to perform: s3:PutObject on resource
 because no VPC endpoint policy allows the s3:PutObject action
@@ -633,11 +650,13 @@ because no VPC endpoint policy allows the s3:PutObject action
 **Cause**: The S3 VPC Endpoint policy doesn't allow access to your bucket.
 
 **Fix 1**: Re-run pre-setup with your bucket name:
+
 ```bash
 ./pre-setup.sh --storage=s3 --s3-bucket=your-bucket-name
 ```
 
 **Fix 2**: Manually update the S3 VPC Endpoint policy:
+
 ```bash
 # Find the S3 VPC Endpoint ID
 aws ec2 describe-vpc-endpoints --filters "Name=service-name,Values=com.amazonaws.REGION.s3" \
@@ -657,6 +676,7 @@ aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-xxxx \
 ```
 
 **Fix 3**: Via AWS Console:
+
 1. Go to **VPC → Endpoints**
 2. Find the S3 Gateway endpoint for your VPC
 3. Click **Actions → Manage policy**
@@ -732,8 +752,8 @@ flowchart TD
 1. **Client → Joblet Server**: gRPC requests over TLS (port 443)
 2. **Joblet → VPC Endpoint → DynamoDB**: Job state persistence (private, no internet)
 3. **Joblet → CloudWatch OR S3**: Log/metrics storage
-   - CloudWatch: Real-time log streaming (PutLogEvents)
-   - S3: Batch uploads via VPC Endpoint as gzipped JSONL files (PutObject)
+    - CloudWatch: Real-time log streaming (PutLogEvents)
+    - S3: Batch uploads via VPC Endpoint as gzipped JSONL files (PutObject)
 4. **Client ← CloudWatch/S3**: Historical log queries via `rnx job log`
 
 ---

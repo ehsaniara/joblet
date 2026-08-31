@@ -18,7 +18,8 @@ for future execution, architecture details, multi-node behavior, and persistence
 
 ## Overview
 
-Joblet supports scheduling jobs for future execution using either relative durations (e.g. `30min`, `2h30m`) or absolute RFC3339 timestamps. Scheduled jobs are:
+Joblet supports scheduling jobs for future execution using either relative durations (e.g. `30min`, `2h30m`) or absolute
+RFC3339 timestamps. Scheduled jobs are:
 
 - **Persisted** to DynamoDB for durability across restarts
 - **Node-specific** - each job runs only on the node that created it
@@ -27,13 +28,13 @@ Joblet supports scheduling jobs for future execution using either relative durat
 
 ### Key Characteristics
 
-| Feature | Behavior |
-|---------|----------|
-| Time Format | Relative duration (e.g., `30min`, `2h30m`) or RFC3339 (e.g., `2025-01-15T10:30:00Z`) |
-| Timezone | UTC recommended, local time supported |
-| Persistence | DynamoDB (survives restarts) |
-| Node Affinity | Jobs execute on creating node only |
-| Overdue Jobs | Execute immediately on recovery |
+| Feature       | Behavior                                                                             |
+|---------------|--------------------------------------------------------------------------------------|
+| Time Format   | Relative duration (e.g., `30min`, `2h30m`) or RFC3339 (e.g., `2025-01-15T10:30:00Z`) |
+| Timezone      | UTC recommended, local time supported                                                |
+| Persistence   | DynamoDB (survives restarts)                                                         |
+| Node Affinity | Jobs execute on creating node only                                                   |
+| Overdue Jobs  | Execute immediately on recovery                                                      |
 
 ## Scheduling Jobs
 
@@ -167,15 +168,15 @@ stateDiagram-v2
     CANCELED --> [*]
 ```
 
-| Status | Description |
-|--------|-------------|
-| `SCHEDULED` | Job queued for future execution |
-| `INITIALIZING` | Job starting (setting up resources) |
-| `RUNNING` | Job actively executing |
-| `COMPLETED` | Job finished successfully |
-| `FAILED` | Job exited with error |
-| `STOPPED` | Job manually stopped |
-| `CANCELED` | Scheduled job removed before execution |
+| Status         | Description                            |
+|----------------|----------------------------------------|
+| `SCHEDULED`    | Job queued for future execution        |
+| `INITIALIZING` | Job starting (setting up resources)    |
+| `RUNNING`      | Job actively executing                 |
+| `COMPLETED`    | Job finished successfully              |
+| `FAILED`       | Job exited with error                  |
+| `STOPPED`      | Job manually stopped                   |
+| `CANCELED`     | Scheduled job removed before execution |
 
 ## Multi-Node Deployments
 
@@ -217,6 +218,7 @@ server:
 - Manual intervention required to reassign or cancel jobs
 
 This is a deliberate design choice. Future orchestration layers may add:
+
 - Leader election for scheduler master
 - Job reassignment on node failure
 - Distributed locking mechanisms
@@ -257,10 +259,10 @@ When a Joblet node restarts:
 
 Jobs whose scheduled time passed during downtime execute immediately:
 
-| Scheduled Time | Node Down | Node Up | Behavior |
-|----------------|-----------|---------|----------|
-| 10:00 | 09:55 | 10:15 | Executes at 10:15 (15 min overdue) |
-| 10:00 | 09:55 | 09:58 | Executes at 10:00 (on time) |
+| Scheduled Time | Node Down | Node Up | Behavior                           |
+|----------------|-----------|---------|------------------------------------|
+| 10:00          | 09:55     | 10:15   | Executes at 10:15 (15 min overdue) |
+| 10:00          | 09:55     | 09:58   | Executes at 10:00 (on time)        |
 
 ## Monitoring Scheduled Jobs
 
@@ -311,6 +313,7 @@ Use `rnx job cancel` for jobs still in `SCHEDULED` status. `rnx job stop` is for
 jobs that are already `RUNNING` (which transition to `STOPPED`, not `CANCELED`).
 
 **Result:**
+
 - Job removed from scheduler queue
 - Status changed to `CANCELED`
 - Pre-staged uploads cleaned up
@@ -326,12 +329,12 @@ rnx job delete <job-id>
 
 ### Current Limitations
 
-| Limitation | Description | Workaround |
-|------------|-------------|------------|
-| No recurring schedules | Single execution only | External cron + API calls |
-| Node-specific | Jobs tied to creating node | Design for node affinity |
-| No distributed locking | No cross-node coordination | Future orchestration layer |
-| In-memory queue | Queue rebuilt on restart | Persistent storage ensures durability |
+| Limitation             | Description                | Workaround                            |
+|------------------------|----------------------------|---------------------------------------|
+| No recurring schedules | Single execution only      | External cron + API calls             |
+| Node-specific          | Jobs tied to creating node | Design for node affinity              |
+| No distributed locking | No cross-node coordination | Future orchestration layer            |
+| In-memory queue        | Queue rebuilt on restart   | Persistent storage ensures durability |
 
 ### Not Supported
 
@@ -394,6 +397,7 @@ rnx job run --schedule="2025-01-15T02:00:00Z" \
 **Symptoms:** Job remains in `SCHEDULED` status past its scheduled time.
 
 **Checks:**
+
 1. Verify node is running: `systemctl status joblet`
 2. Check scheduler logs: `journalctl -u joblet | grep scheduler`
 3. Verify job's `nodeId` matches current node
@@ -403,6 +407,7 @@ rnx job run --schedule="2025-01-15T02:00:00Z" \
 **Symptoms:** Scheduled jobs missing after node restart.
 
 **Checks:**
+
 1. Verify DynamoDB connectivity
 2. Check `SyncFromPersistentState` logs
 3. Confirm `nodeId` hasn't changed
@@ -419,6 +424,7 @@ journalctl -u joblet | grep -E "(recovering|recovered)"
 **Cause:** Likely `nodeId` configuration issue.
 
 **Fix:**
+
 1. Ensure each node has unique `nodeId`
 2. Restart affected nodes
 3. Check job's `nodeId` field
@@ -434,11 +440,11 @@ rnx job run --schedule="2020-01-01T00:00:00Z" echo "runs now"
 
 ### Common Error Messages
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `invalid schedule` | Unrecognized schedule spec | Use a relative duration (e.g. `30min`) or RFC3339 timestamp |
-| `job not found` | Job deleted or wrong ID | Verify job ID with `rnx job list` |
-| `state client not available` | DynamoDB connection issue | Check state service logs |
+| Error                        | Cause                      | Solution                                                    |
+|------------------------------|----------------------------|-------------------------------------------------------------|
+| `invalid schedule`           | Unrecognized schedule spec | Use a relative duration (e.g. `30min`) or RFC3339 timestamp |
+| `job not found`              | Job deleted or wrong ID    | Verify job ID with `rnx job list`                           |
+| `state client not available` | DynamoDB connection issue  | Check state service logs                                    |
 
 ## Related Documentation
 

@@ -162,12 +162,12 @@ security:
 
 Joblet reads the client's role from the certificate Organizational Unit (OU) field (case-insensitive):
 
-| Role       | OU Value     | Permissions                                                                                                                                    |
-|------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| Admin      | `admin`      | Every operation, including removing runtimes, networks, and volumes                                                                            |
-| Maintainer | `maintainer` | Provisions infrastructure (builds runtimes, validates runtime YAML, creates networks and volumes) and everything a developer can do         |
-| Developer  | `developer`  | Runs, stops, and deletes jobs, tests runtimes, and reads everything. Cannot change infrastructure                                              |
-| Reader     | `reader`     | Reads only: jobs, logs, status, resource listings, and metrics. Meant for dashboards and reporting                                             |
+| Role       | OU Value     | Permissions                                                                                                                         |
+|------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| Admin      | `admin`      | Every operation, including removing runtimes, networks, and volumes                                                                 |
+| Maintainer | `maintainer` | Provisions infrastructure (builds runtimes, validates runtime YAML, creates networks and volumes) and everything a developer can do |
+| Developer  | `developer`  | Runs, stops, and deletes jobs, tests runtimes, and reads everything. Cannot change infrastructure                                   |
+| Reader     | `reader`     | Reads only: jobs, logs, status, resource listings, and metrics. Meant for dashboards and reporting                                  |
 
 Issue `maintainer` certificates to CI/CD service accounts: they can provision what their pipelines need but can never
 remove shared infrastructure. Certificates carrying the older `viewer` OU keep working and behave as `reader`. Any

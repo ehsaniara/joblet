@@ -34,7 +34,8 @@ The Joblet runtime system provides a sophisticated isolation and mounting archit
     - Defines data structures for runtime configurations
     - Simplified structure supporting self-contained runtimes
 
-4. **CLI Integration** (`internal/rnx/resources/runtime.go` in the [joblet-rnx](https://github.com/ehsaniara/joblet-rnx) repo)
+4. **CLI Integration** (`internal/rnx/resources/runtime.go` in the [joblet-rnx](https://github.com/ehsaniara/joblet-rnx)
+   repo)
     - Runtime management commands (`rnx runtime build/list/info`)
     - Runtime build using declarative YAML specifications
 
@@ -520,11 +521,11 @@ rnx job run --runtime=python-3.11-ml python -c "import numpy; print('✅ Runtime
 
 ### Common Issues
 
-| Issue                                    | Solution                                                       |
-|------------------------------------------|----------------------------------------------------------------|
-| `runtime not found`                      | Verify runtime was built with `rnx runtime build`              |
-| `validation errors`                      | Check runtime.yaml syntax with `rnx runtime validate`          |
-| `build failed`                           | Check disk space and network connectivity on target host       |
+| Issue               | Solution                                                 |
+|---------------------|----------------------------------------------------------|
+| `runtime not found` | Verify runtime was built with `rnx runtime build`        |
+| `validation errors` | Check runtime.yaml syntax with `rnx runtime validate`    |
+| `build failed`      | Check disk space and network connectivity on target host |
 
 ---
 

@@ -162,7 +162,8 @@ CloudWatch Logs:
 
 ### S3 Backend
 
-The S3 backend uses **time-partitioned keys** to avoid expensive read-modify-write operations. Each flush creates a new object with a nanosecond timestamp, enabling efficient append-only writes.
+The S3 backend uses **time-partitioned keys** to avoid expensive read-modify-write operations. Each flush creates a new
+object with a nanosecond timestamp, enabling efficient append-only writes.
 
 **Storage Layout:**
 
@@ -217,12 +218,13 @@ storage:
 
 **Cost Comparison:**
 
-| Backend    | Ingestion Cost | Storage Cost | Query Cost       |
-|------------|----------------|--------------|------------------|
-| CloudWatch | ~$0.50/GB      | ~$0.03/GB/mo | CloudWatch Logs  |
-| S3         | Free           | ~$0.023/GB/mo| Application-side |
+| Backend    | Ingestion Cost | Storage Cost  | Query Cost       |
+|------------|----------------|---------------|------------------|
+| CloudWatch | ~$0.50/GB      | ~$0.03/GB/mo  | CloudWatch Logs  |
+| S3         | Free           | ~$0.023/GB/mo | Application-side |
 
 **When to use S3:**
+
 - Long-term archival (cheaper than CloudWatch)
 - High-volume telemetry data
 - Custom query requirements (Athena, Spark)

@@ -479,10 +479,13 @@ Log Events:
 
 - ✓ Detect and enumerate NVIDIA GPUs *(working)*
 - ✓ Allocate GPUs to jobs based on requirements *(working - in-memory bookkeeping)*
-- ✓ Pass through GPU devices to isolated jobs *(implemented - per-job `/dev/nvidia*` nodes created; pending GPU-hardware validation)*
-- ✓ Mount CUDA libraries in job environment *(implemented - read-only bind-mount wired; pending GPU-hardware validation)*
+- ✓ Pass through GPU devices to isolated jobs *(implemented - per-job `/dev/nvidia*` nodes created; pending GPU-hardware
+  validation)*
+- ✓ Mount CUDA libraries in job environment *(implemented - read-only bind-mount wired; pending GPU-hardware
+  validation)*
 - ✓ Enforce GPU resource limits *(not implemented - `--gpu-memory` filters at selection only, not enforced)*
-- ✓ Clean up GPU resources after job completion *(partial - allocation bookkeeping released; GPU memory not reliably cleared)*
+- ✓ Clean up GPU resources after job completion *(partial - allocation bookkeeping released; GPU memory not reliably
+  cleared)*
 
 ### Performance Requirements
 

@@ -82,7 +82,8 @@ rnx job run --gpu=1 --max-cpu=400 --max-memory=16384 python hybrid_workload.py
 Upon GPU allocation request, Joblet performs the following operations:
 
 1. **GPU Discovery**: Enumerates available NVIDIA devices via `/proc/driver/nvidia/gpus/` and `nvidia-smi` interfaces
-2. **Device Allocation**: Assigns specific GPU indices to job instances with tracking in job metadata (in-memory bookkeeping)
+2. **Device Allocation**: Assigns specific GPU indices to job instances with tracking in job metadata (in-memory
+   bookkeeping)
 3. **Device Node Creation** *(implemented, pending GPU-hardware validation)*: Creates the per-job `/dev/nvidia*`,
    `/dev/nvidiactl`, and `/dev/nvidia-uvm` nodes inside the job (post-chroot) for the allocated GPU indices. Note:
    cgroup device-access rules are still not applied

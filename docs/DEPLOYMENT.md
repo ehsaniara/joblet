@@ -38,11 +38,11 @@ Joblet requires Linux for job execution due to its dependency on Linux-specific 
 
 RNX CLI clients can run on multiple platforms:
 
-| Platform | Status               | Installation Method       |
-|----------|----------------------|---------------------------|
-| Linux    | ✅ Full Support       | Package manager or binary |
-| macOS    | ✅ CLI Only           | Binary download           |
-| Windows  | ✅ CLI Only (via WSL) | WSL2 + Linux binary       |
+| Platform | Status         | Installation Method       |
+|----------|----------------|---------------------------|
+| Linux    | ✅ Full Support | Package manager or binary |
+| macOS    | ✅ CLI Only     | Binary download           |
+| Windows  | ✅ CLI Only     | Native binary (amd64)     |
 
 ### Kernel Verification
 
@@ -364,25 +364,18 @@ systemctl status joblet
 rnx --version
 ```
 
-### Method 2: Manual Binary Installation
+### Method 2: RPM Installation (RHEL/CentOS/Fedora)
 
 ```bash
-# Create user and directories
-sudo useradd -r -s /bin/false -d /opt/joblet joblet
-sudo mkdir -p /opt/joblet/{bin,certs,logs}
-sudo mkdir -p /var/log/joblet
-
-# Download and install binaries
-wget https://github.com/ehsaniara/joblet/releases/latest/download/joblet-linux-amd64.tar.gz
-tar -xzf joblet-linux-amd64.tar.gz
-
-sudo mv joblet /opt/joblet/bin/
-sudo mv rnx /usr/local/bin/
-sudo chmod +x /opt/joblet/bin/joblet /usr/local/bin/rnx
-
-# Set ownership
-sudo chown -R joblet:joblet /opt/joblet
+# Download and install the latest release
+wget $(curl -s https://api.github.com/repos/ehsaniara/joblet/releases/latest | grep "browser_download_url.*\.rpm" | cut -d '"' -f 4)
+sudo rpm -i joblet-*.rpm
+sudo systemctl enable --now joblet
 ```
+
+Both package types install the latest `rnx` client on the host as part of the
+install (`JOBLET_SKIP_RNX_INSTALL=1` skips it). Client machines install rnx from
+[joblet-rnx releases](https://github.com/ehsaniara/joblet-rnx/releases/latest).
 
 ### Method 3: Build from Source
 
@@ -390,14 +383,12 @@ sudo chown -R joblet:joblet /opt/joblet
 # Prerequisites
 sudo apt-get install -y golang-go protobuf-compiler make git
 
-# Clone and build
+# Clone, build the server binaries, fetch the rnx client, and install a .deb
+# built from the working tree (uses sudo)
 git clone https://github.com/ehsaniara/joblet.git
 cd joblet
-make build
-
-# Install binaries
-sudo cp bin/joblet /opt/joblet/bin/
-sudo cp bin/rnx /usr/local/bin/
+make all rnx
+make fresh-install
 ```
 
 ### Automated Deployment
