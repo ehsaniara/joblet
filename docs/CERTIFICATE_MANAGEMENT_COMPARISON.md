@@ -157,8 +157,8 @@ aws secretsmanager list-secrets --filters Key=name,Values=joblet/
 
 # Step 4: Launch new instances (auto-enable on EC2)
 
-# Step 5: Distribute new client config
-scp ec2-user@new-instance:/opt/joblet/config/rnx-config.yml ~/.rnx/
+# Step 5: Distribute the new per-role client configs
+ssh ec2-user@new-instance "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 ```
 
 **Downtime:** ~5 minutes (rolling restart)

@@ -147,9 +147,9 @@ case "$1" in
 
             # Set secure permissions on config files (they now contain private keys)
             chmod 600 ${JOBLET_HOME}/config/joblet-config.yml
-            # rnx-config.yml needs to be readable for client usage
-            # Users can copy to ~/.rnx/ for personal use or use directly
-            chmod 644 ${JOBLET_HOME}/config/rnx-config.yml
+            # rnx-config.yml embeds every role's private key, including admin;
+            # clients get the ~/.rnx copy below or a per-role rnx-config-<role>.yml
+            chmod 600 ${JOBLET_HOME}/config/rnx-config.yml
 
             # Set up ~/.rnx for the user who ran the install (sudo), so rnx
             # works out of the box for them
@@ -158,6 +158,7 @@ case "$1" in
                 if [ -n "$SUDO_USER_HOME" ] && [ -d "$SUDO_USER_HOME" ]; then
                     mkdir -p "$SUDO_USER_HOME/.rnx"
                     cp ${JOBLET_HOME}/config/rnx-config.yml "$SUDO_USER_HOME/.rnx/rnx-config.yml"
+                    chmod 600 "$SUDO_USER_HOME/.rnx/rnx-config.yml"
                     chown -R "$SUDO_USER:" "$SUDO_USER_HOME/.rnx"
                     echo "  Client config installed to $SUDO_USER_HOME/.rnx/rnx-config.yml"
                 fi

@@ -143,38 +143,32 @@ DNS.1 = joblet
 DNS.2 = localhost
 DNS.3 = joblet-server
 IP.1 = 127.0.0.1
-IP.2 = 0.0.0.0
 EOF
 
-# Add server address and additional names
 DNS_INDEX=4
-IP_INDEX=3
+IP_INDEX=2
 
-# Add primary server address
-if [[ "$SERVER_ADDRESS" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    if [ "$SERVER_ADDRESS" != "127.0.0.1" ] && [ "$SERVER_ADDRESS" != "0.0.0.0" ]; then
-        echo "IP.$IP_INDEX = $SERVER_ADDRESS" >> server-ext.cnf
+# Append a SAN entry unless the exact value is already listed
+add_san() {
+    local name="$1"
+    awk -F' = ' -v n="$name" '$2==n{found=1} END{exit !found}' server-ext.cnf && return 0
+    if [[ "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        [ "$name" = "0.0.0.0" ] && return 0
+        echo "IP.$IP_INDEX = $name" >> server-ext.cnf
         IP_INDEX=$((IP_INDEX + 1))
+    else
+        echo "DNS.$DNS_INDEX = $name" >> server-ext.cnf
+        DNS_INDEX=$((DNS_INDEX + 1))
     fi
-else
-    echo "DNS.$DNS_INDEX = $SERVER_ADDRESS" >> server-ext.cnf
-    DNS_INDEX=$((DNS_INDEX + 1))
-fi
+}
 
-# Add additional names
+add_san "$SERVER_ADDRESS"
+
 if [ -n "$ADDITIONAL_NAMES" ]; then
     IFS=',' read -ra NAMES <<< "$ADDITIONAL_NAMES"
     for name in "${NAMES[@]}"; do
         name=$(echo "$name" | xargs)
-        if [ -n "$name" ]; then
-            if [[ "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                echo "IP.$IP_INDEX = $name" >> server-ext.cnf
-                IP_INDEX=$((IP_INDEX + 1))
-            else
-                echo "DNS.$DNS_INDEX = $name" >> server-ext.cnf
-                DNS_INDEX=$((DNS_INDEX + 1))
-            fi
-        fi
+        [ -n "$name" ] && add_san "$name"
     done
 fi
 
@@ -188,13 +182,21 @@ print_success "Server certificate generated"
 # role: admin (full access), maintainer (provision infrastructure + run jobs),
 # developer (run jobs on existing infrastructure), reader (read-only).
 CLIENT_ROLES="admin maintainer developer reader"
+
+# Client certificates are restricted to client authentication only
+cat > client-ext.cnf << 'EOF'
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+EOF
+
 for ROLE in $CLIENT_ROLES; do
     print_info "Generating $ROLE client certificate..."
     openssl genrsa -out "$ROLE-client-key.pem" 2048
     openssl req -new -key "$ROLE-client-key.pem" -out "$ROLE-client.csr" \
         -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=$ROLE/CN=$ROLE-client"
     openssl x509 -req -days 365 -in "$ROLE-client.csr" -CA ca-cert.pem -CAkey ca-key.pem \
-        -CAcreateserial -out "$ROLE-client-cert.pem"
+        -CAcreateserial -out "$ROLE-client-cert.pem" -extfile client-ext.cnf
     print_success "$ROLE client certificate generated"
 done
 
@@ -319,14 +321,15 @@ print_info "Updating client configuration with embedded certificates..."
 CLIENT_CONFIG="$CONFIG_DIR/rnx-config.yml"
 
 # Create client configuration with embedded certificates.
-# "admin" is marked isDefault: true; one node per role is added so
-# clients can select a role with: rnx --node <role> ...
+# The combined config stays on the server host, so every role node connects
+# via loopback and keeps working when the host IP changes; the per-role
+# files below carry the network address for distribution to other machines.
 cat > "$CLIENT_CONFIG" << EOF
 version: "3.0"
 
 nodes:
   admin:
-    address: "$SERVER_ADDRESS:50051"
+    address: "127.0.0.1:50051"
     nodeId: "$NODE_ID"
     isDefault: true
     cert: |
@@ -342,7 +345,7 @@ for ROLE in $CLIENT_ROLES; do
     [ "$ROLE" = "admin" ] && continue
     cat >> "$CLIENT_CONFIG" << EOF
   $ROLE:
-    address: "$SERVER_ADDRESS:50051"
+    address: "127.0.0.1:50051"
     nodeId: "$NODE_ID"
     cert: |
 $(read_cert_for_yaml "$ROLE-client-cert.pem" "      ")
@@ -426,7 +429,7 @@ echo
 
 print_info "🚀 Usage:"
 echo "  Server: systemctl start joblet  # Uses embedded certs from joblet-config.yml"
-echo "  CLI: rnx --config=$CLIENT_CONFIG list  # Uses embedded certs"
+echo "  CLI: rnx --config=$CLIENT_CONFIG job list  # Uses embedded certs"
 echo
 
 print_info "🔧 To regenerate certificates:"

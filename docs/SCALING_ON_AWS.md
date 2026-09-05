@@ -121,9 +121,9 @@ INSTANCE_IP=$(aws ec2 describe-instances \
   --query 'Reservations[0].Instances[0].PublicIpAddress' \
   --output text)
 
-scp ec2-user@$INSTANCE_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/
+ssh ec2-user@$INSTANCE_IP "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 
-# This config works with ALL instances!
+# The certificates work with ALL instances (shared CA)
 ```
 
 ## Architecture
@@ -269,8 +269,8 @@ sudo USE_SECRETS_MANAGER=true FORCE_REGENERATE=true \
 aws autoscaling start-instance-refresh \
   --auto-scaling-group-name joblet-asg
 
-# Step 3: Download new client config
-scp ec2-user@<instance-ip>:/opt/joblet/config/rnx-config.yml ~/.rnx/
+# Step 3: Download the new client config for your role
+ssh ec2-user@<instance-ip> "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 
 # Step 4: Distribute to all clients
 ```

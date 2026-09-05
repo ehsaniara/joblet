@@ -166,9 +166,9 @@ After the instance is running (wait ~5 minutes for installation):
 # Get the public IP from EC2 Console
 PUBLIC_IP="x.x.x.x"  # Replace with actual IP
 
-# Download client config
+# Download your role's client config (config files are root-only)
 mkdir -p ~/.rnx
-scp -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP}:/opt/joblet/config/rnx-config.yml ~/.rnx/
+ssh -i ~/.ssh/your-key.pem ubuntu@${PUBLIC_IP} "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 ```
 
 ### 2. Test Connection

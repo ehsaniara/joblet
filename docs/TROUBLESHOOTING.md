@@ -167,7 +167,7 @@ sudo journalctl -u joblet -n 50
 ping joblet-server
 
 # 2. Use IP address instead
-rnx --config=<(sed 's/joblet-server/192.168.1.100/' ~/.rnx/rnx-config.yml) list
+rnx --config=<(sed 's/joblet-server/192.168.1.100/' ~/.rnx/rnx-config.yml) job list
 
 # 3. Add to /etc/hosts
 echo "192.168.1.100 joblet-server" | sudo tee -a /etc/hosts
@@ -511,8 +511,8 @@ ls -la ~/.rnx/rnx-config.yml
 # 2. Regenerate certificates
 sudo /usr/local/bin/certs_gen_embedded.sh
 
-# 3. Copy new client config
-scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+# 3. Copy the new client config for your role (files are root-only)
+scp root@server:/opt/joblet/config/rnx-config-<role>.yml ~/.rnx/rnx-config.yml
 
 # 4. Verify certificate chain
 openssl verify -CAfile ca-cert.pem client-cert.pem
@@ -569,9 +569,9 @@ openssl x509 -in server-cert.pem -noout -dates
 # Renew certificates before expiration
 sudo /usr/local/bin/certs_gen_embedded.sh
 
-# Update all clients with new certificates
+# Update all clients with their role's new config
 for client in client1 client2 client3; do
-  scp /opt/joblet/config/rnx-config.yml $client:~/.rnx/
+  scp /opt/joblet/config/rnx-config-developer.yml $client:~/.rnx/rnx-config.yml
 done
 ```
 

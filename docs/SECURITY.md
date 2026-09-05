@@ -120,8 +120,8 @@ sudo /usr/local/bin/certs_gen_embedded.sh
 # 2. Update server configuration
 sudo systemctl restart joblet
 
-# 3. Distribute new client certificates
-scp /opt/joblet/config/rnx-config.yml client:~/.rnx/
+# 3. Distribute new per-role client configs (never the combined file)
+scp /opt/joblet/config/rnx-config-<role>.yml client:~/.rnx/rnx-config.yml
 
 # 4. Verify new certificates
 rnx job list  # Should work with new certs

@@ -17,6 +17,19 @@ import (
 	"github.com/ehsaniara/joblet/pkg/logger"
 )
 
+// waitFor polls cond until it holds or timeout passes; async flush timing
+// varies under load, so tests wait on outcomes instead of fixed sleeps
+func waitFor(timeout time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return cond()
+}
+
 func TestNewServer(t *testing.T) {
 	cfg := &config.IPCConfig{
 		Socket:         "/tmp/test.sock",
@@ -145,11 +158,8 @@ func TestServerReceiveLogMessage(t *testing.T) {
 		t.Fatalf("Failed to write message: %v", err)
 	}
 
-	// Wait for message to be processed
-	time.Sleep(200 * time.Millisecond)
-
 	// Verify backend was called
-	if backend.WriteLogsCallCount() == 0 {
+	if !waitFor(5*time.Second, func() bool { return backend.WriteLogsCallCount() > 0 }) {
 		t.Error("Expected WriteLogs to be called on backend")
 	}
 
@@ -235,10 +245,8 @@ func TestServerReceiveMetricMessage(t *testing.T) {
 		t.Fatalf("Failed to write message: %v", err)
 	}
 
-	time.Sleep(200 * time.Millisecond)
-
 	// Verify backend was called
-	if backend.WriteMetricsCallCount() == 0 {
+	if !waitFor(5*time.Second, func() bool { return backend.WriteMetricsCallCount() > 0 }) {
 		t.Error("Expected WriteMetrics to be called on backend")
 	}
 
@@ -358,23 +366,24 @@ func TestServerBatchProcessing(t *testing.T) {
 		conn.Write(msgData)
 	}
 
-	// Wait for batch processing
-	time.Sleep(500 * time.Millisecond)
+	// The 10 logs may arrive across several flushes; wait on the total
+	countLogs := func() int {
+		total := 0
+		for i := 0; i < backend.WriteLogsCallCount(); i++ {
+			_, logs := backend.WriteLogsArgsForCall(i)
+			total += len(logs)
+		}
+		return total
+	}
+	waitFor(5*time.Second, func() bool { return countLogs() == 10 })
 
 	// Verify batching occurred (should be fewer calls than messages due to batching)
-	callCount := backend.WriteLogsCallCount()
-	if callCount == 0 {
+	if backend.WriteLogsCallCount() == 0 {
 		t.Error("Expected at least one batch write")
 	}
 
 	// Verify all logs were written
-	totalLogs := 0
-	for i := 0; i < callCount; i++ {
-		_, logs := backend.WriteLogsArgsForCall(i)
-		totalLogs += len(logs)
-	}
-
-	if totalLogs != 10 {
+	if totalLogs := countLogs(); totalLogs != 10 {
 		t.Errorf("Expected 10 total logs, got %d", totalLogs)
 	}
 }
