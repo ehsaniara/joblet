@@ -91,9 +91,9 @@ machines use one of the options below (see the joblet-rnx README for all).
 brew tap ehsaniara/rnx https://github.com/ehsaniara/joblet-rnx
 brew install rnx
 
-# Copy configuration from server
+# Copy your role's configuration from the server (files are root-only)
 mkdir -p ~/.rnx
-scp user@joblet-server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+ssh user@joblet-server "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 ```
 
 #### Windows

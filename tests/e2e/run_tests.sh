@@ -80,34 +80,6 @@ fresh_install() {
     cd "$SCRIPT_DIR"
 }
 
-# Quick iteration mode (QUICK_DEPLOY=1): swap binaries onto the existing
-# install instead of the full purge + packaged install
-build_and_deploy() {
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}  Build and Deployment (quick mode)${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-
-    cd "$JOBLET_ROOT"
-
-    echo -e "${BLUE}Building joblet binaries and resolving rnx...${NC}"
-    if ! make all rnx >/dev/null 2>&1; then
-        echo -e "${RED}Build failed!${NC}"
-        exit 1
-    fi
-
-    echo -e "${BLUE}Deploying to joblet service...${NC}"
-    if ! make deploy; then
-        echo -e "${RED}Deployment failed!${NC}"
-        exit 1
-    fi
-
-    echo -e "${GREEN}✓ Build and deployment successful${NC}"
-    echo -e "${BLUE}Waiting for service to stabilize...${NC}"
-    sleep 5
-    echo -e "${GREEN}✓ Service ready${NC}\n"
-    cd "$SCRIPT_DIR"
-}
-
 # ============================================
 # Test Discovery and Execution
 # ============================================
@@ -162,22 +134,29 @@ run_all_tests() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}Found $total_tests test suites to run${NC}\n"
     
+    # Fail fast: stop at the first failing suite instead of running the rest
     for test_file in "${TESTS_TO_RUN[@]}"; do
         if run_single_test "$test_file"; then
             ((passed_suites++))
         else
             ((failed_suites++))
+            echo -e "\n${RED}✗ Fail fast: stopping after failure in $(basename "$test_file" .sh)${NC}"
+            break
         fi
     done
-    
+    skipped_suites=$((total_tests - passed_suites - failed_suites))
+
     # Final summary
     echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Overall Test Summary${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    echo -e "Test Suites Run:    $total_tests"
+
+    echo -e "Test Suites Found:  $total_tests"
     echo -e "Suites Passed:      ${GREEN}$passed_suites${NC}"
     echo -e "Suites Failed:      ${RED}$failed_suites${NC}"
+    if [[ $skipped_suites -gt 0 ]]; then
+        echo -e "Suites Not Run:     ${YELLOW}$skipped_suites${NC} (stopped at first failure)"
+    fi
     
     if [[ $failed_suites -eq 0 ]]; then
         echo -e "\n${GREEN}🎉 ALL TEST SUITES PASSED!${NC}"
@@ -207,9 +186,12 @@ This script ALWAYS performs these steps for 100% confidence testing:
   4. Build a .deb from the working tree and install it (needs sudo)
   5. Run all E2E test suites against the clean packaged install
 
+Fail fast: the first failing test aborts its suite, and the first failing
+suite stops the whole run - remaining suites are not executed.
+
 This validates the same artifact a user would install. Modes:
-  QUICK_DEPLOY=1  swap binaries onto the existing install (fast iteration)
-  SKIP_DEPLOY=1   test the already-running service as-is
+  SKIP_DEPLOY=1   test the already-running service as-is (debugging only,
+                  never a substitute for the clean packaged install)
 
 OPTIONS:
     -h, --help          Show this help message
@@ -342,12 +324,10 @@ main() {
         exit 1
     fi
 
-    # Default: purge + packaged install. QUICK_DEPLOY=1 swaps binaries onto the
-    # existing install; SKIP_DEPLOY=1 tests the running service as-is
+    # Default: purge + packaged install. SKIP_DEPLOY=1 tests the running
+    # service as-is (debugging only)
     if [[ "${SKIP_DEPLOY:-}" == "1" ]]; then
         echo -e "${YELLOW}⊘ Skipping install (SKIP_DEPLOY=1) - testing the running service${NC}\n"
-    elif [[ "${QUICK_DEPLOY:-}" == "1" ]]; then
-        build_and_deploy
     else
         fresh_install
     fi

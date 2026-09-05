@@ -759,11 +759,13 @@ Both certificate scripts (`scripts/certs_gen_embedded.sh` and the AWS variant
 `scripts/certs_gen_with_secretsmanager.sh`) generate one client certificate per role and write two kinds of client
 config:
 
-- `rnx-config.yml`: the operator's copy, with one node per role; the `admin` node is marked `isDefault: true`. It
-  contains the admin key, so it stays on the server. On the server, select a role with `rnx --node <role> ...`.
-- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node marked `isDefault: true`. Hand each
-  party the
-  file for its role and nothing else; a developer holding `rnx-config-developer.yml` never sees the admin key.
+- `rnx-config.yml`: the operator's copy, with one node per role; the `admin` node is marked `isDefault: true`. Every
+  node connects via `127.0.0.1`, so same-host rnx keeps working when the host IP changes. It contains the admin key,
+  so it stays on the server. On the server, select a role with `rnx --node <role> ...`.
+- `rnx-config-<role>.yml`: one self-contained file per role, with that role's node marked `isDefault: true` and the
+  server's network address. Hand each
+  party the file for its role and nothing else; a developer holding `rnx-config-developer.yml` never sees the admin
+  key.
 
 The AWS variant additionally stores each role's certificate pair in Secrets Manager
 (`joblet/client-cert-<role>` and `joblet/client-key-<role>`; the unsuffixed `joblet/client-cert` and

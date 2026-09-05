@@ -98,8 +98,8 @@ workstation:
 # Create config directory
 mkdir -p ~/.rnx
 
-# Copy the client configuration from server
-scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+# Copy your role's client configuration from the server (files are root-only)
+ssh server "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 ```
 
 ### Step 2: Validate Client Connectivity

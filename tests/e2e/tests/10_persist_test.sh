@@ -78,20 +78,21 @@ test_log_persistence() {
 
     echo "  Job ID: $job_id"
 
-    # Wait for job to complete
-    sleep 3
+    # Logs become queryable once persist flushes; poll instead of one fixed sleep
+    local logs=""
+    local i
+    for i in $(seq 1 30); do
+        logs=$($RNX_BINARY job log "$job_id" 2>&1)
+        if echo "$logs" | grep -q "Test log persistence"; then
+            echo "  ✓ Logs persisted successfully (after ${i}s)"
+            return 0
+        fi
+        sleep 1
+    done
 
-    # Check if logs are accessible
-    local logs=$($RNX_BINARY job log "$job_id" 2>&1)
-
-    if echo "$logs" | grep -q "Test log persistence"; then
-        echo "  ✓ Logs persisted successfully"
-        return 0
-    else
-        echo "  ✗ Logs not found"
-        echo "  Log output: $logs"
-        return 1
-    fi
+    echo "  ✗ Logs not found after 30s"
+    echo "  Log output: $logs"
+    return 1
 }
 
 test_metric_persistence() {

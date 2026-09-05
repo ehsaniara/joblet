@@ -544,7 +544,7 @@ log "  Check status: systemctl status joblet"
 log "  View logs: journalctl -u joblet -f"
 log ""
 log "Client Configuration:"
-log "  Copy config: scp root@$PUBLIC_IP:/opt/joblet/config/rnx-config.yml ~/.rnx/"
+log "  Copy config: scp root@$PUBLIC_IP:/opt/joblet/config/rnx-config-<role>.yml ~/.rnx/rnx-config.yml"
 log "  Test connection: rnx --version"
 
 # Start Joblet service
@@ -602,9 +602,9 @@ sudo systemctl status joblet
 # View Joblet logs
 sudo journalctl -u joblet -f
 
-# Configure RNX client
+# Configure RNX client with your role's config (config files are root-only)
 mkdir -p ~/.rnx
-scp -i ~/.ssh/your-key.pem ubuntu@$(terraform output -raw joblet_server_public_ip):/opt/joblet/config/rnx-config.yml ~/.rnx/
+ssh -i ~/.ssh/your-key.pem ubuntu@$(terraform output -raw joblet_server_public_ip) "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 
 # Test connection
 rnx --version
@@ -934,8 +934,8 @@ ls -la /opt/joblet/run/persist.sock
 ### Client Connectivity Test
 
 ```bash
-# Copy client config from server
-scp server:/opt/joblet/config/rnx-config.yml ~/.rnx/
+# Copy your role's client config from the server (files are root-only)
+ssh server "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 
 # Test connection
 rnx job list

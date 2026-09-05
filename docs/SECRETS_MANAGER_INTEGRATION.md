@@ -216,13 +216,14 @@ No additional steps needed - just use the same user data script!
 
 ### Step 5: Distribute Client Config
 
-Download the client config from **any** instance:
+Download your role's client config from **any** instance (config files are root-only):
 
 ```bash
 # From instance 1
-scp ec2-user@instance1:/opt/joblet/config/rnx-config.yml ~/.rnx/
+ssh ec2-user@instance1 "sudo cat /opt/joblet/config/rnx-config-<role>.yml" > ~/.rnx/rnx-config.yml
 
-# This config works with ALL instances!
+# The certificates work with ALL instances (shared CA); point the
+# address at whichever instance you want to reach
 rnx job list  # uses the node marked isDefault: true
 ```
 

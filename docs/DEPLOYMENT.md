@@ -576,8 +576,8 @@ sudo /usr/local/bin/certs_gen_embedded.sh
 # Certificate structure created:
 # /opt/joblet/config/
 # ├── joblet-config.yml           # Server config with embedded certificates
-# └── rnx-config.yml             # Client config with one node per role plus
-#                                 # "default" (admin certificate)
+# └── rnx-config.yml             # Server-host client config: one node per role,
+#                                 # all connecting via 127.0.0.1 (admin default)
 ```
 
 The certificate OU decides what each client may do: `admin` can do everything, `maintainer` adds runtime builds and
@@ -878,8 +878,8 @@ sudo journalctl -u joblet.service --since "1 hour ago" -f
 # Verify embedded certificates in config
 grep -A 5 "BEGIN CERTIFICATE" /opt/joblet/config/joblet-config.yml
 
-# Test TLS connection
-rnx --config=/opt/joblet/config/rnx-config.yml list
+# Test TLS connection (the config is root-only, it embeds private keys)
+sudo rnx --config=/opt/joblet/config/rnx-config.yml job list
 
 # Regenerate certificates if needed
 sudo /usr/local/bin/certs_gen_embedded.sh

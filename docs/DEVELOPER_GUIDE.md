@@ -341,17 +341,15 @@ End-to-end tests validate complete workflows against a running joblet instance.
 The default flow is a clean-room validation: remove previous build artifacts,
 purge any existing joblet/rnx install, build and install a .deb from the
 working tree, then run every suite against that packaged install (needs
-sudo, run in a real terminal).
+sudo, run in a real terminal). Runs fail fast: the first failing test aborts
+its suite and stops the whole run.
 
 ```bash
 # Full clean install + all e2e tests (default)
 cd tests/e2e
 ./run_tests.sh
 
-# Fast iteration: swap binaries onto the existing install instead
-QUICK_DEPLOY=1 ./run_tests.sh
-
-# Test whatever is already running (no build, no install)
+# Debugging only: test whatever is already running (no build, no install)
 SKIP_DEPLOY=1 ./run_tests.sh
 
 # Run specific test against the running service

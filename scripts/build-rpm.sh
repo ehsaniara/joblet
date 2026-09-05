@@ -273,8 +273,9 @@ echo ""
 if generate_and_embed_certificates; then
     # Set secure permissions on config files
     chmod 600 /opt/joblet/config/joblet-config.yml 2>/dev/null || true
-    # rnx-config.yml needs to be readable for client usage
-    chmod 644 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
+    # rnx-config.yml embeds every role's private key, including admin;
+    # clients get the ~/.rnx copy below or a per-role rnx-config-<role>.yml
+    chmod 600 /opt/joblet/config/rnx-config.yml 2>/dev/null || true
 
     # Set up ~/.rnx for the user who ran the install (sudo), so rnx
     # works out of the box for them
@@ -283,6 +284,7 @@ if generate_and_embed_certificates; then
         if [ -n "$SUDO_USER_HOME" ] && [ -d "$SUDO_USER_HOME" ]; then
             mkdir -p "$SUDO_USER_HOME/.rnx"
             cp /opt/joblet/config/rnx-config.yml "$SUDO_USER_HOME/.rnx/rnx-config.yml"
+            chmod 600 "$SUDO_USER_HOME/.rnx/rnx-config.yml"
             chown -R "$SUDO_USER:" "$SUDO_USER_HOME/.rnx"
             echo "  Client config installed to $SUDO_USER_HOME/.rnx/rnx-config.yml"
         fi

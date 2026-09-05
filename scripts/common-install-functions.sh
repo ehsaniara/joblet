@@ -666,15 +666,8 @@ generate_and_embed_certificates() {
                 print_success "Updated server configuration: bind $JOBLET_BIND_ADDRESS:$JOBLET_SERVER_PORT"
             fi
 
-            # Update client configuration files with all valid connection endpoints
-            if [ -f ${JOBLET_HOME}/config/rnx-config.yml ]; then
-                # For each node in the client config, we need to update the address
-                # The address in rnx-config.yml should be how clients connect, not the bind address
-                # Use the certificate primary address as it's what clients should connect to
-                sed -i "s/address: \"[^:]*:50051\"/address: \"$JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT\"/" ${JOBLET_HOME}/config/rnx-config.yml
-                print_success "Updated client configuration with connection endpoint: $JOBLET_CERT_PRIMARY:$JOBLET_SERVER_PORT"
-            fi
-
+            # The combined rnx-config.yml connects via loopback (it stays on
+            # the server); per-role configs carry the network address
             return 0
         else
             print_error "Certificate generation failed"
@@ -788,7 +781,7 @@ display_quickstart_info() {
         echo "    https://github.com/ehsaniara/joblet-rnx/releases/latest"
         echo "  Then for same-host admin use:"
     fi
-    echo "    mkdir -p ~/.rnx && cp ${JOBLET_HOME}/config/rnx-config-admin.yml ~/.rnx/rnx-config.yml"
+    echo "    mkdir -p ~/.rnx && sudo install -m 600 -o \$(id -un) ${JOBLET_HOME}/config/rnx-config.yml ~/.rnx/rnx-config.yml"
     echo "    rnx job list                 # Test local connection"
     if [ "$EC2_CLOUDWATCH_CONFIGURED" = "true" ]; then
         echo "    rnx job run echo 'Hello CloudWatch'  # Test job with CloudWatch logging"
@@ -810,8 +803,8 @@ display_quickstart_info() {
     fi
     echo ""
     print_info "📋 Client Configuration:"
-    echo "  Copy ${JOBLET_HOME}/config/rnx-config.yml to client machines"
-    echo "  Or use: scp root@$JOBLET_CERT_PRIMARY:${JOBLET_HOME}/config/rnx-config.yml ~/.rnx/"
+    echo "  Give each client machine the config for its role only:"
+    echo "    scp root@$JOBLET_CERT_PRIMARY:${JOBLET_HOME}/config/rnx-config-<role>.yml ~/.rnx/rnx-config.yml"
     echo ""
 
     # Display AWS-specific information

@@ -80,7 +80,9 @@ run_test() {
     else
         ((FAILED_TESTS++))
         echo -e "${RED}  ✗ FAIL${NC}: $test_name"
-        return 1
+        # Fail fast: one failure is enough, stop the suite immediately
+        echo -e "${RED}  Aborting suite after first failure (${PASSED_TESTS} passed before it)${NC}"
+        exit 1
     fi
 }
 
