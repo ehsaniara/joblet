@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -115,22 +113,6 @@ type LoggingConfig struct {
 type MonitoringConfig struct {
 	SystemInterval time.Duration `yaml:"system_interval" json:"system_interval"`
 	CloudDetection bool          `yaml:"cloud_detection" json:"cloud_detection"`
-}
-
-// ClientConfig represents the client-side configuration with multiple nodes
-type ClientConfig struct {
-	Version string           `yaml:"version"`
-	Nodes   map[string]*Node `yaml:"nodes"`
-}
-
-// Node represents a single server configuration with embedded certificates
-type Node struct {
-	Address   string `yaml:"address"`
-	NodeId    string `yaml:"nodeId,omitempty"`    // Unique identifier of the Joblet node (optional, for display purposes)
-	IsDefault *bool  `yaml:"isDefault,omitempty"` // Marks this node as the one used when --node is not specified
-	Cert      string `yaml:"cert"`                // Embedded PEM certificate
-	Key       string `yaml:"key"`                 // Embedded PEM private key
-	CA        string `yaml:"ca"`                  // Embedded PEM CA certificate
 }
 
 // BuffersConfig holds buffer and pub-sub configuration
@@ -432,43 +414,6 @@ func (c *Config) GetServerTLSConfig() (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// GetClientTLSConfig creates a client-side TLS configuration from node certificates.
-// Parses the PEM-encoded client certificate, private key, and CA certificate
-// from the node configuration to create a TLS config that:
-//   - Presents client certificate for mTLS authentication
-//   - Validates server certificate against the configured CA
-//   - Uses TLS 1.3 minimum version for security
-//   - Sets server name to "joblet" for certificate validation
-//
-// Returns configured tls.Config or error if certificate parsing fails.
-func (n *Node) GetClientTLSConfig() (*tls.Config, error) {
-	if n.Cert == "" || n.Key == "" || n.CA == "" {
-		return nil, fmt.Errorf("client certificates are not configured for node")
-	}
-
-	// Load client certificate and key from embedded PEM
-	clientCert, err := tls.X509KeyPair([]byte(n.Cert), []byte(n.Key))
-	if err != nil {
-		return nil, fmt.Errorf("failed to load client certificate: %w", err)
-	}
-
-	// Load CA certificate from embedded PEM
-	caCertPool := x509.NewCertPool()
-	if ok := caCertPool.AppendCertsFromPEM([]byte(n.CA)); !ok {
-		return nil, fmt.Errorf("failed to parse CA certificate")
-	}
-
-	// Create TLS configuration
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      caCertPool,
-		MinVersion:   tls.VersionTLS13,
-		ServerName:   "joblet", // Must match server certificate
-	}
-
-	return tlsConfig, nil
-}
-
 // LoadConfig loads the main server configuration from file and environment variables.
 //  1. Path specified in JOBLET_CONFIG_PATH environment variable
 //  2. /opt/joblet/config/joblet-config.yml
@@ -736,154 +681,4 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
-}
-
-// LoadClientConfig loads RNX client configuration from the specified file.
-//
-//  1. Path from RNX_CONFIG environment variable
-//
-//  2. ./rnx-config.yml
-//
-//  3. ./config/rnx-config.yml
-//
-//  4. ~/.rnx/rnx-config.yml
-//
-//  5. /etc/joblet/rnx-config.yml
-//
-//  6. /opt/joblet/config/rnx-config.yml
-//
-//  6. /opt/joblet/config/rnx-config.yml
-//
-// Parses YAML configuration and validates that at least one node is configured.
-// Returns ClientConfig with node definitions for connecting to Joblet servers.
-func LoadClientConfig(configPath string) (*ClientConfig, error) {
-	if configPath == "" {
-		// Look for rnx-config.yml in common locations
-		configPath = findClientConfig()
-		if configPath == "" {
-			return nil, fmt.Errorf("client configuration file not found. Please create rnx-config.yml or specify path with --config")
-		}
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("client configuration file not found: %s", configPath)
-	}
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read client config file %s: %w", configPath, err)
-	}
-
-	var config ClientConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse client config: %w", err)
-	}
-
-	// Validate that we have nodes
-	if len(config.Nodes) == 0 {
-		return nil, fmt.Errorf("no nodes configured in %s", configPath)
-	}
-
-	// Validate that at most one node is marked as default
-	var defaults []string
-	for name, node := range config.Nodes {
-		if node.IsDefault != nil && *node.IsDefault {
-			defaults = append(defaults, name)
-		}
-	}
-	if len(defaults) > 1 {
-		sort.Strings(defaults)
-		return nil, fmt.Errorf("multiple nodes marked with isDefault: true in %s: %s (only one node can be the default)",
-			configPath, strings.Join(defaults, ", "))
-	}
-
-	return &config, nil
-}
-
-// DefaultNodeName returns the name of the node used when no --node is specified.
-// Resolution order: the node marked isDefault: true, then a node literally named
-// "default" (legacy configs), then the only node if exactly one is configured.
-// Returns empty string if no default can be determined. Assumes at most one node
-// is marked isDefault (enforced by LoadClientConfig).
-func (c *ClientConfig) DefaultNodeName() string {
-	for name, node := range c.Nodes {
-		if node.IsDefault != nil && *node.IsDefault {
-			return name
-		}
-	}
-	if _, exists := c.Nodes["default"]; exists {
-		return "default"
-	}
-	if len(c.Nodes) == 1 {
-		for name := range c.Nodes {
-			return name
-		}
-	}
-	return ""
-}
-
-// GetNode retrieves the configuration for a named Joblet server node.
-// If nodeName is empty, resolves the default node via DefaultNodeName.
-// Returns the Node configuration containing server address and certificates,
-// or error if the specified node name is not found in the configuration.
-// Used by RNX client to select which Joblet server to connect to.
-func (c *ClientConfig) GetNode(nodeName string) (*Node, error) {
-	if nodeName == "" {
-		nodeName = c.DefaultNodeName()
-		if nodeName == "" {
-			return nil, fmt.Errorf("no default node configured: mark one node with isDefault: true or use --node to select one of: %s",
-				strings.Join(c.ListNodes(), ", "))
-		}
-	}
-
-	node, exists := c.Nodes[nodeName]
-	if !exists {
-		return nil, fmt.Errorf("node '%s' not found in configuration", nodeName)
-	}
-
-	return node, nil
-}
-
-// ListNodes returns a slice of all configured node names.
-// Provides a list of available Joblet servers that the client can connect to.
-// Used by RNX client for node discovery and selection.
-// Returns empty slice if no nodes are configured.
-func (c *ClientConfig) ListNodes() []string {
-	nodes := make([]string, 0, len(c.Nodes))
-	for name := range c.Nodes {
-		nodes = append(nodes, name)
-	}
-	sort.Strings(nodes)
-	return nodes
-}
-
-// findClientConfig searches for RNX client configuration file in standard locations.
-// First checks RNX_CONFIG environment variable, then searches common paths.
-// Returns the path of the first found configuration file.
-// Returns empty string if no configuration file is found.
-// Used internally by LoadClientConfig when no specific path is provided.
-func findClientConfig() string {
-	// First check RNX_CONFIG environment variable
-	if envPath := os.Getenv("RNX_CONFIG"); envPath != "" {
-		if _, err := os.Stat(envPath); err == nil {
-			return envPath
-		}
-	}
-
-	locations := []string{
-		"./rnx-config.yml",
-		"./config/rnx-config.yml",
-		filepath.Join(os.Getenv("HOME"), ".rnx", "rnx-config.yml"),
-		"/etc/joblet/rnx-config.yml",
-		"/opt/joblet/config/rnx-config.yml",
-	}
-
-	for _, path := range locations {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	return ""
 }
