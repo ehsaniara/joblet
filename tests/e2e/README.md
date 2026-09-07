@@ -141,13 +141,13 @@ validate_config          # Manual validation
 |--------------------|------------------------------------------------------|
 | Connection refused | Check `RNX_HOST` and `RNX_CONFIG` settings           |
 | Network conflicts  | Use `TEST_NETWORK_CIDR_BASE=10.150`                  |
-| Runtime not found  | Check `./bin/rnx runtime list`, set `TEST_RUNTIME`   |
+| Runtime not found  | Check `rnx runtime list`, set `TEST_RUNTIME`         |
 | Permission denied  | Ensure user namespaces enabled, check sudo setup     |
 | Jobs hanging       | Check `journalctl -u joblet --since "5 minutes ago"` |
 
 ```bash
 # Debug commands
-./bin/rnx job list                           # Test connection
+rnx job list                                 # Test connection
 TEST_VERBOSE=true ./test_joblet_principles.sh  # Detailed output
 systemctl status joblet                  # Service status
 ```

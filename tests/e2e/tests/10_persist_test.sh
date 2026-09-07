@@ -333,7 +333,7 @@ fi
 echo -e "\n${BLUE}Completed: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
 
 if [[ $FAILED_TESTS -eq 0 ]]; then
-    echo -e "\n${GREEN}✅ ALL TESTS PASSED!${NC}"
+    echo -e "\n${GREEN}✅ PERSIST SUITE PASSED!${NC}"
     echo -e "${GREEN}Persist subprocess is working correctly.${NC}"
     exit 0
 else
