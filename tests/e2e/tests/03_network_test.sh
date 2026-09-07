@@ -929,6 +929,7 @@ test_custom_network_internet_access() {
 
 main() {
     # Initialize test suite with remote host info
+    export SUITE_NAME="Comprehensive Network Configuration Tests"
     echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Comprehensive Network Configuration Tests${NC}"
     echo -e "${CYAN}  Testing against: ${TEST_HOST}${NC}"

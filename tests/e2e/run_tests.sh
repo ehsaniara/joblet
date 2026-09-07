@@ -30,8 +30,8 @@ fresh_install() {
     echo -e "${BLUE}Removing previous build artifacts (bin/, dist/, packages)...${NC}"
     rm -rf bin/ dist/ joblet-deb-*/ rpmbuild/ joblet_*.deb joblet-*.rpm
 
-    echo -e "${BLUE}Building joblet binaries and resolving rnx...${NC}"
-    if ! make all rnx >/dev/null 2>&1; then
+    echo -e "${BLUE}Building joblet binaries...${NC}"
+    if ! make all >/dev/null 2>&1; then
         echo -e "${RED}Build failed!${NC}"
         exit 1
     fi
@@ -51,6 +51,10 @@ fresh_install() {
         exit 1
     fi
     DEB=$(ls -t "$JOBLET_ROOT"/joblet_*_"$ARCH".deb | head -1)
+
+    # The binaries are in the .deb now; the run uses only installed artifacts
+    rm -rf "$JOBLET_ROOT/bin"
+    echo -e "${BLUE}Removed build binaries (packaged into $DEB)${NC}"
 
     echo -e "${BLUE}Installing: $DEB${NC}"
     if ! sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$DEB"; then
@@ -181,7 +185,7 @@ Run Joblet E2E tests with full build and deployment for 100% confidence.
 
 This script ALWAYS performs these steps for 100% confidence testing:
   1. Remove previous build artifacts (bin/, dist/, packages)
-  2. Build the Joblet codebase and resolve rnx (make all rnx)
+  2. Build the Joblet codebase (make all)
   3. Purge any existing joblet/rnx install (/opt/joblet, symlinks, configs)
   4. Build a .deb from the working tree and install it (needs sudo)
   5. Run all E2E test suites against the clean packaged install
@@ -208,7 +212,9 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
     JOBLET_ROOT         Path to joblet root directory
-    RNX_BINARY          Path to rnx binary
+    RNX_BINARY          Path to the rnx client (default: /usr/local/bin/rnx,
+                        the released client the package install provides; set
+                        this to test an unreleased rnx build against joblet)
     DEFAULT_RUNTIME     Default runtime to use (default: python-3.11-ml)
 
 EOF

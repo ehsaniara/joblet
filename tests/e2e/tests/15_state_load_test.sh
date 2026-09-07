@@ -261,7 +261,7 @@ if (( FAILED_TESTS > 0 )); then
     exit 1
 else
     echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}  ALL TESTS PASSED ✓${NC}"
+    echo -e "${GREEN}  STATE LOAD SUITE PASSED ✓${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
     exit 0
 fi

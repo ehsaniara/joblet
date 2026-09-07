@@ -96,7 +96,10 @@ joblet/ (repo root)
 
 The `rnx` CLI client lives in its own repository,
 [joblet-rnx](https://github.com/ehsaniara/joblet-rnx); `make rnx` resolves a
-binary into `bin/rnx` via `scripts/get-rnx.sh` for deploy/e2e use.
+binary into `bin/rnx` via `scripts/get-rnx.sh` for the `make deploy` dev flow.
+The e2e suite instead uses `/usr/local/bin/rnx`, the released client its own
+package install provides (override with `RNX_BINARY` to test an unreleased
+rnx build).
 
 **Dependencies:**
 

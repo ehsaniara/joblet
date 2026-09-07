@@ -19,7 +19,9 @@ export SKIPPED_TESTS=0
 
 # Paths for developer
 export JOBLET_ROOT="${JOBLET_ROOT:-/home/jay/joblet/joblet}"
-export RNX_BINARY="${RNX_BINARY:-$JOBLET_ROOT/bin/rnx}"
+# The client the installer provides; override RNX_BINARY to test an
+# unreleased rnx build against joblet
+export RNX_BINARY="${RNX_BINARY:-/usr/local/bin/rnx}"
 export TESTS_DIR="$JOBLET_ROOT/tests/e2e"
 
 # Runtime configuration
@@ -46,6 +48,7 @@ fi
 # Initialize test suite
 test_suite_init() {
     local suite_name="$1"
+    export SUITE_NAME="$suite_name"
     TOTAL_TESTS=0
     PASSED_TESTS=0
     FAILED_TESTS=0
@@ -298,10 +301,10 @@ test_suite_summary() {
     echo -e "\n${BLUE}Completed: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
     
     if [[ $FAILED_TESTS -eq 0 && $TOTAL_TESTS -gt 0 ]]; then
-        echo -e "\n${GREEN}✅ ALL TESTS PASSED!${NC}"
+        echo -e "\n${GREEN}✅ SUITE PASSED: ${SUITE_NAME:-this suite}${NC}"
         return 0
     elif [[ $FAILED_TESTS -gt 0 ]]; then
-        echo -e "\n${RED}❌ SOME TESTS FAILED${NC}"
+        echo -e "\n${RED}❌ SUITE FAILED: ${SUITE_NAME:-this suite}${NC}"
         return 1
     else
         echo -e "\n${YELLOW}⚠ NO TESTS EXECUTED${NC}"
