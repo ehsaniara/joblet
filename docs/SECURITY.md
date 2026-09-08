@@ -56,8 +56,10 @@ sudo /usr/local/bin/certs_gen_embedded.sh
 
 This creates:
 
-- **CA Certificate**: Root certificate authority
-- **Server Certificate**: For Joblet daemon
+- **CA Certificate**: Root certificate authority, the host's single trust anchor
+- **Server Certificate**: For the Joblet daemon
+- **joblet-flow Server Certificate**: For the flow engine on this host
+  (loopback-only SANs, no `joblet` SAN; inert when flow is not installed)
 - **Client Certificates**: One per role (admin, maintainer, developer, reader)
 
 The script writes the operator's `rnx-config.yml` (all roles, admin key included, keep it on the server) and one

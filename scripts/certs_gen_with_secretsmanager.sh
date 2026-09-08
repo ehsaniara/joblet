@@ -650,6 +650,28 @@ openssl x509 -req -days 365 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem \
 
 print_success "Server certificate generated (instance-specific)"
 
+# joblet-flow server certificate: the ceremony provisions the host's whole
+# trust domain, so this is minted whether or not joblet-flow is installed.
+# Loopback-only SANs and no "joblet" SAN, so it cannot impersonate joblet.
+print_info "Generating joblet-flow server certificate..."
+cat > flow-ext.cnf << 'EOF'
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = joblet-flow
+DNS.2 = localhost
+IP.1 = 127.0.0.1
+EOF
+openssl genrsa -out flow-server-key.pem 2048
+openssl req -new -key flow-server-key.pem -out flow-server.csr \
+    -subj "/C=US/ST=CA/L=Los Angeles/O=Joblet/OU=Server/CN=joblet-flow-server"
+openssl x509 -req -days 365 -in flow-server.csr -CA ca-cert.pem -CAkey ca-key.pem \
+    -CAcreateserial -out flow-server-cert.pem -extfile flow-ext.cnf
+print_success "joblet-flow server certificate generated"
+
 # Note: Server certificates are NOT stored in Secrets Manager
 # Each instance has its own unique server certificate
 
@@ -775,6 +797,19 @@ EOF
     chmod 600 "$ROLE_CONFIG" 2>/dev/null || true
 done
 
+# Server credentials for the joblet-flow engine on this host (inert when
+# joblet-flow is not installed)
+FLOW_SERVER_CONFIG="$CONFIG_DIR/joblet-flow-server.yml"
+cat > "$FLOW_SERVER_CONFIG" << EOF
+serverCert: |
+$(read_cert_for_yaml flow-server-cert.pem "  ")
+serverKey: |
+$(read_cert_for_yaml flow-server-key.pem "  ")
+caCert: |
+$(read_cert_for_yaml ca-cert.pem "  ")
+EOF
+chmod 600 "$FLOW_SERVER_CONFIG" 2>/dev/null || true
+
 print_success "Client configurations created with embedded certificates"
 
 # Verify all certificates
@@ -785,6 +820,13 @@ if openssl verify -CAfile ca-cert.pem server-cert.pem > /dev/null 2>&1; then
     print_success "Server certificate verified"
 else
     print_error "Server certificate verification failed"
+    CERT_ERRORS=$((CERT_ERRORS + 1))
+fi
+
+if openssl verify -CAfile ca-cert.pem flow-server-cert.pem > /dev/null 2>&1; then
+    print_success "joblet-flow server certificate verified"
+else
+    print_error "joblet-flow server certificate verification failed"
     CERT_ERRORS=$((CERT_ERRORS + 1))
 fi
 
@@ -814,6 +856,7 @@ echo
 print_info "📋 Configuration files updated:"
 echo "  🖥️  Server Config: $SERVER_CONFIG"
 echo "  📱 Operator Client Config (all roles): $CLIENT_CONFIG"
+echo "  🖥️  joblet-flow Server Config: $FLOW_SERVER_CONFIG"
 for ROLE in $CLIENT_ROLES; do
     echo "  📱 $ROLE Client Config: $CONFIG_DIR/rnx-config-$ROLE.yml"
 done
