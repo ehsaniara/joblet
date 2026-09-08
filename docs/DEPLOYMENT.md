@@ -576,8 +576,10 @@ sudo /usr/local/bin/certs_gen_embedded.sh
 # Certificate structure created:
 # /opt/joblet/config/
 # ├── joblet-config.yml           # Server config with embedded certificates
-# └── rnx-config.yml             # Server-host client config: one node per role,
+# ├── rnx-config.yml             # Server-host client config: one node per role,
 #                                 # all connecting via 127.0.0.1 (admin default)
+# └── joblet-flow-server.yml     # Server credentials for the joblet-flow engine
+#                                 # on this host (inert when flow is not installed)
 ```
 
 The certificate OU decides what each client may do: `admin` can do everything, `maintainer` adds runtime builds and

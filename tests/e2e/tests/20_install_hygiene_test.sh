@@ -45,7 +45,8 @@ test_server_configs_root_only() {
     local file mode_owner
     for file in joblet-config.yml rnx-config.yml \
         rnx-config-admin.yml rnx-config-maintainer.yml \
-        rnx-config-developer.yml rnx-config-reader.yml; do
+        rnx-config-developer.yml rnx-config-reader.yml \
+        joblet-flow-server.yml; do
         mode_owner=$(file_mode_owner "$CONFIG_DIR/$file")
         if [[ "$mode_owner" != "600 root" ]]; then
             echo "    ✗ $file is '$mode_owner', expected '600 root'"
